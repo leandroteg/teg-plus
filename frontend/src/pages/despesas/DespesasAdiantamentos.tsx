@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -75,6 +75,37 @@ export default function DespesasAdiantamentos() {
   const criar = useCriarSolicitacaoAdiantamento()
   const atualizarClasse = useAtualizarClasseAdiantamento()
   const adiantamentosIndisponiveis = isDespesaSchemaMissing(adiantamentosError)
+
+  // Resizable columns
+  const adTableRef = useRef<HTMLDivElement>(null)
+  const adColWidthsRef = useRef<number[]>([])
+  const AD_COLS_DEFAULT = '1fr 1.4fr 1fr 1fr 1fr 1fr 0.9fr'
+  const startAdColResize = useCallback((colIndex: number, startX: number) => {
+    const container = adTableRef.current
+    if (!container) return
+    const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-adh]'))
+    const startWidths = cells.length > 0
+      ? cells.map(el => el.getBoundingClientRect().width)
+      : adColWidthsRef.current.length > 0
+        ? [...adColWidthsRef.current]
+        : [160, 220, 160, 160, 120, 120]
+    adColWidthsRef.current = startWidths
+    const onMove = (e: MouseEvent) => {
+      const next = startWidths.map((w, i) => i === colIndex ? Math.max(60, w + (e.clientX - startX)) : w)
+      adColWidthsRef.current = next
+      container.style.setProperty('--ad-cols', next.map(w => `${w}px`).join(' '))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.removeProperty('cursor')
+      document.body.style.removeProperty('user-select')
+    }
+    document.body.style.setProperty('cursor', 'col-resize')
+    document.body.style.setProperty('user-select', 'none')
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
@@ -226,14 +257,46 @@ export default function DespesasAdiantamentos() {
         </div>
       </div>
 
-      <div className={`overflow-hidden rounded-3xl border ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
-        <div className={`grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 border-b px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${dark ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
-          <span>Número</span>
-          <span>Finalidade</span>
-          <span>Solicitante</span>
-          <span>Favorecido</span>
-          <span>Valor</span>
-          <span>Status</span>
+      <div
+        ref={adTableRef}
+        style={{ '--ad-cols': adColWidthsRef.current.length ? adColWidthsRef.current.map(w => `${w}px`).join(' ') : AD_COLS_DEFAULT } as Record<string, string>}
+        className={`overflow-x-auto rounded-3xl border ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-white'}`}
+      >
+        <div
+          className={`grid gap-4 border-b px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${dark ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'}`}
+          style={{ gridTemplateColumns: 'var(--ad-cols)' }}
+        >
+          <span className="relative" data-adh>Número
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(0, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span className="relative" data-adh>Finalidade
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(1, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span className="relative" data-adh>Solicitante
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(2, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span className="relative" data-adh>Gestor
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(3, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span className="relative" data-adh>Favorecido
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(4, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span className="relative" data-adh>Valor
+            <div className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10" onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startAdColResize(5, e.clientX) }}>
+              <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+            </div>
+          </span>
+          <span data-adh>Status</span>
         </div>
         <div className="divide-y divide-slate-100 dark:divide-white/5">
           {adiantamentos.length === 0 && (
@@ -251,7 +314,8 @@ export default function DespesasAdiantamentos() {
                   setDetalheClasseId(item.classe_financeira_id || '')
                   setDetalheErroCls('')
                 }}
-                className={`grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 px-5 py-4 text-sm cursor-pointer transition-colors ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                className={`grid gap-4 px-5 py-4 text-sm cursor-pointer transition-colors ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                style={{ gridTemplateColumns: 'var(--ad-cols)' }}
               >
                 <div>
                   <p className={`font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</p>
@@ -267,7 +331,9 @@ export default function DespesasAdiantamentos() {
                 </div>
                 <div>
                   <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.solicitante_nome || 'Usuário não identificado'}</p>
-                  <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.gestor_nome || 'Gestor não identificado'}</p>
+                </div>
+                <div>
+                  <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.gestor_nome || '—'}</p>
                 </div>
                 <div>
                   <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.favorecido_nome}</p>

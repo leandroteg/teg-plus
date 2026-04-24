@@ -77,35 +77,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
-      // 3b. Busca historico de esclarecimentos para requisicoes
-      const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
-      if (cmpIds.length > 0) {
-        const { data: escData } = await supabase
-          .from(TABLE_APR)
-          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
-          .in('entidade_id', cmpIds)
-          .eq('modulo', 'cmp')
-          .in('status', ['esclarecimento', 'pendente'])
-          .not('observacao', 'is', null)
-          .order('created_at', { ascending: true })
-
-        for (const e of escData ?? []) {
-          const obs = (e.observacao as string) ?? ''
-          const isResposta = obs.startsWith('Esclarecimento respondido')
-          // Filtra: so registros de esclarecimento ou respostas de esclarecimento
-          if (e.status !== 'esclarecimento' && !isResposta) continue
-
-          const hist = escHistMap.get(e.entidade_id as string) ?? []
-          hist.push({
-            tipo: e.status === 'esclarecimento' ? 'pedido' : 'resposta',
-            autor: (e.aprovador_nome as string) ?? '',
-            msg: obs,
-            data: (e.data_decisao as string) ?? (e.created_at as string) ?? '',
-          })
-          escHistMap.set(e.entidade_id as string, hist)
-        }
-      }
-
       // 4. Busca dados de contratos (minuta_contratual)
       const conIds = aprData
         .filter(a => a.tipo_aprovacao === 'minuta_contratual')
@@ -160,6 +131,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const finMap = new Map<string, Record<string, unknown>>()
       const loteMap = new Map<string, Record<string, unknown>>()
       const loteItensMap = new Map<string, Record<string, unknown>[]>()
+      const rcMap = new Map<string, Record<string, unknown>>()
+      const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
+      const docMap = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -217,7 +191,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             .filter(Boolean)
 
           // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
-          const rcMap = new Map<string, Record<string, unknown>>()
           if (reqIds.length > 0) {
             const { data: rcData } = await supabase
               .from('cmp_requisicoes')
@@ -227,7 +200,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           }
 
           // Map: pedido_id -> anexos[]
-          const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
           if (pedidoIds.length > 0) {
             const { data: anexosData } = await supabase
               .from('cmp_pedidos_anexos')
@@ -242,7 +214,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           }
 
           // Map: cp_id -> fin_documentos[]
-          const docMap = new Map<string, Record<string, unknown>[]>()
           if (cpIds.length > 0) {
             const { data: docsData } = await supabase
               .from('fin_documentos')
@@ -267,7 +238,34 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
-      // 5b. Busca dados de transporte (aprovacao_transporte)
+      // 5b. Busca historico de esclarecimentos (cmp + fin)
+      const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
+      const escIds = [...cmpIds, ...finIds]
+      if (escIds.length > 0) {
+        const { data: escData } = await supabase
+          .from(TABLE_APR)
+          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+          .in('entidade_id', escIds)
+          .not('observacao', 'is', null)
+          .order('created_at', { ascending: true })
+
+        for (const e of escData ?? []) {
+          const obs = (e.observacao as string) ?? ''
+          const isResposta = obs.startsWith('Esclarecimento respondido')
+          if (e.status !== 'esclarecimento' && !isResposta) continue
+
+          const hist = escHistMap.get(e.entidade_id as string) ?? []
+          hist.push({
+            tipo: e.status === 'esclarecimento' ? 'pedido' : 'resposta',
+            autor: (e.aprovador_nome as string) ?? '',
+            msg: obs,
+            data: (e.data_decisao as string) ?? (e.created_at as string) ?? '',
+          })
+          escHistMap.set(e.entidade_id as string, hist)
+        }
+      }
+
+      // 5c. Busca dados de transporte (aprovacao_transporte)
       const logIds = aprData
         .filter(a => a.tipo_aprovacao === 'aprovacao_transporte')
         .map(a => a.entidade_id)
@@ -533,7 +531,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter((a): a is AprovacaoPendente => a !== null)
     },
     refetchInterval: 15_000,
-    refetchOnMount: 'always',
     retry: 1,
     staleTime: 10_000,
   })
@@ -584,10 +581,19 @@ export function useHistoricoAprovacoes(filtros?: HistoricoFiltros) {
 
       const { data, error } = await query
       if (error) throw error
-      const rows = (data ?? []).map(d => ({
-        ...d,
-        tipo_aprovacao: d.tipo_aprovacao || 'requisicao_compra',
-      })) as AprovacaoHistorico[]
+      const rows = (data ?? [])
+        // Remove registros intermediarios do ciclo de esclarecimento:
+        // - status='esclarecimento' são pedidos (mostrados no thread, nao como card separado)
+        // - status='rejeitada' com observacao 'Esclarecimento respondido:...' são artefatos do reenvio
+        .filter(d => {
+          if (d.status === 'esclarecimento') return false
+          if (d.status === 'rejeitada' && d.observacao?.startsWith('Esclarecimento respondido')) return false
+          return true
+        })
+        .map(d => ({
+          ...d,
+          tipo_aprovacao: d.tipo_aprovacao || 'requisicao_compra',
+        })) as AprovacaoHistorico[]
 
       // Enriquecer com histórico de esclarecimentos por entidade
       const entidadeIds = Array.from(new Set(rows.map(r => r.entidade_id).filter(Boolean)))

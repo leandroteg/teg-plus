@@ -307,7 +307,14 @@ export function useEnviarLoteAprovacao() {
       // 2. CPs already have status 'em_lote' from useCriarLote — no change needed
       // (keeping lote_id reference intact)
 
-      // 3. Create apr_aprovacoes record for the batch
+      // 3. Cancela aprovacoes pendentes/esclarecimento anteriores do mesmo lote
+      await supabase
+        .from('apr_aprovacoes')
+        .update({ status: 'rejeitada', data_decisao: new Date().toISOString() })
+        .eq('entidade_id', loteId)
+        .in('status', ['pendente', 'esclarecimento'])
+
+      // 4. Create apr_aprovacoes record for the batch
       const nivel = lote.valor_total > 100000 ? 4 : lote.valor_total > 25000 ? 3 : lote.valor_total > 5000 ? 2 : 1
       const aprovadorNome = lote.valor_total > 25000 ? 'Laucidio' : 'Welton'
       const loteData = new Date().toLocaleDateString('pt-BR')

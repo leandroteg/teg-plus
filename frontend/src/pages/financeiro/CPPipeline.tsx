@@ -9,7 +9,7 @@ import {
   Plus, Save, Loader2, RefreshCw,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useRequisitanteCtx } from '../../components/ModuleLayout'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -44,7 +44,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
-import type { ContaPagar, Fornecedor, LotePagamento, StatusCP } from '../../types/financeiro'
+import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
@@ -2044,6 +2044,22 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   )
 }
 
+// ══ CpColResizeHandle ════════════════════════════════════════════
+
+function CpColResizeHandle({ colIndex, onStart }: {
+  colIndex: number
+  onStart: (colIndex: number, startX: number) => void
+}) {
+  return (
+    <div
+      className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10"
+      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onStart(colIndex, e.clientX) }}
+    >
+      <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+    </div>
+  )
+}
+
 // ══ CPRow (compact table row) ═══════════════════════════════════
 
 function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
@@ -2062,11 +2078,12 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   return (
     <div
       onClick={onClick}
-      className={`${CP_TABLE_GRID} px-3 py-2 border-b cursor-pointer transition-all ${
+      className={`grid items-center gap-x-3 px-3 py-2 border-b cursor-pointer transition-all ${
         isDark
           ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
           : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
       }`}
+      style={{ gridTemplateColumns: 'var(--cp-cols)' }}
     >
       <input
         type="checkbox"
@@ -2350,6 +2367,21 @@ function LoteItemsPanel({
   )
 }
 
+function LoteSemaforo({ status }: { status: StatusLote }) {
+  const cfg =
+    status === 'aprovado' || status === 'parcialmente_aprovado' || status === 'pago' || status === 'em_pagamento'
+      ? { color: 'bg-emerald-500', ring: 'ring-emerald-400/40', title: 'Aprovado' }
+      : status === 'cancelado'
+      ? { color: 'bg-rose-500', ring: 'ring-rose-400/40', title: 'Cancelado' }
+      : { color: 'bg-amber-400', ring: 'ring-amber-400/40', title: status === 'enviado_aprovacao' ? 'Em Aprovação' : 'Montando' }
+  return (
+    <span
+      title={cfg.title}
+      className={`inline-block w-2.5 h-2.5 rounded-full ring-2 ${cfg.color} ${cfg.ring} shrink-0`}
+    />
+  )
+}
+
 function LoteTableRow({
   summary,
   isDark,
@@ -2377,6 +2409,15 @@ function LoteTableRow({
 
   return (
     <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+      {summary.lote.status === 'montando' && summary.lote.observacao && (
+        <Link
+          to={`/financeiro/lotes/${summary.lote.id}`}
+          className={`mx-3 mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${isDark ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'}`}
+        >
+          <span className="mt-px shrink-0">⚠</span>
+          <span><strong>Esclarecimento solicitado:</strong> {summary.lote.observacao} — <span className="underline underline-offset-2">Clique para responder</span></span>
+        </Link>
+      )}
       <div
         className={`${LOTE_TABLE_GRID} px-3 py-3 transition-all ${isDark ? `hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}` : `hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`}`}
       >
@@ -2389,7 +2430,10 @@ function LoteTableRow({
         />
         <div className={`w-0.5 h-10 rounded-full ${isDark ? 'bg-emerald-400/60' : 'bg-emerald-500/70'}`} />
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
-          <p className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.headerLabel}</p>
+          <div className="flex items-center gap-1.5">
+            <LoteSemaforo status={summary.lote.status} />
+            <p className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.headerLabel}</p>
+          </div>
           <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
         </button>
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
@@ -2528,6 +2572,37 @@ export default function CPPipeline() {
   const [showCustomDate, setShowCustomDate] = useState(false)
   // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
+
+  // Resizable columns
+  const cpTableRef = useRef<HTMLDivElement>(null)
+  const cpColWidthsRef = useRef<number[]>([])
+  const CP_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 70px 110px 72px 96px'
+  const startCpColResize = useCallback((colIndex: number, startX: number) => {
+    const container = cpTableRef.current
+    if (!container) return
+    const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-cph]'))
+    const startWidths = cells.length > 0
+      ? cells.map(el => el.getBoundingClientRect().width)
+      : cpColWidthsRef.current.length > 0
+        ? [...cpColWidthsRef.current]
+        : [220, 180, 120, 70, 110, 72, 96]
+    cpColWidthsRef.current = startWidths
+    const onMove = (e: MouseEvent) => {
+      const next = startWidths.map((w, i) => i === colIndex ? Math.max(40, w + (e.clientX - startX)) : w)
+      cpColWidthsRef.current = next
+      container.style.setProperty('--cp-cols', `20px 2px ${next.map(w => `${w}px`).join(' ')}`)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.removeProperty('cursor')
+      document.body.style.removeProperty('user-select')
+    }
+    document.body.style.setProperty('cursor', 'col-resize')
+    document.body.style.setProperty('user-select', 'none')
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showNovaMenu, setShowNovaMenu] = useState(false)
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
@@ -2624,7 +2699,11 @@ export default function CPPipeline() {
     }
     if (!cp.lote_id) return null
     const lote = lotesById.get(cp.lote_id)
-    if (!lote || lote.status !== 'enviado_aprovacao') return null
+    if (!lote) return null
+    if (lote.status === 'montando' && lote.observacao) {
+      return { text: `Esclarecimento solicitado: ${lote.observacao}`, tone: 'rose' }
+    }
+    if (lote.status !== 'enviado_aprovacao') return null
     return lote.aprovador_nome
       ? { text: `Aprovador: ${lote.aprovador_nome}`, tone: 'amber' }
       : { text: 'Em aprovação', tone: 'amber' }
@@ -3065,7 +3144,7 @@ export default function CPPipeline() {
             disabled: enviarRemessaMut.isPending,
           },
           secondary: {
-            label: 'Registrar pgto',
+            label: 'Registrar Pagamento',
             onClick: () => handlePagar(summary.cpIds),
             tone: 'bg-emerald-600 hover:bg-emerald-700',
             icon: Banknote,
@@ -3262,7 +3341,7 @@ export default function CPPipeline() {
             Contas a Pagar
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+            {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
         </div>
         <div ref={novaMenuRef} className="relative z-50">
@@ -3670,20 +3749,27 @@ export default function CPPipeline() {
               })}
             </div>
           ) : viewMode === 'list' ? (
-            <>
+            <div
+              ref={cpTableRef}
+              style={{ '--cp-cols': cpColWidthsRef.current.length ? `20px 2px ${cpColWidthsRef.current.map(w => `${w}px`).join(' ')}` : CP_COLS_DEFAULT } as React.CSSProperties}
+              className="overflow-x-auto"
+            >
               {/* Table header */}
-              <div className={`${CP_TABLE_GRID} px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
-                isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
-              }`}>
+              <div
+                className={`grid items-center gap-x-3 px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
+                  isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
+                }`}
+                style={{ gridTemplateColumns: 'var(--cp-cols)' }}
+              >
                 <span />
                 <span />
-                <span>Fornecedor</span>
-                <span>{`Descri\u00e7\u00e3o`}</span>
-                <span>Obra</span>
-                <span>CC</span>
-                <span>Pedido</span>
-                <span className="text-right">Venc.</span>
-                <span className="text-right">Valor</span>
+                <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
+                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
+                <span className="text-right" data-cph>Valor</span>
               </div>
               {activeCPs.map(cp => (
                 <CPRow
@@ -3696,7 +3782,7 @@ export default function CPPipeline() {
                   approvalHint={getApprovalHint(cp)}
                 />
               ))}
-            </>
+            </div>
           ) : (
             <div className="space-y-2 p-4 stagger-children">
               {activeCPs.map(cp => (

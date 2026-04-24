@@ -119,6 +119,8 @@ function normalizeModuleKey(mod: string): string {
   return mod
 }
 
+const featureFlagCache: { rbacV2?: boolean } = {}
+
 export const ALCADA_LABEL: Record<number, string> = {
   0: 'Sem alçada',
   1: 'Coordenador (até R$ 5.000)',
@@ -288,18 +290,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data: flagData, error: flagError } = await supabase.rpc('get_feature_flag', {
-        p_chave: 'rbac_v2_enabled',
-        p_default: false,
-      })
+      let enabled: boolean
+      if (featureFlagCache.rbacV2 !== undefined) {
+        enabled = featureFlagCache.rbacV2
+      } else {
+        const { data: flagData, error: flagError } = await supabase.rpc('get_feature_flag', {
+          p_chave: 'rbac_v2_enabled',
+          p_default: false,
+        })
 
-      if (flagError) {
-        setRbacV2Enabled(false)
-        setPerfilSetores([])
-        return
+        if (flagError) {
+          featureFlagCache.rbacV2 = false
+          setRbacV2Enabled(false)
+          setPerfilSetores([])
+          return
+        }
+
+        enabled = Boolean(flagData)
+        featureFlagCache.rbacV2 = enabled
       }
-
-      const enabled = Boolean(flagData)
       setRbacV2Enabled(enabled)
 
       if (!enabled) {

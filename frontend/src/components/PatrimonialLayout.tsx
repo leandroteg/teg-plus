@@ -32,7 +32,7 @@ export default function PatrimonialLayout() {
       nav={NAV}
       moduleSubtitle={'Ativos e deprecia\u00e7\u00e3o'}
       mobileModuleName="Patrimonial"
-      maxWidth="max-w-5xl"
+      maxWidth="max-w-7xl"
       bottomNavCompact={false}
       truncateBottomLabels
     />

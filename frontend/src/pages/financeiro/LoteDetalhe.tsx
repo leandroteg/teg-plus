@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Package, Send, CheckCircle2, XCircle,
-  Clock, User, FileText, AlertTriangle, Trash2,
+  Clock, User, MessageCircle, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../services/supabase'
 import {
   useLoteById,
   useEnviarLoteAprovacao,
@@ -12,7 +14,15 @@ import {
   useDecidirLoteCompleto,
   useRemoverItemLote,
 } from '../../hooks/useLotesPagamento'
-import type { StatusLote, DecisaoLoteItem, LoteItem, ContaPagar } from '../../types/financeiro'
+import type { StatusLote, DecisaoLoteItem, LoteItem } from '../../types/financeiro'
+
+type MsgEsclarecimento = {
+  id: string
+  tipo: 'pergunta' | 'resposta'
+  autor: string
+  texto: string
+  data: string
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +34,21 @@ const fmtData = (d: string) =>
 
 const fmtDataFull = (d: string) =>
   new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+function LoteSemaforo({ status }: { status: StatusLote }) {
+  const cfg =
+    status === 'aprovado' || status === 'parcialmente_aprovado' || status === 'pago' || status === 'em_pagamento'
+      ? { color: 'bg-emerald-500', ring: 'ring-emerald-400/40', title: 'Aprovado' }
+      : status === 'cancelado'
+      ? { color: 'bg-rose-500', ring: 'ring-rose-400/40', title: 'Cancelado' }
+      : { color: 'bg-amber-400', ring: 'ring-amber-400/40', title: status === 'enviado_aprovacao' ? 'Em Aprovação' : 'Montando' }
+  return (
+    <span
+      title={cfg.title}
+      className={`inline-block w-3 h-3 rounded-full ring-2 ${cfg.color} ${cfg.ring} shrink-0`}
+    />
+  )
+}
 
 const STATUS_LABELS: Record<StatusLote, { label: string; color: string }> = {
   montando:                { label: 'Montando',           color: 'slate' },
@@ -47,6 +72,8 @@ export default function LoteDetalhe() {
   const { loteId } = useParams<{ loteId: string }>()
   const navigate = useNavigate()
   const { isDark } = useTheme()
+  const { perfil, canApprove } = useAuth()
+  const isAprovadorFinanceiro = canApprove(1)
   const { data: lote, isLoading } = useLoteById(loteId)
   const enviarAprovacao = useEnviarLoteAprovacao()
   const decidirItem = useDecidirItemLote()
@@ -54,10 +81,66 @@ export default function LoteDetalhe() {
   const removerItem = useRemoverItemLote()
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [historico, setHistorico] = useState<MsgEsclarecimento[]>([])
+  const [resposta, setResposta] = useState('')
+  const [enviandoResposta, setEnviandoResposta] = useState(false)
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  useEffect(() => {
+    if (!loteId) return
+    supabase
+      .from('apr_aprovacoes')
+      .select('id, status, observacao, aprovador_nome, data_decisao, created_at')
+      .eq('entidade_id', loteId)
+      .eq('modulo', 'fin')
+      .not('observacao', 'is', null)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        const msgs: MsgEsclarecimento[] = (data ?? []).flatMap(r => {
+          const obs = (r.observacao as string) ?? ''
+          if (!obs) return []
+          const isResposta = obs.startsWith('Esclarecimento respondido:')
+          if (r.status !== 'esclarecimento' && !isResposta) return []
+          return [{
+            id: r.id as string,
+            tipo: isResposta ? 'resposta' : 'pergunta',
+            autor: (r.aprovador_nome as string) ?? '',
+            texto: isResposta ? obs.replace('Esclarecimento respondido: ', '') : obs,
+            data: (r.data_decisao as string) ?? (r.created_at as string) ?? '',
+          }]
+        })
+        setHistorico(msgs)
+      })
+  }, [loteId, lote?.status])
+
+  const handleResponder = async () => {
+    if (!resposta.trim() || !loteId || !lote) return
+    setEnviandoResposta(true)
+    try {
+      await supabase.from('apr_aprovacoes').insert({
+        entidade_id: loteId,
+        entidade_numero: lote.numero_lote,
+        tipo_aprovacao: 'autorizacao_pagamento',
+        modulo: 'fin',
+        aprovador_nome: perfil?.nome ?? 'Financeiro',
+        aprovador_email: perfil?.email ?? '',
+        nivel: 1,
+        status: 'pendente',
+        observacao: `Esclarecimento respondido: ${resposta.trim()}`,
+        data_decisao: new Date().toISOString(),
+      })
+      await enviarAprovacao.mutateAsync({ loteId: lote.id, lote })
+      setResposta('')
+      showToast('success', 'Resposta enviada e lote reenviado para aprovação!')
+    } catch {
+      showToast('error', 'Erro ao enviar resposta')
+    } finally {
+      setEnviandoResposta(false)
+    }
   }
 
   if (isLoading || !lote) {
@@ -145,6 +228,7 @@ export default function LoteDetalhe() {
 
           <div className="flex-1">
             <div className="flex items-center gap-2">
+              <LoteSemaforo status={lote.status} />
               <h1 className="text-xl font-bold">{lote.numero_lote}</h1>
               <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full bg-${stConfig.color}-100 dark:bg-${stConfig.color}-900/30 text-${stConfig.color}-700 dark:text-${stConfig.color}-400`}>
                 {stConfig.label}
@@ -162,6 +246,65 @@ export default function LoteDetalhe() {
           </div>
         </div>
       </div>
+
+      {/* Esclarecimento thread */}
+      {(isMontando && lote.observacao) || historico.length > 0 ? (
+        <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-amber-900/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+          <div className={`flex items-center gap-2 px-4 py-3 border-b ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
+            <MessageCircle size={15} className="text-amber-500" />
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Esclarecimento</span>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            {historico.map(msg => (
+              <div key={msg.id} className={`flex gap-3 ${msg.tipo === 'resposta' ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                  msg.tipo === 'pergunta'
+                    ? (isDark ? 'bg-rose-900/40 text-rose-300' : 'bg-rose-100 text-rose-600')
+                    : (isDark ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-100 text-emerald-600')
+                }`}>
+                  {msg.autor.slice(0, 2).toUpperCase()}
+                </div>
+                <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                  msg.tipo === 'pergunta'
+                    ? (isDark ? 'bg-rose-900/20 text-rose-200' : 'bg-rose-100 text-rose-800')
+                    : (isDark ? 'bg-emerald-900/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800')
+                }`}>
+                  <div className="font-medium text-[10px] mb-1 opacity-70">{msg.autor} · {new Date(msg.data).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</div>
+                  <div>{msg.texto}</div>
+                </div>
+              </div>
+            ))}
+
+            {/* Mostrar pergunta atual do lote se não estiver no histórico */}
+            {isMontando && lote.observacao && historico.filter(m => m.tipo === 'pergunta' && m.texto === lote.observacao).length === 0 && (
+              <div className={`rounded-xl px-3 py-2 text-sm ${isDark ? 'bg-rose-900/20 text-rose-200' : 'bg-rose-100 text-rose-800'}`}>
+                <div className="font-medium text-[10px] mb-1 opacity-70">Aprovador · Esclarecimento pendente</div>
+                <div>{lote.observacao}</div>
+              </div>
+            )}
+
+            {isMontando && (
+              <div className="pt-1 space-y-2">
+                <textarea
+                  value={resposta}
+                  onChange={e => setResposta(e.target.value)}
+                  placeholder="Digite sua resposta..."
+                  rows={3}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-400'}`}
+                />
+                <button
+                  onClick={handleResponder}
+                  disabled={!resposta.trim() || enviandoResposta}
+                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Send size={14} />
+                  {enviandoResposta ? 'Enviando...' : 'Responder e Reenviar para Aprovação'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Progress bar */}
       <div className={`rounded-xl border p-4 ${cardBg}`}>
@@ -199,39 +342,17 @@ export default function LoteDetalhe() {
         </div>
       </div>
 
-      {/* Bulk actions */}
-      {(isMontando || isEmAprovacao) && (
+      {/* Bulk actions — somente montagem. Aprovação ocorre via AprovAi */}
+      {isMontando && (
         <div className="flex flex-wrap gap-2">
-          {isMontando && (
-            <button
-              onClick={handleEnviar}
-              disabled={enviarAprovacao.isPending || itens.length === 0}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
-            >
-              <Send size={14} />
-              {enviarAprovacao.isPending ? 'Enviando...' : 'Enviar para Aprovação'}
-            </button>
-          )}
-          {isEmAprovacao && pendentes > 0 && (
-            <>
-              <button
-                onClick={() => handleDecidirTodos('aprovado')}
-                disabled={decidirCompleto.isPending}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
-              >
-                <CheckCircle2 size={14} />
-                Aprovar Todos ({pendentes})
-              </button>
-              <button
-                onClick={() => handleDecidirTodos('rejeitado')}
-                disabled={decidirCompleto.isPending}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
-              >
-                <XCircle size={14} />
-                Rejeitar Todos ({pendentes})
-              </button>
-            </>
-          )}
+          <button
+            onClick={handleEnviar}
+            disabled={enviarAprovacao.isPending || itens.length === 0}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+          >
+            <Send size={14} />
+            {enviarAprovacao.isPending ? 'Enviando...' : 'Enviar para Aprovação'}
+          </button>
         </div>
       )}
 
@@ -299,26 +420,6 @@ export default function LoteDetalhe() {
                 </div>
 
                 {/* Actions */}
-                {isPending && isEmAprovacao && (
-                  <div className="flex gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleDecidir(item, 'aprovado')}
-                      disabled={decidirItem.isPending}
-                      className="p-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 text-emerald-600 transition-colors"
-                      title="Aprovar"
-                    >
-                      <CheckCircle2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDecidir(item, 'rejeitado')}
-                      disabled={decidirItem.isPending}
-                      className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 transition-colors"
-                      title="Rejeitar"
-                    >
-                      <XCircle size={16} />
-                    </button>
-                  </div>
-                )}
 
                 {isMontando && (
                   <button

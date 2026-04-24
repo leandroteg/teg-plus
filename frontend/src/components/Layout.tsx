@@ -25,7 +25,7 @@ export default function Layout() {
       moduleEmoji="🛒"
       accent="teal"
       nav={NAV}
-      maxWidth="max-w-4xl"
+      maxWidth="max-w-7xl"
       bottomNavCompact={false}
     />
   )

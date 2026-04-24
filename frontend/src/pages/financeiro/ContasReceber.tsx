@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   TrendingUp, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, X, ShieldCheck,
@@ -488,6 +488,22 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
   )
 }
 
+// ── CrColResizeHandle ────────────────────────────────────────────────────────
+
+function CrColResizeHandle({ colIndex, onStart }: {
+  colIndex: number
+  onStart: (colIndex: number, startX: number) => void
+}) {
+  return (
+    <div
+      className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10"
+      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onStart(colIndex, e.clientX) }}
+    >
+      <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
+    </div>
+  )
+}
+
 // ── CRRow (compact table row) ────────────────────────────────────────────────
 
 function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
@@ -502,11 +518,12 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
   return (
     <div
       onClick={onClick}
-      className={`${CR_TABLE_GRID} px-3 py-2 border-b cursor-pointer transition-all ${
+      className={`grid items-center gap-x-3 px-3 py-2 border-b cursor-pointer transition-all ${
         isDark
           ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
           : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
       }`}
+      style={{ gridTemplateColumns: 'var(--cr-cols)' }}
     >
       <input
         type="checkbox"
@@ -651,6 +668,37 @@ export default function ContasReceber() {
   const [sortField, setSortField] = useState<SortField>('vencimento')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+
+  // Resizable columns
+  const crTableRef = useRef<HTMLDivElement>(null)
+  const crColWidthsRef = useRef<number[]>([])
+  const CR_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) 90px 72px minmax(0,1fr) 72px 96px'
+  const startCrColResize = useCallback((colIndex: number, startX: number) => {
+    const container = crTableRef.current
+    if (!container) return
+    const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-crh]'))
+    const startWidths = cells.length > 0
+      ? cells.map(el => el.getBoundingClientRect().width)
+      : crColWidthsRef.current.length > 0
+        ? [...crColWidthsRef.current]
+        : [220, 180, 90, 72, 120, 72, 96]
+    crColWidthsRef.current = startWidths
+    const onMove = (e: MouseEvent) => {
+      const next = startWidths.map((w, i) => i === colIndex ? Math.max(40, w + (e.clientX - startX)) : w)
+      crColWidthsRef.current = next
+      container.style.setProperty('--cr-cols', `20px 2px ${next.map(w => `${w}px`).join(' ')}`)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.removeProperty('cursor')
+      document.body.style.removeProperty('user-select')
+    }
+    document.body.style.setProperty('cursor', 'col-resize')
+    document.body.style.setProperty('user-select', 'none')
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   // Data
   const { data: contas = [], isLoading } = useContasReceber()
@@ -1054,20 +1102,27 @@ export default function ContasReceber() {
               </p>
             </div>
           ) : viewMode === 'list' ? (
-            <>
+            <div
+              ref={crTableRef}
+              style={{ '--cr-cols': crColWidthsRef.current.length ? `20px 2px ${crColWidthsRef.current.map(w => `${w}px`).join(' ')}` : CR_COLS_DEFAULT } as Record<string, string>}
+              className="overflow-x-auto"
+            >
               {/* Table header */}
-              <div className={`${CR_TABLE_GRID} px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
-                isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
-              }`}>
+              <div
+                className={`grid items-center gap-x-3 px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
+                  isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
+                }`}
+                style={{ gridTemplateColumns: 'var(--cr-cols)' }}
+              >
                 <span />
                 <span />
-                <span>Cliente</span>
-                <span>Descricao</span>
-                <span>NF</span>
-                <span>CC</span>
-                <span>Classe</span>
-                <span className="text-right">Venc.</span>
-                <span className="text-right">Valor</span>
+                <span className="relative" data-crh>Cliente<CrColResizeHandle colIndex={0} onStart={startCrColResize} /></span>
+                <span className="relative" data-crh>Descrição<CrColResizeHandle colIndex={1} onStart={startCrColResize} /></span>
+                <span className="relative" data-crh>NF<CrColResizeHandle colIndex={2} onStart={startCrColResize} /></span>
+                <span className="relative" data-crh>CC<CrColResizeHandle colIndex={3} onStart={startCrColResize} /></span>
+                <span className="relative" data-crh>Classe<CrColResizeHandle colIndex={4} onStart={startCrColResize} /></span>
+                <span className="relative text-right" data-crh>Venc.<CrColResizeHandle colIndex={5} onStart={startCrColResize} /></span>
+                <span className="text-right" data-crh>Valor</span>
               </div>
               {activeCRs.map(cr => (
                 <CRRow
@@ -1079,7 +1134,7 @@ export default function ContasReceber() {
                   onSelect={toggleSelect}
                 />
               ))}
-            </>
+            </div>
           ) : (
             <div className="space-y-2 p-4">
               {activeCRs.map(cr => (

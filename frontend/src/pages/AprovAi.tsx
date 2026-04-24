@@ -734,6 +734,44 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
+        {/* Historico de esclarecimentos */}
+        {aprovacao.esclarecimento_historico && aprovacao.esclarecimento_historico.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <History size={13} className="text-amber-500" />
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Historico de Esclarecimentos</p>
+            </div>
+            <div className="space-y-1.5 border-l-2 border-amber-200 pl-3 ml-1">
+              {aprovacao.esclarecimento_historico.map((h, i) => (
+                <div key={i} className={`rounded-lg px-2.5 py-1.5 ${
+                  h.tipo === 'pedido' ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'
+                }`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {h.tipo === 'pedido'
+                      ? <MessageSquare size={11} className="text-amber-500" />
+                      : <CheckCircle size={11} className="text-emerald-500" />
+                    }
+                    <span className={`text-[10px] font-bold ${h.tipo === 'pedido' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {h.tipo === 'pedido' ? 'Esclarecimento solicitado' : 'Resposta do solicitante'}
+                    </span>
+                    <span className="text-[9px] text-slate-400 ml-auto">
+                      {h.data ? new Date(h.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                  <p className={`text-[11px] leading-relaxed ${h.tipo === 'pedido' ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {h.tipo === 'resposta' && h.msg.startsWith('Esclarecimento respondido')
+                      ? h.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '').replace(/^Esclarecimento respondido:\s*/i, '')
+                      : h.msg}
+                  </p>
+                  <p className={`text-[9px] mt-0.5 ${h.tipo === 'pedido' ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    {h.autor}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {expanded && (
           <div className="mt-3">
             <label className="text-xs text-slate-400">

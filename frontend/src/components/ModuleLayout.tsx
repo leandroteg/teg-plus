@@ -276,7 +276,7 @@ const ACCENT_CLASSES: Record<string, AccentClasses> = {
 export default function ModuleLayout({
   variant = 'full',
   showCadastrosLink = false,
-  maxWidth = 'max-w-5xl',
+  maxWidth = 'max-w-7xl',
   moduleSubtitle = 'Módulo ativo',
   mobileModuleName,
   backRoute = '/',
@@ -1066,7 +1066,7 @@ export default function ModuleLayout({
             {headerExtra}
           </div>
         )}
-        <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
+        <main className="flex-1 px-4 py-5 pb-28 lg:px-6 lg:pb-8">
           <div className={`${maxWidth} mx-auto animate-page-enter`}>
             {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
