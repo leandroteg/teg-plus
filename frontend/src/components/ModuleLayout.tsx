@@ -1067,7 +1067,7 @@ export default function ModuleLayout({
           </div>
         )}
         <main className="flex-1 px-4 py-5 pb-28 lg:px-6 lg:pb-8">
-          <div className={`${maxWidth} mx-auto animate-page-enter`}>
+          <div className={`${maxWidth} animate-page-enter`}>
             {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
               : <Outlet />}
