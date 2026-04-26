@@ -54,6 +54,8 @@ export interface FroVeiculo {
   responsavel_id?: string
   // Código interno legado (ex.: UTFRO000001, MUNCK000003 — vem do cadastro original)
   codigo_interno?: string
+  // Mapeamento de IDs em sistemas externos (telemetria etc.) — ex.: { cobli: "...", mobi7: "..." }
+  external_ids?: Record<string, string>
   created_at: string
   updated_at: string
 }

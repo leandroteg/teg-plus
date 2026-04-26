@@ -3,7 +3,8 @@ import { AlertTriangle } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEventosTelemetria } from '../../../hooks/useTelemetria'
 import { useVeiculos } from '../../../hooks/useFrotas'
-import type { TipoEventoTel } from '../../../types/telemetria'
+import type { TipoEventoTel, TelProvider } from '../../../types/telemetria'
+import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
 
 // ── Event type config ───────────────────────────────────────────────────────
 
@@ -20,6 +21,15 @@ const EVENTO_CFG: Record<TipoEventoTel, { label: string; cls: string; dotColor: 
   low_external_battery:           { label: 'Bateria baixa',           cls: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30', dotColor: '#eab308' },
   disconnected_external_battery:  { label: 'Bateria desconectada',    cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',       dotColor: '#ef4444' },
   reconnected_external_battery:   { label: 'Bateria reconectada',     cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30', dotColor: '#22c55e' },
+  // ── Mobi7 (mapeados aos mesmos labels semanticamente equivalentes) ──
+  speeding:                       { label: 'Excesso de velocidade',   cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',       dotColor: '#ef4444' },
+  acceleration_light:             { label: 'Aceleração brusca (leve)',  cls: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20', dotColor: '#fb923c' },
+  acceleration_medium:            { label: 'Aceleração brusca (média)', cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30', dotColor: '#f97316' },
+  acceleration_high:              { label: 'Aceleração brusca (forte)', cls: 'bg-orange-500/20 text-orange-800 dark:text-orange-300 border-orange-500/40', dotColor: '#ea580c' },
+  braking_light:                  { label: 'Frenagem brusca (leve)',    cls: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20', dotColor: '#fb923c' },
+  braking_medium:                 { label: 'Frenagem brusca (média)',   cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30', dotColor: '#f97316' },
+  braking_high:                   { label: 'Frenagem brusca (forte)',   cls: 'bg-orange-500/20 text-orange-800 dark:text-orange-300 border-orange-500/40', dotColor: '#ea580c' },
+  cornering:                      { label: 'Curva brusca',              cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30', dotColor: '#f97316' },
 }
 
 const TIPO_OPTIONS: { value: TipoEventoTel | ''; label: string }[] = [
@@ -48,12 +58,14 @@ export default function AlertasTelemetria() {
   const [veiculoId, setVeiculoId] = useState('')
   const [desde, setDesde] = useState('')
   const [ate, setAte] = useState('')
+  const [provedor, setProvedor] = useState<ProviderFilter>('todos')
 
   const { data: eventos = [], isLoading } = useEventosTelemetria({
     tipo_evento: tipoEvento || undefined,
     veiculo_id: veiculoId || undefined,
     desde: desde ? desde + 'T00:00:00' : undefined,
     ate: ate ? ate + 'T23:59:59' : undefined,
+    provider: provedor === 'todos' ? undefined : (provedor as TelProvider),
   })
 
   const cardCls = isLight
@@ -121,6 +133,11 @@ export default function AlertasTelemetria() {
               value={ate}
               onChange={e => setAte(e.target.value)}
             />
+          </div>
+
+          <div className="min-w-[180px]">
+            <label className={`block mb-1 ${lblCls}`}>Provedor</label>
+            <FiltroProvedor value={provedor} onChange={setProvedor} isLight={isLight} />
           </div>
         </div>
       </div>

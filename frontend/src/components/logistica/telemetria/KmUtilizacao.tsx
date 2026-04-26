@@ -6,6 +6,7 @@ import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { formatCodigoCategoria } from '../../frotas/veiculoObs'
 import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
 import type { FroVeiculo, FroAlocacao, CategoriaVeiculo } from '../../../types/frotas'
+import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
 
 const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
@@ -42,6 +43,7 @@ export default function KmUtilizacao() {
   const [fim, setFim] = useState(fimDoMes)
   const [filtroCat, setFiltroCat] = useState<CategoriaVeiculo | 'todos'>('todos')
   const [filtroObra, setFiltroObra] = useState<string>('todas')
+  const [provedor, setProvedor] = useState<ProviderFilter>('todos')
   const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
 
   const inicioISO = inicio ? inicio + 'T00:00:00' : undefined
@@ -61,15 +63,16 @@ export default function KmUtilizacao() {
     return Array.from(s).sort()
   }, [alocacoes])
 
-  // Filtra kmData pela categoria e obra do veiculo
+  // Filtra kmData pela categoria, obra e provedor de telemetria do veiculo
   const kmDataFiltered = useMemo(() => {
     return kmData.filter(k => {
       const v = veicMap.get(k.veiculo_id)
       if (filtroCat !== 'todos' && v?.categoria !== filtroCat) return false
       if (filtroObra !== 'todas' && alocByVeic.get(k.veiculo_id)?.obra?.nome !== filtroObra) return false
+      if (provedor !== 'todos' && !v?.external_ids?.[provedor]) return false
       return true
     })
-  }, [kmData, veicMap, alocByVeic, filtroCat, filtroObra])
+  }, [kmData, veicMap, alocByVeic, filtroCat, filtroObra, provedor])
 
   const totalKm = useMemo(() => kmDataFiltered.reduce((s, v) => s + v.km_percorrido, 0), [kmDataFiltered])
 
@@ -105,6 +108,7 @@ export default function KmUtilizacao() {
           <option value="todas">Todas obras</option>
           {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
+        <FiltroProvedor value={provedor} onChange={setProvedor} isLight={isLight} size="sm" />
       </div>
 
       {isLoading ? (

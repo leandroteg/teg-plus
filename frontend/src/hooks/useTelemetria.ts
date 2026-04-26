@@ -6,7 +6,7 @@ import { supabase } from '../services/supabase'
 import type {
   TelUltimaPosicao, TelPosicao, TelEvento,
   TelKmVeiculo, TelUtilizacao, TelemetriaKPIs,
-  TipoEventoTel,
+  TipoEventoTel, TelProvider,
 } from '../types/telemetria'
 
 // ── Últimas Posições (polling 30s) ───────────────────────────────────────────
@@ -56,6 +56,7 @@ export function useEventosTelemetria(filtros?: {
   veiculo_id?: string
   desde?: string
   ate?: string
+  provider?: TelProvider
 }) {
   return useQuery<TelEvento[]>({
     queryKey: ['tel_eventos', filtros],
@@ -70,6 +71,7 @@ export function useEventosTelemetria(filtros?: {
       if (filtros?.veiculo_id)  q = q.eq('veiculo_id', filtros.veiculo_id)
       if (filtros?.desde)       q = q.gte('cobli_ts', filtros.desde)
       if (filtros?.ate)         q = q.lte('cobli_ts', filtros.ate)
+      if (filtros?.provider)    q = q.eq('provider', filtros.provider)
 
       const { data, error } = await q
       if (error) throw error

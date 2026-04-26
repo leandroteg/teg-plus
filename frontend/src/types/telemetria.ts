@@ -2,6 +2,10 @@
 // types/telemetria.ts — Módulo Telemetria (Logística)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Provedor de telemetria (multi-provedor: Cobli + Mobi7 + futuros)
+// Linhas antigas são DEFAULT 'cobli' no banco (compatível).
+export type TelProvider = 'cobli' | 'mobi7'
+
 // Position record from tel_posicoes table
 export interface TelPosicao {
   id: string
@@ -15,6 +19,7 @@ export interface TelPosicao {
   evento: string
   cobli_ts: string
   created_at: string
+  provider?: TelProvider
 }
 
 // Latest position per vehicle (from tel_ultima_posicao view)
@@ -27,16 +32,23 @@ export interface TelUltimaPosicao {
   ignicao: boolean
   hodometro: number | null
   cobli_ts: string
+  provider?: TelProvider
 }
 
-// Cobli event types
+// Tipos de evento de telemetria — Cobli + Mobi7
 export type TipoEventoTel =
+  // Cobli
   | 'ignition_on' | 'ignition_off'
   | 'geofence_enter' | 'geofence_exit'
   | 'speed_alert'
   | 'hard_brake' | 'hard_acceleration' | 'hard_cornering'
   | 'low_external_battery' | 'disconnected_external_battery' | 'reconnected_external_battery'
   | 'desvio_rota'
+  // Mobi7 (ofensas/comportamentos)
+  | 'speeding'
+  | 'acceleration_light' | 'acceleration_medium' | 'acceleration_high'
+  | 'braking_light' | 'braking_medium' | 'braking_high'
+  | 'cornering'
 
 // Event record from tel_eventos table
 export interface TelEvento {
@@ -51,6 +63,7 @@ export interface TelEvento {
   cobli_ts: string
   created_at: string
   veiculo?: { id: string; placa: string; marca: string; modelo: string }
+  provider?: TelProvider
 }
 
 // KM per vehicle

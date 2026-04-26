@@ -9,6 +9,7 @@ import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import type { TelUltimaPosicao } from '../../../types/telemetria'
 import type { FroVeiculo, FroAlocacao } from '../../../types/frotas'
 import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
+import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
 
 // Fix leaflet default icon issue (safely)
 try {
@@ -108,6 +109,7 @@ export default function MapaAoVivo() {
   const { data: veiculos = [] } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const [busca, setBusca] = useState('')
+  const [provedor, setProvedor] = useState<ProviderFilter>('todos')
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [sidebarAberta, setSidebarAberta] = useState(true)
   const [detalheVeiculo, setDetalheVeiculo] = useState<{
@@ -137,18 +139,19 @@ export default function MapaAoVivo() {
     setDetalheVeiculo({ v, a, pos })
   }
 
-  // Filter positions by search
+  // Filter positions by search + provider
   const posicoesFiltradas = useMemo(() => {
-    if (!busca.trim()) return posicoes
-    const termo = busca.toLowerCase()
+    const termo = busca.trim().toLowerCase()
     return posicoes.filter(p => {
+      if (provedor !== 'todos' && p.provider !== provedor) return false
+      if (!termo) return true
       const v = veiculoMap.get(p.veiculo_id)
       return (
         p.placa.toLowerCase().includes(termo) ||
         (v && `${v.marca} ${v.modelo}`.toLowerCase().includes(termo))
       )
     })
-  }, [posicoes, busca, veiculoMap])
+  }, [posicoes, busca, provedor, veiculoMap])
 
   // Fly-to position when selecting a vehicle
   const flyToPosition = useMemo<[number, number] | null>(() => {
@@ -190,8 +193,8 @@ export default function MapaAoVivo() {
       <div className={`flex flex-col shrink-0 border-r transition-all duration-300 ${
         sidebarAberta ? 'w-72' : 'w-0 border-r-0 overflow-hidden'
       } ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
-        {/* Search */}
-        <div className="p-3">
+        {/* Search + Provedor */}
+        <div className="p-3 space-y-2">
           <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
             isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/[0.04] border border-white/[0.08]'
           }`}>
@@ -205,6 +208,13 @@ export default function MapaAoVivo() {
               onChange={e => setBusca(e.target.value)}
             />
           </div>
+          <FiltroProvedor
+            value={provedor}
+            onChange={setProvedor}
+            isLight={isLight}
+            size="sm"
+            className="w-full"
+          />
         </div>
 
         {/* Status tags */}
