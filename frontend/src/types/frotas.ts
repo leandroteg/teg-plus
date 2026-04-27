@@ -2,7 +2,10 @@
 // types/frotas.ts — Módulo Manutenção e Uso de Frotas
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type CategoriaVeiculo  = 'passeio' | 'pickup' | 'van' | 'vuc' | 'truck' | 'carreta' | 'moto' | 'onibus'
+// CategoriaVeiculo: re-exportada do arquivo central para preservar compatibilidade
+// dos imports existentes. Nova categoria → adicionar em constants/categoriaVeiculo.ts.
+import type { CategoriaVeiculo as _CategoriaVeiculo } from '../constants/categoriaVeiculo'
+export type CategoriaVeiculo = _CategoriaVeiculo
 export type CombustivelVeiculo = 'flex' | 'gasolina' | 'diesel' | 'etanol' | 'eletrico' | 'gnv'
 export type PropriedadeVeiculo = 'propria' | 'locada' | 'cedida'
 export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'bloqueado' | 'baixado' | 'em_entrada' | 'aguardando_saida'

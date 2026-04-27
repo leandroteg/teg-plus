@@ -4,6 +4,7 @@ import { useVeiculos, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/api'
 import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo } from '../../types/frotas'
+import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
@@ -14,11 +15,6 @@ const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
   baixado:         { label: 'Baixado',        cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-500 border-slate-500/20' },
   em_entrada:      { label: 'Em Entrada',     cls: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30' },
   aguardando_saida:{ label: 'Ag. Saida',      cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' },
-}
-
-const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
-  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
-  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Onibus',
 }
 
 const COMBUSTIVEL_LABEL: Record<CombustivelVeiculo, string> = {

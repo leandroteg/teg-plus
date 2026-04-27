@@ -8,10 +8,7 @@ import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
 import type { FroVeiculo, FroAlocacao, CategoriaVeiculo } from '../../../types/frotas'
 import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
 
-const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
-  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
-  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Ônibus',
-}
+import { CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

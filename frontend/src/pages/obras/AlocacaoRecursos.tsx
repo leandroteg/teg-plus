@@ -12,14 +12,10 @@ import {
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
+import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
-
-const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
-  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
-  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Onibus',
-}
 
 const STATUS_LABEL: Record<StatusVeiculo, { label: string; color: string; bg: string; bgDark: string }> = {
   disponivel:        { label: 'Disponivel',     color: 'text-emerald-600', bg: 'bg-emerald-50', bgDark: 'bg-emerald-500/10' },
