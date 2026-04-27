@@ -39,15 +39,18 @@ export type CategoriaVeiculo = typeof CATEGORIA_VEICULO[number]
 /** Categorias DEPRECADAS — não aparecem em selects/filtros. Mantidas no enum do
  *  banco pra preservar registros legados. Para reativar, basta tirar daqui. */
 export const CATEGORIA_DEPRECATED: CategoriaVeiculo[] = [
-  // Substituídas por 'outras_maquinas' historicamente
-  'escavadeira', 'carregadeira', 'motoniveladora', 'rolo_compactador',
-  // Zeradas / não utilizadas no contexto atual da empresa
-  'van', 'vuc', 'moto', 'carreta', 'guindaste', 'munck', 'betoneira', 'outras_maquinas',
+  // Não utilizadas no contexto atual da empresa
+  'vuc', 'moto', 'carreta',
 ]
 
 /** Categorias ATIVAS — para usar em selects de cadastro e filtros. Exclui depreciadas. */
 export const CATEGORIA_VEICULO_ATIVAS: CategoriaVeiculo[] =
   CATEGORIA_VEICULO.filter(c => !CATEGORIA_DEPRECATED.includes(c))
+
+/** Mapa ativo {categoria: label} — usar em vez de CATEGORIA_LABEL em selects/filtros
+ *  para garantir que categorias depreciadas não apareçam para o usuário. */
+export const CATEGORIA_LABEL_ATIVAS: Record<string, string> =
+  Object.fromEntries(CATEGORIA_VEICULO_ATIVAS.map(c => [c, CATEGORIA_LABEL[c]]))
 
 export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   passeio:          'Passeio',
@@ -72,21 +75,43 @@ export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   rolo_compactador: 'Rolo Compactador',
 }
 
-/** Categorias agrupadas para filtros / KPIs / abas (Leves / Caminhão / Maquinário). */
-export const CATEGORIA_GRUPO: Record<CategoriaVeiculo, 'leve' | 'caminhao' | 'maquina'> = {
-  passeio: 'leve', pickup: 'leve', van: 'leve', vuc: 'leve', moto: 'leve', onibus: 'leve',
-  truck: 'caminhao', carreta: 'caminhao',
-  guindauto: 'maquina', guindaste: 'maquina', munck: 'maquina', retro: 'maquina',
-  trator: 'maquina', betoneira: 'maquina', outras_maquinas: 'maquina',
-  // deprecated — ainda mapeadas para grupo correto caso apareçam em registros legados
-  escavadeira: 'maquina', carregadeira: 'maquina', motoniveladora: 'maquina',
-  rolo_compactador: 'maquina',
+/** Tipos de grupo de categoria. */
+export type CategoriaGrupo = 'leve' | 'onibus_van' | 'pesados' | 'guindauto' | 'maquina'
+
+/** Categorias agrupadas em 5 grupos para filtros / KPIs / atalhos.
+ *  Leve · Ônibus/Van · Pesados · Guindauto · Máquinas. */
+export const CATEGORIA_GRUPO: Record<CategoriaVeiculo, CategoriaGrupo> = {
+  // Leve
+  passeio: 'leve', pickup: 'leve',
+  // Ônibus / Van (Sprinter entra como van)
+  onibus: 'onibus_van', van: 'onibus_van',
+  // Pesados (caminhões)
+  truck: 'pesados', carreta: 'pesados',
+  // Guindauto / equipamentos de içamento
+  guindauto: 'guindauto', guindaste: 'guindauto', munck: 'guindauto',
+  // Máquinas pesadas (terraplanagem, concreto, etc)
+  trator: 'maquina', retro: 'maquina', motoniveladora: 'maquina',
+  escavadeira: 'maquina', carregadeira: 'maquina', rolo_compactador: 'maquina',
+  betoneira: 'maquina', outras_maquinas: 'maquina',
+  // Deprecated (sem veículos hoje, mantém grupo coerente caso reapareçam)
+  vuc: 'pesados', moto: 'leve',
 }
 
-export const CATEGORIA_GRUPO_LABEL: Record<'leve' | 'caminhao' | 'maquina', string> = {
-  leve:     'Leves',
-  caminhao: 'Caminhões',
-  maquina:  'Máquinas',
+export const CATEGORIA_GRUPO_LABEL: Record<CategoriaGrupo, string> = {
+  leve:        'Leve',
+  onibus_van:  'Ônibus/Van',
+  pesados:     'Pesados',
+  guindauto:   'Guindauto',
+  maquina:     'Máquinas',
+}
+
+/** Cor associada a cada grupo (Tailwind). Usado em badges/atalhos. */
+export const CATEGORIA_GRUPO_COLOR: Record<CategoriaGrupo, { lightBg: string; lightText: string; darkBg: string; darkText: string }> = {
+  leve:       { lightBg: 'bg-emerald-50', lightText: 'text-emerald-700', darkBg: 'bg-emerald-500/15', darkText: 'text-emerald-300' },
+  onibus_van: { lightBg: 'bg-sky-50',     lightText: 'text-sky-700',     darkBg: 'bg-sky-500/15',     darkText: 'text-sky-300' },
+  pesados:    { lightBg: 'bg-amber-50',   lightText: 'text-amber-700',   darkBg: 'bg-amber-500/15',   darkText: 'text-amber-300' },
+  guindauto:  { lightBg: 'bg-violet-50',  lightText: 'text-violet-700',  darkBg: 'bg-violet-500/15',  darkText: 'text-violet-300' },
+  maquina:    { lightBg: 'bg-rose-50',    lightText: 'text-rose-700',    darkBg: 'bg-rose-500/15',    darkText: 'text-rose-300' },
 }
 
 /** Emoji/ícone associado a cada categoria — usado em telas como Planejamento de Manutenção. */

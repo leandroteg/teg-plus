@@ -9,6 +9,7 @@ import { useVeiculos, useOrdensServico, useSalvarVeiculo } from '../../../hooks/
 import { useBases } from '../../../hooks/useEstoque'
 import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
+import FiltroPropriedadeVeiculo from '../../../components/frotas/FiltroPropriedadeVeiculo'
 import type { FroVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo, TipoAtivo } from '../../../types/frotas'
 import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
 
@@ -437,6 +438,9 @@ export default function Patio() {
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
     () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
+  const [propriedadesSelecionadas, setPropriedadesSelecionadas] = useState<Set<PropriedadeVeiculo>>(
+    () => new Set(['propria', 'locada', 'cedida'])
+  )
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
   const { data: ordens  = [] } = useOrdensServico({
@@ -466,13 +470,21 @@ export default function Patio() {
     if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(v => tiposSelecionados.has(v.categoria))
     }
+    if (propriedadesSelecionadas.size < 3) {
+      list = list.filter(v => propriedadesSelecionadas.has(v.propriedade))
+    }
     return list
-  }, [veiculos, search, tiposSelecionados])
+  }, [veiculos, search, tiposSelecionados, propriedadesSelecionadas])
 
-  // Contagem por categoria (todos veículos do pátio)
+  // Contagens (categoria + propriedade)
   const contagemCategoria = useMemo(() => {
     const c: Record<string, number> = {}
     veiculos.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculos])
+  const contagemPropriedade = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculos.forEach(v => { c[v.propriedade] = (c[v.propriedade] ?? 0) + 1 })
     return c
   }, [veiculos])
 
@@ -522,6 +534,13 @@ export default function Patio() {
             selecionadas={tiposSelecionados}
             onChange={setTiposSelecionados}
             contagem={contagemCategoria}
+            isLight={isLight}
+          />
+
+          <FiltroPropriedadeVeiculo
+            selecionadas={propriedadesSelecionadas}
+            onChange={setPropriedadesSelecionadas}
+            contagem={contagemPropriedade}
             isLight={isLight}
           />
 

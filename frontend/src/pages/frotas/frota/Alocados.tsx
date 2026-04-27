@@ -6,8 +6,9 @@ import { useAlocacoes, useEncerrarAlocacao, useOrdensServico, useVeiculos } from
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
-import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
-import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import FiltroPropriedadeVeiculo from '../../../components/frotas/FiltroPropriedadeVeiculo'
+import type { FroAlocacao, FroVeiculo, PropriedadeVeiculo } from '../../../types/frotas'
+import { CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 
 // ── OSBadge ───────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,9 @@ export default function Alocados() {
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
     () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
+  const [propriedadesSelecionadas, setPropriedadesSelecionadas] = useState<Set<PropriedadeVeiculo>>(
+    () => new Set(['propria', 'locada', 'cedida'])
+  )
 
   const { data: alocacoesAll = [], isLoading } = useAlocacoes({ status: 'ativa' })
   const { data: veiculosAll = [] } = useVeiculos()
@@ -380,8 +384,14 @@ export default function Alocados() {
         return v ? tiposSelecionados.has(v.categoria) : false
       })
     }
+    if (propriedadesSelecionadas.size < 3) {
+      list = list.filter(a => {
+        const v = veicMap.get(a.veiculo_id)
+        return v ? propriedadesSelecionadas.has(v.propriedade) : false
+      })
+    }
     return list
-  }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp, tiposSelecionados])
+  }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp, tiposSelecionados, propriedadesSelecionadas])
 
   // Contagem por categoria (para mostrar no dropdown)
   const contagemCategoria = useMemo(() => {
@@ -389,6 +399,16 @@ export default function Alocados() {
     alocacoesAll.forEach(a => {
       const v = veicMap.get(a.veiculo_id)
       if (v) c[v.categoria] = (c[v.categoria] ?? 0) + 1
+    })
+    return c
+  }, [alocacoesAll, veicMap])
+
+  // Contagem por propriedade
+  const contagemPropriedade = useMemo(() => {
+    const c: Record<string, number> = {}
+    alocacoesAll.forEach(a => {
+      const v = veicMap.get(a.veiculo_id)
+      if (v) c[v.propriedade] = (c[v.propriedade] ?? 0) + 1
     })
     return c
   }, [alocacoesAll, veicMap])
@@ -514,6 +534,12 @@ export default function Alocados() {
             selecionadas={tiposSelecionados}
             onChange={setTiposSelecionados}
             contagem={contagemCategoria}
+            isLight={isLight}
+          />
+          <FiltroPropriedadeVeiculo
+            selecionadas={propriedadesSelecionadas}
+            onChange={setPropriedadesSelecionadas}
+            contagem={contagemPropriedade}
             isLight={isLight}
           />
           <span className={`ml-auto text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>

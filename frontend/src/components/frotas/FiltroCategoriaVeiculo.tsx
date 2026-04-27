@@ -11,6 +11,7 @@ import {
   CATEGORIA_GRUPO,
   CATEGORIA_GRUPO_LABEL,
   type CategoriaVeiculo,
+  type CategoriaGrupo,
 } from '../../constants/categoriaVeiculo'
 
 interface Props {
@@ -38,7 +39,7 @@ export default function FiltroCategoriaVeiculo({
     onChange(next)
   }
 
-  function selecionarGrupo(grupo: 'leve' | 'caminhao' | 'maquina' | 'todos') {
+  function selecionarGrupo(grupo: CategoriaGrupo | 'todos') {
     if (grupo === 'todos') onChange(new Set(CATEGORIA_VEICULO_ATIVAS))
     else onChange(new Set(CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === grupo)))
   }
@@ -103,17 +104,23 @@ export default function FiltroCategoriaVeiculo({
               <div className="flex flex-wrap gap-1">
                 <button onClick={() => selecionarGrupo('leve')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                   isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
-                }`}>Leves</button>
-                <button onClick={() => selecionarGrupo('caminhao')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                }`}>Leve</button>
+                <button onClick={() => selecionarGrupo('onibus_van')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                  isLight ? 'bg-sky-50 text-sky-700 hover:bg-sky-100' : 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25'
+                }`}>Ônibus/Van</button>
+                <button onClick={() => selecionarGrupo('pesados')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                   isLight ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-                }`}>Caminhões</button>
-                <button onClick={() => selecionarGrupo('maquina')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                }`}>Pesados</button>
+                <button onClick={() => selecionarGrupo('guindauto')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                   isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100' : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'
+                }`}>Guindauto</button>
+                <button onClick={() => selecionarGrupo('maquina')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                  isLight ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
                 }`}>Máquinas</button>
               </div>
             </div>
             <div className="overflow-y-auto max-h-[360px]">
-              {(['leve', 'caminhao', 'maquina'] as const).map(grupo => (
+              {(['leve', 'onibus_van', 'pesados', 'guindauto', 'maquina'] as const).map(grupo => (
                 <div key={grupo}>
                   <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>
                     {CATEGORIA_GRUPO_LABEL[grupo]}

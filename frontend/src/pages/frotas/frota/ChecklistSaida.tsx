@@ -4,7 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
-import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import FiltroPropriedadeVeiculo from '../../../components/frotas/FiltroPropriedadeVeiculo'
+import { CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import type { PropriedadeVeiculo } from '../../../types/frotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
@@ -19,6 +21,9 @@ export default function ChecklistSaida() {
   const [busca, setBusca] = useState('')
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
     () => new Set(CATEGORIA_VEICULO_ATIVAS)
+  )
+  const [propriedadesSelecionadas, setPropriedadesSelecionadas] = useState<Set<PropriedadeVeiculo>>(
+    () => new Set(['propria', 'locada', 'cedida'])
   )
 
   const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
@@ -50,13 +55,21 @@ export default function ChecklistSaida() {
     if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(v => tiposSelecionados.has(v.categoria))
     }
+    if (propriedadesSelecionadas.size < 3) {
+      list = list.filter(v => propriedadesSelecionadas.has(v.propriedade))
+    }
     return list
-  }, [veiculosAll, busca, tiposSelecionados])
+  }, [veiculosAll, busca, tiposSelecionados, propriedadesSelecionadas])
 
-  // Contagem por categoria (todos veículos aguardando saída)
+  // Contagens (categoria + propriedade)
   const contagemCategoria = useMemo(() => {
     const c: Record<string, number> = {}
     veiculosAll.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculosAll])
+  const contagemPropriedade = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculosAll.forEach(v => { c[v.propriedade] = (c[v.propriedade] ?? 0) + 1 })
     return c
   }, [veiculosAll])
 
@@ -127,6 +140,12 @@ export default function ChecklistSaida() {
             selecionadas={tiposSelecionados}
             onChange={setTiposSelecionados}
             contagem={contagemCategoria}
+            isLight={isLight}
+          />
+          <FiltroPropriedadeVeiculo
+            selecionadas={propriedadesSelecionadas}
+            onChange={setPropriedadesSelecionadas}
+            contagem={contagemPropriedade}
             isLight={isLight}
           />
         </div>
