@@ -195,6 +195,23 @@ function fmtDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('pt-BR')
 }
 
+/**
+ * Abrevia nomes longos de obras mantendo o essencial:
+ * "LD Nova Ponte 2 – Perdizes 2, 138 kV (OSC 00)" → "LD Nova Ponte 2 – Perdizes 2"
+ * "LD Paracatu 03 – Paracatu 04, 138 kV – Kinross (OSC 44.2025)" → "LD Paracatu 03 – Paracatu 04 · Kinross"
+ */
+function abreviarObra(nome?: string | null): string {
+  if (!nome) return '—'
+  return nome
+    // remove "(OSC xx)" no final
+    .replace(/\s*\(OSC[^)]*\)\s*$/i, '')
+    // remove ", 138 kV"
+    .replace(/,\s*\d+\s*kV/gi, '')
+    // troca " – " sobrando em excesso pra nada, mantém apenas um
+    .replace(/\s+–\s+/g, ' – ')
+    .trim()
+}
+
 // ── AlocacaoCard ──────────────────────────────────────────────────────────────
 
 interface AlocacaoCardProps {
@@ -506,13 +523,13 @@ export default function Alocados() {
             <table className="w-full">
               <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
                 <tr>
-                  <th className={thCls}>Ativo</th>
-                  <th className={thCls}>Obra / CC</th>
-                  <th className={thCls}>Responsável</th>
-                  <th className={thCls}>Saída</th>
-                  <th className={thCls}>Ret. Previsto</th>
-                  <th className={thCls}>OS</th>
-                  <th className={thCls + ' text-right'}>Ações</th>
+                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 220 }}>Ativo</th>
+                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 220, maxWidth: 280 }}>Obra / CC</th>
+                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 160 }}>Responsável</th>
+                  <th className={`${thCls} whitespace-nowrap`}>Saída</th>
+                  <th className={`${thCls} whitespace-nowrap`}>Ret. Previsto</th>
+                  <th className={`${thCls} whitespace-nowrap`}>OS</th>
+                  <th className={`${thCls} text-right whitespace-nowrap`}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -532,7 +549,7 @@ export default function Alocados() {
                   return (
                     <tr key={a.id} className={trCls} onClick={() => openDetalhe(a)}>
                       {/* Ativo */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ minWidth: 220 }}>
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                             isMaquina
@@ -541,7 +558,7 @@ export default function Alocados() {
                           }`}>
                             {isMaquina ? <Cog size={13} /> : <Car size={13} />}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-baseline gap-1.5">
                               <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
                               {categoria && (
@@ -550,7 +567,7 @@ export default function Alocados() {
                                 </span>
                               )}
                             </div>
-                            <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <p className={`text-[10px] truncate max-w-[220px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                               {a.veiculo?.marca} {a.veiculo?.modelo}
                               <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
                               <span className="font-mono">{a.veiculo?.placa}</span>
@@ -559,25 +576,28 @@ export default function Alocados() {
                         </div>
                       </td>
 
-                      {/* Obra */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 size={12} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-                          <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                            {a.obra?.nome ?? a.centro_custo_id ?? '—'}
+                      {/* Obra (abreviada) */}
+                      <td className="px-4 py-3" style={{ maxWidth: 280 }}>
+                        <div className="flex items-center gap-1.5" title={a.obra?.nome ?? ''}>
+                          <Building2 size={12} className={`shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+                          <span className={`text-xs truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                            {abreviarObra(a.obra?.nome ?? a.centro_custo_id)}
                           </span>
                         </div>
                       </td>
 
                       {/* Responsável */}
-                      <td className="px-4 py-3">
-                        <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                      <td className="px-4 py-3" style={{ maxWidth: 180 }}>
+                        <span
+                          className={`text-xs truncate block ${isLight ? 'text-slate-600' : 'text-slate-300'}`}
+                          title={a.responsavel_nome ?? ''}
+                        >
                           {a.responsavel_nome ?? '—'}
                         </span>
                       </td>
 
                       {/* Saída */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-1 text-xs">
                           <CalendarDays size={11} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
                           <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
@@ -587,7 +607,7 @@ export default function Alocados() {
                       </td>
 
                       {/* Retorno previsto */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`text-xs font-medium ${
                           retAtrasado
                             ? (isLight ? 'text-red-600' : 'text-red-400')
@@ -607,16 +627,17 @@ export default function Alocados() {
                       </td>
 
                       {/* Ações */}
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => setRetornoAloc(a)}
-                          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                          title="Registrar retorno da alocação"
+                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                             isLight
                               ? 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
                               : 'bg-slate-700/60 text-slate-300 hover:bg-rose-500/10 hover:text-rose-400'
                           }`}
                         >
-                          <CornerDownLeft size={12} /> Registrar Retorno
+                          <CornerDownLeft size={12} /> Retorno
                         </button>
                       </td>
                     </tr>

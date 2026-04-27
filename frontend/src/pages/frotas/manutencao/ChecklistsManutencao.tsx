@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
-import { Search, ChevronRight, Check, X, Plus, LayoutList, LayoutGrid, AlertTriangle } from 'lucide-react'
+import { Search, ChevronRight, Check, X, Plus, LayoutList, LayoutGrid, AlertTriangle, Info } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import {
   useVeiculos, useItensManutencao, useIntervalosPreventiva,
   useRegistrarTroca, useInicializarItensVeiculo, useHodometroEfetivo,
+  useAlocacoes,
 } from '../../../hooks/useFrotas'
-import type { FroVeiculo, FroItemManutencao, CategoriaVeiculo } from '../../../types/frotas'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import type { FroVeiculo, FroItemManutencao, CategoriaVeiculo, FroAlocacao } from '../../../types/frotas'
 
 const ITEM_LABELS: Record<string, string> = {
   oleo_motor: 'Óleo', filtro_oleo: 'Filtro Óleo', filtro_ar: 'Filtro Ar',
@@ -40,10 +43,16 @@ function countAlertas(itens: FroItemManutencao[], hodometro: number) {
 export default function ChecklistsManutencao() {
   const { isLightSidebar: isLight } = useTheme()
   const { data: veiculos = [] } = useVeiculos()
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const [busca, setBusca] = useState('')
   const [catFiltro, setCatFiltro] = useState<string>('')
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
+  const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+  const openVeicDetalhe = (v: FroVeiculo) => {
+    setDetalheVeic({ v, a: alocByVeic.get(v.id) })
+  }
 
   const ativos = useMemo(() => {
     let list = veiculos.filter(v => v.status !== 'baixado')
@@ -101,7 +110,9 @@ export default function ChecklistsManutencao() {
           {ativos.map(v => (
             <div key={v.id}>
               <VeiculoRow veiculo={v} isLight={isLight} isOpen={selecionado === v.id}
-                onToggle={() => setSelecionado(selecionado === v.id ? null : v.id)} cardCls={cardCls} />
+                onToggle={() => setSelecionado(selecionado === v.id ? null : v.id)}
+                onVeicClick={() => openVeicDetalhe(v)}
+                cardCls={cardCls} />
               {selecionado === v.id && <DetalheItens veiculo={v} isLight={isLight} />}
             </div>
           ))}
@@ -114,7 +125,8 @@ export default function ChecklistsManutencao() {
           {ativos.map(v => (
             <VeiculoCard key={v.id} veiculo={v} isLight={isLight} cardCls={cardCls}
               isOpen={selecionado === v.id}
-              onToggle={() => setSelecionado(selecionado === v.id ? null : v.id)} />
+              onToggle={() => setSelecionado(selecionado === v.id ? null : v.id)}
+              onVeicClick={() => openVeicDetalhe(v)} />
           ))}
         </div>
       )}
@@ -129,13 +141,15 @@ export default function ChecklistsManutencao() {
       {viewMode === 'card' && selecionado && (() => {
         const v = veiculos.find(x => x.id === selecionado)
         if (!v) return null
+        const { codigo, categoria } = formatCodigoCategoria(v)
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setSelecionado(null)}>
             <div className={`rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-auto p-4 ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</span>
-                  <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo}</span>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>{categoria}</span>
+                  <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo} · {v.placa}</span>
                 </div>
                 <button onClick={() => setSelecionado(null)} className="text-slate-400"><X size={18} /></button>
               </div>
@@ -144,20 +158,39 @@ export default function ChecklistsManutencao() {
           </div>
         )
       })()}
+
+      {/* Modal de detalhes padrao do veiculo */}
+      {detalheVeic && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeic.v}
+          isLight={isLight}
+          onClose={() => setDetalheVeic(null)}
+          alocacaoInfo={detalheVeic.a ? {
+            id: detalheVeic.a.id,
+            obraId: detalheVeic.a.obra_id,
+            obra: detalheVeic.a.obra?.nome,
+            responsavel: detalheVeic.a.responsavel_nome ?? undefined,
+            dataSaida: detalheVeic.a.data_saida,
+            dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+            observacoes: detalheVeic.a.observacoes ?? undefined,
+          } : undefined}
+        />
+      )}
     </div>
   )
 }
 
 // ── Veículo Row (table view) ─────────────────────────────────────────────────
 
-function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
-  veiculo: FroVeiculo; isLight: boolean; isOpen: boolean; onToggle: () => void; cardCls: string
+function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, onVeicClick, cardCls }: {
+  veiculo: FroVeiculo; isLight: boolean; isOpen: boolean; onToggle: () => void; onVeicClick: () => void; cardCls: string
 }) {
   const { data: itens = [] } = useItensManutencao(v.id)
   const { data: hodo } = useHodometroEfetivo(v.id, v.hodometro_atual)
   const kmEfetivo = hodo?.km ?? v.hodometro_atual
   const alertas = itens.length > 0 ? countAlertas(itens, kmEfetivo) : null
   const fonteLabel = hodo?.fonte === 'telemetria' ? 'via telemetria' : hodo?.fonte === 'checklist' ? 'via checklist' : ''
+  const { codigo, categoria } = formatCodigoCategoria(v)
 
   return (
     <button onClick={onToggle}
@@ -166,17 +199,27 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
           ? isLight ? 'bg-violet-50 border border-violet-200' : 'bg-violet-500/10 border border-violet-500/25'
           : `${cardCls} hover:shadow-md`
       }`}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</span>
-          <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo}</span>
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-            isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'
-          }`}>{CAT_LABELS[v.categoria] ?? v.categoria}</span>
+      <div
+        className="flex-1 min-w-0 cursor-pointer hover:underline decoration-dotted"
+        onClick={e => { e.stopPropagation(); onVeicClick() }}
+        title="Click para ver ficha do veículo"
+      >
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+          {categoria && (
+            <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+              {categoria}
+            </span>
+          )}
         </div>
-        <div className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        <p className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          {v.marca} {v.modelo}
+          <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+          <span className="font-mono">{v.placa}</span>
+        </p>
+        <div className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
           Hodômetro: {kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}
-          {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
+          {fonteLabel && <span className="ml-1 opacity-60">({fonteLabel})</span>}
         </div>
       </div>
       {/* Alertas */}
@@ -207,28 +250,48 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
 
 // ── Veículo Card (card view) ─────────────────────────────────────────────────
 
-function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle }: {
-  veiculo: FroVeiculo; isLight: boolean; cardCls: string; isOpen: boolean; onToggle: () => void
+function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle, onVeicClick }: {
+  veiculo: FroVeiculo; isLight: boolean; cardCls: string; isOpen: boolean; onToggle: () => void; onVeicClick: () => void
 }) {
   const { data: itens = [] } = useItensManutencao(v.id)
   const { data: hodo } = useHodometroEfetivo(v.id, v.hodometro_atual)
   const kmEfetivo = hodo?.km ?? v.hodometro_atual
   const alertas = itens.length > 0 ? countAlertas(itens, kmEfetivo) : null
   const fonteLabel = hodo?.fonte === 'telemetria' ? 'telemetria' : hodo?.fonte === 'checklist' ? 'checklist' : ''
+  const { codigo, categoria } = formatCodigoCategoria(v)
 
   return (
     <button onClick={onToggle}
       className={`rounded-2xl p-4 text-left transition-all hover:shadow-md w-full ${
         isOpen ? (isLight ? 'ring-2 ring-violet-400' : 'ring-2 ring-violet-500/50') : ''
       } ${cardCls}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</span>
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-          isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'
-        }`}>{CAT_LABELS[v.categoria] ?? v.categoria}</span>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div
+          className="min-w-0 cursor-pointer hover:underline decoration-dotted"
+          onClick={e => { e.stopPropagation(); onVeicClick() }}
+          title="Click para ver ficha do veículo"
+        >
+          <div className="flex items-baseline gap-1.5">
+            <span className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+            {categoria && (
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                {categoria}
+              </span>
+            )}
+          </div>
+          <p className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            {v.marca} {v.modelo}
+            <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+            <span className="font-mono">{v.placa}</span>
+          </p>
+        </div>
+        <Info
+          size={14}
+          className={`shrink-0 ${isLight ? 'text-slate-400 hover:text-violet-600' : 'text-slate-500 hover:text-violet-400'} transition-colors`}
+          onClick={e => { e.stopPropagation(); onVeicClick() }}
+        />
       </div>
-      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo}</p>
-      <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+      <p className={`text-xs mt-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
         Hodômetro: <span className="font-semibold">{kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}</span>
         {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
       </p>
