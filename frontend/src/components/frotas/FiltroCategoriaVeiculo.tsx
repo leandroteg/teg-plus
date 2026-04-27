@@ -68,15 +68,39 @@ export default function FiltroCategoriaVeiculo({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className={`absolute right-0 mt-1 w-[260px] max-h-[480px] rounded-xl border shadow-xl z-50 overflow-hidden ${
+          <div className={`absolute right-0 mt-1 w-[260px] max-h-[520px] rounded-xl border shadow-xl z-50 overflow-hidden ${
             isLight ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.1]'
           }`}>
+            {/* Marcar todos / Limpar */}
+            <div className={`px-3 py-2 border-b flex items-center justify-between ${
+              isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.06] bg-white/[0.02]'
+            }`}>
+              <p className={`text-xs font-bold ${txtMain}`}>
+                {selecionadas.size}/{CATEGORIA_VEICULO_ATIVAS.length} selecionados
+              </p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onChange(new Set(CATEGORIA_VEICULO_ATIVAS))}
+                  className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${
+                    isLight ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-blue-500 text-white hover:bg-blue-400'
+                  }`}
+                >
+                  Marcar todos
+                </button>
+                <button
+                  onClick={() => onChange(new Set())}
+                  className={`text-[10px] px-2 py-1 rounded font-semibold transition-colors ${
+                    isLight ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]'
+                  }`}
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
             <div className={`px-3 py-2 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-              <p className={`text-xs font-bold mb-1.5 ${txtMain}`}>Atalhos</p>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Atalhos por grupo</p>
               <div className="flex flex-wrap gap-1">
-                <button onClick={() => selecionarGrupo('todos')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
-                  isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]'
-                }`}>Todos</button>
                 <button onClick={() => selecionarGrupo('leve')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                   isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
                 }`}>Leves</button>
