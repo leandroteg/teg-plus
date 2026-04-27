@@ -204,46 +204,46 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, onVeicClick, cardCl
         onClick={e => { e.stopPropagation(); onVeicClick() }}
         title="Click para ver ficha do veículo"
       >
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className={`text-base font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
           {categoria && (
-            <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
               {categoria}
             </span>
           )}
         </div>
-        <p className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           {v.marca} {v.modelo}
           <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
-          <span className="font-mono">{v.placa}</span>
+          <span className="font-mono font-semibold">{v.placa}</span>
         </p>
-        <div className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Hodômetro: {kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}
-          {fonteLabel && <span className="ml-1 opacity-60">({fonteLabel})</span>}
+        <div className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          Hodômetro: <span className="font-semibold">{kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}</span>
+          {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
         </div>
       </div>
       {/* Alertas */}
       {alertas && alertas.vencidos > 0 && (
-        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-red-500/15 text-red-600 dark:text-red-300">
-          <AlertTriangle size={11} /> {alertas.vencidos} vencido{alertas.vencidos > 1 ? 's' : ''}
+        <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-red-500/15 text-red-600 dark:text-red-300">
+          <AlertTriangle size={12} /> {alertas.vencidos} vencido{alertas.vencidos > 1 ? 's' : ''}
         </span>
       )}
       {alertas && alertas.vencidos === 0 && alertas.emBreve > 0 && (
-        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-300">
+        <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-300">
           {alertas.emBreve} em breve
         </span>
       )}
       {itens.length === 0 && (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
           Sem itens
         </span>
       )}
       {kmEfetivo === 0 && (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
           Sem registro do hodômetro
         </span>
       )}
-      <ChevronRight size={16} className={`transition-transform ${isOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+      <ChevronRight size={18} className={`transition-transform ${isOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
     </button>
   )
 }
@@ -271,27 +271,27 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle, onVeicCli
           onClick={e => { e.stopPropagation(); onVeicClick() }}
           title="Click para ver ficha do veículo"
         >
-          <div className="flex items-baseline gap-1.5">
-            <span className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className={`text-base font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
             {categoria && (
-              <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
                 {categoria}
               </span>
             )}
           </div>
-          <p className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             {v.marca} {v.modelo}
             <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
-            <span className="font-mono">{v.placa}</span>
+            <span className="font-mono font-semibold">{v.placa}</span>
           </p>
         </div>
         <Info
-          size={14}
+          size={16}
           className={`shrink-0 ${isLight ? 'text-slate-400 hover:text-violet-600' : 'text-slate-500 hover:text-violet-400'} transition-colors`}
           onClick={e => { e.stopPropagation(); onVeicClick() }}
         />
       </div>
-      <p className={`text-xs mt-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+      <p className={`text-xs mt-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
         Hodômetro: <span className="font-semibold">{kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}</span>
         {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
       </p>
@@ -299,27 +299,27 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle, onVeicCli
       {/* Status badges */}
       <div className="flex gap-1.5 mt-3 flex-wrap">
         {alertas && alertas.vencidos > 0 && (
-          <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 dark:text-red-300">
-            <AlertTriangle size={10} /> {alertas.vencidos} vencido{alertas.vencidos > 1 ? 's' : ''}
+          <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-red-500/15 text-red-600 dark:text-red-300">
+            <AlertTriangle size={11} /> {alertas.vencidos} vencido{alertas.vencidos > 1 ? 's' : ''}
           </span>
         )}
         {alertas && alertas.emBreve > 0 && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300">
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300">
             {alertas.emBreve} em breve
           </span>
         )}
         {alertas && alertas.vencidos === 0 && alertas.emBreve === 0 && itens.length > 0 && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
             Tudo OK
           </span>
         )}
         {itens.length === 0 && (
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
             Sem itens
           </span>
         )}
         {kmEfetivo === 0 && (
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
             Sem registro do hodômetro
           </span>
         )}
