@@ -462,7 +462,6 @@ export function useAdicionarItemInventario() {
           base_id: payload.base_id ?? null,
           saldo_sistema: 0,
           saldo_contado: payload.quantidade_fisica ?? 0,
-          divergencia: payload.quantidade_fisica ?? 0,
           ajuste_aplicado: false,
           observacao: payload.descricao_livre
             ? `Item avulso: ${payload.descricao_livre} (${payload.unidade ?? 'UN'})`
