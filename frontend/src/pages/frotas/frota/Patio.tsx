@@ -9,6 +9,7 @@ import { useVeiculos, useOrdensServico, useSalvarVeiculo } from '../../../hooks/
 import { useBases } from '../../../hooks/useEstoque'
 import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
 import type { FroVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo, TipoAtivo } from '../../../types/frotas'
+import { CATEGORIA_VEICULO, CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -836,12 +837,10 @@ function VeiculoDetalhesModal({
 
 // ── NovoAtivoModal ───────────────────────────────────────────────────────────
 
-const CATEGORIAS: { value: CategoriaVeiculo; label: string }[] = [
-  { value: 'passeio', label: 'Passeio' }, { value: 'pickup', label: 'Pickup/SUV' },
-  { value: 'van', label: 'Van' }, { value: 'vuc', label: 'VUC' },
-  { value: 'truck', label: 'Truck' }, { value: 'carreta', label: 'Carreta' },
-  { value: 'moto', label: 'Moto' }, { value: 'onibus', label: 'Onibus' },
-]
+const CATEGORIAS: { value: CategoriaVeiculo; label: string }[] = CATEGORIA_VEICULO.map(k => ({
+  value: k,
+  label: k === 'pickup' ? 'Pickup/SUV' : CATEGORIA_LABEL[k],
+}))
 
 const COMBUSTIVEIS: { value: CombustivelVeiculo; label: string }[] = [
   { value: 'flex', label: 'Flex' }, { value: 'gasolina', label: 'Gasolina' },

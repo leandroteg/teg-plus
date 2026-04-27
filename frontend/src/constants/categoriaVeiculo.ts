@@ -65,3 +65,25 @@ export const CATEGORIA_GRUPO_LABEL: Record<'leve' | 'caminhao' | 'maquina', stri
   caminhao: 'Caminhões',
   maquina:  'Máquinas',
 }
+
+/** Emoji/ícone associado a cada categoria — usado em telas como Planejamento de Manutenção. */
+export const CATEGORIA_ICON: Record<CategoriaVeiculo, string> = {
+  passeio:          '🚗',
+  pickup:           '🛻',
+  van:              '🚐',
+  vuc:              '📦',
+  moto:             '🏍️',
+  onibus:           '🚌',
+  truck:            '🚛',
+  carreta:          '🚚',
+  guindauto:        '🏗️',
+  guindaste:        '🏗️',
+  munck:            '🪝',
+  retro:            '🚜',
+  escavadeira:      '⛏️',
+  carregadeira:     '🚜',
+  motoniveladora:   '🛣️',
+  rolo_compactador: '🛞',
+  trator:           '🚜',
+  betoneira:        '🥣',
+}

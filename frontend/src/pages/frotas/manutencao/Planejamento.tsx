@@ -3,17 +3,13 @@ import { X, Check, RotateCcw } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useIntervalosPreventiva, useSalvarIntervalosCategoria, useResetarIntervalosCategoria } from '../../../hooks/useFrotas'
 import type { CategoriaVeiculo } from '../../../types/frotas'
+import { CATEGORIA_VEICULO, CATEGORIA_LABEL, CATEGORIA_ICON } from '../../../constants/categoriaVeiculo'
 
-const CATEGORIAS: Array<{ key: CategoriaVeiculo; label: string; icon: string }> = [
-  { key: 'passeio',  label: 'Passeio',  icon: '🚗' },
-  { key: 'pickup',   label: 'Pickup',   icon: '🛻' },
-  { key: 'van',      label: 'Van',      icon: '🚐' },
-  { key: 'vuc',      label: 'VUC',      icon: '📦' },
-  { key: 'truck',    label: 'Truck',    icon: '🚛' },
-  { key: 'carreta',  label: 'Carreta',  icon: '🚚' },
-  { key: 'moto',     label: 'Moto',     icon: '🏍️' },
-  { key: 'onibus',   label: 'Ônibus',   icon: '🚌' },
-]
+const CATEGORIAS: Array<{ key: CategoriaVeiculo; label: string; icon: string }> = CATEGORIA_VEICULO.map(k => ({
+  key: k,
+  label: CATEGORIA_LABEL[k],
+  icon: CATEGORIA_ICON[k],
+}))
 
 export default function Planejamento() {
   const { isLightSidebar: isLight } = useTheme()

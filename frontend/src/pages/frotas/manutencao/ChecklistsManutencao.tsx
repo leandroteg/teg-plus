@@ -9,16 +9,12 @@ import {
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import type { FroVeiculo, FroItemManutencao, CategoriaVeiculo, FroAlocacao } from '../../../types/frotas'
+import { CATEGORIA_LABEL as CAT_LABELS } from '../../../constants/categoriaVeiculo'
 
 const ITEM_LABELS: Record<string, string> = {
   oleo_motor: 'Óleo', filtro_oleo: 'Filtro Óleo', filtro_ar: 'Filtro Ar',
   pneus: 'Pneus', bateria: 'Bateria', freios_pastilhas: 'Freios',
   suspensao: 'Suspensão', correia_dentada: 'Correia', fluido_freio: 'Fluido Freio',
-}
-
-const CAT_LABELS: Record<CategoriaVeiculo, string> = {
-  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
-  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Ônibus',
 }
 
 function fmtKm(v: number) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) }
