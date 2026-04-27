@@ -47,11 +47,6 @@ export const CATEGORIA_DEPRECATED: CategoriaVeiculo[] = [
 export const CATEGORIA_VEICULO_ATIVAS: CategoriaVeiculo[] =
   CATEGORIA_VEICULO.filter(c => !CATEGORIA_DEPRECATED.includes(c))
 
-/** Mapa ativo {categoria: label} — usar em vez de CATEGORIA_LABEL em selects/filtros
- *  para garantir que categorias depreciadas não apareçam para o usuário. */
-export const CATEGORIA_LABEL_ATIVAS: Record<string, string> =
-  Object.fromEntries(CATEGORIA_VEICULO_ATIVAS.map(c => [c, CATEGORIA_LABEL[c]]))
-
 export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   passeio:          'Passeio',
   pickup:           'Pickup',
@@ -74,6 +69,11 @@ export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   motoniveladora:   'Motoniveladora',
   rolo_compactador: 'Rolo Compactador',
 }
+
+/** Mapa ativo {categoria: label} — usar em vez de CATEGORIA_LABEL em selects/filtros
+ *  para garantir que categorias depreciadas não apareçam para o usuário. */
+export const CATEGORIA_LABEL_ATIVAS: Record<string, string> =
+  Object.fromEntries(CATEGORIA_VEICULO_ATIVAS.map(c => [c, CATEGORIA_LABEL[c]]))
 
 /** Tipos de grupo de categoria. */
 export type CategoriaGrupo = 'leve' | 'onibus_van' | 'pesados' | 'guindauto' | 'maquina'
