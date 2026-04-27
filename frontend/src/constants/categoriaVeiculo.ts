@@ -36,9 +36,13 @@ export const CATEGORIA_VEICULO = [
 
 export type CategoriaVeiculo = typeof CATEGORIA_VEICULO[number]
 
-/** Categorias DEPRECADAS — não aparecem em selects de cadastro. Substituídas por 'outras_maquinas'. */
+/** Categorias DEPRECADAS — não aparecem em selects/filtros. Mantidas no enum do
+ *  banco pra preservar registros legados. Para reativar, basta tirar daqui. */
 export const CATEGORIA_DEPRECATED: CategoriaVeiculo[] = [
+  // Substituídas por 'outras_maquinas' historicamente
   'escavadeira', 'carregadeira', 'motoniveladora', 'rolo_compactador',
+  // Zeradas / não utilizadas no contexto atual da empresa
+  'van', 'vuc', 'moto', 'carreta', 'guindaste', 'munck', 'betoneira', 'outras_maquinas',
 ]
 
 /** Categorias ATIVAS — para usar em selects de cadastro e filtros. Exclui depreciadas. */
