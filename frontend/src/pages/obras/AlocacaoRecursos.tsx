@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo,
   useSolicitarMovimentoObras,
@@ -28,6 +29,51 @@ const STATUS_LABEL: Record<StatusVeiculo, { label: string; color: string; bg: st
 }
 
 type TabKey = 'lista' | 'gantt' | 'kanban'
+
+const STEPS: FlowStep[] = [
+  {
+    key: 'lista',
+    label: 'Lista',
+    description: 'Lista completa de veículos por obra com filtros e busca.',
+    icon: List,
+    accent: {
+      bg: 'hover:bg-emerald-50',
+      bgActive: 'bg-emerald-50',
+      text: 'text-emerald-600',
+      textActive: 'text-emerald-800',
+      border: 'border-emerald-500',
+      badge: 'bg-emerald-100 text-emerald-700',
+    },
+  },
+  {
+    key: 'gantt',
+    label: 'Cronograma',
+    description: 'Linha do tempo com agrupamento por obra e indicador de movimentações pendentes.',
+    icon: CalendarRange,
+    accent: {
+      bg: 'hover:bg-blue-50',
+      bgActive: 'bg-blue-50',
+      text: 'text-blue-600',
+      textActive: 'text-blue-800',
+      border: 'border-blue-500',
+      badge: 'bg-blue-100 text-blue-700',
+    },
+  },
+  {
+    key: 'kanban',
+    label: 'Kanban',
+    description: 'Cards arrastáveis entre canteiros — solicita movimentação para Frotas confirmar.',
+    icon: LayoutGrid,
+    accent: {
+      bg: 'hover:bg-orange-50',
+      bgActive: 'bg-orange-50',
+      text: 'text-orange-600',
+      textActive: 'text-orange-800',
+      border: 'border-orange-500',
+      badge: 'bg-orange-100 text-orange-700',
+    },
+  },
+]
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 
@@ -91,50 +137,30 @@ export default function AlocacaoRecursos() {
     }
   }, [alocAtivaByVeic, solicitarMovimento])
 
+  // Botão "Nova Alocação" flutuante (fica no canto superior direito da página)
+  const novaAlocBtn = (
+    <button
+      onClick={() => handleOpenNova()}
+      className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 text-white px-3 py-2 text-xs font-bold hover:bg-orange-600 transition-colors shadow-sm"
+    >
+      <Plus size={14} /> Nova Alocação
+    </button>
+  )
+
   return (
-    <div className="space-y-4">
-      {/* ── Header ── */}
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className={`text-lg font-bold ${txtMain}`}>Alocacao de Recursos</h1>
-          <p className={`text-xs ${txtMuted}`}>
-            Frota x Obras — visao integrada com o modulo Frotas
-          </p>
-        </div>
-        <button
-          onClick={() => handleOpenNova()}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 text-white px-3 py-2 text-xs font-bold hover:bg-orange-600 transition-colors shadow-sm"
-        >
-          <Plus size={14} /> Nova Alocacao
-        </button>
+    <div className="relative">
+      {/* Botão de ação fixo no canto superior direito (alinha com o título do ControladoriaFlow) */}
+      <div className="absolute top-0 right-0 z-10">
+        {novaAlocBtn}
       </div>
 
-      {/* ── Tabs ── */}
-      <div className={`inline-flex rounded-xl border p-0.5 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-        {([
-          { k: 'lista',  icon: List,         label: 'Lista' },
-          { k: 'gantt',  icon: CalendarRange, label: 'Cronograma' },
-          { k: 'kanban', icon: LayoutGrid,   label: 'Kanban' },
-        ] as const).map(t => {
-          const Icon = t.icon
-          const active = tab === t.k
-          return (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                active
-                  ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800'
-                  : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Icon size={13} /> {t.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Content ── */}
+      <ControladoriaFlow
+        title="Alocação de Recursos"
+        subtitle="Frota x Obras — visão integrada com o módulo Frotas"
+        steps={STEPS}
+        activeStep={tab}
+        onStepChange={(step) => setTab(step as TabKey)}
+      >
       {loadingVeic || loadingAloc ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
@@ -172,6 +198,7 @@ export default function AlocacaoRecursos() {
           )}
         </>
       )}
+      </ControladoriaFlow>
 
       {/* ── Modal Nova Alocação ── */}
       {novaAlocOpen && (
