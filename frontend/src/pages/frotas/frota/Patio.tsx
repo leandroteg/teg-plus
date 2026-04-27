@@ -10,7 +10,7 @@ import { useBases } from '../../../hooks/useEstoque'
 import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
 import type { FroVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo, TipoAtivo } from '../../../types/frotas'
-import { CATEGORIA_VEICULO, CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -435,7 +435,7 @@ export default function Patio() {
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [showNovoAtivo, setShowNovoAtivo] = useState(false)
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
-    () => new Set(CATEGORIA_VEICULO)
+    () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
@@ -463,7 +463,7 @@ export default function Patio() {
         (v.numero_serie ?? '').toLowerCase().includes(q)
       )
     }
-    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+    if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(v => tiposSelecionados.has(v.categoria))
     }
     return list
@@ -861,7 +861,7 @@ function VeiculoDetalhesModal({
 
 // ── NovoAtivoModal ───────────────────────────────────────────────────────────
 
-const CATEGORIAS: { value: CategoriaVeiculo; label: string }[] = CATEGORIA_VEICULO.map(k => ({
+const CATEGORIAS: { value: CategoriaVeiculo; label: string }[] = CATEGORIA_VEICULO_ATIVAS.map(k => ({
   value: k,
   label: k === 'pickup' ? 'Pickup/SUV' : CATEGORIA_LABEL[k],
 }))

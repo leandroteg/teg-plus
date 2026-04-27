@@ -4,6 +4,9 @@
 // Sincronizado com enum fro_categoria no Supabase (migration 089).
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Lista COMPLETA — usada para tipos e renderização de labels de dados existentes.
+// Algumas categorias foram unificadas em "outras_maquinas" e estão DEPRECATED:
+// não aparecem em selects de cadastro novo (use CATEGORIA_VEICULO_ATIVAS).
 export const CATEGORIA_VEICULO = [
   // ── Frota leve / passageiros ─────────────────────────────────────────────
   'passeio',
@@ -20,15 +23,27 @@ export const CATEGORIA_VEICULO = [
   'guindaste',
   'munck',
   'retro',
+  'trator',
+  'betoneira',
+  'outras_maquinas',
+  // ── DEPRECATED (substituídas por outras_maquinas, mantidas no tipo apenas
+  //                para preservar dados legados):
   'escavadeira',
   'carregadeira',
   'motoniveladora',
   'rolo_compactador',
-  'trator',
-  'betoneira',
 ] as const
 
 export type CategoriaVeiculo = typeof CATEGORIA_VEICULO[number]
+
+/** Categorias DEPRECADAS — não aparecem em selects de cadastro. Substituídas por 'outras_maquinas'. */
+export const CATEGORIA_DEPRECATED: CategoriaVeiculo[] = [
+  'escavadeira', 'carregadeira', 'motoniveladora', 'rolo_compactador',
+]
+
+/** Categorias ATIVAS — para usar em selects de cadastro e filtros. Exclui depreciadas. */
+export const CATEGORIA_VEICULO_ATIVAS: CategoriaVeiculo[] =
+  CATEGORIA_VEICULO.filter(c => !CATEGORIA_DEPRECATED.includes(c))
 
 export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   passeio:          'Passeio',
@@ -37,18 +52,20 @@ export const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   vuc:              'VUC',
   moto:             'Moto',
   onibus:           'Ônibus',
-  truck:            'Truck',
+  truck:            'Caminhão',
   carreta:          'Carreta',
   guindauto:        'Guindauto',
   guindaste:        'Guindaste',
   munck:            'Munck',
-  retro:            'Retroescavadeira',
+  retro:            'Retro',
+  trator:           'Trator',
+  betoneira:        'Betoneira',
+  outras_maquinas:  'Outras Máquinas',
+  // ── Deprecated — labels mantidos para renderizar registros legados ──
   escavadeira:      'Escavadeira',
   carregadeira:     'Carregadeira',
   motoniveladora:   'Motoniveladora',
   rolo_compactador: 'Rolo Compactador',
-  trator:           'Trator',
-  betoneira:        'Betoneira',
 }
 
 /** Categorias agrupadas para filtros / KPIs / abas (Leves / Caminhão / Maquinário). */
@@ -56,8 +73,10 @@ export const CATEGORIA_GRUPO: Record<CategoriaVeiculo, 'leve' | 'caminhao' | 'ma
   passeio: 'leve', pickup: 'leve', van: 'leve', vuc: 'leve', moto: 'leve', onibus: 'leve',
   truck: 'caminhao', carreta: 'caminhao',
   guindauto: 'maquina', guindaste: 'maquina', munck: 'maquina', retro: 'maquina',
+  trator: 'maquina', betoneira: 'maquina', outras_maquinas: 'maquina',
+  // deprecated — ainda mapeadas para grupo correto caso apareçam em registros legados
   escavadeira: 'maquina', carregadeira: 'maquina', motoniveladora: 'maquina',
-  rolo_compactador: 'maquina', trator: 'maquina', betoneira: 'maquina',
+  rolo_compactador: 'maquina',
 }
 
 export const CATEGORIA_GRUPO_LABEL: Record<'leve' | 'caminhao' | 'maquina', string> = {
@@ -80,10 +99,12 @@ export const CATEGORIA_ICON: Record<CategoriaVeiculo, string> = {
   guindaste:        '🏗️',
   munck:            '🪝',
   retro:            '🚜',
+  trator:           '🚜',
+  betoneira:        '🥣',
+  outras_maquinas:  '⚙️',
+  // deprecated
   escavadeira:      '⛏️',
   carregadeira:     '🚜',
   motoniveladora:   '🛣️',
   rolo_compactador: '🛞',
-  trator:           '🚜',
-  betoneira:        '🥣',
 }

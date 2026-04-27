@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { Filter } from 'lucide-react'
 import {
-  CATEGORIA_VEICULO,
+  CATEGORIA_VEICULO_ATIVAS,
   CATEGORIA_LABEL,
   CATEGORIA_GRUPO,
   CATEGORIA_GRUPO_LABEL,
@@ -30,7 +30,7 @@ export default function FiltroCategoriaVeiculo({
 }: Props) {
   const [open, setOpen] = useState(false)
 
-  const todasSelecionadas = selecionadas.size === CATEGORIA_VEICULO.length
+  const todasSelecionadas = selecionadas.size === CATEGORIA_VEICULO_ATIVAS.length
 
   function toggle(cat: CategoriaVeiculo) {
     const next = new Set(selecionadas)
@@ -39,8 +39,8 @@ export default function FiltroCategoriaVeiculo({
   }
 
   function selecionarGrupo(grupo: 'leve' | 'caminhao' | 'maquina' | 'todos') {
-    if (grupo === 'todos') onChange(new Set(CATEGORIA_VEICULO))
-    else onChange(new Set(CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo)))
+    if (grupo === 'todos') onChange(new Set(CATEGORIA_VEICULO_ATIVAS))
+    else onChange(new Set(CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === grupo)))
   }
 
   const txtMain  = isLight ? 'text-slate-800' : 'text-white'
@@ -94,7 +94,7 @@ export default function FiltroCategoriaVeiculo({
                   <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>
                     {CATEGORIA_GRUPO_LABEL[grupo]}
                   </p>
-                  {CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo).map(c => {
+                  {CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === grupo).map(c => {
                     const n = contagem?.[c] ?? 0
                     return (
                       <label key={c} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${

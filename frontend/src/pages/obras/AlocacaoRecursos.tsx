@@ -13,7 +13,7 @@ import {
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
-import { CATEGORIA_LABEL, CATEGORIA_VEICULO, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL, CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -482,7 +482,7 @@ function GanttView({
   const [todasMinimizadas, setTodasMinimizadas] = useState(false)
   const [filtroTipoOpenG, setFiltroTipoOpenG] = useState(false)
   const [filtroObraOpenG, setFiltroObraOpenG] = useState(false)
-  const [tiposSelG, setTiposSelG] = useState<Set<CategoriaVeiculo>>(() => new Set(CATEGORIA_VEICULO))
+  const [tiposSelG, setTiposSelG] = useState<Set<CategoriaVeiculo>>(() => new Set(CATEGORIA_VEICULO_ATIVAS))
   const [obrasSelG, setObrasSelG] = useState<Set<string>>(() => new Set(obras.map(o => o.id).concat('__sem_obra__')))
 
   // Atualiza obras selecionadas se a lista de obras mudar
@@ -508,7 +508,7 @@ function GanttView({
       .filter(r => !!r.veic) as { aloc: FroAlocacao; veic: FroVeiculo }[]
 
     // Filtro por TIPO (categoria do veículo)
-    let out = (tiposSelG.size === CATEGORIA_VEICULO.length)
+    let out = (tiposSelG.size === CATEGORIA_VEICULO_ATIVAS.length)
       ? list
       : list.filter(r => tiposSelG.has(r.veic.categoria))
 
@@ -555,8 +555,8 @@ function GanttView({
     })
   }
   const selecionarGrupoG = (g: 'leve' | 'caminhao' | 'maquina' | 'todos') => {
-    if (g === 'todos') setTiposSelG(new Set(CATEGORIA_VEICULO))
-    else setTiposSelG(new Set(CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === g)))
+    if (g === 'todos') setTiposSelG(new Set(CATEGORIA_VEICULO_ATIVAS))
+    else setTiposSelG(new Set(CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === g)))
   }
   const toggleObraG = (id: string) => {
     setObrasSelG(prev => {
@@ -665,7 +665,7 @@ function GanttView({
             }`}
           >
             <Filter size={13} /> Filtrar tipos
-            {tiposSelG.size < CATEGORIA_VEICULO.length && (
+            {tiposSelG.size < CATEGORIA_VEICULO_ATIVAS.length && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-bold">{tiposSelG.size}</span>
             )}
           </button>
@@ -688,7 +688,7 @@ function GanttView({
                   {(['leve','caminhao','maquina'] as const).map(g => (
                     <div key={g}>
                       <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>{CATEGORIA_GRUPO_LABEL[g]}</p>
-                      {CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === g).map(c => (
+                      {CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === g).map(c => (
                         <label key={c} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
                           <input type="checkbox" checked={tiposSelG.has(c)} onChange={() => toggleTipoG(c)} className="accent-blue-500" />
                           <span className={`text-xs ${txtMain}`}>{CATEGORIA_LABEL[c]}</span>
@@ -937,7 +937,7 @@ function KanbanView({
     () => new Set(['pool', ...obras.map(o => o.id)])
   )
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
-    () => new Set(CATEGORIA_VEICULO),
+    () => new Set(CATEGORIA_VEICULO_ATIVAS),
   )
   const [buscaObra, setBuscaObra] = useState('')
   const topScrollRef = useRef<HTMLDivElement | null>(null)
@@ -980,7 +980,7 @@ function KanbanView({
 
   // Aplica filtro de TIPO antes de agrupar (afeta tanto colunas quanto contagens)
   const veiculosFiltrados = useMemo(() => {
-    if (tiposSelecionados.size === CATEGORIA_VEICULO.length) return veiculos
+    if (tiposSelecionados.size === CATEGORIA_VEICULO_ATIVAS.length) return veiculos
     return veiculos.filter(v => tiposSelecionados.has(v.categoria))
   }, [veiculos, tiposSelecionados])
 
@@ -1047,8 +1047,8 @@ function KanbanView({
     })
   }
   const selecionarGrupo = (grupo: 'leve' | 'caminhao' | 'maquina' | 'todos') => {
-    if (grupo === 'todos') setTiposSelecionados(new Set(CATEGORIA_VEICULO))
-    else setTiposSelecionados(new Set(CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo)))
+    if (grupo === 'todos') setTiposSelecionados(new Set(CATEGORIA_VEICULO_ATIVAS))
+    else setTiposSelecionados(new Set(CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === grupo)))
   }
 
   // Contagem de veículos por categoria (com filtro de tipo desconsiderado, só pra UI do dropdown)
@@ -1086,7 +1086,7 @@ function KanbanView({
               }`}
             >
               <Filter size={13} /> Filtrar tipos
-              {tiposSelecionados.size < CATEGORIA_VEICULO.length && (
+              {tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-bold">
                   {tiposSelecionados.size}
                 </span>
@@ -1113,7 +1113,7 @@ function KanbanView({
                         <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>
                           {CATEGORIA_GRUPO_LABEL[grupo]}
                         </p>
-                        {CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo).map(c => (
+                        {CATEGORIA_VEICULO_ATIVAS.filter(c => CATEGORIA_GRUPO[c] === grupo).map(c => (
                           <label key={c} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
                             <input type="checkbox" checked={tiposSelecionados.has(c)} onChange={() => toggleTipo(c)} className="accent-blue-500" />
                             <span className={`text-xs ${txtMain}`}>{CATEGORIA_LABEL[c]}</span>

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useObras } from '../../../hooks/useFinanceiro'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
-import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import ChecklistDivergenciasModal from '../../../components/frotas/ChecklistDivergenciasModal'
 import RegistrarEntradaModal from '../../../components/frotas/RegistrarEntradaModal'
@@ -23,7 +23,7 @@ export default function EmEntrada() {
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [busca, setBusca] = useState('')
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
-    () => new Set(CATEGORIA_VEICULO)
+    () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
   const [divVeiculo, setDivVeiculo] = useState<FroVeiculo | null>(null)
   const [divItens, setDivItens] = useState<DivergenciaItem[]>([])
@@ -55,7 +55,7 @@ export default function EmEntrada() {
         v.modelo?.toLowerCase().includes(q) ||
         (v.codigo_interno ?? '').toLowerCase().includes(q))
     }
-    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+    if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(v => tiposSelecionados.has(v.categoria))
     }
     return list

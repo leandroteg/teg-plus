@@ -7,7 +7,7 @@ import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModa
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
 import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
-import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 
 // ── OSBadge ───────────────────────────────────────────────────────────────────
 
@@ -327,7 +327,7 @@ export default function Alocados() {
   const [filtroObra, setFiltroObra] = useState<string>('todas')
   const [filtroResp, setFiltroResp] = useState<string>('todos')
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
-    () => new Set(CATEGORIA_VEICULO)
+    () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
 
   const { data: alocacoesAll = [], isLoading } = useAlocacoes({ status: 'ativa' })
@@ -374,7 +374,7 @@ export default function Alocados() {
     }
     if (filtroObra !== 'todas') list = list.filter(a => a.obra?.nome === filtroObra)
     if (filtroResp !== 'todos') list = list.filter(a => a.responsavel_nome === filtroResp)
-    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+    if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(a => {
         const v = veicMap.get(a.veiculo_id)
         return v ? tiposSelecionados.has(v.categoria) : false

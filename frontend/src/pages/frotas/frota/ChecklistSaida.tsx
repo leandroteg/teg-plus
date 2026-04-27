@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
-import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
@@ -18,7 +18,7 @@ export default function ChecklistSaida() {
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [busca, setBusca] = useState('')
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
-    () => new Set(CATEGORIA_VEICULO)
+    () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
 
   const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
@@ -47,7 +47,7 @@ export default function ChecklistSaida() {
         (v.codigo_interno ?? '').toLowerCase().includes(q)
       )
     }
-    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+    if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(v => tiposSelecionados.has(v.categoria))
     }
     return list
