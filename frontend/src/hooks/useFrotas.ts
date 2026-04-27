@@ -719,6 +719,119 @@ export function useEncerrarAlocacao() {
   })
 }
 
+// ── Demandas Obras → Frotas (próxima alocação) ───────────────────────────────
+
+import type { FroAlocacaoHist } from '../types/frotas'
+
+/**
+ * Histórico de uma alocação (todos os eventos do registro em fro_alocacoes_hist).
+ * Ordenado do mais recente para o mais antigo.
+ */
+export function useAlocacaoHistorico(alocacaoId: string | undefined) {
+  return useQuery<FroAlocacaoHist[]>({
+    queryKey: ['fro_alocacao_hist', alocacaoId],
+    enabled: !!alocacaoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_alocacoes_hist')
+        .select(`
+          *,
+          obra_origem_rel:sys_obras!obra_origem(id,nome),
+          obra_destino_rel:sys_obras!obra_destino(id,nome),
+          feito_por_perfil:sys_perfis!fro_alocacoes_hist_feito_por_fkey(nome,email)
+        `)
+        .eq('alocacao_id', alocacaoId!)
+        .order('feito_em', { ascending: false })
+      if (error) {
+        // Se não houver registros ainda ou tabela recém-criada, retorna vazio
+        return []
+      }
+      return (data ?? []).map((r: Record<string, unknown>) => {
+        const ori = r.obra_origem_rel as { nome?: string } | null
+        const dst = r.obra_destino_rel as { nome?: string } | null
+        const usr = r.feito_por_perfil as { nome?: string; email?: string } | null
+        return {
+          ...r,
+          obra_origem_nome: ori?.nome,
+          obra_destino_nome: dst?.nome,
+          feito_por_nome: usr?.nome ?? usr?.email,
+        } as FroAlocacaoHist
+      })
+    },
+  })
+}
+
+/**
+ * Solicita movimentação de uma alocação ATIVA para outra obra (= demanda).
+ * Apenas preenche proxima_*, NÃO encerra a alocação atual.
+ * Frotas confirma depois fazendo checklist de retorno.
+ */
+export function useSolicitarMovimentoObras() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      alocacao_id: string
+      proxima_obra_id: string
+      proxima_data_inicio?: string
+      proxima_data_fim?: string
+      proxima_observacoes?: string
+    }) => {
+      const { alocacao_id, ...campos } = payload
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase
+        .from('fro_alocacoes')
+        .update({
+          ...campos,
+          proxima_solicitada_por: user?.id,
+          proxima_solicitada_em: new Date().toISOString(),
+        })
+        .eq('id', alocacao_id)
+        .eq('status', 'ativa')   // garante que só ATIVAS recebem demanda
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacao_hist'] })
+    },
+  })
+}
+
+/**
+ * Frotas rejeita/cancela uma demanda Obras: limpa os campos proxima_*.
+ * Registra motivo via observacoes (que vira descrição no histórico).
+ */
+export function useRejeitarDemandaObras() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ alocacao_id, motivo }: { alocacao_id: string; motivo?: string }) => {
+      // Atualiza observações antes pra que o trigger de log capture o motivo
+      if (motivo) {
+        await supabase
+          .from('fro_alocacoes')
+          .update({ observacoes: motivo })
+          .eq('id', alocacao_id)
+      }
+      const { error } = await supabase
+        .from('fro_alocacoes')
+        .update({
+          proxima_obra_id: null,
+          proxima_data_inicio: null,
+          proxima_data_fim: null,
+          proxima_observacoes: null,
+          proxima_solicitada_por: null,
+          proxima_solicitada_em: null,
+        })
+        .eq('id', alocacao_id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacao_hist'] })
+    },
+  })
+}
+
 // ── Multas & Pedágios ─────────────────────────────────────────────────────────
 
 export function useMultas(filtros?: { tipo?: TipoMulta; status?: StatusMulta }) {

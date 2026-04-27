@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList, Search } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList, Search, ArrowRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useVeiculos } from '../../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
@@ -17,6 +17,20 @@ export default function ChecklistSaida() {
   const [busca, setBusca] = useState('')
 
   const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
+  const { data: alocacoesAll = [] } = useAlocacoes()
+
+  // Detecta se a alocação ATIVA do veículo foi criada por demanda Obras (trigger automático)
+  const demandaPorVeiculo = useMemo(() => {
+    const m = new Map<string, { obra_destino?: string; observacoes?: string }>()
+    alocacoesAll
+      .filter(a => a.status === 'ativa' && a.observacoes?.includes('demanda Obras'))
+      .forEach(a => m.set(a.veiculo_id, {
+        obra_destino: a.obra?.nome,
+        observacoes: a.observacoes,
+      }))
+    return m
+  }, [alocacoesAll])
+
   const veiculos = busca
     ? veiculosAll.filter(v => {
         const q = busca.toLowerCase()
@@ -131,12 +145,28 @@ export default function ChecklistSaida() {
                     </p>
                   </div>
 
-                  {/* Status pill */}
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
-                  }`}>
-                    Checklist pendente
-                  </span>
+                  {/* Status pill + badge demanda Obras */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
+                    }`}>
+                      Checklist pendente
+                    </span>
+                    {(() => {
+                      const dem = demandaPorVeiculo.get(v.id)
+                      if (!dem?.obra_destino) return null
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isLight ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                          }`}
+                          title={dem.observacoes || 'Solicitação Obras'}
+                        >
+                          <ArrowRight size={9} /> {dem.obra_destino}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
 
                 {/* Action */}

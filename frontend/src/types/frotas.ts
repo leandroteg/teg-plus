@@ -341,10 +341,36 @@ export interface FroAlocacao {
   checklist_retorno_id?: string
   status: StatusAlocacao
   observacoes?: string
+  // ── Demanda Obras: próxima alocação solicitada ──
+  proxima_obra_id?: string
+  proxima_data_inicio?: string
+  proxima_data_fim?: string
+  proxima_observacoes?: string
+  proxima_solicitada_por?: string
+  proxima_solicitada_em?: string
   created_at: string
   updated_at: string
   veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo' | 'marca' | 'categoria'>
   obra?: { id: string; nome: string; codigo?: string }
+  proxima_obra?: { id: string; nome: string; codigo?: string }
+}
+
+// ── Histórico de movimentações (fro_alocacoes_hist) ───────────────────────
+export interface FroAlocacaoHist {
+  id: string
+  alocacao_id: string
+  veiculo_id?: string
+  acao: 'criada' | 'editada' | 'demanda_obras' | 'demanda_cancelada' | 'encerrada' | 'rejeitada' | 'automatica'
+  obra_origem?: string
+  obra_destino?: string
+  payload_antes?: Record<string, unknown>
+  payload_depois?: Record<string, unknown>
+  feito_por?: string
+  feito_em: string
+  descricao?: string
+  obra_origem_nome?: string
+  obra_destino_nome?: string
+  feito_por_nome?: string
 }
 
 export interface FroChecklistTemplate {

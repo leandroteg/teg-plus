@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { LogIn, Plus, Car, Cog, ClipboardList } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { LogIn, Plus, Car, Cog, ClipboardList, ArrowRight } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useQueryClient } from '@tanstack/react-query'
-import { useVeiculos } from '../../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
+import { useObras } from '../../../hooks/useFinanceiro'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import ChecklistDivergenciasModal from '../../../components/frotas/ChecklistDivergenciasModal'
 import RegistrarEntradaModal from '../../../components/frotas/RegistrarEntradaModal'
@@ -24,6 +25,22 @@ export default function EmEntrada() {
   const [divZonas, setDivZonas] = useState<DivergenciaZona[]>([])
 
   const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'em_entrada' })
+  const { data: alocacoesAll = [] } = useAlocacoes()
+  const { data: obras = [] } = useObras()
+
+  // Map: veiculo_id → alocacao ATIVA com proxima_obra_id (= demanda Obras pendente)
+  const demandaPorVeiculo = useMemo(() => {
+    const m = new Map<string, { proxima_obra_nome?: string; observacoes?: string }>()
+    const obraById = new Map(obras.map(o => [o.id, o.nome]))
+    alocacoesAll
+      .filter(a => a.status === 'ativa' && a.proxima_obra_id)
+      .forEach(a => m.set(a.veiculo_id, {
+        proxima_obra_nome: a.proxima_obra_id ? obraById.get(a.proxima_obra_id) : undefined,
+        observacoes: a.proxima_observacoes,
+      }))
+    return m
+  }, [alocacoesAll, obras])
+
   const veiculos = busca
     ? veiculosAll.filter(v => {
         const q = busca.toLowerCase()
@@ -157,12 +174,28 @@ export default function EmEntrada() {
                     </p>
                   </div>
 
-                  {/* Status pill */}
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
-                  }`}>
-                    Vistoria pendente
-                  </span>
+                  {/* Status pill + Demanda Obras */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
+                    }`}>
+                      Vistoria pendente
+                    </span>
+                    {(() => {
+                      const dem = demandaPorVeiculo.get(v.id)
+                      if (!dem?.proxima_obra_nome) return null
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isLight ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                          }`}
+                          title={dem.observacoes ? `Demanda Obras: ${dem.observacoes}` : 'Solicitação de movimentação por Obras'}
+                        >
+                          <ArrowRight size={9} /> {dem.proxima_obra_nome}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
 
                 {/* Action */}

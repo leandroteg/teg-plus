@@ -1,14 +1,18 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import {
   Truck, Package, Search, Plus, X, LayoutGrid, List, CalendarRange,
-  CheckCircle2, PauseCircle, Wrench, MapPin, Calendar, Clock,
+  CheckCircle2, PauseCircle, Wrench, MapPin, Calendar, Clock, Building2,
   AlertTriangle, ChevronDown, ChevronUp, ArrowRight, Send, Filter,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo } from '../../hooks/useFrotas'
+import {
+  useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo,
+  useSolicitarMovimentoObras,
+} from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
+import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 
@@ -43,10 +47,13 @@ export default function AlocacaoRecursos() {
   const [tab, setTab] = useState<TabKey>('lista')
   const [novaAlocOpen, setNovaAlocOpen] = useState(false)
   const [novaAlocPreset, setNovaAlocPreset] = useState<{ veiculoId?: string; obraId?: string } | null>(null)
+  // Modal de edição/demanda de alocação (Kanban + Gantt + Lista)
+  const [editAloc, setEditAloc] = useState<FroAlocacao | null>(null)
 
   const { data: veiculos = [], isLoading: loadingVeic } = useVeiculos()
   const { data: alocacoes = [], isLoading: loadingAloc } = useAlocacoes()
   const { data: obras = [] } = useObras()
+  const solicitarMovimento = useSolicitarMovimentoObras()
 
   // Map: veiculo_id -> alocacao ativa (se houver)
   const alocAtivaByVeic = useMemo(() => {
@@ -62,6 +69,31 @@ export default function AlocacaoRecursos() {
     setNovaAlocPreset(preset)
     setNovaAlocOpen(true)
   }
+
+  /**
+   * Move veículo de uma obra para outra no Kanban:
+   * - Se veículo TEM alocação ativa → cria DEMANDA (proxima_obra_id) e mantém alocação atual
+   * - Se está no pool (sem alocação) → abre modal Nova Alocação (fluxo antigo)
+   * Frotas confirma a demanda fazendo o checklist de retorno (trigger cria nova automática).
+   */
+  const handleMoveToObra = useCallback(async (veiculoId: string, obraId: string) => {
+    const aloc = alocAtivaByVeic.get(veiculoId)
+    if (!aloc) {
+      // Sem alocação → fluxo de criação direta
+      handleOpenNova({ veiculoId, obraId })
+      return
+    }
+    if (aloc.obra_id === obraId) return
+    // Com alocação ativa → cria demanda
+    try {
+      await solicitarMovimento.mutateAsync({
+        alocacao_id: aloc.id,
+        proxima_obra_id: obraId,
+      })
+    } catch (err) {
+      alert('Erro ao solicitar movimentação: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }, [alocAtivaByVeic, solicitarMovimento])
 
   return (
     <div className="space-y-4">
@@ -126,7 +158,9 @@ export default function AlocacaoRecursos() {
             <GanttView
               veiculos={veiculos}
               alocacoes={alocacoes}
+              obras={obras}
               isDark={isDark}
+              onEditAloc={(aloc) => setEditAloc(aloc)}
             />
           )}
           {tab === 'kanban' && (
@@ -135,8 +169,9 @@ export default function AlocacaoRecursos() {
               alocacoes={alocacoes}
               obras={obras}
               isDark={isDark}
-              onMoveToObra={(veiculoId, obraId) => handleOpenNova({ veiculoId, obraId })}
+              onMoveToObra={handleMoveToObra}
               onNewObra={() => handleOpenNova()}
+              onEditAloc={(aloc) => setEditAloc(aloc)}
             />
           )}
         </>
@@ -150,6 +185,15 @@ export default function AlocacaoRecursos() {
           veiculos={veiculos}
           preset={novaAlocPreset}
           onClose={() => { setNovaAlocOpen(false); setNovaAlocPreset(null) }}
+        />
+      )}
+
+      {/* ── Modal Editar Maquinário (demanda Obras → Frotas) ── */}
+      {editAloc && (
+        <EditarMaquinarioModal
+          alocacao={editAloc}
+          isLight={isLight}
+          onClose={() => setEditAloc(null)}
         />
       )}
     </div>
@@ -402,21 +446,30 @@ function KpiCard({ isDark, icon: Icon, label, value, color, onClick, active }: {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function GanttView({
-  veiculos, alocacoes, isDark,
+  veiculos, alocacoes, obras, isDark, onEditAloc,
 }: {
   veiculos: FroVeiculo[]
   alocacoes: FroAlocacao[]
+  obras: { id: string; nome: string; codigo: string }[]
   isDark: boolean
+  onEditAloc: (aloc: FroAlocacao) => void
 }) {
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaVeiculo | 'todos'>('todos')
-  const [sortBy, setSortBy] = useState<'tipo' | 'data_inicio' | 'data_fim' | 'obra'>('data_inicio')
-  const [expanded, setExpanded] = useState(true)
+  const [sortBy, setSortBy] = useState<'tipo' | 'data_inicio' | 'data_fim'>('data_inicio')
+  const [obrasMinimizadas, setObrasMinimizadas] = useState<Set<string>>(new Set())
+  const [todasMinimizadas, setTodasMinimizadas] = useState(false)
 
   const veicById = useMemo(() => {
     const m = new Map<string, FroVeiculo>()
     veiculos.forEach(v => m.set(v.id, v))
     return m
   }, [veiculos])
+
+  const obraById = useMemo(() => {
+    const m = new Map<string, { id: string; nome: string; codigo: string }>()
+    obras.forEach(o => m.set(o.id, o))
+    return m
+  }, [obras])
 
   const rows = useMemo(() => {
     const list = alocacoes.filter(a => a.status === 'ativa' || a.status === 'encerrada')
@@ -430,11 +483,38 @@ function GanttView({
         case 'tipo':        return CATEGORIA_LABEL[a.veic.categoria].localeCompare(CATEGORIA_LABEL[b.veic.categoria])
         case 'data_inicio': return new Date(a.aloc.data_saida).getTime() - new Date(b.aloc.data_saida).getTime()
         case 'data_fim':    return new Date(a.aloc.data_retorno_prev || a.aloc.data_saida).getTime() - new Date(b.aloc.data_retorno_prev || b.aloc.data_saida).getTime()
-        case 'obra':        return (a.aloc.obra?.nome || '').localeCompare(b.aloc.obra?.nome || '')
       }
     })
     return out
   }, [alocacoes, veicById, filtroCategoria, sortBy])
+
+  // Agrupa rows por obra (id + nome) — "Sem obra" para alocações sem obra_id
+  const groups = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string; rows: typeof rows }>()
+    rows.forEach(r => {
+      const id = r.aloc.obra_id ?? '__sem_obra__'
+      const nome = r.aloc.obra?.nome ?? 'Sem obra'
+      if (!map.has(id)) map.set(id, { id, nome, rows: [] })
+      map.get(id)!.rows.push(r)
+    })
+    return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [rows])
+
+  const toggleObra = (id: string) => {
+    setObrasMinimizadas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleTodas = () => {
+    setTodasMinimizadas(prev => {
+      const novoEstado = !prev
+      setObrasMinimizadas(novoEstado ? new Set(groups.map(g => g.id)) : new Set())
+      return novoEstado
+    })
+  }
 
   // Timeline window: min data_saida → max data_retorno_prev (ou +60d se ativa sem fim)
   const window = useMemo(() => {
@@ -476,18 +556,28 @@ function GanttView({
     return labels
   }, [window, totalDays])
 
+  // Larguras das colunas (table-like)
+  const COL_W = {
+    atividade: 220,
+    inicio: 90,
+    termino: 90,
+    status: 100,
+    deparaq: 130,
+  }
+  const tableW = COL_W.atividade + COL_W.inicio + COL_W.termino + COL_W.status + COL_W.deparaq
+
   return (
     <div className="space-y-3">
       {/* Header controls */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setExpanded(e => !e)}
+          onClick={toggleTodas}
           className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
             isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'
           }`}
         >
-          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          {expanded ? 'Recolher' : 'Expandir'}
+          {todasMinimizadas ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+          {todasMinimizadas ? 'Expandir todas obras' : 'Minimizar todas obras'}
         </button>
 
         <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
@@ -496,7 +586,6 @@ function GanttView({
           <option value="tipo">Ordenar: Tipo</option>
           <option value="data_inicio">Ordenar: Inicio</option>
           <option value="data_fim">Ordenar: Termino</option>
-          <option value="obra">Ordenar: Canteiro</option>
         </select>
 
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaVeiculo | 'todos')} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
@@ -510,80 +599,154 @@ function GanttView({
       </div>
 
       {/* Gantt */}
-      <div className={`rounded-xl border overflow-hidden ${border}`}>
-        {/* Month header */}
+      <div className={`rounded-xl border overflow-x-auto ${border}`}>
+        {/* Header */}
         <div className={`flex items-center border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className={`w-[240px] shrink-0 px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Equipamento / Obra</div>
-          <div className="flex-1 relative h-8">
+          <div className={`flex shrink-0 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${tableW}px` }}>
+            <div className={`px-3 py-2 border-r ${border}`} style={{ width: `${COL_W.atividade}px` }}>Atividade</div>
+            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.inicio}px` }}>Início</div>
+            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.termino}px` }}>Término</div>
+            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.status}px` }}>Status</div>
+            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.deparaq}px` }}>De / Para</div>
+          </div>
+          <div className="flex-1 relative h-8 min-w-[400px]">
             {monthLabels.map((m, i) => (
               <div key={i} className={`absolute top-0 bottom-0 flex items-center text-[10px] font-semibold ${txtMuted} border-l ${border}`} style={{ left: `${m.pct}%`, paddingLeft: '4px' }}>
                 {m.label}
               </div>
             ))}
-            {/* Today line */}
             <div className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-10 pointer-events-none" style={{ left: `${todayPct}%` }}>
               <div className="absolute -top-0.5 -translate-x-1/2 text-[9px] font-bold text-red-500 whitespace-nowrap">hoje</div>
             </div>
           </div>
         </div>
 
-        {/* Rows */}
+        {/* Groups by obra */}
         {rows.length === 0 ? (
           <div className={`text-center py-12 ${txtMuted}`}>
             <CalendarRange size={36} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">Nenhuma alocacao cadastrada</p>
           </div>
-        ) : expanded && rows.map(r => {
-          const start = new Date(r.aloc.data_saida)
-          const end = new Date(r.aloc.data_retorno_real || r.aloc.data_retorno_prev || addDays(new Date(), 30).toISOString())
-          const startOffset = daysBetween(window.start, start)
-          const duration = Math.max(1, daysBetween(start, end))
-          const leftPct = (startOffset / totalDays) * 100
-          const widthPct = Math.max(1, (duration / totalDays) * 100)
-
-          const isEncerrada = r.aloc.status === 'encerrada'
-          const isLate = !isEncerrada && r.aloc.data_retorno_prev && new Date(r.aloc.data_retorno_prev) < today
-          const isNearEnd = !isEncerrada && !isLate && r.aloc.data_retorno_prev &&
-            daysBetween(today, new Date(r.aloc.data_retorno_prev)) <= 7
-
-          const barColor = isEncerrada
-            ? 'bg-slate-400'
-            : isLate
-              ? 'bg-red-500'
-              : isNearEnd
-                ? 'bg-amber-500'
-                : 'bg-emerald-500'
-
+        ) : groups.map(group => {
+          const minimizada = obrasMinimizadas.has(group.id)
           return (
-            <div key={r.aloc.id} className={`flex items-center border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.02]' : 'border-slate-100 hover:bg-slate-50'}`}>
-              <div className="w-[240px] shrink-0 px-3 py-2">
-                <p className={`text-xs font-bold truncate ${txtMain}`}>
-                  {CATEGORIA_LABEL[r.veic.categoria]} · <span className="font-mono text-[10px]">{r.veic.placa || r.veic.numero_serie}</span>
-                </p>
-                <p className={`text-[10px] truncate ${txtMuted}`}>{r.aloc.obra?.nome || 'Sem obra'}</p>
-              </div>
-              <div className="flex-1 relative h-10">
-                {/* Today line repeated in each row */}
-                <div className="absolute top-0 bottom-0 w-[1px] bg-red-500/40 pointer-events-none" style={{ left: `${todayPct}%` }} />
-                {/* Bar */}
-                <div
-                  className={`absolute top-1/2 -translate-y-1/2 h-5 rounded ${barColor} shadow-sm text-white text-[9px] font-bold flex items-center px-1.5 overflow-hidden`}
-                  style={{ left: `${leftPct}%`, width: `${widthPct}%`, minWidth: 12 }}
-                  title={`${fmtDate(r.aloc.data_saida)} - ${fmtDate(r.aloc.data_retorno_prev)} · ${r.aloc.obra?.nome || ''}`}
-                >
-                  {widthPct > 8 && (
-                    <>
-                      {fmtDate(r.aloc.data_saida)}
-                      {widthPct > 20 && (
-                        <>
-                          <ArrowRight size={9} className="mx-1 opacity-60" />
-                          {fmtDate(r.aloc.data_retorno_prev)}
-                        </>
-                      )}
-                    </>
-                  )}
+            <div key={group.id}>
+              {/* Group header (clicável) */}
+              <button
+                onClick={() => toggleObra(group.id)}
+                className={`flex items-center w-full text-left border-b transition-colors ${
+                  isDark ? 'border-white/[0.04] bg-white/[0.04] hover:bg-white/[0.06]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'
+                }`}
+                style={{ minWidth: `${tableW + 400}px` }}
+              >
+                <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${tableW}px` }}>
+                  {minimizada ? <ChevronDown size={13} className={txtMuted} /> : <ChevronUp size={13} className={txtMuted} />}
+                  <Building2 size={12} className={txtMuted} />
+                  <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{group.nome}</span>
+                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'
+                  }`}>{group.rows.length}</span>
                 </div>
-              </div>
+                <div className="flex-1 h-7" />
+              </button>
+
+              {/* Group rows */}
+              {!minimizada && group.rows.map(r => {
+                const start = new Date(r.aloc.data_saida)
+                const end = new Date(r.aloc.data_retorno_real || r.aloc.data_retorno_prev || addDays(new Date(), 30).toISOString())
+                const startOffset = daysBetween(window.start, start)
+                const duration = Math.max(1, daysBetween(start, end))
+                const leftPct = (startOffset / totalDays) * 100
+                const widthPct = Math.max(1, (duration / totalDays) * 100)
+
+                const isEncerrada = r.aloc.status === 'encerrada'
+                const isLate = !isEncerrada && r.aloc.data_retorno_prev && new Date(r.aloc.data_retorno_prev) < today
+                const isNearEnd = !isEncerrada && !isLate && r.aloc.data_retorno_prev &&
+                  daysBetween(today, new Date(r.aloc.data_retorno_prev)) <= 7
+
+                const barColor = isEncerrada
+                  ? 'bg-slate-400'
+                  : isLate
+                    ? 'bg-red-500'
+                    : isNearEnd
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500'
+
+                const statusLabel = isEncerrada ? 'Encerrada' : isLate ? 'Atrasado' : isNearEnd ? 'Próx. fim' : 'Em uso'
+                const statusCls = isEncerrada
+                  ? (isDark ? 'bg-slate-500/15 text-slate-400' : 'bg-slate-100 text-slate-600')
+                  : isLate
+                    ? (isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-700')
+                    : isNearEnd
+                      ? (isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-700')
+                      : (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-700')
+
+                const proximaObra = r.aloc.proxima_obra_id ? obraById.get(r.aloc.proxima_obra_id) : undefined
+
+                return (
+                  <div
+                    key={r.aloc.id}
+                    onClick={() => onEditAloc(r.aloc)}
+                    className={`flex items-center border-b cursor-pointer transition-colors ${
+                      isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'
+                    }`}
+                    title="Clique para editar"
+                  >
+                    {/* Tabela esquerda */}
+                    <div className="flex shrink-0" style={{ width: `${tableW}px` }}>
+                      <div className={`px-3 py-2 border-r ${border}`} style={{ width: `${COL_W.atividade}px` }}>
+                        <p className={`text-xs font-bold truncate ${txtMain}`}>
+                          {CATEGORIA_LABEL[r.veic.categoria]} — {r.veic.marca} {r.veic.modelo}
+                        </p>
+                        <p className={`text-[10px] font-mono truncate ${txtMuted}`}>{r.veic.placa || r.veic.numero_serie}</p>
+                      </div>
+                      <div className={`px-2 py-2 border-r ${border} text-[11px] ${txtMain}`} style={{ width: `${COL_W.inicio}px` }}>
+                        {fmtDate(r.aloc.data_saida)}
+                      </div>
+                      <div className={`px-2 py-2 border-r ${border} text-[11px] ${txtMain}`} style={{ width: `${COL_W.termino}px` }}>
+                        {fmtDate(r.aloc.data_retorno_real || r.aloc.data_retorno_prev)}
+                      </div>
+                      <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.status}px` }}>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${statusCls}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className={`px-2 py-2 border-r ${border} text-[10px] ${txtMuted}`} style={{ width: `${COL_W.deparaq}px` }}>
+                        {proximaObra ? (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold ${
+                            isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'
+                          }`} title={`Solicitação Obras → ${proximaObra.nome}`}>
+                            <ArrowRight size={9} /> {proximaObra.nome}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Gantt bar */}
+                    <div className="flex-1 relative h-10 min-w-[400px]">
+                      <div className="absolute top-0 bottom-0 w-[1px] bg-red-500/40 pointer-events-none" style={{ left: `${todayPct}%` }} />
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 h-5 rounded ${barColor} shadow-sm text-white text-[9px] font-bold flex items-center px-1.5 overflow-hidden cursor-pointer`}
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%`, minWidth: 12 }}
+                        title={`${fmtDate(r.aloc.data_saida)} → ${fmtDate(r.aloc.data_retorno_prev)} · clique para editar`}
+                      >
+                        {widthPct > 8 && (
+                          <>
+                            {fmtDate(r.aloc.data_saida)}
+                            {widthPct > 20 && (
+                              <>
+                                <ArrowRight size={9} className="mx-1 opacity-60" />
+                                {fmtDate(r.aloc.data_retorno_prev)}
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )
         })}
@@ -606,7 +769,7 @@ function GanttView({
 // ══════════════════════════════════════════════════════════════════════════════
 
 function KanbanView({
-  veiculos, alocacoes, obras, isDark, onMoveToObra, onNewObra,
+  veiculos, alocacoes, obras, isDark, onMoveToObra, onNewObra, onEditAloc,
 }: {
   veiculos: FroVeiculo[]
   alocacoes: FroAlocacao[]
@@ -614,6 +777,7 @@ function KanbanView({
   isDark: boolean
   onMoveToObra: (veiculoId: string, obraId: string) => void
   onNewObra: () => void
+  onEditAloc: (aloc: FroAlocacao) => void
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [filtroOpen, setFiltroOpen] = useState(false)
@@ -828,15 +992,20 @@ function KanbanView({
                 </div>
               ) : col.veiculos.map(v => {
                 const aloc = alocAtivaByVeic.get(v.id)
+                const proximaObraNome = aloc?.proxima_obra_id
+                  ? obras.find(o => o.id === aloc.proxima_obra_id)?.nome
+                  : undefined
                 return (
                   <VeiculoKanbanCard
                     key={v.id}
                     veiculo={v}
                     aloc={aloc}
+                    proximaObraNome={proximaObraNome}
                     isDark={isDark}
                     isDragging={dragId === v.id}
                     onDragStart={() => onDragStart(v.id)}
                     onDragEnd={onDragEnd}
+                    onClick={() => aloc && onEditAloc(aloc)}
                   />
                 )
               })}
@@ -859,13 +1028,17 @@ function KanbanView({
   )
 }
 
-function VeiculoKanbanCard({ veiculo: v, aloc, isDark, isDragging, onDragStart, onDragEnd }: {
+function VeiculoKanbanCard({
+  veiculo: v, aloc, proximaObraNome, isDark, isDragging, onDragStart, onDragEnd, onClick,
+}: {
   veiculo: FroVeiculo
   aloc?: FroAlocacao
+  proximaObraNome?: string
   isDark: boolean
   isDragging: boolean
   onDragStart: () => void
   onDragEnd: () => void
+  onClick?: () => void
 }) {
   const stCfg = STATUS_LABEL[v.status]
   const cardCls = isDark
@@ -895,7 +1068,11 @@ function VeiculoKanbanCard({ veiculo: v, aloc, isDark, isDragging, onDragStart, 
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`rounded-xl border p-2.5 cursor-grab active:cursor-grabbing transition-all ${cardCls} ${isDragging ? 'opacity-40 scale-95' : ''}`}
+      onClick={(e) => {
+        // só dispara click se NÃO foi drag (movimento)
+        if (!isDragging && onClick) onClick()
+      }}
+      className={`rounded-xl border p-2.5 cursor-pointer hover:cursor-grab active:cursor-grabbing transition-all ${cardCls} ${isDragging ? 'opacity-40 scale-95' : ''}`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
         <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{CATEGORIA_LABEL[v.categoria]}</span>
@@ -909,6 +1086,14 @@ function VeiculoKanbanCard({ veiculo: v, aloc, isDark, isDragging, onDragStart, 
 
       <p className={`text-xs font-extrabold ${txtMain} truncate`}>{v.marca} {v.modelo}</p>
       <p className={`text-[10px] font-mono mt-0.5 ${txtMuted}`}>{v.placa || v.numero_serie || '—'}</p>
+
+      {proximaObraNome && (
+        <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+          isDark ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200'
+        }`} title={`Movimentação solicitada para ${proximaObraNome} - aguardando confirmação Frotas`}>
+          <ArrowRight size={9} /> {proximaObraNome}
+        </div>
+      )}
 
       {aloc?.data_saida && (
         <div className="mt-2 space-y-1">
