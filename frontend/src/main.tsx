@@ -25,6 +25,11 @@ import './index.css'
       if (tag === 'INPUT' && !TEXT_TYPES.has((target as HTMLInputElement).type)) return
       if (target.readOnly || target.disabled) return
       if (target.closest('[data-no-upper]')) return
+      // Skip password fields even when toggled to type=text (show-password toggle)
+      const ac = (target.getAttribute('autocomplete') || '').toLowerCase()
+      if (ac.includes('password')) return
+      const nm = (target.getAttribute('name') || target.id || '').toLowerCase()
+      if (nm.includes('password') || nm.includes('senha')) return
 
       const upper = toUpperNorm(target.value)
       if (upper === target.value) return

@@ -723,9 +723,6 @@ function UserDetailPanel({
   const { isDark } = useTheme()
   const update = useUpdateUser()
   const changePwd = useChangePassword()
-  const deleteUser = useDeleteUser()
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleteTyped, setDeleteTyped] = useState('')
   const [editing, setEditing] = useState(false)
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
@@ -901,47 +898,7 @@ function UserDetailPanel({
               }`}>
             <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
           </button>
-          <button onClick={() => setConfirmDelete(true)}
-            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-500 hover:bg-red-50'}`}>
-            <X size={12} />
-          </button>
         </div>
-        {confirmDelete && (
-          <div className="px-4 pb-3">
-            <div className={`rounded-xl border-2 p-3 ${isDark ? 'border-red-500/30 bg-red-500/10' : 'border-red-200 bg-red-50'}`}>
-              <p className={`text-xs font-bold mb-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>Excluir {user.nome}?</p>
-              <p className={`text-[10px] mb-3 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
-                Esta acao e irreversivel. O usuario sera removido permanentemente do sistema, incluindo Auth e perfil.
-              </p>
-              <div className="mb-3">
-                <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
-                  Digite <span className={`font-black px-1 rounded ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>EXCLUIR</span> para confirmar:
-                </p>
-                <input
-                  type="text"
-                  value={deleteTyped}
-                  onChange={e => setDeleteTyped(e.target.value)}
-                  placeholder="EXCLUIR"
-                  className={`w-full text-xs rounded-lg px-3 py-2 border-2 outline-none font-bold uppercase tracking-wider ${isDark ? 'border-red-500/30 bg-white/[0.05] text-red-400 placeholder-red-500/40 focus:border-red-500/50' : 'border-red-200 bg-white text-red-700 placeholder-red-300 focus:border-red-400'}`}
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { setConfirmDelete(false); setDeleteTyped('') }}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
-                  disabled={deleteUser.isPending || deleteTyped.trim().toUpperCase() !== 'EXCLUIR'}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-opacity">
-                  {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                  Excluir Permanentemente
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </>) : (
         <div className={`px-4 pb-4 space-y-4 border-t pt-4 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           {/* Role */}
