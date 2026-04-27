@@ -12,7 +12,7 @@ import {
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
-import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL, CATEGORIA_VEICULO, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -450,10 +450,18 @@ function GanttView({
   isDark: boolean
   onEditAloc: (aloc: FroAlocacao) => void
 }) {
-  const [filtroCategoria, setFiltroCategoria] = useState<CategoriaVeiculo | 'todos'>('todos')
   const [sortBy, setSortBy] = useState<'tipo' | 'data_inicio' | 'data_fim'>('data_inicio')
   const [obrasMinimizadas, setObrasMinimizadas] = useState<Set<string>>(new Set())
   const [todasMinimizadas, setTodasMinimizadas] = useState(false)
+  const [filtroTipoOpenG, setFiltroTipoOpenG] = useState(false)
+  const [filtroObraOpenG, setFiltroObraOpenG] = useState(false)
+  const [tiposSelG, setTiposSelG] = useState<Set<CategoriaVeiculo>>(() => new Set(CATEGORIA_VEICULO))
+  const [obrasSelG, setObrasSelG] = useState<Set<string>>(() => new Set(obras.map(o => o.id).concat('__sem_obra__')))
+
+  // Atualiza obras selecionadas se a lista de obras mudar
+  useEffect(() => {
+    setObrasSelG(prev => prev.size === 0 ? new Set(obras.map(o => o.id).concat('__sem_obra__')) : prev)
+  }, [obras])
 
   const veicById = useMemo(() => {
     const m = new Map<string, FroVeiculo>()
@@ -472,7 +480,13 @@ function GanttView({
       .map(a => ({ aloc: a, veic: veicById.get(a.veiculo_id) }))
       .filter(r => !!r.veic) as { aloc: FroAlocacao; veic: FroVeiculo }[]
 
-    let out = filtroCategoria === 'todos' ? list : list.filter(r => r.veic.categoria === filtroCategoria)
+    // Filtro por TIPO (categoria do veículo)
+    let out = (tiposSelG.size === CATEGORIA_VEICULO.length)
+      ? list
+      : list.filter(r => tiposSelG.has(r.veic.categoria))
+
+    // Filtro por OBRA
+    out = out.filter(r => obrasSelG.has(r.aloc.obra_id ?? '__sem_obra__'))
 
     out.sort((a, b) => {
       switch (sortBy) {
@@ -482,7 +496,7 @@ function GanttView({
       }
     })
     return out
-  }, [alocacoes, veicById, filtroCategoria, sortBy])
+  }, [alocacoes, veicById, tiposSelG, obrasSelG, sortBy])
 
   // Agrupa rows por obra (id + nome) — "Sem obra" para alocações sem obra_id
   const groups = useMemo(() => {
@@ -495,6 +509,37 @@ function GanttView({
     })
     return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows])
+
+  // Contagens por categoria/obra (para mostrar nos dropdowns; baseadas em todas as alocações ativas/encerradas)
+  const contagemPorCategoriaG = useMemo(() => {
+    const c: Record<string, number> = {}
+    alocacoes.filter(a => a.status === 'ativa' || a.status === 'encerrada').forEach(a => {
+      const v = veicById.get(a.veiculo_id)
+      if (v) c[v.categoria] = (c[v.categoria] ?? 0) + 1
+    })
+    return c
+  }, [alocacoes, veicById])
+
+  const toggleTipoG = (cat: CategoriaVeiculo) => {
+    setTiposSelG(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+  const selecionarGrupoG = (g: 'leve' | 'caminhao' | 'maquina' | 'todos') => {
+    if (g === 'todos') setTiposSelG(new Set(CATEGORIA_VEICULO))
+    else setTiposSelG(new Set(CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === g)))
+  }
+  const toggleObraG = (id: string) => {
+    setObrasSelG(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const todasObrasG = () => setObrasSelG(new Set(obras.map(o => o.id).concat('__sem_obra__')))
+  const nenhumaObraG = () => setObrasSelG(new Set())
 
   const toggleObra = (id: string) => {
     setObrasMinimizadas(prev => {
@@ -584,12 +629,95 @@ function GanttView({
           <option value="data_fim">Ordenar: Termino</option>
         </select>
 
-        <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaVeiculo | 'todos')} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
-          isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'
-        }`}>
-          <option value="todos">Todos os tipos</option>
-          {Object.entries(CATEGORIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        {/* ── Filtro Tipo ─────────────────────────────────────────────── */}
+        <div className="relative">
+          <button
+            onClick={() => setFiltroTipoOpenG(o => !o)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+              isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200 hover:bg-white/[0.08]' : 'bg-white border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <Filter size={13} /> Filtrar tipos
+            {tiposSelG.size < CATEGORIA_VEICULO.length && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-bold">{tiposSelG.size}</span>
+            )}
+          </button>
+          {filtroTipoOpenG && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setFiltroTipoOpenG(false)} />
+              <div className={`absolute left-0 mt-1 w-[260px] max-h-[480px] rounded-xl border shadow-xl z-50 overflow-hidden ${
+                isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'
+              }`}>
+                <div className={`px-3 py-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                  <p className={`text-xs font-bold mb-1.5 ${txtMain}`}>Atalhos por grupo</p>
+                  <div className="flex flex-wrap gap-1">
+                    <button onClick={() => selecionarGrupoG('todos')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>Todos</button>
+                    <button onClick={() => selecionarGrupoG('leve')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>Leves</button>
+                    <button onClick={() => selecionarGrupoG('caminhao')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>Caminhões</button>
+                    <button onClick={() => selecionarGrupoG('maquina')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25' : 'bg-violet-50 text-violet-700 hover:bg-violet-100'}`}>Máquinas</button>
+                  </div>
+                </div>
+                <div className="overflow-y-auto max-h-[360px]">
+                  {(['leve','caminhao','maquina'] as const).map(g => (
+                    <div key={g}>
+                      <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>{CATEGORIA_GRUPO_LABEL[g]}</p>
+                      {CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === g).map(c => (
+                        <label key={c} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                          <input type="checkbox" checked={tiposSelG.has(c)} onChange={() => toggleTipoG(c)} className="accent-blue-500" />
+                          <span className={`text-xs ${txtMain}`}>{CATEGORIA_LABEL[c]}</span>
+                          <span className={`ml-auto text-[10px] ${txtMuted}`}>{contagemPorCategoriaG[c] ?? 0}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Filtro Obra ─────────────────────────────────────────────── */}
+        <div className="relative">
+          <button
+            onClick={() => setFiltroObraOpenG(o => !o)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+              isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200 hover:bg-white/[0.08]' : 'bg-white border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <Filter size={13} /> Filtrar obras
+            {obrasSelG.size < obras.length + 1 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold">{obrasSelG.size}</span>
+            )}
+          </button>
+          {filtroObraOpenG && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setFiltroObraOpenG(false)} />
+              <div className={`absolute left-0 mt-1 w-[280px] max-h-[480px] rounded-xl border shadow-xl z-50 overflow-hidden ${
+                isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'
+              }`}>
+                <div className={`px-3 py-2 border-b flex items-center justify-between ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                  <p className={`text-xs font-bold ${txtMain}`}>Obras visíveis</p>
+                  <div className="flex gap-1">
+                    <button onClick={todasObrasG} className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Todas</button>
+                    <button onClick={nenhumaObraG} className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Nenhuma</button>
+                  </div>
+                </div>
+                <div className="overflow-y-auto max-h-[360px]">
+                  <label className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                    <input type="checkbox" checked={obrasSelG.has('__sem_obra__')} onChange={() => toggleObraG('__sem_obra__')} className="accent-orange-500" />
+                    <span className={`text-xs italic ${txtMuted}`}>Sem obra</span>
+                  </label>
+                  {obras.map(o => (
+                    <label key={o.id} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                      <input type="checkbox" checked={obrasSelG.has(o.id)} onChange={() => toggleObraG(o.id)} className="accent-orange-500" />
+                      <span className={`text-xs truncate ${txtMain}`} title={o.nome}>{o.nome}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         <span className={`ml-auto text-[11px] ${txtMuted}`}>{rows.length} alocacoes</span>
       </div>
@@ -777,8 +905,12 @@ function KanbanView({
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [filtroOpen, setFiltroOpen] = useState(false)
+  const [filtroTipoOpen, setFiltroTipoOpen] = useState(false)
   const [obrasSelecionadas, setObrasSelecionadas] = useState<Set<string>>(
     () => new Set(['pool', ...obras.map(o => o.id)])
+  )
+  const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
+    () => new Set(CATEGORIA_VEICULO),
   )
   const [buscaObra, setBuscaObra] = useState('')
   const topScrollRef = useRef<HTMLDivElement | null>(null)
@@ -819,23 +951,29 @@ function KanbanView({
     return m
   }, [alocacoes])
 
+  // Aplica filtro de TIPO antes de agrupar (afeta tanto colunas quanto contagens)
+  const veiculosFiltrados = useMemo(() => {
+    if (tiposSelecionados.size === CATEGORIA_VEICULO.length) return veiculos
+    return veiculos.filter(v => tiposSelecionados.has(v.categoria))
+  }, [veiculos, tiposSelecionados])
+
   // Group veiculos by current obra
   const columns = useMemo(() => {
     const cols: Array<{ id: string; name: string; veiculos: FroVeiculo[] }> = []
     cols.push({
       id: 'pool',
       name: 'Disponiveis',
-      veiculos: veiculos.filter(v => !alocAtivaByVeic.get(v.id) && v.status !== 'baixado'),
+      veiculos: veiculosFiltrados.filter(v => !alocAtivaByVeic.get(v.id) && v.status !== 'baixado'),
     })
     obras.forEach(o => {
       cols.push({
         id: o.id,
         name: o.nome,
-        veiculos: veiculos.filter(v => alocAtivaByVeic.get(v.id)?.obra_id === o.id),
+        veiculos: veiculosFiltrados.filter(v => alocAtivaByVeic.get(v.id)?.obra_id === o.id),
       })
     })
     return cols
-  }, [veiculos, obras, alocAtivaByVeic])
+  }, [veiculosFiltrados, obras, alocAtivaByVeic])
 
   // Colunas visiveis apos filtro
   const visibleColumns = useMemo(() => {
@@ -874,6 +1012,25 @@ function KanbanView({
   const selecionarTodas = () => setObrasSelecionadas(new Set(['pool', ...obras.map(o => o.id)]))
   const limparSelecao = () => setObrasSelecionadas(new Set())
 
+  const toggleTipo = (cat: CategoriaVeiculo) => {
+    setTiposSelecionados(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+  const selecionarGrupo = (grupo: 'leve' | 'caminhao' | 'maquina' | 'todos') => {
+    if (grupo === 'todos') setTiposSelecionados(new Set(CATEGORIA_VEICULO))
+    else setTiposSelecionados(new Set(CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo)))
+  }
+
+  // Contagem de veículos por categoria (com filtro de tipo desconsiderado, só pra UI do dropdown)
+  const contagemPorCategoria = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculos.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculos])
+
   const obrasFiltradas = useMemo(() => {
     if (!buscaObra) return obras
     const q = buscaObra.toLowerCase()
@@ -892,6 +1049,59 @@ function KanbanView({
           <span className={`text-[11px] ${txtMuted}`}>
             {visibleColumns.length} / {columns.length} canteiros
           </span>
+
+          {/* ── Filtro Tipo ────────────────────────────────────────────── */}
+          <div className="relative">
+            <button
+              onClick={() => setFiltroTipoOpen(o => !o)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+                isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]' : 'bg-white border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Filter size={13} /> Filtrar tipos
+              {tiposSelecionados.size < CATEGORIA_VEICULO.length && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-bold">
+                  {tiposSelecionados.size}
+                </span>
+              )}
+            </button>
+            {filtroTipoOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setFiltroTipoOpen(false)} />
+                <div className={`absolute right-0 mt-1 w-[260px] max-h-[480px] rounded-xl border shadow-xl z-50 overflow-hidden ${
+                  isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'
+                }`}>
+                  <div className={`px-3 py-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                    <p className={`text-xs font-bold mb-1.5 ${txtMain}`}>Atalhos por grupo</p>
+                    <div className="flex flex-wrap gap-1">
+                      <button onClick={() => selecionarGrupo('todos')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>Todos</button>
+                      <button onClick={() => selecionarGrupo('leve')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>Leves</button>
+                      <button onClick={() => selecionarGrupo('caminhao')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>Caminhões</button>
+                      <button onClick={() => selecionarGrupo('maquina')} className={`text-[10px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25' : 'bg-violet-50 text-violet-700 hover:bg-violet-100'}`}>Máquinas</button>
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto max-h-[360px]">
+                    {(['leve','caminhao','maquina'] as const).map(grupo => (
+                      <div key={grupo}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider px-3 pt-2 pb-1 ${txtMuted}`}>
+                          {CATEGORIA_GRUPO_LABEL[grupo]}
+                        </p>
+                        {CATEGORIA_VEICULO.filter(c => CATEGORIA_GRUPO[c] === grupo).map(c => (
+                          <label key={c} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                            <input type="checkbox" checked={tiposSelecionados.has(c)} onChange={() => toggleTipo(c)} className="accent-blue-500" />
+                            <span className={`text-xs ${txtMain}`}>{CATEGORIA_LABEL[c]}</span>
+                            <span className={`ml-auto text-[10px] ${txtMuted}`}>{contagemPorCategoria[c] ?? 0}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ── Filtro Obras (existente) ─────────────────────────────── */}
           <div className="relative">
             <button
               onClick={() => setFiltroOpen(o => !o)}
