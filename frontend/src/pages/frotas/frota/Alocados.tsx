@@ -5,7 +5,9 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useAlocacoes, useEncerrarAlocacao, useOrdensServico, useVeiculos } from '../../../hooks/useFrotas'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
 import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
+import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 
 // ── OSBadge ───────────────────────────────────────────────────────────────────
 
@@ -324,6 +326,9 @@ export default function Alocados() {
   const [busca, setBusca] = useState('')
   const [filtroObra, setFiltroObra] = useState<string>('todas')
   const [filtroResp, setFiltroResp] = useState<string>('todos')
+  const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
+    () => new Set(CATEGORIA_VEICULO)
+  )
 
   const { data: alocacoesAll = [], isLoading } = useAlocacoes({ status: 'ativa' })
   const { data: veiculosAll = [] } = useVeiculos()
@@ -369,8 +374,24 @@ export default function Alocados() {
     }
     if (filtroObra !== 'todas') list = list.filter(a => a.obra?.nome === filtroObra)
     if (filtroResp !== 'todos') list = list.filter(a => a.responsavel_nome === filtroResp)
+    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+      list = list.filter(a => {
+        const v = veicMap.get(a.veiculo_id)
+        return v ? tiposSelecionados.has(v.categoria) : false
+      })
+    }
     return list
-  }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp])
+  }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp, tiposSelecionados])
+
+  // Contagem por categoria (para mostrar no dropdown)
+  const contagemCategoria = useMemo(() => {
+    const c: Record<string, number> = {}
+    alocacoesAll.forEach(a => {
+      const v = veicMap.get(a.veiculo_id)
+      if (v) c[v.categoria] = (c[v.categoria] ?? 0) + 1
+    })
+    return c
+  }, [alocacoesAll, veicMap])
 
   // map veiculo_id → OS count
   const osCountMap: Record<string, number> = {}
@@ -489,6 +510,12 @@ export default function Alocados() {
             <option value="todos">Todos responsáveis</option>
             {respsUnicos.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
+          <FiltroCategoriaVeiculo
+            selecionadas={tiposSelecionados}
+            onChange={setTiposSelecionados}
+            contagem={contagemCategoria}
+            isLight={isLight}
+          />
           <span className={`ml-auto text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             {alocacoes.length} resultado{alocacoes.length !== 1 ? 's' : ''}
           </span>

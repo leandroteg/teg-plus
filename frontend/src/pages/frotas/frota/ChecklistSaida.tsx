@@ -3,6 +3,8 @@ import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList, Search, ArrowRig
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
+import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
+import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
@@ -15,6 +17,9 @@ export default function ChecklistSaida() {
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [busca, setBusca] = useState('')
+  const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
+    () => new Set(CATEGORIA_VEICULO)
+  )
 
   const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
   const { data: alocacoesAll = [] } = useAlocacoes()
@@ -31,15 +36,29 @@ export default function ChecklistSaida() {
     return m
   }, [alocacoesAll])
 
-  const veiculos = busca
-    ? veiculosAll.filter(v => {
-        const q = busca.toLowerCase()
-        return v.placa?.toLowerCase().includes(q) ||
-          v.marca?.toLowerCase().includes(q) ||
-          v.modelo?.toLowerCase().includes(q) ||
-          (v.codigo_interno ?? '').toLowerCase().includes(q)
-      })
-    : veiculosAll
+  const veiculos = useMemo(() => {
+    let list = veiculosAll
+    if (busca) {
+      const q = busca.toLowerCase()
+      list = list.filter(v =>
+        v.placa?.toLowerCase().includes(q) ||
+        v.marca?.toLowerCase().includes(q) ||
+        v.modelo?.toLowerCase().includes(q) ||
+        (v.codigo_interno ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+      list = list.filter(v => tiposSelecionados.has(v.categoria))
+    }
+    return list
+  }, [veiculosAll, busca, tiposSelecionados])
+
+  // Contagem por categoria (todos veículos aguardando saída)
+  const contagemCategoria = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculosAll.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculosAll])
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -89,18 +108,26 @@ export default function ChecklistSaida() {
         </div>
       )}
 
-      {/* Busca */}
+      {/* Busca + Filtro categoria */}
       {!isLoading && veiculosAll.length > 0 && (
-        <div className="relative max-w-xs">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar código, placa, modelo..."
-            className={`w-full pl-8 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
-            }`}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar código, placa, modelo..."
+              className={`w-full pl-8 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+              }`}
+            />
+          </div>
+          <FiltroCategoriaVeiculo
+            selecionadas={tiposSelecionados}
+            onChange={setTiposSelecionados}
+            contagem={contagemCategoria}
+            isLight={isLight}
           />
         </div>
       )}

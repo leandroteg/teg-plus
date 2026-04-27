@@ -4,6 +4,8 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useObras } from '../../../hooks/useFinanceiro'
+import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
+import { CATEGORIA_VEICULO, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import ChecklistDivergenciasModal from '../../../components/frotas/ChecklistDivergenciasModal'
 import RegistrarEntradaModal from '../../../components/frotas/RegistrarEntradaModal'
@@ -20,6 +22,9 @@ export default function EmEntrada() {
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [busca, setBusca] = useState('')
+  const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
+    () => new Set(CATEGORIA_VEICULO)
+  )
   const [divVeiculo, setDivVeiculo] = useState<FroVeiculo | null>(null)
   const [divItens, setDivItens] = useState<DivergenciaItem[]>([])
   const [divZonas, setDivZonas] = useState<DivergenciaZona[]>([])
@@ -41,15 +46,27 @@ export default function EmEntrada() {
     return m
   }, [alocacoesAll, obras])
 
-  const veiculos = busca
-    ? veiculosAll.filter(v => {
-        const q = busca.toLowerCase()
-        return v.placa?.toLowerCase().includes(q) ||
-          v.marca?.toLowerCase().includes(q) ||
-          v.modelo?.toLowerCase().includes(q) ||
-          (v.codigo_interno ?? '').toLowerCase().includes(q)
-      })
-    : veiculosAll
+  const veiculos = useMemo(() => {
+    let list = veiculosAll
+    if (busca) {
+      const q = busca.toLowerCase()
+      list = list.filter(v => v.placa?.toLowerCase().includes(q) ||
+        v.marca?.toLowerCase().includes(q) ||
+        v.modelo?.toLowerCase().includes(q) ||
+        (v.codigo_interno ?? '').toLowerCase().includes(q))
+    }
+    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+      list = list.filter(v => tiposSelecionados.has(v.categoria))
+    }
+    return list
+  }, [veiculosAll, busca, tiposSelecionados])
+
+  // Contagem por categoria (todos veículos em entrada)
+  const contagemCategoria = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculosAll.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculosAll])
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -119,17 +136,25 @@ export default function EmEntrada() {
         </div>
       )}
 
-      {/* Busca */}
+      {/* Busca + Filtro categoria */}
       {!isLoading && veiculosAll.length > 0 && (
-        <div className="relative max-w-xs">
-          <input
-            type="text"
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar código, placa, modelo..."
-            className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
-              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
-            }`}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <input
+              type="text"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar código, placa, modelo..."
+              className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+              }`}
+            />
+          </div>
+          <FiltroCategoriaVeiculo
+            selecionadas={tiposSelecionados}
+            onChange={setTiposSelecionados}
+            contagem={contagemCategoria}
+            isLight={isLight}
           />
         </div>
       )}

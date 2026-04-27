@@ -8,6 +8,7 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useOrdensServico, useSalvarVeiculo } from '../../../hooks/useFrotas'
 import { useBases } from '../../../hooks/useEstoque'
 import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
+import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
 import type { FroVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo, TipoAtivo } from '../../../types/frotas'
 import { CATEGORIA_VEICULO, CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
 
@@ -433,6 +434,9 @@ export default function Patio() {
   const [alocarVeiculo, setAlocarVeiculo] = useState<FroVeiculo | null>(null)
   const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [showNovoAtivo, setShowNovoAtivo] = useState(false)
+  const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
+    () => new Set(CATEGORIA_VEICULO)
+  )
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
   const { data: ordens  = [] } = useOrdensServico({
@@ -449,15 +453,28 @@ export default function Patio() {
   }, [ordens])
 
   const filtered = useMemo(() => {
+    let list = veiculos
     const q = search.toLowerCase()
-    if (!q) return veiculos
-    return veiculos.filter(v =>
-      v.placa.toLowerCase().includes(q) ||
-      v.marca.toLowerCase().includes(q) ||
-      v.modelo.toLowerCase().includes(q) ||
-      (v.numero_serie ?? '').toLowerCase().includes(q)
-    )
-  }, [veiculos, search])
+    if (q) {
+      list = list.filter(v =>
+        v.placa.toLowerCase().includes(q) ||
+        v.marca.toLowerCase().includes(q) ||
+        v.modelo.toLowerCase().includes(q) ||
+        (v.numero_serie ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (tiposSelecionados.size < CATEGORIA_VEICULO.length) {
+      list = list.filter(v => tiposSelecionados.has(v.categoria))
+    }
+    return list
+  }, [veiculos, search, tiposSelecionados])
+
+  // Contagem por categoria (todos veículos do pátio)
+  const contagemCategoria = useMemo(() => {
+    const c: Record<string, number> = {}
+    veiculos.forEach(v => { c[v.categoria] = (c[v.categoria] ?? 0) + 1 })
+    return c
+  }, [veiculos])
 
   // handlers
   const handleAlocar    = (id: string) => {
@@ -500,6 +517,13 @@ export default function Patio() {
               }`}
             />
           </div>
+
+          <FiltroCategoriaVeiculo
+            selecionadas={tiposSelecionados}
+            onChange={setTiposSelecionados}
+            contagem={contagemCategoria}
+            isLight={isLight}
+          />
 
           {/* View toggle */}
           <div className={`flex items-center rounded-xl border overflow-hidden ${
