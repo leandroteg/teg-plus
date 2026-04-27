@@ -634,7 +634,7 @@ export function useAlocacoes(filtros?: { status?: StatusAlocacao; veiculo_id?: s
     queryFn: async () => {
       let q = supabase
         .from('fro_alocacoes')
-        .select(`*, veiculo:fro_veiculos(id,placa,modelo,marca,categoria), obra:sys_obras(id,nome,codigo)`)
+        .select(`*, veiculo:fro_veiculos(id,placa,modelo,marca,categoria), obra:sys_obras!obra_id(id,nome,codigo), proxima_obra:sys_obras!proxima_obra_id(id,nome,codigo)`)
         .order('data_saida', { ascending: false })
       if (filtros?.status)     q = q.eq('status', filtros.status)
       if (filtros?.veiculo_id) q = q.eq('veiculo_id', filtros.veiculo_id)
