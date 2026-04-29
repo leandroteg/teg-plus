@@ -153,6 +153,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    if (!mutation.isSuccess) return
+    const t = setTimeout(() => setHidden(true), 2500)
+    return () => clearTimeout(t)
+  }, [mutation.isSuccess])
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -208,6 +215,8 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
       })
     } catch { /* error handled by mutation state */ }
   }
+
+  if (hidden) return null
 
   // Resultado pos-decisao
   if (mutation.isSuccess) {
