@@ -1137,7 +1137,7 @@ export function useDecisaoRequisicao() {
       } else if (decisao === 'rejeitada') {
         updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
       } else if (decisao === 'esclarecimento') {
-        updates.status = 'em_esclarecimento'
+        updates.status = isFinancialApproval ? 'cotacao_em_esclarecimento' : 'em_esclarecimento'
         updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
         updates.esclarecimento_por = aprovadorNome
         updates.esclarecimento_em = new Date().toISOString()

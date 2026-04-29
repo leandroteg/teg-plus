@@ -181,7 +181,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
       )}
 
       {/* Esclarecimento alert */}
-      {r.status === 'em_esclarecimento' && r.esclarecimento_msg && (
+      {(r.status === 'em_esclarecimento' || r.status === 'cotacao_em_esclarecimento') && r.esclarecimento_msg && (
         <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <MessageSquare size={13} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
           <div className="min-w-0">
@@ -450,7 +450,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           )}
 
           {/* Responder esclarecimento (para requisitante) */}
-          {r.status === 'em_esclarecimento' && (
+          {(r.status === 'em_esclarecimento' || r.status === 'cotacao_em_esclarecimento') && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
               <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Responder Esclarecimento</p>
               <UpperTextarea
@@ -474,7 +474,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           )}
 
           {/* Ações de decisão (aprovador) */}
-          {canDecide && r.status !== 'em_esclarecimento' && (
+          {canDecide && r.status !== 'em_esclarecimento' && r.status !== 'cotacao_em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <UpperTextarea
                 rows={2}
@@ -929,6 +929,7 @@ export default function ListaRequisicoes() {
               alcadaNivel: detail.alcada_nivel,
               solicitanteNome: perfil?.nome ?? 'Solicitante',
               resposta,
+              statusAtual: detail.status,
             }, {
               onSuccess: () => {
                 setDetail(null)

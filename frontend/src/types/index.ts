@@ -2,7 +2,7 @@ export type StatusRequisicao =
   | 'rascunho' | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
   | 'devolvida_solicitante'
-  | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada'
+  | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada' | 'cotacao_em_esclarecimento'
   | 'pedido_emitido' | 'em_entrega' | 'entregue'
   | 'aguardando_pgto' | 'pago'
   | 'comprada' | 'cancelada'

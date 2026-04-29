@@ -341,21 +341,29 @@ export function useReenviarEsclarecimento() {
       alcadaNivel,
       solicitanteNome,
       resposta,
+      statusAtual,
     }: {
       requisicaoId: string
       requisicaoNumero: string
       alcadaNivel: number
       solicitanteNome: string
       resposta?: string
+      statusAtual?: string
     }) => {
-      // 1. Atualiza status de volta para em_aprovacao
+      const isCotacaoEsclarecimento = statusAtual === 'cotacao_em_esclarecimento'
+      const statusRetorno = isCotacaoEsclarecimento ? 'cotacao_enviada' : 'em_aprovacao'
+
+      // 1. Atualiza status de volta para o estágio correto
       const { error: reqError } = await supabase
         .from(TABLE)
-        .update({ status: 'em_aprovacao' })
+        .update({ status: statusRetorno })
         .eq('id', requisicaoId)
       if (reqError) throw reqError
 
-      // 2. Busca aprovador da alçada para recriar o registro pendente
+      // 2. Para cotacao_em_esclarecimento, FilaCotacoes gerencia o fluxo — não recriar apr_aprovacoes
+      if (isCotacaoEsclarecimento) return
+
+      // 3. Busca aprovador da alçada para recriar o registro pendente
       const { data: alcadaData } = await supabase
         .from('apr_alcadas')
         .select('id, prazo_horas, aprovador_padrao:sys_usuarios!aprovador_padrao_id(id, nome, email)')
@@ -370,7 +378,7 @@ export function useReenviarEsclarecimento() {
         ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
         : `Esclarecimento respondido por ${solicitanteNome}`
 
-      // 3. Insere novo registro pendente em apr_aprovacoes
+      // 4. Insere novo registro pendente em apr_aprovacoes
       await supabase.from('apr_aprovacoes').insert({
         modulo: 'cmp',
         tipo_aprovacao: 'requisicao_compra',

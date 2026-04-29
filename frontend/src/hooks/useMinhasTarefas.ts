@@ -103,12 +103,12 @@ export function useMinhasTarefas() {
         })
       }
 
-      // 3. Esclarecimentos solicitados a mim (minhas requisicoes em_esclarecimento)
+      // 3. Esclarecimentos solicitados a mim (minhas requisicoes em_esclarecimento ou cotacao_em_esclarecimento)
       const { data: esclRcs } = await supabase
         .from('cmp_requisicoes')
         .select('id, numero, descricao, status, updated_at')
         .eq('solicitante_id', authId)
-        .eq('status', 'em_esclarecimento')
+        .in('status', ['em_esclarecimento', 'cotacao_em_esclarecimento'])
         .order('updated_at', { ascending: false })
 
       for (const r of esclRcs ?? []) {

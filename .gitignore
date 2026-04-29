@@ -17,6 +17,10 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 
+# Claude Code (local por máquina)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
 # IDE
 .vscode/
 .idea/
