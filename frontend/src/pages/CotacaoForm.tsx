@@ -721,21 +721,18 @@ export default function CotacaoForm() {
     const normalizedQuery = toUpperNorm(query)
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: normalizedQuery } : f))
     if (searchTimerRef.current[idx]) clearTimeout(searchTimerRef.current[idx])
-    if (normalizedQuery.trim().length < 2) {
-      setFornResults(prev => ({ ...prev, [idx]: [] }))
-      setFornOpen(prev => ({ ...prev, [idx]: false }))
-      return
-    }
     searchTimerRef.current[idx] = setTimeout(async () => {
-      const { data } = await supabase
+      const q = supabase
         .from('cmp_fornecedores')
         .select('id, nome_fantasia, razao_social, cnpj, telefone, email, contato_nome, cidade, uf')
-        .or(`nome_fantasia.ilike.%${normalizedQuery}%,razao_social.ilike.%${normalizedQuery}%`)
         .eq('ativo', true)
-        .limit(8)
+        .limit(10)
+      const { data } = normalizedQuery.trim().length >= 2
+        ? await q.or(`nome_fantasia.ilike.%${normalizedQuery}%,razao_social.ilike.%${normalizedQuery}%`)
+        : await q.order('nome_fantasia', { ascending: true })
       setFornResults(prev => ({ ...prev, [idx]: data || [] }))
       setFornOpen(prev => ({ ...prev, [idx]: (data?.length ?? 0) > 0 }))
-    }, 300)
+    }, normalizedQuery.trim().length >= 2 ? 300 : 0)
   }, [])
 
   const selectFornecedor = useCallback((idx: number, f: any) => {
@@ -1334,8 +1331,10 @@ export default function CotacaoForm() {
                 value={forn.fornecedor_nome}
                 onChange={e => searchFornecedor(idx, e.target.value)}
                 onFocus={() => {
-                  if (forn.fornecedor_nome.trim().length >= 2 && (fornResults[idx]?.length ?? 0) > 0)
+                  if ((fornResults[idx]?.length ?? 0) > 0)
                     setFornOpen(prev => ({ ...prev, [idx]: true }))
+                  else
+                    searchFornecedor(idx, forn.fornecedor_nome)
                 }}
                 onBlur={() => setTimeout(() => setFornOpen(prev => ({ ...prev, [idx]: false })), 150)}
               />
