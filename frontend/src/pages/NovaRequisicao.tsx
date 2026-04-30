@@ -163,10 +163,12 @@ export default function NovaRequisicao() {
       const pf = JSON.parse(raw)
 
 
-      // Clean item names: remove leading verbs/articles ("Fornecimento de" → keep noun)
+      // Clean item names: remove leading verbs/articles + trailing unit codes
+      const UNIT_REGEX = /\s+(un|und|unid|unidade|pc|pç|pcs|peca|pe[cç]as?|kg|kgs?|g|gr|m|mt|mts|m2|m²|m3|m³|l|lt|lts|cx|cxs|caixa|pct|pcts|rl|rlo|rolo|bd|bds|tb|tbs|mm|cm|km|ml|saco|sc|par|jogo|cj|conj|conjunto|tubo|tb|barra|br)\.?$/i
       const cleanName = (s: string) =>
         s.replace(/^(fornecimento|contrata[cç][aã]o|presta[cç][aã]o|aquisi[cç][aã]o|servi[cç]os?)\s+d[eao]s?\s+/i, '')
          .replace(/^(o|a|os|as|um|uma|uns|umas|de|do|da|dos|das)\s+/i, '')
+         .replace(UNIT_REGEX, '')
          .trim()
 
       // Apply extracted items from parse-cotacao
