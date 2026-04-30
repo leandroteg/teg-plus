@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin, Smartphone,
+  Truck, MapPin, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -100,6 +100,17 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
+  solicitacao_adiantamento: {
+    label: 'Solicitacao de Adiantamento',
+    icon: Wallet,
+    color: 'cyan',
+    bgLight: 'bg-cyan-50',
+    textColor: 'text-cyan-700',
+    borderColor: 'border-cyan-200',
+    badgeBg: 'bg-cyan-100',
+    badgeText: 'text-cyan-700',
+    headerBg: 'bg-gradient-to-r from-cyan-600 to-cyan-500',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -108,6 +119,7 @@ const tipoOrder: TipoAprovacao[] = [
   'minuta_contratual',
   'requisicao_compra',
   'aprovacao_transporte',
+  'solicitacao_adiantamento',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -133,6 +145,14 @@ function formatDateShort(dateStr?: string): string {
   })
 }
 
+function formatDateFull(dateStr?: string): string {
+  if (!dateStr) return '--'
+  return new Date(dateStr).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 // ── AprovacaoCard (requisicoes de compra — card completo) ──────────────────────
 
 function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
@@ -145,6 +165,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    if (!mutation.isSuccess) return
+    const t = setTimeout(() => setHidden(true), 2500)
+    return () => clearTimeout(t)
+  }, [mutation.isSuccess])
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -200,6 +227,8 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
       })
     } catch { /* error handled by mutation state */ }
   }
+
+  if (hidden) return null
 
   // Resultado pos-decisao
   if (mutation.isSuccess) {
@@ -723,6 +752,44 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             <span className={`text-lg font-extrabold ${tipo.textColor}`}>
               {fmt(aprovacao.requisicao.valor_estimado)}
             </span>
+          </div>
+        )}
+
+        {/* Historico de esclarecimentos */}
+        {aprovacao.esclarecimento_historico && aprovacao.esclarecimento_historico.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <History size={13} className="text-amber-500" />
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Historico de Esclarecimentos</p>
+            </div>
+            <div className="space-y-1.5 border-l-2 border-amber-200 pl-3 ml-1">
+              {aprovacao.esclarecimento_historico.map((h, i) => (
+                <div key={i} className={`rounded-lg px-2.5 py-1.5 ${
+                  h.tipo === 'pedido' ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'
+                }`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {h.tipo === 'pedido'
+                      ? <MessageSquare size={11} className="text-amber-500" />
+                      : <CheckCircle size={11} className="text-emerald-500" />
+                    }
+                    <span className={`text-[10px] font-bold ${h.tipo === 'pedido' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {h.tipo === 'pedido' ? 'Esclarecimento solicitado' : 'Resposta do solicitante'}
+                    </span>
+                    <span className="text-[9px] text-slate-400 ml-auto">
+                      {h.data ? new Date(h.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                  <p className={`text-[11px] leading-relaxed ${h.tipo === 'pedido' ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {h.tipo === 'resposta' && h.msg.startsWith('Esclarecimento respondido')
+                      ? h.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '').replace(/^Esclarecimento respondido:\s*/i, '')
+                      : h.msg}
+                  </p>
+                  <p className={`text-[9px] mt-0.5 ${h.tipo === 'pedido' ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    {h.autor}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1358,6 +1425,7 @@ function TabPendentes({
       minuta_contratual: [],
       requisicao_compra: [],
       aprovacao_transporte: [],
+      solicitacao_adiantamento: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'
@@ -1448,6 +1516,7 @@ const decisaoOptions = [
 ] as const
 
 function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
+  const navigate = useNavigate()
   const tipo = tipoConfig[item.tipo_aprovacao] || tipoConfig.requisicao_compra
   const statusColor = item.status === 'aprovada'
     ? { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Aprovada' }
@@ -1457,8 +1526,36 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
     ? { bg: 'bg-slate-100', text: 'text-slate-500', label: 'Expirada' }
     : { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Esclarecimento' }
 
+  // Rota de detalhe conforme o tipo
+  const detalheRoute = (() => {
+    switch (item.tipo_aprovacao) {
+      case 'requisicao_compra':
+      case 'cotacao':
+        return `/requisicoes/${item.entidade_id}`
+      case 'autorizacao_pagamento':
+        return `/financeiro/contas-pagar`
+      case 'minuta_contratual':
+        return `/contratos/solicitacoes/${item.entidade_id}`
+      case 'aprovacao_transporte':
+        return `/logistica/solicitacoes`
+      default:
+        return null
+    }
+  })()
+
+  const isClickable = Boolean(detalheRoute)
+  const handleClick = () => { if (detalheRoute) navigate(detalheRoute) }
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+    <div
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={isClickable ? handleClick : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } } : undefined}
+      className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-4 ${
+        isClickable ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md active:scale-[0.99] transition-all' : ''
+      }`}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tipo.badgeBg} ${tipo.badgeText}`}>
@@ -1473,16 +1570,56 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
           {formatDateShort(item.data_decisao || item.created_at)}
         </span>
       </div>
-      <p className="text-sm font-bold text-slate-800 mb-0.5">
-        {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
-      </p>
-      <p className="text-xs text-slate-500 mb-1">
-        Nivel {item.nivel} | {item.aprovador_nome}
-      </p>
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-800 mb-0.5 truncate">
+            {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
+          </p>
+          <p className="text-xs text-slate-500">
+            Nivel {item.nivel} | Por <span className="font-semibold text-slate-700">{item.aprovador_nome}</span>
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {formatDateFull(item.data_decisao || item.created_at)}
+          </p>
+        </div>
+        {isClickable && (
+          <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+        )}
+      </div>
       {item.observacao && (
         <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2 mt-2 italic">
           "{item.observacao}"
         </p>
+      )}
+      {item.esclarecimento_historico && item.esclarecimento_historico.length > 0 && (
+        <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50/60 p-2 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1">
+            <MessageSquare size={11} /> Esclarecimentos ({item.esclarecimento_historico.length})
+          </p>
+          {item.esclarecimento_historico.map((h, i) => {
+            const isResposta = h.tipo === 'resposta'
+            const msg = isResposta
+              ? h.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '')
+              : h.msg
+            return (
+              <div key={`${h.tipo}-${h.data}-${i}`} className={`rounded-md px-2 py-1.5 ${
+                isResposta ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-amber-100'
+              }`}>
+                <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${
+                  isResposta ? 'text-emerald-700' : 'text-amber-700'
+                }`}>
+                  {isResposta ? 'Resposta' : 'Pedido'}{h.autor ? ` — ${h.autor}` : ''}
+                </p>
+                <p className={`text-[11px] leading-snug ${isResposta ? 'text-emerald-800' : 'text-amber-800'}`}>
+                  {msg}
+                </p>
+                {h.data && (
+                  <p className="text-[9px] text-slate-400 mt-0.5">{formatDateFull(h.data)}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
@@ -1656,26 +1793,13 @@ export default function AprovAi() {
 
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-xs font-semibold">Voltar</span>
-          </button>
-          {/* Botão "Abrir como App" — leva pra /aprovaai (HTML standalone com manifest próprio) */}
-          {!window.matchMedia?.('(display-mode: standalone)').matches && !(window.navigator as Navigator & { standalone?: boolean }).standalone && (
-            <a
-              href="/aprovaai"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
-              title="Abrir AprovAi standalone para instalar como app"
-            >
-              <Smartphone size={13} />
-              Instalar App
-            </a>
-          )}
-        </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-xs font-semibold">Voltar</span>
+        </button>
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
