@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin, Wallet,
+  Truck, MapPin, Wallet, Smartphone,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -1793,13 +1793,26 @@ export default function AprovAi() {
 
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-xs font-semibold">Voltar</span>
-        </button>
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={18} />
+            <span className="text-xs font-semibold">Voltar</span>
+          </button>
+          {/* Botão "Instalar App" — leva pra /aprovaai (HTML standalone com manifest próprio) */}
+          {!window.matchMedia?.('(display-mode: standalone)').matches && !(window.navigator as Navigator & { standalone?: boolean }).standalone && (
+            <a
+              href="/aprovaai"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
+              title="Abrir AprovAi standalone para instalar como app"
+            >
+              <Smartphone size={13} />
+              Instalar App
+            </a>
+          )}
+        </div>
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
