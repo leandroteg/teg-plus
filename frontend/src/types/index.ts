@@ -132,7 +132,7 @@ export interface Requisicao {
   }[]
 }
 
-export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
+export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte' | 'solicitacao_adiantamento'
 
 export interface Aprovacao {
   id: string

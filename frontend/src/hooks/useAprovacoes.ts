@@ -1068,6 +1068,28 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'solicitacao_adiantamento') {
+          const now = new Date().toISOString()
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'aprovado',
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'rejeitado',
+                observacoes: observacao || 'Rejeitado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -1094,6 +1116,7 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['cotacoes'] })
       qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['adiantamentos'] })
     },
   })
 }
