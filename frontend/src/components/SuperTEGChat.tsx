@@ -210,10 +210,14 @@ export default function SuperTEGChat() {
       {/* ── Chat Panel ─────────────────────────────────────── */}
       {isOpen && (
         <div
-          className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-[9999] w-full sm:w-[420px] h-[100dvh] sm:h-[640px] sm:max-h-[85vh] flex flex-col bg-white sm:rounded-2xl border border-slate-200/60 overflow-hidden"
+          className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-[9999] w-full sm:w-[420px] sm:h-[640px] sm:max-h-[85vh] flex flex-col bg-white sm:rounded-2xl border border-slate-200/60 overflow-hidden"
           style={{
             animation: 'steg-slide 0.35s cubic-bezier(.22,1,.36,1)',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08), 0 12px 24px -8px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02)',
+            // Mobile: respect notch/status bar via env(safe-area-inset-top)
+            height: 'min(100dvh, calc(100dvh - env(safe-area-inset-top, 0px)))',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
           {/* Header */}
