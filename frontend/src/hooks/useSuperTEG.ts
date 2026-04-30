@@ -264,39 +264,28 @@ export function useSuperTEG() {
           return  // finally block handles busyRef/setIsLoading
         }
 
-        // 3. Extract data from PDF/image via OCR workflow (Gemini)
+        // 3. Extract data from PDF/image via Parse Cotação workflow (Gemini)
         const N8N_BASE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
         let extractedData: Record<string, unknown> = {}
         if (isPdfOrImage) {
           try {
-            // Use the OCR workflow with a temporary ID (no DB record needed — PATCH on missing row = 200 no-op)
-            const tempId = crypto.randomUUID()
-            const parseRes = await fetch(`${N8N_BASE}/compras/ocr`, {
+            // Use Parse Cotação workflow — returns { success, fornecedores: [...] } directly
+            const parseRes = await fetch(`${N8N_BASE}/compras/parse-cotacao`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                anexo_id: tempId,
-                url: publicUrl,
+                file_url: publicUrl,
                 mime_type: file.type || 'application/pdf',
-                nome_arquivo: file.name,
+                file_name: file.name,
               }),
             })
             const parseData = await parseRes.json().catch(() => ({}))
-            // Map OCR llm_dados format → fornecedores format expected by NovaRequisicao
-            if (parseData?.success && parseData?.llm_dados) {
-              const d = parseData.llm_dados
-              const itens = (d.itens || []).map((it: Record<string, unknown>) => ({
-                descricao: String(it.descricao ?? ''),
-                quantidade: Number(it.qtd ?? it.quantidade ?? 1) || 1,
-                unidade: String(it.unidade ?? 'un'),
-                valor_unitario: Number(it.valor_unit ?? it.valor_unitario ?? 0),
-              }))
-              if (itens.length > 0) {
-                extractedData = {
-                  success: true,
-                  fornecedores: [{ nome_fornecedor: d.fornecedor_nome || null, itens }],
-                }
+            // parse-cotacao retorna { success, fornecedores: [{ nome_fornecedor, itens: [...] }] }
+            if (parseData?.success && Array.isArray(parseData?.fornecedores) && parseData.fornecedores.length > 0) {
+              extractedData = {
+                success: true,
+                fornecedores: parseData.fornecedores,
               }
             }
           } catch { /* parse falhou — ainda navega com arquivo */ }
