@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin,
+  Truck, MapPin, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -100,6 +100,17 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
+  solicitacao_adiantamento: {
+    label: 'Solicitacao de Adiantamento',
+    icon: Wallet,
+    color: 'cyan',
+    bgLight: 'bg-cyan-50',
+    textColor: 'text-cyan-700',
+    borderColor: 'border-cyan-200',
+    badgeBg: 'bg-cyan-100',
+    badgeText: 'text-cyan-700',
+    headerBg: 'bg-gradient-to-r from-cyan-600 to-cyan-500',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -108,6 +119,7 @@ const tipoOrder: TipoAprovacao[] = [
   'minuta_contratual',
   'requisicao_compra',
   'aprovacao_transporte',
+  'solicitacao_adiantamento',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -153,6 +165,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    if (!mutation.isSuccess) return
+    const t = setTimeout(() => setHidden(true), 2500)
+    return () => clearTimeout(t)
+  }, [mutation.isSuccess])
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -208,6 +227,8 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
       })
     } catch { /* error handled by mutation state */ }
   }
+
+  if (hidden) return null
 
   // Resultado pos-decisao
   if (mutation.isSuccess) {
@@ -1404,6 +1425,7 @@ function TabPendentes({
       minuta_contratual: [],
       requisicao_compra: [],
       aprovacao_transporte: [],
+      solicitacao_adiantamento: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'

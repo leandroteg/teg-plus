@@ -16,6 +16,33 @@ import './index.css'
   const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
   const textareaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
 
+  // Track every input that was ever type="password" so show-password toggles
+  // (which switch to type="text") are never uppercased.
+  const passwordEls = new WeakSet<HTMLInputElement>()
+  const trackEl = (el: Element) => {
+    if (el instanceof HTMLInputElement && el.type === 'password') passwordEls.add(el)
+  }
+  const mo = new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'childList') {
+        m.addedNodes.forEach(n => {
+          if (n instanceof Element) {
+            trackEl(n)
+            n.querySelectorAll('input[type="password"]').forEach(trackEl)
+          }
+        })
+      } else if (m.type === 'attributes') {
+        trackEl(m.target as Element)
+      }
+    }
+  })
+  mo.observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ['type'],
+  })
+
   document.addEventListener(
     'input',
     (e) => {
@@ -25,7 +52,9 @@ import './index.css'
       if (tag === 'INPUT' && !TEXT_TYPES.has((target as HTMLInputElement).type)) return
       if (target.readOnly || target.disabled) return
       if (target.closest('[data-no-upper]')) return
-      // Skip password fields even when toggled to type=text (show-password toggle)
+      // Skip any input that was ever type="password" (covers show-password toggles)
+      if (tag === 'INPUT' && passwordEls.has(target as HTMLInputElement)) return
+      // Fallback: skip by autocomplete or name/id hints
       const ac = (target.getAttribute('autocomplete') || '').toLowerCase()
       if (ac.includes('password')) return
       const nm = (target.getAttribute('name') || target.id || '').toLowerCase()

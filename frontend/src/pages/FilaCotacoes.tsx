@@ -70,7 +70,7 @@ function shouldShowInCotacoes(cot: Cotacao) {
   if (cot.status === 'pendente' || cot.status === 'em_andamento') return true
 
   // Cotações concluídas ficam nesta tela apenas enquanto aguardam decisão financeira.
-  return cot.status === 'concluida' && reqStatus === 'cotacao_enviada'
+  return cot.status === 'concluida' && (reqStatus === 'cotacao_enviada' || reqStatus === 'cotacao_em_esclarecimento')
 }
 
 function getDescricaoPrincipal(cot: Cotacao) {

@@ -1068,6 +1068,28 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'solicitacao_adiantamento') {
+          const now = new Date().toISOString()
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'aprovado',
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'rejeitado',
+                observacoes: observacao || 'Rejeitado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -1094,6 +1116,7 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['cotacoes'] })
       qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['adiantamentos'] })
     },
   })
 }
@@ -1137,7 +1160,7 @@ export function useDecisaoRequisicao() {
       } else if (decisao === 'rejeitada') {
         updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
       } else if (decisao === 'esclarecimento') {
-        updates.status = 'em_esclarecimento'
+        updates.status = isFinancialApproval ? 'cotacao_em_esclarecimento' : 'em_esclarecimento'
         updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
         updates.esclarecimento_por = aprovadorNome
         updates.esclarecimento_em = new Date().toISOString()

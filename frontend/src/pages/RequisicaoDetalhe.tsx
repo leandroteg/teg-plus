@@ -69,6 +69,7 @@ export default function RequisicaoDetalhe() {
     && req.status === 'cotacao_aprovada'
   const canMutateComprasReq = canDecide || canEmitPedido
     || req?.status === 'em_esclarecimento'
+    || req?.status === 'cotacao_em_esclarecimento'
     || req?.status === 'devolvida_solicitante'
   const { isLocked, blockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
@@ -251,7 +252,7 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* Alerta Esclarecimento */}
-      {req.status === 'em_esclarecimento' && (
+      {(req.status === 'em_esclarecimento' || req.status === 'cotacao_em_esclarecimento') && (
         <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />

@@ -2,7 +2,7 @@ export type StatusRequisicao =
   | 'rascunho' | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
   | 'devolvida_solicitante'
-  | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada'
+  | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada' | 'cotacao_em_esclarecimento'
   | 'pedido_emitido' | 'em_entrega' | 'entregue'
   | 'aguardando_pgto' | 'pago'
   | 'comprada' | 'cancelada'
@@ -132,7 +132,7 @@ export interface Requisicao {
   }[]
 }
 
-export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
+export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte' | 'solicitacao_adiantamento'
 
 export interface Aprovacao {
   id: string
