@@ -206,33 +206,84 @@ export default function PainelDisponibilidade() {
 
   if (!data || !kpis) return null
 
-  // Estilo dos cards de KPI
+  // Card KPI compacto (cabe 8 numa linha em telas largas)
   const kpiCard = (label: string, value: string | number, icon: React.ReactNode, color: string) => (
-    <div className={`rounded-xl p-3 ${cardCls}`}>
-      <div className="flex items-center justify-between mb-1">
-        <span className={`${color}`}>{icon}</span>
-        <span className={`text-2xl font-extrabold ${txt}`}>{value}</span>
+    <div className={`rounded-lg px-2.5 py-2 ${cardCls}`}>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span className={color}>{icon}</span>
+        <span className={`text-lg font-extrabold leading-none ${txt}`}>{value}</span>
       </div>
-      <p className={`text-[10px] font-semibold uppercase tracking-wider ${txtMuted}`}>{label}</p>
+      <p className={`text-[9px] font-semibold uppercase tracking-wider ${txtMuted} truncate`}>{label}</p>
     </div>
   )
 
+  // ── Pulso por situação — distribuição mutuamente excludente da frota ──────
+  const pulso = useMemo(() => {
+    const disp = kpis.total_frota - kpis.em_parada
+    const segs = [
+      { label: 'Disponíveis',       v: disp,                  color: 'bg-emerald-500', textColor: 'text-emerald-700' },
+      { label: 'Em manutenção',     v: kpis.em_manutencao,    color: 'bg-amber-500',   textColor: 'text-amber-700' },
+      { label: 'Aguard. orçamento', v: kpis.aguard_orcamento, color: 'bg-blue-500',    textColor: 'text-blue-700' },
+      { label: 'Aguard. aprovação', v: kpis.aguard_aprovacao, color: 'bg-violet-500',  textColor: 'text-violet-700' },
+      { label: '> 30 dias',         v: kpis.mais_30_dias,     color: 'bg-rose-600',    textColor: 'text-rose-700' },
+    ]
+    const total = kpis.total_frota
+    return segs.map(s => ({ ...s, pct: total > 0 ? (s.v / total) * 100 : 0 }))
+  }, [kpis])
+
   return (
     <div className="space-y-4">
-      {/* ── ① Indicadores Gerenciais ────────────────────────────────────── */}
+      {/* ── ① Indicadores Gerenciais (1 linha) ─────────────────────────────── */}
       <section>
-        <h2 className={`text-sm font-bold uppercase tracking-wider mb-2 ${txt}`}>
+        <h2 className={`text-xs font-bold uppercase tracking-wider mb-2 ${txt}`}>
           ① Indicadores Gerenciais
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {kpiCard('Em Parada', kpis.em_parada, <AlertTriangle size={16} />, 'text-rose-500')}
-          {kpiCard('Em Manutenção', kpis.em_manutencao, <Wrench size={16} />, 'text-amber-500')}
-          {kpiCard('Aguard. Orçamento', kpis.aguard_orcamento, <Clock size={16} />, 'text-blue-500')}
-          {kpiCard('Aguard. Aprovação', kpis.aguard_aprovacao, <Clock size={16} />, 'text-violet-500')}
-          {kpiCard('> 30 dias', kpis.mais_30_dias, <AlertTriangle size={16} />, 'text-red-600')}
-          {kpiCard('Total Dias Parados', kpis.total_dias, <Activity size={16} />, 'text-slate-500')}
-          {kpiCard('Custo Estimado', fmtBRL(kpis.custo), <Wrench size={16} />, 'text-rose-600')}
-          {kpiCard('Total Frota', kpis.total_frota, <Building2 size={16} />, 'text-emerald-500')}
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+          {kpiCard('Em Parada',         kpis.em_parada,            <AlertTriangle size={13} />, 'text-rose-500')}
+          {kpiCard('Em Manutenção',     kpis.em_manutencao,        <Wrench size={13} />,         'text-amber-500')}
+          {kpiCard('Aguard. Orçamento', kpis.aguard_orcamento,     <Clock size={13} />,          'text-blue-500')}
+          {kpiCard('Aguard. Aprovação', kpis.aguard_aprovacao,     <Clock size={13} />,          'text-violet-500')}
+          {kpiCard('> 30 dias',          kpis.mais_30_dias,        <AlertTriangle size={13} />, 'text-red-600')}
+          {kpiCard('Dias Parados',      kpis.total_dias,           <Activity size={13} />,       'text-slate-500')}
+          {kpiCard('Custo Est.',        fmtBRL(kpis.custo),        <Wrench size={13} />,         'text-rose-600')}
+          {kpiCard('Total Frota',       kpis.total_frota,          <Building2 size={13} />,      'text-emerald-500')}
+        </div>
+      </section>
+
+      {/* ── Pulso por Situação ─────────────────────────────────────────────── */}
+      <section className={`rounded-2xl p-4 ${cardCls}`}>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+            <Activity size={14} className="text-rose-500" />
+            Pulso por Situação
+          </h2>
+          <span className={`text-[10px] font-semibold ${txtMuted}`}>{kpis.total_frota} veículo(s)</span>
+        </div>
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>
+          Distribuição atual da frota
+        </p>
+        {/* Barra empilhada */}
+        <div className="flex w-full h-7 rounded-lg overflow-hidden">
+          {pulso.map(s => s.pct > 0 && (
+            <div
+              key={s.label}
+              className={`${s.color} flex items-center justify-center text-[10px] font-bold text-white transition-all`}
+              style={{ width: `${s.pct}%` }}
+              title={`${s.label}: ${s.v}`}
+            >
+              {s.pct >= 6 ? `${s.label} ${s.v}` : s.v}
+            </div>
+          ))}
+        </div>
+        {/* Legenda compacta */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+          {pulso.map(s => (
+            <span key={s.label} className={`inline-flex items-center gap-1.5 text-[11px] ${txt}`}>
+              <span className={`w-2 h-2 rounded-sm ${s.color}`} />
+              <span className="font-semibold">{s.label}</span>
+              <span className={txtMuted}>{s.v}</span>
+            </span>
+          ))}
         </div>
       </section>
 
