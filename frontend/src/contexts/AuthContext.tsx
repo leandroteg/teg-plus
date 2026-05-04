@@ -553,13 +553,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Fallback: elevar com base em modulo_papeis (permissoes_especiais)
-    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
-    if (moduloPapeis && typeof moduloPapeis === 'object') {
-      for (const p of Object.values(moduloPapeis) as string[]) {
-        if (niveis[p as PapelGlobal] > (niveis[best] ?? 0)) best = p as PapelGlobal
-      }
-    }
+    // NOTA: modulo_papeis (permissoes_especiais) é intencionalmente NÃO usado aqui.
+    // Papéis por módulo não devem elevar o papel global — isso causaria vazamento de
+    // permissão (ex: equipe em estoque virar comprador em compras via currentNivel).
+    // hasSetorPapel e getPapelForModule já leem modulo_papeis diretamente.
 
     return best
   })()
