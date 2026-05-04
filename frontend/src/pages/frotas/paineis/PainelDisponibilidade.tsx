@@ -196,6 +196,21 @@ export default function PainelDisponibilidade() {
       .slice(0, 8)
   }, [data])
 
+  // ── Pulso por situação — DEVE ficar antes dos early returns (Rules of Hooks) ──
+  const pulso = useMemo(() => {
+    if (!kpis) return []
+    const disp = kpis.total_frota - kpis.em_parada
+    const segs = [
+      { label: 'Disponíveis',       v: disp,                  color: 'bg-emerald-500' },
+      { label: 'Em manutenção',     v: kpis.em_manutencao,    color: 'bg-amber-500' },
+      { label: 'Aguard. orçamento', v: kpis.aguard_orcamento, color: 'bg-blue-500' },
+      { label: 'Aguard. aprovação', v: kpis.aguard_aprovacao, color: 'bg-violet-500' },
+      { label: '> 30 dias',         v: kpis.mais_30_dias,     color: 'bg-rose-600' },
+    ]
+    const total = kpis.total_frota
+    return segs.map(s => ({ ...s, pct: total > 0 ? (s.v / total) * 100 : 0 }))
+  }, [kpis])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -216,20 +231,6 @@ export default function PainelDisponibilidade() {
       <p className={`text-[9px] font-semibold uppercase tracking-wider ${txtMuted} truncate`}>{label}</p>
     </div>
   )
-
-  // ── Pulso por situação — distribuição mutuamente excludente da frota ──────
-  const pulso = useMemo(() => {
-    const disp = kpis.total_frota - kpis.em_parada
-    const segs = [
-      { label: 'Disponíveis',       v: disp,                  color: 'bg-emerald-500', textColor: 'text-emerald-700' },
-      { label: 'Em manutenção',     v: kpis.em_manutencao,    color: 'bg-amber-500',   textColor: 'text-amber-700' },
-      { label: 'Aguard. orçamento', v: kpis.aguard_orcamento, color: 'bg-blue-500',    textColor: 'text-blue-700' },
-      { label: 'Aguard. aprovação', v: kpis.aguard_aprovacao, color: 'bg-violet-500',  textColor: 'text-violet-700' },
-      { label: '> 30 dias',         v: kpis.mais_30_dias,     color: 'bg-rose-600',    textColor: 'text-rose-700' },
-    ]
-    const total = kpis.total_frota
-    return segs.map(s => ({ ...s, pct: total > 0 ? (s.v / total) * 100 : 0 }))
-  }, [kpis])
 
   return (
     <div className="space-y-4">
