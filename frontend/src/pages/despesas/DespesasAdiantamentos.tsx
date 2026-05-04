@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -110,6 +111,17 @@ export default function DespesasAdiantamentos() {
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Abre o modal automaticamente quando vier ?nova= na URL (fluxo do requisitante)
+  useEffect(() => {
+    if (searchParams.has('nova')) {
+      setShowModal(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('nova')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
   const [detalheItem, setDetalheItem] = useState<typeof adiantamentos[0] | null>(null)
   const [detalheClasseId, setDetalheClasseId] = useState('')
   const [detalheErroCls, setDetalheErroCls] = useState('')

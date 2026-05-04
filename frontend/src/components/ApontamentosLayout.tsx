@@ -10,8 +10,8 @@ export default function ApontamentosLayout() {
 
   const NAV: NavItem[] = [
     { to: '/despesas', icon: LayoutDashboard, label: 'Painel', end: true },
-    { to: '/despesas/cartoes', icon: CreditCard, label: 'Cartões', end: false, action: () => navigate(`/despesas/cartoes?nova=${Date.now()}`), accent: true },
-    { to: '/despesas/adiantamentos', icon: Wallet, label: 'Adiantamentos', end: false },
+    { to: '/despesas/cartoes', icon: CreditCard, label: 'Cartões', end: false, action: () => navigate(`/despesas/cartoes?nova=${Date.now()}`), accent: true, requisitanteAllowed: true },
+    { to: '/despesas/adiantamentos', icon: Wallet, label: 'Adiantamentos', end: false, action: () => navigate(`/despesas/adiantamentos?nova=${Date.now()}`), requisitanteAllowed: true },
   ]
 
   return (
