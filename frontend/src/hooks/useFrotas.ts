@@ -765,6 +765,9 @@ export function useAlocacaoHistorico(alocacaoId: string | undefined) {
  * Solicita movimentação de uma alocação ATIVA para outra obra (= demanda).
  * Apenas preenche proxima_*, NÃO encerra a alocação atual.
  * Frotas confirma depois fazendo checklist de retorno.
+ *
+ * Por padrão cria com proxima_status='publicado' (visível para Frotas).
+ * Se modoPlanejamento=true, cria como 'rascunho' (Frotas não vê).
  */
 export function useSolicitarMovimentoObras() {
   const qc = useQueryClient()
@@ -775,8 +778,9 @@ export function useSolicitarMovimentoObras() {
       proxima_data_inicio?: string
       proxima_data_fim?: string
       proxima_observacoes?: string
+      modoPlanejamento?: boolean
     }) => {
-      const { alocacao_id, ...campos } = payload
+      const { alocacao_id, modoPlanejamento, ...campos } = payload
       const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase
         .from('fro_alocacoes')
@@ -784,15 +788,98 @@ export function useSolicitarMovimentoObras() {
           ...campos,
           proxima_solicitada_por: user?.id,
           proxima_solicitada_em: new Date().toISOString(),
+          proxima_status: modoPlanejamento ? 'rascunho' : 'publicado',
         })
         .eq('id', alocacao_id)
-        .eq('status', 'ativa')   // garante que só ATIVAS recebem demanda
+        .eq('status', 'ativa')
       if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
       qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
       qc.invalidateQueries({ queryKey: ['fro_alocacao_hist'] })
+    },
+  })
+}
+
+/**
+ * Lista as alocações em RASCUNHO do usuário atual (modo planejamento).
+ */
+export function useRascunhosPlanejamento() {
+  return useQuery<FroAlocacao[]>({
+    queryKey: ['fro_alocacoes_rascunho'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+      const { data, error } = await supabase
+        .from('fro_alocacoes')
+        .select(`*, veiculo:fro_veiculos(id,placa,modelo,marca,categoria),
+                 obra:sys_obras!obra_id(id,nome,codigo),
+                 proxima_obra:sys_obras!proxima_obra_id(id,nome,codigo)`)
+        .eq('status', 'ativa')
+        .eq('proxima_status', 'rascunho')
+        .eq('proxima_solicitada_por', user.id)
+      if (error) return []
+      return data as FroAlocacao[]
+    },
+  })
+}
+
+/**
+ * Publica TODOS os rascunhos do usuário atual de uma vez.
+ * Vira demanda real visível para Frotas.
+ */
+export function usePublicarPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+      const { data, error } = await supabase
+        .from('fro_alocacoes')
+        .update({ proxima_status: 'publicado' })
+        .eq('proxima_status', 'rascunho')
+        .eq('proxima_solicitada_por', user.id)
+        .select('id')
+      if (error) throw error
+      return (data ?? []).length
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes_rascunho'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacao_hist'] })
+    },
+  })
+}
+
+/**
+ * Descarta TODOS os rascunhos do usuário atual (limpa proxima_*).
+ */
+export function useDescartarPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+      const { error } = await supabase
+        .from('fro_alocacoes')
+        .update({
+          proxima_obra_id: null,
+          proxima_data_inicio: null,
+          proxima_data_fim: null,
+          proxima_observacoes: null,
+          proxima_solicitada_por: null,
+          proxima_solicitada_em: null,
+          proxima_status: 'publicado', // reset
+        })
+        .eq('proxima_status', 'rascunho')
+        .eq('proxima_solicitada_por', user.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes_rascunho'] })
     },
   })
 }

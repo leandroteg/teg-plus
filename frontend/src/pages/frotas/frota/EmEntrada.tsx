@@ -43,7 +43,8 @@ export default function EmEntrada() {
     const m = new Map<string, { proxima_obra_nome?: string; observacoes?: string }>()
     const obraById = new Map(obras.map(o => [o.id, o.nome]))
     alocacoesAll
-      .filter(a => a.status === 'ativa' && a.proxima_obra_id)
+      .filter(a => a.status === 'ativa' && a.proxima_obra_id
+                   && a.proxima_status === 'publicado')
       .forEach(a => m.set(a.veiculo_id, {
         proxima_obra_nome: a.proxima_obra_id ? obraById.get(a.proxima_obra_id) : undefined,
         observacoes: a.proxima_observacoes,

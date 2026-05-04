@@ -3,17 +3,19 @@ import {
   Truck, Package, Search, Plus, X, LayoutGrid, List, CalendarRange,
   CheckCircle2, PauseCircle, Wrench, MapPin, Calendar, Clock, Building2,
   AlertTriangle, ChevronDown, ChevronUp, ArrowRight, Send, Filter,
+  Loader2, Trash2, FileEdit,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo,
-  useSolicitarMovimentoObras,
+  useSolicitarMovimentoObras, useRascunhosPlanejamento,
+  usePublicarPlano, useDescartarPlano,
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
-import { CATEGORIA_LABEL, CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL, CATEGORIA_LABEL_ATIVAS, CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -89,13 +91,18 @@ export default function AlocacaoRecursos() {
   const [tab, setTab] = useState<TabKey>('lista')
   const [novaAlocOpen, setNovaAlocOpen] = useState(false)
   const [novaAlocPreset, setNovaAlocPreset] = useState<{ veiculoId?: string; obraId?: string } | null>(null)
-  // Modal de edição/demanda de alocação (Kanban + Gantt + Lista)
   const [editAloc, setEditAloc] = useState<FroAlocacao | null>(null)
+  // Modo Planejamento — Obras planeja sem impactar Frotas
+  const [modoPlanejamento, setModoPlanejamento] = useState(false)
+  const [confirmacaoOpen, setConfirmacaoOpen] = useState<'publicar' | 'descartar' | null>(null)
 
   const { data: veiculos = [], isLoading: loadingVeic } = useVeiculos()
   const { data: alocacoes = [], isLoading: loadingAloc } = useAlocacoes()
   const { data: obras = [] } = useObras()
+  const { data: rascunhos = [] } = useRascunhosPlanejamento()
   const solicitarMovimento = useSolicitarMovimentoObras()
+  const publicarPlano = usePublicarPlano()
+  const descartarPlano = useDescartarPlano()
 
   // Map: veiculo_id -> alocacao ativa (se houver)
   const alocAtivaByVeic = useMemo(() => {
@@ -126,32 +133,57 @@ export default function AlocacaoRecursos() {
       return
     }
     if (aloc.obra_id === obraId) return
-    // Com alocação ativa → cria demanda
+    // Com alocação ativa → cria demanda (rascunho ou publicada conforme modo)
     try {
       await solicitarMovimento.mutateAsync({
         alocacao_id: aloc.id,
         proxima_obra_id: obraId,
+        modoPlanejamento,
       })
     } catch (err) {
       alert('Erro ao solicitar movimentação: ' + (err instanceof Error ? err.message : String(err)))
     }
-  }, [alocAtivaByVeic, solicitarMovimento])
+  }, [alocAtivaByVeic, solicitarMovimento, modoPlanejamento])
 
-  // Botão "Nova Alocação" flutuante (fica no canto superior direito da página)
-  const novaAlocBtn = (
-    <button
-      onClick={() => handleOpenNova()}
-      className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 text-white px-3 py-2 text-xs font-bold hover:bg-orange-600 transition-colors shadow-sm"
-    >
-      <Plus size={14} /> Nova Alocação
-    </button>
+  // Botões flutuantes no canto superior direito (alinha com o título do flow)
+  const headerBtns = (
+    <div className="flex items-center gap-2">
+      {/* Toggle Modo Planejamento */}
+      <label
+        className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold cursor-pointer border transition-colors ${
+          modoPlanejamento
+            ? (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-500/15 border-amber-500/40 text-amber-300')
+            : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]')
+        }`}
+      >
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={modoPlanejamento}
+          onChange={e => setModoPlanejamento(e.target.checked)}
+        />
+        <FileEdit size={13} />
+        Modo Planejamento
+        {modoPlanejamento && rascunhos.length > 0 && (
+          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold">
+            {rascunhos.length}
+          </span>
+        )}
+      </label>
+      <button
+        onClick={() => handleOpenNova()}
+        className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 text-white px-3 py-2 text-xs font-bold hover:bg-orange-600 transition-colors shadow-sm"
+      >
+        <Plus size={14} /> Nova Alocação
+      </button>
+    </div>
   )
 
   return (
     <div className="relative">
-      {/* Botão de ação fixo no canto superior direito (alinha com o título do ControladoriaFlow) */}
+      {/* Botões de ação fixos no canto superior direito */}
       <div className="absolute top-0 right-0 z-10">
-        {novaAlocBtn}
+        {headerBtns}
       </div>
 
       <ControladoriaFlow
@@ -161,6 +193,47 @@ export default function AlocacaoRecursos() {
         activeStep={tab}
         onStepChange={(step) => setTab(step as TabKey)}
       >
+
+      {/* Banner Modo Planejamento — visível quando há rascunhos */}
+      {modoPlanejamento && rascunhos.length > 0 && (
+        <div className={`mb-4 rounded-xl border-2 border-dashed p-3 flex items-center justify-between gap-3 flex-wrap ${
+          isLight ? 'bg-amber-50 border-amber-300' : 'bg-amber-500/10 border-amber-500/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              isLight ? 'bg-amber-100' : 'bg-amber-500/20'
+            }`}>
+              <FileEdit size={16} className={isLight ? 'text-amber-700' : 'text-amber-300'} />
+            </div>
+            <div>
+              <p className={`text-sm font-bold ${isLight ? 'text-amber-800' : 'text-amber-300'}`}>
+                Plano em rascunho — {rascunhos.length} movimentação{rascunhos.length > 1 ? 'ões' : ''} pendente{rascunhos.length > 1 ? 's' : ''}
+              </p>
+              <p className={`text-xs ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>
+                Frotas ainda não vê esses movimentos. Publique para enviar tudo de uma vez ou descarte para começar de novo.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirmacaoOpen('descartar')}
+              disabled={descartarPlano.isPending}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                isLight ? 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50' : 'bg-white/[0.04] text-rose-400 border border-rose-500/30 hover:bg-rose-500/10'
+              }`}
+            >
+              <Trash2 size={13} /> Descartar
+            </button>
+            <button
+              onClick={() => setConfirmacaoOpen('publicar')}
+              disabled={publicarPlano.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm"
+            >
+              <Send size={13} /> Publicar plano
+            </button>
+          </div>
+        </div>
+      )}
       {loadingVeic || loadingAloc ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
@@ -218,6 +291,90 @@ export default function AlocacaoRecursos() {
           isLight={isLight}
           onClose={() => setEditAloc(null)}
         />
+      )}
+
+      {/* ── Modal Confirmação publicar/descartar plano ── */}
+      {confirmacaoOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmacaoOpen(null)}>
+          <div
+            className={`w-full max-w-md rounded-2xl border shadow-2xl ${
+              isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.08]'
+            }`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <h3 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {confirmacaoOpen === 'publicar' ? 'Publicar plano' : 'Descartar rascunho'}
+              </h3>
+              <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {confirmacaoOpen === 'publicar'
+                  ? `${rascunhos.length} movimentação${rascunhos.length > 1 ? 'ões' : ''} ${rascunhos.length > 1 ? 'serão enviadas' : 'será enviada'} para o módulo Frotas`
+                  : `Todos os ${rascunhos.length} rascunhos serão removidos. Esta ação não pode ser desfeita.`}
+              </p>
+            </div>
+            {/* Lista veiculos */}
+            <div className="px-5 py-4 max-h-[300px] overflow-y-auto space-y-2">
+              {rascunhos.map(r => {
+                const obraDest = obras.find(o => o.id === r.proxima_obra_id)
+                return (
+                  <div key={r.id} className={`flex items-center gap-2 text-xs p-2 rounded-lg ${
+                    isLight ? 'bg-slate-50' : 'bg-white/[0.03]'
+                  }`}>
+                    <span className={`font-mono font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                      {r.veiculo?.placa ?? '—'}
+                    </span>
+                    <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                      {r.veiculo?.marca} {r.veiculo?.modelo}
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-[11px]">
+                      <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>{r.obra?.nome ?? '—'}</span>
+                      <ArrowRight size={10} className="text-amber-500" />
+                      <span className={`font-semibold ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>
+                        {obraDest?.nome ?? '—'}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className={`px-5 py-3 border-t flex items-center justify-end gap-2 ${
+              isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.06] bg-white/[0.02]'
+            }`}>
+              <button
+                onClick={() => setConfirmacaoOpen(null)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold ${
+                  isLight ? 'bg-white text-slate-700 border border-slate-200' : 'bg-white/[0.06] text-slate-300 border border-white/[0.08]'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    if (confirmacaoOpen === 'publicar') {
+                      const n = await publicarPlano.mutateAsync()
+                      alert(`✅ ${n} movimentação${n > 1 ? 'ões publicadas' : ' publicada'} para Frotas`)
+                    } else {
+                      await descartarPlano.mutateAsync()
+                    }
+                    setConfirmacaoOpen(null)
+                  } catch (err) {
+                    alert('Erro: ' + (err instanceof Error ? err.message : String(err)))
+                  }
+                }}
+                disabled={publicarPlano.isPending || descartarPlano.isPending}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-sm ${
+                  confirmacaoOpen === 'publicar'
+                    ? 'bg-emerald-500 hover:bg-emerald-600'
+                    : 'bg-rose-500 hover:bg-rose-600'
+                } disabled:opacity-50`}
+              >
+                {(publicarPlano.isPending || descartarPlano.isPending) && <Loader2 size={13} className="animate-spin" />}
+                {confirmacaoOpen === 'publicar' ? 'Publicar' : 'Descartar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -325,7 +482,7 @@ function ListaView({
         </div>
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaVeiculo | 'todos')} className={`${inputCls} max-w-[140px]`}>
           <option value="todos">Todos os tipos</option>
-          {Object.entries(CATEGORIA_LABEL).map(([k, v]) => (
+          {Object.entries(CATEGORIA_LABEL_ATIVAS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
@@ -1228,12 +1385,14 @@ function KanbanView({
                 const proximaObraNome = aloc?.proxima_obra_id
                   ? obras.find(o => o.id === aloc.proxima_obra_id)?.nome
                   : undefined
+                const isRascunho = aloc?.proxima_status === 'rascunho'
                 return (
                   <VeiculoKanbanCard
                     key={v.id}
                     veiculo={v}
                     aloc={aloc}
                     proximaObraNome={proximaObraNome}
+                    isRascunho={isRascunho}
                     isDark={isDark}
                     isDragging={dragId === v.id}
                     onDragStart={() => onDragStart(v.id)}
@@ -1262,11 +1421,12 @@ function KanbanView({
 }
 
 function VeiculoKanbanCard({
-  veiculo: v, aloc, proximaObraNome, isDark, isDragging, onDragStart, onDragEnd, onClick,
+  veiculo: v, aloc, proximaObraNome, isRascunho, isDark, isDragging, onDragStart, onDragEnd, onClick,
 }: {
   veiculo: FroVeiculo
   aloc?: FroAlocacao
   proximaObraNome?: string
+  isRascunho?: boolean
   isDark: boolean
   isDragging: boolean
   onDragStart: () => void
@@ -1321,10 +1481,19 @@ function VeiculoKanbanCard({
       <p className={`text-[10px] font-mono mt-0.5 ${txtMuted}`}>{v.placa || v.numero_serie || '—'}</p>
 
       {proximaObraNome && (
-        <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
-          isDark ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200'
-        }`} title={`Movimentação solicitada para ${proximaObraNome} - aguardando confirmação Frotas`}>
-          <ArrowRight size={9} /> {proximaObraNome}
+        <div
+          className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+            isRascunho
+              ? `border-dashed ${isDark ? 'bg-amber-500/10 text-amber-300 border-amber-500/40' : 'bg-amber-50 text-amber-700 border-amber-300'}`
+              : isDark ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}
+          title={isRascunho
+            ? `Rascunho — destino ${proximaObraNome}. Não enviado para Frotas ainda.`
+            : `Movimentação solicitada para ${proximaObraNome} — aguardando confirmação Frotas`}
+        >
+          <ArrowRight size={9} />
+          {isRascunho ? '✏ ' : ''}
+          {proximaObraNome}
         </div>
       )}
 

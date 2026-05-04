@@ -351,6 +351,7 @@ export interface FroAlocacao {
   proxima_observacoes?: string
   proxima_solicitada_por?: string
   proxima_solicitada_em?: string
+  proxima_status?: 'rascunho' | 'publicado' | 'cancelado'
   created_at: string
   updated_at: string
   veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo' | 'marca' | 'categoria'>
