@@ -66,6 +66,8 @@ export interface ModuleConfig {
   truncateBottomLabels?: boolean
   bottomNavMaxItems?: number
   headerExtra?: React.ReactNode
+  /** Prefixos de path que requisitantes podem acessar diretamente (ex: detalhe de RC) */
+  requisitanteAllowedPaths?: string[]
 }
 
 // ── Avatar helpers (shared, extracted once) ────────────────────────────────────
@@ -406,9 +408,11 @@ export default function ModuleLayout({
     if (novaFlowPathRef.current === location.pathname) return
     // Voltou ao home → limpa o ref
     if (location.pathname === homeRoute) { novaFlowPathRef.current = null; return }
+    // Paths explicitamente permitidos para requisitantes (ex: detalhe de RC para responder esclarecimento)
+    if (config.requisitanteAllowedPaths?.some(p => location.pathname.startsWith(p))) return
     // Qualquer outro path sem nova → volta para home
     navigate(homeRoute, { replace: true })
-  }, [isRequisitante, homeRoute, location.pathname, location.search, navigate])
+  }, [isRequisitante, homeRoute, location.pathname, location.search, navigate, config.requisitanteAllowedPaths])
 
   async function handleLogout() {
     await signOut()

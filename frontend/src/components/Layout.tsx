@@ -27,6 +27,7 @@ export default function Layout() {
       nav={NAV}
       maxWidth="max-w-none"
       bottomNavCompact={false}
+      requisitanteAllowedPaths={['/requisicoes/']}
     />
   )
 }
