@@ -8,6 +8,7 @@ import { useAtualizarAlocacao } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo } from '../../types/frotas'
 import { parseObsInfo } from './veiculoObs'
+import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../constants/categoriaVeiculo'
 
 // ── Shared helpers ──────────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ export default function VeiculoDetalhesModal({
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
   const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
-  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+  const categoriaOrigem = (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria).toUpperCase()
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'

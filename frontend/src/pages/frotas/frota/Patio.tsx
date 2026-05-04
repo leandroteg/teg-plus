@@ -132,7 +132,7 @@ function VeiculoCard({ v, osCount, isLight, onOpen, onAlocar, onOS, onChecklist 
   // Primeira linha: "CÓDIGO" em destaque + categoria menor ao lado (mesma cor)
   // Prioridade: codigo_interno (formal) > Cód. Sistema (obs) > Cód. Frota (obs) > numero_serie > placa
   const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
-  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+  const categoriaOrigem = (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria).toUpperCase()
   // Segunda linha: "MODELO - PLACA"
   const modelo = `${v.marca} ${v.modelo}${v.ano_mod ? ` · ${v.ano_mod}` : ''}`
 
@@ -286,7 +286,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onOpen, onAlocar, onOS, onCheckl
 
   const obs = parseObsInfo(v.observacoes)
   const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
-  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+  const categoriaOrigem = (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria).toUpperCase()
 
   const trCls = `border-t transition-colors cursor-pointer ${
     isLight
@@ -717,7 +717,7 @@ function VeiculoDetalhesModal({
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
   const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
-  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+  const categoriaOrigem = (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria).toUpperCase()
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'

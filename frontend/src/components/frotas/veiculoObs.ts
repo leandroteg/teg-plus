@@ -1,6 +1,8 @@
 // Helper para extrair campos do campo `observacoes` do fro_veiculos
 // Formato esperado: "Categoria origem: X | Cód. Sistema: Y | Cód. Frota: Z | Responsável: W | Local: V | Rastreador: R"
 
+import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../constants/categoriaVeiculo'
+
 export interface ObsInfo {
   categoriaOrigem?: string
   codigo?: string
@@ -38,6 +40,9 @@ export function formatCodigoCategoria(v: {
   const isMaquina = v.tipo_ativo === 'maquina'
   // Prioridade: campo dedicado codigo_interno > Cód. Sistema (obs) > Cód. Frota (obs) > numero_serie (maquina) > placa
   const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
-  const categoria = obs.categoriaOrigem || v.categoria.toUpperCase()
+  // Usa SEMPRE a categoria atual do banco (CATEGORIA_LABEL[v.categoria])
+  // — ignora "Categoria origem" das observações (texto legado da importação inicial)
+  const cat = v.categoria as CategoriaVeiculo
+  const categoria = (CATEGORIA_LABEL[cat] ?? v.categoria).toUpperCase()
   return { codigo, categoria }
 }
