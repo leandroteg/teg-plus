@@ -67,9 +67,13 @@ export default function RequisicaoDetalhe() {
   const canEmitPedido = !!req
     && atLeast('comprador')
     && req.status === 'cotacao_aprovada'
+  // Quem pode responder esclarecimento: comprador+ (nunca o requisitante)
+  // em_esclarecimento: TI/comprador responde sobre a necessidade
+  // cotacao_em_esclarecimento: comprador responde sobre a cotação
+  const canResponderEsclarecimento = atLeast('comprador')
   const canMutateComprasReq = canDecide || canEmitPedido
-    || req?.status === 'em_esclarecimento'
-    || req?.status === 'cotacao_em_esclarecimento'
+    || (req?.status === 'em_esclarecimento' && canResponderEsclarecimento)
+    || (req?.status === 'cotacao_em_esclarecimento' && canResponderEsclarecimento)
     || req?.status === 'devolvida_solicitante'
   const { isLocked, blockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
@@ -264,8 +268,8 @@ export default function RequisicaoDetalhe() {
             {req.esclarecimento_em && <span>· {fmtData(req.esclarecimento_em)}</span>}
           </div>
 
-          {/* Reenviar para aprovador */}
-          {!reenviarMutation.isSuccess && (
+          {/* Reenviar para aprovador — somente comprador+ */}
+          {canResponderEsclarecimento && !reenviarMutation.isSuccess && (
             <div className="pt-2 border-t border-amber-200 space-y-2">
               <p className="text-xs font-semibold text-amber-700">Responder e reenviar ao aprovador:</p>
               <UpperTextarea
