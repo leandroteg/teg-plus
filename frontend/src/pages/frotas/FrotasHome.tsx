@@ -10,6 +10,7 @@ import type { FrotasKPIs } from '../../types/frotas'
 
 const IndicadoresFrota = lazy(() => import('./paineis/IndicadoresFrota'))
 const PainelMotoristas = lazy(() => import('./paineis/PainelMotoristas'))
+const PainelDisponibilidade = lazy(() => import('./paineis/PainelDisponibilidade'))
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const BRL = (v: number) =>
@@ -103,7 +104,7 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
 export default function FrotasHome() {
   const nav = useNavigate()
   const { isDark } = useTheme()
-  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'indicadores' | 'motoristas'>('painel')
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'disponibilidade' | 'indicadores' | 'motoristas'>('painel')
   const { data: kpis, isLoading, refetch } = useFrotasKPIs()
   const { data: osAbertas = [] } = useOrdensServico({
     status: ['aberta', 'em_cotacao', 'aguardando_aprovacao', 'aprovada', 'em_execucao'],
@@ -213,7 +214,7 @@ export default function FrotasHome() {
           <div className="relative">
             <select
               value={painelAtivo}
-              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'indicadores' | 'motoristas')}
+              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'disponibilidade' | 'indicadores' | 'motoristas')}
               className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
                 isDark
                   ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]'
@@ -221,6 +222,7 @@ export default function FrotasHome() {
               }`}
             >
               <option value="painel">Painel</option>
+              <option value="disponibilidade">Disponibilidade</option>
               <option value="indicadores">Indicadores</option>
               <option value="motoristas">Motoristas</option>
             </select>
@@ -231,6 +233,12 @@ export default function FrotasHome() {
           <RefreshCw size={16} />
         </button>
       </div>
+
+      {painelAtivo === 'disponibilidade' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-rose-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <PainelDisponibilidade />
+        </Suspense>
+      )}
 
       {painelAtivo === 'indicadores' && (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-rose-500 border-t-transparent rounded-full animate-spin" /></div>}>
