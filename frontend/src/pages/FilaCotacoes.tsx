@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info,
   XCircle, MessageSquare, FileText, ScrollText, Ban, Search, X, ArrowUp, ArrowDown,
-  LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar, Sparkles,
+  LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar, Sparkles, Send,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../services/supabase'
 import { useCotacoes } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useReenviarEsclarecimento } from '../hooks/useRequisicoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
@@ -129,16 +130,21 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
+  const emEsclarecimento = cot.requisicao?.status === 'cotacao_em_esclarecimento'
   const descricaoPrincipal = getDescricaoPrincipal(cot)
 
   return (
     <div onClick={onClick}
       className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 flex flex-col justify-between ${
         isDark
-          ? 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
-          : concluida
-            ? 'bg-white border-emerald-200 hover:border-emerald-300 hover:shadow-md shadow-sm'
-            : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-md shadow-sm'
+          ? emEsclarecimento
+            ? 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50'
+            : 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
+          : emEsclarecimento
+            ? 'bg-rose-50 border-rose-300 hover:border-rose-400 shadow-sm'
+            : concluida
+              ? 'bg-white border-emerald-200 hover:border-emerald-300 hover:shadow-md shadow-sm'
+              : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-md shadow-sm'
       }`}>
       {/* Row 1: RC + status + dias */}
       <div className="flex justify-between items-center gap-2">
@@ -151,9 +157,14 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
                 : isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
             }`}>⚡ {cot.requisicao.urgencia}</span>
           )}
-          {concluida && (
+          {concluida && !emEsclarecimento && (
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
               Concluída
+            </span>
+          )}
+          {emEsclarecimento && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${isDark ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-700'}`}>
+              <MessageSquare size={9} /> Esclarecimento
             </span>
           )}
         </div>
@@ -220,8 +231,11 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   onOpenCotacao: () => void
 }) {
   const navigate = useNavigate()
+  const { perfil } = useAuth()
   const { data: categorias = [] } = useCategorias()
+  const reenviarMutation = useReenviarEsclarecimento()
   const [observacao, setObservacao] = useState('')
+  const [respostaEsc, setRespostaEsc] = useState('')
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
   const categoriaCodigo = ((cot.requisicao as any)?.categoria ?? '') as string
   const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
@@ -269,6 +283,53 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
           </div>
 
           {!concluida && <AlertaCotacoes valor={valor} regras={categoriaRegra} isDark={isDark} />}
+
+          {/* Esclarecimento solicitado pelo aprovador — comprador responde aqui */}
+          {concluida && reqStatus === 'cotacao_em_esclarecimento' && (
+            <div className={`rounded-xl border-2 p-3 space-y-2 ${isDark ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-300'}`}>
+              <div className="flex items-center gap-2">
+                <MessageSquare size={14} className="text-rose-500 shrink-0" />
+                <p className={`text-xs font-bold ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>Esclarecimento Solicitado</p>
+              </div>
+              {(cot.requisicao as any)?.esclarecimento_msg && (
+                <p className={`text-xs ${isDark ? 'text-rose-200' : 'text-rose-800'}`}>{(cot.requisicao as any).esclarecimento_msg}</p>
+              )}
+              {atLeastComprador && !reenviarMutation.isSuccess && (
+                <div className="space-y-2 pt-1">
+                  <UpperTextarea
+                    rows={2}
+                    value={respostaEsc}
+                    onChange={e => setRespostaEsc(e.target.value)}
+                    placeholder="Resposta do comprador (opcional)..."
+                    className={`w-full rounded-lg border px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-rose-400 ${isDark ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-rose-200 text-slate-800 placeholder:text-rose-300'}`}
+                  />
+                  <button
+                    disabled={reenviarMutation.isPending}
+                    onClick={() => {
+                      const req = cot.requisicao
+                      if (!req || !perfil) return
+                      reenviarMutation.mutate({
+                        requisicaoId: req.id,
+                        requisicaoNumero: req.numero,
+                        alcadaNivel: (req as any).alcada_nivel ?? 1,
+                        solicitanteNome: perfil.nome,
+                        resposta: respostaEsc.trim() || undefined,
+                      })
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 transition-colors"
+                  >
+                    {reenviarMutation.isPending
+                      ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <Send size={13} />}
+                    Responder e Reenviar p/ Aprovação
+                  </button>
+                </div>
+              )}
+              {reenviarMutation.isSuccess && (
+                <p className={`text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>✓ Reenviado para aprovação!</p>
+              )}
+            </div>
+          )}
 
           {/* Status chips */}
           {concluida && reqStatus === 'cotacao_enviada' && (
