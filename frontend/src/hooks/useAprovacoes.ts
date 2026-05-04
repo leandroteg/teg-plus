@@ -1026,8 +1026,8 @@ export function useDecisaoGenerica() {
           } else if (decisao === 'rejeitada') {
             updates.status = 'cotacao_rejeitada'
           } else if (decisao === 'esclarecimento') {
-            // Devolve ao comprador para esclarecer a cotação
-            updates.status = 'em_esclarecimento'
+            // Devolve ao comprador para esclarecer a cotação — fica na fila de cotações
+            updates.status = 'cotacao_em_esclarecimento'
             updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado na aprovação financeira'
             updates.esclarecimento_por = aprovadorNome
             updates.esclarecimento_em = now
