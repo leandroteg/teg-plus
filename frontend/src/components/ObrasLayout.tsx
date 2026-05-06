@@ -1,11 +1,10 @@
 import {
-  LayoutDashboard, FileText, Users2, Truck, ListTree,
+  LayoutDashboard, FileText, Users2, Truck,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/obras', icon: LayoutDashboard, label: 'Painel', end: true },
-  { to: '/obras/eap', icon: ListTree, label: 'EAP' },
   { to: '/obras/rdo', icon: FileText, label: 'Diário Obra' },
   { to: '/obras/equipe', icon: Users2, label: 'Equipe' },
   { to: '/obras/alocacao-recursos', icon: Truck, label: 'Alocação de Recursos' },

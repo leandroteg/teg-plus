@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Rocket, Compass, Zap, BarChart3, CheckCircle2,
-  ChevronDown, Building2,
+  ChevronDown, Building2, ListTree,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
@@ -15,6 +15,7 @@ const NAV = [
   { to: '/egp/execucao',     icon: Zap,             label: 'Execução' },
   { to: '/egp/controle',     icon: BarChart3,       label: 'Controle' },
   { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
+  { to: '/egp/eap',          icon: ListTree,        label: 'EAP Carteira' },
 ]
 
 function ContractSelector() {

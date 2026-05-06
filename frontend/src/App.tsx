@@ -395,7 +395,6 @@ export default function App() {
               <Route path="/obras/prestacao"          element={<Lazy><PrestacaoContas /></Lazy>} />
               <Route path="/obras/equipe"            element={<Lazy><PlanejamentoEquipe /></Lazy>} />
               <Route path="/obras/alocacao-recursos"  element={<Lazy><AlocacaoRecursos /></Lazy>} />
-              <Route path="/obras/eap"                element={<Lazy><EAP /></Lazy>} />
             </Route>
           </Route>
 
@@ -415,6 +414,8 @@ export default function App() {
               <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramento /></Lazy>} />
               <Route path="/egp/encerramento/:portfolioId"        element={<Lazy><EGPEncerramento /></Lazy>} />
+              {/* EAP - Visão Carteira (Executiva + Detalhada) */}
+              <Route path="/egp/eap"                              element={<Lazy><EAP /></Lazy>} />
               {/* Portfólio (mantido para acesso direto) */}
               <Route path="/egp/portfolio"                        element={<Lazy><Portfolio /></Lazy>} />
               <Route path="/egp/portfolio/novo"                   element={<Lazy><NovoPortfolio /></Lazy>} />
