@@ -331,18 +331,33 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
 
   if (isLoading) return <Spinner />
 
-  // Build indentation map from parent_id
+  // Achata a árvore: parents (sorted por ordem) + filhos imediatos (sorted por ordem)
+  // Quando "Todos" projetos: agrupa por projeto_id antes
+  const flatItems: PMOEAP[] = []
   const indentMap = new Map<string, number>()
-  const buildIndent = (list: PMOEAP[]) => {
-    list.forEach(item => {
-      if (!item.parent_id) {
-        indentMap.set(item.id, 0)
-      } else {
-        indentMap.set(item.id, (indentMap.get(item.parent_id) ?? 0) + 1)
-      }
+  const groupByProj = new Map<string, PMOEAP[]>()
+  ;(items ?? []).forEach(it => {
+    const k = it.projeto_id ?? '_'
+    if (!groupByProj.has(k)) groupByProj.set(k, [])
+    groupByProj.get(k)!.push(it)
+  })
+
+  for (const [, projItems] of groupByProj) {
+    const parents = projItems
+      .filter(i => !i.parent_id)
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+    parents.forEach(parent => {
+      flatItems.push(parent)
+      indentMap.set(parent.id, 0)
+      const children = projItems
+        .filter(i => i.parent_id === parent.id)
+        .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+      children.forEach(child => {
+        flatItems.push(child)
+        indentMap.set(child.id, 1)
+      })
     })
   }
-  buildIndent(items ?? [])
 
   return (
     <div className="space-y-3">
@@ -402,8 +417,9 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
                 </tr>
               </thead>
               <tbody>
-                {(items ?? []).map(item => {
+                {flatItems.map(item => {
                   const indent = indentMap.get(item.id) ?? 0
+                  const isParent = !item.parent_id
                   const qr = item.qty_realizado
                   const qt = item.qty_total
                   const u = item.unidade ?? ''
@@ -419,7 +435,12 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
                           ? (isLight ? 'text-amber-600' : 'text-amber-400')
                           : (isLight ? 'text-slate-400' : 'text-slate-500')
                   return (
-                    <tr key={item.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
+                    <tr
+                      key={item.id}
+                      className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'} ${
+                        isParent ? (isLight ? 'bg-slate-50/60 font-semibold' : 'bg-white/[0.02] font-semibold') : ''
+                      }`}
+                    >
                       <td className={tdCls}>
                         <span className="font-mono text-xs">{item.codigo ?? '-'}</span>
                       </td>
