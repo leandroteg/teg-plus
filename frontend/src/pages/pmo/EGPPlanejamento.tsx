@@ -400,6 +400,8 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
             Nenhum item na EAP. Use "Gerar EAP com IA" para iniciar.
           </p>
         </div>
+      ) : !projetoId && view === 'tabela' ? (
+        <EAPResumoPorProjeto items={items ?? []} isLight={isLight} />
       ) : view === 'grafico' ? (
         <EAPGrafico items={items ?? []} isLight={isLight} singleProjeto={!!projetoId} />
       ) : (
@@ -465,6 +467,178 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── EAP Resumo por Projeto (visão "Todos" na tabela) ────────────────────────
+function EAPResumoPorProjeto({ items, isLight }: { items: PMOEAP[]; isLight: boolean }) {
+  const portfolioId = useEGPPortfolioId()
+  const { data: projetos } = useProjetos(portfolioId)
+  const { thCls, tdCls, cardCls } = useTableStyles(isLight)
+
+  // Pacotes únicos (top-level) — extraídos da EAP
+  const pacotesPadrao = Array.from(
+    new Map(
+      items.filter(i => !i.parent_id).map(i => [i.codigo, { codigo: i.codigo!, titulo: i.titulo }])
+    ).values()
+  ).sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0))
+
+  // Para cada projeto, calcula % físico realizado (média ponderada por peso)
+  const linhas = (projetos ?? []).map(proj => {
+    const itensProj = items.filter(i => i.projeto_id === proj.id)
+    const pacotes = itensProj.filter(i => !i.parent_id)
+    const subItens = itensProj.filter(i => !!i.parent_id)
+
+    let pctPond = 0
+    let pesoTotal = 0
+    let nComConcluidos = 0
+    let nComQty = 0
+    subItens.forEach(s => {
+      const peso = Number(s.peso_percentual ?? 0)
+      pesoTotal += peso
+      if (s.qty_total != null && s.qty_realizado != null && s.qty_total > 0) {
+        nComQty++
+        const p = Math.min((Number(s.qty_realizado) / Number(s.qty_total)) * 100, 100)
+        pctPond += (p * peso) / 100
+        if (p >= 100) nComConcluidos++
+      }
+    })
+    const pctNorm = pesoTotal > 0 ? (pctPond / pesoTotal) * 100 : 0
+
+    // Por pacote: pct calculado (média ponderada dos sub-itens do pacote)
+    const pctPorPacote = new Map<string, number>()
+    pacotes.forEach(pac => {
+      const subs = subItens.filter(s => s.parent_id === pac.id)
+      let pp = 0
+      let wp = 0
+      subs.forEach(s => {
+        const peso = Number(s.peso_percentual ?? 0)
+        wp += peso
+        if (s.qty_total != null && s.qty_realizado != null && s.qty_total > 0) {
+          const p = Math.min((Number(s.qty_realizado) / Number(s.qty_total)) * 100, 100)
+          pp += (p * peso) / 100
+        }
+      })
+      pctPorPacote.set(pac.codigo!, wp > 0 ? (pp / wp) * 100 : 0)
+    })
+
+    return {
+      proj,
+      pctNorm,
+      n_subitens: subItens.length,
+      n_com_qty: nComQty,
+      n_concluidos: nComConcluidos,
+      pctPorPacote,
+    }
+  })
+
+  // Total geral (média ponderada simples por número de sub-itens com qty)
+  const totalPctPorPacote = new Map<string, number>()
+  pacotesPadrao.forEach(pac => {
+    let soma = 0
+    let cnt = 0
+    linhas.forEach(l => {
+      const v = l.pctPorPacote.get(pac.codigo)
+      if (v != null && v > 0) { soma += v; cnt++ }
+    })
+    totalPctPorPacote.set(pac.codigo, cnt > 0 ? soma / cnt : 0)
+  })
+  const totalPctGeral =
+    linhas.reduce((s, l) => s + l.pctNorm, 0) / Math.max(linhas.length, 1)
+  const totalSubItens = linhas.reduce((s, l) => s + l.n_subitens, 0)
+  const totalConcluidos = linhas.reduce((s, l) => s + l.n_concluidos, 0)
+
+  const corPct = (p: number) =>
+    p >= 90
+      ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+      : p >= 50
+        ? (isLight ? 'text-blue-600' : 'text-blue-400')
+        : p > 0
+          ? (isLight ? 'text-amber-600' : 'text-amber-400')
+          : (isLight ? 'text-slate-400' : 'text-slate-500')
+
+  return (
+    <div className={cardCls}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[820px]">
+          <thead>
+            <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
+              <th className={thCls}>Projeto</th>
+              {pacotesPadrao.map(p => (
+                <th key={p.codigo} className={`${thCls} text-center`} title={p.titulo}>
+                  {p.codigo}
+                </th>
+              ))}
+              <th className={`${thCls} text-center`}>Itens</th>
+              <th className={`${thCls} text-center`}>% Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map(l => (
+              <tr key={l.proj.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
+                <td className={tdCls}>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {l.proj.centro_custo?.codigo ?? '-'}
+                    </span>
+                    <span className="font-semibold">
+                      {(l.proj.centro_custo?.descricao || l.proj.nome).replace(/^CEMIG\s*\|\s*/, '')}
+                    </span>
+                  </div>
+                </td>
+                {pacotesPadrao.map(pac => {
+                  const v = l.pctPorPacote.get(pac.codigo) ?? 0
+                  return (
+                    <td key={pac.codigo} className={`${tdCls} text-center font-mono text-xs ${corPct(v)}`}>
+                      {v > 0 ? `${Math.round(v)}%` : '—'}
+                    </td>
+                  )
+                })}
+                <td className={`${tdCls} text-center font-mono text-xs`}>
+                  {l.n_concluidos}/{l.n_subitens}
+                </td>
+                <td className={`${tdCls} text-center font-bold ${corPct(l.pctNorm)}`}>
+                  {l.pctNorm > 0 ? `${Math.round(l.pctNorm)}%` : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className={`border-t-2 ${isLight ? 'border-slate-300 bg-slate-100/60 font-bold' : 'border-white/[0.10] bg-white/[0.04] font-bold'}`}>
+              <td className={tdCls}>
+                <span className="text-[10px] uppercase tracking-wide">Total Carteira</span>
+              </td>
+              {pacotesPadrao.map(pac => {
+                const v = totalPctPorPacote.get(pac.codigo) ?? 0
+                return (
+                  <td key={pac.codigo} className={`${tdCls} text-center font-mono text-xs ${corPct(v)}`}>
+                    {v > 0 ? `${Math.round(v)}%` : '—'}
+                  </td>
+                )
+              })}
+              <td className={`${tdCls} text-center font-mono text-xs`}>
+                {totalConcluidos}/{totalSubItens}
+              </td>
+              <td className={`${tdCls} text-center ${corPct(totalPctGeral)}`}>
+                {totalPctGeral > 0 ? `${Math.round(totalPctGeral)}%` : '—'}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* Legenda dos pacotes */}
+      <div className={`px-4 py-2 border-t flex flex-wrap gap-x-4 gap-y-1 text-[10px] ${
+        isLight ? 'border-slate-100 text-slate-500' : 'border-white/[0.04] text-slate-400'
+      }`}>
+        {pacotesPadrao.map(p => (
+          <span key={p.codigo}>
+            <span className="font-mono font-bold mr-1">{p.codigo}</span>
+            {p.titulo}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
