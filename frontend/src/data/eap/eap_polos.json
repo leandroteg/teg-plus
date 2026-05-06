@@ -1,0 +1,4470 @@
+{
+  "frentes": [
+    {
+      "id": "F1 - Frutal",
+      "contratado": 36375262.46,
+      "saldo": 4327661.21,
+      "torres": 266,
+      "ton": 595.0,
+      "n_oscs": 2,
+      "secoes_pct": {
+        "preliminares": 79.0,
+        "fundacoes": 87.9,
+        "transportes": 107.3,
+        "montagem": 98.3,
+        "aterramento": 76.7,
+        "lancamento": 99.5,
+        "complementares": 168.2,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 90.9,
+        "_cobertura": 2,
+        "_total": 2
+      },
+      "canteiros": [
+        {
+          "nome": "Frutal",
+          "contratado": 36375262.46,
+          "saldo": 4327661.21,
+          "torres": 266,
+          "ton": 595.0,
+          "n_oscs": 2,
+          "oscs": [
+            {
+              "key": "2024/27",
+              "obra": "LD FRUTAL 2 - ITAPAGIPE 1 - 138",
+              "status": "Em andamento",
+              "valor": 34959682.39,
+              "saldo": 4171677.7699999996,
+              "estr": 254,
+              "postes": 0,
+              "ton": 571.1,
+              "tot": 254,
+              "detalhe_torres": "DL1: 1 · DL3A: 5 · H3L4A: 28 · H6L7: 2 · L3A: 13 · L6: 85 · LTP2: 117 · T4R: 3",
+              "torres_real": null,
+              "fonte_qtd": "OneDrive Docx Caracteristicas",
+              "tem_medicao": true,
+              "pct_acum": 91.0,
+              "valor_acum": 31819551.35,
+              "secoes_pct": {
+                "preliminares": 78.95686961746748,
+                "fundacoes": 87.24089412260581,
+                "transportes": 107.28611216473982,
+                "montagem": 98.4633902995399,
+                "aterramento": 74.18643303434447,
+                "lancamento": 96.5419415748615
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 425668.43,
+                    "preco_medio": 0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 212834.22
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 22617.03,
+                    "preco_medio": 0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 176189.69,
+                    "preco_medio": 0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 88094.84
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 3975292.83,
+                    "preco_medio": 0.1,
+                    "qty_acum": 0.866,
+                    "valor_acum": 3443301.21
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 650.0,
+                    "valor": 80665.36,
+                    "preco_medio": 0,
+                    "qty_acum": 515.0,
+                    "valor_acum": 63911.78
+                  },
+                  "ha": {
+                    "qty": 126.5,
+                    "valor": 1352557.24,
+                    "preco_medio": 8.99,
+                    "qty_acum": 82.06,
+                    "valor_acum": 888076.87
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 85.0,
+                    "valor": 253165.12,
+                    "preco_medio": 2.52,
+                    "qty_acum": 82.096,
+                    "valor_acum": 244515.81
+                  }
+                },
+                "2.1": {
+                  "m3": {
+                    "qty": 910.0,
+                    "valor": 338900.87,
+                    "preco_medio": 0
+                  }
+                },
+                "2.3": {
+                  "m3": {
+                    "qty": 30.0,
+                    "valor": 10318.07,
+                    "preco_medio": 0
+                  }
+                },
+                "2.4": {
+                  "m3": {
+                    "qty": 650.0,
+                    "valor": 627653.31,
+                    "preco_medio": 0,
+                    "qty_acum": 69.0,
+                    "valor_acum": 66627.81
+                  }
+                },
+                "2.8": {
+                  "m3": {
+                    "qty": 173.0,
+                    "valor": 323924.89,
+                    "preco_medio": 1.58
+                  }
+                },
+                "2.9": {
+                  "m2": {
+                    "qty": 260.0,
+                    "valor": 221253.55,
+                    "preco_medio": 0.72
+                  }
+                },
+                "2.10": {
+                  "kg": {
+                    "qty": 6000.0,
+                    "valor": 241109.64,
+                    "preco_medio": 0
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 1510.0,
+                    "valor": 7553894.34,
+                    "preco_medio": 4.07,
+                    "qty_acum": 1634.978,
+                    "valor_acum": 8061653.99
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 7440.0,
+                    "valor": 211391.7,
+                    "preco_medio": 0,
+                    "qty_acum": 7425.0,
+                    "valor_acum": 235188.27
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 400.0,
+                    "valor": 7824.25,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 580.0,
+                    "valor": 5183024.13,
+                    "preco_medio": 7.56,
+                    "qty_acum": 570.8,
+                    "valor_acum": 5104724.25
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 580.0,
+                    "valor": 2707755.81,
+                    "preco_medio": 0,
+                    "qty_acum": 570.8,
+                    "valor_acum": 2664805.2
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 89.0,
+                    "valor": 3405076.8,
+                    "preco_medio": 33.88,
+                    "qty_acum": 70.294,
+                    "valor_acum": 2507669.57
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 86.3,
+                    "valor": 4479589.0,
+                    "preco_medio": 44.04,
+                    "qty_acum": 85.286,
+                    "valor_acum": 4426489.01
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 86.0,
+                    "valor": 3179127.52,
+                    "preco_medio": 0,
+                    "qty_acum": 84.61,
+                    "valor_acum": 3127743.95
+                  },
+                  "eq/dia": {
+                    "qty": 14.0,
+                    "valor": 166103.27,
+                    "preco_medio": 0
+                  }
+                }
+              }
+            },
+            {
+              "key": "2024/28",
+              "obra": "LD  Frutal 2 - Itapagipe - 138 kV -  Derivação Fronteira 2",
+              "status": "Em andamento Cemig = Concluído",
+              "valor": 1415580.07,
+              "saldo": 155983.44000000018,
+              "estr": 12,
+              "postes": 0,
+              "ton": 23.9,
+              "tot": 12,
+              "detalhe_torres": "H3L4A: 3 · L6: 2 · LTP2: 7",
+              "torres_real": 12,
+              "fonte_qtd": "OneDrive Docx Caracteristicas",
+              "tem_medicao": true,
+              "pct_acum": 89.0,
+              "valor_acum": 1259596.63,
+              "secoes_pct": {
+                "fundacoes": 104.07423806229741,
+                "montagem": 93.06823439676745,
+                "aterramento": 139.07215466465797,
+                "lancamento": 173.68894622244775,
+                "complementares": 168.16862507115
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.6": {
+                  "km": {
+                    "qty": 3.5,
+                    "valor": 9920.47,
+                    "preco_medio": 2.52,
+                    "qty_acum": 3.395,
+                    "valor_acum": 10111.71
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 73.0,
+                    "valor": 308852.35,
+                    "preco_medio": 4.08,
+                    "qty_acum": 66.723,
+                    "valor_acum": 321435.73
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1360.0,
+                    "valor": 26463.59,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 25.0,
+                    "valor": 206202.96,
+                    "preco_medio": 7.33,
+                    "qty_acum": 21.501,
+                    "valor_acum": 183502.35
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 25.0,
+                    "valor": 111071.04,
+                    "preco_medio": 3.95,
+                    "qty_acum": 23.943,
+                    "valor_acum": 111778.96
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 3.0,
+                    "valor": 105460.68,
+                    "preco_medio": 31.25,
+                    "qty_acum": 4.134,
+                    "valor_acum": 146666.45
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 3.6,
+                    "valor": 174464.43,
+                    "preco_medio": 43.09,
+                    "qty_acum": 3.469,
+                    "valor_acum": 177560.79
+                  }
+                },
+                "7.1": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 455.65,
+                    "preco_medio": 0.21
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 30.0,
+                    "valor": 11540.14,
+                    "preco_medio": 0.34
+                  }
+                },
+                "17.3": {
+                  "un": {
+                    "qty": 30.0,
+                    "valor": 10021.7,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 1.0,
+                    "valor": 364.43,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 1790.63,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 48.0,
+                    "valor": 12201.5,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 15.0,
+                    "valor": 1265.37,
+                    "preco_medio": 0.07
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 432.58
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.847,
+                    "valor_acum": 136199.1
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 3.394,
+                    "valor_acum": 125464.64
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F2 - Tres Marias",
+      "contratado": 33296575.28,
+      "saldo": 28900874.330000002,
+      "torres": 108,
+      "ton": 645.3,
+      "n_oscs": 2,
+      "secoes_pct": {
+        "preliminares": 23.6,
+        "fundacoes": 20.3,
+        "transportes": 59.3,
+        "montagem": 31.7,
+        "aterramento": null,
+        "lancamento": null,
+        "complementares": null,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 13.5,
+        "_cobertura": 2,
+        "_total": 2
+      },
+      "canteiros": [
+        {
+          "nome": "3M (Tres Marias)",
+          "contratado": 33296575.28,
+          "saldo": 28900874.330000002,
+          "torres": 108,
+          "ton": 645.3,
+          "n_oscs": 2,
+          "oscs": [
+            {
+              "key": "2025/58",
+              "obra": "LD TRES MARIAS VARZEA DA PALMA 7 138",
+              "status": "Em andamento",
+              "valor": 30915820.28,
+              "saldo": 27003670.48,
+              "estr": 97,
+              "postes": 0,
+              "ton": 600.3,
+              "tot": 97,
+              "detalhe_torres": "97 estruturas novas (de 194 existentes), 100 km cabo (Detalhamento OSC)",
+              "torres_real": null,
+              "fonte_qtd": "OneDrive Docx Caracteristicas (reatribuido de 054 -> 058)",
+              "tem_medicao": true,
+              "pct_acum": 13.0,
+              "valor_acum": 3912149.81,
+              "secoes_pct": {
+                "preliminares": 22.453980683506362,
+                "fundacoes": 20.32410814437251,
+                "transportes": 59.26076323633189,
+                "montagem": 31.91396427789593
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 2.0,
+                    "valor": 851336.86,
+                    "preco_medio": 0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 425668.43
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 2.0,
+                    "valor": 45234.06,
+                    "preco_medio": 19.14,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 183317.9,
+                    "preco_medio": 155.1,
+                    "qty_acum": 0.5,
+                    "valor_acum": 91658.95
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 4136133.88,
+                    "preco_medio": 3499.53,
+                    "qty_acum": 0.127,
+                    "valor_acum": 523394.66
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 300.0,
+                    "valor": 37230.17,
+                    "preco_medio": 0.1
+                  },
+                  "ha": {
+                    "qty": 100.0,
+                    "valor": 1199047.7,
+                    "preco_medio": 0,
+                    "qty_acum": 25.76,
+                    "valor_acum": 308874.69
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 78.68,
+                    "valor": 234341.55,
+                    "preco_medio": 2.52,
+                    "qty_acum": 43.38,
+                    "valor_acum": 129203.56
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 620.0,
+                    "valor": 3271408.69,
+                    "preco_medio": 4.46,
+                    "qty_acum": 130.19,
+                    "valor_acum": 664884.64
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 14000.0,
+                    "valor": 329989.27,
+                    "preco_medio": 0.02,
+                    "qty_acum": 17320.0,
+                    "valor_acum": 391108.32
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 14000.0,
+                    "valor": 329989.27,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 258.0,
+                    "valor": 2541004.86,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 258.0,
+                    "valor": 1204484.48,
+                    "preco_medio": 3.95,
+                    "qty_acum": 256.04,
+                    "valor_acum": 1195334.13
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 37.4,
+                    "valor": 1225448.26,
+                    "preco_medio": 0
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 78.68,
+                    "valor": 912909.18,
+                    "preco_medio": 0
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 84.19,
+                    "valor": 8208854.97,
+                    "preco_medio": 39.34
+                  },
+                  "eq/dia": {
+                    "qty": 30.0,
+                    "valor": 349077.12,
+                    "preco_medio": 0
+                  }
+                },
+                "8.1": {
+                  "ton": {
+                    "qty": 262.0,
+                    "valor": 845372.95,
+                    "preco_medio": 2.73
+                  }
+                },
+                "8.3": {
+                  "km": {
+                    "qty": 157.36,
+                    "valor": 3709199.02,
+                    "preco_medio": 11.45
+                  }
+                }
+              }
+            },
+            {
+              "key": "2024/14",
+              "obra": "LD Três Marias - João Pinheiro 3 - 138 kV",
+              "status": "? Cemig = Concluído",
+              "valor": 2380755.0,
+              "saldo": 1897203.85,
+              "estr": 11,
+              "postes": 0,
+              "ton": 45,
+              "tot": 11,
+              "detalhe_torres": "45t metal autoportante",
+              "torres_real": null,
+              "fonte_qtd": "PDF 2024 tabela",
+              "tem_medicao": true,
+              "pct_acum": 20.0,
+              "valor_acum": 483551.15,
+              "secoes_pct": {
+                "preliminares": 38.31243091889422,
+                "montagem": 28.541385818279856
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 78725.25,
+                    "preco_medio": 72.22,
+                    "qty_acum": 1.0,
+                    "valor_acum": 78725.25
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 20858.24,
+                    "preco_medio": 19.14,
+                    "qty_acum": 1.0,
+                    "valor_acum": 20858.24
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 78087.6,
+                    "preco_medio": 71.64,
+                    "qty_acum": 1.0,
+                    "valor_acum": 78087.6
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 568617.03,
+                    "preco_medio": 521.67,
+                    "qty_acum": 0.203,
+                    "valor_acum": 115490.85
+                  }
+                },
+                "1.5": {
+                  "ha": {
+                    "qty": 0.02,
+                    "valor": 221.16,
+                    "preco_medio": 10.14
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 6.8,
+                    "valor": 18678.24,
+                    "preco_medio": 2.52
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 34.24,
+                    "valor": 155234.32,
+                    "preco_medio": 4.16
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1010.0,
+                    "valor": 23118.9,
+                    "preco_medio": 0.02
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 1010.0,
+                    "valor": 23118.9,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 45.0,
+                    "valor": 408733.65,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 60.0,
+                    "valor": 258330.0,
+                    "preco_medio": 3.95,
+                    "qty_acum": 44.22,
+                    "valor_acum": 190389.21
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 6.0,
+                    "valor": 177744.12,
+                    "preco_medio": 27.18
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 6.8,
+                    "valor": 72763.6,
+                    "preco_medio": 9.82
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 6.8,
+                    "valor": 231825.12,
+                    "preco_medio": 31.28
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2118.96,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 819.68,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 20.4,
+                    "valor": 3335.4,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 12.0,
+                    "valor": 981.0,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 20.4,
+                    "valor": 3335.4,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 12.0,
+                    "valor": 981.0,
+                    "preco_medio": 0.07
+                  }
+                },
+                "8.1": {
+                  "ton": {
+                    "qty": 20.4,
+                    "valor": 60704.28,
+                    "preco_medio": 2.73
+                  }
+                },
+                "8.3": {
+                  "km": {
+                    "qty": 8.0,
+                    "valor": 192423.15,
+                    "preco_medio": 22.07
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F3.1/3.2 - Araxa/Perdizes",
+      "contratado": 18624075.009999998,
+      "saldo": 13238802.99,
+      "torres": 68,
+      "ton": 176.5,
+      "n_oscs": 3,
+      "secoes_pct": {
+        "preliminares": 49.3,
+        "fundacoes": 30.3,
+        "transportes": null,
+        "montagem": 72.5,
+        "aterramento": null,
+        "lancamento": null,
+        "complementares": null,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 30.7,
+        "_cobertura": 2,
+        "_total": 3
+      },
+      "canteiros": [
+        {
+          "nome": "Araxa",
+          "contratado": 7221610.64,
+          "saldo": 5330960.22,
+          "torres": 31,
+          "ton": 162.5,
+          "n_oscs": 1,
+          "oscs": [
+            {
+              "key": "2025/22",
+              "obra": "LD Araxa 3 - CBMM, 138kV",
+              "status": "Em andamento",
+              "valor": 7221610.64,
+              "saldo": 5330960.22,
+              "estr": 31,
+              "postes": 0,
+              "ton": 162.5,
+              "tot": 31,
+              "detalhe_torres": "DG3A: 1 · LL1A: 6 · LL2: 15 · LL3A: 9",
+              "torres_real": null,
+              "fonte_qtd": "OneDrive Docx Caracteristicas",
+              "tem_medicao": true,
+              "pct_acum": 26.0,
+              "valor_acum": 1890650.42,
+              "secoes_pct": {
+                "preliminares": 58.01429862066154,
+                "montagem": 105.08014934677725
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1397046.45,
+                    "preco_medio": 1242.07,
+                    "qty_acum": 0.249,
+                    "valor_acum": 365753.1
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 5.0,
+                    "valor": 590.5,
+                    "preco_medio": 0.11
+                  },
+                  "ha": {
+                    "qty": 2.5,
+                    "valor": 28526.98,
+                    "preco_medio": 10.14
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 10.0,
+                    "valor": 28344.2,
+                    "preco_medio": 2.52,
+                    "qty_acum": 10.0,
+                    "valor_acum": 29784.13
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2600.0,
+                    "valor": 56834.63,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 161.9,
+                    "valor": 0.0,
+                    "preco_medio": 0
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 224.23,
+                    "valor": 996218.35,
+                    "preco_medio": 3.95,
+                    "qty_acum": 224.23,
+                    "valor_acum": 1046827.73
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 10.16,
+                    "valor": 320483.64,
+                    "preco_medio": 28.04
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.61,
+                    "valor": 10105.72,
+                    "preco_medio": 14.73
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 60.0,
+                    "valor": 23080.28,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 60.0,
+                    "valor": 20043.4,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 4373.11,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 64.0,
+                    "valor": 6766.62,
+                    "preco_medio": 0.09
+                  }
+                },
+                "1.1": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 425668.43
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Perdizes",
+          "contratado": 11402464.37,
+          "saldo": 7907842.7700000005,
+          "torres": 37,
+          "ton": 14,
+          "n_oscs": 2,
+          "oscs": [
+            {
+              "key": "2025/3",
+              "obra": "LD NOVA PONTE 2 - PERDIZES 2 - 138",
+              "status": "Em andamento",
+              "valor": 10372817.0,
+              "saldo": 6878195.4,
+              "estr": 33,
+              "postes": 0,
+              "ton": 0,
+              "tot": 33,
+              "detalhe_torres": "33 torres metálicas",
+              "torres_real": 11,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 34.0,
+              "valor_acum": 3494621.6,
+              "secoes_pct": {
+                "preliminares": 43.21052758379557,
+                "fundacoes": 30.2679593675225,
+                "montagem": 49.83336116227039
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 405089.29,
+                    "preco_medio": 360.15,
+                    "qty_acum": 1.0,
+                    "valor_acum": 425668.43
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 21523.6,
+                    "preco_medio": 19.14,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 114717.54,
+                    "preco_medio": 101.99,
+                    "qty_acum": 0.5,
+                    "valor_acum": 60272.68
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1951216.13,
+                    "preco_medio": 1734.77,
+                    "qty_acum": 0.321,
+                    "valor_acum": 657368.39
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 687.0,
+                    "valor": 81135.28,
+                    "preco_medio": 0.1
+                  },
+                  "ha": {
+                    "qty": 16.68,
+                    "valor": 179149.77,
+                    "preco_medio": 9.55
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 13.45,
+                    "valor": 38122.95,
+                    "preco_medio": 2.52,
+                    "qty_acum": 13.45,
+                    "valor_acum": 40059.66
+                  }
+                },
+                "2.1": {
+                  "m3": {
+                    "qty": 120.0,
+                    "valor": 42493.81,
+                    "preco_medio": 0.31
+                  }
+                },
+                "2.3": {
+                  "m3": {
+                    "qty": 11.0,
+                    "valor": 3600.39,
+                    "preco_medio": 0.29
+                  }
+                },
+                "2.4": {
+                  "m3": {
+                    "qty": 70.0,
+                    "valor": 64325.6,
+                    "preco_medio": 0.82
+                  }
+                },
+                "2.8": {
+                  "m3": {
+                    "qty": 28.0,
+                    "valor": 49881.3,
+                    "preco_medio": 1.58
+                  }
+                },
+                "2.9": {
+                  "m2": {
+                    "qty": 36.0,
+                    "valor": 29154.04,
+                    "preco_medio": 0.72
+                  }
+                },
+                "2.10": {
+                  "kg": {
+                    "qty": 650.0,
+                    "valor": 24857.42,
+                    "preco_medio": 0.03
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 580.0,
+                    "valor": 2706984.08,
+                    "preco_medio": 4.15,
+                    "qty_acum": 183.544,
+                    "valor_acum": 884216.88
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 19600.0,
+                    "valor": 434869.83,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.1": {
+                  "un": {
+                    "qty": 38.0,
+                    "valor": 16882.8,
+                    "preco_medio": 0.4
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 197.37,
+                    "valor": 1849891.45,
+                    "preco_medio": 8.33,
+                    "qty_acum": 49.04,
+                    "valor_acum": 482987.9
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 197.0,
+                    "valor": 875239.78,
+                    "preco_medio": 3.95,
+                    "qty_acum": 197.37,
+                    "valor_acum": 921430.63
+                  }
+                },
+                "4.3": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 76215.54,
+                    "preco_medio": 8.47
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 12.24,
+                    "valor": 401396.89,
+                    "preco_medio": 29.16
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.82,
+                    "valor": 13584.75,
+                    "preco_medio": 14.73
+                  }
+                },
+                "5.3": {
+                  "m2": {
+                    "qty": 800.0,
+                    "valor": 131373.14,
+                    "preco_medio": 0.15
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 13.19,
+                    "valor": 149948.15,
+                    "preco_medio": 10.11
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 13.45,
+                    "valor": 473163.29,
+                    "preco_medio": 31.28
+                  }
+                },
+                "7.1": {
+                  "un": {
+                    "qty": 40.0,
+                    "valor": 9313.1,
+                    "preco_medio": 0.21
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 68.0,
+                    "valor": 26157.65,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 68.0,
+                    "valor": 22715.85,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 728.85,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.6": {
+                  "un": {
+                    "qty": 1.0,
+                    "valor": 714.23,
+                    "preco_medio": 0.64
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 23.0,
+                    "valor": 2431.75,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.13": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 13443.25,
+                    "preco_medio": 1.0
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 57.0,
+                    "valor": 5705.96,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 198.0,
+                    "valor": 67479.45,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.31": {
+                  "m": {
+                    "qty": 240.0,
+                    "valor": 66946.31,
+                    "preco_medio": 0.25
+                  }
+                },
+                "7.34": {
+                  "un": {
+                    "qty": 3.0,
+                    "valor": 4231.38,
+                    "preco_medio": 1.25
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 98.0,
+                    "valor": 8267.06,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 98.0,
+                    "valor": 8267.06,
+                    "preco_medio": 0.07
+                  }
+                }
+              }
+            },
+            {
+              "key": "2025/86",
+              "obra": "32050 - LD NOVA PONTE 2 PERDIZES 3 138",
+              "status": "Em andamento",
+              "valor": 1029647.37,
+              "saldo": 1029647.37,
+              "estr": 4,
+              "postes": 0,
+              "ton": 14,
+              "tot": 4,
+              "detalhe_torres": "4 torres metálicas",
+              "torres_real": null,
+              "fonte_qtd": "Manual",
+              "tem_medicao": false,
+              "pct_acum": 0,
+              "valor_acum": 0,
+              "secoes_pct": {},
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 29095.08,
+                    "preco_medio": 24.62
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 23438.58,
+                    "preco_medio": 19.83
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 271241.37,
+                    "preco_medio": 229.49
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 60.0,
+                    "valor": 289047.91,
+                    "preco_medio": 4.08
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2600.0,
+                    "valor": 59284.6,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 14.42,
+                    "valor": 142020.55,
+                    "preco_medio": 8.33
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 1.08,
+                    "valor": 39894.54,
+                    "preco_medio": 31.25
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 0.73,
+                    "valor": 8470.04,
+                    "preco_medio": 9.82
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 0.65,
+                    "valor": 43250.46,
+                    "preco_medio": 56.3
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 4.0,
+                    "valor": 444.4,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 9.0,
+                    "valor": 946.71,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2148.71,
+                    "preco_medio": 0.3
+                  }
+                },
+                "8.2": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 37522.1,
+                    "preco_medio": 3.97
+                  }
+                },
+                "8.3": {
+                  "km": {
+                    "qty": 2.08,
+                    "valor": 82842.32,
+                    "preco_medio": 33.7
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F3.3/3.4 - Patrocinio/Ituiutaba",
+      "contratado": 15268386.59,
+      "saldo": 8298516.39082832,
+      "torres": 40,
+      "ton": 150,
+      "n_oscs": 7,
+      "secoes_pct": {
+        "preliminares": 67.4,
+        "fundacoes": 99.9,
+        "transportes": 72.8,
+        "montagem": 88.9,
+        "aterramento": 57.4,
+        "lancamento": 63.2,
+        "complementares": 32.7,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 60.3,
+        "_cobertura": 6,
+        "_total": 7
+      },
+      "canteiros": [
+        {
+          "nome": "Guarda Mor",
+          "contratado": 3968171.35,
+          "saldo": 200754.4500000002,
+          "torres": 11,
+          "ton": 78,
+          "n_oscs": 1,
+          "oscs": [
+            {
+              "key": "2025/12",
+              "obra": "LD GUARDA MOR 2 - PARACATU 13 - 138",
+              "status": "Em andamento",
+              "valor": 3968171.35,
+              "saldo": 200754.4500000002,
+              "estr": 11,
+              "postes": 0,
+              "ton": 78,
+              "tot": 11,
+              "detalhe_torres": "11 estruturas (Detalhamento OSC)",
+              "torres_real": 11,
+              "fonte_qtd": "PDF tabela",
+              "tem_medicao": true,
+              "pct_acum": 98.0,
+              "valor_acum": 3885015.67,
+              "secoes_pct": {
+                "preliminares": 99.25187676664976,
+                "fundacoes": 94.57541108180735,
+                "transportes": 73.92333010075686,
+                "montagem": 104.44805051957387,
+                "aterramento": 81.68493566467717,
+                "lancamento": 105.01023497659807,
+                "complementares": 40.60907025799703
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.5,
+                    "valor": 95244.96,
+                    "preco_medio": 169.36,
+                    "qty_acum": 0.5,
+                    "valor_acum": 100083.55
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 105493.3,
+                    "preco_medio": 93.79,
+                    "qty_acum": 1.0,
+                    "valor_acum": 110852.52
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 890453.41,
+                    "preco_medio": 791.68,
+                    "qty_acum": 0.932,
+                    "valor_acum": 871793.37
+                  }
+                },
+                "1.5": {
+                  "ha": {
+                    "qty": 2.87,
+                    "valor": 32749.03,
+                    "preco_medio": 10.14,
+                    "qty_acum": 2.696,
+                    "valor_acum": 32326.38
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 2.92,
+                    "valor": 8276.51,
+                    "preco_medio": 2.52,
+                    "qty_acum": 2.918,
+                    "valor_acum": 8691.01
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 230.0,
+                    "valor": 1088271.22,
+                    "preco_medio": 4.21,
+                    "qty_acum": 213.647,
+                    "valor_acum": 1029236.98
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1200.0,
+                    "valor": 22304.19,
+                    "preco_medio": 0.02,
+                    "qty_acum": 777.0,
+                    "valor_acum": 16487.99
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 78.87,
+                    "valor": 739225.5,
+                    "preco_medio": 8.33,
+                    "qty_acum": 71.81,
+                    "valor_acum": 707246.34
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 93.6,
+                    "valor": 415849.96,
+                    "preco_medio": 3.95,
+                    "qty_acum": 106.93,
+                    "valor_acum": 499207.46
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 4.32,
+                    "valor": 145261.57,
+                    "preco_medio": 29.9,
+                    "qty_acum": 3.4,
+                    "valor_acum": 118656.82
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 2.92,
+                    "valor": 144631.92,
+                    "preco_medio": 44.04,
+                    "qty_acum": 2.918,
+                    "valor_acum": 151875.35
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 3.2,
+                    "valor": 194611.65,
+                    "preco_medio": 54.07,
+                    "qty_acum": 3.198,
+                    "valor_acum": 204365.13
+                  }
+                },
+                "7.1": {
+                  "un": {
+                    "qty": 11.0,
+                    "valor": 2561.1,
+                    "preco_medio": 0.21
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 769.34,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 668.11,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 728.85,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 1790.63,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 48.0,
+                    "valor": 12201.5,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 1268.74,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 138.0,
+                    "valor": 13814.43,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 48.0,
+                    "valor": 16358.65,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.21": {
+                  "un": {
+                    "qty": 3.0,
+                    "valor": 4956.86,
+                    "preco_medio": 1.47
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 78.86,
+                    "valor": 13304.9,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 14.65,
+                    "valor": 1235.9,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 78.86,
+                    "valor": 13304.9,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 14.65,
+                    "valor": 1235.9,
+                    "preco_medio": 0.07
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Ituiutaba",
+          "contratado": 6585454.18,
+          "saldo": 5042088.03,
+          "torres": 23,
+          "ton": 41,
+          "n_oscs": 3,
+          "oscs": [
+            {
+              "key": "2026/20",
+              "obra": "32077 - LD AVATINGUARA ITUIUTABA 4 138KV",
+              "status": "À iniciar",
+              "valor": 3500259.91,
+              "saldo": 3500259.91,
+              "estr": 12,
+              "postes": 0,
+              "ton": 0,
+              "tot": 12,
+              "detalhe_torres": "12 estrutura [lo para atender a nova SE Ituiutaba 4 — 12 estruturas metáli]",
+              "torres_real": null,
+              "fonte_qtd": "Escopo 2026",
+              "tem_medicao": false,
+              "pct_acum": 0,
+              "valor_acum": 0,
+              "secoes_pct": {},
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.8,
+                    "valor": 160133.68,
+                    "preco_medio": 169.36
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.8,
+                    "valor": 18093.62,
+                    "preco_medio": 19.14
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 69482.13,
+                    "preco_medio": 58.79
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 745451.91,
+                    "preco_medio": 630.72
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 150.0,
+                    "valor": 18615.08,
+                    "preco_medio": 0.1
+                  },
+                  "ha": {
+                    "qty": 7.0,
+                    "valor": 99704.74,
+                    "preco_medio": 12.05
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 4.0,
+                    "valor": 11913.65,
+                    "preco_medio": 2.52
+                  }
+                },
+                "2.1": {
+                  "m3": {
+                    "qty": 80.0,
+                    "valor": 32053.4,
+                    "preco_medio": 0.34
+                  }
+                },
+                "2.3": {
+                  "m3": {
+                    "qty": 12.5,
+                    "valor": 10001.91,
+                    "preco_medio": 0.68
+                  }
+                },
+                "2.4": {
+                  "m3": {
+                    "qty": 48.0,
+                    "valor": 46349.78,
+                    "preco_medio": 0.82
+                  }
+                },
+                "2.8": {
+                  "m3": {
+                    "qty": 20.0,
+                    "valor": 37504.37,
+                    "preco_medio": 1.59
+                  }
+                },
+                "2.9": {
+                  "m2": {
+                    "qty": 32.0,
+                    "valor": 27231.21,
+                    "preco_medio": 0.72
+                  }
+                },
+                "2.10": {
+                  "kg": {
+                    "qty": 500.0,
+                    "valor": 20092.47,
+                    "preco_medio": 0.03
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 169.0,
+                    "valor": 817210.39,
+                    "preco_medio": 4.09
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2600.0,
+                    "valor": 32266.14,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 56.0,
+                    "valor": 551535.94,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 56.0,
+                    "valor": 261438.49,
+                    "preco_medio": 3.95
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 8.0,
+                    "valor": 276245.46,
+                    "preco_medio": 29.22
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 4.0,
+                    "valor": 46411.24,
+                    "preco_medio": 9.82
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 4.6,
+                    "valor": 169731.5,
+                    "preco_medio": 31.22
+                  }
+                },
+                "7.1": {
+                  "un": {
+                    "qty": 5.0,
+                    "valor": 1223.28,
+                    "preco_medio": 0.21
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 4042.13,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 3510.27,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 1.0,
+                    "valor": 382.94,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.6": {
+                  "un": {
+                    "qty": 1.0,
+                    "valor": 750.51,
+                    "preco_medio": 0.64
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 666.6,
+                    "preco_medio": 0.09
+                  }
+                }
+              }
+            },
+            {
+              "key": "2025/20",
+              "obra": "LD ITUIUTABA 1 - ITUIUTABA 2",
+              "status": "Em andamento",
+              "valor": 1832939.0,
+              "saldo": 1018349.5599999999,
+              "estr": 6,
+              "postes": 0,
+              "ton": 25,
+              "tot": 6,
+              "detalhe_torres": "25t metal [4.2.1 | Montagemde suportes metalicos autoportantes-701311 | ton | 25.]",
+              "torres_real": null,
+              "fonte_qtd": "PDF tabela",
+              "tem_medicao": true,
+              "pct_acum": 44.0,
+              "valor_acum": 814589.44,
+              "secoes_pct": {
+                "fundacoes": 76.91023612770645,
+                "aterramento": 19.614260065623643
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.6": {
+                  "km": {
+                    "qty": 1.5,
+                    "valor": 4467.62,
+                    "preco_medio": 2.52,
+                    "qty_acum": 1.5,
+                    "valor_acum": 4467.62
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 127.0,
+                    "valor": 611818.08,
+                    "preco_medio": 4.08,
+                    "qty_acum": 97.676,
+                    "valor_acum": 470550.73
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1800.0,
+                    "valor": 39428.52,
+                    "preco_medio": 0.02
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 800.0,
+                    "valor": 16357.63,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 26.57,
+                    "valor": 257991.22,
+                    "preco_medio": 8.22
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 0.65,
+                    "valor": 20879.27,
+                    "preco_medio": 27.18,
+                    "qty_acum": 0.65,
+                    "valor_acum": 20879.27
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.34,
+                    "valor": 5918.89,
+                    "preco_medio": 14.73
+                  }
+                },
+                "5.4": {
+                  "m2": {
+                    "qty": 648.0,
+                    "valor": 79651.28,
+                    "preco_medio": 0.1
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 0.64,
+                    "valor": 7425.82,
+                    "preco_medio": 9.82
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 1.3,
+                    "valor": 47710.28,
+                    "preco_medio": 31.05
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 4850.56,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 4212.33,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.4": {
+                  "un": {
+                    "qty": 3.0,
+                    "valor": 50278.45,
+                    "preco_medio": 14.18
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 24.0,
+                    "valor": 9190.53,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 23.0,
+                    "valor": 2555.29,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 631.14,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 26.55,
+                    "valor": 4706.96,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 6.0,
+                    "valor": 531.86,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 26.55,
+                    "valor": 4706.96,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 6.0,
+                    "valor": 531.86,
+                    "preco_medio": 0.07
+                  }
+                },
+                "8.1": {
+                  "ton": {
+                    "qty": 10.0,
+                    "valor": 32266.14,
+                    "preco_medio": 2.73
+                  }
+                },
+                "8.2": {
+                  "un": {
+                    "qty": 1.0,
+                    "valor": 4575.17,
+                    "preco_medio": 3.87
+                  }
+                },
+                "1.1": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 85363.45
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 33245.95
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.444,
+                    "valor_acum": 200082.43
+                  }
+                }
+              }
+            },
+            {
+              "key": "2025/21",
+              "obra": "LD ITUIUTABA 2 - SANTA VITORIA - 138",
+              "status": "Em andamento",
+              "valor": 1252255.27,
+              "saldo": 523478.56000000006,
+              "estr": 5,
+              "postes": 0,
+              "ton": 16,
+              "tot": 5,
+              "detalhe_torres": "5 estruturas (Detalhamento OSC)",
+              "torres_real": null,
+              "fonte_qtd": "PDF tabela",
+              "tem_medicao": true,
+              "pct_acum": 58.0,
+              "valor_acum": 728776.7,
+              "secoes_pct": {
+                "fundacoes": 98.35257717345127,
+                "transportes": 72.77778260808137,
+                "montagem": 10.029937516681777,
+                "aterramento": 35.56470240924892
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 22737.58,
+                    "preco_medio": 19.24,
+                    "qty_acum": 0.5,
+                    "valor_acum": 11368.79
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 97.0,
+                    "valor": 467294.12,
+                    "preco_medio": 4.08,
+                    "qty_acum": 95.402,
+                    "valor_acum": 459595.81
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1200.0,
+                    "valor": 24536.45,
+                    "preco_medio": 0.02,
+                    "qty_acum": 650.0,
+                    "valor_acum": 13290.58
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 600.0,
+                    "valor": 12268.23,
+                    "preco_medio": 0.02,
+                    "qty_acum": 660.0,
+                    "valor_acum": 13495.05
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 16.7,
+                    "valor": 164475.9,
+                    "preco_medio": 8.33,
+                    "qty_acum": 1.675,
+                    "valor_acum": 16496.83
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 1.1,
+                    "valor": 35334.14,
+                    "preco_medio": 27.18,
+                    "qty_acum": 1.1,
+                    "valor_acum": 35334.14
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.5,
+                    "valor": 8704.18,
+                    "preco_medio": 14.73
+                  }
+                },
+                "5.4": {
+                  "m2": {
+                    "qty": 450.0,
+                    "valor": 55313.39,
+                    "preco_medio": 0.1
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 1.14,
+                    "valor": 41879.56,
+                    "preco_medio": 31.08
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2425.28,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2106.16,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.4": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 33518.97,
+                    "preco_medio": 14.18
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 16.0,
+                    "valor": 6127.02,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 23.0,
+                    "valor": 2555.29,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 3.0,
+                    "valor": 315.57,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 15.0,
+                    "valor": 5371.78,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.24": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 4122.5,
+                    "preco_medio": 1.74
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 16.7,
+                    "valor": 2960.68,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 5.0,
+                    "valor": 443.22,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 16.7,
+                    "valor": 2960.68,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 5.0,
+                    "valor": 443.22,
+                    "preco_medio": 0.07
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.582,
+                    "valor_acum": 179195.5
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Patrocinio",
+          "contratado": 4714761.06,
+          "saldo": 3055673.91082832,
+          "torres": 6,
+          "ton": 31,
+          "n_oscs": 3,
+          "oscs": [
+            {
+              "key": "2025/37",
+              "obra": "LD COROMANDEL 2 - PATROCINIO 138",
+              "status": "Em andamento",
+              "valor": 1913231.94,
+              "saldo": 1519913.47799651,
+              "estr": 0,
+              "postes": 0,
+              "ton": 0,
+              "tot": 0,
+              "detalhe_torres": "",
+              "torres_real": null,
+              "fonte_qtd": "sem dados",
+              "tem_medicao": true,
+              "pct_acum": 21.0,
+              "valor_acum": 393318.46,
+              "secoes_pct": {
+                "preliminares": 17.606483492143504,
+                "lancamento": 27.255369289039166
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.3,
+                    "valor": 60050.13,
+                    "preco_medio": 169.36,
+                    "qty_acum": 0.3,
+                    "valor_acum": 60050.13
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.3,
+                    "valor": 6785.11,
+                    "preco_medio": 19.14,
+                    "qty_acum": 0.3,
+                    "valor_acum": 6785.11
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 24919.39,
+                    "preco_medio": 21.08,
+                    "qty_acum": 0.5,
+                    "valor_acum": 12459.7
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 376719.63,
+                    "preco_medio": 318.74,
+                    "qty_acum": 0.206,
+                    "valor_acum": 77445.28
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 20.0,
+                    "valor": 2482.01,
+                    "preco_medio": 0.11,
+                    "qty_acum": 46.0,
+                    "valor_acum": 5708.63
+                  },
+                  "ha": {
+                    "qty": 23.0,
+                    "valor": 459499.43,
+                    "preco_medio": 16.9,
+                    "qty_acum": 0.18,
+                    "valor_acum": 2158.29
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 1.5,
+                    "valor": 4467.62,
+                    "preco_medio": 2.52
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 8.0,
+                    "valor": 416382.17,
+                    "preco_medio": 44.04,
+                    "qty_acum": 1.915,
+                    "valor_acum": 99671.48
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 8.0,
+                    "valor": 414023.08,
+                    "preco_medio": 43.79,
+                    "qty_acum": 1.808,
+                    "valor_acum": 120302.82
+                  }
+                },
+                "6.3": {
+                  "km": {
+                    "qty": 0.3,
+                    "valor": 2859.28,
+                    "preco_medio": 8.06,
+                    "qty_acum": 0.3,
+                    "valor_acum": 2859.28
+                  }
+                },
+                "6.4": {
+                  "km": {
+                    "qty": 0.3,
+                    "valor": 5877.76,
+                    "preco_medio": 16.58,
+                    "qty_acum": 0.3,
+                    "valor_acum": 5877.76
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 4042.13,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 3510.27,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 7526.4,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 192.0,
+                    "valor": 51285.44,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 888.8,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.17": {
+                  "m": {
+                    "qty": 30.0,
+                    "valor": 60277.41,
+                    "preco_medio": 1.7
+                  }
+                }
+              }
+            },
+            {
+              "key": "2025/41",
+              "obra": "LD PATROCINIO 1 - PATROCINIO 3 138",
+              "status": "Em andamento",
+              "valor": 1748305.74,
+              "saldo": 1050307.74283181,
+              "estr": 3,
+              "postes": 0,
+              "ton": 20,
+              "tot": 3,
+              "detalhe_torres": "3 torres metálicas",
+              "torres_real": 2,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 40.0,
+              "valor_acum": 697998.0,
+              "secoes_pct": {
+                "preliminares": 49.46985575144865,
+                "transportes": 43.1115772680752,
+                "montagem": 109.97467487378336,
+                "lancamento": 38.76279154808516,
+                "complementares": 2.892120279399502
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.3,
+                    "valor": 60050.13,
+                    "preco_medio": 169.36,
+                    "qty_acum": 0.3,
+                    "valor_acum": 60050.13
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 22770.68,
+                    "preco_medio": 19.27,
+                    "qty_acum": 0.5,
+                    "valor_acum": 11385.34
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 344244.29,
+                    "preco_medio": 291.26,
+                    "qty_acum": 0.399,
+                    "valor_acum": 137436.96
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 1241.01,
+                    "preco_medio": 0.11
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 2.0,
+                    "valor": 5956.83,
+                    "preco_medio": 2.52,
+                    "qty_acum": 2.0,
+                    "valor_acum": 5956.83
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1650.0,
+                    "valor": 35829.61,
+                    "preco_medio": 0.02,
+                    "qty_acum": 742.6,
+                    "valor_acum": 15446.71
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 20.0,
+                    "valor": 196977.12,
+                    "preco_medio": 8.33,
+                    "qty_acum": 19.448,
+                    "valor_acum": 191540.55
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 20.0,
+                    "valor": 93370.89,
+                    "preco_medio": 3.95,
+                    "qty_acum": 27.368,
+                    "valor_acum": 127768.73
+                  }
+                },
+                "5.3": {
+                  "m2": {
+                    "qty": 2000.0,
+                    "valor": 345117.72,
+                    "preco_medio": 0.15
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 6.0,
+                    "valor": 231396.7,
+                    "preco_medio": 32.63,
+                    "qty_acum": 1.808,
+                    "valor_acum": 20977.88
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 2.0,
+                    "valor": 133078.34,
+                    "preco_medio": 56.3,
+                    "qty_acum": 1.808,
+                    "valor_acum": 120302.82
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 3.0,
+                    "valor": 1148.82,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 4.0,
+                    "valor": 444.4,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.17": {
+                  "m": {
+                    "qty": 30.0,
+                    "valor": 60277.41,
+                    "preco_medio": 1.7
+                  }
+                },
+                "7.31": {
+                  "m": {
+                    "qty": 600.0,
+                    "valor": 175868.21,
+                    "preco_medio": 0.25
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 20.0,
+                    "valor": 3545.73,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 10.0,
+                    "valor": 886.43,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 20.0,
+                    "valor": 3545.73,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 10.0,
+                    "valor": 886.43,
+                    "preco_medio": 0.07
+                  }
+                }
+              }
+            },
+            {
+              "key": "2024/37",
+              "obra": "LD Coromandel - Vazante, 138 kV - Derivação para SE Coromandel 4",
+              "status": "? Cemig = Concluído",
+              "valor": 1053223.38,
+              "saldo": 485452.68999999994,
+              "estr": 3,
+              "postes": 0,
+              "ton": 11,
+              "tot": 3,
+              "detalhe_torres": "3 torres metálicas",
+              "torres_real": null,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 54.0,
+              "valor_acum": 567770.69,
+              "secoes_pct": {
+                "fundacoes": 162.14801069541355,
+                "transportes": 117.64700999228808,
+                "lancamento": 11.894701878487982,
+                "complementares": 52.337522377690895
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 33646.59,
+                    "preco_medio": 29.91,
+                    "qty_acum": 1.0,
+                    "valor_acum": 33646.59
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 0.3,
+                    "valor": 850.33,
+                    "preco_medio": 2.52,
+                    "qty_acum": 0.3,
+                    "valor_acum": 850.33
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 25.0,
+                    "valor": 116689.27,
+                    "preco_medio": 4.15,
+                    "qty_acum": 40.67,
+                    "valor_acum": 189209.34
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 510.0,
+                    "valor": 12046.29,
+                    "preco_medio": 0.02,
+                    "qty_acum": 600.0,
+                    "valor_acum": 14172.1
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 11.5,
+                    "valor": 0.0,
+                    "preco_medio": 0,
+                    "qty_acum": 11.34,
+                    "valor_acum": 106286.51
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 0.46,
+                    "valor": 5079.24,
+                    "preco_medio": 9.82,
+                    "qty_acum": 0.455,
+                    "valor_acum": 5024.03
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 6.6,
+                    "valor": 334160.62,
+                    "preco_medio": 45.01,
+                    "qty_acum": 0.789,
+                    "valor_acum": 35327.54
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 2915.4,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 7.0,
+                    "valor": 740.1,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 44.0,
+                    "valor": 4404.6,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2044.83,
+                    "preco_medio": 0.3
+                  }
+                },
+                "1.1": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 27688.46
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.539,
+                    "valor_acum": 150277.12
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F3.5/3.6/3.7 - Uberlandia",
+      "contratado": 2462566.2199999997,
+      "saldo": 1665706.65,
+      "torres": 5,
+      "ton": 19,
+      "n_oscs": 2,
+      "secoes_pct": {
+        "preliminares": 57.7,
+        "fundacoes": 87.2,
+        "transportes": null,
+        "montagem": 91.5,
+        "aterramento": 16.8,
+        "lancamento": 65.4,
+        "complementares": 7.4,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 57.0,
+        "_cobertura": 1,
+        "_total": 2
+      },
+      "canteiros": [
+        {
+          "nome": "Uberlandia",
+          "contratado": 2462566.2199999997,
+          "saldo": 1665706.65,
+          "torres": 5,
+          "ton": 19,
+          "n_oscs": 2,
+          "oscs": [
+            {
+              "key": "2025/48",
+              "obra": "LD UBERLANDIA 7 - UBERLANDIA 11 - 138",
+              "status": "Em andamento",
+              "valor": 1393739.0,
+              "saldo": 596879.43,
+              "estr": 3,
+              "postes": 0,
+              "ton": 19,
+              "tot": 3,
+              "detalhe_torres": "3 estruturas (Detalhamento OSC)",
+              "torres_real": 2,
+              "fonte_qtd": "PDF tabela",
+              "tem_medicao": true,
+              "pct_acum": 57.0,
+              "valor_acum": 796859.57,
+              "secoes_pct": {
+                "preliminares": 57.71444783712095,
+                "fundacoes": 87.1659662471892,
+                "montagem": 91.5105286609302,
+                "aterramento": 16.789027465154753,
+                "lancamento": 65.35760402285396,
+                "complementares": 7.426671947606672
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 0.12,
+                    "preco_medio": 0
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 349690.53,
+                    "preco_medio": 295.87,
+                    "qty_acum": 0.572,
+                    "valor_acum": 199932.87
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 1.5,
+                    "valor": 4467.62,
+                    "preco_medio": 2.52,
+                    "qty_acum": 1.5,
+                    "valor_acum": 4467.62
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 73.0,
+                    "valor": 391781.89,
+                    "preco_medio": 4.54,
+                    "qty_acum": 70.888,
+                    "valor_acum": 341500.47
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 40.0,
+                    "valor": 817.88,
+                    "preco_medio": 0.02,
+                    "qty_acum": 1729.0,
+                    "valor_acum": 35352.94
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 19.0,
+                    "valor": 187128.26,
+                    "preco_medio": 8.33,
+                    "qty_acum": 17.387,
+                    "valor_acum": 171242.06
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 0.36,
+                    "valor": 23195.46,
+                    "preco_medio": 54.52,
+                    "qty_acum": 0.18,
+                    "valor_acum": 11597.73
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.41,
+                    "valor": 7137.44,
+                    "preco_medio": 14.73
+                  }
+                },
+                "5.3": {
+                  "m2": {
+                    "qty": 400.0,
+                    "valor": 69023.54,
+                    "preco_medio": 0.15
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 0.36,
+                    "valor": 4176.99,
+                    "preco_medio": 9.82,
+                    "qty_acum": 0.222,
+                    "valor_acum": 2575.81
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 0.36,
+                    "valor": 13307.95,
+                    "preco_medio": 31.28,
+                    "qty_acum": 0.222,
+                    "valor_acum": 8206.57
+                  }
+                },
+                "6.3": {
+                  "km": {
+                    "qty": 0.26,
+                    "valor": 1598.89,
+                    "preco_medio": 5.2,
+                    "qty_acum": 0.195,
+                    "valor_acum": 1199.17
+                  }
+                },
+                "6.4": {
+                  "km": {
+                    "qty": 0.26,
+                    "valor": 5094.03,
+                    "preco_medio": 16.58,
+                    "qty_acum": 0.195,
+                    "valor_acum": 3820.52
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 25.0,
+                    "valor": 10105.33,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 25.0,
+                    "valor": 8775.68,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 3063.51,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 23.0,
+                    "valor": 2555.29,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 631.14,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 9.0,
+                    "valor": 3223.07,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.17": {
+                  "m": {
+                    "qty": 48.0,
+                    "valor": 96443.86,
+                    "preco_medio": 1.7
+                  }
+                },
+                "7.31": {
+                  "m": {
+                    "qty": 120.0,
+                    "valor": 35173.64,
+                    "preco_medio": 0.25
+                  }
+                }
+              }
+            },
+            {
+              "key": "2026/8",
+              "obra": "31910 - LD UBERLANDIA 6 - UBERLANDIA 12 - 138",
+              "status": "Em andamento",
+              "valor": 1068827.22,
+              "saldo": 1068827.22,
+              "estr": 2,
+              "postes": 0,
+              "ton": 0,
+              "tot": 2,
+              "detalhe_torres": "2 estrutura [trução de 172m de LD em circuito duplo: 2 estruturas metálic]",
+              "torres_real": null,
+              "fonte_qtd": "Escopo 2026",
+              "tem_medicao": false,
+              "pct_acum": 0,
+              "valor_acum": 0,
+              "secoes_pct": {},
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.7,
+                    "valor": 20366.55,
+                    "preco_medio": 24.62
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 16406.09,
+                    "preco_medio": 13.88
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 282085.28,
+                    "preco_medio": 238.67
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 248.2,
+                    "preco_medio": 0.1
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 0.17,
+                    "valor": 521.22,
+                    "preco_medio": 2.52
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 64.0,
+                    "valor": 308317.77,
+                    "preco_medio": 4.08
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 690.0,
+                    "valor": 18983.85,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 16.0,
+                    "valor": 157581.7,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 16.0,
+                    "valor": 74696.71,
+                    "preco_medio": 3.95
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.5,
+                    "valor": 8704.18,
+                    "preco_medio": 14.73
+                  }
+                },
+                "5.3": {
+                  "m2": {
+                    "qty": 400.0,
+                    "valor": 69023.54,
+                    "preco_medio": 0.15
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 0.17,
+                    "valor": 9108.39,
+                    "preco_medio": 44.04
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 0.17,
+                    "valor": 11644.3,
+                    "preco_medio": 56.3
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 808.43,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 702.05,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 765.88,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 1881.6,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 48.0,
+                    "valor": 12821.36,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 12.0,
+                    "valor": 1333.19,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.19": {
+                  "un": {
+                    "qty": 24.0,
+                    "valor": 34294.3,
+                    "preco_medio": 1.21
+                  }
+                },
+                "7.31": {
+                  "m": {
+                    "qty": 120.0,
+                    "valor": 35173.64,
+                    "preco_medio": 0.25
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F3.12 - Paracatu",
+      "contratado": 5618992.55,
+      "saldo": 4183983.4699999997,
+      "torres": 5,
+      "ton": 30.4,
+      "n_oscs": 1,
+      "secoes_pct": {
+        "preliminares": 45.9,
+        "fundacoes": null,
+        "transportes": null,
+        "montagem": 24.1,
+        "aterramento": null,
+        "lancamento": null,
+        "complementares": null,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 26.0,
+        "_cobertura": 1,
+        "_total": 1
+      },
+      "canteiros": [
+        {
+          "nome": "Paracatu",
+          "contratado": 5618992.55,
+          "saldo": 4183983.4699999997,
+          "torres": 5,
+          "ton": 30.4,
+          "n_oscs": 1,
+          "oscs": [
+            {
+              "key": "2025/44",
+              "obra": "PARACATU 3/PARACATU 4 - 138",
+              "status": "Em andamento",
+              "valor": 5618992.55,
+              "saldo": 4183983.4699999997,
+              "estr": 5,
+              "postes": 0,
+              "ton": 30.4,
+              "tot": 5,
+              "detalhe_torres": "5 estruturas (Detalhamento OSC)",
+              "torres_real": null,
+              "fonte_qtd": "OneDrive Docx Caracteristicas",
+              "tem_medicao": true,
+              "pct_acum": 26.0,
+              "valor_acum": 1435009.08,
+              "secoes_pct": {
+                "preliminares": 45.92929562609312,
+                "montagem": 24.142778063680904
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 425668.43,
+                    "preco_medio": 360.15,
+                    "qty_acum": 1.0,
+                    "valor_acum": 425668.43
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 22617.03,
+                    "preco_medio": 19.14,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 267014.98,
+                    "preco_medio": 225.92,
+                    "qty_acum": 0.5,
+                    "valor_acum": 133507.49
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1234457.25,
+                    "preco_medio": 1044.46,
+                    "qty_acum": 0.255,
+                    "valor_acum": 315262.46
+                  }
+                },
+                "1.5": {
+                  "ha": {
+                    "qty": 1.0,
+                    "valor": 11990.48,
+                    "preco_medio": 10.14
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 2.46,
+                    "valor": 7326.9,
+                    "preco_medio": 2.52,
+                    "qty_acum": 2.46,
+                    "valor_acum": 7326.9
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 115.0,
+                    "valor": 554008.49,
+                    "preco_medio": 4.08
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 1500.0,
+                    "valor": 36284.63,
+                    "preco_medio": 0.02
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 1000.0,
+                    "valor": 24820.11,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 113.66,
+                    "valor": 1667242.79,
+                    "preco_medio": 12.41
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 113.66,
+                    "valor": 530626.77,
+                    "preco_medio": 3.95,
+                    "qty_acum": 113.66,
+                    "valor_acum": 530626.77
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 4.32,
+                    "valor": 152641.07,
+                    "preco_medio": 29.9
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 2.46,
+                    "valor": 28542.89,
+                    "preco_medio": 9.82
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 2.46,
+                    "valor": 248646.33,
+                    "preco_medio": 85.52
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2425.28,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 6.0,
+                    "valor": 2106.16,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.4": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 33518.97,
+                    "preco_medio": 14.18
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 765.88,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 7.0,
+                    "valor": 777.7,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 9.0,
+                    "valor": 946.71,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.24": {
+                  "un": {
+                    "qty": 14.0,
+                    "valor": 28857.51,
+                    "preco_medio": 1.74
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 113.66,
+                    "valor": 20150.38,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.40": {
+                  "ton": {
+                    "qty": 8.0,
+                    "valor": 709.15,
+                    "preco_medio": 0.07
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 113.66,
+                    "valor": 20150.38,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 8.0,
+                    "valor": 709.15,
+                    "preco_medio": 0.07
+                  }
+                },
+                "8.1": {
+                  "ton": {
+                    "qty": 84.0,
+                    "valor": 271035.6,
+                    "preco_medio": 2.73
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F4 - Rio Paranaiba",
+      "contratado": 34473364.73,
+      "saldo": 18111000.065313898,
+      "torres": 106,
+      "ton": 268.9,
+      "n_oscs": 5,
+      "secoes_pct": {
+        "preliminares": 57.0,
+        "fundacoes": 95.4,
+        "transportes": 61.4,
+        "montagem": 82.1,
+        "aterramento": 54.0,
+        "lancamento": null,
+        "complementares": 23.0,
+        "desmontagem": null,
+        "deposito": null,
+        "geral": 56.1,
+        "_cobertura": 4,
+        "_total": 5
+      },
+      "canteiros": [
+        {
+          "nome": "Bom Despacho (novo 2026)",
+          "contratado": 5416711.5,
+          "saldo": 5416711.5,
+          "torres": 0,
+          "ton": 0,
+          "n_oscs": 1,
+          "oscs": [
+            {
+              "key": "2026/2",
+              "obra": "31953 - LD BOM DESPACHO 2 - PERDIGAO 1 - 138 KV",
+              "status": "Em andamento",
+              "valor": 5416711.5,
+              "saldo": 5416711.5,
+              "estr": 0,
+              "postes": 0,
+              "ton": 0,
+              "tot": 0,
+              "detalhe_torres": "",
+              "torres_real": null,
+              "fonte_qtd": "Escopo 2026",
+              "tem_medicao": false,
+              "pct_acum": 0,
+              "valor_acum": 0,
+              "secoes_pct": {},
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.5,
+                    "valor": 212834.22,
+                    "preco_medio": 360.15
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.5,
+                    "valor": 11308.51,
+                    "preco_medio": 19.14
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 183317.9,
+                    "preco_medio": 155.1
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1219398.77,
+                    "preco_medio": 1031.72
+                  }
+                },
+                "1.5": {
+                  "un": {
+                    "qty": 75.0,
+                    "valor": 9307.54,
+                    "preco_medio": 0.1
+                  },
+                  "ha": {
+                    "qty": 11.0,
+                    "valor": 205930.09,
+                    "preco_medio": 15.84
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 2.7,
+                    "valor": 8041.72,
+                    "preco_medio": 2.52
+                  }
+                },
+                "2.1": {
+                  "m3": {
+                    "qty": 418.0,
+                    "valor": 467584.88,
+                    "preco_medio": 0.95
+                  }
+                },
+                "2.6": {
+                  "m3": {
+                    "qty": 323.0,
+                    "valor": 174844.67,
+                    "preco_medio": 0.46
+                  }
+                },
+                "2.8": {
+                  "m3": {
+                    "qty": 104.8,
+                    "valor": 194337.2,
+                    "preco_medio": 1.57
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 249.0,
+                    "valor": 1331505.53,
+                    "preco_medio": 4.52
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 620.0,
+                    "valor": 13636.88,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 60.29,
+                    "valor": 593807.19,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 60.29,
+                    "valor": 281475.88,
+                    "preco_medio": 3.95
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 3.7,
+                    "valor": 127763.53,
+                    "preco_medio": 29.22
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 0.61,
+                    "valor": 10619.11,
+                    "preco_medio": 14.73
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 2.81,
+                    "valor": 142443.44,
+                    "preco_medio": 42.89
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 2.7,
+                    "valor": 179655.76,
+                    "preco_medio": 56.3
+                  }
+                },
+                "7.1": {
+                  "un": {
+                    "qty": 5.0,
+                    "valor": 1223.28,
+                    "preco_medio": 0.21
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 4042.13,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 10.0,
+                    "valor": 3510.27,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 4.0,
+                    "valor": 1531.76,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 2.0,
+                    "valor": 1881.6,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 48.0,
+                    "valor": 12821.36,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 60.29,
+                    "valor": 10688.96,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 60.29,
+                    "valor": 10688.96,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 28.32,
+                    "valor": 2510.38,
+                    "preco_medio": 0.07
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Rio Paranaiba",
+          "contratado": 23211747.68,
+          "saldo": 9682690.444693899,
+          "torres": 106,
+          "ton": 268.9,
+          "n_oscs": 3,
+          "oscs": [
+            {
+              "key": "2024/12",
+              "obra": "LD RIO PARANAIBA 2 - SAO GOTARDO 1 - 138",
+              "status": "Em andamento",
+              "valor": 10336075.75,
+              "saldo": 3087703.7898451798,
+              "estr": 48,
+              "postes": 0,
+              "ton": 77.4,
+              "tot": 48,
+              "detalhe_torres": "48 torres metálicas",
+              "torres_real": 33,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 70.0,
+              "valor_acum": 7248371.96,
+              "secoes_pct": {
+                "preliminares": 78.33969177409432,
+                "fundacoes": 106.54715316256132,
+                "transportes": 63.03061399202934,
+                "montagem": 97.04625757742768,
+                "aterramento": 75.28009040415708,
+                "complementares": 23.03835783007057
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 392566.77,
+                    "preco_medio": 360.15,
+                    "qty_acum": 1.0,
+                    "valor_acum": 425668.43
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1929042.76,
+                    "preco_medio": 1769.76,
+                    "qty_acum": 0.647,
+                    "valor_acum": 1352778.35
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 510.0,
+                    "valor": 2329450.01,
+                    "preco_medio": 4.19,
+                    "qty_acum": 487.85,
+                    "valor_acum": 2481962.68
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 8200.0,
+                    "valor": 162878.7,
+                    "preco_medio": 0.02,
+                    "qty_acum": 4646.0,
+                    "valor_acum": 108772.13
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 700.0,
+                    "valor": 12627.65,
+                    "preco_medio": 0.02,
+                    "qty_acum": 99.1,
+                    "valor_acum": 1850.61
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 158.94,
+                    "valor": 1404867.65,
+                    "preco_medio": 8.11,
+                    "qty_acum": 129.814,
+                    "valor_acum": 1241797.44
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 248.0,
+                    "valor": 1067764.0,
+                    "preco_medio": 3.95,
+                    "qty_acum": 248.0,
+                    "valor_acum": 1157799.04
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 14.4,
+                    "valor": 461773.16,
+                    "preco_medio": 29.42,
+                    "qty_acum": 10.28,
+                    "valor_acum": 369861.39
+                  }
+                },
+                "5.2": {
+                  "km": {
+                    "qty": 1.84,
+                    "valor": 29540.53,
+                    "preco_medio": 14.73
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 16.78,
+                    "valor": 805445.58,
+                    "preco_medio": 44.04
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 15.15,
+                    "valor": 929677.02,
+                    "preco_medio": 56.3
+                  }
+                },
+                "7.2": {
+                  "un": {
+                    "qty": 106.0,
+                    "valor": 39514.68,
+                    "preco_medio": 0.34
+                  }
+                },
+                "7.3": {
+                  "un": {
+                    "qty": 106.0,
+                    "valor": 34315.38,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.5": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 2825.28,
+                    "preco_medio": 0.32
+                  }
+                },
+                "7.9": {
+                  "un": {
+                    "qty": 8.0,
+                    "valor": 6941.12,
+                    "preco_medio": 0.8
+                  }
+                },
+                "7.10": {
+                  "un": {
+                    "qty": 168.0,
+                    "valor": 41385.12,
+                    "preco_medio": 0.23
+                  }
+                },
+                "7.11": {
+                  "un": {
+                    "qty": 68.0,
+                    "valor": 6967.28,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.14": {
+                  "un": {
+                    "qty": 108.0,
+                    "valor": 10477.08,
+                    "preco_medio": 0.09
+                  }
+                },
+                "7.15": {
+                  "un": {
+                    "qty": 276.0,
+                    "valor": 91154.52,
+                    "preco_medio": 0.3
+                  }
+                },
+                "7.26": {
+                  "un": {
+                    "qty": 5.0,
+                    "valor": 190.75,
+                    "preco_medio": 0.04
+                  }
+                },
+                "7.39": {
+                  "ton": {
+                    "qty": 160.0,
+                    "valor": 26160.0,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.41": {
+                  "ton": {
+                    "qty": 160.0,
+                    "valor": 26160.0,
+                    "preco_medio": 0.15
+                  }
+                },
+                "7.42": {
+                  "ton": {
+                    "qty": 89.0,
+                    "valor": 7275.75,
+                    "preco_medio": 0.07
+                  }
+                },
+                "8.3": {
+                  "km": {
+                    "qty": 1.63,
+                    "valor": 20343.22,
+                    "preco_medio": 11.45
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 22617.03
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 0.0,
+                    "valor": 0.0,
+                    "preco_medio": 0.0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 17677.95
+                  }
+                }
+              }
+            },
+            {
+              "key": "2024/42",
+              "obra": "LD ARAPUA 1 - RIO PARANAIBA 2 - 138",
+              "status": "Em andamento",
+              "valor": 10072974.24,
+              "saldo": 5111431.554848719,
+              "estr": 50,
+              "postes": 0,
+              "ton": 146.5,
+              "tot": 50,
+              "detalhe_torres": "DG3A: 2 · G1: 8 · G1A: 5 · G2: 18 · G3A: 8 · GTP2: 10",
+              "torres_real": 12,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 49.0,
+              "valor_acum": 4961542.69,
+              "secoes_pct": {
+                "preliminares": 50.241284307460944,
+                "fundacoes": 79.78203521144476,
+                "transportes": 59.65908631334958,
+                "montagem": 61.241777246506246,
+                "aterramento": 24.604297355976332
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 85363.45,
+                    "preco_medio": 0,
+                    "qty_acum": 1.0,
+                    "valor_acum": 85363.45
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 84672.03,
+                    "preco_medio": 0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 42336.02
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 2008978.59,
+                    "preco_medio": 0,
+                    "qty_acum": 0.469,
+                    "valor_acum": 941702.31
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 18.0,
+                    "valor": 53611.44,
+                    "preco_medio": 2.52,
+                    "qty_acum": 17.559,
+                    "valor_acum": 52297.96
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 500.0,
+                    "valor": 2677144.34,
+                    "preco_medio": 4.61,
+                    "qty_acum": 413.0,
+                    "valor_acum": 2135880.24
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2640.0,
+                    "valor": 65525.09,
+                    "preco_medio": 0.02,
+                    "qty_acum": 1575.0,
+                    "valor_acum": 39091.67
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 138.0,
+                    "valor": 1317289.52,
+                    "preco_medio": 6.25,
+                    "qty_acum": 40.548,
+                    "valor_acum": 370655.29
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 241.0,
+                    "valor": 1125119.22,
+                    "preco_medio": 3.95,
+                    "qty_acum": 241.0,
+                    "valor_acum": 1125119.22
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 18.0,
+                    "valor": 602282.43,
+                    "preco_medio": 28.31,
+                    "qty_acum": 4.171,
+                    "valor_acum": 148187.36
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 18.08,
+                    "valor": 937788.14,
+                    "preco_medio": 43.89
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 18.0,
+                    "valor": 1197705.05,
+                    "preco_medio": 56.3
+                  }
+                }
+              }
+            },
+            {
+              "key": "2025/36",
+              "obra": "LD COROMANDEL 2 - GUIMARANIA 1 - 138",
+              "status": "Em andamento",
+              "valor": 2802697.69,
+              "saldo": 1483555.1,
+              "estr": 8,
+              "postes": 0,
+              "ton": 45,
+              "tot": 8,
+              "detalhe_torres": "8 torres metálicas",
+              "torres_real": null,
+              "fonte_qtd": "Manual",
+              "tem_medicao": true,
+              "pct_acum": 47.0,
+              "valor_acum": 1319142.59,
+              "secoes_pct": {
+                "preliminares": 51.80608469404461,
+                "fundacoes": 110.34396283386245,
+                "montagem": 33.45939366547212,
+                "aterramento": 81.57657325000947
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 0.3,
+                    "valor": 60050.13,
+                    "preco_medio": 0,
+                    "qty_acum": 0.3,
+                    "valor_acum": 60050.13
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 0.3,
+                    "valor": 6785.11,
+                    "preco_medio": 0,
+                    "qty_acum": 0.3,
+                    "valor_acum": 6785.11
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 36504.47,
+                    "preco_medio": 0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 18252.24
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 551857.42,
+                    "preco_medio": 466.92,
+                    "qty_acum": 0.471,
+                    "valor_acum": 259742.11
+                  }
+                },
+                "1.5": {
+                  "ha": {
+                    "qty": 2.0,
+                    "valor": 21243.65,
+                    "preco_medio": 8.99
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 2.5,
+                    "valor": 7446.03,
+                    "preco_medio": 2.52,
+                    "qty_acum": 3.178,
+                    "valor_acum": 9465.4
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 115.0,
+                    "valor": 594110.7,
+                    "preco_medio": 4.69,
+                    "qty_acum": 126.65,
+                    "valor_acum": 655565.3
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2000.0,
+                    "valor": 44073.43,
+                    "preco_medio": 0.02
+                  }
+                },
+                "3.2": {
+                  "km": {
+                    "qty": 900.0,
+                    "valor": 20370.22,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.1": {
+                  "un": {
+                    "qty": 5.0,
+                    "valor": 2334.27,
+                    "preco_medio": 0.4
+                  }
+                },
+                "4.2": {
+                  "ton": {
+                    "qty": 45.0,
+                    "valor": 443198.52,
+                    "preco_medio": 8.33
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 45.0,
+                    "valor": 210084.5,
+                    "preco_medio": 3.95,
+                    "qty_acum": 46.988,
+                    "valor_acum": 219365.57
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 2.5,
+                    "valor": 110223.74,
+                    "preco_medio": 37.3,
+                    "qty_acum": 2.262,
+                    "valor_acum": 89916.74
+                  }
+                },
+                "6.1": {
+                  "km": {
+                    "qty": 4.0,
+                    "valor": 208191.08,
+                    "preco_medio": 44.04
+                  }
+                },
+                "6.2": {
+                  "km": {
+                    "qty": 4.0,
+                    "valor": 147866.4,
+                    "preco_medio": 31.28
+                  },
+                  "eq/dia": {
+                    "qty": 1.0,
+                    "valor": 11635.9,
+                    "preco_medio": 0
+                  }
+                },
+                "6.3": {
+                  "km": {
+                    "qty": 0.2,
+                    "valor": 1906.18,
+                    "preco_medio": 8.06
+                  }
+                },
+                "6.4": {
+                  "km": {
+                    "qty": 0.2,
+                    "valor": 3918.5,
+                    "preco_medio": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Sao Gotardo",
+          "contratado": 5844905.55,
+          "saldo": 3011598.12062,
+          "torres": 0,
+          "ton": 0,
+          "n_oscs": 1,
+          "oscs": [
+            {
+              "key": "2025/19",
+              "obra": "LD CAMPOS ALTOS - SÃO GOTARDO 2 - 138",
+              "status": "Em andamento",
+              "valor": 5844905.55,
+              "saldo": 3011598.12062,
+              "estr": 0,
+              "postes": 0,
+              "ton": 0,
+              "tot": 0,
+              "detalhe_torres": "",
+              "torres_real": null,
+              "fonte_qtd": "OCR",
+              "tem_medicao": true,
+              "pct_acum": 48.0,
+              "valor_acum": 2833307.43,
+              "secoes_pct": {
+                "preliminares": 33.304671521772086,
+                "montagem": 115.14823437995543
+              },
+              "secoes_contrato": [
+                "aterramento",
+                "complementares",
+                "fundacoes",
+                "lancamento",
+                "montagem",
+                "preliminares",
+                "transportes"
+              ],
+              "items_por_subsec": {
+                "1.1": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 425668.43,
+                    "preco_medio": 0
+                  }
+                },
+                "1.2": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 22617.03,
+                    "preco_medio": 0
+                  }
+                },
+                "1.3": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 183317.9,
+                    "preco_medio": 0,
+                    "qty_acum": 0.5,
+                    "valor_acum": 91658.95
+                  }
+                },
+                "1.4": {
+                  "gl": {
+                    "qty": 1.0,
+                    "valor": 1273076.63,
+                    "preco_medio": 0,
+                    "qty_acum": 0.461,
+                    "valor_acum": 587286.56
+                  }
+                },
+                "1.6": {
+                  "km": {
+                    "qty": 44.96,
+                    "valor": 133909.46,
+                    "preco_medio": 2.52
+                  }
+                },
+                "2.11": {
+                  "m3": {
+                    "qty": 310.0,
+                    "valor": 1543952.67,
+                    "preco_medio": 4.21
+                  }
+                },
+                "3.1": {
+                  "km": {
+                    "qty": 2550.0,
+                    "valor": 61323.4,
+                    "preco_medio": 0.02
+                  }
+                },
+                "4.conf": {
+                  "ton": {
+                    "qty": 387.9,
+                    "valor": 1810928.41,
+                    "preco_medio": 3.95,
+                    "qty_acum": 446.66,
+                    "valor_acum": 2085252.09
+                  }
+                },
+                "5.1": {
+                  "km": {
+                    "qty": 11.7,
+                    "valor": 448422.55,
+                    "preco_medio": 32.91
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "total": {
+    "contratado": 146119222.84,
+    "saldo": 78726545.10614222,
+    "torres": 598,
+    "ton": 1885.1,
+    "n_oscs": 22
+  }
+}

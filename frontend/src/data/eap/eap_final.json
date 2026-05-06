@@ -1,0 +1,1223 @@
+{
+  "polos": [
+    {
+      "id": "F2",
+      "label": "Três Marias",
+      "contr": "R$ 33,3M",
+      "fat": "R$ 4,4M",
+      "saldo": "R$ 28,9M",
+      "pct_fin": 13,
+      "pct_fis": 14,
+      "torres": 108,
+      "ton": 645.3,
+      "n_oscs": 2,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 51,
+          "valor_total": "R$ 1,5M",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "85.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 51,
+                "qty_real": "43.4 km",
+                "qty_total": "85.5 km"
+              }
+            },
+            {
+              "sub": "1.5",
+              "label": "Faixa/Sup.Veg.",
+              "qty": "85.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 51,
+                "qty_real": "43.4 km",
+                "qty_total": "85.5 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 67,
+          "valor_total": "R$ 1,3M",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "3 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 67,
+                "qty_real": "2 gl",
+                "qty_total": "3 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 20,
+          "valor_total": "R$ 3,4M",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "654.2 m3",
+              "med": {
+                "data": "10/04",
+                "pct": 20,
+                "qty_real": "130.2 m3",
+                "qty_total": "654.2 m3"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 4,4M",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "303 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 ton",
+                "qty_total": "303 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "108 torres · 645.3 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 9,8M",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "85.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 km",
+                "qty_total": "85.5 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 16,
+          "valor_total": "R$ 4,7M",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "2 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 16,
+                "qty_real": "0.3 gl",
+                "qty_total": "2 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 14,
+          "valor_total": "R$ 6,9M",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "654.2 m3",
+        "mont": "621 ton",
+        "lanc": "85.5 km",
+        "log": "15.0k km"
+      },
+      "torres_str": "108 torres · 645.3 ton"
+    },
+    {
+      "id": "F3.1/3.2",
+      "label": "Araxá/Perdizes",
+      "contr": "R$ 18,6M",
+      "fat": "R$ 5,4M",
+      "saldo": "R$ 13,2M",
+      "pct_fin": 29,
+      "pct_fis": 31,
+      "torres": 68,
+      "ton": 176.5,
+      "n_oscs": 3,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 100,
+          "valor_total": "R$ 355k",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "23.4 km",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "23.4 km",
+                "qty_total": "23.4 km"
+              }
+            },
+            {
+              "sub": "1.5",
+              "label": "Faixa/Sup.Veg.",
+              "qty": "23.4 km",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "23.4 km",
+                "qty_total": "23.4 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 100,
+          "valor_total": "R$ 594k",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "2 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "2 gl",
+                "qty_total": "2 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 29,
+          "valor_total": "R$ 3,2M",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "640 m3",
+              "med": {
+                "data": "10/04",
+                "pct": 29,
+                "qty_real": "183.5 m3",
+                "qty_total": "640 m3"
+              }
+            }
+          ],
+          "_outros": "R$ 214k",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 13,
+          "valor_total": "R$ 4,0M",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "373.7 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 13,
+                "qty_real": "49.0 ton",
+                "qty_total": "373.7 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "68 torres · 176.5 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 675k",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "13.9 km",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 km",
+                "qty_total": "13.9 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 19,
+          "valor_total": "R$ 3,6M",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "3 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 19,
+                "qty_real": "0.6 gl",
+                "qty_total": "3 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 31,
+          "valor_total": "R$ 1,9M",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "640 m3",
+        "mont": "794.9 ton",
+        "lanc": "13.9 km",
+        "log": "24.8k km"
+      },
+      "torres_str": "68 torres · 176.5 ton"
+    },
+    {
+      "id": "F3.3/3.4",
+      "label": "Patrocínio/Ituiutaba",
+      "contr": "R$ 15,3M",
+      "fat": "R$ 7,0M",
+      "saldo": "R$ 10,8M",
+      "pct_fin": 46,
+      "pct_fis": 60,
+      "torres": 40,
+      "ton": 150,
+      "n_oscs": 9,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 55,
+          "valor_total": "R$ 686k",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "12.2 km",
+              "med": {
+                "data": "10/04",
+                "pct": 55,
+                "qty_real": "6.7 km",
+                "qty_total": "12.2 km"
+              }
+            },
+            {
+              "sub": "1.5",
+              "label": "Faixa/Sup.Veg.",
+              "qty": "12.2 km",
+              "med": {
+                "data": "10/04",
+                "pct": 55,
+                "qty_real": "6.7 km",
+                "qty_total": "12.2 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 100,
+          "valor_total": "R$ 865k",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "1.9 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "3.1 gl",
+                "qty_total": "1.9 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 69,
+          "valor_total": "R$ 4,1M",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "648 m3",
+              "med": {
+                "data": "10/04",
+                "pct": 69,
+                "qty_real": "447.4 m3",
+                "qty_total": "648 m3"
+              }
+            }
+          ],
+          "_outros": "R$ 173k",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 50,
+          "valor_total": "R$ 3,5M",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "209.6 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 50,
+                "qty_real": "104.3 ton",
+                "qty_total": "209.6 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "40 torres · 150 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 32,
+          "valor_total": "R$ 2,8M",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "22.0 km",
+              "med": {
+                "data": "10/04",
+                "pct": 32,
+                "qty_real": "7.1 km",
+                "qty_total": "22.0 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 78,
+          "valor_total": "R$ 3,2M",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "4 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 78,
+                "qty_real": "3.1 gl",
+                "qty_total": "4 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 60,
+          "valor_total": "R$ 2,2M",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "803 m3",
+        "mont": "487.2 ton",
+        "lanc": "26.0 km",
+        "log": "11.9k km"
+      },
+      "torres_str": "40 torres · 150 ton"
+    },
+    {
+      "id": "F3.5/3.6/3.7",
+      "label": "Uberlândia",
+      "contr": "R$ 2,5M",
+      "fat": "R$ 797k",
+      "saldo": "R$ 1,7M",
+      "pct_fin": 32,
+      "pct_fis": 57,
+      "torres": 5,
+      "ton": 19,
+      "n_oscs": 2,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 90,
+          "valor_total": "R$ 5k",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "1.7 km",
+              "med": {
+                "data": "10/04",
+                "pct": 90,
+                "qty_real": "1.5 km",
+                "qty_total": "1.7 km"
+              }
+            },
+            {
+              "sub": "1.5",
+              "label": "Faixa/Sup.Veg.",
+              "qty": "1.7 km",
+              "med": {
+                "data": "10/04",
+                "pct": 90,
+                "qty_real": "1.5 km",
+                "qty_total": "1.7 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 36k",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "0.7 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 gl",
+                "qty_total": "0.7 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 52,
+          "valor_total": "R$ 700k",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "137 m3",
+              "med": {
+                "data": "10/04",
+                "pct": 52,
+                "qty_real": "70.9 m3",
+                "qty_total": "137 m3"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 50,
+          "valor_total": "R$ 419k",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "35 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 50,
+                "qty_real": "17.4 ton",
+                "qty_total": "35 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "5 torres · 19 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 42,
+          "valor_total": "R$ 45k",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "0.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 42,
+                "qty_real": "0.2 km",
+                "qty_total": "0.5 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 29,
+          "valor_total": "R$ 632k",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "2 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 29,
+                "qty_real": "0.6 gl",
+                "qty_total": "2 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 57,
+          "valor_total": "R$ 445k",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "137 m3",
+        "mont": "51 ton",
+        "lanc": "0.5 km",
+        "log": "730 km"
+      },
+      "torres_str": "5 torres · 19 ton"
+    },
+    {
+      "id": "F3.12",
+      "label": "Paracatu",
+      "contr": "R$ 5,6M",
+      "fat": "R$ 1,4M",
+      "saldo": "R$ 4,2M",
+      "pct_fin": 26,
+      "pct_fis": 26,
+      "torres": 5,
+      "ton": 30.4,
+      "n_oscs": 1,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 100,
+          "valor_total": "R$ 19k",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "2.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "2.5 km",
+                "qty_total": "2.5 km"
+              }
+            },
+            {
+              "sub": "1.5",
+              "label": "Faixa/Sup.Veg.",
+              "qty": "2.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "2.5 km",
+                "qty_total": "2.5 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 100,
+          "valor_total": "R$ 715k",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "1 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 100,
+                "qty_real": "1 gl",
+                "qty_total": "1 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 554k",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "115 m3",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 m3",
+                "qty_total": "115 m3"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 2,2M",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "113.7 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 ton",
+                "qty_total": "113.7 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "5 torres · 30.4 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 277k",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "2.5 km",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 km",
+                "qty_total": "2.5 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 26,
+          "valor_total": "R$ 1,2M",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "1 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 26,
+                "qty_real": "0.3 gl",
+                "qty_total": "1 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 26,
+          "valor_total": "R$ 596k",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "115 m3",
+        "mont": "227.3 ton",
+        "lanc": "2.5 km",
+        "log": "1.5k km"
+      },
+      "torres_str": "5 torres · 30.4 ton"
+    },
+    {
+      "id": "F5",
+      "label": "Rio Paranaiba",
+      "contr": "R$ 34,5M",
+      "fat": "R$ 16,4M",
+      "saldo": "R$ 8,2M",
+      "pct_fin": 47,
+      "pct_fis": 56,
+      "torres": 106,
+      "ton": 268.9,
+      "n_oscs": 2,
+      "pacotes": [
+        {
+          "n": "Serv. Preliminares",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 30,
+          "valor_total": "R$ 54k",
+          "_lines": [
+            {
+              "sub": "1.6",
+              "label": "Topografia",
+              "qty": "68.2 km",
+              "med": {
+                "data": "10/04",
+                "pct": 30,
+                "qty_real": "20.7 km",
+                "qty_total": "68.2 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0284c7",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Canteiro e Mobiliz.",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 61,
+          "valor_total": "R$ 563k",
+          "_lines": [
+            {
+              "sub": "1.1",
+              "label": "Canteiro + Mob.",
+              "qty": "3.8 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 61,
+                "qty_real": "2.3 gl",
+                "qty_total": "3.8 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#0369a1",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Fundações",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 61,
+          "valor_total": "R$ 5,0M",
+          "_lines": [
+            {
+              "sub": "2.11",
+              "label": "Tubulões",
+              "qty": "1.7k m3",
+              "med": {
+                "data": "10/04",
+                "pct": 61,
+                "qty_real": "1.0k m3",
+                "qty_total": "1.7k m3"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#92400e",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Montagem de Torres",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 42,
+          "valor_total": "R$ 4,9M",
+          "_lines": [
+            {
+              "sub": "4.2",
+              "label": "Mont. Metálicos",
+              "qty": "402.2 ton",
+              "med": {
+                "data": "10/04",
+                "pct": 42,
+                "qty_real": "170.4 ton",
+                "qty_total": "402.2 ton"
+              }
+            },
+            {
+              "sub": "—",
+              "label": "Torres",
+              "qty": "106 torres · 268.9 ton",
+              "med": null,
+              "special": true
+            }
+          ],
+          "_outros": "",
+          "_color": "#374151",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Lançamento de Cabos",
+          "tags": [
+            "OBR",
+            "MAN"
+          ],
+          "has": true,
+          "pct": 0,
+          "valor_total": "R$ 3,9M",
+          "_lines": [
+            {
+              "sub": "6.2",
+              "label": "Lanç. Cabos",
+              "qty": "41.7 km",
+              "med": {
+                "data": "10/04",
+                "pct": 0,
+                "qty_real": "0 km",
+                "qty_total": "41.7 km"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#3730a3",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Administração Local",
+          "tags": [
+            "OBR"
+          ],
+          "has": true,
+          "pct": 41,
+          "valor_total": "R$ 3,9M",
+          "_lines": [
+            {
+              "sub": "1.4",
+              "label": "Adm. Local",
+              "qty": "5 gl",
+              "med": {
+                "data": "10/04",
+                "pct": 41,
+                "qty_real": "2.0 gl",
+                "qty_total": "5 gl"
+              }
+            }
+          ],
+          "_outros": "",
+          "_color": "#6d28d9",
+          "_is_outros_block": false
+        },
+        {
+          "n": "Outros",
+          "tags": [
+            "OBR",
+            "OPC"
+          ],
+          "has": true,
+          "pct": 56,
+          "valor_total": "R$ 1,7M",
+          "_lines": [],
+          "_outros": "",
+          "_color": "#4b5563",
+          "_is_outros_block": true
+        }
+      ],
+      "metrics": {
+        "fund": "1.0k m3",
+        "mont": "785.9 ton",
+        "lanc": "34.9 km",
+        "log": "10.8k km"
+      },
+      "torres_str": "106 torres · 268.9 ton"
+    }
+  ]
+}

@@ -86,6 +86,7 @@ const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
 const AlocacaoRecursos = lazy(() => import('./pages/obras/AlocacaoRecursos'))
+const EAP = lazy(() => import('./pages/obras/EAP'))
 
 // EGP — Ciclo de Vida (seletor de contrato persistente)
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
@@ -115,6 +116,7 @@ const Bases = lazy(() => import('./pages/cadastros/Bases'))
 // RH
 const RHHome = lazy(() => import('./pages/rh/RHHome'))
 const MuralAdmin = lazy(() => import('./pages/rh/MuralAdmin'))
+const PortalTEG = lazy(() => import('./pages/rh/PortalTEG'))
 const CulturaHome = lazy(() => import('./pages/rh/CulturaHome'))
 const Endomarketing = lazy(() => import('./pages/rh/Endomarketing'))
 const RHPainel = lazy(() => import('./pages/rh/RHPainel'))
@@ -219,6 +221,7 @@ export default function App() {
         {/* Aprovação por token: pública (aprovador externo) */}
         <Route path="/aprovacao/:token" element={<Lazy><Aprovacao /></Lazy>} />
         <Route path="/aprovaai"         element={<Lazy><AprovAi /></Lazy>} />
+        <Route path="/portal-teg"       element={<Lazy><PortalTEG /></Lazy>} />
 
         {/* ── Privadas ──────────────────────────────────────── */}
         <Route element={<PrivateRoute />}>
@@ -227,7 +230,7 @@ export default function App() {
           <Route path="/" element={<Lazy><ModuloSelector /></Lazy>} />
 
           {/* Global: Perfil */}
-          <Route path="/perfil" element={<Lazy><Perfil /></Lazy>} />
+          <Route path="/perfil"      element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-tarefas" element={<Lazy><MinhasTarefas /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
@@ -392,6 +395,7 @@ export default function App() {
               <Route path="/obras/prestacao"          element={<Lazy><PrestacaoContas /></Lazy>} />
               <Route path="/obras/equipe"            element={<Lazy><PlanejamentoEquipe /></Lazy>} />
               <Route path="/obras/alocacao-recursos"  element={<Lazy><AlocacaoRecursos /></Lazy>} />
+              <Route path="/obras/eap"                element={<Lazy><EAP /></Lazy>} />
             </Route>
           </Route>
 

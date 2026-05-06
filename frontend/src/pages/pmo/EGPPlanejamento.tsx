@@ -183,7 +183,7 @@ export default function EGPPlanejamento() {
                       <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
                     </div>
                     {p.centro_custo && (
-                      <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>CC: {p.centro_custo.codigo} - {p.centro_custo.nome}</p>
+                      <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>CC: {p.centro_custo.codigo} - {p.centro_custo.descricao}</p>
                     )}
                     {p.responsavel && (
                       <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{p.responsavel}</p>

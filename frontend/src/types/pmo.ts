@@ -84,7 +84,7 @@ export interface PMOProjeto {
   created_at: string
   updated_at: string
   // Joins
-  centro_custo?: { id: string; nome: string; codigo: string }
+  centro_custo?: { id: string; descricao: string; codigo: string }
 }
 
 export interface PMOTAP {

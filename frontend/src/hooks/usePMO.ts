@@ -94,7 +94,7 @@ export function useProjetos(portfolioId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pmo_projetos')
-        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, nome, codigo)')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, descricao, codigo)')
         .eq('portfolio_id', portfolioId!)
         .order('created_at', { ascending: false })
       if (error) return []
@@ -110,7 +110,7 @@ export function useProjeto(id: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pmo_projetos')
-        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, nome, codigo)')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, descricao, codigo)')
         .eq('id', id!)
         .single()
       if (error) return null
