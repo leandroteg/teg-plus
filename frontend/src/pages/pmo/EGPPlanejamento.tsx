@@ -390,18 +390,34 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
       ) : (
         <div className={cardCls}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full min-w-[680px]">
               <thead>
                 <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
                   <th className={thCls}>Código</th>
                   <th className={thCls}>Título</th>
-                  <th className={thCls}>Fase</th>
+                  <th className={`${thCls} text-right`}>Realizado</th>
+                  <th className={`${thCls} text-right`}>Total</th>
+                  <th className={`${thCls} text-center`}>%</th>
                   <th className={`${thCls} text-right`}>Peso %</th>
                 </tr>
               </thead>
               <tbody>
                 {(items ?? []).map(item => {
                   const indent = indentMap.get(item.id) ?? 0
+                  const qr = item.qty_realizado
+                  const qt = item.qty_total
+                  const u = item.unidade ?? ''
+                  const hasQty = qr != null && qt != null
+                  const pct = hasQty && qt! > 0 ? Math.round((qr! / qt!) * 100) : null
+                  const pctColor = pct == null
+                    ? (isLight ? 'text-slate-400' : 'text-slate-500')
+                    : pct >= 90
+                      ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+                      : pct >= 50
+                        ? (isLight ? 'text-blue-600' : 'text-blue-400')
+                        : pct > 0
+                          ? (isLight ? 'text-amber-600' : 'text-amber-400')
+                          : (isLight ? 'text-slate-400' : 'text-slate-500')
                   return (
                     <tr key={item.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
                       <td className={tdCls}>
@@ -410,7 +426,15 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
                       <td className={tdCls}>
                         <span style={{ paddingLeft: `${indent * 20}px` }}>{item.titulo}</span>
                       </td>
-                      <td className={tdCls}>{item.fase ?? '-'}</td>
+                      <td className={`${tdCls} text-right font-mono text-xs`}>
+                        {hasQty ? `${qr!.toLocaleString('pt-BR')} ${u}` : '—'}
+                      </td>
+                      <td className={`${tdCls} text-right font-mono text-xs`}>
+                        {hasQty ? `${qt!.toLocaleString('pt-BR')} ${u}` : '—'}
+                      </td>
+                      <td className={`${tdCls} text-center font-bold ${pctColor}`}>
+                        {pct != null ? `${pct}%` : '—'}
+                      </td>
                       <td className={`${tdCls} text-right font-medium`}>{fmtPct(item.peso_percentual)}</td>
                     </tr>
                   )
@@ -418,6 +442,58 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sub-item card (usado em EAPGrafico) ──────────────────────────────────────
+function SubItemCard({ sub, cor, isLight }: { sub: PMOEAP; cor: string; isLight: boolean }) {
+  const qr = sub.qty_realizado
+  const qt = sub.qty_total
+  const u = sub.unidade ?? ''
+  const hasQty = qr != null && qt != null
+  const pct = hasQty && qt! > 0 ? Math.round((qr! / qt!) * 100) : null
+  return (
+    <div
+      className={`text-[11px] rounded-md px-2 py-1.5 border ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            {sub.codigo}
+          </span>
+          <span className={`font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+            {sub.titulo}
+          </span>
+        </div>
+        {pct != null && (
+          <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: cor }}>
+            {pct}%
+          </span>
+        )}
+      </div>
+      {hasQty && (
+        <div className="flex items-center justify-between mt-1">
+          <span className={`text-[10px] font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+            {qr!.toLocaleString('pt-BR')} / {qt!.toLocaleString('pt-BR')} {u}
+          </span>
+          <span className={`text-[9px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            peso {(sub.peso_percentual ?? 0).toFixed(1)}%
+          </span>
+        </div>
+      )}
+      {!hasQty && (
+        <div className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          peso {(sub.peso_percentual ?? 0).toFixed(1)}%
+        </div>
+      )}
+      {hasQty && pct != null && (
+        <div className="h-1 bg-slate-200/60 dark:bg-slate-700/60 rounded-full mt-1 overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: cor }} />
         </div>
       )}
     </div>
@@ -501,31 +577,7 @@ function EAPGrafico({ items, isLight, singleProjeto }: { items: PMOEAP[]; isLigh
                     {subs.length > 0 && (
                       <div className="border-l-2 pl-2 ml-1 space-y-1 mt-1" style={{ borderColor: cor + '40' }}>
                         {subs.map(sub => (
-                          <div
-                            key={sub.id}
-                            className={`text-[11px] rounded-md px-2 py-1.5 border ${
-                              isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
-                            }`}
-                          >
-                            <div className="flex items-baseline justify-between gap-2">
-                              <div className="flex items-baseline gap-1.5 min-w-0">
-                                <span className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {sub.codigo}
-                                </span>
-                                <span className={`font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                                  {sub.titulo}
-                                </span>
-                              </div>
-                              <span className={`text-[10px] font-bold whitespace-nowrap`} style={{ color: cor }}>
-                                {(sub.peso_percentual ?? 0).toFixed(1)}%
-                              </span>
-                            </div>
-                            {sub.descricao && (
-                              <div className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {sub.descricao}
-                              </div>
-                            )}
-                          </div>
+                          <SubItemCard key={sub.id} sub={sub} cor={cor} isLight={isLight} />
                         ))}
                       </div>
                     )}

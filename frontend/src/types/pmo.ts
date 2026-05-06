@@ -141,6 +141,10 @@ export interface PMOEAP {
   entregaveis?: string[]
   criterio_conclusao?: string
   peso_percentual: number
+  qty_realizado?: number | null
+  qty_total?: number | null
+  unidade?: string | null
+  projeto_id?: string | null
   created_at: string
   children?: PMOEAP[]
 }
