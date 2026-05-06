@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign,
   AlertTriangle, Plus, Trash2, Save, Edit3, X, Check, Sparkles, FolderKanban, ChevronRight,
+  Table2, GitBranch,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -321,6 +322,7 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
   const { data: items, isLoading } = useEAP(portfolioId, projetoId)
   const gerarIA = useGerarEAPIA()
   const { thCls, tdCls, cardCls } = useTableStyles(isLight)
+  const [view, setView] = useState<'tabela' | 'grafico'>('grafico')
 
   const handleGerarIA = () => {
     if (!portfolioId) return
@@ -344,29 +346,61 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {/* Toggle Tabela ↔ Gráfico */}
+        <div className={`inline-flex rounded-xl p-0.5 border ${
+          isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/[0.05] border-white/[0.08]'
+        }`}>
+          <button
+            onClick={() => setView('grafico')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              view === 'grafico'
+                ? isLight
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'bg-blue-500/15 text-blue-300 shadow-sm'
+                : isLight ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GitBranch size={13} /> Gráfico
+          </button>
+          <button
+            onClick={() => setView('tabela')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              view === 'tabela'
+                ? isLight
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'bg-blue-500/15 text-blue-300 shadow-sm'
+                : isLight ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Table2 size={13} /> Tabela
+          </button>
+        </div>
         <IAButton label="Gerar EAP com IA" onClick={handleGerarIA} isPending={gerarIA.isPending} />
       </div>
-      <div className={cardCls}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead>
-              <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-                <th className={thCls}>Código</th>
-                <th className={thCls}>Título</th>
-                <th className={thCls}>Fase</th>
-                <th className={`${thCls} text-right`}>Peso %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(items ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={4} className={`${tdCls} text-center py-10 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Nenhum item na EAP. Use "Gerar EAP com IA" para iniciar.
-                  </td>
+
+      {(items ?? []).length === 0 ? (
+        <div className={cardCls}>
+          <p className={`text-center py-12 text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            Nenhum item na EAP. Use "Gerar EAP com IA" para iniciar.
+          </p>
+        </div>
+      ) : view === 'grafico' ? (
+        <EAPGrafico items={items ?? []} isLight={isLight} singleProjeto={!!projetoId} />
+      ) : (
+        <div className={cardCls}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
+                  <th className={thCls}>Código</th>
+                  <th className={thCls}>Título</th>
+                  <th className={thCls}>Fase</th>
+                  <th className={`${thCls} text-right`}>Peso %</th>
                 </tr>
-              ) : (
-                (items ?? []).map(item => {
+              </thead>
+              <tbody>
+                {(items ?? []).map(item => {
                   const indent = indentMap.get(item.id) ?? 0
                   return (
                     <tr key={item.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
@@ -380,12 +414,128 @@ function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; p
                       <td className={`${tdCls} text-right font-medium`}>{fmtPct(item.peso_percentual)}</td>
                     </tr>
                   )
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+    </div>
+  )
+}
+
+// ── EAP Visão Gráfica (árvore de pacotes em colunas) ─────────────────────────
+const SEC_COLOR: Record<string, string> = {
+  'serviços preliminares': '#0284c7',
+  'canteiro e mobilização': '#0369a1',
+  'fundações': '#92400e',
+  'montagem de torres': '#374151',
+  'lançamento de cabos': '#3730a3',
+  'administração local': '#6d28d9',
+  'outros': '#4b5563',
+}
+
+function corPacote(titulo: string): string {
+  return SEC_COLOR[titulo.toLowerCase().trim()] ?? '#374151'
+}
+
+function EAPGrafico({ items, isLight, singleProjeto }: { items: PMOEAP[]; isLight: boolean; singleProjeto: boolean }) {
+  // Agrupa por projeto_id (quando "Todos") ou trata como um só (quando filtrado)
+  const grupos = new Map<string, PMOEAP[]>()
+  items.forEach(it => {
+    const key = it.projeto_id ?? 'sem-projeto'
+    if (!grupos.has(key)) grupos.set(key, [])
+    grupos.get(key)!.push(it)
+  })
+
+  return (
+    <div className="space-y-4">
+      {Array.from(grupos.entries()).map(([projId, projItems]) => {
+        const pacotes = projItems.filter(i => !i.parent_id).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        const filhos = (parentId: string) =>
+          projItems.filter(i => i.parent_id === parentId).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+
+        return (
+          <div key={projId} className={`rounded-2xl border p-5 ${
+            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+          }`}>
+            {!singleProjeto && (
+              <div className="text-center mb-4">
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                  isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-200'
+                }`}>
+                  Projeto {projItems[0]?.projeto_id?.slice(0, 8) ?? ''}
+                </span>
+              </div>
+            )}
+
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {pacotes.map(pac => {
+                const cor = corPacote(pac.titulo)
+                const subs = filhos(pac.id)
+                return (
+                  <div key={pac.id} className="flex-shrink-0 min-w-[200px] max-w-[260px] flex flex-col gap-2">
+                    <div
+                      className="text-white font-bold text-xs px-3 py-2 rounded-md text-center shadow-sm"
+                      style={{ background: cor }}
+                    >
+                      <div className="font-mono text-[10px] opacity-80">{pac.codigo}</div>
+                      <div>{pac.titulo}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={`text-base font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                        {(pac.peso_percentual ?? 0).toFixed(0)}%
+                      </div>
+                      <div className={`text-[10px] uppercase tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                        peso
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.min(pac.peso_percentual ?? 0, 100)}%`, background: cor }}
+                      />
+                    </div>
+
+                    {/* Sub-itens */}
+                    {subs.length > 0 && (
+                      <div className="border-l-2 pl-2 ml-1 space-y-1 mt-1" style={{ borderColor: cor + '40' }}>
+                        {subs.map(sub => (
+                          <div
+                            key={sub.id}
+                            className={`text-[11px] rounded-md px-2 py-1.5 border ${
+                              isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
+                            }`}
+                          >
+                            <div className="flex items-baseline justify-between gap-2">
+                              <div className="flex items-baseline gap-1.5 min-w-0">
+                                <span className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {sub.codigo}
+                                </span>
+                                <span className={`font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                                  {sub.titulo}
+                                </span>
+                              </div>
+                              <span className={`text-[10px] font-bold whitespace-nowrap`} style={{ color: cor }}>
+                                {(sub.peso_percentual ?? 0).toFixed(1)}%
+                              </span>
+                            </div>
+                            {sub.descricao && (
+                              <div className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {sub.descricao}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
