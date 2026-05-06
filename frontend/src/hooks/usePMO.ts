@@ -208,16 +208,18 @@ export function useSalvarTAP() {
 
 // ── EAP ──────────────────────────────────────────────────────────────────────
 
-export function useEAP(portfolioId: string | undefined) {
+export function useEAP(portfolioId: string | undefined, projetoId?: string | null) {
   return useQuery<PMOEAP[]>({
-    queryKey: ['pmo-eap', portfolioId],
+    queryKey: ['pmo-eap', portfolioId, projetoId ?? 'all'],
     enabled: !!portfolioId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('pmo_eap')
         .select('*')
         .eq('portfolio_id', portfolioId!)
         .order('ordem')
+      if (projetoId) q = q.eq('projeto_id', projetoId)
+      const { data, error } = await q
       if (error) return []
       return (data ?? []) as PMOEAP[]
     },

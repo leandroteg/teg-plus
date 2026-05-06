@@ -142,7 +142,7 @@ export default function EGPPlanejamento() {
       />
 
       {/* Tab content */}
-      {tab === 'eap' && <EAPPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'eap' && <EAPPanel portfolioId={portfolioId} projetoId={projetoId} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
@@ -317,8 +317,8 @@ const IAButton = ({ label, onClick, isPending }: { label: string; onClick: () =>
 
 // ── EAP Panel ───────────────────────────────────────────────────────────────
 
-function EAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
-  const { data: items, isLoading } = useEAP(portfolioId)
+function EAPPanel({ portfolioId, projetoId, isLight }: { portfolioId?: string; projetoId?: string | null; isLight: boolean }) {
+  const { data: items, isLoading } = useEAP(portfolioId, projetoId)
   const gerarIA = useGerarEAPIA()
   const { thCls, tdCls, cardCls } = useTableStyles(isLight)
 
