@@ -255,9 +255,14 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           if (e.status !== 'esclarecimento' && !isResposta) continue
 
           const hist = escHistMap.get(e.entidade_id as string) ?? []
+          let autorEsc = (e.aprovador_nome as string) ?? ''
+          if (isResposta) {
+            const m = obs.match(/^Esclarecimento respondido por ([^:]+)/)
+            if (m) autorEsc = m[1].trim()
+          }
           hist.push({
             tipo: e.status === 'esclarecimento' ? 'pedido' : 'resposta',
-            autor: (e.aprovador_nome as string) ?? '',
+            autor: autorEsc,
             msg: obs,
             data: (e.data_decisao as string) ?? (e.created_at as string) ?? '',
           })
@@ -615,9 +620,14 @@ export function useHistoricoAprovacoes(filtros?: HistoricoFiltros) {
           const entidadeId = String((row as { entidade_id?: string }).entidade_id ?? '')
           if (!entidadeId) continue
           const list = escMap.get(entidadeId) ?? []
+          let autorHist = String((row as { aprovador_nome?: string }).aprovador_nome ?? '')
+          if (isResposta) {
+            const m = obs.match(/^Esclarecimento respondido por ([^:]+)/)
+            if (m) autorHist = m[1].trim()
+          }
           list.push({
             tipo: isResposta ? 'resposta' : 'pedido',
-            autor: String((row as { aprovador_nome?: string }).aprovador_nome ?? ''),
+            autor: autorHist,
             msg: obs,
             data: String((row as { data_decisao?: string; created_at?: string }).data_decisao
               ?? (row as { created_at?: string }).created_at
