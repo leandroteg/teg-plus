@@ -44,10 +44,9 @@ function buildEsclarecimentoHistorico(rows: any[]) {
 
 export function useRequisicoes(status?: string, search?: string) {
   const { perfil, atLeast } = useAuth()
-  // Usuários abaixo de 'supervisor' só enxergam as próprias RCs (antes da
-  // etapa de Cotações). Supervisor+ / aprovador / diretor / admin / CEO
-  // mantêm visão ampla.
-  const visaoAmpla = atLeast('supervisor')
+  // Supervisor+ e compradores têm visão ampla (veem todas as RCs).
+  // Demais usuários só enxergam as próprias RCs.
+  const visaoAmpla = atLeast('supervisor') || perfil?.papel_global === 'comprador'
   const solicitanteScopeId = !visaoAmpla ? perfil?.id ?? null : null
 
   return useQuery<Requisicao[]>({
