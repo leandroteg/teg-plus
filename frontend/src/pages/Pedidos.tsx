@@ -1501,6 +1501,26 @@ function DetailModal({
                 <p className="font-semibold text-emerald-500">{fmtData(pedido.data_entrega_real)}</p>
               </div>
             )}
+            {(pedido as any).data_vencimento && (
+              <div>
+                <span className={sub}>Vencimento</span>
+                <p className={`font-semibold ${
+                  !isPago && diasVenc !== null
+                    ? diasVenc < 0 ? 'text-red-500'
+                    : diasVenc === 0 ? 'text-amber-600'
+                    : diasVenc <= 7 ? 'text-yellow-600'
+                    : txt
+                  : txt
+                }`}>
+                  {fmtDataISO((pedido as any).data_vencimento)}
+                  {!isPago && diasVenc !== null && (
+                    <span className="text-[10px] font-normal ml-1">
+                      {diasVenc < 0 ? `(${Math.abs(diasVenc)}d atr.)` : diasVenc === 0 ? '(hoje)' : `(${diasVenc}d)`}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
             {pedido.nf_numero && (
               <div>
                 <span className={sub}>NF</span>
