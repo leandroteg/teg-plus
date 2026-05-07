@@ -400,27 +400,19 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
-        {/* Expandir para observacao */}
-        <button type="button" onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
-        </button>
-
-        {expanded && (
-          <div className="mt-3">
-            <label className="text-xs text-slate-400">
-              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
-            </label>
-            <UpperTextarea
-              rows={2}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisao...'}
-              value={observacao}
-              onChange={e => setObservacao(e.target.value)}
-            />
-          </div>
-        )}
+        {/* Observacao sempre visivel */}
+        <div className="mt-3">
+          <label className="text-xs text-slate-400">
+            {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
+          </label>
+          <UpperTextarea
+            rows={2}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
+            placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisao...'}
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Botoes de acao -- 3 colunas */}
@@ -793,20 +785,19 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
-        {expanded && (
-          <div className="mt-3">
-            <label className="text-xs text-slate-400">
-              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao / Esclarecimento'}
-            </label>
-            <UpperTextarea
-              rows={2}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Descreva o que precisa ser esclarecido ou justifique sua decisao...'}
-              value={observacao}
-              onChange={e => setObservacao(e.target.value)}
-            />
-          </div>
-        )}
+        {/* Observacao sempre visivel */}
+        <div className="mt-3">
+          <label className="text-xs text-slate-400">
+            {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
+          </label>
+          <UpperTextarea
+            rows={2}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
+            placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Descreva o que precisa ser esclarecido ou justifique sua decisao...'}
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+          />
+        </div>
       </div>
       <div className="grid grid-cols-3 border-t border-slate-100">
         <button
