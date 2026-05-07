@@ -348,6 +348,23 @@ export default function RequisicaoDetalhe() {
           </div>
         </div>
 
+        {/* Aprovador técnico */}
+        {req.aprovador_tecnico_nome && (
+          <div className="mt-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <UserCog size={12} /> Aprovado por
+            </div>
+            <p className="text-sm font-semibold text-slate-700">
+              {req.aprovador_tecnico_nome}
+              {req.aprovado_em && (
+                <span className="text-xs font-normal text-slate-400 ml-1.5">
+                  · {fmtData(req.aprovado_em)}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Valor + Alçada */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
           <div>

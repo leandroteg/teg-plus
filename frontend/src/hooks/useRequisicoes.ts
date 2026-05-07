@@ -653,6 +653,8 @@ export function useEnviarParaCotacao() {
 
 export interface RequisicaoDetalhe extends Requisicao {
   itens: RequisicaoItem[]
+  aprovador_tecnico_nome?: string
+  aprovado_em?: string
 }
 
 export function useRequisicao(id?: string) {
@@ -684,11 +686,25 @@ export function useRequisicao(id?: string) {
       if (!data) return null
 
       const d = data as any
+
+      // Busca quem aprovou tecnicamente
+      const { data: aprov } = await supabase
+        .from('apr_aprovacoes')
+        .select('aprovador_nome, data_decisao')
+        .eq('entidade_id', id)
+        .eq('modulo', 'cmp')
+        .eq('status', 'aprovada')
+        .order('data_decisao', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
       return {
         ...d,
         comprador_nome: d.comprador?.nome ?? undefined,
         comprador: undefined,
         itens: d.itens ?? [],
+        aprovador_tecnico_nome: aprov?.aprovador_nome ?? undefined,
+        aprovado_em: aprov?.data_decisao ?? undefined,
       } as RequisicaoDetalhe
     },
     enabled: !!id,
