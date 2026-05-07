@@ -324,6 +324,12 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                 <span>{cot.fornecedor_nome}</span>
                 <span>{cot.prazo_dias}d | {cot.total_cotados} cotado{cot.total_cotados !== 1 ? 's' : ''}</span>
               </div>
+              {cot.comprador_nome && (
+                <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                  <span className="font-semibold text-slate-500">Cotado por:</span>
+                  <span>{cot.comprador_nome}</span>
+                </div>
+              )}
               {cot.valor < req.valor_estimado && (
                 <div className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
                   <Sparkles size={11} />

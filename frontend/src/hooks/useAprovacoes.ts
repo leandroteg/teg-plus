@@ -55,12 +55,13 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         valor: number
         prazo_dias: number
         total_cotados: number
+        comprador_nome: string
       }>()
 
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
@@ -68,11 +69,13 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           const cot = c as Record<string, unknown>
           const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
           const selecionado = fornecedores.find(() => true)
+          const comprador = cot.comprador as { nome?: string } | null
           cotMap.set(cot.requisicao_id as string, {
             fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
             valor: (cot.valor_selecionado as number) ?? 0,
             prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
             total_cotados: fornecedores.length,
+            comprador_nome: comprador?.nome ?? '',
           })
         }
       }
