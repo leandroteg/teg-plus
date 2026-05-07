@@ -1743,6 +1743,37 @@ function DetailModal({
             </div>
           )}
 
+          {/* Itens da requisição */}
+          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
+                <Receipt size={11} /> Itens do Pedido
+              </p>
+              <div className={`rounded-xl border overflow-hidden ${brd}`}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className={`${dark ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                      <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                      <th className="text-center px-2 py-2 font-semibold w-12">Qtd</th>
+                      <th className="text-center px-2 py-2 font-semibold w-10">Un</th>
+                      <th className="text-right px-3 py-2 font-semibold w-20">Vl. Unit.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(pedido.requisicao!.itens!).map((item, i) => (
+                      <tr key={i} className={`border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+                        <td className={`px-3 py-2 ${txt}`}>{item.descricao}</td>
+                        <td className={`px-2 py-2 text-center ${sub}`}>{item.quantidade}</td>
+                        <td className={`px-2 py-2 text-center ${sub}`}>{item.unidade}</td>
+                        <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_estimado)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Documentos */}
           {!pending && (
             <div>
