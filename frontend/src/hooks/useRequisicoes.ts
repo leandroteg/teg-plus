@@ -29,10 +29,17 @@ function buildEsclarecimentoHistorico(rows: any[]) {
     const entidadeId = String(row.entidade_id ?? '')
     if (!entidadeId) continue
 
+    // Para respostas, o autor real está no texto ("Esclarecimento respondido por {nome}: ...")
+    let autor = String(row.aprovador_nome ?? '')
+    if (isResposta) {
+      const match = obs.match(/^Esclarecimento respondido por ([^:]+)/)
+      if (match) autor = match[1].trim()
+    }
+
     const list = map.get(entidadeId) ?? []
     list.push({
       tipo: isResposta ? 'resposta' : 'pedido',
-      autor: String(row.aprovador_nome ?? ''),
+      autor,
       msg: obs,
       data: String(row.data_decisao ?? row.created_at ?? ''),
     })
