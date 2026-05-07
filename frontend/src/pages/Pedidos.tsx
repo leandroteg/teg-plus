@@ -1147,6 +1147,9 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
   const statusPgto = (pedido as any).status_pagamento as string | undefined
   const isPago     = statusPgto === 'pago'
   const isLiberado = statusPgto === 'liberado'
+  const dataVenc   = (pedido as any).data_vencimento as string | undefined
+  const diasVenc   = dataVenc ? Math.floor((new Date(dataVenc + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86_400_000) : null
+  const vencUrgency = !isPago && dataVenc ? (diasVenc! < 0 ? 'overdue' : diasVenc! === 0 ? 'today' : diasVenc! <= 7 ? 'week' : 'normal') : 'normal'
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
   const categoria    = pedido.requisicao?.categoria
@@ -1292,6 +1295,24 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
                     const delta = Math.round((d1.getTime() - d0.getTime()) / 86400000)
                     return <span className="ml-0.5 font-semibold">({delta}d)</span>
                   })()}
+                </span>
+              )}
+              {(entregue || isLiberado) && dataVenc && (
+                <span className={`flex items-center gap-1 font-semibold ${
+                  vencUrgency === 'overdue' ? 'text-red-500' :
+                  vencUrgency === 'today'   ? 'text-amber-600' :
+                  vencUrgency === 'week'    ? 'text-yellow-600' :
+                  dark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  <Banknote size={9} />
+                  Venc: {fmtDataISO(dataVenc)}
+                  {diasVenc !== null && !isPago && (
+                    <span className="ml-0.5">
+                      {vencUrgency === 'overdue' ? `(${Math.abs(diasVenc)}d atr.)` :
+                       vencUrgency === 'today'   ? '(hoje)' :
+                       `(${diasVenc}d)`}
+                    </span>
+                  )}
                 </span>
               )}
               {categoria && (

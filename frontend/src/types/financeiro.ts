@@ -21,7 +21,6 @@ export const CP_PIPELINE_STAGES: { status: StatusCP; label: string; color: strin
   { status: 'aprovado_pgto',  label: 'Aprovados',           color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento',   label: 'Painel de Pagamento', color: 'amber',   borderColor: 'border-t-amber-500' },
   { status: 'pago',           label: 'Realizados',          color: 'teal',    borderColor: 'border-t-teal-500' },
-  { status: 'conciliado',     label: 'Conciliados',         color: 'green',   borderColor: 'border-t-green-500' },
   { status: 'cancelado',      label: 'Cancelados',          color: 'rose',    borderColor: 'border-t-rose-500' },
 ]
 

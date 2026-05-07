@@ -13,7 +13,7 @@ export function usePedidos(status?: string) {
         .select(`
           id, requisicao_id, cotacao_id, comprador_id, fornecedor_id,
           numero_pedido, fornecedor_nome, valor_total, status,
-          data_pedido, data_prevista_entrega, data_entrega_real,
+          data_pedido, data_prevista_entrega, data_entrega_real, data_vencimento,
           nf_numero, observacoes, created_at, updated_at, criado_por_nome, atualizado_por_nome,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,

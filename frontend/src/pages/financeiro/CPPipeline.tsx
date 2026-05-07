@@ -332,7 +332,7 @@ const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; c
   { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
   { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
-  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado', 'cancelado'].includes(stage.status)),
+  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'cancelado'].includes(stage.status)),
 ]
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -2154,9 +2154,11 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       )}
 
       <span className={`text-[11px] text-right ${
-        urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+        cp.status === 'pago'
+          ? isDark ? 'text-teal-400' : 'text-teal-600'
+          : urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
       }`}>
-        {fmtData(cp.data_vencimento)}
+        {cp.status === 'pago' && cp.data_pagamento ? fmtData(cp.data_pagamento) : fmtData(cp.data_vencimento)}
       </span>
 
       <span className={`text-xs font-bold text-right ${
@@ -2187,9 +2189,15 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
     <div
       onClick={onClick}
       className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
-        isDark
-          ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
-          : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
+        isSelected
+          ? isDark ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-300'
+          : urgency === 'overdue'
+            ? isDark ? 'bg-red-500/5 border-red-500/40 hover:border-red-500/60' : 'bg-red-50 border-red-200 hover:border-red-400'
+            : urgency === 'today'
+              ? isDark ? 'bg-amber-500/5 border-amber-500/40 hover:border-amber-500/60' : 'bg-amber-50 border-amber-200 hover:border-amber-400'
+              : urgency === 'week'
+                ? isDark ? 'bg-yellow-500/5 border-yellow-500/30 hover:border-yellow-500/50' : 'bg-yellow-50/60 border-yellow-200 hover:border-yellow-400'
+                : isDark ? 'border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 bg-white/[0.02]' : 'border-slate-200 hover:border-teal-300 hover:shadow-md bg-white'
       }`}
     >
       {/* Linha 1: checkbox + fornecedor + urgency + valor */}
@@ -2209,6 +2217,12 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         </p>
         {urgency === 'overdue' && (
           <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
+        )}
+        {urgency === 'today' && (
+          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full shrink-0">HOJE</span>
+        )}
+        {urgency === 'week' && (
+          <span className="text-[10px] font-semibold text-yellow-700 bg-yellow-50 dark:bg-yellow-500/10 px-2 py-0.5 rounded-full shrink-0">ESTA SEMANA</span>
         )}
         {isUrgentRequest && (
           <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded-full shrink-0">URGENTE</span>
@@ -2289,11 +2303,26 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
             </span>
           )}
         </div>
-        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
-          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
-        }`}>
-          <Calendar size={10} /> {fmtData(cp.data_vencimento)}
-        </span>
+        {cp.status === 'pago' ? (
+          <div className="flex flex-col items-end gap-0.5 shrink-0 ml-3">
+            {cp.data_pagamento && (
+              <span className={`text-[11px] flex items-center gap-1 font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+                <Banknote size={10} /> {fmtData(cp.data_pagamento)}
+              </span>
+            )}
+            {cp.aprovado_por && (
+              <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {cp.aprovado_por}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
+            urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+          }`}>
+            <Calendar size={10} /> {fmtData(cp.data_vencimento)}
+          </span>
+        )}
       </div>
     </div>
   )
