@@ -233,7 +233,7 @@ export function useEmitirPedido() {
       centroCustoId = centroCustoId || requisicao.centro_custo_id || undefined
 
       const now = new Date()
-      const prefix = `PO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+      const prefix = `PC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
 
       const { data: lastPedido, error: seqError } = await supabase
         .from('cmp_pedidos')
@@ -253,7 +253,7 @@ export function useEmitirPedido() {
         const lastNum = parseInt(parts[parts.length - 1], 10)
         if (!Number.isNaN(lastNum)) nextSeq = lastNum + 1
       }
-      const numeroPedido = `${prefix}-${String(nextSeq).padStart(4, '0')}`
+      const numeroPedido = `${prefix}-${String(nextSeq).padStart(5, '0')}`
 
       const parcelasResolvidas = parcelasPreview && parcelasPreview.length > 0
         ? parcelasPreview
