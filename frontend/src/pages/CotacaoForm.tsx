@@ -396,7 +396,12 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
         <button onClick={() => nav('/cotacoes')} className="p-1">
           <ChevronLeft size={18} className="text-slate-500" />
         </button>
-        <h2 className="text-lg font-extrabold text-slate-800">Cotação Concluída</h2>
+        <div>
+          <h2 className="text-lg font-extrabold text-slate-800">Cotação Concluída</h2>
+          {cotacao.comprador_nome && (
+            <p className="text-xs text-slate-400">Cotado por: <span className="font-semibold text-slate-500">{cotacao.comprador_nome}</span></p>
+          )}
+        </div>
       </div>
 
       {/* RC Info */}
@@ -407,11 +412,6 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
           <p className="text-xs text-slate-400">{req?.obra_nome}</p>
           <p className="text-sm font-extrabold text-teal-600">{fmt(cotacao.valor_selecionado ?? req?.valor_estimado ?? 0)}</p>
         </div>
-        {cotacao.comprador_nome && (
-          <p className="text-[11px] text-slate-400 mt-1">
-            <span className="font-semibold text-slate-500">Cotado por:</span> {cotacao.comprador_nome}
-          </p>
-        )}
       </div>
 
       {/* Timeline */}
