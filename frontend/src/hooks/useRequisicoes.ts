@@ -43,10 +43,10 @@ function buildEsclarecimentoHistorico(rows: any[]) {
 }
 
 export function useRequisicoes(status?: string, search?: string) {
-  const { perfil, atLeast } = useAuth()
-  // Supervisor+ e compradores têm visão ampla (veem todas as RCs).
+  const { perfil, atLeast, canTechnicalApprove } = useAuth()
+  // Supervisor+ ou quem tem papel de supervisor em compras (modulo_papeis) vê todas as RCs.
   // Demais usuários só enxergam as próprias RCs.
-  const visaoAmpla = atLeast('supervisor') || perfil?.papel_global === 'comprador'
+  const visaoAmpla = atLeast('supervisor') || canTechnicalApprove('compras')
   const solicitanteScopeId = !visaoAmpla ? perfil?.id ?? null : null
 
   return useQuery<Requisicao[]>({
