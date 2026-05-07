@@ -208,6 +208,11 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
           <CheckCircle size={13} /> {cot.fornecedor_selecionado_nome}
         </div>
       )}
+      {concluida && cot.comprador_nome && (
+        <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Cotado por: <span className="font-semibold">{cot.comprador_nome}</span>
+        </p>
+      )}
 
       {/* Footer */}
       <div className={`flex items-center justify-between pt-2 ${isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}`}>
@@ -279,6 +284,9 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Dias em aberto</p><p className={dias > 5 ? 'text-red-500 font-bold' : ''}>{dias}d</p></div>
             {cot.fornecedor_selecionado_nome && (
               <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Fornecedor</p><p className={isDark ? 'text-emerald-400' : 'text-emerald-600'}>{cot.fornecedor_selecionado_nome}</p></div>
+            )}
+            {concluida && cot.comprador_nome && (
+              <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Cotado por</p><p>{cot.comprador_nome}</p></div>
             )}
           </div>
 
