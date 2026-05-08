@@ -185,9 +185,18 @@ function normalize(s: string): string {
 }
 
 // ── Match parsed items against est_itens catalog ────────────────────────────
-async function matchCatalogItems(result: AiParseResult): Promise<AiParseResult> {
-  const categoriasEstoque = getCategoriaEstoque(result.categoria_sugerida || '')
-  if (categoriasEstoque.length === 0) return result
+async function matchCatalogItems(result: AiParseResult, categoriaCodigo?: string): Promise<AiParseResult> {
+  const totalDoc = result.itens.length
+  const categoriasEstoque = getCategoriaEstoque(categoriaCodigo || result.categoria_sugerida || '')
+
+  // Categoria sem catálogo associado (ex: serviços, alimentação)
+  if (categoriasEstoque.length === 0) {
+    if (categoriaCodigo) {
+      // Modo referência sem catálogo: confia no filtro do Gemini, retorna itens sem enriquecer
+      return { ...result, total_itens_documento: totalDoc }
+    }
+    return result
+  }
 
   // Fetch all active items for matching categories
   const { data: catalog } = await supabase
@@ -196,17 +205,20 @@ async function matchCatalogItems(result: AiParseResult): Promise<AiParseResult> 
     .in('categoria', categoriasEstoque)
     .eq('ativo', true)
 
-  if (!catalog || catalog.length === 0) return result
+  if (!catalog || catalog.length === 0) {
+    if (categoriaCodigo) {
+      return { ...result, total_itens_documento: totalDoc }
+    }
+    return result
+  }
 
-  let matchCount = 0
-  const matchedItens = result.itens.map(item => {
+  const matchedItens: typeof result.itens = []
+  for (const item of result.itens) {
     const normDesc = normalize(item.descricao)
-    // Try to find best match: catalog item whose normalized description contains the search term or vice versa
     const match = catalog.find(c => {
       const normCat = normalize(c.descricao)
       return normCat.includes(normDesc) || normDesc.includes(normCat)
     })
-    // Also try word-level matching (at least 2 significant words match)
     const wordMatch = !match ? catalog.find(c => {
       const normCat = normalize(c.descricao)
       const words = normDesc.split(/\s+/).filter(w => w.length > 2)
@@ -217,24 +229,28 @@ async function matchCatalogItems(result: AiParseResult): Promise<AiParseResult> 
 
     const best = match || wordMatch
     if (best) {
-      matchCount++
-      return {
+      matchedItens.push({
         ...item,
         descricao: best.descricao,
         unidade: (best.unidade || 'UN').toLowerCase(),
         valor_unitario_estimado: best.valor_medio ?? item.valor_unitario_estimado,
         est_item_id: best.id,
         est_item_codigo: best.codigo,
-      }
+      })
+    } else if (!categoriaCodigo) {
+      // Sem filtro de categoria: mantém item mesmo sem match no catálogo
+      matchedItens.push(item)
     }
-    return item
-  })
+    // Com filtro de categoria: ignora itens sem cadastro
+  }
 
+  const matchCount = matchedItens.length
   return {
     ...result,
     itens: matchedItens,
+    total_itens_documento: categoriaCodigo ? totalDoc : undefined,
     confianca: matchCount > 0
-      ? Math.min(0.95, result.confianca + (matchCount / result.itens.length) * 0.2)
+      ? Math.min(0.95, result.confianca + (matchCount / totalDoc) * 0.2)
       : result.confianca,
   }
 }
@@ -244,10 +260,11 @@ export interface AiParseVars {
   texto: string
   solicitante_nome?: string
   arquivo?: { base64: string; nome: string; mime: string }
+  categoria_filtro?: { codigo: string; nome: string }
 }
 
 // ── Parse arquivo binário via Gemini (direto ou n8n fallback) ─────────────────
-async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mime: string }, textoExtra?: string): Promise<AiParseResult> {
+async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mime: string }, textoExtra?: string, categoriaFiltro?: { codigo: string; nome: string }): Promise<AiParseResult> {
   const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY
   const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
@@ -256,7 +273,15 @@ async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mi
   const timeoutMs = arquivo.base64.length > 15_000_000 ? 180_000 : 90_000
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
-  const prompt = `Analise este documento (cotação, proposta comercial, lista de materiais ou similar) e extraia TODOS os itens para uma requisição de compra.
+  const filtroCategoria = categoriaFiltro
+    ? `\n\nATENÇÃO — FILTRO ESTRITO DE CATEGORIA:
+A requisição é da categoria "${categoriaFiltro.nome}".
+Inclua no array "itens" SOMENTE produtos/serviços diretamente relacionados a esta categoria.
+Se nenhum item do documento pertencer a esta categoria, retorne "itens": [].
+É PROIBIDO incluir itens de outras categorias mesmo que estejam no documento.`
+    : ''
+
+  const prompt = `Analise este documento (cotação, proposta comercial, lista de materiais ou similar) e extraia os itens para uma requisição de compra.
 
 Retorne SOMENTE JSON válido (sem markdown, sem blocos de código) no formato:
 {"itens":[{"descricao":"descrição completa do item","quantidade":1,"unidade":"un","valor_unitario_estimado":0.00}],"obra_sugerida":"","urgencia_sugerida":"normal","categoria_sugerida":"consumo","justificativa_sugerida":"","confianca":0.85,"fornecedor_nome":"","fornecedor_cnpj":"","condicao_pagamento":"","validade_proposta":""}
@@ -264,9 +289,8 @@ Retorne SOMENTE JSON válido (sem markdown, sem blocos de código) no formato:
 Regras:
 - Unidades: un, par, jg, kg, ton, m, m², m³, L, pc, cx, rl, hr, vb
 - Se o valor unitário não estiver claro, use 0
-- Inclua TODOS os itens encontrados
 - Se for proposta com valor total por item, calcule o unitário dividindo pela quantidade
-- categoria_sugerida: eletrico|civil|ferramentas|epi|servicos|consumo
+- categoria_sugerida: eletrico|civil|ferramentas|epi|servicos|consumo${filtroCategoria}
 ${textoExtra ? '\nContexto: ' + textoExtra : ''}
 Nome do arquivo: ${arquivo.nome}`
 
@@ -404,13 +428,13 @@ export function useAiParse() {
       // Se tem arquivo binário (PDF, imagem), usar Gemini via n8n
       if (vars.arquivo) {
         try {
-          const result = await parseArquivoComGemini(vars.arquivo, vars.texto)
-          return await matchCatalogItems(result)
+          const result = await parseArquivoComGemini(vars.arquivo, vars.texto, vars.categoria_filtro)
+          return await matchCatalogItems(result, vars.categoria_filtro?.codigo)
         } catch (err) {
           // Se endpoint dedicado falhou, tenta o endpoint genérico
           try {
             const result = await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
-            return await matchCatalogItems(result)
+            return await matchCatalogItems(result, vars.categoria_filtro?.codigo)
           } catch {
             throw err // Re-throw o erro original do Gemini
           }

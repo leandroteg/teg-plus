@@ -1003,6 +1003,7 @@ function UserDetailPanel({
               <input
                 type={showSenha ? 'text' : 'password'}
                 value={novaSenha}
+                autoComplete="new-password"
                 onChange={e => { setNovaSenha(e.target.value); setSenhaError('') }}
                 placeholder="Nova senha"
                 className={`w-full pl-8 pr-9 py-2 rounded-xl border text-xs
@@ -1709,7 +1710,7 @@ export default function AdminUsuarios() {
               </button>
             </div>
             <UserDetailPanel
-              user={editModalUser}
+              user={perfis?.find(p => p.id === editModalUser.id) ?? editModalUser}
               forceEdit={true}
               onClose={() => setEditModalUser(null)}
             />

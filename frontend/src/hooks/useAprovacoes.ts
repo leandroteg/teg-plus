@@ -717,6 +717,7 @@ export function useAprovacaoKPIs() {
     },
     refetchInterval: 30_000,
     staleTime: 15_000,
+    retry: false,
   })
 }
 

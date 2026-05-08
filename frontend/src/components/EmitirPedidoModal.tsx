@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, FileText, Loader2, AlertTriangle, Ban, CheckCircle2, Landmark } from 'lucide-react'
-import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
+import { useCadCentrosCusto, useCadObras } from '../hooks/useCadastros'
 import { useCartoesCredito } from '../hooks/useCartoes'
 import { useEditorLock } from '../hooks/useEditorLock'
 import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
-import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
+import { gerarPreviaParcelas } from '../utils/pagamentos'
 import NumericInput from './NumericInput'
 import { UpperInput, UpperTextarea } from './UpperInput'
 
@@ -74,8 +74,6 @@ interface EmitirPedidoModalProps {
     fornecedorNome: string
     valorTotal: number
     compradorId?: string
-    classeFinanceiraId?: string
-    classeFinanceira?: string
     centroCustoId?: string
     centroCusto?: string
     condicaoPagamento?: string
@@ -106,7 +104,6 @@ export default function EmitirPedidoModal({
   onConfirm,
   isSubmitting,
 }: EmitirPedidoModalProps) {
-  const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
   const { data: cartoes = [] } = useCartoesCredito()
@@ -248,22 +245,8 @@ export default function EmitirPedidoModal({
   const fornecedoresEscolhidos = data?.fornecedoresEscolhidos ?? []
   const temSplit = fornecedoresEscolhidos.length > 1
 
-  const classeResumo = useMemo(
-    () => resumirHomogeneidade(requisicao?.itens.map((item) => item.classe_financeira_codigo) ?? []),
-    [requisicao],
-  )
-
-  const classesDosItens = useMemo(
-    () => Array.from(new Set(
-      (requisicao?.itens ?? [])
-        .map((item) => item.classe_financeira_codigo?.trim())
-        .filter((value): value is string => Boolean(value)),
-    )),
-    [requisicao],
-  )
-
-  const [classeId, setClasseId] = useState('')
   const [centroId, setCentroId] = useState('')
+  const [numParcelas, setNumParcelas] = useState<number | ''>('')
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
   const [cartaoId, setCartaoId] = useState('')
@@ -287,14 +270,7 @@ export default function EmitirPedidoModal({
     if (!open || !requisicao) return
 
     const obra = obras.find((item) => item.id === requisicao.obra_id)
-    const classeSelecionada = classes.find((item) =>
-      item.codigo === classeResumo.valor ||
-      item.id === requisicao.classe_financeira_id ||
-      item.codigo === requisicao.classe_financeira ||
-      requisicao.itens.some((reqItem) => reqItem.classe_financeira_id === item.id),
-    )
 
-    setClasseId(classeSelecionada?.id ?? '')
     setCentroId((obra as any)?.centro_custo_id ?? requisicao.centro_custo_id ?? '')
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
     setFormaPagamento(inferirFormaPagamentoInicial(data?.fornecedorDB))
@@ -305,6 +281,7 @@ export default function EmitirPedidoModal({
     setAdiantamentoValor('')
     setAdiantamentoData('')
     setParcelasEditadasManualmente(false)
+    setNumParcelas('')
     setNaoSolicitarContrato(false)
     setJustNaoContrato('')
     const fdb = data?.fornecedorDB
@@ -314,7 +291,7 @@ export default function EmitirPedidoModal({
     setBancoBoleto(Boolean(fdb?.boleto))
     setBancoPix(fdb?.pix_chave ?? '')
     setBancoPixTipo(fdb?.pix_tipo ?? '')
-  }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor, data?.fornecedorDB])
+  }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, data?.fornecedorDB])
 
   useEffect(() => {
     if (formaPagamento !== 'cartao' && cartaoId) {
@@ -322,7 +299,6 @@ export default function EmitirPedidoModal({
     }
   }, [formaPagamento, cartaoId])
 
-  const classeSelecionada = classes.find((item) => item.id === classeId)
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const fornecedorDB = data?.fornecedorDB ?? null
@@ -335,9 +311,10 @@ export default function EmitirPedidoModal({
   const valorAdiantamento = Math.round((Number(adiantamentoValor || 0) || 0) * 100) / 100
   const adiantamentoInvalido = temAdiantamento && (valorAdiantamento <= 0 || valorAdiantamento > valorTotal || !adiantamentoData)
   const saldoParcelado = Math.max(0, Math.round(((temAdiantamento ? valorTotal - valorAdiantamento : valorTotal)) * 100) / 100)
+  const effectiveCondicao = numParcelas && numParcelas > 0 ? `${numParcelas}x` : condicaoPagamento
   const parcelasSugeridasBase = useMemo(
-    () => gerarPreviaParcelas(saldoParcelado, condicaoPagamento, dataPrevistaEntrega || undefined),
-    [saldoParcelado, condicaoPagamento, dataPrevistaEntrega],
+    () => gerarPreviaParcelas(saldoParcelado, effectiveCondicao, dataPrevistaEntrega || undefined),
+    [saldoParcelado, effectiveCondicao, dataPrevistaEntrega],
   )
   const parcelasSugeridas = useMemo(() => {
     const parcelasRegulares = parcelasSugeridasBase.map((parcela, index) => ({
@@ -370,7 +347,7 @@ export default function EmitirPedidoModal({
   useEffect(() => {
     if (!open) return
     setParcelasEditadasManualmente(false)
-  }, [open, temAdiantamento, adiantamentoValor, adiantamentoData])
+  }, [open, temAdiantamento, adiantamentoValor, adiantamentoData, numParcelas])
 
   const totalParcelas = useMemo(
     () => parcelasEditaveis.reduce((sum, parcela) => sum + (Number(parcela.valor) || 0), 0),
@@ -451,8 +428,6 @@ export default function EmitirPedidoModal({
       fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
       valorTotal: totalParcelas,
       compradorId: cotacaoResolvida?.compradorId,
-      classeFinanceiraId: classeSelecionada?.id,
-      classeFinanceira: classeSelecionada?.codigo,
       centroCustoId: centroSelecionado?.id,
       centroCusto: centroSelecionado?.codigo,
       condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
@@ -706,33 +681,18 @@ export default function EmitirPedidoModal({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
-                  <p className="text-[11px] font-bold text-teal-700">Classe Financeira sugerida</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {classeResumo.homogeno && classeResumo.valor
-                      ? classeResumo.valor
-                      : requisicao.classe_financeira || 'Confirmacao manual necessaria'}
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {classeResumo.homogeno && classeResumo.valor
-                      ? 'Puxada automaticamente dos itens da requisicao.'
-                      : `Itens com multiplas classes: ${classesDosItens.join(', ') || 'sem classe definida'}.`}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
-                  <p className="text-[11px] font-bold text-cyan-700">Centro de Custo sugerido</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {(obraSelecionada as any)?.centro_custo?.codigo || requisicao.centro_custo || '—'}
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {(obraSelecionada as any)?.centro_custo_id
-                      ? 'Puxado automaticamente da obra vinculada.'
-                      : requisicao.centro_custo
-                        ? 'Puxado da requisicao (fallback).'
-                        : 'Nenhum centro de custo vinculado.'}
-                  </p>
-                </div>
+              <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                <p className="text-[11px] font-bold text-cyan-700">Centro de Custo sugerido</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">
+                  {(obraSelecionada as any)?.centro_custo?.codigo || requisicao.centro_custo || '—'}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {(obraSelecionada as any)?.centro_custo_id
+                    ? 'Puxado automaticamente da obra vinculada.'
+                    : requisicao.centro_custo
+                      ? 'Puxado da requisicao (fallback).'
+                      : 'Nenhum centro de custo vinculado.'}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
@@ -759,31 +719,14 @@ export default function EmitirPedidoModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Classe Financeira Final</label>
-                  <SearchableSelect
-                    options={(classes ?? []).map(c => ({ value: c.id, label: c.descricao, code: c.codigo }))}
-                    value={classeId}
-                    onChange={setClasseId}
-                    placeholder="Buscar classe financeira..."
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {classeResumo.homogeno && classeResumo.valor
-                      ? `Sugestao automatica aplicada: ${classeResumo.valor}`
-                      : 'Itens com classes diferentes exigem confirmacao manual.'}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Centro de Custo Final</label>
-                  <SearchableSelect
-                    options={(centros ?? []).map(c => ({ value: c.id, label: c.descricao, code: c.codigo }))}
-                    value={centroId}
-                    onChange={setCentroId}
-                    placeholder="Buscar centro de custo..."
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Centro de Custo Final</label>
+                <SearchableSelect
+                  options={(centros ?? []).map(c => ({ value: c.id, label: c.descricao, code: c.codigo }))}
+                  value={centroId}
+                  onChange={setCentroId}
+                  placeholder="Buscar centro de custo..."
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -921,12 +864,26 @@ export default function EmitirPedidoModal({
                     <p className="text-xs font-bold text-slate-600">Confirmacao das parcelas</p>
                     <p className="text-[11px] text-slate-400">Previa inteligente baseada na condicao de pagamento aprovada.</p>
                   </div>
-                  {!cotacaoResolvida?.condicaoPagamento && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
-                      <AlertTriangle size={12} />
-                      Sem condicao puxada da cotacao
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!cotacaoResolvida?.condicaoPagamento && !numParcelas && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                        <AlertTriangle size={12} />
+                        Sem condicao puxada
+                      </span>
+                    )}
+                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                      <span>Parcelas:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={numParcelas}
+                        onChange={e => setNumParcelas(e.target.value === '' ? '' : Math.max(1, Math.min(60, Number(e.target.value))))}
+                        placeholder="auto"
+                        className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div className="p-4 space-y-2">
                   {parcelasEditaveis.length === 0 ? (
@@ -1054,33 +1011,15 @@ export default function EmitirPedidoModal({
                 </div>
               </div>
               {/* #113 – Confirmation summary: visible when ready to emit */}
-              {!fluxoContrato && (classeId || centroId) && (
-                <div className={`rounded-2xl border p-4 space-y-2 ${
-                  classeId && centroId
-                    ? 'border-emerald-200 bg-emerald-50'
-                    : 'border-amber-200 bg-amber-50'
-                }`}>
+              {!fluxoContrato && centroId && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
                   <div className="flex items-center gap-2 mb-1">
-                    {classeId && centroId
-                      ? <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
-                      : <AlertTriangle size={15} className="text-amber-500 flex-shrink-0" />}
-                    <p className={`text-xs font-bold ${classeId && centroId ? 'text-emerald-700' : 'text-amber-700'}`}>
-                      {classeId && centroId ? 'Confirmação dos vínculos financeiros' : 'Preencha todos os campos antes de emitir'}
-                    </p>
+                    <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
+                    <p className="text-xs font-bold text-emerald-700">Confirmação dos vínculos financeiros</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div className={`rounded-xl px-3 py-2 ${classeId ? 'bg-white border border-emerald-200' : 'bg-amber-100 border border-amber-300'}`}>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Classe Financeira</p>
-                      {classeSelecionada
-                        ? <p className="text-sm font-bold text-slate-800 mt-0.5">{classeSelecionada.codigo} — {classeSelecionada.descricao}</p>
-                        : <p className="text-sm font-semibold text-amber-600 mt-0.5">Não selecionada</p>}
-                    </div>
-                    <div className={`rounded-xl px-3 py-2 ${centroId ? 'bg-white border border-emerald-200' : 'bg-amber-100 border border-amber-300'}`}>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Centro de Custo</p>
-                      {centroSelecionado
-                        ? <p className="text-sm font-bold text-slate-800 mt-0.5">{centroSelecionado.codigo} — {centroSelecionado.descricao}</p>
-                        : <p className="text-sm font-semibold text-amber-600 mt-0.5">Não selecionado</p>}
-                    </div>
+                  <div className={`rounded-xl px-3 py-2 bg-white border border-emerald-200`}>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Centro de Custo</p>
+                    <p className="text-sm font-bold text-slate-800 mt-0.5">{centroSelecionado?.codigo} — {centroSelecionado?.descricao}</p>
                   </div>
                 </div>
               )}
@@ -1107,7 +1046,6 @@ export default function EmitirPedidoModal({
               (!fluxoContrato && (
                 !formaPagamento ||
                 (formaPagamento === 'cartao' && !cartaoId) ||
-                !classeId ||
                 !centroId ||
                 adiantamentoInvalido ||
                 !parcelasValidas ||

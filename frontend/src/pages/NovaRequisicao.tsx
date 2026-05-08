@@ -146,10 +146,11 @@ export default function NovaRequisicao() {
   const [submitError, setSubmitError]       = useState<string | null>(null)
 
   // ── Issue #17: AI progress + preview state ─────────────────────────────────
-  const [aiProgress, setAiProgress]         = useState<'idle' | 'reading' | 'parsing' | 'done' | 'error'>('idle')
+  const [aiProgress, setAiProgress]         = useState<'idle' | 'reading' | 'parsing' | 'done' | 'error' | 'empty'>('idle')
   const [aiPreview, setAiPreview]           = useState<AiParseResult | null>(null)
   const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
   const [showPreview, setShowPreview]       = useState(false)
+  const [aiExtracao, setAiExtracao]         = useState<{ extraidos: number; total: number } | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoesPorValor(total, categoria.cotacoes_regras) : 1
@@ -310,7 +311,7 @@ export default function NovaRequisicao() {
   }, [perfil, solicitante, categorias, descricao])
 
   // ── AI Parse Handler (auto-triggered on file attach) ────────────────────────
-  const handleAiParse = async (fileArg?: File) => {
+  const handleAiParse = async (fileArg?: File, categoriaFiltro?: { codigo: string; nome: string }) => {
     const fileToUse = fileArg ?? selectedFile
     let textoFinal = textoAi
     let arquivoPayload: { base64: string; nome: string; mime: string } | undefined
@@ -368,11 +369,29 @@ export default function NovaRequisicao() {
         texto: textoFinal,
         solicitante_nome: perfil?.nome || solicitante,
         arquivo: arquivoPayload,
+        categoria_filtro: categoriaFiltro,
       })
 
       const sanitized = sanitizeItems(result.itens)
       setAiProgress('done')
-      applyAiResult(result, sanitized, textoFinal)
+
+      if (categoriaFiltro) {
+        // Modo referência: aplica somente os itens, preserva categoria/obra/urgência já preenchidos
+        const totalDoc = result.total_itens_documento ?? sanitized.length
+        if (sanitized.length === 0) {
+          setAiProgress('empty')
+          setAiExtracao(null)
+          setTimeout(() => setAiProgress('idle'), 4000)
+          return
+        }
+        setItens(sanitized)
+        setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
+        setAiExtracao(totalDoc > sanitized.length ? { extraidos: sanitized.length, total: totalDoc } : null)
+      } else {
+        setAiExtracao(null)
+        applyAiResult(result, sanitized, textoFinal)
+      }
+
       setTimeout(() => setAiProgress('idle'), 2000)
     } catch {
       setAiProgress('error')
@@ -678,6 +697,7 @@ export default function NovaRequisicao() {
                     event.stopPropagation()
                     setReferenciaFile(null)
                     setAiProgress('idle')
+                    setAiExtracao(null)
                     if (referenciaInputRef.current) referenciaInputRef.current.value = ''
                   }}
                   className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
@@ -694,6 +714,11 @@ export default function NovaRequisicao() {
                     {aiProgress === 'reading' ? 'Lendo arquivo...' : 'Extraindo itens com IA...'}
                   </span>
                 </div>
+              ) : aiProgress === 'empty' ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-200">
+                  <AlertCircle size={14} className="text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-700">Nenhum item compatível com a categoria encontrado no documento — preencha manualmente</span>
+                </div>
               ) : aiProgress === 'error' ? (
                 <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
                   <AlertCircle size={14} className="text-red-500 shrink-0" />
@@ -702,16 +727,31 @@ export default function NovaRequisicao() {
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
                   {aiProgress === 'done' ? (
-                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <CheckCircle2 size={12} /> Itens preenchidos pela IA
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {aiExtracao ? (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <AlertCircle size={12} />
+                          {aiExtracao.extraidos} de {aiExtracao.total} itens extraídos — verifique os demais manualmente
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 size={12} /> Todos os itens extraídos com sucesso
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={e => { e.stopPropagation(); handleAiParse(referenciaFile) }}
-                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+                      onClick={e => {
+                        e.stopPropagation()
+                        handleAiParse(
+                          referenciaFile,
+                          categoria ? { codigo: categoria.codigo, nome: categoria.nome } : undefined,
+                        )
+                      }}
+                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
                     >
-                      <Zap size={12} /> Ler com IA
+                      <Sparkles size={12} /> Extrair itens com IA
                     </button>
                   )}
                   <a
