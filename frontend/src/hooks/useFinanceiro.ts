@@ -73,6 +73,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
 // â”€â”€ Contas a Pagar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SELECT_CP = `
   *,
+  imposto_tipo, imposto_aliquota, imposto_valor, imposto_deduzir,
   pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento),
   requisicao:cmp_requisicoes!requisicao_id(numero, descricao, justificativa, obra_nome, categoria, centro_custo, classe_financeira, projeto_id, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado))
 `

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Building, Building2, Package2, Tag,
-  Target, HardHat, Users, Layers, FolderTree, Warehouse, FolderKanban,
+  Target, HardHat, Users, Layers, FolderTree, Warehouse, FolderKanban, ShoppingCart,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem, NavSection } from './ModuleLayout'
@@ -25,6 +25,12 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/cadastros/grupos',      icon: Layers,     label: 'Grupos'      },
       { to: '/cadastros/categorias',  icon: FolderTree, label: 'Categorias'  },
       { to: '/cadastros/classes',     icon: Tag,        label: 'Classes'     },
+    ],
+  },
+  {
+    label: 'Compras',
+    items: [
+      { to: '/cadastros/categorias-compras', icon: ShoppingCart, label: 'Categorias' },
     ],
   },
   {
