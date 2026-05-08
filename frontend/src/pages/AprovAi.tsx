@@ -162,6 +162,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 }) {
   const mutation = useDecisaoRequisicao()
   const [expanded, setExpanded] = useState(false)
+  const [showItens, setShowItens] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
@@ -282,14 +283,48 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         <p className="text-sm text-slate-700 mb-2">{req.descricao}</p>
 
-        <a
-          href={`/requisicoes/${req.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-indigo-400 font-semibold hover:text-indigo-600 transition mb-3"
+        {/* Toggle itens */}
+        <button
+          type="button"
+          onClick={() => setShowItens(v => !v)}
+          className="inline-flex items-center gap-1 text-xs text-indigo-400 font-semibold hover:text-indigo-600 transition mb-2"
         >
-          <ExternalLink size={11} /> Ver detalhes completos
-        </a>
+          {showItens ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showItens ? 'Ocultar itens' : 'Ver itens da requisição'}
+        </button>
+
+        {showItens && (() => {
+          const itens = (req as any).itens as { descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }[] | undefined
+          if (!itens || itens.length === 0) return (
+            <p className="text-xs text-slate-400 italic mb-3">Nenhum item cadastrado.</p>
+          )
+          return (
+            <div className="mb-3 rounded-xl border border-slate-200 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500">
+                    <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                    <th className="text-center px-2 py-2 font-semibold w-10">Qtd</th>
+                    <th className="text-center px-2 py-2 font-semibold w-8">Un</th>
+                    <th className="text-right px-3 py-2 font-semibold w-20">Vl. Unit.</th>
+                    <th className="text-right px-3 py-2 font-semibold w-20">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((item, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
+                      <td className="px-2 py-2 text-center text-slate-500">{item.quantidade}</td>
+                      <td className="px-2 py-2 text-center text-slate-500">{item.unidade}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{fmt(item.valor_unitario_estimado)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-slate-700">{fmt(item.quantidade * item.valor_unitario_estimado)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
 
         {/* Obra */}
         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">

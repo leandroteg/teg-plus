@@ -193,11 +193,11 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
             .filter(Boolean)
 
-          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
+          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome, itens }
           if (reqIds.length > 0) {
             const { data: rcData } = await supabase
               .from('cmp_requisicoes')
-              .select('id, numero, descricao, justificativa, solicitante_nome')
+              .select('id, numero, descricao, justificativa, solicitante_nome, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
               .in('id', [...new Set(reqIds)])
             for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
           }
