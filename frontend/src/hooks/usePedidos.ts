@@ -62,11 +62,19 @@ export function useAtualizarPedido() {
   })
 }
 
+export interface ImpostoItemPayload {
+  descricao:        string
+  valor_item:       number
+  imposto_tipo:     string | null
+  imposto_aliquota: number | null
+  imposto_valor:    number
+  deduzir:          boolean
+}
+
 export interface ImpostoPayload {
-  tipo: string
-  aliquota: number | null
-  valor: number
-  deduzir: boolean
+  itens:       ImpostoItemPayload[]
+  valor_total: number
+  deduzir:     boolean   // true se ao menos 1 item deduz
 }
 
 export function useLiberarPagamento() {
@@ -85,15 +93,14 @@ export function useLiberarPagamento() {
       if (error) throw error
 
       // Propaga imposto para a CP vinculada ao pedido, se houver
-      if (imposto && imposto.valor > 0) {
+      if (imposto && imposto.valor_total > 0 && imposto.itens.length > 0) {
         await supabase
           .from('fin_contas_pagar')
           .update({
-            imposto_tipo:     imposto.tipo,
-            imposto_aliquota: imposto.aliquota,
-            imposto_valor:    imposto.valor,
-            imposto_deduzir:  imposto.deduzir,
-            updated_at:       new Date().toISOString(),
+            impostos_itens:  imposto.itens,
+            imposto_valor:   imposto.valor_total,
+            imposto_deduzir: imposto.deduzir,
+            updated_at:      new Date().toISOString(),
           })
           .eq('pedido_id', pedidoId)
           .neq('status', 'pago')

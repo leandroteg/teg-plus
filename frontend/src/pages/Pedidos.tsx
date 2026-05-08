@@ -894,7 +894,15 @@ const TIPO_OPTIONS: { value: PedidoAnexo['tipo']; label: string }[] = [
   { value: 'outro',               label: 'Outro'                 },
 ]
 
-const IMPOSTO_TIPOS = ['ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outro']
+const IMPOSTO_TIPOS = ['IPI', 'ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outro']
+
+type ItemTaxState = {
+  hasImposto:       boolean
+  imposto_tipo:     string
+  imposto_aliquota: string
+  imposto_valor:    string   // manual override
+  deduzir:          boolean
+}
 
 function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
   const uploadAnexo   = useUploadAnexo()
@@ -907,22 +915,29 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const [obs, setObs]         = useState('')
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
+  const [showImposto, setShowImposto] = useState(false)
 
-  // Imposto
-  const [showImposto, setShowImposto]       = useState(false)
-  const [impostoTipo, setImpostoTipo]       = useState('ISS')
-  const [impostoAliq, setImpostoAliq]       = useState('')
-  const [impostoValor, setImpostoValor]     = useState('')
-  const [impostoDeduzir, setImpostoDeduzir] = useState(true)
+  const rcItens = pedido.requisicao?.itens ?? []
 
-  const valorBase = pedido.valor_total ?? 0
-  const aliqNum   = parseFloat(impostoAliq) || 0
-  const valorCalc = aliqNum > 0 ? +(valorBase * aliqNum / 100).toFixed(2) : 0
-  const valorRet  = parseFloat(impostoValor) || valorCalc
-  const valorLiq  = impostoDeduzir && valorRet > 0 ? valorBase - valorRet : valorBase
+  // Per-item tax state — one entry per RC item
+  const [itemTaxes, setItemTaxes] = useState<ItemTaxState[]>(() =>
+    rcItens.map(() => ({ hasImposto: false, imposto_tipo: 'IPI', imposto_aliquota: '', imposto_valor: '', deduzir: false }))
+  )
 
-  // Quando alíquota muda, zera o campo manual para usar o calculado
-  const handleAliq = (v: string) => { setImpostoAliq(v); setImpostoValor('') }
+  const setItemTax = (i: number, patch: Partial<ItemTaxState>) =>
+    setItemTaxes(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it))
+
+  // Totals
+  const totalImposto = rcItens.reduce((sum, item, i) => {
+    if (!itemTaxes[i]?.hasImposto) return sum
+    const valorItem = item.quantidade * item.valor_unitario_estimado
+    const aliq = parseFloat(itemTaxes[i].imposto_aliquota) || 0
+    const calc = aliq > 0 ? +(valorItem * aliq / 100).toFixed(2) : 0
+    return sum + (parseFloat(itemTaxes[i].imposto_valor) || calc)
+  }, 0)
+  const anyDeduzir = itemTaxes.some((it, i) => itemTaxes[i].hasImposto && it.deduzir)
+  const valorBase  = pedido.valor_total ?? 0
+  const valorLiq   = anyDeduzir && totalImposto > 0 ? valorBase - totalImposto : valorBase
 
   const docsExistentes = anexosExistentes?.filter(a => ['nota_fiscal', 'boleto', 'doc_financeiro'].includes(a.tipo)) ?? []
   const temNF = docsExistentes.length > 0
@@ -940,9 +955,33 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
       if (file) {
         await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file, tipo, observacao: obs || undefined, origem: 'compras' })
       }
-      const imposto: ImpostoPayload | null = showImposto && valorRet > 0
-        ? { tipo: impostoTipo, aliquota: aliqNum || null, valor: valorRet, deduzir: impostoDeduzir }
-        : null
+
+      // Build per-item payload
+      const impostoItens: ImpostoPayload['itens'] = rcItens
+        .map((item, i) => {
+          const tax = itemTaxes[i]
+          if (!tax?.hasImposto) return null
+          const valorItem = item.quantidade * item.valor_unitario_estimado
+          const aliqNum   = parseFloat(tax.imposto_aliquota) || 0
+          const valorCalc = aliqNum > 0 ? +(valorItem * aliqNum / 100).toFixed(2) : 0
+          const valorRet  = parseFloat(tax.imposto_valor) || valorCalc
+          if (valorRet <= 0) return null
+          return {
+            descricao:        item.descricao,
+            valor_item:       valorItem,
+            imposto_tipo:     tax.imposto_tipo || null,
+            imposto_aliquota: aliqNum || null,
+            imposto_valor:    valorRet,
+            deduzir:          tax.deduzir,
+          }
+        })
+        .filter(Boolean) as ImpostoPayload['itens']
+
+      const imposto: ImpostoPayload | null =
+        showImposto && impostoItens.length > 0 && totalImposto > 0
+          ? { itens: impostoItens, valor_total: totalImposto, deduzir: anyDeduzir }
+          : null
+
       await liberarPgto.mutateAsync({ pedidoId: pedido.id, imposto })
       onClose()
     } catch (e: any) {
@@ -1027,7 +1066,7 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Observação <span className="text-slate-400 font-normal">(opcional)</span></label>
             <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Ex: NF entregue junto com o material..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300" />
           </div>
-          {/* ── Imposto / Retenção ─────────────────────────────── */}
+          {/* ── Imposto / Retenção por item ───────────────────── */}
           <div className="rounded-xl border border-slate-200 overflow-hidden">
             <button
               type="button"
@@ -1039,9 +1078,9 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
                 Imposto / Retenção
               </span>
               <span className="flex items-center gap-2">
-                {showImposto && valorRet > 0 && (
+                {totalImposto > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
-                    {impostoTipo} − {valorRet.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    − {totalImposto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 )}
                 {showImposto ? <ChevronUp size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
@@ -1049,67 +1088,97 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
             </button>
 
             {showImposto && (
-              <div className="px-3 pb-3 pt-1 space-y-3 border-t border-slate-100 bg-violet-50/40">
-                {/* Tipo */}
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tipo</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {IMPOSTO_TIPOS.map(t => (
-                      <button key={t} type="button" onClick={() => setImpostoTipo(t)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${impostoTipo === t ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'}`}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="border-t border-slate-100 bg-violet-50/30">
+                {rcItens.length === 0 ? (
+                  <p className="px-3 py-3 text-xs text-slate-400 italic">Sem itens de RC vinculados.</p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {rcItens.map((item, i) => {
+                      const tax      = itemTaxes[i] ?? { hasImposto: false, imposto_tipo: 'IPI', imposto_aliquota: '', imposto_valor: '', deduzir: false }
+                      const valorItem = item.quantidade * item.valor_unitario_estimado
+                      const aliqNum  = parseFloat(tax.imposto_aliquota) || 0
+                      const valorCalcItem = aliqNum > 0 ? +(valorItem * aliqNum / 100).toFixed(2) : 0
+                      const valorRetItem  = parseFloat(tax.imposto_valor) || valorCalcItem
+                      return (
+                        <div key={i} className="px-3 py-2.5 space-y-2">
+                          {/* Item header */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
+                              <p className="text-[10px] text-slate-400">{item.quantidade} {item.unidade} · {valorItem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setItemTax(i, { hasImposto: !tax.hasImposto })}
+                              className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${tax.hasImposto ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'}`}
+                            >
+                              {tax.hasImposto ? 'Com imposto' : '+ Imposto'}
+                            </button>
+                          </div>
 
-                {/* Alíquota + Valor */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Alíquota %</label>
-                    <input
-                      type="number" min="0" max="100" step="0.01"
-                      value={impostoAliq}
-                      onChange={e => handleAliq(e.target.value)}
-                      placeholder="ex: 5"
-                      className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-300"
-                    />
-                    {aliqNum > 0 && <p className="text-[10px] text-violet-600 mt-0.5">= {valorCalc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                          {/* Tax inputs */}
+                          {tax.hasImposto && (
+                            <div className="bg-white rounded-xl border border-violet-200 p-2.5 space-y-2">
+                              {/* Tipo */}
+                              <div className="flex flex-wrap gap-1">
+                                {IMPOSTO_TIPOS.map(t => (
+                                  <button key={t} type="button" onClick={() => setItemTax(i, { imposto_tipo: t })}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${tax.imposto_tipo === t ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'}`}>
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* Alíquota + Valor */}
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Alíquota %</label>
+                                  <input type="number" min="0" max="100" step="0.01"
+                                    value={tax.imposto_aliquota}
+                                    onChange={e => setItemTax(i, { imposto_aliquota: e.target.value, imposto_valor: '' })}
+                                    placeholder="ex: 5"
+                                    className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 placeholder:text-slate-300" />
+                                  {valorCalcItem > 0 && <p className="text-[10px] text-violet-600 mt-0.5">= {valorCalcItem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor R$</label>
+                                  <input type="number" min="0" step="0.01"
+                                    value={tax.imposto_valor || (valorCalcItem > 0 ? valorCalcItem : '')}
+                                    onChange={e => setItemTax(i, { imposto_valor: e.target.value })}
+                                    placeholder="manual"
+                                    className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 placeholder:text-slate-300" />
+                                </div>
+                              </div>
+                              {/* Deduzir */}
+                              {valorRetItem > 0 && (
+                                <button type="button" onClick={() => setItemTax(i, { deduzir: !tax.deduzir })}
+                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${tax.deduzir ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-white border-slate-200 text-slate-500'}`}>
+                                  <span>Deduzir do pagamento</span>
+                                  <span className={`w-7 h-3.5 rounded-full transition-colors flex items-center px-0.5 ${tax.deduzir ? 'bg-violet-600' : 'bg-slate-300'}`}>
+                                    <span className={`w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${tax.deduzir ? 'translate-x-3.5' : ''}`} />
+                                  </span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Valor retido R$</label>
-                    <input
-                      type="number" min="0" step="0.01"
-                      value={impostoValor || (aliqNum > 0 ? valorCalc : '')}
-                      onChange={e => setImpostoValor(e.target.value)}
-                      placeholder="manual"
-                      className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-300"
-                    />
-                  </div>
-                </div>
+                )}
 
-                {/* Deduzir toggle */}
-                <button type="button" onClick={() => setImpostoDeduzir(v => !v)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${impostoDeduzir ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-white border-slate-200 text-slate-500'}`}>
-                  <span>Deduzir do valor a pagar</span>
-                  <span className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5 ${impostoDeduzir ? 'bg-violet-600' : 'bg-slate-300'}`}>
-                    <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${impostoDeduzir ? 'translate-x-4' : ''}`} />
-                  </span>
-                </button>
-
-                {/* Resumo */}
-                {valorRet > 0 && (
-                  <div className="rounded-xl bg-white border border-violet-200 px-3 py-2 space-y-1 text-xs">
+                {/* Totals summary */}
+                {totalImposto > 0 && (
+                  <div className="mx-3 mb-3 rounded-xl bg-white border border-violet-200 px-3 py-2 space-y-1 text-xs">
                     <div className="flex justify-between text-slate-500">
                       <span>Valor bruto</span>
                       <span className="font-semibold">{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                     </div>
                     <div className="flex justify-between text-violet-600">
-                      <span>(−) {impostoTipo} retido</span>
-                      <span className="font-semibold">− {valorRet.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      <span>(−) Total impostos retidos</span>
+                      <span className="font-semibold">− {totalImposto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                     </div>
                     <div className="flex justify-between font-bold border-t border-violet-100 pt-1 text-slate-700">
-                      <span>{impostoDeduzir ? 'Valor a pagar ao fornecedor' : 'Valor a pagar (sem dedução)'}</span>
+                      <span>{anyDeduzir ? 'Valor a pagar ao fornecedor' : 'Valor a pagar (sem dedução)'}</span>
                       <span className="text-emerald-700">{valorLiq.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                     </div>
                   </div>
