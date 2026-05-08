@@ -111,6 +111,12 @@ export interface ContaPagar {
     data_prevista_entrega?: string
     status_pagamento?: string
   } | null
+  // Imposto / retenção
+  imposto_tipo?: string | null
+  imposto_aliquota?: number | null
+  imposto_valor?: number | null
+  imposto_deduzir?: boolean | null
+
   // Joined data from cmp_requisicoes
   requisicao?: {
     numero: string

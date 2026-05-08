@@ -62,11 +62,18 @@ export function useAtualizarPedido() {
   })
 }
 
+export interface ImpostoPayload {
+  tipo: string
+  aliquota: number | null
+  valor: number
+  deduzir: boolean
+}
+
 export function useLiberarPagamento() {
   const qc = useQueryClient()
   const { perfil } = useAuth()
   return useMutation({
-    mutationFn: async (pedidoId: string) => {
+    mutationFn: async ({ pedidoId, imposto }: { pedidoId: string; imposto?: ImpostoPayload | null }) => {
       const { error } = await supabase
         .from('cmp_pedidos')
         .update({
@@ -76,8 +83,26 @@ export function useLiberarPagamento() {
         })
         .eq('id', pedidoId)
       if (error) throw error
+
+      // Propaga imposto para a CP vinculada ao pedido, se houver
+      if (imposto && imposto.valor > 0) {
+        await supabase
+          .from('fin_contas_pagar')
+          .update({
+            imposto_tipo:     imposto.tipo,
+            imposto_aliquota: imposto.aliquota,
+            imposto_valor:    imposto.valor,
+            imposto_deduzir:  imposto.deduzir,
+            updated_at:       new Date().toISOString(),
+          })
+          .eq('pedido_id', pedidoId)
+          .neq('status', 'pago')
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
   })
 }
 

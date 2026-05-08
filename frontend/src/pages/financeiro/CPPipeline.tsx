@@ -1493,6 +1493,160 @@ function NovaPrevisaoPagamentoModal({
   )
 }
 
+// ── Seção de Imposto editável (Confirmados) ──────────────────────────────────
+const CP_IMPOSTO_TIPOS = ['ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outro']
+
+function CPImpostoEditor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
+  const qc = useQueryClient()
+  const [open, setOpen]             = useState(false)
+  const [tipo, setTipo]             = useState(cp.imposto_tipo ?? 'ISS')
+  const [aliq, setAliq]             = useState(cp.imposto_aliquota?.toString() ?? '')
+  const [valor, setValor]           = useState(cp.imposto_valor?.toString() ?? '')
+  const [deduzir, setDeduzir]       = useState(cp.imposto_deduzir ?? true)
+  const [saving, setSaving]         = useState(false)
+  const [saved, setSaved]           = useState(false)
+
+  const valorBase = cp.valor_original ?? 0
+  const aliqNum   = parseFloat(aliq) || 0
+  const valorCalc = aliqNum > 0 ? +(valorBase * aliqNum / 100).toFixed(2) : 0
+  const valorRet  = parseFloat(valor) || valorCalc
+  const valorLiq  = deduzir && valorRet > 0 ? valorBase - valorRet : valorBase
+
+  const temImposto = cp.imposto_valor && cp.imposto_valor > 0
+
+  const handleSave = async () => {
+    if (valorRet <= 0) return
+    setSaving(true)
+    try {
+      await supabase
+        .from('fin_contas_pagar')
+        .update({
+          imposto_tipo:     tipo,
+          imposto_aliquota: aliqNum || null,
+          imposto_valor:    valorRet,
+          imposto_deduzir:  deduzir,
+          updated_at:       new Date().toISOString(),
+        })
+        .eq('id', cp.id)
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClear = async () => {
+    setSaving(true)
+    try {
+      await supabase
+        .from('fin_contas_pagar')
+        .update({ imposto_tipo: null, imposto_aliquota: null, imposto_valor: null, imposto_deduzir: false, updated_at: new Date().toISOString() })
+        .eq('id', cp.id)
+      setAliq(''); setValor(''); setTipo('ISS'); setDeduzir(true)
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+        <span className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <Receipt size={12} className="text-violet-500" />
+          Imposto / Retenção
+        </span>
+        <span className="flex items-center gap-2">
+          {temImposto && !open && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+              {cp.imposto_tipo} − {Number(cp.imposto_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+          )}
+          {open ? <ChevronUp size={12} className={isDark ? 'text-slate-400' : 'text-slate-400'} /> : <ChevronDown size={12} className="text-slate-400" />}
+        </span>
+      </button>
+
+      {open && (
+        <div className={`px-3 pb-3 pt-1 space-y-3 border-t ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-100 bg-violet-50/30'}`}>
+          {/* Tipo */}
+          <div className="flex flex-wrap gap-1.5">
+            {CP_IMPOSTO_TIPOS.map(t => (
+              <button key={t} type="button" onClick={() => setTipo(t)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${tipo === t ? 'bg-violet-600 text-white border-violet-600' : isDark ? 'bg-white/[0.06] text-slate-300 border-white/10 hover:border-violet-400' : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* Alíquota + Valor */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`block text-[10px] font-semibold mb-1 uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Alíquota %</label>
+              <input type="number" min="0" max="100" step="0.01" value={aliq}
+                onChange={e => { setAliq(e.target.value); setValor('') }}
+                placeholder="ex: 5"
+                className={`w-full text-xs border rounded-xl px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder:text-slate-500' : 'border-slate-200 placeholder:text-slate-300'}`} />
+              {aliqNum > 0 && <p className="text-[10px] text-violet-500 mt-0.5">= {valorCalc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+            </div>
+            <div>
+              <label className={`block text-[10px] font-semibold mb-1 uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Valor retido R$</label>
+              <input type="number" min="0" step="0.01"
+                value={valor || (aliqNum > 0 ? valorCalc : '')}
+                onChange={e => setValor(e.target.value)}
+                placeholder="manual"
+                className={`w-full text-xs border rounded-xl px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder:text-slate-500' : 'border-slate-200 placeholder:text-slate-300'}`} />
+            </div>
+          </div>
+
+          {/* Toggle deduzir */}
+          <button type="button" onClick={() => setDeduzir(v => !v)}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${deduzir ? 'bg-violet-100 border-violet-300 text-violet-700' : isDark ? 'bg-white/[0.04] border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+            <span>Deduzir do valor a pagar</span>
+            <span className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5 ${deduzir ? 'bg-violet-600' : 'bg-slate-300'}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${deduzir ? 'translate-x-4' : ''}`} />
+            </span>
+          </button>
+
+          {/* Resumo */}
+          {valorRet > 0 && (
+            <div className={`rounded-xl border px-3 py-2 space-y-1 text-xs ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-violet-200'}`}>
+              <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span>Valor bruto</span>
+                <span className="font-semibold">{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+              <div className="flex justify-between text-violet-600">
+                <span>(−) {tipo}</span>
+                <span className="font-semibold">− {valorRet.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+              <div className={`flex justify-between font-bold border-t pt-1 ${isDark ? 'border-white/10 text-white' : 'border-violet-100 text-slate-700'}`}>
+                <span>{deduzir ? 'Valor líquido ao fornecedor' : 'Valor a pagar (sem dedução)'}</span>
+                <span className="text-emerald-600">{valorLiq.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Botões */}
+          <div className="flex gap-2">
+            <button type="button" onClick={handleSave} disabled={saving || valorRet <= 0}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-40">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : saved ? <CheckCircle2 size={12} /> : <Receipt size={12} />}
+              {saved ? 'Salvo!' : 'Salvar'}
+            </button>
+            {temImposto && (
+              <button type="button" onClick={handleClear} disabled={saving}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${isDark ? 'border-white/10 text-slate-400 hover:text-red-400' : 'border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200'}`}>
+                Remover
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Itens da RC colapsável ───────────────────────────────────────────────────
 function CPItensRC({ itens, isDark }: {
   itens: { descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }[]
@@ -1798,6 +1952,26 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               if (itens.length === 0) return null
               return <CPItensRC itens={itens} isDark={isDark} />
             })()}
+
+            {/* Imposto / Retenção — editável em Confirmados, read-only nos demais */}
+            {stageStatus === 'confirmado' ? (
+              <CPImpostoEditor cp={cp} isDark={isDark} />
+            ) : (cp.imposto_valor && cp.imposto_valor > 0) ? (
+              <div className={`rounded-xl border px-3 py-2.5 space-y-1 text-xs ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-violet-200 bg-violet-50/50'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
+                  <Receipt size={10} /> Imposto retido
+                </p>
+                <div className="flex justify-between"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Tipo</span><span className="font-semibold">{cp.imposto_tipo}</span></div>
+                {cp.imposto_aliquota && <div className="flex justify-between"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Alíquota</span><span>{cp.imposto_aliquota}%</span></div>}
+                <div className="flex justify-between text-violet-600"><span>Retido</span><span className="font-semibold">− {Number(cp.imposto_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                {cp.imposto_deduzir && (
+                  <div className={`flex justify-between font-bold border-t pt-1 ${isDark ? 'border-white/10' : 'border-violet-100'}`}>
+                    <span>Valor líquido</span>
+                    <span className="text-emerald-600">{(cp.valor_original - cp.imposto_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {(cp.fornecedor_id || cp.fornecedor_nome) && (
