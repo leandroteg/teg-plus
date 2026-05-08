@@ -1493,6 +1493,66 @@ function NovaPrevisaoPagamentoModal({
   )
 }
 
+// ── Itens da RC colapsável ───────────────────────────────────────────────────
+function CPItensRC({ itens, isDark }: {
+  itens: { descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }[]
+  isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const total = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
+
+  return (
+    <div className={`mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-500 hover:text-indigo-700'}`}
+      >
+        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        {open ? 'Ocultar itens' : `Ver ${itens.length} ${itens.length === 1 ? 'item' : 'itens'} da RC`}
+        {!open && (
+          <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
+            {fmtFull(total)}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className={`mt-2 rounded-xl border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={`${isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                <th className="text-left px-3 py-1.5 font-semibold">Descrição</th>
+                <th className="text-center px-2 py-1.5 font-semibold w-12">Qtd</th>
+                <th className="text-center px-2 py-1.5 font-semibold w-10">Un</th>
+                <th className="text-right px-3 py-1.5 font-semibold w-20">Vl. Unit.</th>
+                <th className="text-right px-3 py-1.5 font-semibold w-20">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((item, i) => (
+                <tr key={i} className={`border-t ${isDark ? 'border-white/5 odd:bg-white/[0.02]' : 'border-slate-100 odd:bg-slate-50/60'}`}>
+                  <td className={`px-3 py-1.5 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.descricao}</td>
+                  <td className={`px-2 py-1.5 text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{item.quantidade}</td>
+                  <td className={`px-2 py-1.5 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.unidade}</td>
+                  <td className={`px-3 py-1.5 text-right ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{fmtFull(item.valor_unitario_estimado)}</td>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtFull(item.quantidade * item.valor_unitario_estimado)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className={`border-t ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-50'}`}>
+                <td colSpan={4} className={`px-3 py-1.5 text-right text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total estimado</td>
+                <td className={`px-3 py-1.5 text-right font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>{fmtFull(total)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   cp: ContaPagar
   stageStatus: PipelineStageId
@@ -1731,6 +1791,13 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                 <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{cp.requisicao.justificativa}</p>
               </div>
             )}
+
+            {/* Itens da requisição */}
+            {cp.requisicao && (() => {
+              const itens = cp.requisicao?.itens ?? []
+              if (itens.length === 0) return null
+              return <CPItensRC itens={itens} isDark={isDark} />
+            })()}
           </div>
 
           {(cp.fornecedor_id || cp.fornecedor_nome) && (

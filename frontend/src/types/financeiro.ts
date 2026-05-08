@@ -115,11 +115,18 @@ export interface ContaPagar {
   requisicao?: {
     numero: string
     descricao: string
+    justificativa?: string
     obra_nome?: string
     categoria?: string
     centro_custo?: string
     classe_financeira?: string
     projeto_id?: string
+    itens?: {
+      descricao: string
+      quantidade: number
+      unidade: string
+      valor_unitario_estimado: number
+    }[]
   } | null
 }
 
