@@ -44,7 +44,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (cmpIds.length > 0) {
         const { data: reqData } = await supabase
           .from(TABLE_REQ)
-          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
+          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
           .in('id', cmpIds)
         reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
       }
