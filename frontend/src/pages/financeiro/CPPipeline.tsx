@@ -1560,17 +1560,44 @@ function CPImpostoEditor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
     return next
   })
 
-  // Totals
-  const totalImposto = items.reduce((sum, it, i) => {
+  // Total-level tax (ISS, INSS etc. sobre o total)
+  const initTotalTax = (): CPItemTaxState & { hasImposto: boolean } => {
+    const existing = cp.impostos_itens?.find(it => it.descricao === 'Total NF')
+    if (existing) {
+      return {
+        hasImposto:       true,
+        descricao:        'Total NF',
+        valor_item:       existing.valor_item,
+        imposto_tipo:     existing.imposto_tipo ?? 'ISS',
+        imposto_aliquota: existing.imposto_aliquota?.toString() ?? '',
+        imposto_valor:    existing.imposto_valor.toString(),
+        deduzir:          existing.deduzir,
+      }
+    }
+    return {
+      hasImposto: false, descricao: 'Total NF',
+      valor_item: cp.valor_original ?? 0,
+      imposto_tipo: 'ISS', imposto_aliquota: '', imposto_valor: '', deduzir: true,
+    }
+  }
+  const [totalTax, setTotalTax] = useState(initTotalTax)
+
+  const valorBase    = cp.valor_original ?? 0
+  const ttAliq       = parseFloat(totalTax.imposto_aliquota) || 0
+  const ttCalc       = ttAliq > 0 ? +(valorBase * ttAliq / 100).toFixed(2) : 0
+  const ttRet        = parseFloat(totalTax.imposto_valor) || ttCalc
+
+  // Totals — per-item + total-level
+  const itemsImposto = items.reduce((sum, it, i) => {
     if (!taxEnabled.has(i)) return sum
     const aliq = parseFloat(it.imposto_aliquota) || 0
     const calc = aliq > 0 ? +(it.valor_item * aliq / 100).toFixed(2) : 0
     return sum + (parseFloat(it.imposto_valor) || calc)
   }, 0)
-  const anyDeduzir  = items.some((it, i) => taxEnabled.has(i) && it.deduzir)
-  const valorBase   = cp.valor_original ?? 0
-  const valorLiq    = anyDeduzir && totalImposto > 0 ? valorBase - totalImposto : valorBase
-  const temImposto  = (cp.imposto_valor ?? 0) > 0
+  const totalImposto = itemsImposto + (totalTax.hasImposto ? ttRet : 0)
+  const anyDeduzir   = items.some((it, i) => taxEnabled.has(i) && it.deduzir) || (totalTax.hasImposto && totalTax.deduzir)
+  const valorLiq     = anyDeduzir && totalImposto > 0 ? valorBase - totalImposto : valorBase
+  const temImposto   = (cp.imposto_valor ?? 0) > 0
 
   const handleSave = async () => {
     if (totalImposto <= 0) return
@@ -1593,6 +1620,18 @@ function CPImpostoEditor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
           }
         })
         .filter(Boolean)
+
+      // Include total-level tax
+      if (totalTax.hasImposto && ttRet > 0) {
+        impostoItens.push({
+          descricao:        'Total NF',
+          valor_item:       valorBase,
+          imposto_tipo:     totalTax.imposto_tipo || null,
+          imposto_aliquota: ttAliq || null,
+          imposto_valor:    ttRet,
+          deduzir:          totalTax.deduzir,
+        })
+      }
 
       await supabase
         .from('fin_contas_pagar')
@@ -1621,6 +1660,7 @@ function CPImpostoEditor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
         .eq('id', cp.id)
       setItems(seedFromRC())
       setTaxEnabled(new Set())
+      setTotalTax({ hasImposto: false, descricao: 'Total NF', valor_item: cp.valor_original ?? 0, imposto_tipo: 'ISS', imposto_aliquota: '', imposto_valor: '', deduzir: true })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
     } finally {
       setSaving(false)
@@ -1718,6 +1758,61 @@ function CPImpostoEditor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
               })}
             </div>
           )}
+
+          {/* ── Imposto sobre o total da NF ── */}
+          <div className={`border-t px-3 pt-2.5 pb-2.5 space-y-2 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Imposto sobre o total da NF</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ISS, INSS, IRRF — sobre o valor total</p>
+              </div>
+              <button type="button" onClick={() => setTotalTax(v => ({ ...v, hasImposto: !v.hasImposto }))}
+                className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${totalTax.hasImposto ? 'bg-violet-600 text-white border-violet-600' : isDark ? 'bg-white/[0.06] text-slate-400 border-white/10 hover:border-violet-400' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'}`}>
+                {totalTax.hasImposto ? 'Com imposto' : '+ Imposto'}
+              </button>
+            </div>
+
+            {totalTax.hasImposto && (
+              <div className={`rounded-xl border p-2.5 space-y-2 ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-violet-200'}`}>
+                <div className="flex flex-wrap gap-1">
+                  {CP_IMPOSTO_TIPOS.filter(t => t !== 'IPI').map(t => (
+                    <button key={t} type="button" onClick={() => setTotalTax(v => ({ ...v, imposto_tipo: t }))}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${totalTax.imposto_tipo === t ? 'bg-violet-600 text-white border-violet-600' : isDark ? 'bg-white/[0.06] text-slate-300 border-white/10 hover:border-violet-400' : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Alíquota %</label>
+                    <input type="number" min="0" max="100" step="0.01"
+                      value={totalTax.imposto_aliquota}
+                      onChange={e => setTotalTax(v => ({ ...v, imposto_aliquota: e.target.value, imposto_valor: '' }))}
+                      placeholder="ex: 5"
+                      className={`w-full text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder:text-slate-600' : 'border-slate-200 placeholder:text-slate-300'}`} />
+                    {ttCalc > 0 && <p className="text-[10px] text-violet-500 mt-0.5">= {ttCalc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                  </div>
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Valor R$</label>
+                    <input type="number" min="0" step="0.01"
+                      value={totalTax.imposto_valor || (ttCalc > 0 ? ttCalc : '')}
+                      onChange={e => setTotalTax(v => ({ ...v, imposto_valor: e.target.value }))}
+                      placeholder="manual"
+                      className={`w-full text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder:text-slate-600' : 'border-slate-200 placeholder:text-slate-300'}`} />
+                  </div>
+                </div>
+                {ttRet > 0 && (
+                  <button type="button" onClick={() => setTotalTax(v => ({ ...v, deduzir: !v.deduzir }))}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${totalTax.deduzir ? 'bg-violet-100 border-violet-300 text-violet-700' : isDark ? 'bg-white/[0.04] border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+                    <span>Deduzir do pagamento</span>
+                    <span className={`w-7 h-3.5 rounded-full transition-colors flex items-center px-0.5 ${totalTax.deduzir ? 'bg-violet-600' : 'bg-slate-300'}`}>
+                      <span className={`w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${totalTax.deduzir ? 'translate-x-3.5' : ''}`} />
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Summary */}
           {totalImposto > 0 && (
