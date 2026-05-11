@@ -749,6 +749,15 @@ export default function ModuleLayout({
                 Usuários
               </button>
               <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/politicas-aprovacao') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Shield size={15} className="shrink-0 opacity-50" />
+                Políticas de Aprovação
+              </button>
+              <button
                 onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
