@@ -6,14 +6,16 @@ import { useAuth } from '../contexts/AuthContext'
 /**
  * Compact badge that shows pending approval count.
  * Clicking navigates to /aprovaai (AprovAi).
- * Only visible to admin/director users.
+ * Visible para qualquer usuário que possa aprovar em algum nível
+ * (admin, CEO, diretor, supervisor com alçada, gestor com alçada explícita).
  */
 export default function ApprovalBadge({ isDark = false }: { isDark?: boolean }) {
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { canApprove } = useAuth()
   const { data: kpis } = useAprovacaoKPIs()
 
-  if (!isAdmin) return null
+  // canApprove(1) = pode aprovar pelo menos no nível mais baixo
+  if (!canApprove(1)) return null
 
   const count = kpis?.totalPendentes ?? 0
   const title =
