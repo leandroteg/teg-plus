@@ -9,14 +9,10 @@ import { useAuth } from '../contexts/AuthContext'
 const TABLE_APR = 'apr_aprovacoes'
 const TABLE_REQ = 'cmp_requisicoes'
 
-// ── IDs fixos das pessoas com papel especifico nas politicas ─────────────────
-// (carregados via apr_validadores_tecnicos para os tecnicos; aqui ficam apenas
-// os papeis com regra de pessoa fixa nas politicas atuais)
+// ── IDs fixos (apenas Laucidio segue hardcoded — minutas/pagamentos sao globais) ──
 const ID_LAUCIDIO = '98723949-73fa-4961-b032-3ef599464e2e'
-const ID_LEANDRO  = '1a530a02-9eec-4aa7-8bbc-7805895b1904'
-const ID_WELTON   = 'ca9b98a4-05bf-4a15-8234-54958c0e5b84'
 
-// ── Politica de visibilidade ────────────────────────────────────────────────
+// ── Politica de visibilidade (por categoria) ─────────────────────────────────
 
 interface UserCtx {
   id?: string
@@ -25,23 +21,22 @@ interface UserCtx {
   isDiretor: boolean
 }
 
+interface CatPolitica {
+  validador_tecnico_id: string | null
+  alcada1_aprovador_id: string | null
+  alcada1_limite: number
+  alcada2_aprovador_id: string | null
+}
+
 interface FiltroContext {
   user: UserCtx
-  /** Validadores tecnicos por area (vindo de apr_validadores_tecnicos). */
-  validadoresTec: Map<string, string | null>  // area -> validador_id
-  /** Mapa codigo_categoria → area (vindo de cmp_categorias). */
-  categoriaArea: Map<string, string>  // categoria_codigo -> area_tecnica
+  /** Mapa codigo_categoria → politica completa (vindo de cmp_categorias). */
+  politicas: Map<string, CatPolitica>
 }
 
 /**
  * Decide se o usuario atual pode ver/aprovar esta pendencia.
- * Regras conforme politica TEG+:
- *  - Admin ve tudo
- *  - validacao tecnica RC: validador da area da categoria
- *  - aprovacao_transporte: por enquanto, qualquer diretor (politica nao definida 100%)
- *  - aprovacao_compras (cotacao): <= R$3k → Leandro/Welton · > R$3k → Laucidio
- *  - solicitacao_adiantamento: qualquer diretor
- *  - minuta_contratual / autorizacao_pagamento: apenas Laucidio
+ * Politica por categoria — lida diretamente de cmp_categorias.
  */
 function podeVerAprovacao(
   apr: { tipo_aprovacao?: string; modulo?: string; entidade_id?: string },
@@ -64,25 +59,27 @@ function podeVerAprovacao(
     return ctx.user.isDiretor
   }
 
-  // Aprovacao Compras (cotacao) → por valor
-  if (tipo === 'cotacao') {
-    const valor = Number((req?.valor_estimado as number | undefined) ?? 0)
-    if (valor <= 3000) return uid === ID_LEANDRO || uid === ID_WELTON
-    return uid === ID_LAUCIDIO
-  }
-
-  // Validacao tecnica de RC (requisicao_compra) → validador da area da categoria
-  if (tipo === 'requisicao_compra') {
-    const categoria = (req?.categoria as string | undefined) ?? ''
-    const area = ctx.categoriaArea.get(categoria)
-    if (!area) return false
-    const validadorId = ctx.validadoresTec.get(area)
-    return validadorId === uid
-  }
-
-  // Aprovacao de transporte → diretores (provisorio; politica final a definir)
+  // Aprovacao de transporte → diretores (provisorio)
   if (tipo === 'aprovacao_transporte') {
     return ctx.user.isDiretor
+  }
+
+  // Aprovacao Compras (cotacao) → por categoria + valor
+  if (tipo === 'cotacao') {
+    const categoria = (req?.categoria as string | undefined) ?? ''
+    const pol = ctx.politicas.get(categoria)
+    if (!pol) return false
+    const valor = Number((req?.valor_estimado as number | undefined) ?? 0)
+    if (valor <= pol.alcada1_limite) return pol.alcada1_aprovador_id === uid
+    return pol.alcada2_aprovador_id === uid
+  }
+
+  // Validacao tecnica de RC → validador_tecnico_id da categoria
+  if (tipo === 'requisicao_compra') {
+    const categoria = (req?.categoria as string | undefined) ?? ''
+    const pol = ctx.politicas.get(categoria)
+    if (!pol) return false
+    return pol.validador_tecnico_id === uid
   }
 
   // Tipos desconhecidos: oculta
@@ -119,20 +116,25 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const isDiretor = (perfilSetores ?? []).some(s => s.ativo && s.papel === 'diretor')
         || perfil?.role === 'diretor'
 
-      const [{ data: validadores }, { data: categorias }] = await Promise.all([
-        supabase.from('apr_validadores_tecnicos').select('area, validador_id'),
-        supabase.from('cmp_categorias').select('codigo, area_tecnica'),
-      ])
+      const { data: categoriasPol } = await supabase
+        .from('cmp_categorias')
+        .select('codigo, validador_tecnico_id, alcada1_aprovador_id, alcada1_limite, alcada2_aprovador_id')
+
+      const politicasMap = new Map<string, CatPolitica>(
+        (categoriasPol ?? []).map(c => [
+          c.codigo as string,
+          {
+            validador_tecnico_id: (c.validador_tecnico_id as string | null) ?? null,
+            alcada1_aprovador_id: (c.alcada1_aprovador_id as string | null) ?? null,
+            alcada1_limite:        Number((c.alcada1_limite as number | null) ?? 0),
+            alcada2_aprovador_id: (c.alcada2_aprovador_id as string | null) ?? null,
+          },
+        ]),
+      )
 
       const ctx: FiltroContext = {
-        user: {
-          id: perfil?.id,
-          email: perfil?.email,
-          isAdmin,
-          isDiretor,
-        },
-        validadoresTec: new Map((validadores ?? []).map(v => [v.area as string, (v.validador_id as string) ?? null])),
-        categoriaArea: new Map((categorias ?? []).map(c => [c.codigo as string, c.area_tecnica as string])),
+        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor },
+        politicas: politicasMap,
       }
 
       // 2. Busca as requisicoes relacionadas pelos IDs (somente para tipo requisicao_compra / cotacao)
