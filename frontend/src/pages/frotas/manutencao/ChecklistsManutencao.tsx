@@ -9,7 +9,7 @@ import {
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import type { FroVeiculo, FroItemManutencao, CategoriaVeiculo, FroAlocacao } from '../../../types/frotas'
-import { CATEGORIA_LABEL as CAT_LABELS } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL as CAT_LABELS, CATEGORIA_LABEL_ATIVAS } from '../../../constants/categoriaVeiculo'
 
 const ITEM_LABELS: Record<string, string> = {
   oleo_motor: 'Óleo', filtro_oleo: 'Filtro Óleo', filtro_ar: 'Filtro Ar',
@@ -84,7 +84,7 @@ export default function ChecklistsManutencao() {
         <select value={catFiltro} onChange={e => setCatFiltro(e.target.value)}
           className={`${inputCls} ${isLight ? '' : '[&>option]:bg-slate-900'}`}>
           <option value="">Todas categorias</option>
-          {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(CATEGORIA_LABEL_ATIVAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className={`flex rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
           <button onClick={() => setViewMode('table')}

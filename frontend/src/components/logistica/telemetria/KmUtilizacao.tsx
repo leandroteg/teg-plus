@@ -8,7 +8,7 @@ import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
 import type { FroVeiculo, FroAlocacao, CategoriaVeiculo } from '../../../types/frotas'
 import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
 
-import { CATEGORIA_LABEL } from '../../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL, CATEGORIA_LABEL_ATIVAS } from '../../../constants/categoriaVeiculo'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ export default function KmUtilizacao() {
         <input type="date" className={inputCls} value={fim} onChange={e => setFim(e.target.value)} title="Fim" />
         <select value={filtroCat} onChange={e => setFiltroCat(e.target.value as CategoriaVeiculo | 'todos')} className={inputCls}>
           <option value="todos">Todos tipos</option>
-          {Object.entries(CATEGORIA_LABEL).map(([k, v]) => (
+          {Object.entries(CATEGORIA_LABEL_ATIVAS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>

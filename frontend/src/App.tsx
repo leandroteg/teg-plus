@@ -184,6 +184,7 @@ const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
+const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 
 // SuperTEG AI Chat
@@ -481,6 +482,7 @@ export default function App() {
         <Route element={<AdminRoute />}>
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<Lazy><AdminUsuarios /></Lazy>} />
+            <Route path="/admin/politicas-aprovacao" element={<Lazy><PoliticasAprovacao /></Lazy>} />
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
           </Route>

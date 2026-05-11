@@ -2,17 +2,99 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
 // NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
 // Por isso NAO usamos PostgREST join -- fazemos duas queries separadas.
 const TABLE_APR = 'apr_aprovacoes'
 const TABLE_REQ = 'cmp_requisicoes'
 
+// ── IDs fixos das pessoas com papel especifico nas politicas ─────────────────
+// (carregados via apr_validadores_tecnicos para os tecnicos; aqui ficam apenas
+// os papeis com regra de pessoa fixa nas politicas atuais)
+const ID_LAUCIDIO = '98723949-73fa-4961-b032-3ef599464e2e'
+const ID_LEANDRO  = '1a530a02-9eec-4aa7-8bbc-7805895b1904'
+const ID_WELTON   = 'ca9b98a4-05bf-4a15-8234-54958c0e5b84'
+
+// ── Politica de visibilidade ────────────────────────────────────────────────
+
+interface UserCtx {
+  id?: string
+  email?: string
+  isAdmin: boolean
+  isDiretor: boolean
+}
+
+interface FiltroContext {
+  user: UserCtx
+  /** Validadores tecnicos por area (vindo de apr_validadores_tecnicos). */
+  validadoresTec: Map<string, string | null>  // area -> validador_id
+  /** Mapa codigo_categoria → area (vindo de cmp_categorias). */
+  categoriaArea: Map<string, string>  // categoria_codigo -> area_tecnica
+}
+
+/**
+ * Decide se o usuario atual pode ver/aprovar esta pendencia.
+ * Regras conforme politica TEG+:
+ *  - Admin ve tudo
+ *  - validacao tecnica RC: validador da area da categoria
+ *  - aprovacao_transporte: por enquanto, qualquer diretor (politica nao definida 100%)
+ *  - aprovacao_compras (cotacao): <= R$3k → Leandro/Welton · > R$3k → Laucidio
+ *  - solicitacao_adiantamento: qualquer diretor
+ *  - minuta_contratual / autorizacao_pagamento: apenas Laucidio
+ */
+function podeVerAprovacao(
+  apr: { tipo_aprovacao?: string; modulo?: string; entidade_id?: string },
+  req: Record<string, unknown> | undefined,
+  ctx: FiltroContext,
+): boolean {
+  // Admin ve tudo
+  if (ctx.user.isAdmin) return true
+
+  const tipo = apr.tipo_aprovacao
+  const uid = ctx.user.id
+
+  // Pessoa fixa: minutas e autorizacao_pagamento → apenas Laucidio
+  if (tipo === 'minuta_contratual' || tipo === 'autorizacao_pagamento') {
+    return uid === ID_LAUCIDIO
+  }
+
+  // Adiantamento → qualquer diretor
+  if (tipo === 'solicitacao_adiantamento') {
+    return ctx.user.isDiretor
+  }
+
+  // Aprovacao Compras (cotacao) → por valor
+  if (tipo === 'cotacao') {
+    const valor = Number((req?.valor_estimado as number | undefined) ?? 0)
+    if (valor <= 3000) return uid === ID_LEANDRO || uid === ID_WELTON
+    return uid === ID_LAUCIDIO
+  }
+
+  // Validacao tecnica de RC (requisicao_compra) → validador da area da categoria
+  if (tipo === 'requisicao_compra') {
+    const categoria = (req?.categoria as string | undefined) ?? ''
+    const area = ctx.categoriaArea.get(categoria)
+    if (!area) return false
+    const validadorId = ctx.validadoresTec.get(area)
+    return validadorId === uid
+  }
+
+  // Aprovacao de transporte → diretores (provisorio; politica final a definir)
+  if (tipo === 'aprovacao_transporte') {
+    return ctx.user.isDiretor
+  }
+
+  // Tipos desconhecidos: oculta
+  return false
+}
+
 // ── Aprovacoes Pendentes (multi-tipo) ──────────────────────────────────────────
 
 export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
+  const { perfil, isAdmin, perfilSetores } = useAuth()
   return useQuery<AprovacaoPendente[]>({
-    queryKey: ['aprovacoes-pendentes', tipo],
+    queryKey: ['aprovacoes-pendentes', tipo, perfil?.id],
     queryFn: async () => {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
@@ -32,6 +114,26 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
       if (aprError) throw aprError
       if (!aprData || aprData.length === 0) return []
+
+      // 1b. Busca contexto para aplicacao da politica
+      const isDiretor = (perfilSetores ?? []).some(s => s.ativo && s.papel === 'diretor')
+        || perfil?.role === 'diretor'
+
+      const [{ data: validadores }, { data: categorias }] = await Promise.all([
+        supabase.from('apr_validadores_tecnicos').select('area, validador_id'),
+        supabase.from('cmp_categorias').select('codigo, area_tecnica'),
+      ])
+
+      const ctx: FiltroContext = {
+        user: {
+          id: perfil?.id,
+          email: perfil?.email,
+          isAdmin,
+          isDiretor,
+        },
+        validadoresTec: new Map((validadores ?? []).map(v => [v.area as string, (v.validador_id as string) ?? null])),
+        categoriaArea: new Map((categorias ?? []).map(c => [c.codigo as string, c.area_tecnica as string])),
+      }
 
       // 2. Busca as requisicoes relacionadas pelos IDs (somente para tipo requisicao_compra / cotacao)
       const cmpIds = aprData
@@ -537,6 +639,12 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
+        // ── Aplica politica de visibilidade ─────────────────────────────────
+        .filter(a => podeVerAprovacao(
+          { tipo_aprovacao: a.tipo_aprovacao, modulo: a.modulo, entidade_id: a.entidade_id },
+          a.requisicao as unknown as Record<string, unknown> | undefined,
+          ctx,
+        ))
     },
     refetchInterval: 15_000,
     retry: 1,

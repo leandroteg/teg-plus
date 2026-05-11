@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "auditoria-html",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "7789", "--directory", "G:/Meu Drive/20_TEG UNIÃO/08 - Relatórios e Painéis"],
+      "port": 7789
+    },
+    {
       "name": "teg-frontend",
       "runtimeExecutable": "node",
       "runtimeArgs": ["C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],

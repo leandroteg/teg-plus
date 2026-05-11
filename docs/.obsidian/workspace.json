@@ -25,10 +25,14 @@
             "id": "7fe4d3337b96e7cc",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Visualização em gráfico"
+              "type": "markdown",
+              "state": {
+                "file": "obsidian/50 - Fluxos Inter-Módulos.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "50 - Fluxos Inter-Módulos"
             }
           }
         ],
@@ -223,6 +227,9 @@
   },
   "active": "7fe4d3337b96e7cc",
   "lastOpenFiles": [
+    "obsidian/07 - Schema Database.md",
+    "obsidian/03 - Páginas e Rotas.md",
+    "obsidian/00 - TEG+ INDEX.md",
     "obsidian/13 - Alçadas.md",
     "obsidian/02 - Frontend Stack.md",
     "obsidian/28 - Módulo Cadastros AI.md",
@@ -246,9 +253,6 @@
     "obsidian/Database/ADRs/ADR-008 - AI Parse Cotacoes.md",
     "obsidian/Database/ADRs/ADR-007 - Aprovacao Token.md",
     "obsidian/Database/ADRs/ADR-006 - Prefixos Schema.md",
-    "obsidian/Database/ADRs/ADR-005 - PWA AprovAi.md",
-    "obsidian/Database/ADRs/ADR-004 - Frontend SPA React.md",
-    "obsidian/Database/ADRs/ADR-003 - n8n Orquestrador.md",
     "obsidian/Database/ADRs",
     "obsidian/sedUAvgrk",
     "obsidian/sedBlhKPZ",

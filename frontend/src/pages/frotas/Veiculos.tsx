@@ -4,7 +4,7 @@ import { useVeiculos, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/api'
 import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo } from '../../types/frotas'
-import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
+import { CATEGORIA_LABEL, CATEGORIA_LABEL_ATIVAS } from '../../constants/categoriaVeiculo'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
@@ -172,7 +172,7 @@ function VeiculoModal({
           <div>
             <label className={lbl}>Categoria</label>
             <select className={sel} value={form.categoria} onChange={e => set('categoria', e.target.value as CategoriaVeiculo)}>
-              {Object.entries(CATEGORIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {Object.entries(CATEGORIA_LABEL_ATIVAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div>
@@ -322,7 +322,7 @@ export default function Veiculos() {
             }`}
           >
             <option value="">Todas</option>
-            {Object.entries(CATEGORIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(CATEGORIA_LABEL_ATIVAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
       </div>
