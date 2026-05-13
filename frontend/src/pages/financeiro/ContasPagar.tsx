@@ -611,7 +611,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
   const isPago = ['pago', 'conciliado'].includes(cp.status)
-  const canApprove = cp.status === 'confirmado'
+  const canApprove = cp.status === 'confirmado' || cp.status === 'aguardando_aprovacao'
   const canPay = cp.status === 'aprovado_pgto'
   const cfg = STATUS_CONFIG[cp.status]
 
