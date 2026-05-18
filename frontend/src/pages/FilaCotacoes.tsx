@@ -290,6 +290,26 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             )}
           </div>
 
+          {/* Arquivo de referência da requisição */}
+          {(cot.requisicao as any)?.arquivo_url && (
+            <a
+              href={(cot.requisicao as any).arquivo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border transition-colors ${
+                isDark
+                  ? 'bg-indigo-500/10 border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300'
+                  : 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100 text-indigo-700'
+              }`}
+            >
+              <FileText size={14} className="shrink-0" />
+              <span className="text-xs font-semibold flex-1 truncate">
+                {decodeURIComponent((cot.requisicao as any).arquivo_url.split('/').pop()?.replace(/^\d+-/, '') ?? 'Arquivo de referência')}
+              </span>
+              <Download size={13} className="shrink-0 opacity-60" />
+            </a>
+          )}
+
           {!concluida && <AlertaCotacoes valor={valor} regras={categoriaRegra} isDark={isDark} />}
 
           {/* Esclarecimento solicitado pelo aprovador — comprador responde aqui */}

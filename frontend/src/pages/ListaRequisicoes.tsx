@@ -91,6 +91,18 @@ function CompradorBadge({ nome, isDark }: { nome: string; isDark: boolean }) {
   )
 }
 
+function SolicitanteBadge({ nome, isDark }: { nome: string; isDark: boolean }) {
+  const bg = AVATAR_COLORS[nome.split(' ')[0]] ?? 'bg-slate-400'
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className={`w-5 h-5 rounded-full ${bg} flex items-center justify-center flex-shrink-0`}>
+        <span className="text-white text-[9px] font-extrabold">{nome.slice(0, 2).toUpperCase()}</span>
+      </div>
+      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nome.split(' ')[0]}</span>
+    </div>
+  )
+}
+
 // ── Export CSV ───────────────────────────────────────────────────────────────
 
 function exportCSV(items: Requisicao[], stageName: string) {
@@ -221,9 +233,10 @@ function ReqCard({ r, apr, isDark, onClick }: {
             </span>
           )}
         </div>
-        <span className={`text-xs flex-shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          {r.solicitante_nome.split(' ')[0]} · {fmtData(r.created_at)}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <SolicitanteBadge nome={r.solicitante_nome} isDark={isDark} />
+          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>· {fmtData(r.created_at)}</span>
+        </div>
       </div>
     </div>
   )
@@ -332,6 +345,26 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
               </div>
             )}
           </div>
+
+          {/* Arquivo de referência */}
+          {r.arquivo_url && (
+            <a
+              href={r.arquivo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border transition-colors ${
+                isDark
+                  ? 'bg-indigo-500/10 border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300'
+                  : 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100 text-indigo-700'
+              }`}
+            >
+              <FileText size={14} className="shrink-0" />
+              <span className="text-xs font-semibold flex-1 truncate">
+                {decodeURIComponent(r.arquivo_url.split('/').pop()?.replace(/^\d+-/, '') ?? 'Arquivo de referência')}
+              </span>
+              <Download size={13} className="shrink-0 opacity-60" />
+            </a>
+          )}
 
           {/* Justificativa de urgência */}
           {r.urgencia !== 'normal' && r.justificativa_urgencia && (

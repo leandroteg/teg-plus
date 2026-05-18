@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_N8N_WEBHOOK_URL: string
   readonly VITE_VAPID_PUBLIC_KEY: string
+  readonly VITE_APP_ENV?: string
 }
 
 interface ImportMeta {
