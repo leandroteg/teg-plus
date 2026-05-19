@@ -595,6 +595,46 @@ export function useReenviarAposDevolucao() {
   })
 }
 
+// ── Devolver RC para o solicitante editar (fluxo de aprovação) ───────────────
+
+export function useDevolverParaEdicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      motivo,
+      aprovadorNome,
+    }: {
+      requisicaoId: string
+      motivo: string
+      aprovadorNome: string
+    }) => {
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({
+          status: 'devolvida_solicitante',
+          devolucao_msg: motivo.trim(),
+          devolucao_por: aprovadorNome,
+          devolucao_em: new Date().toISOString(),
+        })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // Expira aprovações pendentes (não apaga — mantém histórico)
+      await supabase
+        .from('apr_aprovacoes')
+        .update({ status: 'expirada' })
+        .eq('entidade_id', requisicaoId)
+        .in('status', ['pendente', 'esclarecimento'])
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+    },
+  })
+}
+
 // ── Enviar RC aprovada para cotação ──────────────────────────────────────────
 
 export function useEnviarParaCotacao() {

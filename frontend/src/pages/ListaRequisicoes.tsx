@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
-import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
+import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao, useDevolverParaEdicao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -245,7 +245,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onAbrirDetalhe }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
@@ -254,12 +254,15 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onReenviar: (resposta: string, arquivo?: File) => void; isReenviando: boolean
   onEnviarCotacao: () => void; isEnviandoCotacao: boolean
   onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
+  onDevolver: (motivo: string) => void; isDevolvendoEdicao: boolean
   onAbrirDetalhe: () => void
 }) {
   const [observacao, setObservacao] = useState('')
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const [respostaDevolucao, setRespostaDevolucao] = useState('')
   const [respostaArquivo, setRespostaArquivo] = useState<File | null>(null)
+  const [showDevolverForm, setShowDevolverForm] = useState(false)
+  const [motivoDevolucao, setMotivoDevolucao] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
   const esclarecimentos = r.esclarecimento_historico?.length
@@ -556,6 +559,48 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
                   Aprovar
                 </button>
               </div>
+              {/* Devolver para edição */}
+              {!showDevolverForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDevolverForm(true)}
+                  className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    isDark ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <Undo2 size={13} /> Devolver para Edição
+                </button>
+              ) : (
+                <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-rose-500/20 bg-rose-500/5' : 'border-rose-200 bg-rose-50'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+                    Devolver para o solicitante editar
+                  </p>
+                  <UpperTextarea
+                    rows={2}
+                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
+                      isDark ? 'bg-white/5 border-rose-500/20 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-rose-500/30'
+                        : 'border-rose-200 focus:ring-2 focus:ring-rose-300'
+                    }`}
+                    placeholder="Motivo da devolução (ex: anexar planilha de referência)..."
+                    value={motivoDevolucao}
+                    onChange={e => setMotivoDevolucao(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setShowDevolverForm(false); setMotivoDevolucao('') }}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-slate-500 border border-slate-200 hover:bg-slate-100 transition">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDevolvendoEdicao || !motivoDevolucao.trim()}
+                      onClick={() => onDevolver(motivoDevolucao)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 border border-rose-500 transition disabled:opacity-50">
+                      {isDevolvendoEdicao ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}
+                      Devolver
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -636,6 +681,7 @@ export default function ListaRequisicoes() {
   const decisaoMutation = useDecisaoRequisicao()
   const reenviarMutation = useReenviarEsclarecimento()
   const reenviarDevolucaoMutation = useReenviarAposDevolucao()
+  const devolverEdicaoMutation = useDevolverParaEdicao()
   const enviarCotacaoMutation = useEnviarParaCotacao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -1029,6 +1075,24 @@ export default function ListaRequisicoes() {
             })
           }}
           isReenviandoDevolucao={reenviarDevolucaoMutation.isPending}
+          onDevolver={(motivo) => {
+            devolverEdicaoMutation.mutate({
+              requisicaoId: detail.id,
+              motivo,
+              aprovadorNome: perfil?.nome ?? 'Aprovador',
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Devolvida para o solicitante editar` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: 'Erro ao devolver a RC' })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isDevolvendoEdicao={devolverEdicaoMutation.isPending}
           onAbrirDetalhe={() => {
             setDetail(null)
             // Para RCs devolvidas, vai direto para modo edição; outras para o detalhe
