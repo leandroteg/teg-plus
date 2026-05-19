@@ -520,6 +520,21 @@ export function useAtualizarRequisicao() {
         if (insError) throw new Error(`Falha ao gravar itens: ${insError.message}`)
       }
 
+      // 3. Upload do arquivo de referência (se fornecido)
+      if (payload.arquivo_referencia) {
+        const safeName = sanitizeFileName(payload.arquivo_referencia.name)
+        const path = `requisicoes/${requisicaoId}/${Date.now()}-${safeName}`
+        const { error: uploadError } = await supabase.storage
+          .from('cotacoes-docs')
+          .upload(path, payload.arquivo_referencia, {
+            upsert: true,
+            contentType: payload.arquivo_referencia.type,
+          })
+        if (uploadError) throw new Error(`Falha ao enviar arquivo: ${uploadError.message}`)
+        const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+        await supabase.from(TABLE).update({ arquivo_url: publicUrl }).eq('id', requisicaoId)
+      }
+
       return { id: requisicaoId }
     },
     onSuccess: () => {
