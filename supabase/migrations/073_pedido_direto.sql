@@ -5,3 +5,6 @@ ALTER TABLE cmp_pedidos ADD COLUMN IF NOT EXISTS itens_direto JSONB;
 
 -- Marca/Fabricante por item de RC
 ALTER TABLE cmp_requisicao_itens ADD COLUMN IF NOT EXISTS marca VARCHAR(200);
+
+-- Planilha/arquivo de referência anexado pelo solicitante
+ALTER TABLE cmp_requisicoes ADD COLUMN IF NOT EXISTS arquivo_url TEXT;
