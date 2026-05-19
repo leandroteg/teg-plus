@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
-  ScrollText, Undo2,
+  ScrollText, Undo2, Printer,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao, useDevolverRequisicaoCotacao } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
@@ -23,6 +23,8 @@ import NumericInput from '../components/NumericInput'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import { joinFornecedorContato, splitFornecedorContato } from '../utils/fornecedorContato'
+import { getEmpresa, EMPRESA_FALLBACK } from '../services/empresa'
+import type { EmpresaData } from '../services/empresa'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -618,6 +620,193 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
   )
 }
 
+// ─── Solicitação de Cotação PDF ───────────────────────────────────────────────
+
+function buildSolicitacaoHtml(cotacao: Cotacao, EMPRESA: EmpresaData = EMPRESA_FALLBACK): string {
+  const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
+  const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+  const req = cotacao.requisicao
+  const itens = (req as any)?.itens ?? []
+  const hoje = new Date().toLocaleDateString('pt-BR')
+  const prazoResposta = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
+
+  const itensHtml = itens.map((item: any, i: number) => `
+    <tr>
+      <td style="text-align:center;color:#64748b">${i + 1}</td>
+      <td>${esc(item.descricao)}${item.marca ? `<br><span style="font-size:9px;color:#94a3b8">Marca ref.: ${esc(item.marca)}</span>` : ''}</td>
+      <td style="text-align:center">${item.quantidade}</td>
+      <td style="text-align:center">${esc(item.unidade)}</td>
+      <td style="text-align:right;color:#94a3b8;font-style:italic">${fmtBRL(item.valor_unitario_estimado)}</td>
+      <td style="border-bottom:1px solid #94a3b8;min-width:80px"> </td>
+      <td style="border-bottom:1px solid #94a3b8;min-width:90px"> </td>
+    </tr>
+  `).join('')
+
+  const enderecoLinha = [EMPRESA.endereco, EMPRESA.cidade, EMPRESA.uf].filter(Boolean).join(', ')
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Solicitacao de Cotacao - ${esc(req?.numero ?? '')}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Arial,Helvetica,sans-serif; color:#1e293b; font-size:12px; background:#fff; }
+  .page { max-width:820px; margin:0 auto; padding:30px 40px; }
+  .header { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; background:#1e293b; border-radius:12px; margin-bottom:22px; }
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .header-left img { height:52px; object-fit:contain; }
+  .company-name { font-size:12px; font-weight:700; color:#e2e8f0; }
+  .company-detail { font-size:10px; color:#94a3b8; margin-top:2px; }
+  .header-right { text-align:right; }
+  .doc-title { font-size:20px; font-weight:900; color:#2dd4bf; letter-spacing:-0.5px; }
+  .doc-sub { font-size:11px; color:#94a3b8; margin-top:3px; }
+  .doc-date { font-size:10px; color:#64748b; margin-top:5px; }
+  .section { margin-bottom:18px; }
+  .section-title { font-size:10px; font-weight:700; color:#0d9488; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; border-bottom:1.5px solid #e2e8f0; padding-bottom:4px; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; }
+  .field .label { font-size:9px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; }
+  .field .value { font-size:12px; font-weight:600; color:#1e293b; margin-top:1px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  thead th { background:#f1f5f9; color:#475569; font-weight:700; text-align:left; padding:7px 8px; border-bottom:2px solid #e2e8f0; font-size:9px; text-transform:uppercase; }
+  tbody td { padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .write-col { min-width:90px; border-bottom:1.5px solid #94a3b8 !important; background:#fafafa; }
+  .total-note { font-size:10px; color:#64748b; margin-top:6px; font-style:italic; }
+  .warn-box { background:#fffbeb; border:1.5px solid #fcd34d; border-radius:8px; padding:10px 14px; margin-bottom:16px; }
+  .warn-box p { font-size:11px; color:#92400e; }
+  .warn-box strong { color:#78350f; }
+  .supplier-box { border:1.5px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:16px; background:#f8fafc; }
+  .supplier-box .title { font-size:10px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+  .supplier-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .supplier-field { border-bottom:1px solid #94a3b8; padding-bottom:2px; min-height:20px; }
+  .supplier-label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; margin-bottom:2px; }
+  .conditions-box { border:1.5px solid #e2e8f0; border-radius:8px; padding:12px 14px; background:#f8fafc; }
+  .cond-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; }
+  .cond-field { border-bottom:1px solid #94a3b8; min-height:20px; padding-bottom:2px; }
+  .cond-label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; margin-bottom:2px; }
+  .footer { margin-top:28px; padding-top:14px; border-top:2px solid #e2e8f0; display:flex; justify-content:space-between; align-items:flex-end; font-size:9px; color:#94a3b8; }
+  .footer-sig { text-align:center; }
+  .footer-sig .sig-line { border-top:1px solid #94a3b8; width:180px; margin:0 auto 4px; padding-top:4px; }
+  @media print { .page { padding:20px 30px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Cabeçalho -->
+  <div class="header">
+    <div class="header-left">
+      <img src="${esc(EMPRESA.logoUrl)}" alt="Logo" onerror="this.style.display='none'" />
+      <div>
+        <div class="company-name">${esc(EMPRESA.fantasia || EMPRESA.razao)}</div>
+        <div class="company-detail">CNPJ: ${esc(EMPRESA.cnpj)}</div>
+        ${enderecoLinha ? `<div class="company-detail">${esc(enderecoLinha)}</div>` : ''}
+        ${EMPRESA.telefone ? `<div class="company-detail">Tel: ${esc(EMPRESA.telefone)}</div>` : ''}
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">SOLICITAÇÃO DE COTAÇÃO</div>
+      <div class="doc-sub">RC: <strong style="color:#e2e8f0">${esc(req?.numero ?? '—')}</strong></div>
+      <div class="doc-date">Emitido em: ${hoje} &nbsp;|&nbsp; Resp. até: <strong style="color:#fbbf24">${prazoResposta}</strong></div>
+    </div>
+  </div>
+
+  <!-- Aviso prazo -->
+  <div class="warn-box">
+    <p>Solicitamos gentilmente o envio da proposta comercial até <strong>${prazoResposta}</strong>.
+    Encaminhe para o comprador responsável com valores unitários, prazo de entrega e condição de pagamento.
+    Esta cotação não constitui compromisso de compra.</p>
+  </div>
+
+  <!-- Dados da RC -->
+  <div class="section">
+    <div class="section-title">Dados da Solicitação</div>
+    <div class="fields">
+      <div class="field"><div class="label">Obra / Local</div><div class="value">${esc(req?.obra_nome ?? '—')}</div></div>
+      <div class="field"><div class="label">Categoria</div><div class="value">${esc((req as any)?.categoria?.replace(/_/g,' ') ?? '—')}</div></div>
+      <div class="field"><div class="label">Descrição</div><div class="value">${esc(req?.descricao ?? '—')}</div></div>
+      <div class="field"><div class="label">Valor de referência (estimado)</div><div class="value" style="color:#0d9488;font-weight:900">${fmtBRL((req as any)?.valor_estimado)}</div></div>
+    </div>
+    ${req?.justificativa ? `<div style="margin-top:8px;background:#f0fdf4;border-radius:6px;padding:8px 10px;font-size:11px;color:#166534"><strong>Justificativa:</strong> ${esc(req.justificativa)}</div>` : ''}
+  </div>
+
+  <!-- Itens para cotar -->
+  <div class="section">
+    <div class="section-title">Itens para Cotação — preencha os campos em branco</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%">#</th>
+          <th style="width:38%">Descrição do Item</th>
+          <th style="width:8%">Qtd</th>
+          <th style="width:7%">Un</th>
+          <th style="width:13%">Vl. Ref. (est.)</th>
+          <th style="width:15%" class="write-col">Vl. Unit. (R$)</th>
+          <th style="width:15%" class="write-col">Total (R$)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itensHtml}
+        <tr style="background:#f1f5f9">
+          <td colspan="6" style="text-align:right;font-weight:700;font-size:11px;padding:8px">VALOR TOTAL DA PROPOSTA</td>
+          <td class="write-col" style="font-weight:900;font-size:13px"> </td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="total-note">* Valores de referência são estimativas internas. Preencha com seus valores reais.</p>
+  </div>
+
+  <!-- Dados do Fornecedor -->
+  <div class="supplier-box">
+    <div class="title">Dados do Fornecedor — preencher</div>
+    <div class="supplier-grid">
+      <div><div class="supplier-label">Razão Social / Nome</div><div class="supplier-field"> </div></div>
+      <div><div class="supplier-label">CNPJ / CPF</div><div class="supplier-field"> </div></div>
+      <div><div class="supplier-label">Contato / Vendedor</div><div class="supplier-field"> </div></div>
+      <div><div class="supplier-label">Telefone</div><div class="supplier-field"> </div></div>
+      <div><div class="supplier-label">E-mail</div><div class="supplier-field"> </div></div>
+      <div><div class="supplier-label">Cidade / UF</div><div class="supplier-field"> </div></div>
+    </div>
+  </div>
+
+  <!-- Condições Comerciais -->
+  <div class="conditions-box">
+    <div class="title" style="margin-bottom:8px">Condições Comerciais — preencher</div>
+    <div class="cond-grid">
+      <div><div class="cond-label">Prazo de Entrega (dias)</div><div class="cond-field"> </div></div>
+      <div><div class="cond-label">Condição de Pagamento</div><div class="cond-field"> </div></div>
+      <div><div class="cond-label">Validade da Proposta</div><div class="cond-field"> </div></div>
+      <div><div class="cond-label">Frete</div><div class="cond-field"> </div></div>
+    </div>
+    <div style="margin-top:10px"><div class="cond-label">Observações / Condições especiais</div><div style="border-bottom:1px solid #94a3b8;min-height:28px"> </div></div>
+  </div>
+
+  <!-- Rodapé -->
+  <div class="footer">
+    <div>
+      <div>${esc(EMPRESA.fantasia || EMPRESA.razao)} · CNPJ ${esc(EMPRESA.cnpj)}</div>
+      ${EMPRESA.email ? `<div>E-mail: ${esc(EMPRESA.email)}</div>` : ''}
+    </div>
+    <div class="footer-sig">
+      <div class="sig-line"></div>
+      <div>Assinatura e carimbo do fornecedor</div>
+      <div style="margin-top:6px">Data: ___/___/______</div>
+    </div>
+  </div>
+
+</div>
+</body></html>`
+}
+
+async function gerarSolicitacaoCotacao(cotacao: Cotacao) {
+  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+  const html = buildSolicitacaoHtml(cotacao, empresa)
+  const win = window.open('', '_blank')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  setTimeout(() => win.print(), 600)
+}
+
 export default function CotacaoForm() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
@@ -1211,11 +1400,23 @@ export default function CotacaoForm() {
           </div>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={() => nav('/cotacoes')} className="p-1">
-          <ChevronLeft size={18} className="text-slate-500" />
-        </button>
-        <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => nav('/cotacoes')} className="p-1">
+            <ChevronLeft size={18} className="text-slate-500" />
+          </button>
+          <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
+        </div>
+        {cotacao && (
+          <button
+            type="button"
+            onClick={() => gerarSolicitacaoCotacao(cotacao)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
+          >
+            <Printer size={13} />
+            Solicitar Cotação
+          </button>
+        )}
       </div>
 
       <fieldset disabled={isLocked} className={isLocked ? 'space-y-4 opacity-60' : 'space-y-4'}>
