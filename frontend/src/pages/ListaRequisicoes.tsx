@@ -522,7 +522,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
                   onChange={e => setRespostaArquivo(e.target.files?.[0] ?? null)} />
               </label>
               <button
-                disabled={isReenviando || !respostaEsclarecimento.trim()}
+                disabled={isReenviando || (!respostaEsclarecimento.trim() && !respostaArquivo)}
                 onClick={() => onReenviar(respostaEsclarecimento, respostaArquivo ?? undefined)}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 border border-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
                 {isReenviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
