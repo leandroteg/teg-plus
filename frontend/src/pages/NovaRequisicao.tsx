@@ -6,7 +6,7 @@ import {
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
   Package, MapPin, Zap, Save, ExternalLink, Download,
 } from 'lucide-react'
-import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
+import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
@@ -111,6 +111,7 @@ export default function NovaRequisicao() {
   const mutation = useCriarRequisicao()
   const updateMutation = useAtualizarRequisicao()
   const reenviarDevolucaoMutation = useReenviarAposDevolucao()
+  const reenviarEsclarecimentoMutation = useReenviarEsclarecimento()
   const { data: reqExistente, isLoading: reqLoading } = useRequisicao(editId)
   const isDevolvidaEdit = isEditMode && reqExistente?.status === 'devolvida_solicitante'
   const aiParse = useAiParse()
@@ -474,6 +475,15 @@ export default function NovaRequisicao() {
             requisicaoId: editId,
             requisicaoNumero: reqExistente.numero,
             solicitanteNome: perfil?.nome ?? reqExistente.solicitante_nome,
+          })
+          nav('/requisicoes')
+        } else if (reqExistente.status === 'em_esclarecimento') {
+          await reenviarEsclarecimentoMutation.mutateAsync({
+            requisicaoId: editId,
+            requisicaoNumero: reqExistente.numero,
+            alcadaNivel: reqExistente.alcada_nivel,
+            solicitanteNome: perfil?.nome ?? reqExistente.solicitante_nome,
+            statusAtual: reqExistente.status,
           })
           nav('/requisicoes')
         } else {
