@@ -25,6 +25,7 @@ const emptyItem = (): RequisicaoItem => ({
   quantidade: 1,
   unidade: 'un',
   valor_unitario_estimado: 0,
+  marca: '',
   destino_operacional: 'estoque',
 })
 
@@ -232,6 +233,7 @@ export default function NovaRequisicao() {
         quantidade: it.quantidade ?? 1,
         unidade: it.unidade ?? 'un',
         valor_unitario_estimado: it.valor_unitario_estimado ?? 0,
+        marca: (it as any).marca ?? undefined,
         est_item_id: (it as any).est_item_id ?? undefined,
         est_item_codigo: (it as any).est_item_codigo ?? undefined,
         classe_financeira_id: (it as any).classe_financeira_id ?? undefined,
@@ -265,6 +267,7 @@ export default function NovaRequisicao() {
         valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
           ? item.valor_unitario_estimado
           : parseFloat(String(item.valor_unitario_estimado)) || 0,
+        marca: item.marca ? toUpperNorm(String(item.marca).trim()) : undefined,
       }))
       .filter(item => item.descricao.length > 0)
   , [])
@@ -945,6 +948,15 @@ export default function NovaRequisicao() {
               }}
               categoriaRC={categoria?.codigo ?? ''}
             />
+            <div>
+              <label className="text-[10px] text-slate-400">Marca / Fabricante</label>
+              <input
+                className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none uppercase"
+                placeholder="Ex: TRAMONTINA, SCHNEIDER..."
+                value={item.marca ?? ''}
+                onChange={e => updateItem(idx, 'marca', e.target.value.toUpperCase())}
+              />
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>

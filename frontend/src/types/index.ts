@@ -65,6 +65,9 @@ export interface Pedido {
   liberado_pagamento_em?: string
   liberado_pagamento_por?: string
   pago_em?: string
+  sem_cotacao?: boolean
+  justificativa_sem_cotacao?: string
+  itens_direto?: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario: number }>
   // Joins
   requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'> & {
     itens?: Pick<RequisicaoItem, 'descricao' | 'quantidade' | 'unidade' | 'valor_unitario_estimado'>[]
@@ -86,6 +89,7 @@ export interface RequisicaoItem {
   quantidade: number
   unidade: string
   valor_unitario_estimado: number
+  marca?: string
   est_item_id?: string
   est_item_codigo?: string
   classe_financeira_id?: string

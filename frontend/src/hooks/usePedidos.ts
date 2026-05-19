@@ -17,7 +17,7 @@ export function usePedidos(status?: string) {
           nf_numero, observacoes, created_at, updated_at, criado_por_nome, atualizado_por_nome,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
-          condicao_pagamento, parcelas_preview,
+          condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
           comprador:cmp_compradores(nome)
         `)
@@ -451,6 +451,92 @@ export function useCancelarRequisicao() {
       qc.invalidateQueries({ queryKey: ['cotacoes'] })
       qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export interface PedidoDiretoPayload {
+  fornecedorNome: string
+  fornecedorId?: string
+  valorTotal: number
+  itens: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario: number }>
+  obraId?: string
+  obraNome?: string
+  centroCusto?: string
+  centroCustoId?: string
+  classeFinanceira?: string
+  classeFinanceiraId?: string
+  condicaoPagamento?: string
+  dataPrevistaEntrega?: string
+  justificativaSemCotacao: string
+  observacoes?: string
+  compradorId?: string
+}
+
+export function useEmitirPedidoDireto() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+
+  return useMutation({
+    mutationFn: async (payload: PedidoDiretoPayload) => {
+      const now = new Date()
+      const prefix = `PC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+
+      const { data: lastPedido } = await supabase
+        .from('cmp_pedidos')
+        .select('numero_pedido')
+        .like('numero_pedido', `${prefix}%`)
+        .order('numero_pedido', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let nextSeq = 1
+      if (lastPedido?.numero_pedido) {
+        const parts = lastPedido.numero_pedido.split('-')
+        const lastNum = parseInt(parts[parts.length - 1], 10)
+        if (!Number.isNaN(lastNum)) nextSeq = lastNum + 1
+      }
+      const numeroPedido = `${prefix}-${String(nextSeq).padStart(5, '0')}`
+
+      const parcelasResolvidas = gerarPreviaParcelas(
+        payload.valorTotal,
+        payload.condicaoPagamento || '',
+        payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+      )
+
+      const { data: pedido, error } = await supabase
+        .from('cmp_pedidos')
+        .insert({
+          numero_pedido: numeroPedido,
+          fornecedor_nome: payload.fornecedorNome,
+          fornecedor_id: payload.fornecedorId || null,
+          valor_total: payload.valorTotal,
+          status: 'emitido',
+          data_pedido: now.toISOString().split('T')[0],
+          data_prevista_entrega: payload.dataPrevistaEntrega || null,
+          condicao_pagamento: payload.condicaoPagamento || null,
+          centro_custo: payload.centroCusto || null,
+          centro_custo_id: payload.centroCustoId || null,
+          classe_financeira: payload.classeFinanceira || null,
+          classe_financeira_id: payload.classeFinanceiraId || null,
+          observacoes: payload.observacoes || null,
+          comprador_id: payload.compradorId || null,
+          parcelas_preview: parcelasResolvidas,
+          sem_cotacao: true,
+          justificativa_sem_cotacao: payload.justificativaSemCotacao,
+          itens_direto: payload.itens.length > 0 ? payload.itens : null,
+          criado_por_nome: perfil?.nome ?? null,
+        })
+        .select('id, numero_pedido')
+        .single()
+
+      if (error) throw new Error(error.message)
+
+      return pedido
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

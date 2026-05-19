@@ -237,11 +237,10 @@ async function matchCatalogItems(result: AiParseResult, categoriaCodigo?: string
         est_item_id: best.id,
         est_item_codigo: best.codigo,
       })
-    } else if (!categoriaCodigo) {
-      // Sem filtro de categoria: mantém item mesmo sem match no catálogo
+    } else {
+      // Sem match no catálogo: mantém o item original (com ou sem filtro de categoria)
       matchedItens.push(item)
     }
-    // Com filtro de categoria: ignora itens sem cadastro
   }
 
   const matchCount = matchedItens.length
@@ -274,22 +273,19 @@ async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mi
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   const filtroCategoria = categoriaFiltro
-    ? `\n\nATENÇÃO — FILTRO ESTRITO DE CATEGORIA:
-A requisição é da categoria "${categoriaFiltro.nome}".
-Inclua no array "itens" SOMENTE produtos/serviços diretamente relacionados a esta categoria.
-Se nenhum item do documento pertencer a esta categoria, retorne "itens": [].
-É PROIBIDO incluir itens de outras categorias mesmo que estejam no documento.`
+    ? `\n\nCONTEXTO DE CATEGORIA: A requisição é da categoria "${categoriaFiltro.nome}". Extraia TODOS os itens do documento, independentemente da categoria. Informe a categoria de cada item no campo "categoria_item" se desejar.`
     : ''
 
   const prompt = `Analise este documento (cotação, proposta comercial, lista de materiais ou similar) e extraia os itens para uma requisição de compra.
 
 Retorne SOMENTE JSON válido (sem markdown, sem blocos de código) no formato:
-{"itens":[{"descricao":"descrição completa do item","quantidade":1,"unidade":"un","valor_unitario_estimado":0.00}],"obra_sugerida":"","urgencia_sugerida":"normal","categoria_sugerida":"consumo","justificativa_sugerida":"","confianca":0.85,"fornecedor_nome":"","fornecedor_cnpj":"","condicao_pagamento":"","validade_proposta":""}
+{"itens":[{"descricao":"descrição do item SEM marca/fabricante","quantidade":1,"unidade":"un","valor_unitario_estimado":0.00,"marca":"nome da marca ou fabricante se houver"}],"obra_sugerida":"","urgencia_sugerida":"normal","categoria_sugerida":"consumo","justificativa_sugerida":"","confianca":0.85,"fornecedor_nome":"","fornecedor_cnpj":"","condicao_pagamento":"","validade_proposta":""}
 
 Regras:
 - Unidades: un, par, jg, kg, ton, m, m², m³, L, pc, cx, rl, hr, vb
 - Se o valor unitário não estiver claro, use 0
 - Se for proposta com valor total por item, calcule o unitário dividindo pela quantidade
+- IMPORTANTE: coloque a marca/fabricante no campo "marca", NÃO na descrição
 - categoria_sugerida: eletrico|civil|ferramentas|epi|servicos|consumo${filtroCategoria}
 ${textoExtra ? '\nContexto: ' + textoExtra : ''}
 Nome do arquivo: ${arquivo.nome}`
@@ -397,6 +393,7 @@ Nome do arquivo: ${arquivo.nome}`
       quantidade: Number(item.qtd || item.quantidade || 1),
       unidade: String(item.unidade || 'un').toLowerCase(),
       valor_unitario_estimado: Number(item.valor_unit || item.valor_unitario || item.valor_unitario_estimado || 0),
+      marca: item.marca ? String(item.marca).trim() : undefined,
     })).filter(i => i.descricao.length > 1)
 
     const joined = itens.map(i => i.descricao).join(' ').toLowerCase()

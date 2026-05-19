@@ -412,6 +412,16 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
           <p className="text-xs text-slate-400">{req?.obra_nome}</p>
           <p className="text-sm font-extrabold text-teal-600">{fmt(cotacao.valor_selecionado ?? req?.valor_estimado ?? 0)}</p>
         </div>
+        {(req as any)?.arquivo_url && (
+          <a
+            href={(req as any).arquivo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition"
+          >
+            <Paperclip size={12} /> Planilha de referência do solicitante
+          </a>
+        )}
       </div>
 
       {/* Timeline */}

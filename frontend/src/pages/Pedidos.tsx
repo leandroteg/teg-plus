@@ -7,6 +7,7 @@ import {
   ClipboardList, ShieldCheck, BoxIcon, CreditCard, ArchiveIcon,
   Building2, Link2, RefreshCw, UserPlus,
   Tag, Briefcase, Hash, Calendar, Receipt, CheckCircle2, ChevronDown, ChevronUp,
+  ShoppingCart,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
@@ -18,6 +19,7 @@ import {
   useEmitirPedido,
   type ImpostoPayload,
 } from '../hooks/usePedidos'
+import PedidoDiretoModal from '../components/PedidoDiretoModal'
 import { useCadFornecedores } from '../hooks/useCadastros'
 import { useCotacoes } from '../hooks/useCotacoes'
 import {
@@ -1466,6 +1468,11 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
               <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                 {getDisplayNumber(pedido)}
               </span>
+              {pedido.sem_cotacao && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
+                  <ShoppingCart size={8} />SEM COTAÇÃO
+                </span>
+              )}
               {pedido.requisicao?.numero && (
                 <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                   <Hash size={8} />{pedido.requisicao.numero}
@@ -2270,6 +2277,7 @@ export default function Pedidos() {
   const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
   const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
   const [receberPedido, setReceberPedido]           = useState<Pedido | null>(null)
+  const [showPedidoDireto, setShowPedidoDireto]     = useState(false)
   const [toast, setToast]                           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
 
@@ -2456,6 +2464,13 @@ export default function Pedidos() {
           <Truck size={18} className="text-teal-500" />
           Pedidos
         </h2>
+        <button
+          onClick={() => setShowPedidoDireto(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm shadow-orange-500/20 transition-colors"
+        >
+          <ShoppingCart size={13} />
+          Pedido Direto
+        </button>
       </div>
 
       {/* Pipeline tabs */}
@@ -2605,9 +2620,16 @@ export default function Pedidos() {
                       {fmt(p.valor_total)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st2.bgDark + ' ' + st2.textDark : st2.bg + ' ' + st2.text}`}>
-                        {st2.label}
-                      </span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st2.bgDark + ' ' + st2.textDark : st2.bg + ' ' + st2.text}`}>
+                          {st2.label}
+                        </span>
+                        {p.sem_cotacao && (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
+                            S/ COT.
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className={`px-3 py-2.5 ${atr ? 'text-red-500 font-semibold' : dark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {pending ? 'Cotacao aprovada' : fmtDataISO(p.data_prevista_entrega)}
@@ -2655,6 +2677,13 @@ export default function Pedidos() {
       {receberPedido && (
         <RecebimentoModal pedido={receberPedido} onClose={() => setReceberPedido(null)} />
       )}
+
+      {/* Pedido Direto modal */}
+      <PedidoDiretoModal
+        open={showPedidoDireto}
+        onClose={() => setShowPedidoDireto(false)}
+        onSuccess={num => { setShowPedidoDireto(false); showToast('success', `Pedido ${num} emitido com sucesso!`) }}
+      />
     </div>
   )
 }

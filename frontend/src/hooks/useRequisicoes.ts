@@ -266,6 +266,7 @@ export function useCriarRequisicao() {
             quantidade:               item.quantidade,
             unidade:                  item.unidade || 'un',
             valor_unitario_estimado:  item.valor_unitario_estimado ?? 0,
+            marca:                    item.marca || null,
             est_item_id:              item.est_item_id || null,
             est_item_codigo:          item.est_item_codigo || null,
             classe_financeira_id:     item.classe_financeira_id || null,
@@ -502,6 +503,7 @@ export function useAtualizarRequisicao() {
           quantidade:               item.quantidade,
           unidade:                  item.unidade || 'un',
           valor_unitario_estimado:  item.valor_unitario_estimado ?? 0,
+          marca:                    item.marca || null,
           est_item_id:              item.est_item_id || null,
           est_item_codigo:          item.est_item_codigo || null,
           classe_financeira_id:     item.classe_financeira_id || null,
@@ -673,7 +675,7 @@ export function useRequisicao(id?: string) {
           created_at, esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           comprador:cmp_compradores(nome, email),
           itens:cmp_requisicao_itens(
-            id, descricao, quantidade, unidade, valor_unitario_estimado,
+            id, descricao, quantidade, unidade, valor_unitario_estimado, marca,
             est_item_id, est_item_codigo,
             classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
             categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
