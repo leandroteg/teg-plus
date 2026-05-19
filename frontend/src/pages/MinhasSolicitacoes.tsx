@@ -278,10 +278,12 @@ function SolicitacaoCard({
   const jaUrgente = item.urgencia_flag === 'urgente' || item.urgencia_flag === 'critica' || item.urgencia_flag === 'alta'
   const ago = timeAgo(item.updated_at ?? item.created_at)
   const isDevolvida = item.status === 'devolvida_solicitante'
+  const isEsclarecimento = item.status === 'em_esclarecimento'
+  const precisaAcao = isDevolvida || isEsclarecimento
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-shadow p-4 ${
-      isDevolvida ? 'border-rose-200 ring-1 ring-rose-100' : 'border-slate-100'
+      precisaAcao ? 'border-rose-200 ring-1 ring-rose-100' : 'border-slate-100'
     }`}>
       <div className="flex items-start gap-3">
         {/* Módulo icon */}
@@ -325,19 +327,22 @@ function SolicitacaoCard({
         </div>
       </div>
 
-      {/* Aviso de devolução */}
-      {isDevolvida && (
+      {/* Aviso de ação necessária */}
+      {precisaAcao && (
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5">
           <AlertTriangle size={13} className="text-rose-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-rose-700 font-medium leading-snug">
-            Sua solicitação foi devolvida para edição. Clique em <strong>Editar e Reenviar</strong> para corrigi-la.
+            {isDevolvida
+              ? <>Sua solicitação foi devolvida para edição. Clique em <strong>Editar e Reenviar</strong> para corrigi-la.</>
+              : <>Foi solicitado um esclarecimento. Clique em <strong>Editar e Reenviar</strong> para completar e reenviar.</>
+            }
           </p>
         </div>
       )}
 
       {/* Action buttons */}
       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
-        {isDevolvida && item.modulo === 'compras' ? (
+        {precisaAcao && item.modulo === 'compras' ? (
           <button
             onClick={() => navigate(`/requisicoes/${item.id}/editar`)}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors"
@@ -354,7 +359,7 @@ function SolicitacaoCard({
             Consultar andamento
           </button>
         )}
-        {!encerrada && !isDevolvida && item.modulo !== 'financeiro' && (
+        {!encerrada && !precisaAcao && item.modulo !== 'financeiro' && (
           <button
             onClick={() => onUrgencia(item)}
             disabled={jaUrgente}
