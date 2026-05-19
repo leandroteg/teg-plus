@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ClipboardList, Eye, Zap, X, AlertTriangle,
   CheckCircle2, Package, ShoppingCart, Truck, DollarSign,
-  Clock, Filter,
+  Clock, Filter, Pencil,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -98,6 +98,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   planejado:           { label: 'Planejado',          cls: 'bg-indigo-100 text-indigo-700' },
   em_transito:         { label: 'Em trânsito',        cls: 'bg-sky-100 text-sky-700' },
   em_esclarecimento:   { label: 'Em esclarecimento',  cls: 'bg-orange-100 text-orange-700' },
+  devolvida_solicitante: { label: 'Devolvida — editar', cls: 'bg-rose-100 text-rose-700' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -276,9 +277,12 @@ function SolicitacaoCard({
   const encerrada = isEncerrada(item)
   const jaUrgente = item.urgencia_flag === 'urgente' || item.urgencia_flag === 'critica' || item.urgencia_flag === 'alta'
   const ago = timeAgo(item.updated_at ?? item.created_at)
+  const isDevolvida = item.status === 'devolvida_solicitante'
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-4">
+    <div className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-shadow p-4 ${
+      isDevolvida ? 'border-rose-200 ring-1 ring-rose-100' : 'border-slate-100'
+    }`}>
       <div className="flex items-start gap-3">
         {/* Módulo icon */}
         <div className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${mod.bg}`}>
@@ -321,16 +325,36 @@ function SolicitacaoCard({
         </div>
       </div>
 
+      {/* Aviso de devolução */}
+      {isDevolvida && (
+        <div className="mt-3 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5">
+          <AlertTriangle size={13} className="text-rose-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-rose-700 font-medium leading-snug">
+            Sua solicitação foi devolvida para edição. Clique em <strong>Editar e Reenviar</strong> para corrigi-la.
+          </p>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
-        <button
-          onClick={() => navigate(mod.detalhePath(item.id))}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
-        >
-          <Eye size={13} className="text-slate-400" />
-          Consultar andamento
-        </button>
-        {!encerrada && item.modulo !== 'financeiro' && (
+        {isDevolvida && item.modulo === 'compras' ? (
+          <button
+            onClick={() => navigate(`/requisicoes/${item.id}/editar`)}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors"
+          >
+            <Pencil size={13} />
+            Editar e Reenviar
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate(mod.detalhePath(item.id))}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
+          >
+            <Eye size={13} className="text-slate-400" />
+            Consultar andamento
+          </button>
+        )}
+        {!encerrada && !isDevolvida && item.modulo !== 'financeiro' && (
           <button
             onClick={() => onUrgencia(item)}
             disabled={jaUrgente}
