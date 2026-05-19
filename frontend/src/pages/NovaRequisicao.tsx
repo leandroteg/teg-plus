@@ -729,6 +729,15 @@ export default function NovaRequisicao() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
+                  {!isEditMode && (
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); handleAiParse(referenciaFile, categoria ? { codigo: categoria.codigo, nome: categoria.nome } : undefined) }}
+                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+                    >
+                      <Sparkles size={12} /> Extrair itens com IA
+                    </button>
+                  )}
                   <a
                     href={URL.createObjectURL(referenciaFile)}
                     target="_blank"
