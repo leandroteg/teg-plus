@@ -4,8 +4,9 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2, Send, PackageCheck, Undo2,
+  Loader2, Send, PackageCheck, Undo2, Paperclip,
 } from 'lucide-react'
+import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
 import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
@@ -250,7 +251,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
   isProcessing: boolean
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
-  onReenviar: (resposta: string) => void; isReenviando: boolean
+  onReenviar: (resposta: string, arquivo?: File) => void; isReenviando: boolean
   onEnviarCotacao: () => void; isEnviandoCotacao: boolean
   onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
   onAbrirDetalhe: () => void
@@ -258,6 +259,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   const [observacao, setObservacao] = useState('')
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const [respostaDevolucao, setRespostaDevolucao] = useState('')
+  const [respostaArquivo, setRespostaArquivo] = useState<File | null>(null)
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
   const esclarecimentos = r.esclarecimento_historico?.length
@@ -496,9 +498,29 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
                 value={respostaEsclarecimento}
                 onChange={e => setRespostaEsclarecimento(e.target.value)}
               />
+              {/* Anexo de arquivo */}
+              <label className={`flex items-center gap-2 rounded-xl px-3 py-2.5 cursor-pointer border transition-colors ${
+                respostaArquivo
+                  ? isDark ? 'bg-violet-500/10 border-violet-500/30 text-violet-300' : 'bg-violet-50 border-violet-200 text-violet-700'
+                  : isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:border-amber-500/30' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-amber-300'
+              }`}>
+                <Paperclip size={13} className="shrink-0" />
+                <span className="text-xs font-medium flex-1 truncate">
+                  {respostaArquivo ? respostaArquivo.name : 'Anexar planilha ou documento (opcional)'}
+                </span>
+                {respostaArquivo && (
+                  <button type="button" onClick={e => { e.preventDefault(); setRespostaArquivo(null) }}
+                    className="shrink-0 text-slate-400 hover:text-red-500 transition">
+                    <X size={13} />
+                  </button>
+                )}
+                <input type="file" className="hidden"
+                  accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={e => setRespostaArquivo(e.target.files?.[0] ?? null)} />
+              </label>
               <button
                 disabled={isReenviando || !respostaEsclarecimento.trim()}
-                onClick={() => onReenviar(respostaEsclarecimento)}
+                onClick={() => onReenviar(respostaEsclarecimento, respostaArquivo ?? undefined)}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 border border-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
                 {isReenviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 Reenviar para Aprovacao
@@ -955,7 +977,19 @@ export default function ListaRequisicoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
-          onReenviar={(resposta) => {
+          onReenviar={async (resposta, arquivo) => {
+            // Upload do arquivo de referência antes de reenviar
+            if (arquivo) {
+              try {
+                const safeName = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+                const path = `requisicoes/${detail.id}/${Date.now()}-${safeName}`
+                const { error: upErr } = await supabase.storage.from('cotacoes-docs').upload(path, arquivo, { upsert: false })
+                if (!upErr) {
+                  const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+                  await supabase.from('cmp_requisicoes').update({ arquivo_url: publicUrl }).eq('id', detail.id)
+                }
+              } catch { /* silencioso — reenvio segue mesmo sem o arquivo */ }
+            }
             reenviarMutation.mutate({
               requisicaoId: detail.id,
               requisicaoNumero: detail.numero,
