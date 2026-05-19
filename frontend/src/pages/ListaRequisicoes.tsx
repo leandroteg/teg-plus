@@ -1024,17 +1024,28 @@ export default function ListaRequisicoes() {
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
           onReenviar={async (resposta, arquivo) => {
-            // Upload do arquivo de referência antes de reenviar
             if (arquivo) {
               try {
                 const safeName = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
                 const path = `requisicoes/${detail.id}/${Date.now()}-${safeName}`
                 const { error: upErr } = await supabase.storage.from('cotacoes-docs').upload(path, arquivo, { upsert: false })
-                if (!upErr) {
-                  const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
-                  await supabase.from('cmp_requisicoes').update({ arquivo_url: publicUrl }).eq('id', detail.id)
+                if (upErr) {
+                  setToast({ type: 'error', msg: `Falha ao enviar o arquivo: ${upErr.message}` })
+                  setTimeout(() => setToast(null), 6000)
+                  return
                 }
-              } catch { /* silencioso — reenvio segue mesmo sem o arquivo */ }
+                const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+                const { error: urlErr } = await supabase.from('cmp_requisicoes').update({ arquivo_url: publicUrl }).eq('id', detail.id)
+                if (urlErr) {
+                  setToast({ type: 'error', msg: `Arquivo enviado mas não vinculado: ${urlErr.message}` })
+                  setTimeout(() => setToast(null), 6000)
+                  return
+                }
+              } catch (e: any) {
+                setToast({ type: 'error', msg: `Erro no upload: ${e?.message ?? 'desconhecido'}` })
+                setTimeout(() => setToast(null), 6000)
+                return
+              }
             }
             reenviarMutation.mutate({
               requisicaoId: detail.id,
