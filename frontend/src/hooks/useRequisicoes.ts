@@ -499,18 +499,10 @@ export function useAtualizarRequisicao() {
 
       if (reqError) throw new Error(reqError.message)
 
-      // 2. Substitui itens (delete-all + insert). Seguro porque status editáveis
-      //    nunca têm cotações/pedidos referenciando os itens.
-      const { error: delError } = await supabase
-        .from('cmp_requisicao_itens')
-        .delete()
-        .eq('requisicao_id', requisicaoId)
-      if (delError) throw new Error(`Falha ao limpar itens antigos: ${delError.message}`)
-
+      // 2. Substitui itens via RPC (SECURITY DEFINER contorna RLS do DELETE)
       const itensNovos = payload.itens
         .filter(i => i.descricao?.trim())
         .map(item => ({
-          requisicao_id:            requisicaoId,
           descricao:                item.descricao,
           quantidade:               item.quantidade,
           unidade:                  item.unidade || 'un',
@@ -525,12 +517,11 @@ export function useAtualizarRequisicao() {
           categoria_financeira_descricao: item.categoria_financeira_descricao || null,
           destino_operacional:      item.destino_operacional || 'estoque',
         }))
-      if (itensNovos.length > 0) {
-        const { error: insError } = await supabase
-          .from('cmp_requisicao_itens')
-          .insert(itensNovos)
-        if (insError) throw new Error(`Falha ao gravar itens: ${insError.message}`)
-      }
+      const { error: rpcError } = await supabase.rpc('replace_requisicao_itens', {
+        p_requisicao_id: requisicaoId,
+        p_itens: itensNovos,
+      })
+      if (rpcError) throw new Error(`Falha ao substituir itens: ${rpcError.message}`)
 
       // 3. Upload do arquivo de referência (se fornecido)
       if (payload.arquivo_referencia) {
