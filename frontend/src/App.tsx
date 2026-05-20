@@ -467,9 +467,10 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="compras" />}>
             <Route element={<Layout />}>
               <Route path="/compras"     element={<LazyDash><Dashboard /></LazyDash>} />
-              <Route path="/nova"        element={<Lazy><NovaRequisicao /></Lazy>} />
-              <Route path="/requisicoes" element={<Lazy><ListaRequisicoes /></Lazy>} />
-              <Route path="/requisicoes/:id" element={<Lazy><RequisicaoDetalhe /></Lazy>} />
+              <Route path="/nova"             element={<Lazy><NovaRequisicao /></Lazy>} />
+              <Route path="/requisicoes"      element={<Lazy><ListaRequisicoes /></Lazy>} />
+              <Route path="/requisicoes/nova" element={<Lazy><NovaRequisicao /></Lazy>} />
+              <Route path="/requisicoes/:id"  element={<Lazy><RequisicaoDetalhe /></Lazy>} />
               <Route path="/requisicoes/:id/editar" element={<Lazy><NovaRequisicao /></Lazy>} />
               <Route path="/cotacoes"    element={<Lazy><FilaCotacoes /></Lazy>} />
               <Route path="/cotacoes/:id" element={<Lazy><CotacaoForm /></Lazy>} />

@@ -433,7 +433,7 @@ export default function MinhasSolicitacoes({
             </div>
           </div>
           <button
-            onClick={() => navigate('/nova')}
+            onClick={() => navigate('/requisicoes/nova')}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
           >
             <Plus size={14} />
@@ -483,7 +483,7 @@ export default function MinhasSolicitacoes({
               </p>
             </div>
             <button
-              onClick={() => navigate('/nova')}
+              onClick={() => navigate('/requisicoes/nova')}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
             >
               <Plus size={14} />
