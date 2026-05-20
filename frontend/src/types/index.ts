@@ -103,6 +103,7 @@ export interface RequisicaoItem {
 export interface Requisicao {
   id: string
   numero: string
+  solicitante_id?: string
   solicitante_nome: string
   obra_nome: string
   obra_id?: string

@@ -487,6 +487,13 @@ export default function NovaRequisicao() {
             statusAtual: reqExistente.status,
           })
           nav('/requisicoes')
+        } else if (reqExistente.status === 'aprovada') {
+          await reenviarDevolucaoMutation.mutateAsync({
+            requisicaoId: editId,
+            requisicaoNumero: reqExistente.numero,
+            solicitanteNome: perfil?.nome ?? reqExistente.solicitante_nome,
+          })
+          nav('/requisicoes')
         } else {
           nav(`/requisicoes/${editId}`)
         }
@@ -689,6 +696,9 @@ export default function NovaRequisicao() {
               const file = event.target.files?.[0]
               if (file) {
                 setReferenciaFile(file)
+                if (!isEditMode) {
+                  handleAiParse(file, categoria ? { codigo: categoria.codigo, nome: categoria.nome } : undefined)
+                }
               }
             }}
           />

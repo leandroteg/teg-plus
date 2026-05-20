@@ -255,6 +255,23 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
+      {/* Editar RC aprovada antes de iniciar cotação */}
+      {req.status === 'aprovada' && (perfil?.id === req.solicitante_id || isAdmin) && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Pencil size={15} className="text-sky-500 shrink-0" />
+            <p className="text-sm text-sky-700">Precisa corrigir itens ou anexar a cotação de referência?</p>
+          </div>
+          <button
+            onClick={() => navigate(`/requisicoes/${req.id}/editar`)}
+            className="shrink-0 flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold
+              border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 transition-colors"
+          >
+            <Pencil size={12} /> Editar e reenviar
+          </button>
+        </div>
+      )}
+
       {/* Alerta Esclarecimento */}
       {(req.status === 'em_esclarecimento' || req.status === 'cotacao_em_esclarecimento') && (
         <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-3">

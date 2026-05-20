@@ -427,7 +427,7 @@ export function useReenviarEsclarecimento() {
 // devolvida_solicitante. Demais status lançam erro para evitar corromper
 // fluxo de aprovação/cotação.
 
-const STATUS_EDITAVEIS = ['rascunho', 'em_esclarecimento', 'devolvida_solicitante'] as const
+const STATUS_EDITAVEIS = ['rascunho', 'em_esclarecimento', 'devolvida_solicitante', 'aprovada'] as const
 
 export function useAtualizarRequisicao() {
   const qc = useQueryClient()
@@ -735,7 +735,7 @@ export function useRequisicao(id?: string) {
       const { data, error } = await supabase
         .from(TABLE)
         .select(`
-          id, numero, solicitante_nome, obra_nome, obra_id,
+          id, numero, solicitante_id, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
