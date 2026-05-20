@@ -397,7 +397,16 @@ export function useReenviarEsclarecimento() {
         ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
         : `Esclarecimento respondido por ${solicitanteNome}`
 
-      // 4. Insere novo registro pendente em apr_aprovacoes
+      // 4. Expira pendentes anteriores desta RC para evitar duplicatas no AprovAi
+      await supabase
+        .from('apr_aprovacoes')
+        .update({ status: 'expirada', data_decisao: new Date().toISOString() })
+        .eq('entidade_id', requisicaoId)
+        .eq('modulo', 'cmp')
+        .eq('tipo_aprovacao', 'requisicao_compra')
+        .eq('status', 'pendente')
+
+      // 5. Insere novo registro pendente em apr_aprovacoes
       await supabase.from('apr_aprovacoes').insert({
         modulo: 'cmp',
         tipo_aprovacao: 'requisicao_compra',
@@ -587,7 +596,16 @@ export function useReenviarAposDevolucao() {
         ? `RC reenviada por ${solicitanteNome} após devolução da cotação: ${resposta.trim()}`
         : `RC reenviada por ${solicitanteNome} após devolução da cotação`
 
-      // 3. Insere novo registro pendente em apr_aprovacoes (alçada 1)
+      // 3. Expira pendentes anteriores desta RC para evitar duplicatas no AprovAi
+      await supabase
+        .from('apr_aprovacoes')
+        .update({ status: 'expirada', data_decisao: new Date().toISOString() })
+        .eq('entidade_id', requisicaoId)
+        .eq('modulo', 'cmp')
+        .eq('tipo_aprovacao', 'requisicao_compra')
+        .eq('status', 'pendente')
+
+      // 4. Insere novo registro pendente em apr_aprovacoes (alçada 1)
       const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
         modulo: 'cmp',
         tipo_aprovacao: 'requisicao_compra',
