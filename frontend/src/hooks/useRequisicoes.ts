@@ -748,6 +748,7 @@ export function useRequisicao(id?: string) {
           descricao, justificativa, valor_estimado, urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
+          arquivo_url,
           created_at, esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           comprador:cmp_compradores(nome, email),
           itens:cmp_requisicao_itens(
