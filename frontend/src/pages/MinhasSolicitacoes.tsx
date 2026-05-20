@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ClipboardList, Eye, Zap, X, AlertTriangle,
   CheckCircle2, Package, ShoppingCart, Truck, DollarSign,
-  Clock, Filter, Pencil,
+  Clock, Filter, Pencil, Plus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -432,6 +432,13 @@ export default function MinhasSolicitacoes({
               </p>
             </div>
           </div>
+          <button
+            onClick={() => navigate('/requisicoes/nova')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
+          >
+            <Plus size={14} />
+            Nova
+          </button>
         </div>
 
         {/* Tabs — só no header standalone */}
@@ -469,12 +476,19 @@ export default function MinhasSolicitacoes({
             <div className="w-7 h-7 rounded-xl bg-indigo-100 flex items-center justify-center">
               <ClipboardList size={14} className="text-indigo-600" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-sm font-bold text-slate-800">Minhas Solicitações</h1>
               <p className="text-[11px] text-slate-400">
                 {isLoading ? 'Carregando…' : `${abertas.length} em aberto · ${encerradas.length} encerrada${encerradas.length !== 1 ? 's' : ''}`}
               </p>
             </div>
+            <button
+              onClick={() => navigate('/requisicoes/nova')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
+            >
+              <Plus size={14} />
+              Nova
+            </button>
           </div>
         )}
 
