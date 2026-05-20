@@ -256,7 +256,7 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* Editar RC aprovada antes de iniciar cotação */}
-      {req.status === 'aprovada' && (perfil?.id === req.solicitante_id || isAdmin) && (
+      {req.status === 'aprovada' && (
         <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Pencil size={15} className="text-sky-500 shrink-0" />
