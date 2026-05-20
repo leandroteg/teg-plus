@@ -4,7 +4,7 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2, Send, PackageCheck, Undo2, Paperclip,
+  Loader2, Send, PackageCheck, Undo2, Paperclip, Package,
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
@@ -176,6 +176,11 @@ function ReqCard({ r, apr, isDark, onClick }: {
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {(r as any).itens_count > 0 && (
+            <span className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <Package size={9} />{(r as any).itens_count} {(r as any).itens_count === 1 ? 'item' : 'itens'}
+            </span>
+          )}
           {(r as any).compra_recorrente && (
             <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">MENSAL</span>
           )}
@@ -972,6 +977,11 @@ export default function ListaRequisicoes() {
                   <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
                     {fmt(r.valor_estimado)}
                     {(r as any).compra_recorrente && <span className="text-[8px] font-bold text-indigo-500 ml-1">/mês</span>}
+                    {(r as any).itens_count > 0 && (
+                      <span className={`block text-[9px] font-normal mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {(r as any).itens_count} {(r as any).itens_count === 1 ? 'item' : 'itens'}
+                      </span>
+                    )}
                   </td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
                   <td className="px-3 py-2"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>

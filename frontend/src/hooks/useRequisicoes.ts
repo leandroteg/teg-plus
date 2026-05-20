@@ -84,18 +84,29 @@ export function useRequisicoes(status?: string, search?: string) {
       const rows = (data ?? []) as any[]
       const ids = rows.map(r => r.id).filter(Boolean)
       const historicoMap = new Map<string, NonNullable<Requisicao['esclarecimento_historico']>>()
+      const itemCountMap = new Map<string, number>()
 
       if (ids.length > 0) {
-        const { data: historicoData } = await supabase
-          .from('apr_aprovacoes')
-          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
-          .in('entidade_id', ids)
-          .eq('modulo', 'cmp')
-          .not('observacao', 'is', null)
-          .order('created_at', { ascending: true })
+        const [{ data: historicoData }, { data: itemRows }] = await Promise.all([
+          supabase
+            .from('apr_aprovacoes')
+            .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+            .in('entidade_id', ids)
+            .eq('modulo', 'cmp')
+            .not('observacao', 'is', null)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('cmp_requisicao_itens')
+            .select('requisicao_id')
+            .in('requisicao_id', ids),
+        ])
 
         for (const [id, historico] of buildEsclarecimentoHistorico(historicoData ?? [])) {
           historicoMap.set(id, historico)
+        }
+
+        for (const row of itemRows ?? []) {
+          itemCountMap.set(row.requisicao_id, (itemCountMap.get(row.requisicao_id) ?? 0) + 1)
         }
       }
 
@@ -105,6 +116,7 @@ export function useRequisicoes(status?: string, search?: string) {
         comprador_nome: r.comprador?.nome ?? undefined,
         comprador: undefined,
         esclarecimento_historico: historicoMap.get(r.id),
+        itens_count: itemCountMap.get(r.id) ?? 0,
       })) as Requisicao[]
     },
     refetchInterval: false,

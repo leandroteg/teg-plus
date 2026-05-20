@@ -134,6 +134,7 @@ export interface Requisicao {
     msg: string
     data: string
   }[]
+  itens_count?: number
 }
 
 export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte' | 'solicitacao_adiantamento'
