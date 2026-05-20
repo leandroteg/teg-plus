@@ -12,10 +12,13 @@ export default function UpdateAvailable() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, r) {
-      // Check for updates every 60 minutes
-      if (r) {
-        setInterval(() => { r.update() }, 60 * 60 * 1000)
-      }
+      if (!r) return
+      // Checa por updates ao registrar, a cada 5 min, e ao voltar para a aba
+      r.update()
+      setInterval(() => { r.update() }, 5 * 60 * 1000)
+      const onVisible = () => { if (document.visibilityState === 'visible') r.update() }
+      document.addEventListener('visibilitychange', onVisible)
+      window.addEventListener('focus', onVisible)
     },
     onRegSWUpdFound() {
       setShow(true)

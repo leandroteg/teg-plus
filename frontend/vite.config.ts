@@ -29,7 +29,7 @@ export default defineConfig({
     react(),
     stripPwaManifestFromAprovAi(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'sounds/*.mp3'],
       manifest: {
         name: 'TEG+ ERP',
