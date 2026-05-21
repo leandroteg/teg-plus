@@ -38,6 +38,7 @@ import { useCadFornecedores } from '../../hooks/useCadastros'
 import { formatCNPJ, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import SearchableSelect from '../../components/SearchableSelect'
+import { AnexoReferencia } from '../../components/AnexoReferencia'
 import type { SelectOption } from '../../components/SearchableSelect'
 import FornecedorCadastroModal, { type FornecedorFormData } from '../../components/FornecedorCadastroModal'
 import { useAuth } from '../../contexts/AuthContext'
@@ -2157,6 +2158,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               if (itens.length === 0) return null
               return <CPItensRC itens={itens} isDark={isDark} />
             })()}
+
+            {/* Anexo / Referência de cotação */}
+            <AnexoReferencia url={cp.requisicao?.arquivo_url} className="mt-3" />
 
             {/* Imposto / Retenção — editável em Confirmados, read-only nos demais */}
             {stageStatus === 'confirmado' ? (

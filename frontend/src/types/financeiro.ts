@@ -127,6 +127,7 @@ export interface ContaPagar {
     centro_custo?: string
     classe_financeira?: string
     projeto_id?: string
+    arquivo_url?: string
     itens?: {
       descricao: string
       quantidade: number

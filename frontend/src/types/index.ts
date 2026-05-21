@@ -69,7 +69,7 @@ export interface Pedido {
   justificativa_sem_cotacao?: string
   itens_direto?: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario: number }>
   // Joins
-  requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'> & {
+  requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria' | 'arquivo_url'> & {
     itens?: Pick<RequisicaoItem, 'descricao' | 'quantidade' | 'unidade' | 'valor_unitario_estimado'>[]
   }
   comprador?: Pick<Comprador, 'nome'>

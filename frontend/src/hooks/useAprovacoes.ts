@@ -148,7 +148,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (cmpIds.length > 0) {
         const { data: reqData } = await supabase
           .from(TABLE_REQ)
-          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
+          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at, arquivo_url, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
           .in('id', cmpIds)
         reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
       }
@@ -301,7 +301,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           if (reqIds.length > 0) {
             const { data: rcData } = await supabase
               .from('cmp_requisicoes')
-              .select('id, numero, descricao, justificativa, solicitante_nome, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
+              .select('id, numero, descricao, justificativa, solicitante_nome, arquivo_url, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
               .in('id', [...new Set(reqIds)])
             for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
           }
@@ -521,10 +521,17 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                   const rcId = (cp?.requisicao_id as string) ?? ''
                   const pedId = (cp?.pedido_id as string) ?? ''
                   const rc = rcId ? rcMap.get(rcId) : undefined
-                  // Merge anexos from pedido + fin_documentos
+                  // Merge anexos: referência de cotação da RC + pedido + fin_documentos
                   const pedAnexos = pedId ? (pedAnexosMap.get(pedId) ?? []) : []
                   const finDocs = cpId ? (docMap.get(cpId) ?? []) : []
+                  const rcArquivoUrl = rc?.arquivo_url as string | undefined
                   const anexos = [
+                    ...(rcArquivoUrl ? [{
+                      nome: decodeURIComponent(rcArquivoUrl.split('/').pop()?.replace(/^\d+[-_]/, '') ?? 'Referência de cotação'),
+                      url: rcArquivoUrl,
+                      tipo: 'referencia_cotacao',
+                      mime_type: '',
+                    }] : []),
                     ...pedAnexos.map(a => ({
                       nome: (a.nome_arquivo as string) ?? '',
                       url: (a.url as string) ?? '',

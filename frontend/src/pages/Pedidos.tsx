@@ -37,6 +37,7 @@ import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
+import { AnexoReferencia } from '../components/AnexoReferencia'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
 
@@ -1809,6 +1810,9 @@ function DetailModal({
               </div>
             )}
           </div>
+
+          {/* Anexo / Referência de cotação */}
+          <AnexoReferencia url={pedido.requisicao?.arquivo_url} />
 
           {/* Auditoria */}
           <div className={`rounded-xl px-3 py-2.5 border text-[11px] space-y-1 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>

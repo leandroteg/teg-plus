@@ -22,6 +22,7 @@ import {
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
 import { UpperTextarea } from '../components/UpperInput'
+import { AnexoReferencia } from '../components/AnexoReferencia'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -325,6 +326,9 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             </div>
           )
         })()}
+
+        {/* Anexo / Referência de cotação */}
+        <AnexoReferencia url={req.arquivo_url} showLabel={false} className="mb-3" />
 
         {/* Obra */}
         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
