@@ -154,6 +154,9 @@ export default function NovaRequisicao() {
   const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
   const [showPreview, setShowPreview]       = useState(false)
   const [aiExtracao, setAiExtracao]         = useState<{ extraidos: number; total: number } | null>(null)
+  // Escolha do usuário ao anexar a referência: ler com IA ou apenas armazenar.
+  // false = ainda não decidiu (mostra a pergunta); true = já escolheu (rodou IA ou apenas anexou)
+  const [leituraDecidida, setLeituraDecidida] = useState(false)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoesPorValor(total, categoria.cotacoes_regras) : 1
@@ -696,9 +699,10 @@ export default function NovaRequisicao() {
               const file = event.target.files?.[0]
               if (file) {
                 setReferenciaFile(file)
-                if (!isEditMode) {
-                  handleAiParse(file, categoria ? { codigo: categoria.codigo, nome: categoria.nome } : undefined)
-                }
+                // Não dispara IA automaticamente: pergunta ao usuário (ler com IA ou apenas anexar)
+                setLeituraDecidida(false)
+                setAiProgress('idle')
+                setAiExtracao(null)
               }
             }}
           />
@@ -722,6 +726,7 @@ export default function NovaRequisicao() {
                     setReferenciaFile(null)
                     setAiProgress('idle')
                     setAiExtracao(null)
+                    setLeituraDecidida(false)
                     if (referenciaInputRef.current) referenciaInputRef.current.value = ''
                   }}
                   className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
@@ -747,6 +752,27 @@ export default function NovaRequisicao() {
                 <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
                   <AlertCircle size={14} className="text-red-500 shrink-0" />
                   <span className="text-xs text-red-600">Não foi possível extrair itens — preencha manualmente</span>
+                </div>
+              ) : !leituraDecidida ? (
+                <div className="px-3 py-2.5 bg-violet-50 rounded-xl border border-violet-200 space-y-2">
+                  <p className="text-xs font-semibold text-violet-700">O que deseja fazer com este arquivo?</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setLeituraDecidida(true); handleAiParse(referenciaFile, categoria ? { codigo: categoria.codigo, nome: categoria.nome } : undefined) }}
+                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors"
+                    >
+                      <Sparkles size={12} /> Ler com IA e extrair itens
+                    </button>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setLeituraDecidida(true) }}
+                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Check size={12} /> Apenas anexar
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">O arquivo será salvo junto da requisição de qualquer forma.</p>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
