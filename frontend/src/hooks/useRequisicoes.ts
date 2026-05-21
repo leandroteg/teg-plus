@@ -397,28 +397,19 @@ export function useReenviarEsclarecimento() {
         ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
         : `Esclarecimento respondido por ${solicitanteNome}`
 
-      // 4. Expira pendentes anteriores desta RC para evitar duplicatas no AprovAi
-      await supabase
-        .from('apr_aprovacoes')
-        .update({ status: 'expirada', data_decisao: new Date().toISOString() })
-        .eq('entidade_id', requisicaoId)
-        .eq('modulo', 'cmp')
-        .eq('tipo_aprovacao', 'requisicao_compra')
-        .eq('status', 'pendente')
-
-      // 5. Insere novo registro pendente em apr_aprovacoes
-      await supabase.from('apr_aprovacoes').insert({
-        modulo: 'cmp',
-        tipo_aprovacao: 'requisicao_compra',
-        entidade_id: requisicaoId,
-        entidade_numero: requisicaoNumero,
-        aprovador_nome: aprovador?.nome ?? solicitanteNome,
-        aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
-        nivel: alcadaNivel,
-        status: 'pendente',
-        observacao: obs,
-        data_limite: dataLimite,
+      // 4. Expira pendentes anteriores + insere novo pendente atomicamente via RPC
+      // SECURITY DEFINER (mesmo motivo do useReenviarAposDevolucao: requisitante não tem
+      // UPDATE em apr_aprovacoes, o que duplicava pendentes no AprovAi).
+      const { error: aprError } = await supabase.rpc('apr_reinserir_pendente_rc', {
+        p_entidade_id: requisicaoId,
+        p_entidade_numero: requisicaoNumero,
+        p_nivel: alcadaNivel,
+        p_aprovador_nome: aprovador?.nome ?? solicitanteNome,
+        p_aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+        p_observacao: obs,
+        p_data_limite: dataLimite,
       })
+      if (aprError) throw aprError
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
@@ -596,27 +587,18 @@ export function useReenviarAposDevolucao() {
         ? `RC reenviada por ${solicitanteNome} após devolução da cotação: ${resposta.trim()}`
         : `RC reenviada por ${solicitanteNome} após devolução da cotação`
 
-      // 3. Expira pendentes anteriores desta RC para evitar duplicatas no AprovAi
-      await supabase
-        .from('apr_aprovacoes')
-        .update({ status: 'expirada', data_decisao: new Date().toISOString() })
-        .eq('entidade_id', requisicaoId)
-        .eq('modulo', 'cmp')
-        .eq('tipo_aprovacao', 'requisicao_compra')
-        .eq('status', 'pendente')
-
-      // 4. Insere novo registro pendente em apr_aprovacoes (alçada 1)
-      const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
-        modulo: 'cmp',
-        tipo_aprovacao: 'requisicao_compra',
-        entidade_id: requisicaoId,
-        entidade_numero: requisicaoNumero,
-        aprovador_nome: aprovador?.nome ?? solicitanteNome,
-        aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
-        nivel: 1,
-        status: 'pendente',
-        observacao: obs,
-        data_limite: dataLimite,
+      // 3. Expira pendentes anteriores + insere novo pendente atomicamente via RPC
+      // SECURITY DEFINER. O reenvio é feito pelo solicitante (requisitante), que não tem
+      // permissão de UPDATE em apr_aprovacoes — fazer no cliente deixava o expira falhar
+      // silenciosamente e duplicava pendentes no AprovAi.
+      const { error: aprError } = await supabase.rpc('apr_reinserir_pendente_rc', {
+        p_entidade_id: requisicaoId,
+        p_entidade_numero: requisicaoNumero,
+        p_nivel: 1,
+        p_aprovador_nome: aprovador?.nome ?? solicitanteNome,
+        p_aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+        p_observacao: obs,
+        p_data_limite: dataLimite,
       })
       if (aprError) throw aprError
     },
