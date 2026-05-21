@@ -12,6 +12,16 @@ const TABLE_REQ = 'cmp_requisicoes'
 // ── IDs fixos (apenas Laucidio segue hardcoded — minutas/pagamentos sao globais) ──
 const ID_LAUCIDIO = '98723949-73fa-4961-b032-3ef599464e2e'
 
+// Aprovadores autorizados de COMPRAS (RC + cotacao). Mesmo admin so aprova compras
+// se estiver nesta lista. Conceder/remover = editar aqui.
+const APROVADORES_COMPRAS = new Set([
+  'laucidio@login.teg.local',
+  'welton.pereira@login.teg.local',
+  'elton.costa@login.teg.local',
+  'leandro.mallet@login.teg.local',
+  'jackeline.freire@login.teg.local',
+])
+
 // ── Politica de visibilidade (por categoria) ─────────────────────────────────
 
 interface UserCtx {
@@ -43,11 +53,26 @@ function podeVerAprovacao(
   req: Record<string, unknown> | undefined,
   ctx: FiltroContext,
 ): boolean {
-  // Admin ve tudo
-  if (ctx.user.isAdmin) return true
-
   const tipo = apr.tipo_aprovacao
   const uid = ctx.user.id
+
+  // Compras (validacao tecnica de RC + aprovacao de cotacao): SOMENTE aprovadores
+  // autorizados (independe de ser admin) — evita que admins fora da lista aprovem.
+  if (tipo === 'requisicao_compra' || tipo === 'cotacao') {
+    const autorizado = APROVADORES_COMPRAS.has((ctx.user.email ?? '').toLowerCase())
+    if (!autorizado) return false
+    if (ctx.user.isAdmin) return true // admins autorizados veem todas as compras
+    const categoria = (req?.categoria as string | undefined) ?? ''
+    const pol = ctx.politicas.get(categoria)
+    if (!pol) return false
+    if (tipo === 'requisicao_compra') return pol.validador_tecnico_id === uid
+    const valor = Number((req?.valor_estimado as number | undefined) ?? 0)
+    if (valor <= pol.alcada1_limite) return pol.alcada1_aprovador_id === uid
+    return pol.alcada2_aprovador_id === uid
+  }
+
+  // Demais tipos (nao-compras): admin ve tudo
+  if (ctx.user.isAdmin) return true
 
   // Pessoa fixa: minutas e autorizacao_pagamento → apenas Laucidio
   if (tipo === 'minuta_contratual' || tipo === 'autorizacao_pagamento') {
@@ -62,24 +87,6 @@ function podeVerAprovacao(
   // Aprovacao de transporte → diretores (provisorio)
   if (tipo === 'aprovacao_transporte') {
     return ctx.user.isDiretor
-  }
-
-  // Aprovacao Compras (cotacao) → por categoria + valor
-  if (tipo === 'cotacao') {
-    const categoria = (req?.categoria as string | undefined) ?? ''
-    const pol = ctx.politicas.get(categoria)
-    if (!pol) return false
-    const valor = Number((req?.valor_estimado as number | undefined) ?? 0)
-    if (valor <= pol.alcada1_limite) return pol.alcada1_aprovador_id === uid
-    return pol.alcada2_aprovador_id === uid
-  }
-
-  // Validacao tecnica de RC → validador_tecnico_id da categoria
-  if (tipo === 'requisicao_compra') {
-    const categoria = (req?.categoria as string | undefined) ?? ''
-    const pol = ctx.politicas.get(categoria)
-    if (!pol) return false
-    return pol.validador_tecnico_id === uid
   }
 
   // Tipos desconhecidos: oculta
