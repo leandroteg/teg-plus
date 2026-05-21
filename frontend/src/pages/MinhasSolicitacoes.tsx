@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
+import { BarraPrazo } from '../components/BarraPrazo'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ interface SolicitacaoItem {
   solicitante_id: string | null
   urgencia_flag: string | null
   justificativa_urgencia: string | null
+  data_necessidade: string | null
 }
 
 // ── Helpers de status ──────────────────────────────────────────────────────────
@@ -326,6 +328,9 @@ function SolicitacaoCard({
           </div>
         </div>
       </div>
+
+      {/* Barra de prazo (abertura → necessidade de entrega) */}
+      <BarraPrazo createdAt={item.created_at} dataNecessidade={item.data_necessidade} encerrada={encerrada} />
 
       {/* Aviso de ação necessária */}
       {precisaAcao && (
