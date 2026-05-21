@@ -12,14 +12,15 @@ const TABLE_REQ = 'cmp_requisicoes'
 // ── IDs fixos (apenas Laucidio segue hardcoded — minutas/pagamentos sao globais) ──
 const ID_LAUCIDIO = '98723949-73fa-4961-b032-3ef599464e2e'
 
-// Aprovadores autorizados de COMPRAS (RC + cotacao). Mesmo admin so aprova compras
-// se estiver nesta lista. Conceder/remover = editar aqui.
+// Aprovadores autorizados de COMPRAS (RC + cotacao), por usuario (parte antes do @ do
+// e-mail) — imune a troca de dominio (@login.teg.local -> @teguniao.com.br). Mesmo admin
+// so aprova compras se estiver nesta lista. Conceder/remover = editar aqui.
 const APROVADORES_COMPRAS = new Set([
-  'laucidio@login.teg.local',
-  'welton.pereira@login.teg.local',
-  'elton.costa@login.teg.local',
-  'leandro.mallet@login.teg.local',
-  'jackeline.freire@login.teg.local',
+  'laucidio',
+  'welton.pereira',
+  'elton.costa',
+  'leandro.mallet',
+  'jackeline.freire',
 ])
 
 // ── Politica de visibilidade (por categoria) ─────────────────────────────────
@@ -59,7 +60,7 @@ function podeVerAprovacao(
   // Compras (validacao tecnica de RC + aprovacao de cotacao): SOMENTE aprovadores
   // autorizados (independe de ser admin) — evita que admins fora da lista aprovem.
   if (tipo === 'requisicao_compra' || tipo === 'cotacao') {
-    const autorizado = APROVADORES_COMPRAS.has((ctx.user.email ?? '').toLowerCase())
+    const autorizado = APROVADORES_COMPRAS.has((ctx.user.email ?? '').toLowerCase().split('@')[0])
     if (!autorizado) return false
     if (ctx.user.isAdmin) return true // admins autorizados veem todas as compras
     const categoria = (req?.categoria as string | undefined) ?? ''

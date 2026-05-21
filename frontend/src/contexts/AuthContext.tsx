@@ -266,18 +266,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const perfilLoadedRef = useRef(false)
   const LOGIN_DOMAIN = 'login.teg.local'
   const LOGIN_FALLBACK_DOMAIN = 'login.teg.local.com'
+  const REAL_DOMAIN = 'teguniao.com.br'
 
+  // Gera os e-mails candidatos para login/reset. Prioriza o e-mail REAL (@teguniao.com.br)
+  // para usuários migrados — assim o reset de senha chega na caixa real — mantendo o
+  // login interno (@login.teg.local) como fallback para quem ainda não migrou.
   const resolveIdentifierCandidates = useCallback((identifier: string): string[] => {
     const input = identifier.trim().toLowerCase()
     if (!input) return []
     if (!input.includes('@')) {
-      return [`${input}@${LOGIN_DOMAIN}`, `${input}@${LOGIN_FALLBACK_DOMAIN}`]
+      return [`${input}@${REAL_DOMAIN}`, `${input}@${LOGIN_DOMAIN}`, `${input}@${LOGIN_FALLBACK_DOMAIN}`]
     }
     const [local, domain] = input.split('@')
     if (!local || !domain) return [input]
-    if (domain === LOGIN_DOMAIN || domain === LOGIN_FALLBACK_DOMAIN) return [input]
-    if (domain === 'teguniao.com.br') {
-      return [`${local}@${LOGIN_DOMAIN}`, `${local}@${LOGIN_FALLBACK_DOMAIN}`]
+    if (domain === REAL_DOMAIN) {
+      return [input, `${local}@${LOGIN_DOMAIN}`, `${local}@${LOGIN_FALLBACK_DOMAIN}`]
+    }
+    if (domain === LOGIN_DOMAIN || domain === LOGIN_FALLBACK_DOMAIN) {
+      return [input, `${local}@${REAL_DOMAIN}`]
     }
     return [input]
   }, [])
