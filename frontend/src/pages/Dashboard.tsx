@@ -49,6 +49,13 @@ const STATUS_ATIVO: StatusRequisicao[] = [
 const PEDIDO_ATIVO = ['emitido', 'confirmado', 'em_entrega', 'parcialmente_recebido']
 const COTACAO_ATIVA = ['pendente', 'em_andamento']
 
+// RCs "em aberto": aguardando aprovação técnica + em cotação (exclui rascunho,
+// já aprovadas em compra, pedido emitido, entrega, pagamento, rejeitada, cancelada)
+const RC_ABERTAS_STATUS: StatusRequisicao[] = [
+  'pendente', 'em_aprovacao', 'em_esclarecimento', // aguardando aprovação técnica
+  'aprovada', 'em_cotacao', 'cotacao_enviada',      // cotação
+]
+
 const NIVEL_LABEL: Record<number, string> = { 1: 'Coordenador', 2: 'Gerente', 3: 'Diretor', 4: 'CEO' }
 
 // ── Item unificado para urgentes/vencidas ────────────────────────────────────
@@ -424,12 +431,18 @@ export default function Dashboard() {
   const hoje = Date.now()
   const tresDias = 3 * 24 * 3600_000
 
-  // Valor total de pedidos emitidos
-  const valorTotalPedidos = useMemo(() =>
-    todosPedidos
-      .filter(p => p.status !== 'cancelado')
-      .reduce((sum, p) => sum + (p.valor_total ?? 0), 0),
+  // Quantidade de pedidos emitidos (toda linha em cmp_pedidos já foi emitida; exclui cancelados)
+  const pedidosEmitidos = useMemo(() =>
+    todosPedidos.filter(p => p.status !== 'cancelado').length,
     [todosPedidos]
+  )
+
+  // RCs em aberto no período: aguardando aprovação técnica + cotação
+  const rcsEmAberto = useMemo(() =>
+    (data?.por_status ?? [])
+      .filter(s => (RC_ABERTAS_STATUS as string[]).includes(s.status))
+      .reduce((sum, s) => sum + (s.total ?? 0), 0),
+    [data]
   )
 
   // ── Converter tudo para DashItem (sem duplicar fluxo) ───
@@ -658,16 +671,16 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric
-                label="Valor Pedidos"
-                value={fmt(valorTotalPedidos)}
+                label="Pedidos Emitidos"
+                value={pedidosEmitidos}
                 tone="teal"
                 note="pedidos emitidos"
               />
               <SpotlightMetric
-                label="Total RCs"
-                value={kpis.total_mes}
+                label="RCs em Aberto"
+                value={rcsEmAberto}
                 tone="sky"
-                note="solicitacoes abertas"
+                note="aprov. tecnica + cotacao"
               />
               <SpotlightMetric
                 label="Lead Time"
