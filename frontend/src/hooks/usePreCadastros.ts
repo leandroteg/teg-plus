@@ -54,11 +54,17 @@ export function usePreCadastros() {
   const { perfil, isAdmin, papelGlobal, canTechnicalApprove } = useAuth()
   const qc = useQueryClient()
 
+  // Permissão concedida por usuário (flag no perfil) — permite gestores/requisitantes
+  // específicos gerenciarem pré-cadastros sem mudar o papel. Espelha o RLS
+  // can_manage_pre_cadastros() na sys_pre_cadastros.
+  const podeAprovarCadastros = !!((perfil?.permissoes_especiais as Record<string, unknown> | null)?.pode_aprovar_cadastros)
+
   const isAdminOrDirector =
     isAdmin
     || papelGlobal === 'diretor'
     || papelGlobal === 'ceo'
     || canTechnicalApprove('cadastros')
+    || podeAprovarCadastros
 
   // Fetch pending pre-cadastros (admin/director only)
   const { data: pendentes = [], isLoading } = useQuery({
