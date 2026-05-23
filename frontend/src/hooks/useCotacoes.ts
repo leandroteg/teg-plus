@@ -250,13 +250,38 @@ export function useFinalizarCotacao() {
       // 5. Busca dados da RC para criar aprovação financeira
       const { data: rcData } = await supabase
         .from('cmp_requisicoes')
-        .select('numero, alcada_nivel, valor_estimado')
+        .select('numero, alcada_nivel, valor_estimado, categoria')
         .eq('id', requisicao_id)
         .single()
 
       // 6. Cria aprovação financeira pendente em apr_aprovacoes
       if (rcData) {
-        const aprovadorNome = (rcData.valor_estimado ?? 0) > 2000 ? 'Laucídio' : 'Welton'
+        // Roteia o aprovador financeiro pela politica da categoria (mesma regra do
+        // podeVerAprovacao em useAprovacoes.ts): valor <= alcada1_limite -> alcada1,
+        // senao alcada2. Grava nome+email reais p/ o registro bater com quem ve no AprovAi.
+        const valorRC = Number(rcData.valor_estimado ?? 0)
+        let aprovadorNome = ''
+        let aprovadorEmail = ''
+        const { data: catPol } = await supabase
+          .from('cmp_categorias')
+          .select('alcada1_limite, alcada1_aprovador_id, alcada2_aprovador_id')
+          .eq('codigo', rcData.categoria ?? '')
+          .maybeSingle()
+        if (catPol) {
+          const limite = Number(catPol.alcada1_limite ?? 0)
+          const aprovadorId = valorRC <= limite
+            ? catPol.alcada1_aprovador_id
+            : catPol.alcada2_aprovador_id
+          if (aprovadorId) {
+            const { data: aprovadorPerfil } = await supabase
+              .from('sys_perfis')
+              .select('nome, email')
+              .eq('id', aprovadorId)
+              .maybeSingle()
+            aprovadorNome = aprovadorPerfil?.nome ?? ''
+            aprovadorEmail = aprovadorPerfil?.email ?? ''
+          }
+        }
 
         // Monta texto de recomendação multi-critério
         const fornParaScore = (fornInserted ?? []).map(fi => {
@@ -287,7 +312,7 @@ export function useFinalizarCotacao() {
             entidade_id: requisicao_id,
             entidade_numero: rcData.numero,
             aprovador_nome: aprovadorNome,
-            aprovador_email: '',
+            aprovador_email: aprovadorEmail,
             nivel: rcData.alcada_nivel ?? 1,
             status: 'pendente',
             observacao: obsText,

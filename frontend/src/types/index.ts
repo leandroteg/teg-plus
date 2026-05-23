@@ -31,6 +31,13 @@ export interface CategoriaMaterial {
   alcada1_limite?: number
   cotacoes_regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
   politica_resumo?: string
+  // Politica de aprovacao financeira (FK -> sys_perfis) + nomes resolvidos
+  validador_tecnico_id?: string | null
+  alcada1_aprovador_id?: string | null
+  alcada2_aprovador_id?: string | null
+  validador_tecnico_nome?: string | null
+  alcada1_aprovador_nome?: string | null
+  alcada2_aprovador_nome?: string | null
 }
 
 export interface Pedido {

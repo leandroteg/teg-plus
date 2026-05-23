@@ -608,16 +608,16 @@ export default function NovaRequisicao() {
                 <p className="font-bold text-slate-700 dark:text-slate-200">{categoria.comprador_nome ?? '—'}</p>
               </div>
               <div>
-                <span className="text-teal-500 dark:text-teal-400">Aprovação ≤R$2k</span>
-                <p className="font-bold text-slate-700 dark:text-slate-200">{categoria.alcada1_aprovador ?? 'Welton'}</p>
+                <span className="text-teal-500 dark:text-teal-400">Aprovação ≤{fmt(categoria.alcada1_limite ?? 0)}</span>
+                <p className="font-bold text-slate-700 dark:text-slate-200">{categoria.alcada1_aprovador_nome ?? categoria.alcada1_aprovador ?? '—'}</p>
               </div>
               <div>
-                <span className="text-teal-500 dark:text-teal-400">Aprovação &gt;R$2k</span>
-                <p className="font-bold text-slate-700 dark:text-slate-200">Laucídio</p>
+                <span className="text-teal-500 dark:text-teal-400">Aprovação &gt;{fmt(categoria.alcada1_limite ?? 0)}</span>
+                <p className="font-bold text-slate-700 dark:text-slate-200">{categoria.alcada2_aprovador_nome ?? '—'}</p>
               </div>
               <div>
                 <span className="text-teal-500 dark:text-teal-400">Cotações mínimas</span>
-                <p className="font-bold text-slate-700 dark:text-slate-200">≤R$500: 1 · ≤R$2k: 2 · &gt;R$2k: 3</p>
+                <p className="font-bold text-slate-700 dark:text-slate-200">≤R$500: {categoria.cotacoes_regras?.ate_500 ?? 1} · ≤R$2k: {categoria.cotacoes_regras?.['501_a_2k'] ?? 2} · &gt;R$2k: {categoria.cotacoes_regras?.acima_2k ?? 3}</p>
               </div>
             </div>
             {categoria.politica_resumo && (
@@ -1419,9 +1419,9 @@ export default function NovaRequisicao() {
           <div className="flex flex-wrap gap-1.5 text-xs">
             {[
               { label: '① Sua RC',   color: 'bg-slate-200 text-slate-700' },
-              { label: `② ${total > 2000 ? 'Laucídio' : (categoria.alcada1_aprovador ?? 'Welton')} aprova`, color: 'bg-blue-100 text-blue-700' },
+              { label: `② ${categoria.validador_tecnico_nome ?? 'Validador'} valida`, color: 'bg-blue-100 text-blue-700' },
               { label: `③ ${categoria.comprador_nome} cota`, color: 'bg-violet-100 text-violet-700' },
-              { label: '④ Aprov. Fin.', color: 'bg-indigo-100 text-indigo-700' },
+              { label: `④ ${(total > (categoria.alcada1_limite ?? 0) ? categoria.alcada2_aprovador_nome : categoria.alcada1_aprovador_nome) ?? 'Aprov.'} aprova fin.`, color: 'bg-indigo-100 text-indigo-700' },
               { label: '⑤ Pedido',    color: 'bg-cyan-100 text-cyan-700' },
               { label: '⑥ Entrega',   color: 'bg-teal-100 text-teal-700' },
               { label: '⑦ Pagamento', color: 'bg-emerald-100 text-emerald-700' },
