@@ -7,7 +7,7 @@ import {
   FileText, Ban, Send, Undo2, Pencil,
 } from 'lucide-react'
 import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
-import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
@@ -56,14 +56,16 @@ export default function RequisicaoDetalhe() {
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
 
-  // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada)
+  // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada).
+  // Compras exige tambem allowlist de aprovadores (mesma regra do AprovAi).
+  const isAprovadorCompras = podeAprovarCompras(perfil?.email)
   const canDecideTechnical = !!req
     && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status)
     && canTechnicalApprove('compras')
   const canDecideFinancial = !!req
     && req.status === 'cotacao_enviada'
     && isAdmin
-  const canDecide = canDecideTechnical || canDecideFinancial
+  const canDecide = isAprovadorCompras && (canDecideTechnical || canDecideFinancial)
   const canEmitPedido = !!req
     && atLeast('comprador')
     && req.status === 'cotacao_aprovada'

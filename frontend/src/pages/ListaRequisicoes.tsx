@@ -10,7 +10,7 @@ import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
 import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao, useDevolverParaEdicao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
-import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useAprovacoesPendentes, useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
@@ -1001,11 +1001,13 @@ export default function ListaRequisicoes() {
           isDark={isDark}
           onClose={() => setDetail(null)}
           canDecide={
-            (
-              ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
-              && canTechnicalApprove('compras')
+            podeAprovarCompras(perfil?.email) && (
+              (
+                ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
+                && canTechnicalApprove('compras')
+              )
+              || (detail.status === 'cotacao_enviada' && isAdmin)
             )
-            || (detail.status === 'cotacao_enviada' && isAdmin)
           }
           isProcessing={decisaoMutation.isPending}
           onDecisao={(decisao, obs) => {

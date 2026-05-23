@@ -23,6 +23,13 @@ const APROVADORES_COMPRAS = new Set([
   'jackeline.freire',
 ])
 
+// Helper reutilizavel: usuario esta na allowlist de aprovadores de compras?
+// Compara a parte antes do @ (imune a troca de dominio). Usado tanto no AprovAi
+// (podeVerAprovacao) quanto no gate de Validacao Tecnica em ListaRequisicoes.
+export function podeAprovarCompras(email?: string | null): boolean {
+  return APROVADORES_COMPRAS.has((email ?? '').toLowerCase().split('@')[0])
+}
+
 // ── Politica de visibilidade (por categoria) ─────────────────────────────────
 
 interface UserCtx {
@@ -60,8 +67,7 @@ function podeVerAprovacao(
   // Compras (validacao tecnica de RC + aprovacao de cotacao): SOMENTE aprovadores
   // autorizados (independe de ser admin) — evita que admins fora da lista aprovem.
   if (tipo === 'requisicao_compra' || tipo === 'cotacao') {
-    const autorizado = APROVADORES_COMPRAS.has((ctx.user.email ?? '').toLowerCase().split('@')[0])
-    if (!autorizado) return false
+    if (!podeAprovarCompras(ctx.user.email)) return false
     if (ctx.user.isAdmin) return true // admins autorizados veem todas as compras
     const categoria = (req?.categoria as string | undefined) ?? ''
     const pol = ctx.politicas.get(categoria)
