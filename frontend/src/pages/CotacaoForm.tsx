@@ -37,7 +37,8 @@ interface FornecedorForm {
   fornecedor_telefone: string
   fornecedor_email: string
   fornecedor_cnpj:    string
-  valor_total:        number
+  valor_total:        number   // subtotal de produtos (soma dos itens ou valor digitado)
+  valor_frete:        number
   prazo_entrega_dias: number
   condicao_pagamento: string
   observacao:         string
@@ -47,12 +48,16 @@ interface FornecedorForm {
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_telefone: '', fornecedor_email: '', fornecedor_cnpj: '',
-  valor_total: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
+  valor_total: 0, valor_frete: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
   arquivo_url: '', itens_precos: [],
 })
 
 const calcTotalItems = (itens: ItemPreco[]) =>
   Math.round(itens.reduce((s, i) => s + i.valor_total, 0) * 100) / 100
+
+// Custo entregue = produtos + frete (usado p/ comparar fornecedores e na aprovacao)
+const calcTotalEntregue = (f: FornecedorForm) =>
+  Math.round((f.valor_total + (f.valor_frete || 0)) * 100) / 100
 
 // ── Tabela de itens e preços por fornecedor ──────────────────────────────────
 type ReqItem = { id: string; descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }
@@ -1126,6 +1131,7 @@ export default function CotacaoForm() {
           fornecedor_telefone: telefone,
           fornecedor_email:   email,
           valor_total:        valorTotal,
+          valor_frete:        0,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
           observacao:         toUpperNorm(p.observacao || ''),
@@ -1349,7 +1355,8 @@ export default function CotacaoForm() {
             fornecedor_telefone: f.fornecedor_telefone || undefined,
             fornecedor_email:   f.fornecedor_email || undefined,
             fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
-            valor_total:        f.valor_total,
+            valor_total:        calcTotalEntregue(f),
+            valor_frete:        f.valor_frete || undefined,
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
             observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
@@ -1622,12 +1629,12 @@ export default function CotacaoForm() {
               reqItens={(cotacao?.requisicao as any)?.itens ?? []}
             />
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">
                   {calcTotalItems(forn.itens_precos) > 0
-                    ? (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal (calculado)' : 'Valor Total (calculado)'
-                    : (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal *' : 'Valor Total *'}
+                    ? (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal (calculado)' : 'Produtos (calculado)'
+                    : (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal *' : 'Produtos *'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
@@ -1648,6 +1655,18 @@ export default function CotacaoForm() {
                 </div>
               </div>
               <div>
+                <label className="text-[10px] text-slate-400 font-semibold">Frete (R$)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
+                  <NumericInput
+                    min={0} step={0.01}
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                    value={forn.valor_frete}
+                    onChange={v => updateFornecedor(idx, 'valor_frete', v)}
+                  />
+                </div>
+              </div>
+              <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
                 <NumericInput
                   min={1}
@@ -1657,6 +1676,13 @@ export default function CotacaoForm() {
                 />
               </div>
             </div>
+
+            {forn.valor_frete > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-teal-50 border border-teal-100 px-3 py-1.5">
+                <span className="text-[11px] font-semibold text-teal-600">Total entregue (produtos + frete)</span>
+                <span className="text-sm font-bold text-teal-700">{fmt(calcTotalEntregue(forn))}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
@@ -1818,12 +1844,12 @@ export default function CotacaoForm() {
               fornecedor_telefone: f.fornecedor_telefone || undefined,
               fornecedor_email: f.fornecedor_email || undefined,
               fornecedor_cnpj: f.fornecedor_cnpj || undefined,
-              valor_total: f.valor_total,
+              valor_total: calcTotalEntregue(f),
               prazo_entrega_dias: f.prazo_entrega_dias || undefined,
               condicao_pagamento: f.condicao_pagamento || undefined,
               itens_precos: f.itens_precos,
               arquivo_url: f.arquivo_url || undefined,
-              selecionado: f.valor_total === Math.min(...validos.map(x => x.valor_total)),
+              selecionado: calcTotalEntregue(f) === Math.min(...validos.map(x => calcTotalEntregue(x))),
             }))}
             selecaoPorItem={selecaoPorItemParaComparativo}
             onSelectItem={(descricao, idStr) => {
