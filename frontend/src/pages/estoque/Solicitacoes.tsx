@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarSolicitacao,
-  useEstoqueItens, useAtenderItemSolicitacao,
+  useEstoqueItens, useAtenderItemSolicitacao, useBases,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -54,7 +54,10 @@ type ItemForm = { item_id?: string; descricao_livre?: string; quantidade: number
 
 export default function Solicitacoes() {
   const { isLightSidebar: isLight } = useTheme()
-  const { hasSetorPapel } = useAuth()
+  const { hasSetorPapel, perfil, isAdmin } = useAuth()
+  const { data: bases = [] } = useBases()
+  const minhaBase = bases.find(b => b.id === perfil?.base_id)
+  const isTriador = isAdmin || Boolean((minhaBase as any)?.faz_triagem)
   const [statusFiltro, setStatusFiltro] = useState<StatusSolicitacao | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -177,7 +180,7 @@ export default function Solicitacoes() {
                           {sol.itens.map(item => {
                             const atendida = Number((item as any).quantidade_atendida ?? 0)
                             const pend = item.quantidade - atendida
-                            const podeAtender = canApproveSaida && Boolean(item.item_id) && pend > 0 && sol.status !== 'cancelada'
+                            const podeAtender = isTriador && Boolean(item.item_id) && pend > 0 && sol.status !== 'cancelada'
                             return (
                             <div key={item.id} className="flex items-center justify-between gap-2 py-1.5">
                               <span className={`text-xs flex-1 min-w-0 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
