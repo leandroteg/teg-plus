@@ -1349,6 +1349,39 @@ export function useDecisaoRequisicao() {
         .eq('modulo', 'cmp')
         .eq('status', 'pendente')
 
+      // 3. Push ao requisitante quando o aprovador pede esclarecimento (best-effort)
+      if (decisao === 'esclarecimento') {
+        try {
+          const { data: reqRow } = await supabase
+            .from(TABLE_REQ)
+            .select('solicitante_id')
+            .eq('id', requisicaoId)
+            .maybeSingle()
+          const solicitanteId = (reqRow as { solicitante_id?: string } | null)?.solicitante_id
+          if (solicitanteId) {
+            const { data: perfilRow } = await supabase
+              .from('sys_perfis')
+              .select('auth_id')
+              .eq('id', solicitanteId)
+              .maybeSingle()
+            const authId = (perfilRow as { auth_id?: string } | null)?.auth_id
+            if (authId) {
+              await supabase.functions.invoke('send-push', {
+                body: {
+                  user_ids: [authId],
+                  title: `Esclarecimento — ${requisicaoNumero}`,
+                  body: observacao?.trim() || 'O aprovador pediu esclarecimento na sua requisição.',
+                  url: `/requisicoes/${requisicaoId}`,
+                  tag: `escl-${requisicaoId}`,
+                },
+              })
+            }
+          }
+        } catch (e) {
+          console.warn('Aviso: push de esclarecimento não enviado:', e)
+        }
+      }
+
       return { decisao }
     },
     onSuccess: () => {

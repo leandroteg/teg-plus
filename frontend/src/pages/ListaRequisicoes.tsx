@@ -708,6 +708,15 @@ export default function ListaRequisicoes() {
     )
   }, [requisicoes, perfil])
 
+  // RCs minhas com esclarecimento pedido pelo aprovador — preciso responder
+  const minhasEmEsclarecimento = useMemo(() => {
+    if (!perfil) return []
+    return requisicoes.filter(r =>
+      r.status === 'em_esclarecimento' &&
+      (r.solicitante_id ? r.solicitante_id === perfil.id : r.solicitante_nome === perfil.nome)
+    )
+  }, [requisicoes, perfil])
+
   // Group by pipeline tab
   const grouped = useMemo(() => {
     const map = new Map<PipelineTab, Requisicao[]>()
@@ -785,6 +794,40 @@ export default function ListaRequisicoes() {
           {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
           {toast.msg}
         </div>
+      )}
+
+      {/* Notificação: minhas RCs com esclarecimento pedido pelo aprovador */}
+      {minhasEmEsclarecimento.length > 0 && (
+        <button
+          onClick={() => {
+            setActiveTab('em_validacao')
+            const first = minhasEmEsclarecimento[0]
+            if (first) setDetail(first)
+          }}
+          className={`w-full flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all hover:shadow-md ${
+            isDark
+              ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15'
+              : 'bg-amber-50 border-amber-200 hover:bg-amber-100'
+          }`}
+        >
+          <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+            <span className="absolute inset-0 rounded-full bg-amber-400/40 animate-ping" />
+            <MessageSquare size={16} className="relative text-amber-600" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+              {minhasEmEsclarecimento.length === 1
+                ? '1 requisição sua aguarda esclarecimento'
+                : `${minhasEmEsclarecimento.length} requisições suas aguardam esclarecimento`}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
+              O aprovador pediu mais informações. Toque para responder e reenviar.
+            </p>
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-amber-500 text-white text-[11px] font-bold px-2.5 py-1">
+            {minhasEmEsclarecimento.length}
+          </span>
+        </button>
       )}
 
       {/* Notificação: minhas RCs devolvidas pelo comprador */}

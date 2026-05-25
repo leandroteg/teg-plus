@@ -69,13 +69,18 @@ export default function RequisicaoDetalhe() {
   const canEmitPedido = !!req
     && atLeast('comprador')
     && req.status === 'cotacao_aprovada'
-  // Quem pode responder esclarecimento: comprador+ (nunca o requisitante)
-  // em_esclarecimento: TI/comprador responde sobre a necessidade
-  // cotacao_em_esclarecimento: comprador responde sobre a cotação
-  const canResponderEsclarecimento = atLeast('comprador')
+  // Quem pode responder esclarecimento:
+  // em_esclarecimento (necessidade): o requisitante dono da RC + comprador+
+  // cotacao_em_esclarecimento (cotação): somente comprador+
+  const isDonoReq = !!perfil && !!req && perfil.id === req.solicitante_id
+  const canResponderEsclTecnico = atLeast('comprador') || isDonoReq
+  const canResponderEsclCotacao = atLeast('comprador')
+  const canResponderEsteEsclarecimento =
+    req?.status === 'em_esclarecimento' ? canResponderEsclTecnico
+    : req?.status === 'cotacao_em_esclarecimento' ? canResponderEsclCotacao
+    : false
   const canMutateComprasReq = canDecide || canEmitPedido
-    || (req?.status === 'em_esclarecimento' && canResponderEsclarecimento)
-    || (req?.status === 'cotacao_em_esclarecimento' && canResponderEsclarecimento)
+    || canResponderEsteEsclarecimento
     || req?.status === 'devolvida_solicitante'
   const { isLocked, blockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
@@ -287,8 +292,8 @@ export default function RequisicaoDetalhe() {
             {req.esclarecimento_em && <span>· {fmtData(req.esclarecimento_em)}</span>}
           </div>
 
-          {/* Reenviar para aprovador — somente comprador+ */}
-          {canResponderEsclarecimento && !reenviarMutation.isSuccess && (
+          {/* Reenviar para aprovador */}
+          {canResponderEsteEsclarecimento && !reenviarMutation.isSuccess && (
             <div className="pt-2 border-t border-amber-200 space-y-2">
               <p className="text-xs font-semibold text-amber-700">Responder e reenviar ao aprovador:</p>
               <UpperTextarea
@@ -310,6 +315,7 @@ export default function RequisicaoDetalhe() {
                     alcadaNivel: req.alcada_nivel,
                     solicitanteNome: perfil.nome,
                     resposta: respostaEsclarecimento.trim() || undefined,
+                    statusAtual: req.status,
                   })
                 }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl

@@ -57,6 +57,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globIgnores: ['**/bg-*.png', '**/node_modules/**'],
