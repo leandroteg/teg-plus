@@ -256,16 +256,16 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Módulo Apontamentos */}
-          <Route element={<ModuleRoute moduleKey="apontamentos" />}>
-            <Route element={<ApontamentosLayout />}>
-              <Route path="/despesas" element={<Lazy><DespesasHome /></Lazy>} />
-              <Route path="/despesas/cartoes" element={<Lazy><ApontamentosCartao /></Lazy>} />
-              <Route path="/despesas/adiantamentos" element={<Lazy><DespesasAdiantamentos /></Lazy>} />
-              <Route path="/apontamentos" element={<Navigate to="/despesas" replace />} />
-              <Route path="/apontamentos/novo" element={<Navigate to="/despesas/cartoes?nova=1" replace />} />
-              <Route path="/apontamentos/realizados" element={<Navigate to="/despesas/cartoes" replace />} />
-            </Route>
+          {/* Módulo Despesas — área pessoal (apontamentos de cartão e adiantamentos).
+              Sem gate de módulo: todo usuário logado lança seus próprios; os dados
+              são protegidos por RLS (cada um vê apenas os seus). */}
+          <Route element={<ApontamentosLayout />}>
+            <Route path="/despesas" element={<Lazy><DespesasHome /></Lazy>} />
+            <Route path="/despesas/cartoes" element={<Lazy><ApontamentosCartao /></Lazy>} />
+            <Route path="/despesas/adiantamentos" element={<Lazy><DespesasAdiantamentos /></Lazy>} />
+            <Route path="/apontamentos" element={<Navigate to="/despesas" replace />} />
+            <Route path="/apontamentos/novo" element={<Navigate to="/despesas/cartoes?nova=1" replace />} />
+            <Route path="/apontamentos/realizados" element={<Navigate to="/despesas/cartoes" replace />} />
           </Route>
 
           {/* Módulo Fiscal */}

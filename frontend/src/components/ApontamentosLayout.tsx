@@ -21,6 +21,7 @@ export default function ApontamentosLayout() {
       moduleEmoji="💳"
       accent="violet"
       nav={NAV}
+      disableRequisitanteMode
     />
   )
 }

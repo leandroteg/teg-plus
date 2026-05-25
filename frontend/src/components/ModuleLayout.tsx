@@ -68,6 +68,10 @@ export interface ModuleConfig {
   headerExtra?: React.ReactNode
   /** Prefixos de path que requisitantes podem acessar diretamente (ex: detalhe de RC) */
   requisitanteAllowedPaths?: string[]
+  /** Desliga o "modo requisitante" (nav filtrado, guard de rota e home com Minhas
+   *  Solicitações embutido). Use em módulos pessoais como Despesas, onde a home
+   *  deve sempre mostrar o conteúdo da rota e a navegação é livre. */
+  disableRequisitanteMode?: boolean
 }
 
 // ── Avatar helpers (shared, extracted once) ────────────────────────────────────
@@ -382,7 +386,7 @@ export default function ModuleLayout({
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
   const moduloPapel = getPapelForModule(config.moduleKey)
-  const isRequisitante = !isAdmin && moduloPapel === 'requisitante'
+  const isRequisitante = !isAdmin && moduloPapel === 'requisitante' && !config.disableRequisitanteMode
   const visibleNavForRole = useMemo(() => {
     if (isRequisitante) return visibleNav.filter(isNovaSolicitacaoItem)
     return visibleNav
