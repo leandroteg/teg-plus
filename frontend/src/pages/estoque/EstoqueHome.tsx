@@ -6,8 +6,9 @@ import {
   ArrowLeftRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useEstoqueKPIs, useSaldosAbaixoMinimo, useMovimentacoes, useSolicitacoes, useAguardandoEntrada, useLiberadosRetirada } from '../../hooks/useEstoque'
+import { useEstoqueKPIs, useSaldosAbaixoMinimo, useMovimentacoes, useSolicitacoes, useAguardandoEntrada, useLiberadosRetirada, useBases } from '../../hooks/useEstoque'
 import { useCautelas } from '../../hooks/useCautelas'
+import { useAuth } from '../../contexts/AuthContext'
 
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
@@ -103,6 +104,9 @@ export default function EstoqueHome() {
   const { data: cautelasEmAberto = [] } = useCautelas({ status: 'em_aberto' })
   const { data: aguardandoEntrada = [] } = useAguardandoEntrada()
   const { data: liberadosRetirada = [] } = useLiberadosRetirada()
+  const { data: bases = [] } = useBases()
+  const { perfil, isAdmin } = useAuth()
+  const isTriador = isAdmin || Boolean((bases.find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
 
   const cardClass = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -161,6 +165,27 @@ export default function EstoqueHome() {
           <RefreshCw size={16} />
         </button>
       </div>
+
+      {/* Aviso de triagem — só para quem está lotado no CD (faz triagem) */}
+      {isTriador && solicitacoesPendentes.length > 0 && (
+        <button
+          onClick={() => nav('/estoque/solicitacoes')}
+          className={`w-full flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+            isDark ? 'border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/15' : 'border-amber-300 bg-amber-50 hover:bg-amber-100'
+          }`}
+        >
+          <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+            <FileText size={16} className="text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+              {solicitacoesPendentes.length} {solicitacoesPendentes.length === 1 ? 'solicitação nova aguardando triagem' : 'solicitações novas aguardando triagem'}
+            </p>
+            <p className={`text-xs ${isDark ? 'text-amber-200/70' : 'text-amber-700'}`}>Atenda pelo estoque ou encaminhe ao Compras</p>
+          </div>
+          <ArrowRight size={16} className="text-amber-600 shrink-0" />
+        </button>
+      )}
 
       {/* Hero 2 colunas */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
