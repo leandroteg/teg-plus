@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Package2, ArrowLeftRight,
-  ClipboardList, Plus, KeyRound, History, FileBox,
+  ClipboardList, Plus, KeyRound, History, FileBox, Truck,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -19,6 +19,7 @@ export default function EstoqueLayout() {
       accent: true,
     },
     { to: '/estoque/solicitacoes', icon: FileBox, label: 'Solicitações', end: false },
+    { to: '/estoque/recebimentos', icon: Truck, label: 'Recebimentos', end: false },
     { to: '/estoque/cautelas', icon: KeyRound, label: 'Cautelas', end: false },
     { to: '/estoque/itens', icon: Package2, label: 'Estoque', end: false },
     { to: '/estoque/inventario', icon: ClipboardList, label: 'Invent\u00e1rio', end: false },

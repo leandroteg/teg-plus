@@ -105,6 +105,10 @@ export default function RecebimentoModal({
       setErro('Informe a quantidade recebida em pelo menos 1 item.')
       return
     }
+    if (!nfNumero.trim()) {
+      setErro('Informe o numero da Nota Fiscal (necessaria para liberar o pagamento).')
+      return
+    }
     if (temOverrideSemJustificativa) {
       setErro('Preencha a justificativa dos itens com destino alterado.')
       return
@@ -189,6 +193,34 @@ export default function RecebimentoModal({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* ── Nota Fiscal (obrigatoria p/ liberar pagamento) ───── */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    <FileText size={12} className="inline mr-1 -mt-0.5" />
+                    Nota Fiscal <span className="text-red-500">*</span>
+                  </label>
+                  <UpperInput
+                    value={nfNumero}
+                    onChange={e => setNfNumero(e.target.value)}
+                    placeholder="Numero da NF"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    <Hash size={12} className="inline mr-1 -mt-0.5" />
+                    Chave (opcional)
+                  </label>
+                  <UpperInput
+                    value={nfChave}
+                    onChange={e => setNfChave(e.target.value)}
+                    placeholder="Chave de acesso"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300"
+                  />
+                </div>
               </div>
 
               {/* ── Items table ───────────────────────────────────── */}

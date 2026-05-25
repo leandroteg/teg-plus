@@ -18,7 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
-          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
+          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
           comprador:cmp_compradores(nome)
         `)
         .order('data_prevista_entrega', { ascending: true })
@@ -82,6 +82,20 @@ export function useLiberarPagamento() {
   const { perfil } = useAuth()
   return useMutation({
     mutationFn: async ({ pedidoId, imposto }: { pedidoId: string; imposto?: ImpostoPayload | null }) => {
+      // Trava: so libera pagamento apos recebimento confirmado E com nota fiscal
+      const { data: ped, error: pedErr } = await supabase
+        .from('cmp_pedidos')
+        .select('status, nf_numero')
+        .eq('id', pedidoId)
+        .single()
+      if (pedErr) throw pedErr
+      if (!ped || !['entregue', 'parcialmente_recebido'].includes(ped.status)) {
+        throw new Error('So e possivel liberar pagamento apos a confirmacao do recebimento pelo destino/CD.')
+      }
+      if (!ped.nf_numero) {
+        throw new Error('Anexe a Nota Fiscal (no recebimento) antes de liberar o pagamento.')
+      }
+
       const { error } = await supabase
         .from('cmp_pedidos')
         .update({

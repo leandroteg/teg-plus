@@ -148,6 +148,9 @@ export function useCriarRecebimento() {
       if (!perfil?.id) {
         throw new Error('Perfil do usuario nao carregado para registrar o recebimento.')
       }
+      if (!nfNumero?.trim()) {
+        throw new Error('Informe o numero da Nota Fiscal para confirmar o recebimento (necessaria p/ liberar pagamento).')
+      }
 
       // 1. Create recebimento header
       const { data: rec, error: recErr } = await supabase
@@ -203,14 +206,15 @@ export function useCriarRecebimento() {
       const totalRecebido = itensToInsert.reduce((s, i) => s + i.quantidade_recebida, 0)
       const novoStatus = totalRecebido < totalEsperado ? 'parcialmente_recebido' : 'entregue'
 
-      const { error: pedErr } = await supabase
-        .from('cmp_pedidos')
-        .update({
-          status: novoStatus,
-          data_entrega_real: dataRecebimento,
-          qtd_itens_recebidos: itensToInsert.length,
-        })
-        .eq('id', pedidoId)
+      // Aplica status no pedido via RPC SECURITY DEFINER (o recebedor do estoque nao
+      // tem UPDATE em cmp_pedidos; a RLS de cmp_recebimentos ja gateou quem pode receber).
+      const { error: pedErr } = await supabase.rpc('cmp_aplicar_recebimento', {
+        p_pedido_id: pedidoId,
+        p_status: novoStatus,
+        p_nf: nfNumero || null,
+        p_qtd: itensToInsert.length,
+        p_data: dataRecebimento,
+      })
 
       if (pedErr) throw new Error('Recebimento registrado, mas erro ao atualizar status do pedido: ' + pedErr.message)
 
