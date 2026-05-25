@@ -37,10 +37,14 @@
 <body>
 <div class="wrap">
   <h1>TEG<span class="plus">+</span> · Fluxo da Requisição de Compra</h1>
-  <div class="sub">Status reais do sistema + quem dispara cada transição. <span class="tag">NOVO</span> = ajustes desta entrega.</div>
+  <div class="sub">Duas fases: <b>CD (triagem de estoque)</b> → <b>Compras (RC)</b>. Status reais do sistema + quem dispara cada transição. <span class="tag">NOVO</span> = ajustes desta entrega.</div>
 
-  <!-- Stepper das 7 etapas -->
+  <!-- Stepper -->
   <div class="steps">
+    <div class="step" style="border-color:#155e75;background:#0c2a33">
+      <div class="n" style="background:#22d3ee;color:#062a33">0</div>
+      <div><b>CD / Triagem</b><small>solicitação · atende do estoque</small></div>
+    </div>
     <div class="step"><div class="n">1</div><div><b>Requisição</b><small>rascunho · pendente</small></div></div>
     <div class="step"><div class="n">2</div><div><b>Valid. Técnica</b><small>em_aprovacao</small></div></div>
     <div class="step"><div class="n">3</div><div><b>Cotação</b><small>em_cotacao</small></div></div>
@@ -53,31 +57,49 @@
   <div class="card">
     <pre class="mermaid">
 flowchart TD
-  A([Requisitante cria RC]):::start --> R[rascunho]:::draft
-  R -->|requisitante envia| AP{{"Validacao Tecnica<br/>pendente / em_aprovacao"}}:::review
+  subgraph CD["1) CD - Solicitacao de Material (estoque / triagem)"]
+    direction TB
+    SOL([Solicitante cria solicitacao]):::start --> SAB[aberta]:::draft
+    SAB -->|"triador do CD (faz_triagem): Aprovar"| SAP[aprovada]:::ok
+    SAB -->|Cancelar| SCAN[/"cancelada (fim)"/]:::bad
+    SAP -->|Iniciar separacao| SEP[em_separacao]:::phase
+    SEP -->|"Atender itens pelo estoque (baixa de saldo)"| SAT[atendida]:::ok
+    SEP -->|Atende so parte| SPA[parcial]:::warn
+    SPA --> SAT
+    SEP -->|"triador: Encaminhar p/ Compras (o que falta)"| ENC[encaminhada_compras]:::bridge
+    SPA -->|"triador: Encaminhar p/ Compras (saldo nao atendido)"| ENC
+  end
 
-  AP -->|"aprovador: Aprovar"| APV[aprovada]:::ok
-  AP -->|"aprovador: Rejeitar"| REJ[/"rejeitada (fim)"/]:::bad
-  AP -->|"aprovador: Esclarecer"| ESC[em_esclarecimento]:::warn
-  AP -. "NOVO: aprovador edita itens" .-> AP
+  ENC ==>|"gera RC (cmp_requisicao_id)"| AP
 
-  ESC -->|"NOVO: requisitante responde / edita e reenvia (+ push)"| AP
-  ESC -->|"comprador responde / edita e reenvia"| AP
+  subgraph CMP["2) Compras - Requisicao (RC)"]
+    direction TB
+    RQ([Requisitante cria RC direto]):::start --> R[rascunho]:::draft
+    R -->|envia| AP{{"Validacao Tecnica<br/>pendente / em_aprovacao"}}:::review
 
-  APV -->|"comprador: enviar p/ cotacao"| COT[em_cotacao]:::phase
-  COT -->|"comprador envia cotacao"| COTE[cotacao_enviada]:::review
-  COT -. "cotador devolve" .-> DEV[devolvida_solicitante]:::warn
-  DEV -->|"requisitante ajusta e reenvia"| AP
+    AP -->|"aprovador: Aprovar"| APV[aprovada]:::ok
+    AP -->|"aprovador: Rejeitar"| REJ[/"rejeitada (fim)"/]:::bad
+    AP -->|"aprovador: Esclarecer"| ESC[em_esclarecimento]:::warn
+    AP -. "NOVO: aprovador edita itens" .-> AP
 
-  COTE -->|"admin/diretor: Aprovar Fin."| COTA[cotacao_aprovada]:::ok
-  COTE -->|"admin/diretor: Rejeitar"| COTR[/"cotacao_rejeitada (fim)"/]:::bad
-  COTE -->|"admin/diretor: Esclarecer"| CESC[cotacao_em_esclarecimento]:::warn
-  CESC -->|"comprador responde e reenvia"| COTE
+    ESC -->|"NOVO: requisitante responde / edita e reenvia (+ push)"| AP
+    ESC -->|"comprador responde / edita e reenvia"| AP
 
-  COTA -->|"comprador: emitir pedido"| PED[pedido_emitido]:::phase
-  PED --> ENT[Entrega<br/>em_entrega / entregue]:::phase
-  ENT --> PG[Pagamento<br/>aguardando_pgto / pago]:::phase
-  PG --> FIM([Concluido / pago]):::start
+    APV -->|"comprador: enviar p/ cotacao"| COT[em_cotacao]:::phase
+    COT -->|"comprador envia cotacao"| COTE[cotacao_enviada]:::review
+    COT -. "cotador devolve" .-> DEV[devolvida_solicitante]:::warn
+    DEV -->|"requisitante ajusta e reenvia"| AP
+
+    COTE -->|"admin/diretor: Aprovar Fin."| COTA[cotacao_aprovada]:::ok
+    COTE -->|"admin/diretor: Rejeitar"| COTR[/"cotacao_rejeitada (fim)"/]:::bad
+    COTE -->|"admin/diretor: Esclarecer"| CESC[cotacao_em_esclarecimento]:::warn
+    CESC -->|"comprador responde e reenvia"| COTE
+
+    COTA -->|"comprador: emitir pedido"| PED[pedido_emitido]:::phase
+    PED --> ENT[Entrega<br/>em_entrega / entregue]:::phase
+    ENT --> PG[Pagamento<br/>aguardando_pgto / pago]:::phase
+    PG --> FIM([Concluido / pago]):::start
+  end
 
   classDef start fill:#0d9488,stroke:#5eead4,color:#ecfeff,font-weight:bold;
   classDef draft fill:#1f2937,stroke:#64748b,color:#e5e7eb;
@@ -86,6 +108,7 @@ flowchart TD
   classDef warn fill:#92400e,stroke:#fcd34d,color:#fffbeb;
   classDef bad fill:#7f1d1d,stroke:#fca5a5,color:#fef2f2;
   classDef phase fill:#1e293b,stroke:#94a3b8,color:#e2e8f0;
+  classDef bridge fill:#155e75,stroke:#67e8f9,color:#ecfeff,font-weight:bold;
     </pre>
   </div>
 
@@ -96,11 +119,15 @@ flowchart TD
       <span><i class="dot" style="background:#92400e"></i> Esclarecimento / devolução (volta atrás)</span>
       <span><i class="dot" style="background:#7f1d1d"></i> Rejeitado (fim)</span>
       <span><i class="dot" style="background:#1e293b"></i> Fase operacional</span>
+      <span><i class="dot" style="background:#155e75"></i> Elo CD → Compras (implementado)</span>
     </div>
   </div>
 
   <div class="card notes">
     <ul>
+      <li><b>Etapa CD (triagem):</b> a Solicitação de Material entra como <code>aberta</code>; o <b>triador do CD</b> (lotação com <code>faz_triagem</code>) aprova, separa e <b>atende pelo estoque</b> (baixa de saldo) — total (<code>atendida</code>) ou <code>parcial</code>. Só o que <b>falta em estoque</b> deveria seguir para Compras.</li>
+      <li><span class="tag">NOVO</span> <b>Elo CD → Compras (implementado):</b> botão <b>"Encaminhar p/ Compras"</b> na triagem chama o RPC <code>est_encaminhar_solicitacao_compras</code>, que gera a RC (<code>em_aprovacao</code>, com aprovação pendente) dos itens sem saldo e marca a solicitação como <code>encaminhada_compras</code> (vínculo <code>cmp_requisicao_id</code>).</li>
+      <li><b>Gap conhecido:</b> "Atender pelo estoque" exige <code>base_destino_id</code> na solicitação, mas o formulário "Nova Solicitação" ainda não captura a base de destino → atender falha até isso ser corrigido.</li>
       <li><span class="tag">NOVO</span> <b>Esclarecimento técnico</b> (<code>em_esclarecimento</code>) volta para a etapa Requisição; quem responde agora é o <b>requisitante dono</b> (antes só comprador), com <b>push</b> avisando.</li>
       <li><span class="tag">NOVO</span> <b>Editar itens</b>: o requisitante edita ao responder o esclarecimento; o <b>aprovador</b> edita direto em <code>pendente</code>/<code>em_aprovacao</code> ao pedir esclarecimento.</li>
       <li><span class="tag">NOVO</span> <b>Antes/depois</b>: qualquer edição de itens grava um registro de histórico, exibido na RC para todos (requisitante e comprador).</li>
