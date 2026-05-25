@@ -234,6 +234,26 @@ export function useAtenderItemSolicitacao() {
   })
 }
 
+// Encaminha o pendente da solicitacao para Compras (gera RC via RPC)
+export function useEncaminharParaCompras() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (solicitacaoId: string): Promise<string> => {
+      const { data, error } = await supabase.rpc('est_encaminhar_solicitacao_compras', {
+        p_solicitacao_id: solicitacaoId,
+      })
+      if (error) throw error
+      return data as string // id da RC criada
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 export function useRegistrarMovimentacao() {
   const qc = useQueryClient()
   return useMutation({
@@ -274,7 +294,7 @@ export function useSolicitacoes(status?: StatusSolicitacao) {
   })
 }
 
-type StatusSolicitacao = 'aberta' | 'aprovada' | 'em_separacao' | 'atendida' | 'parcial' | 'cancelada'
+type StatusSolicitacao = 'aberta' | 'aprovada' | 'em_separacao' | 'atendida' | 'parcial' | 'cancelada' | 'encaminhada_compras'
 
 export function useCriarSolicitacao() {
   const qc = useQueryClient()

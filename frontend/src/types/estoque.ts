@@ -14,7 +14,7 @@ export type TipoMovimentacao =
   | 'devolucao'
   | 'baixa'
 
-export type StatusSolicitacao = 'aberta' | 'aprovada' | 'em_separacao' | 'atendida' | 'parcial' | 'cancelada'
+export type StatusSolicitacao = 'aberta' | 'aprovada' | 'em_separacao' | 'atendida' | 'parcial' | 'cancelada' | 'encaminhada_compras'
 export type TipoInventario = 'ciclico' | 'periodico' | 'surpresa'
 export type StatusInventario = 'aberto' | 'em_contagem' | 'concluido' | 'cancelado'
 export type StatusImobilizado = 'ativo' | 'em_manutencao' | 'cedido' | 'baixado' | 'em_transferencia' | 'pendente_registro'
@@ -174,6 +174,7 @@ export interface EstSolicitacao {
   aprovado_em?: string
   criado_em: string
   atualizado_em: string
+  cmp_requisicao_id?: string | null
   itens?: EstSolicitacaoItem[]
 }
 

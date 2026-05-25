@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import {
   FileBox, Plus, X, Save, Loader2, Trash2,
-  CheckCircle2, PackageCheck, Clock, Ban,
+  CheckCircle2, PackageCheck, Clock, Ban, ShoppingCart,
   ChevronDown, ChevronRight,
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarSolicitacao,
-  useEstoqueItens, useAtenderItemSolicitacao, useBases,
+  useEstoqueItens, useAtenderItemSolicitacao, useBases, useEncaminharParaCompras,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -21,6 +21,7 @@ const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text
   atendida:     { label: 'Atendida',     bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-500'   },
   parcial:      { label: 'Parcial',      bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   cancelada:    { label: 'Cancelada',    bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
+  encaminhada_compras: { label: 'Encaminhada p/ Compras', bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
 }
 
 const URGENCIA_CONFIG = {
@@ -68,6 +69,7 @@ export default function Solicitacoes() {
   const criarSolicitacao = useCriarSolicitacao()
   const atualizarSolicitacao = useAtualizarSolicitacao()
   const atenderItem = useAtenderItemSolicitacao()
+  const encaminhar = useEncaminharParaCompras()
   const canApproveSaida = hasSetorPapel('estoque', ['supervisor', 'diretor', 'ceo'])
     || hasSetorPapel('patrimonial', ['supervisor', 'diretor', 'ceo'])
 
@@ -242,6 +244,29 @@ export default function Solicitacoes() {
                           )
                         })}
                       </div>
+                    )}
+
+                    {/* Encaminhar pendente para Compras (triador) */}
+                    {isTriador && sol.status !== 'cancelada' && sol.status !== 'encaminhada_compras' && !sol.cmp_requisicao_id
+                      && (sol.itens ?? []).some(i => (i.quantidade - Number((i as any).quantidade_atendida ?? 0)) > 0) && (
+                      <div className="pt-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); encaminhar.mutate(sol.id) }}
+                          disabled={encaminhar.isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700
+                            text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                          title="Gera uma Requisicao de Compra com os itens sem saldo em estoque"
+                        >
+                          {encaminhar.isPending ? <Loader2 size={12} className="animate-spin" /> : <ShoppingCart size={12} />}
+                          Encaminhar p/ Compras
+                        </button>
+                      </div>
+                    )}
+
+                    {encaminhar.isError && (
+                      <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                        {(encaminhar.error as Error)?.message ?? 'Falha ao encaminhar para Compras.'}
+                      </p>
                     )}
                   </div>
                 )}
