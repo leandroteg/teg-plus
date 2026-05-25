@@ -305,6 +305,8 @@ export function useCriarSolicitacao() {
       centro_custo?: string
       urgencia: string
       observacao?: string
+      base_destino_id?: string
+      solicitante_id?: string
       itens: { item_id?: string; descricao_livre?: string; quantidade: number; unidade?: string }[]
     }) => {
       const { itens, ...solicitacao } = payload

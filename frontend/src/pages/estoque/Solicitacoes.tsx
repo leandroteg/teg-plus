@@ -10,7 +10,7 @@ import {
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
+import type { EstSolicitacao, StatusSolicitacao, EstBase } from '../../types/estoque'
 import NumericInput from '../../components/NumericInput'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
@@ -286,6 +286,9 @@ export default function Solicitacoes() {
           }}
           saving={criarSolicitacao.isPending}
           isLight={isLight}
+          bases={bases}
+          defaultBaseId={perfil?.base_id ?? ''}
+          solicitanteId={perfil?.id}
         />
       )}
     </div>
@@ -294,7 +297,7 @@ export default function Solicitacoes() {
 
 // -- Nova Solicitacao Modal --------------------------------------------------------
 function NovaSolicitacaoModal({
-  onClose, onSave, saving, isLight
+  onClose, onSave, saving, isLight, bases, defaultBaseId, solicitanteId
 }: {
   onClose: () => void
   onSave: (data: {
@@ -303,16 +306,22 @@ function NovaSolicitacaoModal({
     centro_custo?: string
     urgencia: string
     observacao?: string
+    base_destino_id?: string
+    solicitante_id?: string
     itens: ItemForm[]
   }) => void
   saving: boolean
   isLight: boolean
+  bases: EstBase[]
+  defaultBaseId?: string
+  solicitanteId?: string
 }) {
   const [solicitante, setSolicitante] = useState('')
   const [obra, setObra] = useState('')
   const [centroCusto, setCentroCusto] = useState('')
   const [urgencia, setUrgencia] = useState('normal')
   const [observacao, setObservacao] = useState('')
+  const [baseDestino, setBaseDestino] = useState(defaultBaseId ?? '')
   const [itens, setItens] = useState<ItemForm[]>([{ quantidade: 1 }])
 
   const { data: catalogoItens = [] } = useEstoqueItens()
@@ -330,13 +339,15 @@ function NovaSolicitacaoModal({
   }
 
   function handleSubmit() {
-    if (!solicitante || !obra || itens.length === 0) return
+    if (!solicitante || !obra || !baseDestino || itens.length === 0) return
     onSave({
       solicitante_nome: solicitante,
       obra_nome: obra,
       centro_custo: centroCusto || undefined,
       urgencia,
       observacao: observacao || undefined,
+      base_destino_id: baseDestino,
+      solicitante_id: solicitanteId,
       itens: itens.filter(i => i.item_id || i.descricao_livre),
     })
   }
@@ -387,6 +398,19 @@ function NovaSolicitacaoModal({
                 <option value="critica">Critica</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Base de destino (canteiro) *</label>
+            <select value={baseDestino} onChange={e => setBaseDestino(e.target.value)} className={inputCls}>
+              <option value="">Selecione a base de destino...</option>
+              {bases.map(b => (
+                <option key={b.id} value={b.id}>{b.nome}</option>
+              ))}
+            </select>
+            <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+              Para onde o material vai (necessario para atender pelo estoque).
+            </p>
           </div>
 
           <div>
@@ -464,7 +488,7 @@ function NovaSolicitacaoModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || !solicitante || !obra || itens.length === 0}
+            disabled={saving || !solicitante || !obra || !baseDestino || itens.length === 0}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700
               text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm"
           >
