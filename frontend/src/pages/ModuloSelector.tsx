@@ -30,6 +30,9 @@ interface SubMod {
   active: boolean
   route: string
   adminOnly?: boolean
+  /** Chave usada na checagem de permissão (hasModule) quando difere de `key`.
+   *  Ex: cards de RH (headcount/cultura) são gateados pelo módulo 'rh'. */
+  moduleKey?: string
 }
 
 interface Pillar {
@@ -104,10 +107,10 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount' },
+      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount', moduleKey: 'rh' },
       { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
       { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
-      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura', moduleKey: 'rh' },
       { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: false, route: '' },
     ],
   },
@@ -167,7 +170,7 @@ function getAvatarColor(name: string) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function ModuloSelector() {
-  const { perfil, isAdmin, signOut } = useAuth()
+  const { perfil, isAdmin, hasModule, signOut } = useAuth()
   const { isLightSidebar: _isLightSidebar, theme, setTheme } = useTheme()
   // Mandala: original = fundo claro + efeitos coloridos; dark = tudo escuro; light = tudo claro
   const isLight = theme === 'light' || theme === 'original' // fundo e texto claro
@@ -207,9 +210,23 @@ export default function ModuloSelector() {
     }
   }, [])
 
+  // Pode entrar agora: módulo construído (active) E com permissão (admin ou hasModule)
   function canAccessSub(sub: SubMod) {
-    if (sub.adminOnly && isAdmin) return true
-    return sub.active
+    if (!sub.active) return false
+    if (sub.adminOnly) return isAdmin
+    return hasModule(sub.moduleKey ?? sub.key)
+  }
+
+  // Visível na mandala: teasers "Em breve" (active:false) aparecem p/ todos;
+  // módulos ativos só aparecem para quem tem permissão no módulo.
+  function isSubVisible(sub: SubMod) {
+    if (!sub.active) return true
+    if (sub.adminOnly) return isAdmin
+    return hasModule(sub.moduleKey ?? sub.key)
+  }
+
+  function visibleSubs(p: Pillar) {
+    return p.subs.filter(isSubVisible)
   }
 
   function activeCount(p: Pillar) {
@@ -217,6 +234,7 @@ export default function ModuloSelector() {
   }
 
   function handleOpenPillar(p: Pillar) {
+    if (visibleSubs(p).length === 0) return
     setOpenPillar(p)
     requestAnimationFrame(() => setOverlayVisible(true))
   }
@@ -632,7 +650,7 @@ export default function ModuloSelector() {
             const x = R * Math.cos(angle)
             const y = R * Math.sin(angle)
             const active = activeCount(p)
-            const total = p.subs.length
+            const total = visibleSubs(p).length
             const hasActive = active > 0
 
             return (
@@ -776,7 +794,7 @@ export default function ModuloSelector() {
 
             {/* Sub-module Mandala Content */}
             <div className="px-4 py-6 flex justify-center">
-              <SubMandalaView pillar={openPillar} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} isGlow={isGlow} theme={theme} />
+              <SubMandalaView pillar={openPillar} subs={visibleSubs(openPillar)} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} isGlow={isGlow} theme={theme} />
             </div>
           </div>
         </div>
@@ -885,8 +903,9 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
 //  SUB-MODULE MANDALA VIEW — Radial layout inside overlay
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function SubMandalaView({ pillar, onNav, canAccess, visible, isLight, isGlow, theme }: {
+function SubMandalaView({ pillar, subs, onNav, canAccess, visible, isLight, isGlow, theme }: {
   pillar: Pillar
+  subs: SubMod[]
   onNav: (r: string) => void
   canAccess: (s: SubMod) => boolean
   visible: boolean
@@ -904,7 +923,6 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight, isGlow, th
     setEntered(false)
   }, [visible])
 
-  const subs = pillar.subs
   const count = subs.length
 
   // Dynamic radius based on number of modules — bigger for readability
