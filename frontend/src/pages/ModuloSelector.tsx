@@ -95,6 +95,7 @@ const PILLARS: Pillar[] = [
       { key: 'fiscal', label: 'Fiscal', desc: 'Notas fiscais e créditos PIS/COFINS', Icon: Receipt, active: true, route: '/fiscal' },
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: true, route: '/controladoria' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
+      { key: 'cadastros', label: 'Cadastros', desc: 'Cadastros gerais do sistema', Icon: Settings, active: true, route: '/cadastros' },
     ],
   },
   {
@@ -232,6 +233,10 @@ export default function ModuloSelector() {
   function activeCount(p: Pillar) {
     return p.subs.filter(s => canAccessSub(s)).length
   }
+
+  // Pilar só aparece na mandala se o usuário tem ao menos um módulo real acessível nele.
+  // (Esconde RH/Projetos para quem não tem o módulo; pilares 100% "Em breve" somem para todos.)
+  const visiblePillars = PILLARS.filter(p => activeCount(p) > 0)
 
   function handleOpenPillar(p: Pillar) {
     if (visibleSubs(p).length === 0) return
@@ -586,15 +591,15 @@ export default function ModuloSelector() {
             />
 
             {/* Connecting lines from center to each pillar + midpoint dots */}
-            {PILLARS.map((p, i) => {
-              const angle = (-90 + (360 / 6) * i) * (Math.PI / 180)
+            {visiblePillars.map((p, i) => {
+              const angle = (-90 + (360 / visiblePillars.length) * i) * (Math.PI / 180)
               const ex = cx + R * Math.cos(angle)
               const ey = cy + R * Math.sin(angle)
               const mx = (cx + ex) / 2
               const my = (cy + ey) / 2
 
               return (
-                <g key={i}>
+                <g key={p.key}>
                   <line
                     x1={cx} y1={cy} x2={ex} y2={ey}
                     stroke={p.accent} strokeWidth="1" strokeDasharray="4 6"
@@ -645,8 +650,8 @@ export default function ModuloSelector() {
           </button>
 
           {/* ── Orbital pillar nodes ────────────────────────────── */}
-          {PILLARS.map((p, i) => {
-            const angle = (-90 + (360 / 6) * i) * (Math.PI / 180)
+          {visiblePillars.map((p, i) => {
+            const angle = (-90 + (360 / visiblePillars.length) * i) * (Math.PI / 180)
             const x = R * Math.cos(angle)
             const y = R * Math.sin(angle)
             const active = activeCount(p)
