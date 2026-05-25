@@ -182,7 +182,8 @@ export default function Solicitacoes() {
                           {sol.itens.map(item => {
                             const atendida = Number((item as any).quantidade_atendida ?? 0)
                             const pend = item.quantidade - atendida
-                            const podeAtender = isTriador && Boolean(item.item_id) && pend > 0 && sol.status !== 'cancelada'
+                            const podeAtender = isTriador && Boolean(item.item_id) && pend > 0
+                              && sol.status !== 'cancelada' && sol.status !== 'encaminhada_compras'
                             return (
                             <div key={item.id} className="flex items-center justify-between gap-2 py-1.5">
                               <span className={`text-xs flex-1 min-w-0 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
