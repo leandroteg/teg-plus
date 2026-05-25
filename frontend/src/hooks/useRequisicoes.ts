@@ -825,3 +825,31 @@ export function useHistoricoAlteracoesItens(requisicaoId?: string) {
     },
   })
 }
+
+// ── Saldo em estoque dos itens da RC (agregado por item do catálogo) ──────────
+export interface SaldoItem { saldo: number; reservado: number; disponivel: number }
+
+export function useSaldosPorItens(itemIds: (string | null | undefined)[]) {
+  const ids = Array.from(new Set(itemIds.filter((x): x is string => Boolean(x))))
+  return useQuery({
+    queryKey: ['saldos-itens', [...ids].sort()],
+    enabled: ids.length > 0,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Record<string, SaldoItem>> => {
+      const { data, error } = await supabase
+        .from('est_saldos')
+        .select('item_id, saldo, saldo_reservado')
+        .in('item_id', ids)
+      if (error) throw error
+      const map: Record<string, SaldoItem> = {}
+      for (const row of (data ?? []) as any[]) {
+        const cur = map[row.item_id] ?? { saldo: 0, reservado: 0, disponivel: 0 }
+        cur.saldo += Number(row.saldo ?? 0)
+        cur.reservado += Number(row.saldo_reservado ?? 0)
+        cur.disponivel = cur.saldo - cur.reservado
+        map[row.item_id] = cur
+      }
+      return map
+    },
+  })
+}

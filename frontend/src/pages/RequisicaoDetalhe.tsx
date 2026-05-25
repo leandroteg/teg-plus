@@ -4,9 +4,9 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
-  FileText, Ban, Send, Undo2, Pencil, History,
+  FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -46,6 +46,7 @@ export default function RequisicaoDetalhe() {
   const reenviarMutation = useReenviarEsclarecimento()
   const reenviarDevolucaoMutation = useReenviarAposDevolucao()
   const { data: alteracoesItens } = useHistoricoAlteracoesItens(id)
+  const { data: saldosItens } = useSaldosPorItens((req?.itens ?? []).map(i => i.est_item_id))
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
@@ -478,7 +479,27 @@ export default function RequisicaoDetalhe() {
                 <tbody>
                   {req.itens.map((item, idx) => (
                     <tr key={item.id ?? idx} className="border-t border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
+                      <td className="px-3 py-2 text-slate-700">
+                        {item.descricao}
+                        {item.est_item_id && saldosItens && (() => {
+                          const s = saldosItens[item.est_item_id] ?? { saldo: 0, reservado: 0, disponivel: 0 }
+                          const cobre = s.disponivel >= item.quantidade
+                          const parcial = s.disponivel > 0 && s.disponivel < item.quantidade
+                          const cls = cobre
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : parcial
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          return (
+                            <span
+                              title={s.reservado > 0 ? `Saldo ${s.saldo} − ${s.reservado} reservado` : `Saldo ${s.saldo}`}
+                              className={`mt-1 flex w-fit items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold ${cls}`}
+                            >
+                              <Boxes size={11} /> Estoque: {s.disponivel} {item.unidade} disp.
+                            </span>
+                          )
+                        })()}
+                      </td>
                       <td className="px-3 py-2 text-right font-mono text-slate-600">{item.quantidade}</td>
                       <td className="px-3 py-2 text-right text-xs text-slate-500">{item.unidade}</td>
                       <td className="px-3 py-2 text-right font-mono text-xs text-slate-600">{fmt(item.valor_unitario_estimado)}</td>
