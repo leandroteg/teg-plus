@@ -154,6 +154,7 @@ export interface Perfil {
   alterar_senha_proximo_login: boolean
   role_id: string | null
   colaborador_id: string | null
+  base_id: string | null
   ultimo_acesso: string | null
   created_at: string
   updated_at: string

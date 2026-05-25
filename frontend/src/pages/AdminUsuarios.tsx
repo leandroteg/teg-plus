@@ -17,6 +17,7 @@ import {
   ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, MODULOS_ERP_GROUPED,
 } from '../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS } from '../constants/contratos'
+import { useBases } from '../hooks/useEstoque'
 
 const INTERNAL_LOGIN_DOMAIN = 'login.teg.local'
 const INTERNAL_SIGNUP_DOMAIN = 'login.teg.local.com'
@@ -724,7 +725,9 @@ function UserDetailPanel({
   const update = useUpdateUser()
   const changePwd = useChangePassword()
   const [editing, setEditing] = useState(false)
+  const { data: bases = [] } = useBases()
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
+  const [baseId, setBaseId] = useState<string>(user.base_id ?? '')
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
@@ -775,6 +778,7 @@ function UserDetailPanel({
       alcada_nivel: alcada,
       ativo,
       alterar_senha_proximo_login: altProxLogin,
+      base_id: baseId || null,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
@@ -784,6 +788,7 @@ function UserDetailPanel({
 
   const handleCancel = () => {
     setPapelGlobal(resolvePapelFromPerfil(user))
+    setBaseId(user.base_id ?? '')
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
@@ -918,6 +923,28 @@ function UserDetailPanel({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Lotação / Base */}
+          <div>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Lotação / Base
+            </label>
+            <select
+              value={baseId}
+              onChange={e => setBaseId(e.target.value)}
+              className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
+            >
+              <option value="">Escritório / sem vínculo (compra direta)</option>
+              {bases.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.nome}{(b as any).faz_triagem ? ' — CD (triagem)' : (b as any).tipo === 'canteiro' ? ' — canteiro' : ''}
+                </option>
+              ))}
+            </select>
+            <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Canteiro: abre Requisição de Material (vai à triagem). CD: decide na triagem. Escritório/sem vínculo: compra direta.
+            </p>
           </div>
 
           {/* Alçada */}

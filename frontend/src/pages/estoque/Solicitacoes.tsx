@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarSolicitacao,
-  useEstoqueItens,
+  useEstoqueItens, useAtenderItemSolicitacao,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -64,6 +64,7 @@ export default function Solicitacoes() {
   )
   const criarSolicitacao = useCriarSolicitacao()
   const atualizarSolicitacao = useAtualizarSolicitacao()
+  const atenderItem = useAtenderItemSolicitacao()
   const canApproveSaida = hasSetorPapel('estoque', ['supervisor', 'diretor', 'ceo'])
     || hasSetorPapel('patrimonial', ['supervisor', 'diretor', 'ceo'])
 
@@ -173,16 +174,33 @@ export default function Solicitacoes() {
                       <div>
                         <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Itens Solicitados</p>
                         <div className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-                          {sol.itens.map(item => (
-                            <div key={item.id} className="flex items-center justify-between py-1.5">
-                              <span className={`text-xs ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                          {sol.itens.map(item => {
+                            const atendida = Number((item as any).quantidade_atendida ?? 0)
+                            const pend = item.quantidade - atendida
+                            const podeAtender = canApproveSaida && Boolean(item.item_id) && pend > 0 && sol.status !== 'cancelada'
+                            return (
+                            <div key={item.id} className="flex items-center justify-between gap-2 py-1.5">
+                              <span className={`text-xs flex-1 min-w-0 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
                                 {item.item?.descricao ?? item.descricao_livre ?? '--'}
+                                {!item.item_id && <span className="ml-1 text-[10px] text-amber-500">(texto livre)</span>}
                               </span>
-                              <span className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                                {item.quantidade} {item.unidade ?? item.item?.unidade ?? ''}
+                              <span className={`text-xs font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                {atendida > 0 ? `${atendida}/${item.quantidade}` : item.quantidade} {item.unidade ?? item.item?.unidade ?? ''}
                               </span>
+                              {podeAtender && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); atenderItem.mutate({ itemId: item.id, quantidade: pend }) }}
+                                  disabled={atenderItem.isPending}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold transition-colors disabled:opacity-50 shrink-0"
+                                  title="Transferir do CD Araxá para o canteiro e baixar o estoque"
+                                >
+                                  {atenderItem.isPending ? <Loader2 size={11} className="animate-spin" /> : <PackageCheck size={11} />}
+                                  Atender
+                                </button>
+                              )}
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -190,6 +208,12 @@ export default function Solicitacoes() {
                     {sol.observacao && (
                       <p className={`text-xs italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {sol.observacao}
+                      </p>
+                    )}
+
+                    {atenderItem.isError && (
+                      <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                        {(atenderItem.error as Error)?.message ?? 'Não foi possível atender pelo estoque.'}
                       </p>
                     )}
 

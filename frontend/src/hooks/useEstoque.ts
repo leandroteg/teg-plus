@@ -215,6 +215,25 @@ export function useMovimentacoes(filtros?: {
   })
 }
 
+// Triagem do CD: atende um item da solicitacao pelo estoque (transferencia CD->canteiro via RPC).
+export function useAtenderItemSolicitacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ itemId, quantidade }: { itemId: string; quantidade: number }) => {
+      const { error } = await supabase.rpc('est_solicitacao_atender_item', {
+        p_item_id: itemId,
+        p_quantidade: quantidade,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+    },
+  })
+}
+
 export function useRegistrarMovimentacao() {
   const qc = useQueryClient()
   return useMutation({
