@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TEG+ · Fluxo da Requisição de Compra</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#0f1a2e; --ink:#e6edf6; --muted:#93a4bd;
+    --teal:#14b8a6; --indigo:#6366f1; --amber:#f59e0b; --rose:#f43f5e; --emerald:#10b981; --slate:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#13213b, #0b1220);color:var(--ink);
+       font:15px/1.5 -apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;padding:28px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 2px;display:flex;align-items:center;gap:10px}
+  h1 .plus{color:var(--teal)}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 22px}
+  .step{flex:1;min-width:120px;background:var(--card);border:1px solid #1e2c47;border-radius:14px;
+        padding:10px 12px;display:flex;align-items:center;gap:10px}
+  .step .n{width:24px;height:24px;border-radius:50%;background:var(--teal);color:#04221d;font-weight:800;
+           display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .step b{font-size:13px}
+  .step small{display:block;color:var(--muted);font-size:11px}
+  .card{background:var(--card);border:1px solid #1e2c47;border-radius:18px;padding:18px;margin-bottom:18px}
+  .mermaid{background:transparent;text-align:center}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:12px;height:12px;border-radius:4px;display:inline-block}
+  .notes{font-size:13.5px;color:#cdd9ea}
+  .notes li{margin:6px 0}
+  .tag{display:inline-block;background:#1e3a8a33;color:#93c5fd;border:1px solid #3b82f655;
+       border-radius:6px;padding:0 6px;font-size:11px;font-weight:700;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TEG<span class="plus">+</span> · Fluxo da Requisição de Compra</h1>
+  <div class="sub">Status reais do sistema + quem dispara cada transição. <span class="tag">NOVO</span> = ajustes desta entrega.</div>
+
+  <!-- Stepper das 7 etapas -->
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div><b>Requisição</b><small>rascunho · pendente</small></div></div>
+    <div class="step"><div class="n">2</div><div><b>Valid. Técnica</b><small>em_aprovacao</small></div></div>
+    <div class="step"><div class="n">3</div><div><b>Cotação</b><small>em_cotacao</small></div></div>
+    <div class="step"><div class="n">4</div><div><b>Aprov. Fin.</b><small>cotacao_aprovada</small></div></div>
+    <div class="step"><div class="n">5</div><div><b>Pedido</b><small>pedido_emitido</small></div></div>
+    <div class="step"><div class="n">6</div><div><b>Entrega</b><small>em_entrega · entregue</small></div></div>
+    <div class="step"><div class="n">7</div><div><b>Pagamento</b><small>aguardando · pago</small></div></div>
+  </div>
+
+  <div class="card">
+    <pre class="mermaid">
+flowchart TD
+  A([Requisitante cria RC]):::start --> R[rascunho]:::draft
+  R -->|requisitante envia| AP{{"Validacao Tecnica<br/>pendente / em_aprovacao"}}:::review
+
+  AP -->|"aprovador: Aprovar"| APV[aprovada]:::ok
+  AP -->|"aprovador: Rejeitar"| REJ[/"rejeitada (fim)"/]:::bad
+  AP -->|"aprovador: Esclarecer"| ESC[em_esclarecimento]:::warn
+  AP -. "NOVO: aprovador edita itens" .-> AP
+
+  ESC -->|"NOVO: requisitante responde / edita e reenvia (+ push)"| AP
+  ESC -->|"comprador responde / edita e reenvia"| AP
+
+  APV -->|"comprador: enviar p/ cotacao"| COT[em_cotacao]:::phase
+  COT -->|"comprador envia cotacao"| COTE[cotacao_enviada]:::review
+  COT -. "cotador devolve" .-> DEV[devolvida_solicitante]:::warn
+  DEV -->|"requisitante ajusta e reenvia"| AP
+
+  COTE -->|"admin/diretor: Aprovar Fin."| COTA[cotacao_aprovada]:::ok
+  COTE -->|"admin/diretor: Rejeitar"| COTR[/"cotacao_rejeitada (fim)"/]:::bad
+  COTE -->|"admin/diretor: Esclarecer"| CESC[cotacao_em_esclarecimento]:::warn
+  CESC -->|"comprador responde e reenvia"| COTE
+
+  COTA -->|"comprador: emitir pedido"| PED[pedido_emitido]:::phase
+  PED --> ENT[Entrega<br/>em_entrega / entregue]:::phase
+  ENT --> PG[Pagamento<br/>aguardando_pgto / pago]:::phase
+  PG --> FIM([Concluido / pago]):::start
+
+  classDef start fill:#0d9488,stroke:#5eead4,color:#ecfeff,font-weight:bold;
+  classDef draft fill:#1f2937,stroke:#64748b,color:#e5e7eb;
+  classDef review fill:#3730a3,stroke:#a5b4fc,color:#eef2ff,font-weight:bold;
+  classDef ok fill:#065f46,stroke:#6ee7b7,color:#ecfdf5;
+  classDef warn fill:#92400e,stroke:#fcd34d,color:#fffbeb;
+  classDef bad fill:#7f1d1d,stroke:#fca5a5,color:#fef2f2;
+  classDef phase fill:#1e293b,stroke:#94a3b8,color:#e2e8f0;
+    </pre>
+  </div>
+
+  <div class="card">
+    <div class="legend">
+      <span><i class="dot" style="background:#3730a3"></i> Etapa de decisão</span>
+      <span><i class="dot" style="background:#065f46"></i> Aprovado</span>
+      <span><i class="dot" style="background:#92400e"></i> Esclarecimento / devolução (volta atrás)</span>
+      <span><i class="dot" style="background:#7f1d1d"></i> Rejeitado (fim)</span>
+      <span><i class="dot" style="background:#1e293b"></i> Fase operacional</span>
+    </div>
+  </div>
+
+  <div class="card notes">
+    <ul>
+      <li><span class="tag">NOVO</span> <b>Esclarecimento técnico</b> (<code>em_esclarecimento</code>) volta para a etapa Requisição; quem responde agora é o <b>requisitante dono</b> (antes só comprador), com <b>push</b> avisando.</li>
+      <li><span class="tag">NOVO</span> <b>Editar itens</b>: o requisitante edita ao responder o esclarecimento; o <b>aprovador</b> edita direto em <code>pendente</code>/<code>em_aprovacao</code> ao pedir esclarecimento.</li>
+      <li><span class="tag">NOVO</span> <b>Antes/depois</b>: qualquer edição de itens grava um registro de histórico, exibido na RC para todos (requisitante e comprador).</li>
+      <li>O <b>esclarecimento da cotação</b> (<code>cotacao_em_esclarecimento</code>) é respondido pelo <b>comprador</b> e volta para <code>cotacao_enviada</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad:true, theme:'dark', securityLevel:'loose',
+    flowchart:{ curve:'basis', nodeSpacing:45, rankSpacing:55 } });
+</script>
+</body>
+</html>

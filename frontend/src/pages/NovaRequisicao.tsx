@@ -7,6 +7,7 @@ import {
   Package, MapPin, Zap, Save, ExternalLink, Download,
 } from 'lucide-react'
 import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
+import { podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
@@ -119,6 +120,10 @@ export default function NovaRequisicao() {
   const { data: categorias = [], isLoading: catLoading } = useCategorias()
   const obras = useLookupObras()
   const { perfil } = useAuth()
+  // Aprovador (comprador+) ajustando itens enquanto a RC está na validação técnica.
+  const isAprovadorPreCotacaoEdit = isEditMode
+    && podeAprovarCompras(perfil?.email)
+    && ['pendente', 'em_aprovacao'].includes(reqExistente?.status ?? '')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const referenciaInputRef = useRef<HTMLInputElement>(null)
@@ -472,6 +477,7 @@ export default function NovaRequisicao() {
           requisicaoId: editId,
           statusAtual: reqExistente.status,
           payload: buildPayload(false),
+          aprovador: isAprovadorPreCotacaoEdit,
         })
         // RC devolvida: após salvar, reenvia automaticamente para aprovação (alçada 1)
         if (reqExistente.status === 'devolvida_solicitante') {
@@ -522,6 +528,7 @@ export default function NovaRequisicao() {
           requisicaoId: editId,
           statusAtual: reqExistente.status,
           payload: buildPayload(false),
+          aprovador: isAprovadorPreCotacaoEdit,
         })
         nav(`/requisicoes/${editId}`)
       } else {

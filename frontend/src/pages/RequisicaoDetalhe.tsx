@@ -4,9 +4,9 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
-  FileText, Ban, Send, Undo2, Pencil,
+  FileText, Ban, Send, Undo2, Pencil, History,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -32,6 +32,12 @@ const NIVEL_LABEL: Record<number, string> = {
   1: 'Coordenador', 2: 'Gerente', 3: 'Diretor', 4: 'CEO',
 }
 
+const fmtItemLinha = (it: AlteracaoItemSnapshot) => {
+  const marca = it.marca ? ` (${it.marca})` : ''
+  const valor = it.valor_unitario_estimado ? ` · ${fmt(it.valor_unitario_estimado)}` : ''
+  return `${it.descricao}${marca} — ${it.quantidade} ${it.unidade}${valor}`
+}
+
 export default function RequisicaoDetalhe() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -39,6 +45,7 @@ export default function RequisicaoDetalhe() {
   const decisaoMutation = useDecisaoRequisicao()
   const reenviarMutation = useReenviarEsclarecimento()
   const reenviarDevolucaoMutation = useReenviarAposDevolucao()
+  const { data: alteracoesItens } = useHistoricoAlteracoesItens(id)
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
@@ -327,6 +334,17 @@ export default function RequisicaoDetalhe() {
                   : <Send size={15} />}
                 Reenviar para Aprovador
               </button>
+              {req.status === 'em_esclarecimento' && (
+                <button
+                  disabled={isLocked}
+                  onClick={() => navigate(`/requisicoes/${req.id}/editar`)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                    border border-amber-300 bg-white text-amber-700 text-sm font-semibold
+                    hover:bg-amber-100 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  <Pencil size={14} /> Editar itens e reenviar
+                </button>
+              )}
               {reenviarMutation.isError && (
                 <p className="text-xs text-red-600">Erro ao reenviar. Tente novamente.</p>
               )}
@@ -479,6 +497,41 @@ export default function RequisicaoDetalhe() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Histórico de alterações de itens (antes/depois) */}
+      {alteracoesItens && alteracoesItens.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <History size={14} className="text-slate-500" />
+            <span className="text-sm font-bold text-slate-700">Alterações nos itens</span>
+          </div>
+          {alteracoesItens.map(alt => (
+            <div key={alt.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
+              <p className="text-xs text-slate-500">
+                Por <span className="font-semibold text-slate-700">{alt.responsavel_nome ?? 'Sistema'}</span>
+                {' '}({alt.responsavel_tipo === 'requisitante' ? 'requisitante' : 'aprovador/comprador'})
+                {' · '}{fmtData(alt.created_at)}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-rose-500">Antes</p>
+                  {alt.antes.length === 0 && <p className="text-xs text-slate-400">—</p>}
+                  {alt.antes.map((it, i) => (
+                    <p key={i} className="text-xs text-slate-600 line-through decoration-rose-300">{fmtItemLinha(it)}</p>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">Depois</p>
+                  {alt.depois.length === 0 && <p className="text-xs text-slate-400">—</p>}
+                  {alt.depois.map((it, i) => (
+                    <p key={i} className="text-xs text-slate-700 font-medium">{fmtItemLinha(it)}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -769,6 +822,18 @@ export default function RequisicaoDetalhe() {
                   Aprovar
                 </button>
               </div>
+
+              {(req.status === 'pendente' || req.status === 'em_aprovacao') && (
+                <button
+                  disabled={isLocked}
+                  onClick={() => navigate(`/requisicoes/${req.id}/editar`)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold
+                    border border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-[0.98]
+                    transition-all disabled:opacity-50"
+                >
+                  <Pencil size={13} /> Editar itens
+                </button>
+              )}
 
               {decisaoMutation.isError && (
                 <p className="text-red-500 text-xs text-center">Erro ao processar. Tente novamente.</p>

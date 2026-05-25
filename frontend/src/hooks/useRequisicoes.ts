@@ -436,12 +436,17 @@ export function useAtualizarRequisicao() {
       requisicaoId,
       statusAtual,
       payload,
+      aprovador = false,
     }: {
       requisicaoId: string
       statusAtual: string
       payload: NovaRequisicaoPayload
+      aprovador?: boolean
     }) => {
-      if (!STATUS_EDITAVEIS.includes(statusAtual as typeof STATUS_EDITAVEIS[number])) {
+      // Aprovador (comprador+) pode ajustar itens ao pedir esclarecimento, enquanto a RC
+      // ainda está na validação técnica. Demais casos seguem STATUS_EDITAVEIS.
+      const aprovadorPodeEditar = aprovador && ['pendente', 'em_aprovacao'].includes(statusAtual)
+      if (!STATUS_EDITAVEIS.includes(statusAtual as typeof STATUS_EDITAVEIS[number]) && !aprovadorPodeEditar) {
         throw new Error(`Esta requisição não pode ser editada no status "${statusAtual}".`)
       }
 
@@ -476,7 +481,7 @@ export function useAtualizarRequisicao() {
       }
 
       // 1. Atualiza campos do cabeçalho (NÃO mexe em numero, solicitante_*, status, created_at)
-      const { error: reqError } = await supabase
+      const { data: headerRows, error: reqError } = await supabase
         .from(TABLE)
         .update({
           obra_nome:        payload.obra_nome,
@@ -496,8 +501,13 @@ export function useAtualizarRequisicao() {
           data_necessidade: (payload as any).data_necessidade || null,
         })
         .eq('id', requisicaoId)
+        .select('id')
 
       if (reqError) throw new Error(reqError.message)
+      // Defesa em profundidade: se a RLS bloqueou o cabeçalho (0 linhas), não mexe nos itens.
+      if (aprovadorPodeEditar && (!headerRows || headerRows.length === 0)) {
+        throw new Error('Sem permissão para editar esta requisição nesta etapa.')
+      }
 
       // 2. Substitui itens via RPC (SECURITY DEFINER contorna RLS do DELETE)
       const itensNovos = payload.itens
@@ -770,5 +780,48 @@ export function useRequisicao(id?: string) {
     },
     enabled: !!id,
     staleTime: 15_000,
+  })
+}
+
+// ── Histórico de alterações de itens (antes/depois) ──────────────────────────
+export interface AlteracaoItemSnapshot {
+  descricao: string
+  quantidade: number
+  unidade: string
+  valor_unitario_estimado: number
+  marca: string | null
+}
+
+export interface AlteracaoItensHistorico {
+  id: string
+  responsavel_nome: string | null
+  responsavel_tipo: string
+  created_at: string
+  antes: AlteracaoItemSnapshot[]
+  depois: AlteracaoItemSnapshot[]
+}
+
+export function useHistoricoAlteracoesItens(requisicaoId?: string) {
+  return useQuery({
+    queryKey: ['historico-itens', requisicaoId],
+    enabled: Boolean(requisicaoId),
+    staleTime: 15_000,
+    queryFn: async (): Promise<AlteracaoItensHistorico[]> => {
+      const { data, error } = await supabase
+        .from('cmp_historico_status')
+        .select('id, responsavel_nome, responsavel_tipo, created_at, dados_extra')
+        .eq('requisicao_id', requisicaoId)
+        .eq('dados_extra->>tipo', 'alteracao_itens')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        responsavel_nome: r.responsavel_nome,
+        responsavel_tipo: r.responsavel_tipo,
+        created_at: r.created_at,
+        antes: (r.dados_extra?.antes ?? []) as AlteracaoItemSnapshot[],
+        depois: (r.dados_extra?.depois ?? []) as AlteracaoItemSnapshot[],
+      }))
+    },
   })
 }
