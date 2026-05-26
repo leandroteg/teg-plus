@@ -32,6 +32,7 @@ const EMPTY_KPIS: DashboardData['kpis'] = {
 
 const PIPELINE_ETAPAS = [
   { key: 'pendentes',  label: 'Pendentes',   statuses: ['rascunho', 'pendente'] as StatusRequisicao[],                         color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',   barClass: 'bg-amber-400'   },
+  { key: 'triagem_cd', label: 'Triagem CD',  statuses: ['em_triagem_cd'] as StatusRequisicao[],                                color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200',     barClass: 'bg-sky-500'     },
   { key: 'valid_tec',  label: 'Valid. Téc.', statuses: ['em_aprovacao'] as StatusRequisicao[],                                 color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',    barClass: 'bg-blue-500'    },
   { key: 'cotacao',    label: 'Cotação',     statuses: ['aprovada', 'em_cotacao', 'cotacao_enviada'] as StatusRequisicao[],    color: 'text-violet-600',  bg: 'bg-violet-50',  border: 'border-violet-200',  barClass: 'bg-violet-500'  },
   { key: 'aprov_fin',  label: 'Aprov. Fin.', statuses: ['cotacao_aprovada'] as StatusRequisicao[],                             color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200',  barClass: 'bg-indigo-500'  },
@@ -41,7 +42,7 @@ const PIPELINE_ETAPAS = [
 ]
 
 const STATUS_ATIVO: StatusRequisicao[] = [
-  'rascunho', 'pendente', 'em_aprovacao', 'aprovada', 'em_esclarecimento',
+  'rascunho', 'em_triagem_cd', 'pendente', 'em_aprovacao', 'aprovada', 'em_esclarecimento',
   'em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'pedido_emitido',
   'em_entrega', 'entregue', 'aguardando_pgto',
 ]

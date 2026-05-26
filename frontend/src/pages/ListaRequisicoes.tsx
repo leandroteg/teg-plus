@@ -30,7 +30,7 @@ const fmtData = (d: string) =>
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'em_validacao' | 'aprovada'
+type PipelineTab = 'pendente' | 'em_triagem' | 'em_validacao' | 'aprovada'
 type SortField = 'data' | 'valor' | 'obra'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -39,18 +39,21 @@ type ViewMode = 'list' | 'cards'
 
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
   { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho', 'devolvida_solicitante'] },
+  { status: 'em_triagem',   label: 'Em Triagem CD',           icon: ClipboardList, statuses: ['em_triagem_cd'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
   pendente:     { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',    textActive: 'text-amber-800',    dot: 'bg-amber-400',    border: 'border-amber-400' },
+  em_triagem:   { bg: 'hover:bg-sky-50',      bgActive: 'bg-sky-50',       text: 'text-sky-600',      textActive: 'text-sky-800',      dot: 'bg-sky-500',      border: 'border-sky-500' },
   em_validacao: { bg: 'hover:bg-violet-50',   bgActive: 'bg-violet-50',    text: 'text-violet-600',   textActive: 'text-violet-800',   dot: 'bg-violet-500',   border: 'border-violet-500' },
   aprovada:     { bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',   text: 'text-emerald-600',  textActive: 'text-emerald-800',  dot: 'bg-emerald-500',  border: 'border-emerald-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string }> = {
   pendente:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300' },
+  em_triagem:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300' },
   em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
   aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
@@ -73,9 +76,11 @@ const NIVEL_LABEL: Record<number, string> = {
 
 function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')          return 'Aguard. Valid. Técnica'
+  if (status === 'em_triagem_cd')     return 'Aguardando CD Araxá'
   if (status === 'em_aprovacao')      return 'Em Validação Técnica'
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
   if (status === 'aprovada')          return 'RC Validada'
+  if (status === 'atendida_cd')       return 'Atendida pelo CD'
   if (status === 'devolvida_solicitante') return 'Devolvida pelo Comprador'
   return undefined
 }

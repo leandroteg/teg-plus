@@ -185,16 +185,18 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Resolve comprador_id pelo nome da categoria quando não informado
+      // Resolve comprador_id e passa_por_cd da categoria.
       let compradorId = payload.comprador_id || null
-      if (!compradorId && payload.categoria) {
+      let passaPorCd = false
+      if (payload.categoria) {
         try {
           const { data: cat } = await supabase
             .from('cmp_categorias')
-            .select('comprador_nome')
+            .select('comprador_nome, passa_por_cd')
             .eq('codigo', payload.categoria)
             .maybeSingle()
-          if (cat?.comprador_nome) {
+          passaPorCd = Boolean(cat?.passa_por_cd)
+          if (!compradorId && cat?.comprador_nome) {
             const { data: comp } = await supabase
               .from('cmp_compradores')
               .select('id')
@@ -205,6 +207,13 @@ export function useCriarRequisicao() {
           }
         } catch { /* non-critical */ }
       }
+
+      // Categorias com passa_por_cd: RC vai p/ triagem do CD Araxa antes
+      // de seguir para validacao tecnica. Sem rascunho, sem apr_aprovacoes
+      // ate o triador liberar.
+      const statusInicial: string = payload.rascunho
+        ? 'rascunho'
+        : passaPorCd ? 'em_triagem_cd' : 'em_aprovacao'
 
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
@@ -219,7 +228,7 @@ export function useCriarRequisicao() {
           urgencia:         payload.urgencia,
           justificativa_urgencia: payload.justificativa_urgencia || null,
           compra_recorrente: payload.compra_recorrente || false,
-          status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
+          status:           statusInicial,
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,
           alcada_nivel:     alcadaNivel,
@@ -296,8 +305,9 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts)
-      if (!payload.rascunho) try {
+      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e p/
+      // categorias que passam pelo CD - o triador cria a aprovacao no liberar).
+      if (!payload.rascunho && !passaPorCd) try {
         // Busca aprovador da alçada correspondente
         const { data: alcadaData } = await supabase
           .from('apr_alcadas')

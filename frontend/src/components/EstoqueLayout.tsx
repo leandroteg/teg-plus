@@ -1,6 +1,6 @@
 import {
-  LayoutDashboard, Package2, ArrowLeftRight,
-  ClipboardList, Plus, KeyRound, History, FileBox, Truck,
+  LayoutDashboard, Package2,
+  ClipboardList, Plus, KeyRound, History, FileBox, Truck, ShoppingCart,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -12,11 +12,18 @@ export default function EstoqueLayout() {
   const NAV: NavItem[] = [
     { to: '/estoque', icon: LayoutDashboard, label: 'Painel', end: true },
     {
+      to: '/requisicoes/nova',
+      icon: ShoppingCart,
+      label: 'Nova Requisi\u00e7\u00e3o',
+      action: () => navigate(`/requisicoes/nova?nova=${Date.now()}`),
+      accent: true,
+      requisitanteAllowed: true,
+    },
+    {
       to: '/estoque/movimentacoes?nova=1',
       icon: Plus,
       label: 'Nova Movimenta\u00e7\u00e3o',
       action: () => navigate('/estoque/movimentacoes?nova=1'),
-      accent: true,
     },
     { to: '/estoque/solicitacoes', icon: FileBox, label: 'Solicitações', end: false },
     { to: '/estoque/recebimentos', icon: Truck, label: 'Recebimentos', end: false },
@@ -34,6 +41,7 @@ export default function EstoqueLayout() {
       accent="blue"
       nav={NAV}
       truncateBottomLabels
+      requisitanteAllowedPaths={['/requisicoes/']}
     />
   )
 }

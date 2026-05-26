@@ -1,5 +1,6 @@
 export type StatusRequisicao =
-  | 'rascunho' | 'pendente' | 'em_aprovacao'
+  | 'rascunho' | 'em_triagem_cd' | 'atendida_cd'
+  | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
   | 'devolvida_solicitante'
   | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada' | 'cotacao_em_esclarecimento'
