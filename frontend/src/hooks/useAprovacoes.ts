@@ -792,46 +792,75 @@ export interface AprovacaoKPIs {
 }
 
 export function useAprovacaoKPIs() {
+  const { perfil, isAdmin, perfilSetores } = useAuth()
   return useQuery<AprovacaoKPIs>({
-    queryKey: ['aprovacoes-kpis'],
+    queryKey: ['aprovacoes-kpis', perfil?.id],
     queryFn: async () => {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const todayISO = today.toISOString()
 
-      // Pendentes
-      const { count: totalPendentes } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pendente')
+      // Contexto de visibilidade (mesma logica de useAprovacoesPendentes)
+      const isDiretor = (perfilSetores ?? []).some(s => s.ativo && s.papel === 'diretor')
+        || perfil?.role === 'diretor'
+      const { data: categoriasPol } = await supabase
+        .from('cmp_categorias')
+        .select('codigo, validador_tecnico_id, alcada1_aprovador_id, alcada1_limite, alcada2_aprovador_id')
+      const politicasMap = new Map<string, CatPolitica>(
+        (categoriasPol ?? []).map(c => [
+          c.codigo as string,
+          {
+            validador_tecnico_id: (c.validador_tecnico_id as string | null) ?? null,
+            alcada1_aprovador_id: (c.alcada1_aprovador_id as string | null) ?? null,
+            alcada1_limite:        Number((c.alcada1_limite as number | null) ?? 0),
+            alcada2_aprovador_id: (c.alcada2_aprovador_id as string | null) ?? null,
+          },
+        ]),
+      )
+      const ctx: FiltroContext = {
+        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor },
+        politicas: politicasMap,
+      }
 
-      // Aprovadas hoje
-      const { count: aprovadasHoje } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'aprovada')
-        .gte('data_decisao', todayISO)
+      // Helper: busca aprovacoes + dados das RCs e aplica podeVerAprovacao.
+      // Retorna pares [apr, req] para uso posterior (tempo medio precisa do created_at de apr).
+      async function fetchFiltradas(filters: { status?: string; statusNot?: boolean; dataDecisaoGte?: string }) {
+        let q = supabase
+          .from(TABLE_APR)
+          .select('id, entidade_id, modulo, tipo_aprovacao, status, created_at, data_decisao')
+        if (filters.status && !filters.statusNot) q = q.eq('status', filters.status)
+        if (filters.status && filters.statusNot) q = q.neq('status', filters.status)
+        if (filters.dataDecisaoGte) q = q.gte('data_decisao', filters.dataDecisaoGte)
+        const { data: aprs } = await q
+        const list = aprs ?? []
+        const cmpIds = list.filter(a => a.modulo === 'cmp' || !a.modulo)
+          .map(a => a.entidade_id).filter(Boolean) as string[]
+        let reqMap = new Map<string, Record<string, unknown>>()
+        if (cmpIds.length > 0) {
+          const { data: reqData } = await supabase
+            .from(TABLE_REQ)
+            .select('id, categoria, valor_estimado')
+            .in('id', cmpIds)
+          reqMap = new Map((reqData ?? []).map(r => [r.id, r as Record<string, unknown>]))
+        }
+        return list.filter(a => podeVerAprovacao(a, reqMap.get(a.entidade_id), ctx))
+      }
 
-      // Rejeitadas hoje
-      const { count: rejeitadasHoje } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'rejeitada')
-        .gte('data_decisao', todayISO)
+      const [pendentes, aprovHoje, rejeHoje, recentesFull] = await Promise.all([
+        fetchFiltradas({ status: 'pendente' }),
+        fetchFiltradas({ status: 'aprovada', dataDecisaoGte: todayISO }),
+        fetchFiltradas({ status: 'rejeitada', dataDecisaoGte: todayISO }),
+        fetchFiltradas({ status: 'pendente', statusNot: true }),
+      ])
 
-      // Tempo medio: ultimas 50 aprovacoes com data_decisao
-      const { data: recentes } = await supabase
-        .from(TABLE_APR)
-        .select('created_at, data_decisao')
-        .neq('status', 'pendente')
-        .not('data_decisao', 'is', null)
-        .order('data_decisao', { ascending: false })
-        .limit(50)
-
+      // Tempo medio: ultimas 50 ja decididas (de quem o usuario pode ver)
+      const decididas = recentesFull
+        .filter(r => r.data_decisao && r.created_at)
+        .sort((a, b) => new Date(b.data_decisao!).getTime() - new Date(a.data_decisao!).getTime())
+        .slice(0, 50)
       let tempoMedioHoras = 0
-      if (recentes && recentes.length > 0) {
-        const diffs = recentes
-          .filter(r => r.data_decisao && r.created_at)
+      if (decididas.length > 0) {
+        const diffs = decididas
           .map(r => new Date(r.data_decisao!).getTime() - new Date(r.created_at).getTime())
           .filter(d => d > 0)
         if (diffs.length > 0) {
@@ -840,12 +869,13 @@ export function useAprovacaoKPIs() {
       }
 
       return {
-        totalPendentes: totalPendentes ?? 0,
-        aprovadasHoje: aprovadasHoje ?? 0,
-        rejeitadasHoje: rejeitadasHoje ?? 0,
+        totalPendentes: pendentes.length,
+        aprovadasHoje: aprovHoje.length,
+        rejeitadasHoje: rejeHoje.length,
         tempoMedioHoras,
       }
     },
+    enabled: !!perfil,
     refetchInterval: 30_000,
     staleTime: 15_000,
     retry: false,

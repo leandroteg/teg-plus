@@ -262,6 +262,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onDevolver: (motivo: string) => void; isDevolvendoEdicao: boolean
   onAbrirDetalhe: () => void
 }) {
+  const { perfil, isAdmin } = useAuth()
   const [observacao, setObservacao] = useState('')
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const [respostaDevolucao, setRespostaDevolucao] = useState('')
@@ -270,6 +271,12 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   const [motivoDevolucao, setMotivoDevolucao] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
+  // Responder esclarecimento: somente solicitante (dono) ou o aprovador
+  // que pediu o esclarecimento. Compradores nao envolvidos nao respondem.
+  const isSolicitante = !!perfil && perfil.id === r.solicitante_id
+  const isAprovadorEnvolvido = !!perfil?.nome && !!r.esclarecimento_por
+    && perfil.nome.trim().toUpperCase() === r.esclarecimento_por.trim().toUpperCase()
+  const canResponderEsclarecimento = isAdmin || isSolicitante || isAprovadorEnvolvido
   const esclarecimentos = r.esclarecimento_historico?.length
     ? r.esclarecimento_historico
     : r.esclarecimento_msg
@@ -492,8 +499,8 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
-          {/* Responder esclarecimento (para requisitante) */}
-          {(r.status === 'em_esclarecimento' || r.status === 'cotacao_em_esclarecimento') && (
+          {/* Responder esclarecimento (somente solicitante ou aprovador envolvido) */}
+          {(r.status === 'em_esclarecimento' || r.status === 'cotacao_em_esclarecimento') && canResponderEsclarecimento && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
               <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Responder Esclarecimento</p>
               <UpperTextarea

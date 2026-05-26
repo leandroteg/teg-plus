@@ -78,10 +78,14 @@ export default function RequisicaoDetalhe() {
     && atLeast('comprador')
     && req.status === 'cotacao_aprovada'
   // Quem pode responder esclarecimento:
-  // em_esclarecimento (necessidade): o requisitante dono da RC + comprador+
-  // cotacao_em_esclarecimento (cotação): somente comprador+
+  // em_esclarecimento (necessidade): solicitante dono da RC OU o aprovador
+  //   que pediu o esclarecimento (match por nome). Compradores nao envolvidos
+  //   nao respondem.
+  // cotacao_em_esclarecimento (cotação): somente comprador+ (fluxo de cotacao)
   const isDonoReq = !!perfil && !!req && perfil.id === req.solicitante_id
-  const canResponderEsclTecnico = atLeast('comprador') || isDonoReq
+  const isAprovadorEnvolvidoEscl = !!perfil?.nome && !!req?.esclarecimento_por
+    && perfil.nome.trim().toUpperCase() === req.esclarecimento_por.trim().toUpperCase()
+  const canResponderEsclTecnico = isAdmin || isDonoReq || isAprovadorEnvolvidoEscl
   const canResponderEsclCotacao = atLeast('comprador')
   const canResponderEsteEsclarecimento =
     req?.status === 'em_esclarecimento' ? canResponderEsclTecnico

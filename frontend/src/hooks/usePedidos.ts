@@ -305,12 +305,36 @@ export function useEmitirPedido() {
         ? parcelasPreview
         : gerarPreviaParcelas(valorTotal, condicaoPagamento || '', dataPrevistaEntrega || now.toISOString().split('T')[0])
 
+      // Resolve comprador_id (FK -> cmp_compradores.id). Pode vir como
+      // cmp_compradores.id (vindo da cotacao) ou perfil.id (vindo do front).
+      // Valida antes de inserir pra nao quebrar o FK.
+      let compradorIdResolvido: string | null = null
+      if (compradorId) {
+        const { data: byId } = await supabase
+          .from('cmp_compradores')
+          .select('id').eq('id', compradorId).maybeSingle()
+        if (byId?.id) {
+          compradorIdResolvido = byId.id as string
+        } else if (perfil) {
+          const { data: byUsuario } = await supabase
+            .from('cmp_compradores')
+            .select('id').eq('usuario_id', compradorId).maybeSingle()
+          if (byUsuario?.id) compradorIdResolvido = byUsuario.id as string
+          else if (perfil.email) {
+            const { data: byEmail } = await supabase
+              .from('cmp_compradores')
+              .select('id').ilike('email', perfil.email).maybeSingle()
+            if (byEmail?.id) compradorIdResolvido = byEmail.id as string
+          }
+        }
+      }
+
       const { data: pedido, error: pedError } = await supabase
         .from('cmp_pedidos')
         .insert({
           requisicao_id: requisicaoId,
           cotacao_id: cotacaoId,
-          comprador_id: compradorId || null,
+          comprador_id: compradorIdResolvido,
           fornecedor_id: fornecedorId || null,
           numero_pedido: numeroPedido,
           fornecedor_nome: fornecedorNome,
@@ -497,6 +521,28 @@ export function useEmitirPedidoDireto() {
       const now = new Date()
       const prefix = `PC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
 
+      // Resolve comprador_id (FK -> cmp_compradores.id). O front pode mandar
+      // perfil.id (sys_perfis.id), que NAO existe em cmp_compradores e quebra
+      // o FK. Tenta casar por usuario_id; senao por email; senao null.
+      let compradorIdResolvido: string | null = null
+      if (payload.compradorId && perfil) {
+        const { data: cmpByUsuario } = await supabase
+          .from('cmp_compradores')
+          .select('id')
+          .eq('usuario_id', payload.compradorId)
+          .maybeSingle()
+        if (cmpByUsuario?.id) {
+          compradorIdResolvido = cmpByUsuario.id as string
+        } else if (perfil.email) {
+          const { data: cmpByEmail } = await supabase
+            .from('cmp_compradores')
+            .select('id')
+            .ilike('email', perfil.email)
+            .maybeSingle()
+          if (cmpByEmail?.id) compradorIdResolvido = cmpByEmail.id as string
+        }
+      }
+
       const { data: lastPedido } = await supabase
         .from('cmp_pedidos')
         .select('numero_pedido')
@@ -535,7 +581,7 @@ export function useEmitirPedidoDireto() {
           classe_financeira: payload.classeFinanceira || null,
           classe_financeira_id: payload.classeFinanceiraId || null,
           observacoes: payload.observacoes || null,
-          comprador_id: payload.compradorId || null,
+          comprador_id: compradorIdResolvido,
           parcelas_preview: parcelasResolvidas,
           sem_cotacao: true,
           justificativa_sem_cotacao: payload.justificativaSemCotacao,
