@@ -678,7 +678,14 @@ export default function ListaRequisicoes() {
   const { isDark } = useTheme()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
-  const [activeTab, setActiveTab] = useState<PipelineTab>('pendente')
+  // Suporta ?tab=em_triagem|em_validacao|aprovada|pendente via URL
+  // (usado p/ links de outros módulos, ex: Estoque -> Janela Crítica)
+  const initialTab: PipelineTab = (() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return (['pendente','em_triagem','em_validacao','aprovada'] as PipelineTab[]).includes(t as PipelineTab)
+      ? (t as PipelineTab) : 'pendente'
+  })()
+  const [activeTab, setActiveTab] = useState<PipelineTab>(initialTab)
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')

@@ -6,7 +6,7 @@ import {
   ArrowLeftRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useEstoqueKPIs, useSaldosAbaixoMinimo, useMovimentacoes, useSolicitacoes, useAguardandoEntrada, useLiberadosRetirada, useBases } from '../../hooks/useEstoque'
+import { useEstoqueKPIs, useSaldosAbaixoMinimo, useMovimentacoes, useSolicitacoes, useAguardandoEntrada, useLiberadosRetirada, useBases, useRCsEmTriagemCD } from '../../hooks/useEstoque'
 import { useCautelas } from '../../hooks/useCautelas'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -105,6 +105,7 @@ export default function EstoqueHome() {
   const { data: aguardandoEntrada = [] } = useAguardandoEntrada()
   const { data: liberadosRetirada = [] } = useLiberadosRetirada()
   const { data: bases = [] } = useBases()
+  const { data: rcsEmTriagem = [] } = useRCsEmTriagemCD()
   const { perfil, isAdmin } = useAuth()
   const isTriador = isAdmin || Boolean((bases.find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
 
@@ -187,6 +188,7 @@ export default function EstoqueHome() {
         </button>
       )}
 
+
       {/* Hero 2 colunas */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
         {/* Núcleo de Estoque */}
@@ -213,39 +215,72 @@ export default function EstoqueHome() {
           </div>
         </section>
 
-        {/* Janela Crítica */}
+        {/* Triagem CD — RCs aguardando triagem (cmp_requisicoes em_triagem_cd) */}
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Janela Crítica
+                  Triagem CD
                 </p>
                 <h2 className={`mt-0.5 text-sm font-black ${txt}`}>
-                  O que exige ação agora
+                  Requisições aguardando triagem
                 </h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(abaixoMinimo.length > 0 || cautelasVencidas.length > 0) ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={14} className={(abaixoMinimo.length > 0 || cautelasVencidas.length > 0) ? 'text-red-500' : 'text-slate-400'} />
-              </div>
+              <button
+                onClick={() => nav('/requisicoes?tab=em_triagem')}
+                className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors ${
+                  rcsEmTriagem.length > 0
+                    ? (isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-100 text-sky-700 hover:bg-sky-200')
+                    : (isDark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500')
+                }`}
+                title="Ver todas"
+              >
+                {rcsEmTriagem.length} {rcsEmTriagem.length > 0 && <ArrowRight size={10} />}
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-2 flex-1">
-              <MiniInfoCard
-                label="Abaixo do Mínimo"
-                value={abaixoMinimo.length}
-                note="reposição necessária"
-                icon={Zap}
-                iconTone={abaixoMinimo.length > 0 ? 'text-amber-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Cautelas Vencidas"
-                value={cautelasVencidas.length}
-                note="devolução em atraso"
-                icon={ShieldAlert}
-                iconTone={cautelasVencidas.length > 0 ? 'text-red-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
+            <div className="flex-1 min-h-0">
+              {rcsEmTriagem.length === 0 ? (
+                <div className={`h-full rounded-xl flex items-center justify-center text-[11px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+                  Nenhuma RC aguardando triagem
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {rcsEmTriagem.slice(0, 4).map(rc => {
+                    const diasParado = Math.floor((Date.now() - new Date(rc.created_at).getTime()) / 86400000)
+                    const tagVelho = diasParado >= 2
+                    return (
+                      <button
+                        key={rc.id}
+                        onClick={() => nav(`/requisicoes/${rc.id}`)}
+                        className={`w-full flex items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors ${
+                          isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className={`text-[10px] font-mono ${isDark ? 'text-sky-400' : 'text-sky-600'}`}>{rc.numero}</span>
+                            {rc.categoria && (
+                              <span className={`text-[9px] font-semibold px-1.5 py-px rounded ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                                {rc.categoria.replace(/_/g, ' ')}
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs font-medium truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{rc.solicitante_nome}</p>
+                          <p className={`text-[10px] truncate ${txtMuted}`}>{rc.obra_nome ?? '—'}</p>
+                        </div>
+                        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          tagVelho
+                            ? (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700')
+                            : (isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-100 text-sky-700')
+                        }`}>
+                          {diasParado === 0 ? 'Hoje' : `${diasParado}d`}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </section>

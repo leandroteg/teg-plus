@@ -275,6 +275,25 @@ export function useRegistrarMovimentacao() {
   })
 }
 
+// RCs aguardando triagem pelo CD Araxa (status em_triagem_cd).
+// Usado no painel do Estoque pra alertar o triador.
+export function useRCsEmTriagemCD() {
+  return useQuery<{ id: string; numero: string; obra_nome: string; solicitante_nome: string; categoria: string | null; created_at: string }[]>({
+    queryKey: ['rcs-em-triagem-cd'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cmp_requisicoes')
+        .select('id, numero, obra_nome, solicitante_nome, categoria, created_at')
+        .eq('status', 'em_triagem_cd')
+        .order('created_at', { ascending: true })
+      if (error) return []
+      return data ?? []
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+}
+
 // ── Solicitações ──────────────────────────────────────────────────────────────
 export function useSolicitacoes(status?: StatusSolicitacao) {
   return useQuery<EstSolicitacao[]>({
