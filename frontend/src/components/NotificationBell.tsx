@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, Check, X, AlertCircle, ChevronRight, UserPlus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Check, X, AlertCircle, ChevronRight, UserPlus, FileText } from 'lucide-react'
 import { usePreCadastros, getEntityLabel, type PreCadastro } from '../hooks/usePreCadastros'
+import { useRCsEmTriagemCD, useBases } from '../hooks/useEstoque'
+import { useAuth } from '../contexts/AuthContext'
 import { useSound } from '../hooks/useSound'
 import ItemFormModal from './ItemFormModal'
 import type { EstItem } from '../types/estoque'
@@ -9,7 +12,14 @@ import type { EstItem } from '../types/estoque'
 // ── Main Bell Component ─────────────────────────────────────────────────────────
 
 export default function NotificationBell({ isDark = false }: { isDark?: boolean }) {
-  const { pendentes, count, isAdminOrDirector, marcarAprovado, rejeitar } = usePreCadastros()
+  const navigate = useNavigate()
+  const { pendentes, count: countPre, isAdminOrDirector, marcarAprovado, rejeitar } = usePreCadastros()
+  const { isAdmin, perfil } = useAuth()
+  const { data: bases = [] } = useBases()
+  const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
+  const { data: rcsTriagem = [] } = useRCsEmTriagemCD()
+  const triagemVisible = isTriador ? rcsTriagem : []
+  const count = countPre + triagemVisible.length
   const { play } = useSound()
   const [open, setOpen] = useState(false)
   const prevCountRef = useRef(count)
@@ -80,7 +90,10 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
     prevCountRef.current = count
   }, [count, play])
 
-  if (!isAdminOrDirector) return null
+  // Mostra o sino se o usuario tem algum tipo de notificacao:
+  // - pre-cadastros (admin/director/aprovador)
+  // - RC em triagem CD (triador)
+  if (!isAdminOrDirector && !isTriador) return null
 
   return (
     <>
@@ -124,9 +137,9 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
             isDark ? 'border-white/5' : 'border-slate-100'
           }`}>
             <div className="flex items-center gap-2">
-              <UserPlus className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} strokeWidth={2} />
+              <Bell className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} strokeWidth={2} />
               <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                Pre-cadastros
+                Notificações
               </span>
             </div>
             {count > 0 && (
@@ -140,50 +153,93 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
 
           {/* List */}
           <div className="overflow-y-auto max-h-[340px]" style={{ scrollbarWidth: 'thin' }}>
-            {selected ? (
+            {selected && (
               <ReviewPanel
                 pre={selected}
                 isDark={isDark}
                 onBack={() => setSelected(null)}
                 onDone={() => { setSelected(null) }}
               />
-            ) : pendentes.length === 0 ? (
+            )}
+            {!selected && count === 0 && (
               <div className={`px-4 py-8 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Nenhum pre-cadastro pendente</p>
+                <p className="text-sm">Nenhuma notificação pendente</p>
               </div>
-            ) : (
-              pendentes.map(pre => (
-                <button
-                  key={pre.id}
-                  onClick={() => {
-                    if (pre.entidade === 'itens') {
-                      setOpen(false)
-                      setItemModal({ pre, key: Date.now() })
-                    } else {
-                      setSelected(pre)
-                    }
-                  }}
-                  className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 border-b last:border-b-0 ${
-                    isDark
-                      ? 'border-white/5 hover:bg-white/5'
-                      : 'border-slate-50 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
-                    <UserPlus className="w-4 h-4 text-teal-500" strokeWidth={2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>
-                      {getEntityLabel(pre.entidade)}: {getMainField(pre)}
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {pre.solicitante_nome || 'SuperTEG'} &middot; {timeAgo(pre.created_at)}
-                    </p>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
-                </button>
-              ))
+            )}
+            {!selected && triagemVisible.length > 0 && (
+              <div>
+                <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                  isDark ? 'text-sky-400 bg-sky-500/5' : 'text-sky-600 bg-sky-50/60'
+                }`}>
+                  Triagem CD ({triagemVisible.length})
+                </div>
+                {triagemVisible.map(rc => {
+                  const diasParado = Math.floor((Date.now() - new Date(rc.created_at).getTime()) / 86400000)
+                  return (
+                    <button
+                      key={rc.id}
+                      onClick={() => { setOpen(false); navigate(`/requisicoes/${rc.id}`) }}
+                      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 border-b last:border-b-0 ${
+                        isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-50 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-sky-500" strokeWidth={2} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                          {rc.numero} · {rc.solicitante_nome}
+                        </p>
+                        <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {rc.obra_nome ?? '—'} · {diasParado === 0 ? 'hoje' : `${diasParado}d`}
+                        </p>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {!selected && pendentes.length > 0 && (
+              <div>
+                <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                  isDark ? 'text-teal-400 bg-teal-500/5' : 'text-teal-600 bg-teal-50/60'
+                }`}>
+                  Pré-cadastros ({pendentes.length})
+                </div>
+                {pendentes.map(pre => (
+                  <button
+                    key={pre.id}
+                    onClick={() => {
+                      if (pre.entidade === 'itens') {
+                        setOpen(false)
+                        setItemModal({ pre, key: Date.now() })
+                      } else {
+                        setSelected(pre)
+                      }
+                    }}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 border-b last:border-b-0 ${
+                      isDark
+                        ? 'border-white/5 hover:bg-white/5'
+                        : 'border-slate-50 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
+                      <UserPlus className="w-4 h-4 text-teal-500" strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                        {getEntityLabel(pre.entidade)}: {getMainField(pre)}
+                      </p>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {pre.solicitante_nome || 'SuperTEG'} &middot; {timeAgo(pre.created_at)}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
