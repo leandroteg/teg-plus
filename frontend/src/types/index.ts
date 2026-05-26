@@ -106,6 +106,8 @@ export interface RequisicaoItem {
   categoria_financeira_codigo?: string
   categoria_financeira_descricao?: string
   destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
+  qtd_atendida_cd?: number
+  atendimento_cd_em?: string
 }
 
 export interface Requisicao {

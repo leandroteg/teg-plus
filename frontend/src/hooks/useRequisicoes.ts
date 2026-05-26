@@ -757,7 +757,8 @@ export function useRequisicao(id?: string) {
             id, descricao, quantidade, unidade, valor_unitario_estimado, marca,
             est_item_id, est_item_codigo,
             classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
-            categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
+            categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional,
+            qtd_atendida_cd, atendimento_cd_em
           )
         `)
         .eq('id', id)
@@ -836,6 +837,42 @@ export function useHistoricoAlteracoesItens(requisicaoId?: string) {
   })
 }
 
+// Saldo dos itens APENAS no CD que faz triagem (uso na triagem CD da RC).
+export function useSaldosNoCD(itemIds: (string | null | undefined)[]) {
+  const ids = Array.from(new Set(itemIds.filter((x): x is string => Boolean(x))))
+  return useQuery({
+    queryKey: ['saldos-cd', [...ids].sort()],
+    enabled: ids.length > 0,
+    staleTime: 15_000,
+    queryFn: async (): Promise<Record<string, { saldo: number; reservado: number; disponivel: number; baseId: string | null }>> => {
+      // Resolve a base do CD (faz_triagem=true)
+      const { data: cd } = await supabase
+        .from('est_bases')
+        .select('id')
+        .eq('faz_triagem', true)
+        .eq('ativa', true)
+        .limit(1)
+        .maybeSingle()
+      const baseId = (cd?.id as string | undefined) ?? null
+      if (!baseId) return {}
+
+      const { data } = await supabase
+        .from('est_saldos')
+        .select('item_id, saldo, saldo_reservado')
+        .in('item_id', ids)
+        .eq('base_id', baseId)
+
+      const map: Record<string, { saldo: number; reservado: number; disponivel: number; baseId: string | null }> = {}
+      for (const row of (data ?? []) as any[]) {
+        const saldo = Number(row.saldo ?? 0)
+        const reservado = Number(row.saldo_reservado ?? 0)
+        map[row.item_id] = { saldo, reservado, disponivel: saldo - reservado, baseId }
+      }
+      return map
+    },
+  })
+}
+
 // ── Saldo em estoque dos itens da RC (agregado por item do catálogo) ──────────
 export interface SaldoItem { saldo: number; reservado: number; disponivel: number }
 
@@ -863,3 +900,43 @@ export function useSaldosPorItens(itemIds: (string | null | undefined)[]) {
     },
   })
 }
+
+// ── Triagem CD: atender item / liberar RC ────────────────────────────────────
+export function useTriagemAtenderItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ itemId, quantidade }: { itemId: string; quantidade: number }) => {
+      const { error } = await supabase.rpc("cmp_rc_triagem_atender_item", {
+        p_item_id: itemId,
+        p_quantidade: quantidade,
+      })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requisicao"] })
+      qc.invalidateQueries({ queryKey: ["requisicoes"] })
+      qc.invalidateQueries({ queryKey: ["rcs-em-triagem-cd"] })
+      qc.invalidateQueries({ queryKey: ["saldos-itens"] })
+      qc.invalidateQueries({ queryKey: ["est-movimentacoes"] })
+    },
+  })
+}
+
+export function useTriagemLiberarRC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ rcId }: { rcId: string }) => {
+      const { error } = await supabase.rpc("cmp_rc_triagem_liberar", {
+        p_rc_id: rcId,
+      })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requisicao"] })
+      qc.invalidateQueries({ queryKey: ["requisicoes"] })
+      qc.invalidateQueries({ queryKey: ["rcs-em-triagem-cd"] })
+      qc.invalidateQueries({ queryKey: ["aprovacoes-pendentes"] })
+    },
+  })
+}
+

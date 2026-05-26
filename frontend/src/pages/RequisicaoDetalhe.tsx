@@ -6,11 +6,12 @@ import {
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
   FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
+import { useBases } from '../hooks/useEstoque'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import StatusBadge from '../components/StatusBadge'
@@ -47,14 +48,23 @@ export default function RequisicaoDetalhe() {
   const reenviarDevolucaoMutation = useReenviarAposDevolucao()
   const { data: alteracoesItens } = useHistoricoAlteracoesItens(id)
   const { data: saldosItens } = useSaldosPorItens((req?.itens ?? []).map(i => i.est_item_id))
+  const { data: saldosCD = {} } = useSaldosNoCD((req?.itens ?? []).map(i => i.est_item_id))
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
+  const atenderTriagem = useTriagemAtenderItem()
+  const liberarTriagem = useTriagemLiberarRC()
+  const { data: bases = [] } = useBases()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   // Cotação vinculada à RC
   const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
   const { data: cotacao } = useCotacaoByRequisicao(showCotacao ? id : undefined)
 
+  // Triador do CD (admin ou lotado em base que faz_triagem)
+  const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
+  const podeTriagem = isTriador && req?.status === 'em_triagem_cd'
+  const [qtdAtender, setQtdAtender] = useState<Record<string, string>>({})
+  const [triagemMsg, setTriagemMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [observacao, setObservacao] = useState('')
   const [showObservacao, setShowObservacao] = useState(false)
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
@@ -449,6 +459,216 @@ export default function RequisicaoDetalhe() {
             <FileText size={15} />
             {decodeURIComponent(req.arquivo_url.split('/').pop()?.replace(/^\d+-/, '') ?? 'Abrir anexo')}
           </a>
+        </div>
+      )}
+
+      {/* Triagem CD — apenas triador, RC em em_triagem_cd */}
+      {podeTriagem && (
+        <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Boxes size={16} className="text-sky-600 flex-shrink-0" />
+            <span className="text-sm font-bold text-sky-700">Triagem CD — Atender com estoque ou liberar para Compras</span>
+          </div>
+          <p className="text-xs text-sky-700">
+            Informe a quantidade que o CD vai atender. Itens sem catálogo (descrição livre) só
+            podem ser liberados ao Compras.
+          </p>
+
+          <div className="space-y-2">
+            {req.itens.map(item => {
+              const restante = item.quantidade - (item.qtd_atendida_cd ?? 0)
+              const semCatalogo = !item.est_item_id
+              const k = item.id ?? ''
+              const saldoCD = item.est_item_id ? (saldosCD[item.est_item_id]?.disponivel ?? 0) : 0
+              const sugerido = Math.min(restante, saldoCD)
+              const maxAtender = Math.min(restante, saldoCD)
+              const valorStr = qtdAtender[k] ?? (sugerido > 0 ? String(sugerido) : '0')
+              const valorNum = Math.max(0, Math.min(maxAtender, Number(valorStr) || 0))
+              const podeAtenderTotal = saldoCD >= restante
+              const podeAtenderParcial = saldoCD > 0 && saldoCD < restante
+              const semSaldo = !semCatalogo && saldoCD === 0
+              const totalmenteAtendido = restante === 0
+              const setVal = (v: number) => setQtdAtender(p => ({ ...p, [k]: String(Math.max(0, Math.min(maxAtender, v))) }))
+              const pct = item.quantidade > 0 ? ((item.qtd_atendida_cd ?? 0) / item.quantidade) * 100 : 0
+              return (
+                <div key={k} className={`bg-white rounded-xl border-2 p-4 space-y-3 ${
+                  totalmenteAtendido ? 'border-emerald-200 bg-emerald-50/30'
+                  : semCatalogo ? 'border-amber-200'
+                  : semSaldo ? 'border-rose-200'
+                  : podeAtenderTotal ? 'border-emerald-200'
+                  : 'border-sky-200'
+                }`}>
+                  {/* Header item */}
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-800 truncate flex-1">{item.descricao}</p>
+                    {totalmenteAtendido && (
+                      <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                        <CheckCircle size={11} /> Atendido
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Stats Grid - 4 colunas grandes */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="text-center bg-slate-50 rounded-lg p-2">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Solicitado</p>
+                      <p className="text-lg font-extrabold text-slate-800">{item.quantidade}</p>
+                      <p className="text-[9px] text-slate-400">{item.unidade}</p>
+                    </div>
+                    <div className="text-center bg-emerald-50 rounded-lg p-2">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600">Atendido</p>
+                      <p className="text-lg font-extrabold text-emerald-700">{item.qtd_atendida_cd ?? 0}</p>
+                      <p className="text-[9px] text-emerald-500">{item.unidade}</p>
+                    </div>
+                    <div className="text-center bg-amber-50 rounded-lg p-2">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-600">Pendente</p>
+                      <p className="text-lg font-extrabold text-amber-700">{restante}</p>
+                      <p className="text-[9px] text-amber-500">{item.unidade}</p>
+                    </div>
+                    <div className={`text-center rounded-lg p-2 ${
+                      semCatalogo ? 'bg-slate-50'
+                      : podeAtenderTotal ? 'bg-emerald-50'
+                      : podeAtenderParcial ? 'bg-amber-50'
+                      : 'bg-rose-50'
+                    }`}>
+                      <p className={`text-[9px] font-bold uppercase tracking-wider ${
+                        semCatalogo ? 'text-slate-400'
+                        : podeAtenderTotal ? 'text-emerald-600'
+                        : podeAtenderParcial ? 'text-amber-600'
+                        : 'text-rose-600'
+                      }`}>Saldo CD</p>
+                      <p className={`text-lg font-extrabold ${
+                        semCatalogo ? 'text-slate-400'
+                        : podeAtenderTotal ? 'text-emerald-700'
+                        : podeAtenderParcial ? 'text-amber-700'
+                        : 'text-rose-700'
+                      }`}>{semCatalogo ? '—' : saldoCD}</p>
+                      <p className={`text-[9px] ${
+                        semCatalogo ? 'text-slate-400'
+                        : podeAtenderTotal ? 'text-emerald-500'
+                        : podeAtenderParcial ? 'text-amber-500'
+                        : 'text-rose-500'
+                      }`}>{semCatalogo ? 'sem cat.' : podeAtenderTotal ? '✓ cobre' : podeAtenderParcial ? 'parcial' : 'sem saldo'}</p>
+                    </div>
+                  </div>
+
+                  {/* Barra de progresso de atendimento */}
+                  {(item.qtd_atendida_cd ?? 0) > 0 && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                        <span>Atendimento</span>
+                        <span className="font-bold">{Math.round(pct)}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Controles de atendimento */}
+                  {restante > 0 && !semCatalogo && !semSaldo && (
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-600">Atender pelo CD:</p>
+                        <p className="text-2xl font-extrabold text-sky-600">
+                          {valorNum} <span className="text-xs text-slate-400">/ {maxAtender} {item.unidade}</span>
+                        </p>
+                      </div>
+
+                      {/* Slider */}
+                      <input
+                        type="range"
+                        min={0}
+                        max={maxAtender}
+                        step={1}
+                        value={valorNum}
+                        onChange={e => setVal(Number(e.target.value))}
+                        className="w-full accent-sky-500"
+                      />
+
+                      {/* Quick actions */}
+                      <div className="flex gap-1.5">
+                        <button onClick={() => setVal(0)}
+                          className="flex-1 px-2 py-1.5 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                          Nada
+                        </button>
+                        <button onClick={() => setVal(Math.floor(maxAtender / 2))}
+                          className="flex-1 px-2 py-1.5 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                          Metade ({Math.floor(maxAtender / 2)})
+                        </button>
+                        <button onClick={() => setVal(maxAtender)}
+                          className="flex-1 px-2 py-1.5 text-[11px] font-bold rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100">
+                          Tudo ({maxAtender})
+                        </button>
+                      </div>
+
+                      <button
+                        disabled={atenderTriagem.isPending || valorNum <= 0}
+                        onClick={async () => {
+                          try {
+                            await atenderTriagem.mutateAsync({ itemId: k, quantidade: valorNum })
+                            setTriagemMsg({ type: 'success', msg: `Atendido ${valorNum} ${item.unidade} de ${item.descricao}` })
+                            setQtdAtender(p => ({ ...p, [k]: '' }))
+                          } catch (e) {
+                            setTriagemMsg({ type: 'error', msg: (e as Error).message })
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <CheckCircle size={15} />
+                        Atender {valorNum} {item.unidade} com estoque
+                      </button>
+                    </div>
+                  )}
+
+                  {semCatalogo && restante > 0 && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                      <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-amber-700">
+                        <b>Item sem catálogo</b> — descrição livre, não dá pra atender com estoque. Use "Liberar para Compras" abaixo.
+                      </p>
+                    </div>
+                  )}
+                  {semSaldo && (
+                    <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-lg p-2">
+                      <AlertTriangle size={12} className="text-rose-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-rose-700">
+                        <b>Sem saldo no CD</b> — use "Liberar para Compras" abaixo.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {triagemMsg && (
+            <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+              triagemMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              {triagemMsg.msg}
+            </div>
+          )}
+
+          {/* Liberar para Compras */}
+          {req.itens.some(i => i.quantidade - (i.qtd_atendida_cd ?? 0) > 0) && (
+            <button
+              disabled={liberarTriagem.isPending}
+              onClick={async () => {
+                try {
+                  await liberarTriagem.mutateAsync({ rcId: req.id })
+                  setTriagemMsg({ type: 'success', msg: 'RC liberada para validação técnica' })
+                } catch (e) {
+                  setTriagemMsg({ type: 'error', msg: (e as Error).message })
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-500 text-white text-sm font-bold hover:bg-sky-600 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <Send size={15} />
+              {liberarTriagem.isPending ? 'Liberando…' : 'Liberar restante para Compras'}
+            </button>
+          )}
         </div>
       )}
 
