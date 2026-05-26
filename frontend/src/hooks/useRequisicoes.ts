@@ -169,17 +169,19 @@ export function useCriarRequisicao() {
 
       let centroCustoId: string | null = null
       let centroCustoCodigo: string | null = null
+      let baseDestinoId: string | null = null
 
       if (payload.obra_id) {
         try {
           const { data: obra } = await supabase
             .from('sys_obras')
-            .select('centro_custo_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
+            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
             .eq('id', payload.obra_id)
             .maybeSingle()
 
           centroCustoId = (obra as any)?.centro_custo_id ?? null
           centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
+          baseDestinoId = (obra as any)?.base_id ?? null
         } catch {
           // fallback sem centro de custo automatico
         }
@@ -234,6 +236,7 @@ export function useCriarRequisicao() {
           alcada_nivel:     alcadaNivel,
           centro_custo:     centroCustoCodigo,
           centro_custo_id:  centroCustoId,
+          base_destino_id:  baseDestinoId,
           classe_financeira: classeFinanceiraCodigo,
           classe_financeira_id: classeFinanceiraId,
           texto_original:   payload.texto_original || null,
@@ -475,18 +478,20 @@ export function useAtualizarRequisicao() {
         ? payload.itens.find(item => item.classe_financeira_codigo === classeFinanceiraCodigo)?.classe_financeira_id ?? null
         : null
 
-      // Centro de custo (a partir da obra, se trocou)
+      // Centro de custo + base destino (a partir da obra, se trocou)
       let centroCustoId: string | null = null
       let centroCustoCodigo: string | null = null
+      let baseDestinoId: string | null = null
       if (payload.obra_id) {
         try {
           const { data: obra } = await supabase
             .from('sys_obras')
-            .select('centro_custo_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
+            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
             .eq('id', payload.obra_id)
             .maybeSingle()
           centroCustoId = (obra as any)?.centro_custo_id ?? null
           centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
+          baseDestinoId = (obra as any)?.base_id ?? null
         } catch { /* mantém null */ }
       }
 
@@ -505,6 +510,7 @@ export function useAtualizarRequisicao() {
           alcada_nivel:     alcadaNivel,
           centro_custo:     centroCustoCodigo,
           centro_custo_id:  centroCustoId,
+          base_destino_id:  baseDestinoId,
           classe_financeira: classeFinanceiraCodigo,
           classe_financeira_id: classeFinanceiraId,
           valor_estimado:   valorEstimado,

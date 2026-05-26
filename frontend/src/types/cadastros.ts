@@ -37,6 +37,7 @@ export interface Obra {
   responsavel_nome?: string
   responsavel_email?: string
   centro_custo_id?: string
+  base_id?: string
   created_at: string
   updated_at: string
   centro_custo?: { id: string; codigo: string; descricao: string }

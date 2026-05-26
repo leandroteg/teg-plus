@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { HardHat, Plus, Search, ChevronRight, MapPin, User, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
 import { UpperInput } from '../../components/UpperInput'
 import { useCadObras, useSalvarObra, useCadCentrosCusto, useAiCadastroParse } from '../../hooks/useCadastros'
+import { useBases } from '../../hooks/useEstoque'
 import { supabase } from '../../services/supabase'
 import type { Obra } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
@@ -31,6 +32,7 @@ export default function ObrasCad() {
 
   const { data: obras = [], isLoading } = useCadObras()
   const { data: centros = [] } = useCadCentrosCusto()
+  const { data: bases = [] } = useBases()
   const salvar = useSalvarObra()
   const aiParse = useAiCadastroParse()
 
@@ -239,12 +241,26 @@ export default function ObrasCad() {
               <SmartTextField table="sys_obras" column="nome" value={editItem.nome ?? ''} onChange={v => set('nome', v)}
                 label="Nome" placeholder="SE Frutal" required />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Centro de Custo</label>
-              <select value={editItem.centro_custo_id ?? ''} onChange={e => set('centro_custo_id', e.target.value || undefined)} className="input-base">
-                <option value="">Nenhum</option>
-                {centros.map(cc => <option key={cc.id} value={cc.id}>{cc.codigo} — {cc.descricao}</option>)}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Centro de Custo</label>
+                <select value={editItem.centro_custo_id ?? ''} onChange={e => set('centro_custo_id', e.target.value || undefined)} className="input-base">
+                  <option value="">Nenhum</option>
+                  {centros.map(cc => <option key={cc.id} value={cc.id}>{cc.codigo} — {cc.descricao}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Base / Canteiro
+                  <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case">(destino de recebimento)</span>
+                </label>
+                <select value={(editItem as any).base_id ?? ''} onChange={e => set('base_id' as any, e.target.value || undefined)} className="input-base">
+                  <option value="">Nenhum</option>
+                  {(bases as any[]).filter(b => b.ativa !== false).map(b => (
+                    <option key={b.id} value={b.id}>{b.codigo} — {b.nome}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <ConfidenceField label="Municipio" value={editItem.municipio ?? ''} onChange={v => set('municipio', v)}
