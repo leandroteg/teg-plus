@@ -1452,7 +1452,7 @@ function AccordionSection({
       {open && count > 0 && (
         <div className="px-4 pb-4 space-y-3">
           {aprovacoes.map(apr =>
-            tipo === 'requisicao_compra' ? (
+            (tipo === 'requisicao_compra' || tipo === 'cotacao') ? (
               <AprovacaoCard
                 key={apr.id}
                 aprovacao={apr}
