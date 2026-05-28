@@ -88,6 +88,8 @@ export function useEstoqueItens(filtros?: { categoria?: string; curva?: string; 
         .from('est_itens')
         .select('*')
         .order('descricao')
+        // Sobrescreve o cap default do PostgREST (1000) — o cadastro tem ~1900 itens
+        .range(0, 9999)
 
       if (filtros?.categoria) q = q.eq('categoria', filtros.categoria)
       if (filtros?.curva)     q = q.eq('curva_abc', filtros.curva)
