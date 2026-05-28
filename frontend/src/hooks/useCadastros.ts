@@ -41,11 +41,19 @@ export function useCadFornecedores(filtros?: { ativo?: boolean }) {
   return useQuery<Fornecedor[]>({
     queryKey: ['cad-fornecedores', filtros],
     queryFn: async () => {
-      let q = supabase.from('cmp_fornecedores').select('*').order('razao_social').range(0, 4999)
-      if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
-      const { data, error } = await q
-      if (error) return []
-      return (data ?? []) as Fornecedor[]
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: Fornecedor[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase.from('cmp_fornecedores').select('*').order('razao_social').range(from, from + PAGE - 1)
+        if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
+        const { data, error } = await q
+        if (error) break
+        const batch = (data ?? []) as Fornecedor[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
   })
 }

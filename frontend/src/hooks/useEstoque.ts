@@ -84,21 +84,29 @@ export function useEstoqueItens(filtros?: { categoria?: string; curva?: string; 
   return useQuery<EstItem[]>({
     queryKey: ['est-itens', filtros],
     queryFn: async () => {
-      let q = supabase
-        .from('est_itens')
-        .select('*')
-        .order('descricao')
-        // Sobrescreve o cap default do PostgREST (1000) — o cadastro tem ~1900 itens
-        .range(0, 9999)
+      // PostgREST do Supabase capa em 1000 linhas por request mesmo com .range().
+      // Pagina no cliente em lotes de 1000 e concatena.
+      const PAGE = 1000
+      const all: EstItem[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('est_itens')
+          .select('*')
+          .order('descricao')
+          .range(from, from + PAGE - 1)
 
-      if (filtros?.categoria) q = q.eq('categoria', filtros.categoria)
-      if (filtros?.curva)     q = q.eq('curva_abc', filtros.curva)
-      if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
-      else q = q.eq('ativo', true)
+        if (filtros?.categoria) q = q.eq('categoria', filtros.categoria)
+        if (filtros?.curva)     q = q.eq('curva_abc', filtros.curva)
+        if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
+        else q = q.eq('ativo', true)
 
-      const { data, error } = await q
-      if (error) return []
-      return (data ?? []) as EstItem[]
+        const { data, error } = await q
+        if (error) break
+        const batch = (data ?? []) as EstItem[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
   })
 }
