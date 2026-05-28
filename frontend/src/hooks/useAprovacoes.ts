@@ -168,34 +168,54 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       }
 
       // 3. Busca dados de cotacao para cotacao_resumo (fornecedor vencedor, valor, total cotados)
-      const cotMap = new Map<string, {
+      //    + lista completa de fornecedores p/ aprovacao tipo='cotacao' (comparativo)
+      type CotResumo = {
         fornecedor_nome: string
         valor: number
         prazo_dias: number
         total_cotados: number
         comprador_nome: string
-      }>()
+      }
+      type CotFornecedor = {
+        id: string
+        fornecedor_nome: string
+        valor_total: number
+        valor_frete?: number | null
+        prazo_entrega_dias?: number | null
+        condicao_pagamento?: string | null
+        observacao?: string | null
+        selecionado?: boolean | null
+      }
+      const cotMap = new Map<string, CotResumo>()
+      const cotForMap = new Map<string, CotFornecedor[]>()
 
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, concluido_por_nome, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, concluido_por_nome, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, fornecedor_nome, valor_total, valor_frete, prazo_entrega_dias, condicao_pagamento, observacao, selecionado)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
         for (const c of cotData ?? []) {
           const cot = c as Record<string, unknown>
-          const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
-          const selecionado = fornecedores.find(() => true)
+          const fornecedores = (cot.fornecedores ?? []) as CotFornecedor[]
+          // vencedor = o marcado como selecionado (ou o primeiro como fallback)
+          const vencedor = fornecedores.find(f => f.selecionado) ?? fornecedores[0]
           const comprador = cot.comprador as { nome?: string } | null
           cotMap.set(cot.requisicao_id as string, {
             fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
             valor: (cot.valor_selecionado as number) ?? 0,
-            prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
+            prazo_dias: vencedor?.prazo_entrega_dias ?? 0,
             total_cotados: fornecedores.length,
             // Prefere quem realmente concluiu; fallback: comprador atribuido (legado)
             comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '',
           })
+          // Ordenado: selecionado primeiro, depois por menor valor_total
+          const sorted = [...fornecedores].sort((a, b) => {
+            if ((b.selecionado ? 1 : 0) !== (a.selecionado ? 1 : 0)) return (b.selecionado ? 1 : 0) - (a.selecionado ? 1 : 0)
+            return (a.valor_total ?? 0) - (b.valor_total ?? 0)
+          })
+          cotForMap.set(cot.requisicao_id as string, sorted)
         }
       }
 
@@ -656,6 +676,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             modulo: a.modulo || 'cmp',
             requisicao,
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
+            cotacao_fornecedores: cotForMap.get(a.entidade_id) ?? undefined,
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
             transporte_detalhes: transporteDetalhes ?? undefined,

@@ -411,6 +411,53 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           )}
         </div>
 
+        {/* Comparativo completo de fornecedores (somente p/ aprovacao de cotacao) */}
+        {aprovacao.tipo_aprovacao === 'cotacao' && aprovacao.cotacao_fornecedores && aprovacao.cotacao_fornecedores.length > 0 && (
+          <div className="mt-3 rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-slate-50 px-3 py-2 flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Comparativo de Fornecedores ({aprovacao.cotacao_fornecedores.length})
+              </p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {aprovacao.cotacao_fornecedores.map(f => (
+                <div key={f.id} className={`px-3 py-2.5 ${f.selecionado ? 'bg-emerald-50/50' : ''}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {f.selecionado && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          <CheckCircle size={9} /> ESCOLHIDO
+                        </span>
+                      )}
+                      <p className="text-xs font-bold text-slate-700 truncate">{f.fornecedor_nome}</p>
+                    </div>
+                    <p className={`text-sm font-extrabold shrink-0 ${f.selecionado ? 'text-emerald-600' : 'text-slate-700'}`}>
+                      {fmt(f.valor_total ?? 0)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500">
+                    <div>
+                      <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Frete</span>
+                      <span className="text-slate-700">{f.valor_frete && f.valor_frete > 0 ? fmt(f.valor_frete) : '—'}</span>
+                    </div>
+                    <div>
+                      <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Entrega</span>
+                      <span className="text-slate-700">{f.prazo_entrega_dias ? `${f.prazo_entrega_dias}d` : '—'}</span>
+                    </div>
+                    <div>
+                      <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Pagamento</span>
+                      <span className="text-slate-700 truncate block">{f.condicao_pagamento || '—'}</span>
+                    </div>
+                  </div>
+                  {f.observacao && (
+                    <p className="text-[10px] text-slate-400 italic mt-1.5 leading-snug">"{f.observacao}"</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Alerta: cotacoes obrigatorias faltantes (#38) */}
         {alertaCotacao?.sem_cotacoes_minimas && (
           <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
@@ -562,7 +609,8 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </button>
       </div>
 
-      {isAprovadorDesignado && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status) && (
+      {/* Cotacao nao pode ser editada — so a validacao tecnica permite alteracao de itens */}
+      {isAprovadorDesignado && aprovacao.tipo_aprovacao !== 'cotacao' && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status) && (
         <button
           type="button"
           disabled={mutation.isPending}

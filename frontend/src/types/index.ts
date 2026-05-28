@@ -175,7 +175,19 @@ export interface AprovacaoPendente extends Aprovacao {
     valor: number
     prazo_dias: number
     total_cotados: number
+    comprador_nome?: string
   }
+  /** Lista completa de fornecedores cotados (so populado para tipo_aprovacao='cotacao') */
+  cotacao_fornecedores?: {
+    id: string
+    fornecedor_nome: string
+    valor_total: number
+    valor_frete?: number | null
+    prazo_entrega_dias?: number | null
+    condicao_pagamento?: string | null
+    observacao?: string | null
+    selecionado?: boolean | null
+  }[]
   minuta_resumo?: {
     objeto: string
     contraparte: string
