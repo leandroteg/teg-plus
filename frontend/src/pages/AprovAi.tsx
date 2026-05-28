@@ -48,6 +48,8 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
   // Cor do nome no accordion quando ha pendencia (fundo escuro indigo)
   accentText: string
+  // Fundo translucido na cor do tipo quando ha pendencia
+  accentBg: string
 }> = {
   cotacao: {
     label: 'Aprovacao Compras',
@@ -60,6 +62,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-blue-700',
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
     accentText: 'text-blue-300',
+    accentBg: 'bg-blue-500/10',
   },
   autorizacao_pagamento: {
     label: 'Autorizacoes de Pagamento',
@@ -72,6 +75,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-amber-700',
     headerBg: 'bg-gradient-to-r from-amber-600 to-amber-500',
     accentText: 'text-amber-300',
+    accentBg: 'bg-amber-500/10',
   },
   minuta_contratual: {
     label: 'Minutas Contratuais',
@@ -84,6 +88,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-violet-700',
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
     accentText: 'text-violet-300',
+    accentBg: 'bg-violet-500/10',
   },
   requisicao_compra: {
     label: 'Validacao Tec. Requisicao de Compra',
@@ -96,6 +101,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-teal-700',
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
     accentText: 'text-teal-300',
+    accentBg: 'bg-teal-500/10',
   },
   aprovacao_transporte: {
     label: 'Aprovacao de Transporte',
@@ -108,6 +114,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
     accentText: 'text-orange-300',
+    accentBg: 'bg-orange-500/10',
   },
   solicitacao_adiantamento: {
     label: 'Solicitacao de Adiantamento',
@@ -120,6 +127,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-cyan-700',
     headerBg: 'bg-gradient-to-r from-cyan-600 to-cyan-500',
     accentText: 'text-cyan-300',
+    accentBg: 'bg-cyan-500/10',
   },
 }
 
@@ -1433,7 +1441,7 @@ function AccordionSection({
   const count = aprovacoes.length
 
   return (
-    <div className={`rounded-2xl overflow-hidden border ${count > 0 ? config.borderColor : 'border-white/10'} ${count > 0 ? 'bg-white/5' : 'bg-white/[0.02]'}`}>
+    <div className={`rounded-2xl overflow-hidden border ${count > 0 ? config.borderColor : 'border-white/10'} ${count > 0 ? config.accentBg : 'bg-white/[0.02]'}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -1595,7 +1603,7 @@ function TabPendentes({
               aprovacoes={grouped[tipo]}
               aprovadorNome={aprovadorNome}
               aprovadorEmail={aprovadorEmail}
-              defaultOpen={grouped[tipo].length > 0}
+              defaultOpen={false}
             />
           ))}
         </div>
