@@ -149,13 +149,20 @@ export function useCriarRequisicao() {
         (sum, item) => sum + (item.quantidade * (item.valor_unitario_estimado ?? 0)), 0
       )
 
-      // Gera número único RC-YYYYMM-XXXX
-      const now = new Date()
-      const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
-      const seq = String(Date.now()).slice(-5)
-      const numero = `RC-${yyyymm}-${seq}`
+      // Gera numero unico via sequence (RPC cmp_proximo_numero_rc, migration 113)
+      let numero: string
+      {
+        const { data: nro, error: nroErr } = await supabase.rpc('cmp_proximo_numero_rc')
+        if (nroErr || !nro) {
+          // Fallback defensivo se a RPC falhar — mantem fluxo, com colisao improvavel
+          const now = new Date()
+          const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+          numero = `RC-${yyyymm}-${String(Date.now()).slice(-5)}`
+        } else {
+          numero = nro as string
+        }
+      }
 
-      const alcadaNivel = valorEstimado > 2000 ? 2 : 1
       const classesSnapshot = Array.from(new Set(
         payload.itens
           .map(item => item.classe_financeira_codigo?.trim())
@@ -187,28 +194,36 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Resolve comprador_id e passa_por_cd da categoria.
+      // Resolve comprador_id, passa_por_cd e alcada1_limite da categoria.
       let compradorId = payload.comprador_id || null
       let passaPorCd = false
+      let alcada1Limite: number | null = null
       if (payload.categoria) {
         try {
           const { data: cat } = await supabase
             .from('cmp_categorias')
-            .select('comprador_nome, passa_por_cd')
+            .select('comprador_nome, passa_por_cd, alcada1_limite')
             .eq('codigo', payload.categoria)
             .maybeSingle()
           passaPorCd = Boolean(cat?.passa_por_cd)
+          if (cat?.alcada1_limite != null) alcada1Limite = Number(cat.alcada1_limite)
           if (!compradorId && cat?.comprador_nome) {
             const { data: comp } = await supabase
               .from('cmp_compradores')
               .select('id')
               .ilike('nome', `%${cat.comprador_nome.split(' ')[0]}%`)
+              .eq('ativo', true)
               .limit(1)
               .maybeSingle()
             compradorId = comp?.id ?? null
           }
         } catch { /* non-critical */ }
       }
+
+      // Alcada deriva do limite da categoria (cmp_categorias.alcada1_limite).
+      // Fallback p/ 2000 se categoria nao tiver limite definido.
+      const limiteAlcada1 = alcada1Limite ?? 2000
+      const alcadaNivel = valorEstimado > limiteAlcada1 ? 2 : 1
 
       // Categorias com passa_por_cd: RC vai p/ triagem do CD Araxa antes
       // de seguir para validacao tecnica. Sem rascunho, sem apr_aprovacoes
@@ -467,7 +482,19 @@ export function useAtualizarRequisicao() {
       const valorEstimado = payload.itens.reduce(
         (sum, item) => sum + (item.quantidade * (item.valor_unitario_estimado ?? 0)), 0
       )
-      const alcadaNivel = valorEstimado > 2000 ? 2 : 1
+      // Alcada deriva do limite da categoria (cmp_categorias.alcada1_limite). Fallback 2000.
+      let alcada1Limite: number | null = null
+      if (payload.categoria) {
+        try {
+          const { data: cat } = await supabase
+            .from('cmp_categorias')
+            .select('alcada1_limite')
+            .eq('codigo', payload.categoria)
+            .maybeSingle()
+          if (cat?.alcada1_limite != null) alcada1Limite = Number(cat.alcada1_limite)
+        } catch { /* fallback */ }
+      }
+      const alcadaNivel = valorEstimado > (alcada1Limite ?? 2000) ? 2 : 1
       const classesSnapshot = Array.from(new Set(
         payload.itens
           .map(item => item.classe_financeira_codigo?.trim())
@@ -702,9 +729,12 @@ export function useEnviarParaCotacao() {
       try {
         let compradorId: string | null = null
         if (categoria) {
+          // Filtra apenas compradores ativos — evita atribuir cotacao a usuario
+          // desativado quando a categoria so tinha um comprador cadastrado.
           const { data: compradores } = await supabase
             .from('cmp_compradores')
             .select('id, categorias')
+            .eq('ativo', true)
           const match = compradores?.find(
             (c: { id: string; categorias: string[] }) =>
               c.categorias?.includes(categoria)
