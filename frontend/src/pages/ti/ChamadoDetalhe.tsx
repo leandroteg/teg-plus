@@ -60,6 +60,9 @@ export default function ChamadoDetalhe() {
       await adicionarComentario({
         chamado_id: id,
         autor_id: perfil.id,
+        autor_nome: perfil.nome,
+        autor_email: perfil.email,
+        autor_eh_atendente: isAtendente,
         mensagem: mensagem.trim(),
         interno: isAtendente ? interno : false,
       })

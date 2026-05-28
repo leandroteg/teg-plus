@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Chamado, Comentario, StatusChamado, Anexo } from './types'
 import { ANEXO_MAX_BYTES } from './types'
+import { notificarNovoChamado, notificarNovoComentario, notificarMudancaStatus } from './email'
 
 /**
  * "Sou atendente de TI?" — lê de ti_atendentes (gerenciada em /ti/admin).
@@ -156,22 +157,48 @@ export async function criarChamado(input: {
   const { data, error } = await supabase
     .from('ti_chamados')
     .insert(input)
-    .select('id, numero')
+    .select(CHAMADO_SELECT)
     .single()
   if (error) throw error
-  return data as { id: string; numero: number }
+  const chamado = data as unknown as Chamado
+  // fire-and-forget — não bloqueia UX
+  void notificarNovoChamado(chamado)
+  return { id: chamado.id, numero: chamado.numero }
 }
 
 export async function adicionarComentario(input: {
   chamado_id: string
   autor_id: string
+  autor_nome: string
+  autor_email?: string | null
+  autor_eh_atendente: boolean
   mensagem: string
   interno?: boolean
 }) {
   const { error } = await supabase
     .from('ti_chamado_comentarios')
-    .insert({ ...input, interno: input.interno ?? false })
+    .insert({
+      chamado_id: input.chamado_id,
+      autor_id: input.autor_id,
+      mensagem: input.mensagem,
+      interno: input.interno ?? false,
+    })
   if (error) throw error
+
+  // Busca o chamado pra montar o e-mail
+  const { data: ch } = await supabase
+    .from('ti_chamados')
+    .select(CHAMADO_SELECT)
+    .eq('id', input.chamado_id)
+    .maybeSingle()
+  if (ch) {
+    void notificarNovoComentario(
+      ch as unknown as Chamado,
+      { nome: input.autor_nome, email: input.autor_email, eAtendente: input.autor_eh_atendente },
+      input.mensagem,
+      input.interno ?? false,
+    )
+  }
 }
 
 export async function atualizarStatus(id: string, status: StatusChamado, atendente_id?: string | null) {
@@ -179,6 +206,15 @@ export async function atualizarStatus(id: string, status: StatusChamado, atenden
   if (atendente_id !== undefined) patch.atendente_id = atendente_id
   const { error } = await supabase.from('ti_chamados').update(patch).eq('id', id)
   if (error) throw error
+
+  const { data: ch } = await supabase
+    .from('ti_chamados')
+    .select(CHAMADO_SELECT)
+    .eq('id', id)
+    .maybeSingle()
+  if (ch) {
+    void notificarMudancaStatus(ch as unknown as Chamado, status)
+  }
 }
 
 // ─── Anexos ─────────────────────────────────────────────────────────────────
