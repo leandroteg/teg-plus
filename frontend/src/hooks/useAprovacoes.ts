@@ -179,7 +179,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, concluido_por_nome, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
@@ -193,7 +193,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             valor: (cot.valor_selecionado as number) ?? 0,
             prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
             total_cotados: fornecedores.length,
-            comprador_nome: comprador?.nome ?? '',
+            // Prefere quem realmente concluiu; fallback: comprador atribuido (legado)
+            comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '',
           })
         }
       }

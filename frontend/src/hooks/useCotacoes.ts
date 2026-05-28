@@ -226,6 +226,22 @@ export function useFinalizarCotacao() {
         ? fornecedoresComTotalEscolhido.reduce((sum, f) => sum + f.totalEscolhido, 0)
         : (vencedor?.valor_total ?? null)
 
+      // Captura quem clicou em Concluir (sys_perfis via auth)
+      const { data: authData } = await supabase.auth.getUser()
+      let concluido_por_id: string | null = null
+      let concluido_por_nome: string | null = null
+      if (authData?.user?.id) {
+        const { data: perfil } = await supabase
+          .from('sys_perfis')
+          .select('id, nome')
+          .eq('auth_id', authData.user.id)
+          .maybeSingle()
+        if (perfil) {
+          concluido_por_id = perfil.id as string
+          concluido_por_nome = perfil.nome as string
+        }
+      }
+
       const { error: cotError } = await supabase
         .from(TABLE_COT)
         .update({
@@ -234,6 +250,8 @@ export function useFinalizarCotacao() {
           fornecedor_selecionado_nome: vencedor?.fornecedor_nome ?? null,
           valor_selecionado: valorSelecionadoTotal,
           data_conclusao: new Date().toISOString(),
+          concluido_por_id,
+          concluido_por_nome,
           sem_cotacoes_minimas: payload.sem_cotacoes_minimas ?? false,
           justificativa_sem_cotacoes: payload.justificativa_sem_cotacoes ?? null,
         })
