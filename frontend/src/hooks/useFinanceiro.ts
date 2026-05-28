@@ -82,17 +82,24 @@ export function useContasPagar(filters?: { status?: string; centro_custo?: strin
   return useQuery<ContaPagar[]>({
     queryKey: ['contas-pagar', filters],
     queryFn: async () => {
-      let q = supabase
-        .from('fin_contas_pagar')
-        .select(SELECT_CP)
-        .order('data_vencimento', { ascending: true })
-        // sobrescreve cap de 1000 do PostgREST
-        .range(0, 4999)
-      if (filters?.status) q = q.eq('status', filters.status)
-      if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
-      const { data, error } = await q
-      if (error) throw error
-      return (data ?? []) as ContaPagar[]
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: ContaPagar[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('fin_contas_pagar')
+          .select(SELECT_CP)
+          .order('data_vencimento', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (filters?.status) q = q.eq('status', filters.status)
+        if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
+        const { data, error } = await q
+        if (error) throw error
+        const batch = (data ?? []) as ContaPagar[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
     retry: false,
   })
@@ -103,13 +110,21 @@ export function useContasReceber() {
   return useQuery<ContaReceber[]>({
     queryKey: ['contas-receber'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fin_contas_receber')
-        .select('*')
-        .order('data_vencimento', { ascending: true })
-        .range(0, 4999)
-      if (error) throw error
-      return (data ?? []) as ContaReceber[]
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: ContaReceber[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        const { data, error } = await supabase
+          .from('fin_contas_receber')
+          .select('*')
+          .order('data_vencimento', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as ContaReceber[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
     retry: false,
   })

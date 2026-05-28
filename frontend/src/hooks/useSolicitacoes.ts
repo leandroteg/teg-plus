@@ -35,21 +35,29 @@ export function useSolicitacoes(filtros?: {
   return useQuery<Solicitacao[]>({
     queryKey: ['con-solicitacoes', filtros],
     queryFn: async () => {
-      let q = supabase
-        .from('con_solicitacoes')
-        .select(SELECT_SOLICITACAO)
-        .order('created_at', { ascending: false })
-        .range(0, 1999)
-      if (filtros?.etapa_atual) q = q.eq('etapa_atual', filtros.etapa_atual)
-      if (filtros?.status) q = q.eq('status', filtros.status)
-      if (filtros?.busca) {
-        q = q.or(
-          `numero.ilike.%${filtros.busca}%,objeto.ilike.%${filtros.busca}%,contraparte_nome.ilike.%${filtros.busca}%`
-        )
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: Solicitacao[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('con_solicitacoes')
+          .select(SELECT_SOLICITACAO)
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (filtros?.etapa_atual) q = q.eq('etapa_atual', filtros.etapa_atual)
+        if (filtros?.status) q = q.eq('status', filtros.status)
+        if (filtros?.busca) {
+          q = q.or(
+            `numero.ilike.%${filtros.busca}%,objeto.ilike.%${filtros.busca}%,contraparte_nome.ilike.%${filtros.busca}%`
+          )
+        }
+        const { data, error } = await q
+        if (error) return all
+        const batch = (data ?? []) as Solicitacao[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
       }
-      const { data, error } = await q
-      if (error) return []
-      return (data ?? []) as Solicitacao[]
+      return all
     },
   })
 }
@@ -78,14 +86,18 @@ export function useSolicitacoesDashboard() {
   return useQuery<Record<string, number>>({
     queryKey: ['con-solicitacoes-dashboard'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('con_solicitacoes')
-        .select('etapa_atual')
-        .range(0, 9999)
-      if (error) return {}
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
       const counts: Record<string, number> = {}
-      for (const row of data ?? []) {
-        counts[row.etapa_atual] = (counts[row.etapa_atual] ?? 0) + 1
+      for (let from = 0; from < 50_000; from += PAGE) {
+        const { data, error } = await supabase
+          .from('con_solicitacoes')
+          .select('etapa_atual')
+          .range(from, from + PAGE - 1)
+        if (error) return counts
+        const batch = data ?? []
+        for (const row of batch) counts[row.etapa_atual] = (counts[row.etapa_atual] ?? 0) + 1
+        if (batch.length < PAGE) break
       }
       return counts
     },

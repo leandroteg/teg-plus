@@ -116,16 +116,22 @@ export function useLotesPagamento(statusFilter?: string) {
   return useQuery<LotePagamento[]>({
     queryKey: ['lotes-pagamento', statusFilter],
     queryFn: async () => {
-      let q = supabase
-        .from('fin_lotes_pagamento')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(0, 1999)
-      if (statusFilter) q = q.eq('status', statusFilter)
-      const { data, error } = await q
-      if (error) throw error
-
-      const lotes = (data ?? []) as LotePagamento[]
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const lotes: LotePagamento[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('fin_lotes_pagamento')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (statusFilter) q = q.eq('status', statusFilter)
+        const { data, error } = await q
+        if (error) throw error
+        const batch = (data ?? []) as LotePagamento[]
+        lotes.push(...batch)
+        if (batch.length < PAGE) break
+      }
       const loteIds = lotes.map(lote => lote.id)
 
       if (loteIds.length === 0) return lotes

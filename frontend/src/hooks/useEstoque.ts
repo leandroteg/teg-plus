@@ -150,21 +150,29 @@ export function useSaldos(baseId?: string) {
   return useQuery<EstSaldo[]>({
     queryKey: ['est-saldos', baseId],
     queryFn: async () => {
-      let q = supabase
-        .from('est_saldos')
-        .select(`
-          *,
-          item:est_itens(codigo, descricao, unidade, curva_abc, estoque_minimo, ponto_reposicao),
-          base:est_bases(codigo, nome)
-        `)
-        .order('atualizado_em', { ascending: false })
-        .range(0, 9999)
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: EstSaldo[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('est_saldos')
+          .select(`
+            *,
+            item:est_itens(codigo, descricao, unidade, curva_abc, estoque_minimo, ponto_reposicao),
+            base:est_bases(codigo, nome)
+          `)
+          .order('atualizado_em', { ascending: false })
+          .range(from, from + PAGE - 1)
 
-      if (baseId) q = q.eq('base_id', baseId)
+        if (baseId) q = q.eq('base_id', baseId)
 
-      const { data, error } = await q
-      if (error) return []
-      return (data ?? []) as EstSaldo[]
+        const { data, error } = await q
+        if (error) break
+        const batch = (data ?? []) as EstSaldo[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
     refetchInterval: 60_000,
   })
@@ -174,19 +182,27 @@ export function useSaldosAbaixoMinimo() {
   return useQuery<EstSaldo[]>({
     queryKey: ['est-saldos-alerta'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('est_saldos')
-        .select(`
-          *,
-          item:est_itens(codigo, descricao, unidade, curva_abc, estoque_minimo, ponto_reposicao),
-          base:est_bases(codigo, nome)
-        `)
-        .range(0, 9999)
-      if (error) return []
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: EstSaldo[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        const { data, error } = await supabase
+          .from('est_saldos')
+          .select(`
+            *,
+            item:est_itens(codigo, descricao, unidade, curva_abc, estoque_minimo, ponto_reposicao),
+            base:est_bases(codigo, nome)
+          `)
+          .range(from, from + PAGE - 1)
+        if (error) break
+        const batch = (data ?? []) as EstSaldo[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
       // Filtra no client: saldo <= ponto_reposicao do item
-      return (data ?? []).filter(
+      return all.filter(
         (s: any) => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
-      ) as EstSaldo[]
+      )
     },
   })
 }
@@ -311,17 +327,25 @@ export function useSolicitacoes(status?: StatusSolicitacao) {
   return useQuery<EstSolicitacao[]>({
     queryKey: ['est-solicitacoes', status],
     queryFn: async () => {
-      let q = supabase
-        .from('est_solicitacoes')
-        .select(`*, itens:est_solicitacao_itens(*, item:est_itens(codigo, descricao, unidade))`)
-        .order('criado_em', { ascending: false })
-        .range(0, 1999)
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: EstSolicitacao[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let q = supabase
+          .from('est_solicitacoes')
+          .select(`*, itens:est_solicitacao_itens(*, item:est_itens(codigo, descricao, unidade))`)
+          .order('criado_em', { ascending: false })
+          .range(from, from + PAGE - 1)
 
-      if (status) q = q.eq('status', status)
+        if (status) q = q.eq('status', status)
 
-      const { data, error } = await q
-      if (error) return []
-      return (data ?? []) as EstSolicitacao[]
+        const { data, error } = await q
+        if (error) break
+        const batch = (data ?? []) as EstSolicitacao[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
+      return all
     },
   })
 }

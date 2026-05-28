@@ -30,19 +30,27 @@ export function useCotacoes(compradorId?: string, status?: string) {
   return useQuery<Cotacao[]>({
     queryKey: ['cotacoes', compradorId, status],
     queryFn: async () => {
-      let query = supabase
-        .from(TABLE_COT)
-        .select(SELECT_COTACAO)
-        .order('created_at', { ascending: false })
-        .range(0, 1999)
+      // PostgREST capa em 1000 — paginar no cliente
+      const PAGE = 1000
+      const all: unknown[] = []
+      for (let from = 0; from < 50_000; from += PAGE) {
+        let query = supabase
+          .from(TABLE_COT)
+          .select(SELECT_COTACAO)
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
 
-      if (compradorId) query = query.eq('comprador_id', compradorId)
-      if (status)      query = query.eq('status', status)
+        if (compradorId) query = query.eq('comprador_id', compradorId)
+        if (status)      query = query.eq('status', status)
 
-      const { data, error } = await query
-      if (error) throw error
+        const { data, error } = await query
+        if (error) throw error
+        const batch = (data ?? []) as unknown[]
+        all.push(...batch)
+        if (batch.length < PAGE) break
+      }
 
-      return ((data ?? []) as unknown[]).map((c: unknown) => {
+      return all.map((c: unknown) => {
         const cot = c as Record<string, unknown>
         const comprador = cot.comprador as Record<string, string> | null
         return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
