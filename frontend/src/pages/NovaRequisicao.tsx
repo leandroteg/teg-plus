@@ -21,14 +21,24 @@ import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const emptyItem = (): RequisicaoItem => ({
-  descricao: '',
-  quantidade: 1,
-  unidade: 'un',
-  valor_unitario_estimado: 0,
-  marca: '',
-  destino_operacional: 'estoque',
-})
+// Categorias claramente de servico — default natureza='servico' ao iniciar item
+const CATEGORIAS_SERVICO = new Set([
+  'SERV_ADMIN', 'SERV_OBRA_LOG', 'SERVICOS',
+  'LOCACAO', 'LOCACAO_IMOVEIS', 'MOBILIZACAO',
+])
+
+const emptyItem = (categoria?: string): RequisicaoItem => {
+  const isServico = !!categoria && CATEGORIAS_SERVICO.has(categoria)
+  return {
+    descricao: '',
+    quantidade: 1,
+    unidade: 'un',
+    valor_unitario_estimado: 0,
+    marca: '',
+    destino_operacional: isServico ? 'nenhum' : 'estoque',
+    natureza: isServico ? 'servico' : 'produto',
+  }
+}
 
 function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
@@ -252,6 +262,7 @@ export default function NovaRequisicao() {
         categoria_financeira_codigo: (it as any).categoria_financeira_codigo ?? undefined,
         categoria_financeira_descricao: (it as any).categoria_financeira_descricao ?? undefined,
         destino_operacional: (it as any).destino_operacional ?? 'estoque',
+        natureza: (it as any).natureza ?? 'produto',
       })))
     }
 
@@ -1010,6 +1021,25 @@ export default function NovaRequisicao() {
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
                   value={item.valor_unitario_estimado} onChange={v => updateItem(idx, 'valor_unitario_estimado', v)} />
               </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Natureza</span>
+              {(['produto', 'servico'] as const).map(n => {
+                const ativo = (item.natureza ?? 'produto') === n
+                const tone = n === 'produto'
+                  ? ativo ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
+                  : ativo ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-200 hover:bg-violet-50'
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => updateItem(idx, 'natureza', n)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${tone}`}
+                  >
+                    {n === 'produto' ? 'Produto' : 'Servico'}
+                  </button>
+                )
+              })}
             </div>
           </div>
         ))}

@@ -314,6 +314,7 @@ export function useCriarRequisicao() {
             categoria_financeira_codigo: item.categoria_financeira_codigo || null,
             categoria_financeira_descricao: item.categoria_financeira_descricao || null,
             destino_operacional:      item.destino_operacional || 'estoque',
+            natureza:                 item.natureza || 'produto',
           }))
         if (itens.length > 0) {
           const { error: itensError } = await supabase
@@ -569,6 +570,7 @@ export function useAtualizarRequisicao() {
           categoria_financeira_codigo: item.categoria_financeira_codigo || null,
           categoria_financeira_descricao: item.categoria_financeira_descricao || null,
           destino_operacional:      item.destino_operacional || 'estoque',
+          natureza:                 item.natureza || 'produto',
         }))
       const { error: rpcError } = await supabase.rpc('replace_requisicao_itens', {
         p_requisicao_id: requisicaoId,

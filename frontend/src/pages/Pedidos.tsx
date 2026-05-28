@@ -1419,6 +1419,11 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
   const vencUrgency = !isPago && dataVenc ? (diasVenc! < 0 ? 'overdue' : diasVenc! === 0 ? 'today' : diasVenc! <= 7 ? 'week' : 'normal') : 'normal'
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
+  const rcItensCard  = pedido.requisicao?.itens ?? []
+  const temProduto   = rcItensCard.some(i => (i.natureza ?? 'produto') === 'produto')
+  const temServico   = rcItensCard.some(i => i.natureza === 'servico')
+  const naturezaTipo: 'misto' | 'servico' | 'produto' | null =
+    temProduto && temServico ? 'misto' : temServico ? 'servico' : temProduto ? 'produto' : null
   const categoria    = pedido.requisicao?.categoria
   const obraNome     = pedido.requisicao?.obra_nome
   const centroCusto  = pedido.centro_custo
@@ -1540,6 +1545,16 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${dark ? 'bg-violet-500/15 text-violet-400 border-violet-500/30 hover:bg-violet-500/25' : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'}`}>
                   <ExternalLink size={9} /> Ver Contrato
                 </a>
+              )}
+              {naturezaTipo === 'servico' && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${dark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-50 text-violet-700'}`}>
+                  Servico
+                </span>
+              )}
+              {naturezaTipo === 'misto' && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${dark ? 'bg-fuchsia-500/15 text-fuchsia-400' : 'bg-fuchsia-50 text-fuchsia-700'}`} title="Pedido com produtos e servicos — 2 notas">
+                  Produto + Servico
+                </span>
               )}
             </div>
 
@@ -2071,36 +2086,59 @@ function DetailModal({
             </div>
           )}
 
-          {/* Itens da requisição */}
-          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (
-            <div>
-              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
-                <Receipt size={11} /> Itens do Pedido
-              </p>
-              <div className={`rounded-xl border overflow-hidden ${brd}`}>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className={`${dark ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-                      <th className="text-left px-3 py-2 font-semibold">Descrição</th>
-                      <th className="text-center px-2 py-2 font-semibold w-12">Qtd</th>
-                      <th className="text-center px-2 py-2 font-semibold w-10">Un</th>
-                      <th className="text-right px-3 py-2 font-semibold w-20">Vl. Unit.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(pedido.requisicao!.itens!).map((item, i) => (
-                      <tr key={i} className={`border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
-                        <td className={`px-3 py-2 ${txt}`}>{item.descricao}</td>
-                        <td className={`px-2 py-2 text-center ${sub}`}>{item.quantidade}</td>
-                        <td className={`px-2 py-2 text-center ${sub}`}>{item.unidade}</td>
-                        <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_estimado)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Itens da requisição — agrupados por natureza (produto/servico) */}
+          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
+            const todos = pedido.requisicao!.itens!
+            const produtos = todos.filter(i => (i.natureza ?? 'produto') === 'produto')
+            const servicos = todos.filter(i => i.natureza === 'servico')
+            const subtotal = (arr: typeof todos) => arr.reduce((s, i) => s + (i.quantidade * i.valor_unitario_estimado), 0)
+            const grupos: { label: string; chip: string; itens: typeof todos; total: number }[] = []
+            if (produtos.length) grupos.push({ label: `Produtos (${produtos.length})`, chip: 'bg-sky-100 text-sky-700', itens: produtos, total: subtotal(produtos) })
+            if (servicos.length) grupos.push({ label: `Servicos (${servicos.length})`, chip: 'bg-violet-100 text-violet-700', itens: servicos, total: subtotal(servicos) })
+
+            return (
+              <div>
+                <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
+                  <Receipt size={11} /> Itens do Pedido
+                  {grupos.length > 1 && (
+                    <span className={`ml-2 text-[10px] font-normal normal-case ${sub}`}>
+                      Produto {fmt(subtotal(produtos))} · Servico {fmt(subtotal(servicos))}
+                    </span>
+                  )}
+                </p>
+                <div className="space-y-3">
+                  {grupos.map((g, gi) => (
+                    <div key={gi} className={`rounded-xl border overflow-hidden ${brd}`}>
+                      <div className={`flex items-center justify-between px-3 py-2 ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${g.chip}`}>{g.label}</span>
+                        <span className={`text-xs font-bold ${txt}`}>{fmt(g.total)}</span>
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className={`${dark ? 'bg-white/[0.02] text-slate-400' : 'bg-white text-slate-500'}`}>
+                            <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                            <th className="text-center px-2 py-2 font-semibold w-12">Qtd</th>
+                            <th className="text-center px-2 py-2 font-semibold w-10">Un</th>
+                            <th className="text-right px-3 py-2 font-semibold w-20">Vl. Unit.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.itens.map((item, i) => (
+                            <tr key={i} className={`border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+                              <td className={`px-3 py-2 ${txt}`}>{item.descricao}</td>
+                              <td className={`px-2 py-2 text-center ${sub}`}>{item.quantidade}</td>
+                              <td className={`px-2 py-2 text-center ${sub}`}>{item.unidade}</td>
+                              <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_estimado)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Documentos */}
           {!pending && (

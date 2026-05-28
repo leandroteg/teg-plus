@@ -108,6 +108,7 @@ export interface RequisicaoItem {
   destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
   qtd_atendida_cd?: number
   atendimento_cd_em?: string
+  natureza?: 'produto' | 'servico'
 }
 
 export interface Requisicao {
