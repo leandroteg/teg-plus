@@ -34,6 +34,7 @@ export function useCotacoes(compradorId?: string, status?: string) {
         .from(TABLE_COT)
         .select(SELECT_COTACAO)
         .order('created_at', { ascending: false })
+        .range(0, 1999)
 
       if (compradorId) query = query.eq('comprador_id', compradorId)
       if (status)      query = query.eq('status', status)

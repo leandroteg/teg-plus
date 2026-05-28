@@ -41,7 +41,7 @@ export function useCadFornecedores(filtros?: { ativo?: boolean }) {
   return useQuery<Fornecedor[]>({
     queryKey: ['cad-fornecedores', filtros],
     queryFn: async () => {
-      let q = supabase.from('cmp_fornecedores').select('*').order('razao_social')
+      let q = supabase.from('cmp_fornecedores').select('*').order('razao_social').range(0, 4999)
       if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
       const { data, error } = await q
       if (error) return []

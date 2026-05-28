@@ -14,16 +14,11 @@ export interface SyncLog {
 }
 
 export interface OmieConfig {
-  omie_app_key: string
-  omie_app_secret: string
   n8n_webhook_url: string
   omie_enabled: string
   cp_remessa_webhook_url: string
   cp_remessa_status_webhook_url: string
-  // Sandbox / homologação
-  omie_sandbox_mode: string        // 'true' | 'false'
-  omie_sandbox_app_key: string
-  omie_sandbox_app_secret: string
+  omie_sandbox_mode: string
 }
 
 // ── useLastSync ───────────────────────────────────────────────────────────────
@@ -49,7 +44,7 @@ export function useLastSync(dominio: string) {
 }
 
 // ── useOmieConfig ─────────────────────────────────────────────────────────────
-// Lê todas as linhas de sys_config e as converte em um objeto OmieConfig.
+// Le somente chaves nao sensiveis de sys_config e as converte em um objeto OmieConfig.
 // Requer que o usuário autenticado seja administrador (RLS).
 
 export function useOmieConfig() {
@@ -59,19 +54,22 @@ export function useOmieConfig() {
       const { data, error } = await supabase
         .from('sys_config')
         .select('chave, valor')
+        .in('chave', [
+          'n8n_webhook_url',
+          'omie_enabled',
+          'cp_remessa_webhook_url',
+          'cp_remessa_status_webhook_url',
+          'omie_sandbox_mode',
+        ])
       if (error) throw error
       const cfg: Record<string, string> = {}
       ;(data ?? []).forEach(row => { cfg[row.chave] = row.valor ?? '' })
       return {
-        omie_app_key:    cfg['omie_app_key']    ?? '',
-        omie_app_secret: cfg['omie_app_secret'] ?? '',
         n8n_webhook_url: cfg['n8n_webhook_url'] ?? '',
         omie_enabled:    cfg['omie_enabled']    ?? 'false',
         cp_remessa_webhook_url: cfg['cp_remessa_webhook_url'] ?? '',
         cp_remessa_status_webhook_url: cfg['cp_remessa_status_webhook_url'] ?? '',
         omie_sandbox_mode:       cfg['omie_sandbox_mode']       ?? 'false',
-        omie_sandbox_app_key:    cfg['omie_sandbox_app_key']    ?? '',
-        omie_sandbox_app_secret: cfg['omie_sandbox_app_secret'] ?? '',
       }
     },
     staleTime: 60_000, // considera os dados frescos por 1 minuto
@@ -87,11 +85,20 @@ export function useSaveOmieConfig() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (config: Partial<OmieConfig>) => {
-      const updates = Object.entries(config).map(([chave, valor]) => ({
-        chave,
-        valor: valor ?? '',
-        updated_at: new Date().toISOString(),
-      }))
+      const allowedKeys = new Set([
+        'n8n_webhook_url',
+        'omie_enabled',
+        'cp_remessa_webhook_url',
+        'cp_remessa_status_webhook_url',
+        'omie_sandbox_mode',
+      ])
+      const updates = Object.entries(config)
+        .filter(([chave]) => allowedKeys.has(chave))
+        .map(([chave, valor]) => ({
+          chave,
+          valor: valor ?? '',
+          updated_at: new Date().toISOString(),
+        }))
       for (const update of updates) {
         const { error } = await supabase
           .from('sys_config')

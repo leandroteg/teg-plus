@@ -150,6 +150,7 @@ export function useSaldos(baseId?: string) {
           base:est_bases(codigo, nome)
         `)
         .order('atualizado_em', { ascending: false })
+        .range(0, 9999)
 
       if (baseId) q = q.eq('base_id', baseId)
 
@@ -172,6 +173,7 @@ export function useSaldosAbaixoMinimo() {
           item:est_itens(codigo, descricao, unidade, curva_abc, estoque_minimo, ponto_reposicao),
           base:est_bases(codigo, nome)
         `)
+        .range(0, 9999)
       if (error) return []
       // Filtra no client: saldo <= ponto_reposicao do item
       return (data ?? []).filter(
@@ -305,6 +307,7 @@ export function useSolicitacoes(status?: StatusSolicitacao) {
         .from('est_solicitacoes')
         .select(`*, itens:est_solicitacao_itens(*, item:est_itens(codigo, descricao, unidade))`)
         .order('criado_em', { ascending: false })
+        .range(0, 1999)
 
       if (status) q = q.eq('status', status)
 

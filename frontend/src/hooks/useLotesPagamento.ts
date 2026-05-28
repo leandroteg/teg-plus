@@ -120,6 +120,7 @@ export function useLotesPagamento(statusFilter?: string) {
         .from('fin_lotes_pagamento')
         .select('*')
         .order('created_at', { ascending: false })
+        .range(0, 1999)
       if (statusFilter) q = q.eq('status', statusFilter)
       const { data, error } = await q
       if (error) throw error

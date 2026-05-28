@@ -39,6 +39,7 @@ export function useSolicitacoes(filtros?: {
         .from('con_solicitacoes')
         .select(SELECT_SOLICITACAO)
         .order('created_at', { ascending: false })
+        .range(0, 1999)
       if (filtros?.etapa_atual) q = q.eq('etapa_atual', filtros.etapa_atual)
       if (filtros?.status) q = q.eq('status', filtros.status)
       if (filtros?.busca) {
@@ -80,6 +81,7 @@ export function useSolicitacoesDashboard() {
       const { data, error } = await supabase
         .from('con_solicitacoes')
         .select('etapa_atual')
+        .range(0, 9999)
       if (error) return {}
       const counts: Record<string, number> = {}
       for (const row of data ?? []) {

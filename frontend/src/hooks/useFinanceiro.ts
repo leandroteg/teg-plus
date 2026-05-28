@@ -86,6 +86,8 @@ export function useContasPagar(filters?: { status?: string; centro_custo?: strin
         .from('fin_contas_pagar')
         .select(SELECT_CP)
         .order('data_vencimento', { ascending: true })
+        // sobrescreve cap de 1000 do PostgREST
+        .range(0, 4999)
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
       const { data, error } = await q
@@ -105,6 +107,7 @@ export function useContasReceber() {
         .from('fin_contas_receber')
         .select('*')
         .order('data_vencimento', { ascending: true })
+        .range(0, 4999)
       if (error) throw error
       return (data ?? []) as ContaReceber[]
     },
@@ -121,6 +124,7 @@ export function useFornecedores() {
         .from('cmp_fornecedores')
         .select('*')
         .order('razao_social')
+        .range(0, 4999)
       if (error) return []
       return (data ?? []) as Fornecedor[]
     },
