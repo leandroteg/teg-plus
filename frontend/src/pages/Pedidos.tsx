@@ -39,6 +39,7 @@ import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
+import PedidoImpostosSection from '../components/PedidoImpostosSection'
 import { AnexoReferencia } from '../components/AnexoReferencia'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
@@ -2138,6 +2139,14 @@ function DetailModal({
                 </div>
               </div>
             )
+          })()}
+
+          {/* Impostos (NF de Produto + NFS-e conforme natureza dos itens) */}
+          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
+            const todos = pedido.requisicao!.itens!
+            const temP = todos.some(i => (i.natureza ?? 'produto') === 'produto')
+            const temS = todos.some(i => i.natureza === 'servico')
+            return <PedidoImpostosSection pedidoId={pedido.id} temProduto={temP} temServico={temS} dark={dark} />
           })()}
 
           {/* Documentos */}
