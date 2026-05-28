@@ -30,6 +30,8 @@ interface SubMod {
   active: boolean
   route: string
   adminOnly?: boolean
+  /** Aberto a qualquer usuário autenticado (sem gate de módulo). Ex.: TI/Chamados. */
+  open?: boolean
   /** Chave usada na checagem de permissão (hasModule) quando difere de `key`.
    *  Ex: cards de RH (headcount/cultura) são gateados pelo módulo 'rh'. */
   moduleKey?: string
@@ -125,7 +127,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(14,165,233,0.16)',
     accent: '#38BDF8',
     subs: [
-      { key: 'ti', label: 'TI', desc: 'Infraestrutura e suporte técnico', Icon: Server, active: false, route: '' },
+      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti', open: true },
       { key: 'ai', label: 'AI Agents', desc: 'Agentes inteligentes TEG+', Icon: Bot, active: false, route: '' },
     ],
   },
@@ -214,6 +216,7 @@ export default function ModuloSelector() {
   // Pode entrar agora: módulo construído (active) E com permissão (admin ou hasModule)
   function canAccessSub(sub: SubMod) {
     if (!sub.active) return false
+    if (sub.open) return true
     if (sub.adminOnly) return isAdmin
     return hasModule(sub.moduleKey ?? sub.key)
   }
@@ -222,6 +225,7 @@ export default function ModuloSelector() {
   // módulos ativos só aparecem para quem tem permissão no módulo.
   function isSubVisible(sub: SubMod) {
     if (!sub.active) return true
+    if (sub.open) return true
     if (sub.adminOnly) return isAdmin
     return hasModule(sub.moduleKey ?? sub.key)
   }

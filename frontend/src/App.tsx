@@ -188,6 +188,14 @@ const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 
+// TI / Help Desk
+const TIHome = lazy(() => import('./pages/ti/TIHome'))
+const NovoChamado = lazy(() => import('./pages/ti/NovoChamado'))
+const MeusChamados = lazy(() => import('./pages/ti/MeusChamados'))
+const FilaChamados = lazy(() => import('./pages/ti/FilaChamados'))
+const ChamadoDetalhe = lazy(() => import('./pages/ti/ChamadoDetalhe'))
+const AdminAtendentes = lazy(() => import('./pages/ti/AdminAtendentes'))
+
 // SuperTEG AI Chat
 const SuperTEGChat = lazy(() => import('./components/SuperTEGChat'))
 
@@ -238,6 +246,14 @@ export default function App() {
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
+
+          {/* TI / Help Desk — aberto a qualquer autenticado */}
+          <Route path="/ti"              element={<Lazy><TIHome /></Lazy>} />
+          <Route path="/ti/novo"         element={<Lazy><NovoChamado /></Lazy>} />
+          <Route path="/ti/meus"         element={<Lazy><MeusChamados /></Lazy>} />
+          <Route path="/ti/fila"         element={<Lazy><FilaChamados /></Lazy>} />
+          <Route path="/ti/c/:id"        element={<Lazy><ChamadoDetalhe /></Lazy>} />
+          <Route path="/ti/admin"        element={<Lazy><AdminAtendentes /></Lazy>} />
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
