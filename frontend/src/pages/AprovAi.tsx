@@ -46,6 +46,8 @@ const tipoConfig: Record<TipoAprovacao, {
   badgeBg: string
   badgeText: string
   headerBg: string
+  // Cor do nome no accordion quando ha pendencia (fundo escuro indigo)
+  accentText: string
 }> = {
   cotacao: {
     label: 'Aprovacao Compras',
@@ -57,6 +59,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-blue-100',
     badgeText: 'text-blue-700',
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
+    accentText: 'text-blue-300',
   },
   autorizacao_pagamento: {
     label: 'Autorizacoes de Pagamento',
@@ -68,6 +71,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-amber-100',
     badgeText: 'text-amber-700',
     headerBg: 'bg-gradient-to-r from-amber-600 to-amber-500',
+    accentText: 'text-amber-300',
   },
   minuta_contratual: {
     label: 'Minutas Contratuais',
@@ -79,6 +83,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-violet-100',
     badgeText: 'text-violet-700',
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
+    accentText: 'text-violet-300',
   },
   requisicao_compra: {
     label: 'Validacao Tec. Requisicao de Compra',
@@ -90,6 +95,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-teal-100',
     badgeText: 'text-teal-700',
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
+    accentText: 'text-teal-300',
   },
   aprovacao_transporte: {
     label: 'Aprovacao de Transporte',
@@ -101,6 +107,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-orange-100',
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
+    accentText: 'text-orange-300',
   },
   solicitacao_adiantamento: {
     label: 'Solicitacao de Adiantamento',
@@ -112,6 +119,7 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeBg: 'bg-cyan-100',
     badgeText: 'text-cyan-700',
     headerBg: 'bg-gradient-to-r from-cyan-600 to-cyan-500',
+    accentText: 'text-cyan-300',
   },
 }
 
@@ -1435,7 +1443,7 @@ function AccordionSection({
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${count > 0 ? config.badgeBg : 'bg-white/10'}`}>
             <IconComp size={16} className={count > 0 ? config.badgeText : 'text-white/40'} />
           </div>
-          <span className={`text-sm font-bold ${count > 0 ? 'text-white' : 'text-white/40'}`}>
+          <span className={`text-sm font-bold ${count > 0 ? config.accentText : 'text-white/40'}`}>
             {config.label}
           </span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${count > 0 ? `${config.badgeBg} ${config.badgeText}` : 'bg-white/10 text-white/30'}`}>
@@ -1577,9 +1585,9 @@ function TabPendentes({
         </div>
       )}
 
-      {/* Accordion sections — grid responsivo: lado a lado em telas medias/grandes */}
+      {/* Accordion sections */}
       {!isLoading && !isError && aprovacoes && aprovacoes.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+        <div className="space-y-3">
           {tipoOrder.map(tipo => (
             <AccordionSection
               key={tipo}
