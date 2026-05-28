@@ -141,7 +141,12 @@ export function useSalvarItem() {
         if (error) throw error
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['est-itens'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      // Invalida o cache do proximo codigo p/ evitar reuso do mesmo codigo
+      // em cadastros consecutivos (raiz do "duplicate key" no est_itens_codigo_key)
+      qc.invalidateQueries({ queryKey: ['next-code', 'est_itens'] })
+    },
   })
 }
 

@@ -6,6 +6,22 @@ import { useCategorias } from '../hooks/useCategorias'
 import type { EstItem } from '../types/estoque'
 import AutoCodeField from './AutoCodeField'
 import SmartTextField from './SmartTextField'
+import { supabase } from '../services/supabase'
+
+// Refaz a busca do proximo codigo direto no banco (fora do cache do useQuery)
+// Usado para retry quando dois cadastros consecutivos colidem no codigo.
+async function fetchNextItemCode(prefix = 'ITM'): Promise<string> {
+  const { data } = await supabase
+    .from('est_itens')
+    .select('codigo')
+    .like('codigo', `${prefix}-%`)
+    .order('codigo', { ascending: false })
+    .limit(1)
+  if (!data || data.length === 0) return `${prefix}-001`
+  const last = data[0].codigo as string
+  const num = parseInt(last.replace(`${prefix}-`, ''), 10) || 0
+  return `${prefix}-${String(num + 1).padStart(3, '0')}`
+}
 
 const UNIDADES = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
 
@@ -99,7 +115,7 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
 
   async function handleSave() {
     if (!editItem.codigo || !editItem.descricao?.trim()) return
-    const payload = {
+    const base = {
       ...editItem,
       categoria: editItem.categoria_financeira_descricao || editItem.categoria || 'GERAL',
       estoque_minimo: editItem.destino_operacional === 'estoque' ? (editItem.estoque_minimo ?? 0) : 0,
@@ -108,12 +124,29 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
         ? (editItem.ponto_reposicao ?? editItem.estoque_minimo ?? 0)
         : 0,
     }
-    try {
+
+    async function trySave(payload: Partial<EstItem>) {
       await salvar.mutateAsync(payload)
       await onSaved?.(payload)
       onClose()
-    } catch {
-      // erro fica visível via salvar.error abaixo
+    }
+
+    try {
+      await trySave(base)
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string }
+      const isDuplicate = e?.code === '23505' || /duplicate key|est_itens_codigo_key/i.test(e?.message ?? '')
+      // Retry uma vez se duplicate de codigo automatico (ITM-)
+      if (isDuplicate && !base.id && /^ITM-\d+$/.test(base.codigo ?? '')) {
+        try {
+          const novoCodigo = await fetchNextItemCode('ITM')
+          setEditItem(prev => ({ ...prev, codigo: novoCodigo }))
+          await trySave({ ...base, codigo: novoCodigo })
+        } catch {
+          // erro fica visível via salvar.error abaixo
+        }
+      }
+      // demais erros tambem ficam visíveis via salvar.error
     }
   }
 
