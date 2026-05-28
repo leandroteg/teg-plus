@@ -1,6 +1,13 @@
+import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
+
+// Mesmo padrao do banco: UPPER + remove acentos (replica unaccent no client)
+function norm(s: string): string {
+  // U+0300..U+036F = combining diacritical marks
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim()
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -81,6 +88,63 @@ export function usePreCadastros() {
     enabled: isAdminOrDirector,
     staleTime: 30_000, // poll every 30s
     refetchInterval: 30_000,
+  })
+
+  // ── Dedup automatico: pre-cadastros que ja existem como cadastro real ─────────
+  // Para itens: bate por descricao normalizada (UPPER + unaccent)
+  // Para fornecedores: por CNPJ (forte) ou razao_social normalizada (fallback)
+  const { data: idsJaExistentes = [] } = useQuery({
+    queryKey: ['pre-cadastros-dedup', pendentes.map(p => p.id).join(',')],
+    enabled: pendentes.length > 0,
+    queryFn: async () => {
+      const matchedIds: string[] = []
+
+      const itensPendentes = pendentes.filter(p => p.entidade === 'itens')
+      const fornPendentes  = pendentes.filter(p => p.entidade === 'fornecedores')
+
+      // itens — busca pelo descricao normalizada
+      for (const p of itensPendentes) {
+        const desc = (p.dados.descricao as string | undefined) ?? ''
+        const descNorm = norm(desc)
+        if (!descNorm) continue
+        const { data } = await supabase
+          .from('est_itens')
+          .select('id')
+          .eq('descricao', descNorm)
+          .limit(1)
+        if (data && data.length > 0) matchedIds.push(p.id)
+      }
+
+      // fornecedores — bate por CNPJ se tiver, senao por razao_social normalizada
+      for (const p of fornPendentes) {
+        const cnpj = (p.dados.cnpj as string | undefined)?.replace(/\D/g, '')
+        const razao = (p.dados.razao_social as string | undefined) ?? ''
+        let achou = false
+        if (cnpj && cnpj.length >= 11) {
+          const { data } = await supabase
+            .from('cmp_fornecedores')
+            .select('id')
+            .eq('cnpj', cnpj)
+            .limit(1)
+          if (data && data.length > 0) achou = true
+        }
+        if (!achou && razao) {
+          const razNorm = norm(razao)
+          if (razNorm) {
+            const { data } = await supabase
+              .from('cmp_fornecedores')
+              .select('id')
+              .eq('razao_social', razNorm)
+              .limit(1)
+            if (data && data.length > 0) achou = true
+          }
+        }
+        if (achou) matchedIds.push(p.id)
+      }
+
+      return matchedIds
+    },
+    staleTime: 60_000,
   })
 
   // Approve mutation — inserts into target table + updates status (#24)
@@ -208,9 +272,23 @@ export function usePreCadastros() {
     },
   })
 
+  // Auto-aprova pre-cadastros cujo cadastro real ja existe (silencioso, 1x por id)
+  const autoProcessadosRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    for (const id of idsJaExistentes) {
+      if (autoProcessadosRef.current.has(id)) continue
+      autoProcessadosRef.current.add(id)
+      marcarAprovado.mutate({ id })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsJaExistentes])
+
+  // Esconde os ja-existentes da UI imediatamente, mesmo antes do servidor responder
+  const pendentesFiltrados = pendentes.filter(p => !idsJaExistentes.includes(p.id))
+
   return {
-    pendentes,
-    count: pendentes.length,
+    pendentes: pendentesFiltrados,
+    count: pendentesFiltrados.length,
     isLoading,
     isAdminOrDirector,
     aprovar,

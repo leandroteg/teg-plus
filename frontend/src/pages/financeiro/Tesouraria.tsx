@@ -66,7 +66,7 @@ const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
   { key: 'contas', label: 'Contas e Saldos' },
   { key: 'conciliacao', label: 'Conciliação' },
   { key: 'conc-cartoes', label: 'Conc. Cartões' },
-  { key: 'omie', label: 'Omie ERP' },
+  // Aba "Omie ERP" desativada — integracao Omie nao sera utilizada
 ]
 
 const TAB_ICONS = {
@@ -1750,9 +1750,9 @@ function OmiePanel({ isDark }: { isDark: boolean }) {
     return (
       <div className={`rounded-2xl border p-8 text-center ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
         <Zap size={32} className="mx-auto mb-3 text-slate-300" />
-        <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Integração Omie não configurada</p>
+        <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Integração Omie protegida no servidor</p>
         <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Acesse Financeiro → Configurações e informe APP_KEY e APP_SECRET do Omie.
+          As credenciais Omie nao sao expostas no navegador. Use os webhooks n8n/proxy para sincronizar saldos e movimentacoes.
         </p>
       </div>
     )
@@ -1775,7 +1775,7 @@ function OmiePanel({ isDark }: { isDark: boolean }) {
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {isSandbox
               ? 'Dados de homologação — aplicação de teste Omie'
-              : 'Saldos e movimentações integradas diretamente do Omie'}
+              : 'Saldos e movimentacoes sincronizados pelo fluxo server-side'}
           </p>
         </div>
         <button

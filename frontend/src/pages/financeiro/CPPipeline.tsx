@@ -2445,25 +2445,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </>
             )}
             {cp.status === 'em_pagamento' && (
-              <>
-                {cp.omie_cp_id ? (
-                  <>
-                    <button
-                      onClick={() => window.open('https://app.omie.com.br', '_blank')}
-                      className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
-                    >
-                      <ExternalLink size={15} /> Pagar no Omie
-                    </button>
-                    <button onClick={() => onAction('sincronizar', cp)} className="flex-1 py-3 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
-                      <RefreshCw size={15} /> Sincronizar
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
-                    <Banknote size={15} /> Registrar Pgto
-                  </button>
-                )}
-              </>
+              <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                <Banknote size={15} /> Registrar Pgto
+              </button>
             )}
             {cp.status === 'pago' && (
               <button
@@ -3630,30 +3614,15 @@ export default function CPPipeline() {
           },
         }
       case 'em_pagamento': {
-        const hasOmie = summary.cpIds.some(id => contasById.get(id)?.omie_cp_id)
-        return hasOmie
-          ? {
-              primary: {
-                label: 'Pagar no Omie',
-                onClick: () => window.open('https://app.omie.com.br', '_blank'),
-                tone: 'bg-indigo-600 hover:bg-indigo-700',
-                icon: ExternalLink,
-              },
-              secondary: {
-                label: 'Sincronizar',
-                onClick: () => handleSincronizarOmie(summary.cpIds),
-                tone: 'bg-sky-600 hover:bg-sky-700',
-                icon: RefreshCw,
-              },
-            }
-          : {
-              primary: {
-                label: 'Registrar Pgto',
-                onClick: () => handleConfirmarPagamento(summary.cpIds),
-                tone: 'bg-teal-600 hover:bg-teal-700',
-                icon: Banknote,
-              },
-            }
+        // Omie desativado: sempre cai no fluxo manual de "Registrar Pgto"
+        return {
+          primary: {
+            label: 'Registrar Pgto',
+            onClick: () => handleConfirmarPagamento(summary.cpIds),
+            tone: 'bg-teal-600 hover:bg-teal-700',
+            icon: Banknote,
+          },
+        }
       }
       default:
         return {}
