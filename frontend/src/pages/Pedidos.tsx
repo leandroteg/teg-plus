@@ -1862,15 +1862,15 @@ function DetailModal({
               <span className={sub}>Criado em</span>
               <span className={`font-mono ${txt}`}>
                 {new Date(pedido.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                {pedido.criado_por_nome && <span className="ml-1 not-italic font-semibold">· {pedido.criado_por_nome}</span>}
+                <span className="ml-1 not-italic font-semibold">· {pedido.criado_por_nome || '—'}</span>
               </span>
             </div>
-            {pedido.updated_at && pedido.updated_at !== pedido.created_at && (
+            {pedido.updated_at && (
               <div className="flex items-center justify-between gap-2">
                 <span className={sub}>Última alteração</span>
                 <span className={`font-mono ${txt}`}>
                   {new Date(pedido.updated_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  {pedido.atualizado_por_nome && <span className="ml-1 not-italic font-semibold">· {pedido.atualizado_por_nome}</span>}
+                  <span className="ml-1 not-italic font-semibold">· {pedido.atualizado_por_nome || '—'}</span>
                 </span>
               </div>
             )}

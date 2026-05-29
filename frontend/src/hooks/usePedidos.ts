@@ -102,6 +102,7 @@ export function useLiberarPagamento() {
           status_pagamento: 'liberado',
           liberado_pagamento_em: new Date().toISOString(),
           liberado_pagamento_por: perfil?.nome ?? 'Comprador',
+          atualizado_por_nome: perfil?.nome ?? null,
         })
         .eq('id', pedidoId)
       if (error) throw error
@@ -129,11 +130,12 @@ export function useLiberarPagamento() {
 
 export function useRegistrarPagamento() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async (pedidoId: string) => {
       const { error } = await supabase
         .from('cmp_pedidos')
-        .update({ status_pagamento: 'pago', pago_em: new Date().toISOString() })
+        .update({ status_pagamento: 'pago', pago_em: new Date().toISOString(), atualizado_por_nome: perfil?.nome ?? null })
         .eq('id', pedidoId)
       if (error) throw error
     },
