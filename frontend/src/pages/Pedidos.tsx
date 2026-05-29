@@ -1620,6 +1620,11 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
                   {classeFinanceira}
                 </span>
               )}
+              {(pedido as any).condicao_pagamento && (
+                <span className={`flex items-center gap-1 font-semibold ${dark ? 'text-teal-300' : 'text-teal-700'}`} title="Condição de pagamento">
+                  <Banknote size={9} />{(pedido as any).condicao_pagamento}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1826,6 +1831,12 @@ function DetailModal({
               <div>
                 <span className={sub}>NF</span>
                 <p className={`font-semibold font-mono ${txt}`}>{pedido.nf_numero}</p>
+              </div>
+            )}
+            {(pedido as any).condicao_pagamento && (
+              <div>
+                <span className={sub}>Condição de Pagamento</span>
+                <p className={`font-semibold ${txt}`}>{(pedido as any).condicao_pagamento}</p>
               </div>
             )}
             {liberadoEm && (
