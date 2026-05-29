@@ -81,6 +81,7 @@ export interface Pedido {
     itens?: Pick<RequisicaoItem, 'descricao' | 'quantidade' | 'unidade' | 'valor_unitario_estimado'>[]
   }
   comprador?: Pick<Comprador, 'nome'>
+  cotacao?: { concluido_por_nome?: string | null }
 }
 
 export interface Comprador {

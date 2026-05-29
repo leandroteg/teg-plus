@@ -19,7 +19,8 @@ export function usePedidos(status?: string) {
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado, natureza)),
-          comprador:cmp_compradores(nome)
+          comprador:cmp_compradores(nome),
+          cotacao:cmp_cotacoes!cotacao_id(concluido_por_nome)
         `)
         .order('data_prevista_entrega', { ascending: true })
         .limit(100)
