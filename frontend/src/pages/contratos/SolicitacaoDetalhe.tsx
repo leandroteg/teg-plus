@@ -26,6 +26,7 @@ import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
 import NumericInput from '../../components/NumericInput'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -1434,6 +1435,14 @@ export default function SolicitacaoDetalhe() {
               )}
             </div>
           </div>
+
+          {/* Auditoria */}
+          <AuditoriaCard
+            createdAt={solicitacao.created_at}
+            updatedAt={solicitacao.updated_at}
+            criadoPor={solicitacao.criado_por_nome ?? solicitacao.solicitante_nome}
+            atualizadoPor={solicitacao.atualizado_por_nome}
+          />
         </div>
       </div>
 

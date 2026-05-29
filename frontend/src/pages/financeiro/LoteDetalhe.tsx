@@ -7,6 +7,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
+import AuditoriaCard from '../../components/AuditoriaCard'
 import {
   useLoteById,
   useEnviarLoteAprovacao,
@@ -452,6 +453,17 @@ export default function LoteDetalhe() {
           )
         })}
       </div>
+
+      {/* Auditoria */}
+      <AuditoriaCard
+        createdAt={lote.created_at}
+        updatedAt={lote.updated_at}
+        criadoPor={lote.criado_por_nome ?? lote.criado_por}
+        atualizadoPor={lote.atualizado_por_nome}
+        extra={[
+          { label: 'Aprovador', value: lote.aprovador_nome },
+        ]}
+      />
 
       {/* Toast */}
       {toast && (

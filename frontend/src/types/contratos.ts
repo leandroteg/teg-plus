@@ -448,6 +448,8 @@ export interface Solicitacao {
   created_at: string
   updated_at: string
   created_by?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Joined
   obra?: { id: string; nome: string }
 }

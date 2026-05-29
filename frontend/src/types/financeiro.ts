@@ -309,6 +309,8 @@ export interface LotePagamento {
   aprovacao_status?: string
   created_at: string
   updated_at: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   itens?: LoteItem[]
 }
 
