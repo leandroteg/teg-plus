@@ -21,6 +21,8 @@ export interface Chamado {
   updated_at: string
   resolved_at: string | null
   closed_at: string | null
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // joins (opcional)
   solicitante?: { nome: string; email: string } | null
   atendente?: { nome: string; email: string } | null

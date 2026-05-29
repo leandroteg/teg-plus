@@ -14,6 +14,7 @@ import { useEditorLock } from '../hooks/useEditorLock'
 import { useBases } from '../hooks/useEstoque'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
+import AuditoriaCard from '../components/AuditoriaCard'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
@@ -787,6 +788,17 @@ export default function RequisicaoDetalhe() {
           <p className="text-sm font-bold text-slate-700">{req.comprador_nome}</p>
         </div>
       )}
+
+      {/* Auditoria */}
+      <AuditoriaCard
+        createdAt={req.created_at}
+        updatedAt={req.updated_at}
+        criadoPor={req.criado_por_nome}
+        atualizadoPor={req.atualizado_por_nome}
+        extra={[
+          { label: 'Solicitante', value: req.solicitante_nome },
+        ]}
+      />
 
       {/* ── Cotação / Comparativo ──────────────────────────────────────────────── */}
       {req.status === 'em_cotacao' && cotacao && (

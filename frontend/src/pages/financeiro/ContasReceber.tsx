@@ -14,6 +14,7 @@ import {
   useCompartilharNFEmail, useConciliarCRBatch,
 } from '../../hooks/useFinanceiro'
 import { UpperInput } from '../../components/UpperInput'
+import AuditoriaCard from '../../components/AuditoriaCard'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { supabase } from '../../services/supabase'
 import type { ContaReceber, StatusCR } from '../../types/financeiro'
@@ -434,6 +435,17 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
               </div>
             </div>
           )}
+
+          {/* Auditoria */}
+          <AuditoriaCard
+            createdAt={cr.created_at}
+            updatedAt={cr.updated_at}
+            criadoPor={cr.criado_por_nome}
+            atualizadoPor={cr.atualizado_por_nome}
+            extra={[
+              { label: 'Autorizado por', value: cr.autorizado_por },
+            ]}
+          />
 
           {/* Pipeline progress */}
           <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>

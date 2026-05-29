@@ -11,7 +11,8 @@ const TABLE_FORN = 'cmp_cotacao_fornecedores'
 const SELECT_COTACAO = `
   id, requisicao_id, comprador_id, status,
   fornecedor_selecionado_id, valor_selecionado, fornecedor_selecionado_nome,
-  observacao, data_limite, data_conclusao, created_at,
+  observacao, data_limite, data_conclusao,
+  created_at, updated_at, criado_por_nome, atualizado_por_nome,
   requisicao:cmp_requisicoes(
     id, numero, solicitante_nome, obra_nome, descricao, justificativa,
     valor_estimado, urgencia, status, alcada_nivel, categoria, created_at,

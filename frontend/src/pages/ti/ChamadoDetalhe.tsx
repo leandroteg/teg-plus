@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { UpperTextarea } from '../../components/UpperInput'
+import AuditoriaCard from '../../components/AuditoriaCard'
 import {
   useChamado, useIsAtendenteTi,
   adicionarComentario, atualizarStatus, assumirChamado,
@@ -138,12 +139,16 @@ export default function ChamadoDetalhe() {
             {chamado.descricao}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span>Solicitante: <strong className="text-slate-700 dark:text-slate-200">{chamado.solicitante?.nome ?? '—'}</strong></span>
-            <span>Aberto em: {new Date(chamado.created_at).toLocaleString('pt-BR')}</span>
-            {chamado.atendente?.nome && (
-              <span>Atendente: <strong className="text-slate-700 dark:text-slate-200">{chamado.atendente.nome}</strong></span>
-            )}
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <AuditoriaCard
+              createdAt={chamado.created_at}
+              updatedAt={chamado.updated_at}
+              criadoPor={chamado.criado_por_nome ?? chamado.solicitante?.nome}
+              atualizadoPor={chamado.atualizado_por_nome}
+              extra={[
+                { label: 'Atendente', value: chamado.atendente?.nome },
+              ]}
+            />
           </div>
         </div>
 

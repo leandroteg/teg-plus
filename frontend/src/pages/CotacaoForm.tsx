@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useEditorLock } from '../hooks/useEditorLock'
 import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
+import AuditoriaCard from '../components/AuditoriaCard'
 import FluxoTimeline from '../components/FluxoTimeline'
 import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import UploadCotacao from '../components/UploadCotacao'
@@ -436,6 +437,17 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 
       {/* Comparativo */}
       {cotacao.fornecedores && <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />}
+
+      {/* Auditoria */}
+      <AuditoriaCard
+        createdAt={cotacao.created_at}
+        updatedAt={cotacao.updated_at}
+        criadoPor={cotacao.criado_por_nome}
+        atualizadoPor={cotacao.atualizado_por_nome}
+        extra={[
+          { label: 'Comprador', value: cotacao.comprador_nome },
+        ]}
+      />
 
       {/* ── Emitir Pedido / Solicitar Contrato / Cancelar ────────────── */}
       {canEmitPedido && (

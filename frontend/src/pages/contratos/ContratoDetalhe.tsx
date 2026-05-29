@@ -9,6 +9,7 @@ import {
   Pencil, X, Check, Upload, Folder, File as FileIcon,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
+import AuditoriaCard from '../../components/AuditoriaCard'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { useAtualizarContrato, useUploadContratoArquivo } from '../../hooks/useContratos'
 import type {
@@ -782,6 +783,14 @@ export default function ContratoDetalhe() {
           </div>
         )}
       </Section>
+
+      {/* Auditoria */}
+      <AuditoriaCard
+        createdAt={contrato?.created_at}
+        updatedAt={contrato?.updated_at}
+        criadoPor={contrato?.criado_por_nome}
+        atualizadoPor={contrato?.atualizado_por_nome}
+      />
 
     </div>
   )

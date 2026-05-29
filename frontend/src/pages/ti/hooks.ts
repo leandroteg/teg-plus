@@ -69,6 +69,7 @@ export async function removerAtendente(perfil_id: string) {
 const CHAMADO_SELECT = `
   id, numero, solicitante_id, categoria, prioridade, titulo, descricao,
   status, atendente_id, created_at, updated_at, resolved_at, closed_at,
+  criado_por_nome, atualizado_por_nome,
   solicitante:sys_perfis!ti_chamados_solicitante_id_fkey(nome,email),
   atendente:sys_perfis!ti_chamados_atendente_id_fkey(nome,email)
 `

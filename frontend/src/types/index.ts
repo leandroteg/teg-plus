@@ -134,6 +134,9 @@ export interface Requisicao {
   ai_confianca?: number
   arquivo_url?: string
   created_at: string
+  updated_at?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
@@ -332,6 +335,9 @@ export interface Cotacao {
   sem_cotacoes_minimas?: boolean
   justificativa_sem_cotacoes?: string
   created_at: string
+  updated_at?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   requisicao?: Requisicao
   fornecedores?: CotacaoFornecedor[]
 }

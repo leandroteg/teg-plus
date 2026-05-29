@@ -87,6 +87,8 @@ export interface Contrato {
   // Audit
   created_at: string
   updated_at: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Joins
   cliente?: ContratoCliente
   fornecedor?: {
