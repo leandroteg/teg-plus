@@ -4,7 +4,7 @@ import {
   FileText, Share2, Download, MessageCircle, Mail, Upload, X, Paperclip,
   Banknote, ExternalLink, Loader2,
   Search, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
-  ClipboardList, ShieldCheck, BoxIcon, CreditCard, ArchiveIcon,
+  ClipboardList, ShieldCheck, BoxIcon, ArchiveIcon,
   Building2, Link2, RefreshCw, UserPlus,
   Tag, Briefcase, Hash, Calendar, Receipt, CheckCircle2, ChevronDown, ChevronUp,
   ShoppingCart,
@@ -47,7 +47,7 @@ import type { Fornecedor } from '../types/financeiro'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'liberado' | 'encerrado'
+type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'encerrado'
 type SortField = 'data' | 'valor' | 'fornecedor'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -289,16 +289,10 @@ const PIPELINE_STAGES: {
     matchFn: p => !isPendingEmission(p) && (p.status === 'entregue' || p.status === 'parcialmente_recebido') && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
-    key: 'liberado',
-    label: 'Liberado p/ Pgto',
-    icon: CreditCard,
-    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'liberado',
-  },
-  {
     key: 'encerrado',
     label: 'Encerrado',
     icon: ArchiveIcon,
-    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'pago',
+    matchFn: p => !isPendingEmission(p) && ['liberado', 'pago'].includes((p as any).status_pagamento),
   },
 ]
 
@@ -306,7 +300,6 @@ const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: s
   pendente:  { bg: 'hover:bg-cyan-50',    bgActive: 'bg-cyan-50',    text: 'text-cyan-600',    textActive: 'text-cyan-800',    badge: 'bg-cyan-100 text-cyan-700',       border: 'border-cyan-400' },
   emitido:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    badge: 'bg-blue-100 text-blue-700',       border: 'border-blue-500' },
   entregue:  { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-500' },
-  liberado:  { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  badge: 'bg-orange-100 text-orange-700',   border: 'border-orange-400' },
   encerrado: { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',  text: 'text-slate-500',   textActive: 'text-slate-700',   badge: 'bg-slate-200 text-slate-600',     border: 'border-slate-400' },
 }
 
@@ -314,7 +307,6 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   pendente:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-cyan-500/10',    text: 'text-cyan-400',    textActive: 'text-cyan-300',    badge: 'bg-cyan-500/20 text-cyan-300',       border: 'border-cyan-500/40' },
   emitido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    badge: 'bg-blue-500/20 text-blue-300',       border: 'border-blue-500/40' },
   entregue:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', badge: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/40' },
-  liberado:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  badge: 'bg-orange-500/20 text-orange-300',   border: 'border-orange-500/40' },
   encerrado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-white/[0.06]',   text: 'text-slate-400',   textActive: 'text-slate-300',   badge: 'bg-white/[0.08] text-slate-300',     border: 'border-white/[0.08]' },
 }
 
@@ -1416,6 +1408,10 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
   const statusPgto = (pedido as any).status_pagamento as string | undefined
   const isPago     = statusPgto === 'pago'
   const isLiberado = statusPgto === 'liberado'
+  const isEncerrado = isPago || isLiberado
+  const { data: anexosCard } = useAnexosPedido(isEncerrado ? pedido.id : undefined)
+  const hasNFDocCard = (anexosCard ?? []).some(a => ['nota_fiscal', 'boleto', 'doc_financeiro'].includes(a.tipo))
+  const nfPendente = isEncerrado && !((pedido as any).nf_numero) && !hasNFDocCard
   const dataVenc   = (pedido as any).data_vencimento as string | undefined
   const diasVenc   = dataVenc ? Math.floor((new Date(dataVenc + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86_400_000) : null
   const vencUrgency = !isPago && dataVenc ? (diasVenc! < 0 ? 'overdue' : diasVenc! === 0 ? 'today' : diasVenc! <= 7 ? 'week' : 'normal') : 'normal'
@@ -1521,6 +1517,11 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
               {isLiberado && !isPago && (
                 <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
                   <Clock size={9} /> Aguard. Pgto
+                </span>
+              )}
+              {nfPendente && (
+                <span title="Pedido encerrado sem nota fiscal anexada" className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                  <AlertTriangle size={9} /> NF pendente
                 </span>
               )}
               {atrasado && (
@@ -1681,9 +1682,8 @@ function DetailModal({
   const pagoEm         = (pedido as any).pago_em as string | undefined
   const isLiberado     = statusPgto === 'liberado'
   const isPago         = statusPgto === 'pago'
-  // Liberar pagamento so com recebimento confirmado E nota fiscal anexada
-  const temNF          = !!((pedido as any).nf_numero)
-  const podeLiberar    = entregue && !statusPgto && temNF
+  // Liberar pagamento apos recebimento confirmado. NF/Boleto/Doc fica como pendencia (badge) se nao anexado.
+  const podeLiberar    = entregue && !statusPgto
   const { data: fornecedorResolvido, isLoading: isLoadingFornecedorResolvido, refetch: refetchFornecedorResolvido } = useFornecedorCotacaoResolver(
     pending ? pedido.source_cotacao?.id : undefined,
   )
@@ -2431,7 +2431,7 @@ export default function Pedidos() {
 
   // Count per tab
   const counts = useMemo(() => {
-    const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, liberado: 0, encerrado: 0 }
+    const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, encerrado: 0 }
     for (const p of allPedidoItems) {
       for (const stage of PIPELINE_STAGES) {
         if (stage.matchFn(p)) { c[stage.key]++; break }

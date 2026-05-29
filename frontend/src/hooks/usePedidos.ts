@@ -91,9 +91,7 @@ export function useLiberarPagamento() {
       if (!ped || !['entregue', 'parcialmente_recebido'].includes(ped.status)) {
         throw new Error('So e possivel liberar pagamento apos a confirmacao do recebimento pelo destino/CD.')
       }
-      if (!ped.nf_numero) {
-        throw new Error('Anexe a Nota Fiscal (no recebimento) antes de liberar o pagamento.')
-      }
+      // NF/Boleto nao sao mais obrigatorios para liberar. Pendencia visualizada via badge "NF pendente" no card.
 
       const { error } = await supabase
         .from('cmp_pedidos')
@@ -202,11 +200,35 @@ function extractHomogeneousClass(req: any) {
   }
 }
 
-function buildDescricaoParcela(descricaoBase: string | null | undefined, parcela: ParcelaPedido, totalParcelas: number) {
+function fmtBRL(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function buildDescricaoParcela(
+  descricaoBase: string | null | undefined,
+  parcela: ParcelaPedido,
+  totalParcelas: number,
+  ctx?: { numeroPedido?: string; valorTotalPedido?: number },
+) {
   const base = descricaoBase?.trim() || 'Pedido de compra'
-  if (parcela.tipo === 'adiantamento') return `${base} - Adiantamento`
-  if (totalParcelas <= 1) return base
-  return `${base} - ${parcela.descricao?.trim() || `Parcela ${parcela.numero}/${totalParcelas}`}`
+  const ref = ctx?.numeroPedido ? `Pedido ${ctx.numeroPedido}` : null
+  const valorTotal = ctx?.valorTotalPedido && ctx.valorTotalPedido > 0
+    ? ` de ${fmtBRL(ctx.valorTotalPedido)}`
+    : ''
+  const valorParcela = fmtBRL(Number(parcela.valor || 0))
+
+  if (parcela.tipo === 'adiantamento') {
+    const head = ref ? `${ref} — Adiantamento` : `${base} - Adiantamento`
+    return `${head} (${valorParcela}${valorTotal})`
+  }
+
+  if (totalParcelas <= 1) {
+    return ref ? `${ref} — ${base} (${valorParcela})` : base
+  }
+
+  const parcelaLabel = parcela.descricao?.trim() || `Parcela ${parcela.numero}/${totalParcelas}`
+  const head = ref ? `${ref} — ${parcelaLabel}` : `${base} - ${parcelaLabel}`
+  return `${head} (${valorParcela}${valorTotal})`
 }
 
 export function useEmitirPedido() {
@@ -416,7 +438,10 @@ export function useEmitirPedido() {
         centro_custo: centroCusto || null,
         classe_financeira: classeFinanceira || null,
         projeto_id: requisicao.projeto_id || null,
-        descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length),
+        descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length, {
+          numeroPedido: pedido.numero_pedido,
+          valorTotalPedido: valorTotal,
+        }),
         natureza: 'material',
         forma_pagamento: formaPagamento || null,
         cartao_id: formaPagamento === 'cartao' ? cartaoId || null : null,
