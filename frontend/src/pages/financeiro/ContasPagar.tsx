@@ -15,6 +15,7 @@ import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar } from '../../types/financeiro'
 import { UpperInput } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
@@ -904,6 +905,16 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
               <AnexosList pedidoId={cp.pedido_id} />
             </>
           )}
+
+          <AuditoriaCard
+            createdAt={cp.created_at}
+            updatedAt={cp.updated_at}
+            criadoPor={cp.criado_por_nome}
+            atualizadoPor={cp.atualizado_por_nome}
+            extra={[
+              { label: 'Autorizado por', value: cp.aprovado_por },
+            ]}
+          />
         </div>
       )}
     </div>

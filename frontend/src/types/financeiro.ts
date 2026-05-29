@@ -103,6 +103,9 @@ export interface ContaPagar {
   descricao?: string
   observacoes?: string
   created_at: string
+  updated_at?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Joined data from cmp_pedidos
   pedido?: {
     numero_pedido: string

@@ -42,7 +42,6 @@ export function usePedidos(status?: string) {
 
 export function useAtualizarPedido() {
   const qc = useQueryClient()
-  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async ({ id, status, data_entrega_real }: {
       id: string
@@ -51,7 +50,7 @@ export function useAtualizarPedido() {
     }) => {
       const { error } = await supabase
         .from('cmp_pedidos')
-        .update({ status, ...(data_entrega_real ? { data_entrega_real } : {}), atualizado_por_nome: perfil?.nome ?? null })
+        .update({ status, ...(data_entrega_real ? { data_entrega_real } : {}) })
         .eq('id', id)
       if (error) throw error
     },
@@ -102,7 +101,6 @@ export function useLiberarPagamento() {
           status_pagamento: 'liberado',
           liberado_pagamento_em: new Date().toISOString(),
           liberado_pagamento_por: perfil?.nome ?? 'Comprador',
-          atualizado_por_nome: perfil?.nome ?? null,
         })
         .eq('id', pedidoId)
       if (error) throw error
@@ -130,12 +128,11 @@ export function useLiberarPagamento() {
 
 export function useRegistrarPagamento() {
   const qc = useQueryClient()
-  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async (pedidoId: string) => {
       const { error } = await supabase
         .from('cmp_pedidos')
-        .update({ status_pagamento: 'pago', pago_em: new Date().toISOString(), atualizado_por_nome: perfil?.nome ?? null })
+        .update({ status_pagamento: 'pago', pago_em: new Date().toISOString() })
         .eq('id', pedidoId)
       if (error) throw error
     },
@@ -354,7 +351,6 @@ export function useEmitirPedido() {
           centro_custo: centroCusto || null,
           centro_custo_id: centroCustoId || null,
           parcelas_preview: parcelasResolvidas,
-          criado_por_nome: perfil?.nome ?? null,
         })
         .select('id, numero_pedido')
         .single()
@@ -588,7 +584,6 @@ export function useEmitirPedidoDireto() {
           sem_cotacao: true,
           justificativa_sem_cotacao: payload.justificativaSemCotacao,
           itens_direto: payload.itens.length > 0 ? payload.itens : null,
-          criado_por_nome: perfil?.nome ?? null,
         })
         .select('id, numero_pedido')
         .single()

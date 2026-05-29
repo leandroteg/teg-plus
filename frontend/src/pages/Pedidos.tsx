@@ -13,6 +13,7 @@ import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import AuditoriaCard from '../components/AuditoriaCard'
 import { useBases } from '../hooks/useEstoque'
 import {
   usePedidos,
@@ -1845,42 +1846,17 @@ function DetailModal({
           <AnexoReferencia url={pedido.requisicao?.arquivo_url} />
 
           {/* Auditoria */}
-          <div className={`rounded-xl px-3 py-2.5 border text-[11px] space-y-1 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
-            {pedido.requisicao && (pedido.requisicao as any).solicitante_nome && (
-              <div className="flex items-center justify-between gap-2">
-                <span className={sub}>Solicitante</span>
-                <span className={`font-semibold ${txt}`}>{(pedido.requisicao as any).solicitante_nome}</span>
-              </div>
-            )}
-            {pedido.comprador?.nome && (
-              <div className="flex items-center justify-between gap-2">
-                <span className={sub}>Comprador</span>
-                <span className={`font-semibold ${txt}`}>{pedido.comprador.nome}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between gap-2">
-              <span className={sub}>Criado em</span>
-              <span className={`font-mono ${txt}`}>
-                {new Date(pedido.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                <span className="ml-1 not-italic font-semibold">· {pedido.criado_por_nome || '—'}</span>
-              </span>
-            </div>
-            {pedido.updated_at && (
-              <div className="flex items-center justify-between gap-2">
-                <span className={sub}>Última alteração</span>
-                <span className={`font-mono ${txt}`}>
-                  {new Date(pedido.updated_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  <span className="ml-1 not-italic font-semibold">· {pedido.atualizado_por_nome || '—'}</span>
-                </span>
-              </div>
-            )}
-            {pedido.liberado_pagamento_por && (
-              <div className="flex items-center justify-between gap-2">
-                <span className={sub}>Liberado por</span>
-                <span className={`font-semibold ${txt}`}>{pedido.liberado_pagamento_por}</span>
-              </div>
-            )}
-          </div>
+          <AuditoriaCard
+            createdAt={pedido.created_at}
+            updatedAt={pedido.updated_at}
+            criadoPor={pedido.criado_por_nome}
+            atualizadoPor={pedido.atualizado_por_nome}
+            extra={[
+              { label: 'Solicitante', value: (pedido.requisicao as any)?.solicitante_nome },
+              { label: 'Comprador', value: pedido.comprador?.nome },
+              { label: 'Liberado por', value: pedido.liberado_pagamento_por },
+            ]}
+          />
 
           {/* Observacoes */}
           {pedido.observacoes && (

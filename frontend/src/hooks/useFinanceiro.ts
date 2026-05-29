@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import type {
   ContaPagar, ContaReceber, Fornecedor,
   FinanceiroDashboardData, FinanceiroKPIs,
@@ -534,7 +533,6 @@ export function useClassificarCPBatch() {
 // â”€â”€ Conciliar em lote (CP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useConciliarCPBatch() {
   const qc = useQueryClient()
-  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async ({ ids }: { ids: string[] }) => {
       const { data: contas, error: loadError } = await supabase
@@ -569,7 +567,6 @@ export function useConciliarCPBatch() {
           .update({
             status_pagamento: 'pago',
             pago_em: agora,
-            atualizado_por_nome: perfil?.nome ?? null,
           })
           .in('id', pedidoIds)
 
