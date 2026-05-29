@@ -233,6 +233,8 @@ export interface ContratoMedicao {
   observacoes?: string
   created_at: string
   updated_at: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   contrato?: Pick<Contrato, 'numero' | 'objeto'>
 }
 
@@ -261,6 +263,8 @@ export interface ContratoAditivo {
   documento_url?: string
   created_at: string
   updated_at: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   contrato?: Pick<Contrato, 'numero' | 'objeto'>
 }
 

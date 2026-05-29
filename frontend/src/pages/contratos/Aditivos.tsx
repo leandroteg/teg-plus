@@ -3,7 +3,9 @@ import { FileSignature, Search, CheckCircle2, XCircle, AlertTriangle } from 'luc
 import { useAditivos, useAtualizarAditivo } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
+import type { StatusAditivo, TipoAditivo, ContratoAditivo } from '../../types/contratos'
+import DetalheDrawer from '../../components/DetalheDrawer'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
@@ -56,6 +58,7 @@ export default function AditivosPage() {
   const { perfil } = useAuth()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [detalheItem, setDetalheItem] = useState<ContratoAditivo | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const { data: aditivos = [], isLoading } = useAditivos()
@@ -211,7 +214,7 @@ export default function AditivosPage() {
               </thead>
               <tbody>
                 {filtered.map(a => (
-                  <tr key={a.id} className={trCls}>
+                  <tr key={a.id} onClick={() => setDetalheItem(a)} className={`${trCls} cursor-pointer`}>
                     <td className="px-4 py-3">
                       <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                         {a.contrato?.numero ?? '-'}
@@ -239,7 +242,7 @@ export default function AditivosPage() {
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={a.status} isLight={isLight} />
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         {a.status === 'em_aprovacao' && (
                           <>
@@ -289,6 +292,71 @@ export default function AditivosPage() {
           </div>
         </div>
       )}
+
+      <DetalheDrawer
+        open={!!detalheItem}
+        onClose={() => setDetalheItem(null)}
+        title={detalheItem ? `Aditivo ${detalheItem.numero_aditivo}` : ''}
+        subtitle={detalheItem?.contrato?.objeto}
+      >
+        {detalheItem && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div className="col-span-2">
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Contrato</span>
+                <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{detalheItem.contrato?.numero ?? '-'}</p>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Tipo</span>
+                <div className="mt-0.5"><TipoBadge tipo={detalheItem.tipo} isLight={isLight} /></div>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Status</span>
+                <div className="mt-0.5"><StatusBadge status={detalheItem.status} isLight={isLight} /></div>
+              </div>
+              <div className="col-span-2">
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Valor Acréscimo</span>
+                <p className={`font-bold text-base ${
+                  detalheItem.valor_acrescimo >= 0
+                    ? isLight ? 'text-emerald-600' : 'text-emerald-400'
+                    : isLight ? 'text-red-600' : 'text-red-400'
+                }`}>{fmt(detalheItem.valor_acrescimo)}</p>
+              </div>
+              {detalheItem.nova_data_fim && (
+                <div className="col-span-2">
+                  <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Nova data de término</span>
+                  <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                    {new Date(detalheItem.nova_data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Descrição</p>
+              <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{detalheItem.descricao}</p>
+            </div>
+            {detalheItem.documento_url && (
+              <a
+                href={detalheItem.documento_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:underline"
+              >
+                <FileSignature size={12} /> Abrir documento
+              </a>
+            )}
+            <AuditoriaCard
+              createdAt={detalheItem.created_at}
+              updatedAt={detalheItem.updated_at}
+              criadoPor={detalheItem.criado_por_nome}
+              atualizadoPor={detalheItem.atualizado_por_nome}
+              extra={[
+                { label: 'Aprovado por', value: detalheItem.aprovado_por },
+              ]}
+            />
+          </>
+        )}
+      </DetalheDrawer>
     </div>
   )
 }

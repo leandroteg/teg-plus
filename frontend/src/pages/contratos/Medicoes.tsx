@@ -3,7 +3,9 @@ import { Receipt, Search, Filter, CheckCircle2, XCircle, AlertTriangle } from 'l
 import { useMedicoes, useContratos, useAtualizarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { StatusMedicao } from '../../types/contratos'
+import type { StatusMedicao, ContratoMedicao } from '../../types/contratos'
+import DetalheDrawer from '../../components/DetalheDrawer'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
@@ -46,6 +48,7 @@ export default function MedicoesPage() {
   const [contratoFilter, setContratoFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [detalheItem, setDetalheItem] = useState<ContratoMedicao | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const { data: medicoes = [], isLoading } = useMedicoes(contratoFilter || undefined)
@@ -213,7 +216,7 @@ export default function MedicoesPage() {
               </thead>
               <tbody>
                 {filtered.map(m => (
-                  <tr key={m.id} className={trCls}>
+                  <tr key={m.id} onClick={() => setDetalheItem(m)} className={`${trCls} cursor-pointer`}>
                     <td className="px-4 py-3">
                       <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                         {m.contrato?.numero ?? '-'}
@@ -240,7 +243,7 @@ export default function MedicoesPage() {
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={m.status} isLight={isLight} />
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         {m.status === 'em_aprovacao' && (
                           <>
@@ -304,6 +307,65 @@ export default function MedicoesPage() {
           </div>
         </div>
       )}
+
+      <DetalheDrawer
+        open={!!detalheItem}
+        onClose={() => setDetalheItem(null)}
+        title={detalheItem ? `Medição ${detalheItem.numero_bm}` : ''}
+        subtitle={detalheItem?.contrato?.objeto}
+      >
+        {detalheItem && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div className="col-span-2">
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Contrato</span>
+                <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{detalheItem.contrato?.numero ?? '-'}</p>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Período</span>
+                <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmtData(detalheItem.periodo_inicio)} — {fmtData(detalheItem.periodo_fim)}</p>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Status</span>
+                <div className="mt-0.5"><StatusBadge status={detalheItem.status} isLight={isLight} /></div>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Valor Medido</span>
+                <p className={`font-bold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{fmt(detalheItem.valor_medido)}</p>
+              </div>
+              <div>
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Retenção</span>
+                <p className={`font-semibold ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{fmt(detalheItem.valor_retencao)}</p>
+              </div>
+              <div className="col-span-2">
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Valor Líquido</span>
+                <p className={`font-bold text-base ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{fmt(detalheItem.valor_liquido)}</p>
+              </div>
+              {detalheItem.aprovado_em && (
+                <div className="col-span-2">
+                  <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Aprovado em</span>
+                  <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmtData(detalheItem.aprovado_em)}</p>
+                </div>
+              )}
+            </div>
+            {detalheItem.observacoes && (
+              <div>
+                <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Observações</p>
+                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{detalheItem.observacoes}</p>
+              </div>
+            )}
+            <AuditoriaCard
+              createdAt={detalheItem.created_at}
+              updatedAt={detalheItem.updated_at}
+              criadoPor={detalheItem.criado_por_nome}
+              atualizadoPor={detalheItem.atualizado_por_nome}
+              extra={[
+                { label: 'Aprovado por', value: detalheItem.aprovado_por },
+              ]}
+            />
+          </>
+        )}
+      </DetalheDrawer>
     </div>
   )
 }
