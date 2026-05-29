@@ -20,6 +20,8 @@ import { useCadClasses, useCadCentrosCusto } from '../../hooks/useCadastros'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
+import DetalheDrawer from '../../components/DetalheDrawer'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -342,6 +344,7 @@ export default function ApontamentosCartao() {
   const [dataFim, setDataFim] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<ApontamentoCartao | null>(null)
+  const [detalheItem, setDetalheItem] = useState<ApontamentoCartao | null>(null)
 
   // Abre modal automaticamente quando ?nova= está presente na URL
   useEffect(() => {
@@ -639,6 +642,14 @@ export default function ApontamentosCartao() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => setDetalheItem(a)}
+                    title="Ver detalhes"
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors
+                      ${isDark ? 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                  >
+                    <Eye size={14} />
+                  </button>
                   {isEditable && (
                     <>
                       <button
@@ -713,6 +724,83 @@ export default function ApontamentosCartao() {
           onSaved={msg => showToast('success', msg)}
         />
       )}
+
+      {/* ── Drawer de detalhes ──────────────────────────────────── */}
+      <DetalheDrawer
+        open={!!detalheItem}
+        onClose={() => setDetalheItem(null)}
+        title={detalheItem ? `Apontamento #${formatControlNumber(detalheItem.numero)}` : ''}
+        subtitle={detalheItem?.descricao}
+      >
+        {detalheItem && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Data</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtDate(detalheItem.data_lancamento)}</p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Valor</span>
+                <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(detalheItem.valor)}</p>
+              </div>
+              {detalheItem.estabelecimento && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Estabelecimento</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.estabelecimento}</p>
+                </div>
+              )}
+              {detalheItem.cartao && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Cartão</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                    {detalheItem.cartao.nome} · {BANDEIRA_LABEL[detalheItem.cartao.bandeira]} ····{detalheItem.cartao.ultimos4}
+                  </p>
+                </div>
+              )}
+              {detalheItem.centro_custo && (
+                <div>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Centro de Custo</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.centro_custo}</p>
+                </div>
+              )}
+              {detalheItem.classe_financeira && (
+                <div>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Classe Financeira</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.classe_financeira}</p>
+                </div>
+              )}
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Status</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  {STATUS_CONFIG[detalheItem.status].label}
+                </p>
+              </div>
+            </div>
+            {detalheItem.observacoes && (
+              <div>
+                <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Observações</p>
+                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{detalheItem.observacoes}</p>
+              </div>
+            )}
+            {detalheItem.comprovante_url && (
+              <a
+                href={detalheItem.comprovante_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:underline"
+              >
+                <Eye size={12} /> Abrir comprovante
+              </a>
+            )}
+            <AuditoriaCard
+              createdAt={detalheItem.created_at}
+              updatedAt={detalheItem.updated_at}
+              criadoPor={detalheItem.criado_por_nome}
+              atualizadoPor={detalheItem.atualizado_por_nome}
+            />
+          </>
+        )}
+      </DetalheDrawer>
     </div>
   )
 }

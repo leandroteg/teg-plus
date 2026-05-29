@@ -15,7 +15,9 @@ import {
   useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao, useImportExtrato,
 } from '../../hooks/useTesouraria'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
-import type { TesourariaDashboardData, CategoriaMovimentacao } from '../../types/financeiro'
+import type { TesourariaDashboardData, CategoriaMovimentacao, MovimentacaoTesouraria } from '../../types/financeiro'
+import DetalheDrawer from '../../components/DetalheDrawer'
+import AuditoriaCard from '../../components/AuditoriaCard'
 import {
   useOmieCredentials,
   useOmieContasCorrentes,
@@ -825,6 +827,7 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
 }) {
   const [filtroTipo, setFiltroTipo] = useState<'all' | 'entrada' | 'saida'>('all')
   const [busca, setBusca] = useState('')
+  const [detalheItem, setDetalheItem] = useState<MovimentacaoTesouraria | null>(null)
 
   const filtered = useMemo(() => {
     let items = [...movimentacoes]
@@ -962,7 +965,8 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
               filtered.map(m => (
                 <tr
                   key={m.id}
-                  className={`transition-colors ${
+                  onClick={() => setDetalheItem(m)}
+                  className={`transition-colors cursor-pointer ${
                     isDark
                       ? 'hover:bg-white/[0.03] border-b border-white/[0.03]'
                       : 'hover:bg-slate-50 border-b border-slate-50'
@@ -1008,6 +1012,72 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
           </tbody>
         </table>
       </div>
+
+      <DetalheDrawer
+        open={!!detalheItem}
+        onClose={() => setDetalheItem(null)}
+        title={detalheItem ? `Movimentação · ${detalheItem.tipo}` : ''}
+        subtitle={detalheItem?.descricao}
+      >
+        {detalheItem && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Data</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtData(detalheItem.data_movimentacao)}</p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Valor</span>
+                <p className={`font-bold ${detalheItem.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {detalheItem.tipo === 'entrada' ? '+' : '-'}{fmtFull(detalheItem.valor)}
+                </p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Conta</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.conta_nome || '—'}</p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Categoria</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.categoria || '—'}</p>
+              </div>
+              {detalheItem.conta_destino_nome && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Conta Destino</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.conta_destino_nome}</p>
+                </div>
+              )}
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Origem</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.origem}</p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Status</span>
+                <p className={`font-semibold ${detalheItem.conciliado ? 'text-emerald-500' : isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {detalheItem.conciliado ? 'Conciliado' : 'Pendente'}
+                </p>
+              </div>
+              {detalheItem.cp_id && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Vinculado a CP</span>
+                  <p className="font-mono text-[11px] text-teal-500">{detalheItem.cp_id}</p>
+                </div>
+              )}
+              {detalheItem.cr_id && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Vinculado a CR</span>
+                  <p className="font-mono text-[11px] text-violet-500">{detalheItem.cr_id}</p>
+                </div>
+              )}
+            </div>
+            <AuditoriaCard
+              createdAt={detalheItem.created_at}
+              updatedAt={detalheItem.updated_at}
+              criadoPor={detalheItem.criado_por_nome}
+              atualizadoPor={detalheItem.atualizado_por_nome}
+            />
+          </>
+        )}
+      </DetalheDrawer>
     </div>
   )
 }

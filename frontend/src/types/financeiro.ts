@@ -252,6 +252,8 @@ export interface ApontamentoCartao {
   observacoes?: string
   created_at: string
   updated_at: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Joins
   cartao?: CartaoCredito
 }
@@ -284,6 +286,9 @@ export interface ItemFaturaCartao {
   conciliado: boolean
   apontamento_id?: string
   created_at: string
+  updated_at?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Joins
   apontamento?: ApontamentoCartao
 }
@@ -362,7 +367,10 @@ export interface MovimentacaoTesouraria {
   conta_destino_nome?: string
   conta_destino_cor?: string
   created_at?: string
+  updated_at?: string
   criado_em?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
 }
 
 export interface ExtratoImport {

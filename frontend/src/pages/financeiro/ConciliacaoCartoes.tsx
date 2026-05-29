@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   CreditCard, Link2, Unlink, Search, Upload,
   CheckCircle2, AlertCircle, ChevronDown, X,
-  RefreshCw, FileText, Clock, Filter, Loader2,
+  RefreshCw, FileText, Clock, Filter, Loader2, Info,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -17,6 +17,8 @@ import {
 import type {
   CartaoCredito, ApontamentoCartao, FaturaCartao, ItemFaturaCartao,
 } from '../../types/financeiro'
+import DetalheDrawer from '../../components/DetalheDrawer'
+import AuditoriaCard from '../../components/AuditoriaCard'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -247,11 +249,13 @@ function ItemFaturaRow({
   isDark,
   isSelected,
   onToggle,
+  onShowDetail,
 }: {
   item: ItemFaturaCartao
   isDark: boolean
   isSelected: boolean
   onToggle: (id: string) => void
+  onShowDetail: (item: ItemFaturaCartao) => void
 }) {
   const isConc = item.conciliado
 
@@ -296,6 +300,16 @@ function ItemFaturaRow({
         <p className={`text-sm font-extrabold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           {fmt(item.valor)}
         </p>
+
+        {/* Info button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onShowDetail(item) }}
+          title="Ver detalhes"
+          className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors
+            ${isDark ? 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+        >
+          <Info size={13} />
+        </button>
       </div>
     </div>
   )
@@ -485,6 +499,8 @@ export default function ConciliacaoCartoes() {
   // Checkbox selections
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedApId, setSelectedApId]     = useState<string | null>(null)
+
+  const [detalheItem, setDetalheItem] = useState<ItemFaturaCartao | null>(null)
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -857,6 +873,7 @@ export default function ConciliacaoCartoes() {
                     isDark={isDark}
                     isSelected={selectedItemId === item.id}
                     onToggle={toggleItem}
+                    onShowDetail={setDetalheItem}
                   />
                 ))}
               </div>
@@ -880,6 +897,56 @@ export default function ConciliacaoCartoes() {
           onCancel={() => { setSelectedItemId(null); setSelectedApId(null) }}
         />
       )}
+
+      {/* ── Detalhes do item de fatura ────────────────────────── */}
+      <DetalheDrawer
+        open={!!detalheItem}
+        onClose={() => setDetalheItem(null)}
+        title="Item de Fatura"
+        subtitle={detalheItem?.descricao}
+      >
+        {detalheItem && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Data Lançamento</span>
+                <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtDate(detalheItem.data_lancamento)}</p>
+              </div>
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Valor</span>
+                <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(detalheItem.valor)}</p>
+              </div>
+              {detalheItem.categoria_banco && (
+                <div className="col-span-2">
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Categoria (banco)</span>
+                  <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.categoria_banco}</p>
+                </div>
+              )}
+              <div>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Status</span>
+                <p className={`font-semibold ${detalheItem.conciliado ? 'text-emerald-500' : isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {detalheItem.conciliado ? 'Conciliado' : 'Pendente'}
+                </p>
+              </div>
+              {detalheItem.conciliado && detalheItem.apontamento && (
+                <div className="col-span-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-0.5">
+                    <Link2 size={9} className="inline mr-1" /> Vinculado a apontamento
+                  </p>
+                  <p className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.apontamento.descricao}</p>
+                  <p className="text-[10px] text-slate-400">{fmtDate(detalheItem.apontamento.data_lancamento)} · {fmt(detalheItem.apontamento.valor)}</p>
+                </div>
+              )}
+            </div>
+            <AuditoriaCard
+              createdAt={detalheItem.created_at}
+              updatedAt={detalheItem.updated_at}
+              criadoPor={detalheItem.criado_por_nome}
+              atualizadoPor={detalheItem.atualizado_por_nome}
+            />
+          </>
+        )}
+      </DetalheDrawer>
     </div>
   )
 }
