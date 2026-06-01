@@ -54,9 +54,19 @@ interface ItemFormModalProps {
   /** Optional info about who requested this pre-cadastro */
   solicitanteNome?: string
   solicitadoEm?: string
+  /** Sugestão de match com item já cadastrado (fuzzy). Quando presente, exibe banner
+   *  com botão "Aceitar este item" (chama onAcceptMatch) e permite ignorar e seguir o fluxo normal. */
+  matchSugerido?: {
+    codigo: string
+    descricao: string
+    similaridade: number
+  }
+  /** Chamado quando o revisor aceita a sugestão de match (deve fechar o pré-cadastro
+   *  como atendido pelo item já existente, sem inserir novo est_item). */
+  onAcceptMatch?: () => Promise<void>
 }
 
-export default function ItemFormModal({ open, initialData, onClose, onSaved, onReject, solicitanteNome, solicitadoEm }: ItemFormModalProps) {
+export default function ItemFormModal({ open, initialData, onClose, onSaved, onReject, solicitanteNome, solicitadoEm, matchSugerido, onAcceptMatch }: ItemFormModalProps) {
   const [editItem, setEditItem] = useState<Partial<EstItem>>(() => ({ ...EMPTY, ...initialData }))
   const [classeBusca, setClasseBusca] = useState(() => {
     if (initialData?.classe_financeira_codigo && initialData?.classe_financeira_descricao) {
@@ -68,6 +78,10 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
   const [showReject, setShowReject] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
+  const [matchDismissed, setMatchDismissed] = useState(false)
+  const [acceptingMatch, setAcceptingMatch] = useState(false)
+
+  const showMatchBanner = !!matchSugerido && !!onAcceptMatch && !matchDismissed
 
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const { data: gruposCompra = [] } = useCategorias()
@@ -167,6 +181,49 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
             <X size={16} />
           </button>
         </div>
+
+        {showMatchBanner && matchSugerido && (
+          <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                <span className="text-amber-600 text-sm font-bold">?</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">
+                  Possível item já cadastrado ({Math.round(matchSugerido.similaridade * 100)}% similar)
+                </p>
+                <p className="text-sm font-semibold text-slate-800 truncate">
+                  {matchSugerido.codigo} — {matchSugerido.descricao}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Se for o mesmo item, marque a solicitação como atendida pelo cadastro existente.
+                  Senão, ignore esta sugestão e cadastre como item novo.
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    disabled={acceptingMatch}
+                    onClick={async () => {
+                      if (!onAcceptMatch) return
+                      setAcceptingMatch(true)
+                      try { await onAcceptMatch() } finally { setAcceptingMatch(false) }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[11px] font-bold"
+                  >
+                    {acceptingMatch ? 'Marcando...' : 'É o mesmo item — marcar como atendido'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMatchDismissed(true)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-600 text-[11px] font-semibold"
+                  >
+                    Ignorar — é item novo
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
