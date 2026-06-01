@@ -3167,6 +3167,10 @@ export default function CPPipeline() {
       return { text: `Esclarecimento solicitado: ${lote.observacao}`, tone: 'rose' }
     }
     if (lote.status !== 'enviado_aprovacao') return null
+    // Em aprovação com pergunta/recusa pendente do aprovador — usa observacao do lote
+    if (lote.observacao && lote.aprovador_nome) {
+      return { text: `${lote.aprovador_nome}: ${lote.observacao}`, tone: 'rose' }
+    }
     return lote.aprovador_nome
       ? { text: `Aprovador: ${lote.aprovador_nome}`, tone: 'amber' }
       : { text: 'Em aprovação', tone: 'amber' }

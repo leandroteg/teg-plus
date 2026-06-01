@@ -1031,34 +1031,18 @@ export function useDecisaoGenerica() {
             .maybeSingle()
 
           if (lote?.id) {
-            if (decisao === 'esclarecimento') {
-              await supabase
-                .from('fin_lote_itens')
-                .update({
-                  decisao: 'pendente',
-                  decidido_por: null,
-                  decidido_em: null,
-                  observacao: observacao || null,
-                })
-                .eq('lote_id', entidadeId)
-
+            if (decisao === 'esclarecimento' || decisao === 'rejeitada') {
+              // Devolve ao financeiro mantendo o lote em "Em Aprovação".
+              // Itens permanecem pendentes; o registro apr_aprovacoes já foi
+              // gravado como 'esclarecimento'/'rejeitada' pelo passo anterior
+              // e o financeiro responde via LoteDetalhe (que cria nova aprovação pendente).
               await supabase
                 .from('fin_lotes_pagamento')
                 .update({
-                  status: 'montando',
                   observacao: observacao || null,
                   updated_at: decisionAt,
                 })
                 .eq('id', entidadeId)
-
-              await supabase
-                .from('fin_contas_pagar')
-                .update({
-                  status: 'em_lote',
-                  updated_at: decisionAt,
-                })
-                .eq('lote_id', entidadeId)
-                .not('status', 'in', '(cancelado,pago,conciliado)')
             } else {
               const { data: loteItens } = await supabase
                 .from('fin_lote_itens')
@@ -1181,15 +1165,6 @@ export function useDecisaoGenerica() {
               }
             }
 
-            if (decisao === 'rejeitada') {
-              await supabase
-                .from('fin_lotes_pagamento')
-                .update({
-                  status: 'cancelado',
-                  updated_at: decisionAt,
-                })
-                .eq('id', entidadeId)
-            }
           } else if (decisao === 'aprovada') {
             await supabase
               .from('fin_contas_pagar')
@@ -1199,16 +1174,15 @@ export function useDecisaoGenerica() {
                 aprovado_em: decisionAt,
               })
               .eq('id', entidadeId)
-          } else if (decisao === 'rejeitada') {
-            await supabase
-              .from('fin_contas_pagar')
-              .update({ status: 'cancelado' })
-              .eq('id', entidadeId)
           } else {
+            // Esclarecimento ou recusa em CP direta: devolve para 'confirmado'
+            // (volta para a fila "Pendentes" da Aprovação) com a observação registrada.
+            // Cancelamento real fica reservado ao próprio financeiro.
             await supabase
               .from('fin_contas_pagar')
               .update({
                 status: 'confirmado',
+                observacoes: observacao || null,
                 updated_at: decisionAt,
               })
               .eq('id', entidadeId)

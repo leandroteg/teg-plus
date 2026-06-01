@@ -83,6 +83,7 @@ export default function LoteDetalhe() {
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [historico, setHistorico] = useState<MsgEsclarecimento[]>([])
+  const [perguntaPendente, setPerguntaPendente] = useState(false)
   const [resposta, setResposta] = useState('')
   const [enviandoResposta, setEnviandoResposta] = useState(false)
 
@@ -101,11 +102,14 @@ export default function LoteDetalhe() {
       .not('observacao', 'is', null)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
-        const msgs: MsgEsclarecimento[] = (data ?? []).flatMap(r => {
+        const rows = data ?? []
+        const msgs: MsgEsclarecimento[] = rows.flatMap(r => {
           const obs = (r.observacao as string) ?? ''
           if (!obs) return []
           const isResposta = obs.startsWith('Esclarecimento respondido:')
-          if (r.status !== 'esclarecimento' && !isResposta) return []
+          const isPergunta = r.status === 'esclarecimento' ||
+            (r.status === 'rejeitada' && !isResposta)
+          if (!isPergunta && !isResposta) return []
           return [{
             id: r.id as string,
             tipo: isResposta ? 'resposta' : 'pergunta',
@@ -115,6 +119,14 @@ export default function LoteDetalhe() {
           }]
         })
         setHistorico(msgs)
+
+        // Pergunta pendente: o último registro de aprovação não é mais 'pendente'
+        // (aprovador decidiu esclarecimento/recusa e financeiro ainda não reenviou).
+        const lastRow = rows.length > 0 ? rows[rows.length - 1] : null
+        const lastStatus = (lastRow?.status as string | undefined) ?? ''
+        setPerguntaPendente(
+          !!lastRow && (lastStatus === 'esclarecimento' || lastStatus === 'rejeitada')
+        )
       })
   }, [loteId, lote?.status])
 
@@ -158,6 +170,9 @@ export default function LoteDetalhe() {
   const isMontando = lote.status === 'montando'
   const isEmAprovacao = lote.status === 'enviado_aprovacao'
   const isResolvido = ['aprovado', 'parcialmente_aprovado', 'cancelado', 'pago'].includes(lote.status)
+  // Financeiro pode responder quando lote está em montagem (legado) ou
+  // em aprovação com pergunta pendente do aprovador (novo fluxo).
+  const podeResponder = (isMontando || isEmAprovacao) && perguntaPendente
 
   const stConfig = STATUS_LABELS[lote.status] ?? STATUS_LABELS.montando
 
@@ -249,7 +264,7 @@ export default function LoteDetalhe() {
       </div>
 
       {/* Esclarecimento thread */}
-      {(isMontando && lote.observacao) || historico.length > 0 ? (
+      {podeResponder || (isMontando && lote.observacao) || historico.length > 0 ? (
         <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-amber-900/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
           <div className={`flex items-center gap-2 px-4 py-3 border-b ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
             <MessageCircle size={15} className="text-amber-500" />
@@ -277,14 +292,14 @@ export default function LoteDetalhe() {
             ))}
 
             {/* Mostrar pergunta atual do lote se não estiver no histórico */}
-            {isMontando && lote.observacao && historico.filter(m => m.tipo === 'pergunta' && m.texto === lote.observacao).length === 0 && (
+            {podeResponder && lote.observacao && historico.filter(m => m.tipo === 'pergunta' && m.texto === lote.observacao).length === 0 && (
               <div className={`rounded-xl px-3 py-2 text-sm ${isDark ? 'bg-rose-900/20 text-rose-200' : 'bg-rose-100 text-rose-800'}`}>
                 <div className="font-medium text-[10px] mb-1 opacity-70">Aprovador · Esclarecimento pendente</div>
                 <div>{lote.observacao}</div>
               </div>
             )}
 
-            {isMontando && (
+            {podeResponder && (
               <div className="pt-1 space-y-2">
                 <textarea
                   value={resposta}
