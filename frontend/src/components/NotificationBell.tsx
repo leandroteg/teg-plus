@@ -265,6 +265,16 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
           unidade: (typeof d.unidade === 'string' ? d.unidade : 'UN') as EstItem['unidade'],
           valor_medio: typeof d.valor_medio === 'number' ? d.valor_medio : 0,
         }
+        // Sugestão de match fuzzy gravada por backfill ou trigger (ver dados.match_sugerido_*)
+        const matchSugerido = typeof d.match_sugerido_codigo === 'string'
+          && typeof d.match_sugerido_descricao === 'string'
+          && typeof d.match_sugerido_similaridade === 'number'
+          ? {
+              codigo: d.match_sugerido_codigo as string,
+              descricao: d.match_sugerido_descricao as string,
+              similaridade: d.match_sugerido_similaridade as number,
+            }
+          : undefined
         return (
           <ItemFormModal
             key={itemModal.key}
@@ -279,6 +289,12 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
               await rejeitar.mutateAsync({ id: itemModal.pre.id, motivo })
               setItemModal(null)
             }}
+            matchSugerido={matchSugerido}
+            onAcceptMatch={matchSugerido ? async () => {
+              // Fecha o pré-cadastro como atendido pelo item existente, sem inserir est_item novo.
+              await marcarAprovado.mutateAsync({ id: itemModal.pre.id })
+              setItemModal(null)
+            } : undefined}
             solicitanteNome={itemModal.pre.solicitante_nome ?? undefined}
             solicitadoEm={itemModal.pre.created_at}
           />
