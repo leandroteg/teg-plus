@@ -382,10 +382,58 @@ export function useEmitirPedido() {
         throw new Error(pedError.message || 'Falha ao criar pedido no banco de dados')
       }
 
+      // Atendimento parcial: estampa em cada item da RC qual pedido o cobriu.
+      // Match por descrição (cotação usa rcMatch — descrição canônica da RC).
+      // Só carimba itens ainda sem atendimento; tolerante a múltiplas chamadas do hook (split).
+      try {
+        const { data: cotFor } = await supabase
+          .from('cmp_cotacao_fornecedores')
+          .select('itens_precos')
+          .eq('cotacao_id', cotacaoId)
+          .eq('fornecedor_nome', fornecedorNome)
+          .eq('selecionado', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const descricoesCobertas = ((cotFor?.itens_precos ?? []) as Array<{ descricao?: string; selecionado?: boolean }>)
+          .filter(ip => ip.selecionado && typeof ip.descricao === 'string' && ip.descricao.trim().length > 0)
+          .map(ip => (ip.descricao as string).trim())
+
+        if (descricoesCobertas.length > 0) {
+          await supabase
+            .from('cmp_requisicao_itens')
+            .update({ atendido_em_pedido_id: pedido.id })
+            .eq('requisicao_id', requisicaoId)
+            .is('atendido_em_pedido_id', null)
+            .in('descricao', descricoesCobertas)
+        } else {
+          // Fallback: cotação sem item selecionado explicito (caso legado de fornecedor único).
+          // Estampa todos os itens da RC ainda não atendidos com este pedido.
+          await supabase
+            .from('cmp_requisicao_itens')
+            .update({ atendido_em_pedido_id: pedido.id })
+            .eq('requisicao_id', requisicaoId)
+            .is('atendido_em_pedido_id', null)
+        }
+      } catch (stampErr) {
+        console.warn('Aviso: falha ao estampar atendimento de itens da RC:', stampErr)
+      }
+
+      // RC só vai pra 'pedido_emitido' quando TODOS os itens forem cobertos.
+      // Enquanto sobrar item sem atendimento, fica em 'em_cotacao' (badge "Parcialmente Atendida" no front).
+      const { count: itensPendentes } = await supabase
+        .from('cmp_requisicao_itens')
+        .select('id', { count: 'exact', head: true })
+        .eq('requisicao_id', requisicaoId)
+        .is('atendido_em_pedido_id', null)
+
+      const novoStatusRC: string = (itensPendentes ?? 0) === 0 ? 'pedido_emitido' : 'em_cotacao'
+
       const { error: reqError } = await supabase
         .from('cmp_requisicoes')
         .update({
-          status: 'pedido_emitido',
+          status: novoStatusRC,
           classe_financeira: classeFinanceira || null,
           classe_financeira_id: classeFinanceiraId || null,
           centro_custo: centroCusto || null,

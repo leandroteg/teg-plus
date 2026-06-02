@@ -151,6 +151,13 @@ export interface Requisicao {
     data: string
   }[]
   itens_count?: number
+  /** Quantos itens já foram cobertos por algum pedido (atendido_em_pedido_id NOT NULL). */
+  itens_atendidos?: number
+  /** Quantos itens ainda não foram comprados (atendido_em_pedido_id IS NULL). */
+  itens_pendentes?: number
+  /** True quando há ao menos 1 item já comprado e ainda sobra item sem comprar.
+   *  RC fica em 'em_cotacao' até atender o último item — quando todos atendidos vai pra 'pedido_emitido'. */
+  parcialmente_atendida?: boolean
 }
 
 export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte' | 'solicitacao_adiantamento'

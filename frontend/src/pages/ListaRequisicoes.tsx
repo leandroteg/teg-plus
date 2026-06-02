@@ -156,6 +156,16 @@ function ReqCard({ r, apr, isDark, onClick }: {
               ⚡ {r.urgencia}
             </span>
           )}
+          {r.parcialmente_atendida && (
+            <span
+              title={`${r.itens_atendidos ?? 0} de ${r.itens_count ?? 0} itens já comprados — falta cotar fornecedor pros restantes`}
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
+                isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
+              }`}
+            >
+              ⏳ PARCIAL ({r.itens_atendidos}/{r.itens_count})
+            </span>
+          )}
           {r.categoria && (
             <span className={`text-[10px] rounded px-1.5 py-0.5 truncate max-w-[80px] ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-100 text-slate-400'}`}>
               {r.categoria.replace(/_/g, ' ')}
@@ -1029,7 +1039,19 @@ export default function ListaRequisicoes() {
               {activeItems.map(r => (
                 <tr key={r.id} onClick={() => setDetail(r)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
-                  <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{r.numero}</td>
+                  <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+                    {r.numero}
+                    {r.parcialmente_atendida && (
+                      <span
+                        title={`${r.itens_atendidos ?? 0} de ${r.itens_count ?? 0} itens já comprados`}
+                        className={`ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded uppercase ${
+                          isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
+                        }`}
+                      >
+                        ⏳ {r.itens_atendidos}/{r.itens_count}
+                      </span>
+                    )}
+                  </td>
                   <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.obra_nome}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.data_necessidade ? new Date(r.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
