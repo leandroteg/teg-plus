@@ -414,7 +414,24 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 
       {/* RC Info */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-        <p className="text-xs text-slate-400 font-mono mb-1">{req?.numero}</p>
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-xs text-slate-400 font-mono">{req?.numero}</p>
+          {(() => {
+            const rcItens = (req as any)?.itens as { atendido_em_pedido_id?: string | null }[] | undefined
+            if (!rcItens || rcItens.length === 0) return null
+            const atendidos = rcItens.filter(it => !!it.atendido_em_pedido_id).length
+            const pendentes = rcItens.length - atendidos
+            if (atendidos === 0 || pendentes === 0) return null
+            return (
+              <span
+                title={`${atendidos} de ${rcItens.length} itens já comprados em pedidos anteriores — adicione fornecedor para os ${pendentes} pendentes`}
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-indigo-100 text-indigo-700"
+              >
+                ⏳ PARCIAL ({atendidos}/{rcItens.length})
+              </span>
+            )
+          })()}
+        </div>
         <p className="text-sm font-bold text-slate-800">{req?.justificativa || req?.descricao}</p>
         <div className="flex justify-between items-center mt-1">
           <p className="text-xs text-slate-400">{req?.obra_nome}</p>
@@ -1788,7 +1805,9 @@ export default function CotacaoForm() {
         type="button"
         onClick={() => {
           const rcItens = cotacao?.requisicao?.itens ?? []
-          const itensPrecos: ItemPreco[] = rcItens.map(item => ({
+          // Filtra itens já atendidos por pedido anterior — não devem entrar em nova cotação.
+          const itensPendentes = rcItens.filter((item: any) => !item.atendido_em_pedido_id)
+          const itensPrecos: ItemPreco[] = itensPendentes.map(item => ({
             descricao: toUpperNorm(item.descricao),
             qtd: item.quantidade,
             valor_unitario: 0,

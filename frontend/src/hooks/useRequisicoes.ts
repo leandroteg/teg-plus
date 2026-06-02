@@ -85,6 +85,9 @@ export function useRequisicoes(status?: string, search?: string) {
       const ids = rows.map(r => r.id).filter(Boolean)
       const historicoMap = new Map<string, NonNullable<Requisicao['esclarecimento_historico']>>()
       const itemCountMap = new Map<string, number>()
+      // Para detectar RC "parcialmente atendida": já tem item comprado (atendido_em_pedido_id NOT NULL)
+      // e ainda tem item sem comprar (NULL).
+      const itemAtendidoMap = new Map<string, { atendidos: number; pendentes: number }>()
 
       if (ids.length > 0) {
         const [{ data: historicoData }, { data: itemRows }] = await Promise.all([
@@ -97,7 +100,7 @@ export function useRequisicoes(status?: string, search?: string) {
             .order('created_at', { ascending: true }),
           supabase
             .from('cmp_requisicao_itens')
-            .select('requisicao_id')
+            .select('requisicao_id, atendido_em_pedido_id')
             .in('requisicao_id', ids),
         ])
 
@@ -106,18 +109,31 @@ export function useRequisicoes(status?: string, search?: string) {
         }
 
         for (const row of itemRows ?? []) {
-          itemCountMap.set(row.requisicao_id, (itemCountMap.get(row.requisicao_id) ?? 0) + 1)
+          const rid = row.requisicao_id as string
+          itemCountMap.set(rid, (itemCountMap.get(rid) ?? 0) + 1)
+          const bucket = itemAtendidoMap.get(rid) ?? { atendidos: 0, pendentes: 0 }
+          if (row.atendido_em_pedido_id) bucket.atendidos += 1
+          else bucket.pendentes += 1
+          itemAtendidoMap.set(rid, bucket)
         }
       }
 
       // Flattens o join: comprador.nome → comprador_nome
-      return rows.map(r => ({
-        ...r,
-        comprador_nome: r.comprador?.nome ?? undefined,
-        comprador: undefined,
-        esclarecimento_historico: historicoMap.get(r.id),
-        itens_count: itemCountMap.get(r.id) ?? 0,
-      })) as Requisicao[]
+      return rows.map(r => {
+        const at = itemAtendidoMap.get(r.id)
+        // Parcialmente atendida = já tem pelo menos 1 item comprado e ainda sobra pelo menos 1 sem comprar.
+        const parcialmente_atendida = !!at && at.atendidos > 0 && at.pendentes > 0
+        return {
+          ...r,
+          comprador_nome: r.comprador?.nome ?? undefined,
+          comprador: undefined,
+          esclarecimento_historico: historicoMap.get(r.id),
+          itens_count: itemCountMap.get(r.id) ?? 0,
+          itens_atendidos: at?.atendidos ?? 0,
+          itens_pendentes: at?.pendentes ?? 0,
+          parcialmente_atendida,
+        }
+      }) as Requisicao[]
     },
     refetchInterval: false,
     refetchOnMount: true,

@@ -17,7 +17,7 @@ const SELECT_COTACAO = `
     id, numero, solicitante_nome, obra_nome, descricao, justificativa,
     valor_estimado, urgencia, status, alcada_nivel, categoria, created_at,
     compra_recorrente, arquivo_url,
-    itens:cmp_requisicao_itens(id, descricao, quantidade, unidade, valor_unitario_estimado, marca)
+    itens:cmp_requisicao_itens(id, descricao, quantidade, unidade, valor_unitario_estimado, marca, atendido_em_pedido_id)
   ),
   comprador:cmp_compradores(nome, email)
 `

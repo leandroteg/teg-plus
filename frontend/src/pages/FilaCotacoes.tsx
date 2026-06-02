@@ -157,6 +157,23 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
                 : isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
             }`}>⚡ {cot.requisicao.urgencia}</span>
           )}
+          {(() => {
+            const itens = (cot.requisicao as any)?.itens as { atendido_em_pedido_id?: string | null }[] | undefined
+            if (!itens || itens.length === 0) return null
+            const atendidos = itens.filter(i => !!i.atendido_em_pedido_id).length
+            const pendentes = itens.length - atendidos
+            if (atendidos === 0 || pendentes === 0) return null
+            return (
+              <span
+                title={`${atendidos} de ${itens.length} itens já comprados — faltam ${pendentes}`}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
+                  isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
+                }`}
+              >
+                ⏳ PARCIAL ({atendidos}/{itens.length})
+              </span>
+            )
+          })()}
           {concluida && !emEsclarecimento && (
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
               Concluída
