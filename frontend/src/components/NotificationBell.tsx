@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSound } from '../hooks/useSound'
 import ItemFormModal from './ItemFormModal'
 import type { EstItem } from '../types/estoque'
+import { normalizeUnidade } from '../constants/unidades'
 
 // ── Main Bell Component ─────────────────────────────────────────────────────────
 
@@ -262,7 +263,10 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
         const d = itemModal.pre.dados
         const initialData: Partial<EstItem> = {
           descricao: typeof d.descricao === 'string' ? d.descricao : '',
-          unidade: (typeof d.unidade === 'string' ? d.unidade : 'UN') as EstItem['unidade'],
+          // Normaliza para o enum est_unidade (UPPER + fallback 'UN' em valores
+          // não reconhecidos). Sem isso o pre-cadastro pode vir com 'fardo' (minúsculo)
+          // direto do cmp_requisicao_itens e o INSERT falha no enum.
+          unidade: normalizeUnidade(d.unidade),
           valor_medio: typeof d.valor_medio === 'number' ? d.valor_medio : 0,
         }
         // Sugestão de match fuzzy gravada por backfill ou trigger (ver dados.match_sugerido_*)

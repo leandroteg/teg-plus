@@ -1012,7 +1012,7 @@ export default function NovaRequisicao() {
                 <label className="text-[10px] text-slate-400">Unidade</label>
                 <select className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none"
                   value={item.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}>
-                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'pct', 'cx', 'rl', 'fardo', 'galao', 'barra', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div>
@@ -1288,7 +1288,7 @@ export default function NovaRequisicao() {
                 <label className="text-[10px] text-slate-400">Unidade</label>
                 <select className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none"
                   value={item.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}>
-                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'pct', 'cx', 'rl', 'fardo', 'galao', 'barra', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div>

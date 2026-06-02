@@ -4,6 +4,7 @@ import { useItemCatalogSearch } from '../hooks/useEstoque'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import type { EstItem } from '../types/estoque'
+import { UNIDADES_ESTOQUE } from '../constants/unidades'
 import { toUpperNorm } from './UpperInput'
 
 // ── Map RC category (cmp_categorias.codigo) → est_itens.categoria ───────────
@@ -56,13 +57,15 @@ export function getCategoriaEstoque(categoriaRC: string): string[] {
   return CATEGORY_MAP[categoriaRC] ?? CATEGORY_MAP[categoriaRC.toUpperCase()] ?? []
 }
 
-// ── Unidades do enum est_unidade ────────────────────────────────────────────
-const UNIDADES_ESTOQUE = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
+// Unidades do enum est_unidade — vêm de constants/unidades (fonte única).
 
-// Map DB enum → RC select values (NovaRequisicao uses lowercase)
+// Map DB enum → RC select values (NovaRequisicao usa minúsculas)
+// NOTE: PCT mapeava para 'pc' antes, mas agora PC é uma unidade própria (peça).
+// PCT virou 'pct' para evitar colisão.
 const UNIDADE_DB_TO_RC: Record<string, string> = {
   UN: 'un', M: 'm', M2: 'm²', M3: 'm³', KG: 'kg', TON: 'ton',
-  L: 'L', CX: 'cx', PCT: 'pc', RL: 'rl', PR: 'par', JG: 'jg',
+  L: 'L', CX: 'cx', PCT: 'pct', RL: 'rl', PR: 'par', JG: 'jg',
+  FARDO: 'fardo', GALAO: 'galao', PC: 'pc', BARRA: 'barra',
 }
 
 // ── Props ───────────────────────────────────────────────────────────────────

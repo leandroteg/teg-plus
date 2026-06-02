@@ -4,6 +4,7 @@ import { useSalvarItem } from '../hooks/useEstoque'
 import { useCadClasses } from '../hooks/useCadastros'
 import { useCategorias } from '../hooks/useCategorias'
 import type { EstItem } from '../types/estoque'
+import { UNIDADES_ESTOQUE } from '../constants/unidades'
 import AutoCodeField from './AutoCodeField'
 import SmartTextField from './SmartTextField'
 import { supabase } from '../services/supabase'
@@ -23,7 +24,7 @@ async function fetchNextItemCode(prefix = 'ITM'): Promise<string> {
   return `${prefix}-${String(num + 1).padStart(3, '0')}`
 }
 
-const UNIDADES = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
+// Unidades do enum est_unidade — vêm de constants/unidades (fonte única).
 
 const EMPTY: Partial<EstItem> = {
   codigo: '',
@@ -244,7 +245,7 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
                 })}
                 className="input-base"
               >
-                {UNIDADES.map((u) => <option key={u}>{u}</option>)}
+                {UNIDADES_ESTOQUE.map((u) => <option key={u}>{u}</option>)}
               </select>
             </div>
           </div>

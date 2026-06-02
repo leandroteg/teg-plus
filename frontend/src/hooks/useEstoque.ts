@@ -5,6 +5,7 @@ import type {
   EstInventario, EstInventarioItem, EstoqueKPIs, NovaMovimentacaoPayload,
   EstoqueEntradaItem, EstoqueMovimentacaoItem,
 } from '../types/estoque'
+import { normalizeUnidade } from '../constants/unidades'
 
 // ── Catalog search (for RC item autocomplete) ────────────────────────────────
 export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: string[], search: string) {
@@ -133,6 +134,10 @@ export function useSalvarItem() {
     mutationFn: async (payload: Partial<EstItem> & { id?: string }) => {
       const { id, ...rest } = payload
       if (rest.descricao) rest.descricao = rest.descricao.replace(/^"+|"+$/g, '').trim()
+      // Guarda final: força `unidade` para o enum est_unidade (UPPER + valid).
+      // Protege contra payloads vindos de pre-cadastros antigos que ainda têm
+      // unidade minúscula (cmp_requisicao_itens.unidade é text livre).
+      if (rest.unidade !== undefined) rest.unidade = normalizeUnidade(rest.unidade)
       if (id) {
         const { error } = await supabase.from('est_itens').update(rest).eq('id', id)
         if (error) throw error

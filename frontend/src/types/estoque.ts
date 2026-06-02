@@ -2,8 +2,13 @@
 // Módulo Estoque e Patrimonial — Types
 // =============================================================================
 
+import type { UnidadeEstoque } from '../constants/unidades'
+
 export type CurvaABC = 'A' | 'B' | 'C'
-export type UnidadeEstoque = 'UN' | 'M' | 'M2' | 'M3' | 'KG' | 'TON' | 'L' | 'CX' | 'PCT' | 'RL' | 'PR' | 'JG'
+// UnidadeEstoque é declarada em constants/unidades.ts (fonte única da verdade,
+// alinhada com o enum est_unidade no Postgres). Re-exportada aqui por
+// conveniência para quem só importa de types/estoque.
+export type { UnidadeEstoque }
 export type TipoMovimentacao =
   | 'entrada'
   | 'saida'
