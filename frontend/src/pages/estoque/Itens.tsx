@@ -114,31 +114,48 @@ export default function Itens() {
     return list
   }, [saldos, curvaFiltro, busca])
 
+  const baseFilterNome = useMemo(
+    () => baseFilter ? bases.find(b => b.id === baseFilter)?.nome ?? '' : '',
+    [baseFilter, bases],
+  )
+
   const entradasFiltradas = useMemo(() => {
-    if (!busca.trim()) return entradas
-    const t = busca.toLowerCase()
-    return entradas.filter(e =>
-      e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
-    )
-  }, [entradas, busca])
+    let list = entradas
+    if (baseFilterNome) list = list.filter(e => e.base_nome === baseFilterNome)
+    if (busca.trim()) {
+      const t = busca.toLowerCase()
+      list = list.filter(e =>
+        e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
+      )
+    }
+    return list
+  }, [entradas, busca, baseFilterNome])
 
   const movsFiltradas = useMemo(() => {
-    if (!busca.trim()) return movs
-    const t = busca.toLowerCase()
-    return movs.filter(m =>
-      m.descricao.toLowerCase().includes(t) || m.codigo.toLowerCase().includes(t)
-    )
-  }, [movs, busca])
+    let list = movs
+    if (baseFilterNome) list = list.filter(m => m.base_nome === baseFilterNome)
+    if (busca.trim()) {
+      const t = busca.toLowerCase()
+      list = list.filter(m =>
+        m.descricao.toLowerCase().includes(t) || m.codigo.toLowerCase().includes(t)
+      )
+    }
+    return list
+  }, [movs, busca, baseFilterNome])
 
   const liberadosFiltrados = useMemo(() => {
-    if (!busca.trim()) return liberados
-    const t = busca.toLowerCase()
-    return liberados.filter(s =>
-      s.numero.toLowerCase().includes(t) ||
-      s.solicitante_nome.toLowerCase().includes(t) ||
-      s.obra_nome.toLowerCase().includes(t)
-    )
-  }, [liberados, busca])
+    let list = liberados
+    if (baseFilter) list = list.filter(s => s.base_id === baseFilter)
+    if (busca.trim()) {
+      const t = busca.toLowerCase()
+      list = list.filter(s =>
+        s.numero.toLowerCase().includes(t) ||
+        s.solicitante_nome.toLowerCase().includes(t) ||
+        s.obra_nome.toLowerCase().includes(t)
+      )
+    }
+    return list
+  }, [liberados, busca, baseFilter])
 
   const counts: Record<EstoquePipelineTab, number> = {
     aguardando_entrada: entradasFiltradas.length,
@@ -258,20 +275,18 @@ export default function Itens() {
             />
           </div>
 
-          {activeTab === 'em_estoque' && (
-            <select
-              value={baseFilter}
-              onChange={e => setBaseFilter(e.target.value)}
-              className={`px-2 py-1.5 rounded-lg border text-xs
-                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
-                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-            >
-              <option value="">Estoque Geral</option>
-              {bases.map(b => (
-                <option key={b.id} value={b.id}>{b.nome}</option>
-              ))}
-            </select>
-          )}
+          <select
+            value={baseFilter}
+            onChange={e => setBaseFilter(e.target.value)}
+            className={`px-2 py-1.5 rounded-lg border text-xs
+              focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+              ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+          >
+            <option value="">{activeTab === 'em_estoque' ? 'Estoque Geral' : 'Todas as bases'}</option>
+            {bases.map(b => (
+              <option key={b.id} value={b.id}>{b.nome}</option>
+            ))}
+          </select>
 
           {activeTab === 'em_estoque' && (
             <div className="flex gap-1">

@@ -78,13 +78,12 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** `cmp_recebimento_itens` (migration 072), [Recebimentos.tsx](../../frontend/src/pages/estoque/Recebimentos.tsx).
 - **Próximo passo:** RPC `fn_confirmar_recebimento_e_gerar_entrada()` automática.
 
-### 🟡 [Alta] Filtro por localidade em "Aguardando Entrada/Saída" — **bloqueado por dados**
-- **Investigação 2026-06-06:**
-  - Tabela `est_localizacoes` JÁ EXISTE (campos: `base_id`, `corredor`, `prateleira`, `posicao`, `descricao`, `ativa`) mas tem **0 registros**.
-  - `est_bases` tem 9 bases cadastradas.
-  - `est_itens` NÃO tem `base_id` nem `localizacao_id` — itens são globais; o vínculo com base/localização provavelmente está em tabela de saldo.
-- **Bloqueio:** sem decisão de modelo (vincular item→localização? ou saldo→localização?) e sem popular `est_localizacoes`, filtro não tem o que filtrar.
-- **Próximo passo:** Workshop curto com PM/almoxarife pra (1) decidir modelo, (2) popular `est_localizacoes` com as estações reais, (3) só então criar o filtro.
+### ✅ [Alta] Filtro por localidade em "Aguardando Entrada/Saída" — **feito 2026-06-06**
+- **Releitura:** "Localidade" no contexto do sprint = **base** (canteiro), não corredor/prateleira. `est_bases` tem 9 cadastradas. `est_localizacoes` (granular) fica pra um sprint futuro.
+- **Estado original:** `baseFilter` existia em Itens.tsx mas o select só renderizava na aba "Em Estoque"; as listas de "Aguardando Entrada", "Liberado para Retirada" e "Em Movimentação" ignoravam o filtro.
+- **Fix:** Removida condição `activeTab === 'em_estoque'` do select; label muda pra "Todas as bases" nas outras abas. Memos `entradasFiltradas`, `movsFiltradas`, `liberadosFiltrados` agora aplicam filtro por `base_nome` (entradas/movs) ou `base_id` (liberados).
+- **Refs:** [Itens.tsx](../../frontend/src/pages/estoque/Itens.tsx).
+- **Validado em preview**: aba "Aguardando Entrada" mostra select com "Todas as bases" + 9 canteiros.
 
 ### ✅ [Alta] Limpar cautela "Teste Leandro" — **feito 2026-06-06**
 - **Achado:** Existia apenas 1 cautela no banco inteiro — `CAU-2026-0001` (LEANDRO MAIA MALLET, obra SEDE, status `em_aberto` há 2 meses, 1 item, observação "Colaborador esqueceu a fonte").
