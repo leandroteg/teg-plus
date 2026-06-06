@@ -160,8 +160,15 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
   const marcarCPPago = useMarcarCPPago()         // direct update of fin_contas_pagar
   const jaTemComprovante = anexosPedido.some(a => a.tipo === 'comprovante_pagamento')
 
+  const comprovanteObrigatorio = !!cp.pedido_id
+  const comprovanteOk = !comprovanteObrigatorio || jaTemComprovante || !!arquivo
+
   const handleConfirm = async () => {
     setErro('')
+    if (!comprovanteOk) {
+      setErro('Anexe o comprovante de pagamento antes de confirmar.')
+      return
+    }
     setLoading(true)
     try {
       // 1. Atualizar classificação (CC, classe financeira) se alterados
@@ -176,20 +183,16 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
         if (classErr) throw new Error('Erro ao atualizar classificação: ' + classErr.message)
       }
 
-      // 2. Upload comprovante if a file was selected
+      // 2. Upload comprovante (obrigatório quando há pedido vinculado).
+      // Erro no upload aborta o registro — sem comprovante, sem baixa.
       if (arquivo && cp.pedido_id) {
-        try {
-          await uploadAnexo.mutateAsync({
-            pedidoId: cp.pedido_id,
-            file: arquivo,
-            tipo: 'comprovante_pagamento',
-            observacao: observacao || undefined,
-            origem: 'financeiro',
-          })
-        } catch (uploadErr) {
-          console.warn('Falha no upload do comprovante:', uploadErr)
-          // Continua com o registro — comprovante pode ser anexado depois
-        }
+        await uploadAnexo.mutateAsync({
+          pedidoId: cp.pedido_id,
+          file: arquivo,
+          tipo: 'comprovante_pagamento',
+          observacao: observacao || undefined,
+          origem: 'financeiro',
+        })
       }
 
       // 3. Register payment
@@ -238,8 +241,8 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
             <div>
               <p className="text-xs font-semibold text-slate-600 mb-2">
                 Comprovante de Pagamento{' '}
-                <span className={`font-normal ${jaTemComprovante ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {jaTemComprovante ? '(já anexado no pedido)' : '(opcional)'}
+                <span className={`font-normal ${jaTemComprovante ? 'text-emerald-600' : arquivo ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {jaTemComprovante ? '(já anexado no pedido)' : arquivo ? '(pronto pra anexar)' : '(obrigatório)'}
                 </span>
               </p>
               <input
@@ -317,9 +320,10 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
             </button>
             <button
               onClick={handleConfirm}
-              disabled={loading}
+              disabled={loading || !comprovanteOk}
+              title={!comprovanteOk ? 'Anexe o comprovante de pagamento' : undefined}
               className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold
-                hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading
                 ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />

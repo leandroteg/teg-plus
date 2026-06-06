@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
 import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
+import PedidoDiretoModal from '../components/PedidoDiretoModal'
 import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
@@ -139,6 +140,7 @@ export default function NovaRequisicao() {
   const referenciaInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]                 = useState(1)
+  const [showPedidoDireto, setShowPedidoDireto] = useState(false)
   const [searchCat, setSearchCat]       = useState('')
   const [showAiHelper, setShowAiHelper] = useState(false)
   const [textoAi, setTextoAi]           = useState('')
@@ -561,6 +563,28 @@ export default function NovaRequisicao() {
     <div className="space-y-5">
       <Stepper step={1} />
 
+      {/* ── Pedido Extraordinário (atalho) ────────────────────────────────── */}
+      {!isEditMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <Zap size={16} className="text-amber-600 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-amber-800">Pedido Extraordinário</p>
+              <p className="text-[11px] text-amber-700 leading-snug">
+                Emergência ou compra sem cotação? Emita direto ao fornecedor, com justificativa.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPedidoDireto(true)}
+            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+          >
+            Abrir
+          </button>
+        </div>
+      )}
+
       {/* ── Category Selector Box ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Header gradient */}
@@ -654,6 +678,12 @@ export default function NovaRequisicao() {
         className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all">
         Próxima Etapa <ChevronRight size={16} />
       </button>
+
+      <PedidoDiretoModal
+        open={showPedidoDireto}
+        onClose={() => setShowPedidoDireto(false)}
+        onSuccess={() => { setShowPedidoDireto(false); nav('/pedidos') }}
+      />
     </div>
   )
 

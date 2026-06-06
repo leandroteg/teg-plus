@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Banknote, Search, CheckSquare, Square, Minus,
   ChevronDown, ChevronUp, AlertTriangle, Calendar,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/useLotesPagamento'
+import { supabase } from '../../services/supabase'
 import type { ContaPagar } from '../../types/financeiro'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ export default function PainelPagamentos() {
   const [dataPagamento, setDataPagamento] = useState(today())
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [pendentesComprovante, setPendentesComprovante] = useState<ContaPagar[]>([])
+  const [checandoComprovantes, setChecandoComprovantes] = useState(false)
 
   // ── Filter ──
   const filtered = useMemo(() => {
@@ -166,9 +169,45 @@ export default function PainelPagamentos() {
     .filter(c => selected.has(c.id))
     .reduce((s, c) => s + c.valor_original, 0)
 
+  // ── Checagem de comprovantes ao abrir a confirmação ──
+  // Bloqueia o batch se algum CP do lote tem pedido_id sem comprovante de pagamento anexado.
+  useEffect(() => {
+    if (!showConfirm) {
+      setPendentesComprovante([])
+      return
+    }
+    const selecionadas = filtered.filter(c => selected.has(c.id))
+    const comPedido = selecionadas.filter(c => !!c.pedido_id)
+    if (comPedido.length === 0) {
+      setPendentesComprovante([])
+      return
+    }
+    let cancelado = false
+    setChecandoComprovantes(true)
+    ;(async () => {
+      const pedidoIds = Array.from(new Set(comPedido.map(c => c.pedido_id as string)))
+      const { data, error } = await supabase
+        .from('cmp_pedidos_anexos')
+        .select('pedido_id')
+        .eq('tipo', 'comprovante_pagamento')
+        .in('pedido_id', pedidoIds)
+      if (cancelado) return
+      setChecandoComprovantes(false)
+      if (error) {
+        setToast({ type: 'error', msg: 'Erro ao verificar comprovantes' })
+        setTimeout(() => setToast(null), 3000)
+        return
+      }
+      const comComprovante = new Set((data ?? []).map(r => r.pedido_id))
+      setPendentesComprovante(comPedido.filter(c => !comComprovante.has(c.pedido_id as string)))
+    })()
+    return () => { cancelado = true }
+  }, [showConfirm, filtered, selected])
+
   // ── Actions ──
   const handleRegistrar = async () => {
     if (selectedCount === 0) return
+    if (pendentesComprovante.length > 0) return
     try {
       const count = await registrarBatch.mutateAsync({
         cpIds: [...selected],
@@ -422,6 +461,36 @@ export default function PainelPagamentos() {
               className={`w-full px-3 py-2 text-sm rounded-lg border mb-5 ${inputBg}`}
             />
 
+            {checandoComprovantes && (
+              <div className="flex items-center gap-2 mb-4 text-xs text-slate-400">
+                <div className="w-3 h-3 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin" />
+                Verificando comprovantes de pagamento...
+              </div>
+            )}
+
+            {pendentesComprovante.length > 0 && (
+              <div className="mb-5 rounded-xl border border-red-300 bg-red-50 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle size={14} className="text-red-500" />
+                  <span className="text-xs font-bold text-red-700">
+                    {pendentesComprovante.length} pagamento(s) sem comprovante anexado
+                  </span>
+                </div>
+                <p className="text-[11px] text-red-600 mb-2">
+                  Anexe o comprovante no pedido antes de registrar a baixa.
+                </p>
+                <ul className="text-[11px] text-red-700 space-y-0.5 max-h-32 overflow-auto">
+                  {pendentesComprovante.map(cp => (
+                    <li key={cp.id} className="truncate">
+                      • {cp.fornecedor_nome}
+                      {cp.numero_documento ? ` — ${cp.numero_documento}` : ''}
+                      {' — '}{fmtFull(cp.valor_original)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowConfirm(false)}
@@ -433,8 +502,9 @@ export default function PainelPagamentos() {
               </button>
               <button
                 onClick={handleRegistrar}
-                disabled={registrarBatch.isPending}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                disabled={registrarBatch.isPending || checandoComprovantes || pendentesComprovante.length > 0}
+                title={pendentesComprovante.length > 0 ? 'Anexe os comprovantes pendentes antes de confirmar' : undefined}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {registrarBatch.isPending ? 'Processando...' : 'Confirmar'}
               </button>
