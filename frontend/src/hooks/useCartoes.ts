@@ -341,6 +341,37 @@ export function useConciliarItem() {
   })
 }
 
+// ── Desmembrar: conciliar 1 item da fatura com N apontamentos ─────────────────
+// O schema já permite (vários apontamentos com o mesmo item_fatura_id). Não muda
+// o fluxo 1:1 existente; é um caminho adicional para rateio de um lançamento.
+export function useConciliarMultiplos() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      apontamentoIds,
+    }: { itemId: string; apontamentoIds: string[] }) => {
+      if (!apontamentoIds.length) throw new Error('Selecione ao menos um apontamento')
+      // 1. Vincula todos os apontamentos selecionados ao item
+      const { error: e1 } = await supabase
+        .from('fin_apontamentos_cartao')
+        .update({ status: 'conciliado', item_fatura_id: itemId })
+        .in('id', apontamentoIds)
+      if (e1) throw e1
+      // 2. Marca o item como conciliado (apontamento_id = primeiro, p/ compat de exibição)
+      const { error: e2 } = await supabase
+        .from('fin_itens_fatura_cartao')
+        .update({ conciliado: true, apontamento_id: apontamentoIds[0] })
+        .eq('id', itemId)
+      if (e2) throw e2
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['apontamentos-cartao'] })
+      qc.invalidateQueries({ queryKey: ['itens-fatura'] })
+    },
+  })
+}
+
 // ── Upload de fatura PDF ───────────────────────────────────────────────────────
 
 export function useUploadFatura() {

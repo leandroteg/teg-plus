@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   CreditCard, Link2, Unlink, Search, Upload,
   CheckCircle2, AlertCircle, ChevronDown, X,
-  RefreshCw, FileText, Clock, Filter, Loader2, Info,
+  RefreshCw, FileText, Clock, Filter, Loader2, Info, Split,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -11,6 +11,7 @@ import {
   useFaturasCartao,
   useItensFatura,
   useConciliarItem,
+  useConciliarMultiplos,
   useDesconciliarItem,
   useUploadFatura,
 } from '../../hooks/useCartoes'
@@ -19,6 +20,7 @@ import type {
 } from '../../types/financeiro'
 import DetalheDrawer from '../../components/DetalheDrawer'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import DesmembrarFaturaModal from '../../components/financeiro/DesmembrarFaturaModal'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -250,12 +252,14 @@ function ItemFaturaRow({
   isSelected,
   onToggle,
   onShowDetail,
+  onDesmembrar,
 }: {
   item: ItemFaturaCartao
   isDark: boolean
   isSelected: boolean
   onToggle: (id: string) => void
   onShowDetail: (item: ItemFaturaCartao) => void
+  onDesmembrar: (item: ItemFaturaCartao) => void
 }) {
   const isConc = item.conciliado
 
@@ -300,6 +304,18 @@ function ItemFaturaRow({
         <p className={`text-sm font-extrabold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           {fmt(item.valor)}
         </p>
+
+        {/* Desmembrar (ratear em vários apontamentos) — só p/ não conciliados */}
+        {!isConc && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDesmembrar(item) }}
+            title="Desmembrar (ratear em vários apontamentos)"
+            className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors
+              ${isDark ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-emerald-500 hover:bg-emerald-50'}`}
+          >
+            <Split size={13} />
+          </button>
+        )}
 
         {/* Info button */}
         <button
@@ -501,6 +517,7 @@ export default function ConciliacaoCartoes() {
   const [selectedApId, setSelectedApId]     = useState<string | null>(null)
 
   const [detalheItem, setDetalheItem] = useState<ItemFaturaCartao | null>(null)
+  const [desmembrarItem, setDesmembrarItem] = useState<ItemFaturaCartao | null>(null)
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -518,8 +535,9 @@ export default function ConciliacaoCartoes() {
   })
 
   const conciliar    = useConciliarItem()
+  const conciliarMultiplos = useConciliarMultiplos()
   const desconciliar = useDesconciliarItem()
-  const isBusy = conciliar.isPending || desconciliar.isPending
+  const isBusy = conciliar.isPending || conciliarMultiplos.isPending || desconciliar.isPending
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -543,6 +561,17 @@ export default function ConciliacaoCartoes() {
       showToast('success', 'Lançamento conciliado com sucesso')
     } catch {
       showToast('error', 'Erro ao conciliar lançamento')
+    }
+  }
+
+  async function handleDesmembrar(apontamentoIds: string[]) {
+    if (!desmembrarItem) return
+    try {
+      await conciliarMultiplos.mutateAsync({ itemId: desmembrarItem.id, apontamentoIds })
+      setDesmembrarItem(null)
+      showToast('success', 'Lançamento desmembrado e conciliado')
+    } catch {
+      showToast('error', 'Erro ao desmembrar lançamento')
     }
   }
 
@@ -874,6 +903,7 @@ export default function ConciliacaoCartoes() {
                     isSelected={selectedItemId === item.id}
                     onToggle={toggleItem}
                     onShowDetail={setDetalheItem}
+                    onDesmembrar={setDesmembrarItem}
                   />
                 ))}
               </div>
@@ -895,6 +925,18 @@ export default function ConciliacaoCartoes() {
           isDark={isDark}
           onConfirm={handleConfirmConciliar}
           onCancel={() => { setSelectedItemId(null); setSelectedApId(null) }}
+        />
+      )}
+
+      {/* ── Desmembrar lançamento em vários apontamentos ──────── */}
+      {desmembrarItem && (
+        <DesmembrarFaturaModal
+          item={desmembrarItem}
+          apontamentos={apontamentos}
+          isDark={isDark}
+          isBusy={conciliarMultiplos.isPending}
+          onClose={() => setDesmembrarItem(null)}
+          onConfirm={handleDesmembrar}
         />
       )}
 
