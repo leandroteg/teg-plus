@@ -2,11 +2,13 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   Banknote, Search, CheckSquare, Square, Minus,
   ChevronDown, ChevronUp, AlertTriangle, Calendar,
-  DollarSign, Clock, CheckCircle2,
+  DollarSign, Clock, CheckCircle2, FileDown, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/useLotesPagamento'
 import type { ContaPagar } from '../../types/financeiro'
+import { downloadPagamentosPrevistosPdf } from '../../utils/pagamentos-previstos-pdf'
+import { supabase } from '../../services/supabase'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,7 @@ export default function PainelPagamentos() {
   const [dataPagamento, setDataPagamento] = useState(today())
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   // ── Filter ──
   const filtered = useMemo(() => {
@@ -184,6 +187,33 @@ export default function PainelPagamentos() {
     }
   }
 
+  const handleExportPdf = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      // Forecast gerencial = todos os títulos em aberto (não só os aprovados p/
+      // pagamento que a tela lista), ordenados por vencimento.
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .select('*')
+        .in('status', ['previsto', 'confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'])
+        .order('data_vencimento', { ascending: true })
+      if (error) throw error
+      const previstos = (data ?? []) as ContaPagar[]
+      if (previstos.length === 0) {
+        setToast({ type: 'error', msg: 'Nenhum pagamento previsto para exportar' })
+        setTimeout(() => setToast(null), 3000)
+        return
+      }
+      await downloadPagamentosPrevistosPdf(previstos)
+    } catch {
+      setToast({ type: 'error', msg: 'Erro ao gerar o PDF' })
+      setTimeout(() => setToast(null), 3000)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const cardBg = isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
   const inputBg = isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
 
@@ -195,9 +225,19 @@ export default function PainelPagamentos() {
           <Banknote size={20} className="text-emerald-500" />
           <h1 className="text-lg font-bold">Painel de Pagamentos</h1>
         </div>
-        <span className="text-xs text-slate-400">
-          {filtered.length} pagamento(s) pendente(s)
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">
+            {filtered.length} pagamento(s) pendente(s)
+          </span>
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-600/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+            Exportar previstos (PDF)
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
