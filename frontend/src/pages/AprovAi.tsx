@@ -22,6 +22,7 @@ import {
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import { useHistoricoAlteracoesItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import FluxoTimeline from '../components/FluxoTimeline'
+import { useLinhaTempoCompra } from '../hooks/useLinhaTempoCompra'
 import { UpperTextarea } from '../components/UpperInput'
 import { AnexoReferencia } from '../components/AnexoReferencia'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
@@ -193,6 +194,8 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
   const [hidden, setHidden] = useState(false)
+  const [showTimeline, setShowTimeline] = useState(false)
+  const { data: marcos } = useLinhaTempoCompra(showTimeline ? aprovacao.requisicao_id : undefined)
 
   useEffect(() => {
     if (!mutation.isSuccess) return
@@ -368,8 +371,23 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           )}
         </div>
 
-        {/* FluxoTimeline compact */}
-        <FluxoTimeline status={req.status} compact className="mb-3" />
+        {/* FluxoTimeline compact + linha do tempo datada */}
+        <div className="mb-3">
+          <FluxoTimeline status={req.status} compact />
+          <button
+            type="button"
+            onClick={() => setShowTimeline(v => !v)}
+            className="inline-flex items-center gap-1 text-[11px] text-indigo-400 font-semibold hover:text-indigo-600 transition mt-2"
+          >
+            {showTimeline ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {showTimeline ? 'Ocultar linha do tempo' : 'Ver linha do tempo'}
+          </button>
+          {showTimeline && (
+            <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+              <FluxoTimeline status={req.status} marcos={marcos} />
+            </div>
+          )}
+        </div>
 
         {/* Valor + Cotacao */}
         <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">

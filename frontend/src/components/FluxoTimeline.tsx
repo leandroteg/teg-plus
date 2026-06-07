@@ -70,9 +70,14 @@ interface Props {
   status: string
   compact?: boolean
   className?: string
+  /** Datas (ISO) por etapa, alinhadas por índice com ETAPAS. Exibidas no modo full. */
+  marcos?: (string | null)[]
 }
 
-export default function FluxoTimeline({ status, compact = false, className = '' }: Props) {
+const fmtMarco = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+
+export default function FluxoTimeline({ status, compact = false, className = '', marcos }: Props) {
   const etapaIdx = getEtapaIndex(status)
   const isCancelada = status === 'cancelada'
   const isRejeitada = status === 'rejeitada' || status === 'cotacao_rejeitada'
@@ -167,6 +172,12 @@ export default function FluxoTimeline({ status, compact = false, className = '' 
               >
                 {etapa.label}
               </span>
+              {/* Data do marco (quando informada) */}
+              {marcos?.[i] && (
+                <span className="mt-0.5 text-[8px] font-medium text-slate-400 text-center leading-tight">
+                  {fmtMarco(marcos[i])}
+                </span>
+              )}
             </div>
 
             {/* Linha conectora (exceto última) */}
