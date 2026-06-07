@@ -155,6 +155,7 @@ const Patrimonial = lazy(() => import('./pages/estoque/Patrimonial'))
 const SolicitacoesEstoque = lazy(() => import('./pages/estoque/Solicitacoes'))
 const RecebimentosEstoque = lazy(() => import('./pages/estoque/Recebimentos'))
 const CautelaHome = lazy(() => import('./pages/estoque/CautelaHome'))
+const PainelEstoque = lazy(() => import('./pages/estoque/PainelEstoque'))
 const NovaCautela = lazy(() => import('./pages/estoque/NovaCautela'))
 
 // Logistica
@@ -305,6 +306,7 @@ export default function App() {
               <Route path="/estoque/patrimonial"   element={<Lazy><Patrimonial /></Lazy>} />
               <Route path="/estoque/solicitacoes" element={<Lazy><SolicitacoesEstoque /></Lazy>} />
               <Route path="/estoque/recebimentos" element={<Lazy><RecebimentosEstoque /></Lazy>} />
+              <Route path="/estoque/painel" element={<Lazy><PainelEstoque /></Lazy>} />
               <Route path="/estoque/cautelas" element={<Lazy><CautelaHome /></Lazy>} />
               <Route path="/estoque/cautelas/nova" element={<Lazy><NovaCautela /></Lazy>} />
             </Route>
