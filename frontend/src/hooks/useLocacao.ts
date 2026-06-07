@@ -157,10 +157,20 @@ export function useAtualizarStatusEntrada() {
         .select()
         .single()
       if (error) throw error
+      // Fecha o ciclo do imóvel: 'liberado' => ativo; demais etapas => em_entrada.
+      // (Não há trigger no banco; a sincronização é responsabilidade do app.)
+      const imovelId = (data as { imovel_id?: string }).imovel_id
+      if (imovelId) {
+        await supabase
+          .from('loc_imoveis')
+          .update({ status: status === 'liberado' ? 'ativo' : 'em_entrada' })
+          .eq('id', imovelId)
+      }
       return data as LocEntrada
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loc_entradas'] })
+      qc.invalidateQueries({ queryKey: ['loc_imoveis'] })
     },
   })
 }
@@ -228,10 +238,19 @@ export function useAtualizarStatusSaida() {
         .select()
         .single()
       if (error) throw error
+      // Fecha o ciclo do imóvel: 'encerrado' => inativo (devolvido); demais => em_saida.
+      const imovelId = (data as { imovel_id?: string }).imovel_id
+      if (imovelId) {
+        await supabase
+          .from('loc_imoveis')
+          .update({ status: status === 'encerrado' ? 'inativo' : 'em_saida' })
+          .eq('id', imovelId)
+      }
       return data as LocSaida
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loc_saidas'] })
+      qc.invalidateQueries({ queryKey: ['loc_imoveis'] })
     },
   })
 }
