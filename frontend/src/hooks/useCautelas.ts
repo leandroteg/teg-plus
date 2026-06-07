@@ -62,7 +62,8 @@ export function useMinhasCautelas(userId: string | undefined) {
           itens:est_cautela_itens(*, item:est_itens(codigo, descricao, unidade))
         `)
         .eq('solicitante_id', userId!)
-        .in('status', ['retirada', 'parcial_devolvida', 'em_separacao', 'aprovada', 'pendente_aprovacao', 'rascunho'])
+        // status canônico (CHECK est_cautelas): retorna todas as cautelas do
+        // colaborador; a página MinhasCautelas separa ativas de encerradas.
         .order('criado_em', { ascending: false })
       if (error) return []
       return (data ?? []) as Cautela[]
@@ -155,7 +156,7 @@ export function useDevolverItens() {
       const { error } = await supabase
         .from('est_cautelas')
         .update({
-          status: allReturned ? 'devolvida' : 'parcial_devolvida',
+          status: allReturned ? 'encerrada' : 'em_devolucao',
           ...(allReturned ? { data_devolucao_real: new Date().toISOString() } : {}),
           atualizado_em: new Date().toISOString(),
         })
@@ -217,7 +218,7 @@ export function useCautelaKPIs(userId: string | undefined) {
         .from('est_cautelas')
         .select('id, status, data_devolucao_prevista')
         .eq('solicitante_id', userId!)
-        .in('status', ['retirada', 'parcial_devolvida'])
+        .in('status', ['em_aberto', 'em_devolucao'])
 
       const ativas = minhas ?? []
       const vencidas = ativas.filter(c =>
