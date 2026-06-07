@@ -511,6 +511,50 @@ export function useCriarAditivo() {
   })
 }
 
+// Avança o status do aditivo e, ao assinar, aplica o efeito no contrato/imóvel:
+//  - renovacao: estende a data_fim_previsto do contrato
+//  - reajuste:  atualiza o valor do imóvel (valor_aluguel_mensal) e do contrato (valor_mensal)
+export function useAtualizarStatusAditivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'rascunho' | 'aguardando_assinatura' | 'assinado' }) => {
+      const { data, error } = await supabase
+        .from('loc_aditivos')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      const ad = data as {
+        tipo?: string; imovel_id?: string; con_contrato_id?: string
+        data_fim?: string; valor_novo?: number
+      }
+      if (status === 'assinado') {
+        if (ad.tipo === 'renovacao' && ad.data_fim && ad.con_contrato_id) {
+          await supabase.from('con_contratos')
+            .update({ data_fim_previsto: ad.data_fim }).eq('id', ad.con_contrato_id)
+        }
+        if (ad.tipo === 'reajuste' && ad.valor_novo != null) {
+          if (ad.imovel_id) {
+            await supabase.from('loc_imoveis')
+              .update({ valor_aluguel_mensal: ad.valor_novo }).eq('id', ad.imovel_id)
+          }
+          if (ad.con_contrato_id) {
+            await supabase.from('con_contratos')
+              .update({ valor_mensal: ad.valor_novo }).eq('id', ad.con_contrato_id)
+          }
+        }
+      }
+      return data as LocAditivo
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loc_aditivos'] })
+      qc.invalidateQueries({ queryKey: ['loc_imoveis'] })
+      qc.invalidateQueries({ queryKey: ['contratos'] })
+    },
+  })
+}
+
 // ── KPIs / Dashboard ──────────────────────────────────────────────────────────
 
 export function useLocacaoKPIs() {
