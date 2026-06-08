@@ -10,19 +10,19 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - 🟡 **PARCIAL** — base existe, falta peça(s) específica(s)
 - 🔴 **PENDENTE** — não implementado / não localizado
 
-## Visão Geral — atualizada 2026-06-08 (pós-merge + ajustes)
+## Visão Geral — atualizada 2026-06-08 (rodada 2: backend automacoes)
 
 | Módulo | OK | Parcial | Pendente | Total |
 |---|---|---|---|---|
 | Compras | 6 | 0 | 1 | 7 |
-| Estoque | 8 | 3 | 2 | 13 |
+| Estoque | 11 | 1 | 1 | 13 |
 | Fin. CAP | 1 | 2 | 1 | 4 |
 | Fin. CR + Tesouraria | 1 | 1 | 1 | 3 |
-| Contratos | 2 | 2 | 1 | 5 |
-| Locação | 2 | 2 | 0 | 4 |
-| **Total** | **20** | **10** | **6** | **36** |
+| Contratos | 3 | 1 | 1 | 5 |
+| Locação | 3 | 1 | 0 | 4 |
+| **Total** | **25** | **6** | **5** | **36** |
 
-**Saltou de 11→20 ✅** (quase dobrou) com a combinação da minha sessão + branch do outro notebook + merge.
+**Trajetória do sprint:** 11 → 20 → **25 ✅**. Sobra apenas teste manual (CAP fluxo end-to-end), 1 decisão de produto (Solicitações Material x Triagem) e 5 itens 🔴 que dependem de decisões/integrações externas.
 
 ---
 
@@ -70,15 +70,15 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 
 ## 📦 Estoque
 
-### 🟡 [Alta] Importar inventário
-- **Estado:** Tela cria inventário (tipo, base, curva). **Falta upload CSV/planilha**.
-- **Refs:** [Inventario.tsx](../../frontend/src/pages/estoque/Inventario.tsx).
-- **Próximo passo:** Hook `useImportarInventario()` com parse de CSV + validação.
+### ✅ [Alta] Importar inventário — **feito 2026-06-08**
+- **Migration 127:** RPC `est_importar_inventario(uuid, jsonb, text)` recebe linhas {codigo, quantidade, observacao?}, resolve item por código, calcula saldo_sistema (agregando est_movimentacoes na base) e divergência, UPSERT em est_inventario_itens (constraint nova: unique inv+item). Marca inventário aberto → em_contagem.
+- **Hook:** `useImportarInventarioCSV` em useEstoque.ts.
+- **UI:** `ImportarCSVModal` com upload .csv/.txt OU cola texto. Detecta cabeçalho, suporta `;`/`,` e vírgula decimal. Lista linhas ignoradas com motivo.
 
-### 🟡 [Alta] Validar fluxo Compras → Estoque
-- **Estado:** Hook `useAguardandoEntrada()` consulta `cmp_recebimento_itens`. **Entrada em estoque ainda é manual** após recebimento.
-- **Refs:** `cmp_recebimento_itens` (migration 072), [Recebimentos.tsx](../../frontend/src/pages/estoque/Recebimentos.tsx).
-- **Próximo passo:** RPC `fn_confirmar_recebimento_e_gerar_entrada()` automática.
+### ✅ [Alta] Validar fluxo Compras → Estoque — **feito 2026-06-08**
+- **Migration 125:** RPC `fn_confirmar_entrada_estoque(uuid[])` confirma itens de recebimento E gera `est_movimentacoes` (tipo=entrada) automaticamente, herdando dados do pedido (base, NF, fornecedor, obra, lote, série, validade, valor). Item sem catálogo só muda status (entra em "puladas").
+- **Hook:** `useConfirmarEntrada` agora chama a RPC em vez de update direto.
+- **Coluna `est_movimentacoes.recebimento_item_id`** (que já existia) passou a ser preenchida automaticamente — audit trail completo.
 
 ### ✅ [Alta] Filtro por localidade em "Aguardando Entrada/Saída" — **feito 2026-06-06**
 - **Releitura:** "Localidade" no contexto do sprint = **base** (canteiro), não corredor/prateleira. `est_bases` tem 9 cadastradas. `est_localizacoes` (granular) fica pra um sprint futuro.
@@ -127,9 +127,10 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [Inventario.tsx](../../frontend/src/pages/estoque/Inventario.tsx).
 - **Próximo passo:** UI de contagem item-a-item + conclusão.
 
-### 🔴 [Baixa] OC automática ao atingir estoque mínimo
-- **Estado:** Não existe trigger/agenda.
-- **Próximo passo:** RPC `fn_gerar_oc_minimo()` + cron por base.
+### ✅ [Baixa] OC automática ao atingir estoque mínimo — **feito 2026-06-08**
+- **Migration 128:** RPC `est_gerar_oc_minimo(p_base_id uuid DEFAULT NULL)` varre itens.estoque_minimo, agrega saldo, cria 1 RC (status=rascunho) por base com itens abaixo do mínimo. Quantidade sugerida = max(estoque_maximo, ponto_reposicao, minimo×2) − saldo. Idempotente: pula itens já cobertos por RC em aberto.
+- **Número:** `RC-AUTO-YYYYMMDD-NNN`. Solicitante: "Sistema (estoque minimo)".
+- **Disparo manual por ora** (frontend pode chamar a RPC). Pode ser plugada em cron/Edge Function depois.
 
 ### ✅ [Baixa] Painel detalhado de Estoque — **feito 2026-06-08 (outro note)**
 - **Entrega** (commit `dc875dd`): nova página `/estoque/painel` (PainelEstoque) com indicadores detalhados; item "Indicadores" no menu lateral do Estoque.
@@ -185,9 +186,10 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 
 ## 📄 Contratos
 
-### 🔴 [Média] Solicitações de elaboração vindas de Compras
-- **Estado:** Não há gatilho. Sem fluxo entre `cmp_pedidos`/`cmp_requisicoes` e `con_solicitacoes`.
-- **Próximo passo:** RPC/webhook que monitore RC aprovada com valor acima do limite (ex.: R$ 2k) e crie `con_solicitacoes` automaticamente.
+### ✅ [Média] Solicitações de elaboração vindas de Compras — **feito 2026-06-08**
+- **Migration 126:** RPC `cmp_criar_solicitacao_contrato_from_rc(requisicao_id, observacao?, responsavel_nome?)` cria `con_solicitacoes` (numero CON-YYYYMM-NNNN, etapa=preparar_minuta) herdando solicitante, obra, escopo, valor estimado, centro_custo da RC. Se já tem pedido emitido, herda fornecedor como contraparte. Idempotente: reaproveita solicitação existente não-cancelada.
+- **Gatilho:** **manual** (comprador decide via banner em [RequisicaoDetalhe.tsx](../../frontend/src/pages/RequisicaoDetalhe.tsx)) — evita poluir Contratos com toda RC aprovada.
+- **UI:** banner "Solicitar contrato" aparece quando RC está em [aprovada, cotacao_em_andamento, cotacao_aprovada, pedido_emitido, em_andamento]; expande textarea de observação; pós-criar mostra link "Abrir" pra ir direto na solicitação.
 
 ### ✅ [Média] Apresentação do título do item pendente
 - **Estado:** STAGES já definidos em SolicitacoesLista e Assinaturas.
@@ -213,10 +215,11 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 
 ## 🏠 Locação de Imóveis
 
-### 🟡 [Média] Envio de faturas para o Financeiro
-- **Estado:** Botão "Enviar p/ Financeiro" ainda exibe `alert('em breve!')`. CRUD de faturas + transição de status prontos.
-- **Refs:** [Faturas.tsx:401](../../frontend/src/pages/locacao/Faturas.tsx:401), `useAtualizarFatura`.
-- **Próximo passo:** RPC `loc_enviar_faturas_financeiro()` que insere em `fin_contas_pagar` e muda status pra `enviado_pagamento`.
+### ✅ [Média] Envio de faturas para o Financeiro — **feito 2026-06-08**
+- **Migration 124:** RPC `loc_enviar_faturas_financeiro(uuid[])` cria 1 `fin_contas_pagar` por fatura elegível (status ∈ [previsto, lancado], valor > 0) com fornecedor=locador, vencimento da fatura, natureza='locacao_imovel', origem='locacao'. Marca fatura como `enviado_pagamento`. Pula já-enviadas/pagas e sem valor.
+- **Hook:** `useEnviarFaturasFinanceiro` em [useLocacao.ts](../../frontend/src/hooks/useLocacao.ts) invalida `loc_faturas` + `contas-pagar`.
+- **Botão:** [Faturas.tsx:400+](../../frontend/src/pages/locacao/Faturas.tsx:400) — antes era `alert('em breve')`. Agora confirma com count, envia, mostra resultado.
+- **Centro de custo** da CP fica vazio inicialmente (financeiro classifica), `locador_nome` do imóvel vira fornecedor.
 
 ### 🟡 [Baixa] Fluxo de ordens de serviço
 - **Estado:** CRUD visual + modal de criação prontos. Falta workflow de avanço de status e vínculo com requisição de compras.
@@ -224,9 +227,9 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Próximo passo:** Mutation `useAtualizarSolicitacao` com transições (aberta → em_andamento → concluída) + FK `cmp_requisicao_id`.
 
 ### ✅ [Baixa] Aditivos e renovações — **feito 2026-06-08 (outro note)**
-- **Entrega** (commit `8ae9d97`): fluxo concluído — botão pra avançar status e aplicar efeito (mudança de valor, prorrogação, etc.).
+- **Entrega** (commit `8ae9d97`): fluxo concluído — botões "Enviar p/ assinatura" (rascunho→aguardando_assinatura) e "Marcar assinado" (aguardando→assinado) em [AditivosRenovacoes.tsx:150+](../../frontend/src/pages/locacao/AditivosRenovacoes.tsx:150). Ao assinar aplica efeito no contrato/imóvel (renovação prorroga data_fim, reajuste atualiza valor_aluguel_mensal).
 - **Bonus** (commit `d0c5fc2`): entrada/saída do imóvel sincronizam status automaticamente.
-- **Refs:** [AditivosRenovacoes.tsx](../../frontend/src/pages/locacao/AditivosRenovacoes.tsx), [useLocacao.ts](../../frontend/src/hooks/useLocacao.ts).
+- **Pendência menor:** disparo automático de e-mail ao locador fica pra quando Graph API tiver App Registration completo (project_ti_chamados).
 
 ### ✅ [Baixa] Entrada e devolução de imóveis
 - **Estado:** Pipelines Kanban completos (entrada 4 etapas, saída 5 etapas), vistoria com checklist, cálculo de data limite. **Falta gerar PDF de orientações** (alertas em EntradasPipeline:329 e SaidaPipeline:298).
