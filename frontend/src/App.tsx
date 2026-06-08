@@ -129,6 +129,7 @@ const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
 // Financeiro
 const DashboardFinanceiro = lazy(() => import('./pages/financeiro/DashboardFinanceiro'))
 const CPPipeline = lazy(() => import('./pages/financeiro/CPPipeline'))
+const PainelPagamentos = lazy(() => import('./pages/financeiro/PainelPagamentos'))
 const ContasReceber = lazy(() => import('./pages/financeiro/ContasReceber'))
 const LoteDetalhe = lazy(() => import('./pages/financeiro/LoteDetalhe'))
 const Tesouraria = lazy(() => import('./pages/financeiro/Tesouraria'))
@@ -264,7 +265,7 @@ export default function App() {
               <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes"              element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes/:loteId"      element={<Lazy><LoteDetalhe /></Lazy>} />
-              <Route path="/financeiro/painel-pagamentos"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/painel-pagamentos"  element={<Lazy><PainelPagamentos /></Lazy>} />
               <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/tesouraria"    element={<Lazy><Tesouraria /></Lazy>} />
               <Route path="/financeiro/relatorios"   element={<Lazy><Relatorios /></Lazy>} />

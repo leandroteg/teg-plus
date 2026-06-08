@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Banknote, Search, CheckSquare, Square, Minus,
   ChevronDown, ChevronUp, AlertTriangle, Calendar,
-  DollarSign, Clock, CheckCircle2,
+  DollarSign, Clock, CheckCircle2, FileDown,
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
@@ -204,6 +205,112 @@ export default function PainelPagamentos() {
     return () => { cancelado = true }
   }, [showConfirm, filtered, selected])
 
+  // ── Export PDF ──
+  const exportPDF = () => {
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const margin = 14
+    let y = margin
+
+    const ensureSpace = (needed: number) => {
+      if (y + needed > pageH - margin) {
+        doc.addPage()
+        y = margin
+      }
+    }
+
+    // Title
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(14)
+    doc.text('Relatório de Pagamentos Previstos', margin, y)
+    y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(120)
+    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · Agrupado por ${groupBy}`, margin, y)
+    doc.setTextColor(0)
+    y += 6
+
+    // KPIs
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    const kpiRow = [
+      ['Total a Pagar', fmtFull(kpis.totalAberto)],
+      ['Vencidos', `${kpis.vencidosCount} · ${fmt(kpis.vencidosValor)}`],
+      ['Vence Hoje', `${kpis.hojeCount} · ${fmt(kpis.hojeValor)}`],
+      ['Vence 7 dias', `${kpis.semanaCount} · ${fmt(kpis.semanaValor)}`],
+    ]
+    const colW = (pageW - margin * 2) / 4
+    kpiRow.forEach(([label, val], i) => {
+      const x = margin + i * colW
+      doc.setFillColor(245)
+      doc.rect(x, y, colW - 2, 12, 'F')
+      doc.setFontSize(7)
+      doc.setTextColor(120)
+      doc.text(label.toUpperCase(), x + 2, y + 4)
+      doc.setFontSize(9)
+      doc.setTextColor(0)
+      doc.text(val, x + 2, y + 9)
+    })
+    y += 16
+
+    // Sections
+    for (const section of sections) {
+      ensureSpace(14)
+      doc.setFillColor(section.overdue ? 254 : 232, section.overdue ? 226 : 232, section.overdue ? 226 : 232)
+      doc.rect(margin, y, pageW - margin * 2, 7, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(section.overdue ? 200 : 30, section.overdue ? 30 : 30, section.overdue ? 30 : 30)
+      doc.text(section.label, margin + 2, y + 5)
+      doc.text(fmtFull(section.total), pageW - margin - 2, y + 5, { align: 'right' })
+      doc.setTextColor(0)
+      y += 9
+
+      // Header row
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(120)
+      doc.text('FORNECEDOR', margin + 2, y)
+      doc.text('DOCUMENTO', margin + 80, y)
+      doc.text('VENC.', margin + 120, y)
+      doc.text('VALOR', pageW - margin - 2, y, { align: 'right' })
+      doc.setTextColor(0)
+      y += 3
+      doc.setDrawColor(220)
+      doc.line(margin, y, pageW - margin, y)
+      y += 3
+
+      // Items
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      for (const cp of section.cps) {
+        ensureSpace(5)
+        const forn = (cp.fornecedor_nome ?? '').slice(0, 45)
+        const doc_ = (cp.numero_documento ?? '').slice(0, 20)
+        doc.text(forn, margin + 2, y)
+        doc.text(doc_, margin + 80, y)
+        doc.text(fmtData(cp.data_vencimento), margin + 120, y)
+        doc.text(fmtFull(cp.valor_original), pageW - margin - 2, y, { align: 'right' })
+        y += 4
+      }
+      y += 3
+    }
+
+    // Footer total
+    ensureSpace(10)
+    doc.setDrawColor(80)
+    doc.line(margin, y, pageW - margin, y)
+    y += 5
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('TOTAL GERAL', margin, y)
+    doc.text(fmtFull(kpis.totalAberto), pageW - margin, y, { align: 'right' })
+
+    doc.save(`pagamentos-previstos-${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
   // ── Actions ──
   const handleRegistrar = async () => {
     if (selectedCount === 0) return
@@ -234,9 +341,19 @@ export default function PainelPagamentos() {
           <Banknote size={20} className="text-emerald-500" />
           <h1 className="text-lg font-bold">Painel de Pagamentos</h1>
         </div>
-        <span className="text-xs text-slate-400">
-          {filtered.length} pagamento(s) pendente(s)
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">
+            {filtered.length} pagamento(s) pendente(s)
+          </span>
+          <button
+            onClick={exportPDF}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <FileDown size={13} />
+            Exportar PDF
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}

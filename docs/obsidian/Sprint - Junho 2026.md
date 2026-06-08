@@ -155,10 +155,14 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [Conciliacao.tsx](../../frontend/src/pages/financeiro/Conciliacao.tsx).
 - **Próximo passo:** RPC de parsing OFX + matching por valor/data.
 
-### ✅ [Média] Painel de pagamentos previstos com export PDF
-- **Estado:** Painel pronto (agrupamento por vencimento/fornecedor/forma, KPIs, batch). **Falta apenas botão "Exportar PDF"**.
+### ✅ [Média] Painel de pagamentos previstos com export PDF — **feito 2026-06-08**
+- **Achado:** `PainelPagamentos.tsx` existia mas era código órfão (rota `/financeiro/painel-pagamentos` redirecionava pra CPPipeline).
+- **Fix:**
+  - Painel ganhou `exportPDF()` com `jsPDF` (já era dep do projeto). PDF tem título, KPIs, seções agrupadas e total geral.
+  - Botão "Exportar PDF" no header (desabilita quando lista vazia).
+  - Removido redirect em [App.tsx:267](../../frontend/src/App.tsx:267); painel agora monta na rota direto.
+  - Adicionado item "Pgtos Previstos" no menu de Financeiro ([FinanceiroLayout.tsx](../../frontend/src/components/FinanceiroLayout.tsx)).
 - **Refs:** [PainelPagamentos.tsx](../../frontend/src/pages/financeiro/PainelPagamentos.tsx).
-- **Próximo passo:** `jsPDF` + `html2canvas` para gerar relatório.
 
 ---
 
