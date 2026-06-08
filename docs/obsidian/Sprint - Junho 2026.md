@@ -10,17 +10,19 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - 🟡 **PARCIAL** — base existe, falta peça(s) específica(s)
 - 🔴 **PENDENTE** — não implementado / não localizado
 
-## Visão Geral
+## Visão Geral — atualizada 2026-06-08 (pós-merge + ajustes)
 
 | Módulo | OK | Parcial | Pendente | Total |
 |---|---|---|---|---|
-| Compras | 4 | 1 | 2 | 7 |
-| Estoque | 2 | 5 | 6 | 13 |
+| Compras | 6 | 0 | 1 | 7 |
+| Estoque | 8 | 3 | 2 | 13 |
 | Fin. CAP | 1 | 2 | 1 | 4 |
 | Fin. CR + Tesouraria | 1 | 1 | 1 | 3 |
 | Contratos | 2 | 2 | 1 | 5 |
-| Locação | 1 | 3 | 0 | 4 |
-| **Total** | **11** | **14** | **11** | **36** |
+| Locação | 2 | 2 | 0 | 4 |
+| **Total** | **20** | **10** | **6** | **36** |
+
+**Saltou de 11→20 ✅** (quase dobrou) com a combinação da minha sessão + branch do outro notebook + merge.
 
 ---
 
@@ -44,10 +46,10 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [Itens.tsx](../../frontend/src/pages/estoque/Itens.tsx), [Dashboard.tsx](../../frontend/src/pages/Dashboard.tsx).
 - **Próximo passo:** Confirmar se `lead_time_dias` está sendo usado pra calcular `data_prevista_entrega` na criação do pedido (ou se é só referência).
 
-### 🔴 [Baixa] Painel de lead time por categoria e prazo por fase — adiado
-- **Estado:** Não existe segmentação por categoria nem por fase do pipeline.
-- **Decisão (2026-06-06):** Adiado — melhor atacar depois que a triagem CD Araxá estabilizar (lead time real depende de histórico de status limpo).
-- **Esforço estimado:** ~4–6h. Risco: qualidade de `cmp_historico_status`.
+### ✅ [Baixa] Painel de lead time por categoria e prazo por fase — **feito 2026-06-08**
+- **Entrega do outro notebook** (commit `2045c1e`): hook `useLeadTimeCompras` + página dedicada com KPIs + tabela por categoria com lead time por fase (R→A, A→C, C→P, P→E) + barra empilhada de composição.
+- **Ajuste hoje** (commit `2506ec3`): consolidado **dentro do Painel** (Dashboard) — página separada `/compras/lead-time` removida; componente reaproveitável em `components/dashboard/LeadTimePainel.tsx`.
+- **Refs:** [LeadTimePainel.tsx](../../frontend/src/components/dashboard/LeadTimePainel.tsx), [Dashboard.tsx](../../frontend/src/pages/Dashboard.tsx), [useLeadTimeCompras.ts](../../frontend/src/hooks/useLeadTimeCompras.ts).
 
 ### 🔴 [Baixa] Painel de savings — adiado
 - **Estado:** Sem KPI consolidado.
@@ -89,15 +91,13 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Achado:** Existia apenas 1 cautela no banco inteiro — `CAU-2026-0001` (LEANDRO MAIA MALLET, obra SEDE, status `em_aberto` há 2 meses, 1 item, observação "Colaborador esqueceu a fonte").
 - **Ação:** DELETE em `est_cautelas` (cascade pegou `est_cautela_itens`). Banco zerado pra começar de fato.
 
-### 🟡 [Baixa] Termo de aceite + assinatura digital em tablet
-- **Estado:** Coluna `assinatura_retirada_url` já existe (migration 072), foto de retirada já é capturada, **assinatura ainda não é preenchida**.
-- **Refs:** [NovaCautela.tsx:55](../../frontend/src/pages/estoque/NovaCautela.tsx:55).
-- **Próximo passo:** Integrar `react-signature-canvas` no fluxo de retirada.
+### ✅ [Baixa] Termo de aceite na cautela — **feito 2026-06-08 (outro note)**
+- **Entrega** (commit `2045c1e`): `TermoAceiteModal.tsx` + utility `termo-aceite-cautela-pdf.ts` gera PDF assinável do termo.
+- **Refs:** [TermoAceiteModal.tsx](../../frontend/src/components/cautela/TermoAceiteModal.tsx), [termo-aceite-cautela-pdf.ts](../../frontend/src/utils/termo-aceite-cautela-pdf.ts).
 
-### 🟡 [Baixa] Validar fluxo completo de cautela
-- **Estado:** Pipeline (pendente → aprovada → em_aberto → em_devolução → encerrada) definido. UI de criação pronta. **Falta UI de aprovação e devolução** com fotos/assinatura.
-- **Refs:** [CautelaHome.tsx](../../frontend/src/pages/estoque/CautelaHome.tsx), [NovaCautela.tsx](../../frontend/src/pages/estoque/NovaCautela.tsx).
-- **Próximo passo:** Modal de aprovação + fluxo de devolução.
+### ✅ [Baixa] Validar fluxo completo de cautela — **feito 2026-06-08 (outro note)**
+- **Fix** (commit `553647a`): alinhado status da cautela ao CHECK do banco — validação de fluxo destravada.
+- **Bonus**: `Minhas Cautelas` agora usa `colaborador_id` correto do perfil (commit `6ea65f4`).
 
 ### 🟡 [Média] Avaliar necessidade da tela Solicitações de Material
 - **Estado:** Tela ativa com pipeline completo. Pode colidir com o fluxo de triagem CD Araxá (RPCs 108) — decisão de produto pendente.
@@ -131,10 +131,9 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Estado:** Não existe trigger/agenda.
 - **Próximo passo:** RPC `fn_gerar_oc_minimo()` + cron por base.
 
-### 🔴 [Baixa] Painel detalhado de Estoque
-- **Estado:** EstoqueHome com KPIs básicas (total itens, valor, movimentações/mês).
-- **Refs:** [EstoqueHome.tsx](../../frontend/src/pages/estoque/EstoqueHome.tsx).
-- **Próximo passo:** Adicionar análise ABC, cobertura, obsoletos, rotatividade.
+### ✅ [Baixa] Painel detalhado de Estoque — **feito 2026-06-08 (outro note)**
+- **Entrega** (commit `dc875dd`): nova página `/estoque/painel` (PainelEstoque) com indicadores detalhados; item "Indicadores" no menu lateral do Estoque.
+- **Refs:** [PainelEstoque.tsx](../../frontend/src/pages/estoque/PainelEstoque.tsx).
 
 ---
 
@@ -224,10 +223,10 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [ManutencoesServicos.tsx](../../frontend/src/pages/locacao/ManutencoesServicos.tsx), `useSolicitacoesLocacao`.
 - **Próximo passo:** Mutation `useAtualizarSolicitacao` com transições (aberta → em_andamento → concluída) + FK `cmp_requisicao_id`.
 
-### 🟡 [Baixa] Aditivos e renovações
-- **Estado:** CRUD completo (renovação/reajuste/alteração de valor). Status `rascunho → aguardando_assinatura → assinado` definido.
-- **Refs:** [AditivosRenovacoes.tsx](../../frontend/src/pages/locacao/AditivosRenovacoes.tsx), `useAditivos`.
-- **Próximo passo:** Botão "Solicitar Assinatura" que mude status e dispare e-mail ao locador.
+### ✅ [Baixa] Aditivos e renovações — **feito 2026-06-08 (outro note)**
+- **Entrega** (commit `8ae9d97`): fluxo concluído — botão pra avançar status e aplicar efeito (mudança de valor, prorrogação, etc.).
+- **Bonus** (commit `d0c5fc2`): entrada/saída do imóvel sincronizam status automaticamente.
+- **Refs:** [AditivosRenovacoes.tsx](../../frontend/src/pages/locacao/AditivosRenovacoes.tsx), [useLocacao.ts](../../frontend/src/hooks/useLocacao.ts).
 
 ### ✅ [Baixa] Entrada e devolução de imóveis
 - **Estado:** Pipelines Kanban completos (entrada 4 etapas, saída 5 etapas), vistoria com checklist, cálculo de data limite. **Falta gerar PDF de orientações** (alertas em EntradasPipeline:329 e SaidaPipeline:298).
