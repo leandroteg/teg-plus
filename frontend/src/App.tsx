@@ -50,7 +50,6 @@ const MinhasSolicitacoes = lazy(() => import('./pages/MinhasSolicitacoes'))
 const MinhasCautelas = lazy(() => import('./pages/MinhasCautelas'))
 const MinhasTarefas = lazy(() => import('./pages/MinhasTarefas'))
 const Pedidos = lazy(() => import('./pages/Pedidos'))
-const LeadTimeCompras = lazy(() => import('./pages/LeadTimeCompras'))
 const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
 const SSMA = lazy(() => import('./pages/SSMA'))
 
@@ -501,7 +500,7 @@ export default function App() {
               <Route path="/cotacoes"    element={<Lazy><FilaCotacoes /></Lazy>} />
               <Route path="/cotacoes/:id" element={<Lazy><CotacaoForm /></Lazy>} />
               <Route path="/pedidos"     element={<Lazy><Pedidos /></Lazy>} />
-              <Route path="/compras/lead-time" element={<Lazy><LeadTimeCompras /></Lazy>} />
+              <Route path="/compras/lead-time" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Route>
         </Route>

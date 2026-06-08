@@ -14,6 +14,7 @@ import { useCotacoes } from '../hooks/useCotacoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useTheme } from '../contexts/ThemeContext'
 import StatusBadge from '../components/StatusBadge'
+import LeadTimePainel from '../components/dashboard/LeadTimePainel'
 import { isPlaceholder } from '../services/supabase'
 import type { StatusRequisicao, DashboardData, Aprovacao, Requisicao, Pedido, Cotacao } from '../types'
 
@@ -730,6 +731,9 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      {/* Lead Time de Compras (por categoria/fase) */}
+      <LeadTimePainel isDark={isDark} />
 
       {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>

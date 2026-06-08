@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Plus, List, ShoppingCart,
-  Truck, Timer,
+  Truck,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -16,7 +16,6 @@ export default function Layout() {
     { to: '/requisicoes', icon: List,            label: 'Requisições',       end: false },
     { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações',          end: false },
     { to: '/pedidos',     icon: Truck,           label: 'Pedidos',           end: false },
-    { to: '/compras/lead-time', icon: Timer,     label: 'Lead Time',         end: false },
   ]
 
   return (
