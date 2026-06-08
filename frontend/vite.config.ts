@@ -5,20 +5,22 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 import { readFileSync, writeFileSync } from 'fs'
 
-// Strip the vite-plugin-pwa injected manifest link from aprovaai.html
-// after the entire build (including PWA plugin) is complete
-function stripPwaManifestFromAprovAi(): Plugin {
+// Strip the vite-plugin-pwa injected manifest link from standalone HTML entries
+// (aprovaai.html, portal.html) after the entire build is complete
+function stripPwaManifestFromStandalone(): Plugin {
   return {
-    name: 'strip-pwa-manifest-aprovaai',
+    name: 'strip-pwa-manifest-standalone',
     enforce: 'post',
     closeBundle() {
-      const file = resolve(__dirname, 'dist', 'aprovaai.html')
-      try {
-        const html = readFileSync(file, 'utf-8')
-        const fixed = html.replace(/<link rel="manifest" href="\/manifest\.webmanifest">/g, '')
-        writeFileSync(file, fixed, 'utf-8')
-      } catch {
-        // file may not exist in dev mode
+      for (const name of ['aprovaai.html', 'portal.html']) {
+        const file = resolve(__dirname, 'dist', name)
+        try {
+          const html = readFileSync(file, 'utf-8')
+          const fixed = html.replace(/<link rel="manifest" href="\/manifest\.webmanifest">/g, '')
+          writeFileSync(file, fixed, 'utf-8')
+        } catch {
+          // file may not exist in dev mode
+        }
       }
     },
   }
@@ -27,7 +29,7 @@ function stripPwaManifestFromAprovAi(): Plugin {
 export default defineConfig({
   plugins: [
     react(),
-    stripPwaManifestFromAprovAi(),
+    stripPwaManifestFromStandalone(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['icons/*.png', 'sounds/*.mp3'],
@@ -61,7 +63,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globIgnores: ['**/bg-*.png', '**/node_modules/**'],
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/aprovaai/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/aprovaai/, /^\/portal/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -100,6 +102,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         aprovaai: resolve(__dirname, 'aprovaai.html'),
+        portal: resolve(__dirname, 'portal.html'),
       },
       output: {
         manualChunks: {

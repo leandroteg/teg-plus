@@ -1,0 +1,18 @@
+{
+  "name": "Portal TEG",
+  "short_name": "Portal TEG",
+  "description": "Acesso rápido para colaboradores TEG União",
+  "start_url": "/portal",
+  "scope": "/portal",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0F766E",
+  "background_color": "#0F172A",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

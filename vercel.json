@@ -5,7 +5,8 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/aprovaai", "destination": "/aprovaai.html" },
-    { "source": "/((?!api|_vercel|aprovaai).*)", "destination": "/index.html" }
+    { "source": "/portal", "destination": "/portal.html" },
+    { "source": "/((?!api|_vercel|aprovaai|portal).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -34,6 +35,12 @@
     },
     {
       "source": "/aprovaai.webmanifest",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/portal.webmanifest",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache" }
       ]
