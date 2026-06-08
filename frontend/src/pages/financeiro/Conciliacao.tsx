@@ -12,6 +12,8 @@ import {
   useClassificarCRBatch, useConciliarCRBatch,
   useDistinctCentroCusto, useDistinctClasseFinanceira,
   useObras,
+  useSugerirConciliacao, useAplicarConciliacaoAuto,
+  type SugestaoConciliacao,
 } from '../../hooks/useFinanceiro'
 import { useUploadAnexo } from '../../hooks/useAnexos'
 import { supabase } from '../../services/supabase'
@@ -154,6 +156,44 @@ export default function Conciliacao() {
   const [batchCC, setBatchCC] = useState('')
   const [batchClasse, setBatchClasse] = useState('')
   const [batchProjeto, setBatchProjeto] = useState('')
+
+  // Conciliacao automatica (OFX matching)
+  const [showAutoModal, setShowAutoModal] = useState(false)
+  const [sugestoes, setSugestoes] = useState<SugestaoConciliacao[]>([])
+  const [aprovadasIds, setAprovadasIds] = useState<Set<string>>(new Set())
+  const sugerirAuto = useSugerirConciliacao()
+  const aplicarAuto = useAplicarConciliacaoAuto()
+
+  async function handleAbrirConciliacaoAuto() {
+    setShowAutoModal(true)
+    setSugestoes([])
+    setAprovadasIds(new Set())
+    try {
+      const r = await sugerirAuto.mutateAsync({})
+      setSugestoes(r.sugestoes ?? [])
+      // Pre-marca matches com score >= 95 como aprovados (alta confianca)
+      setAprovadasIds(new Set((r.sugestoes ?? []).filter(s => s.score >= 95).map(s => s.mov_id)))
+    } catch (err: any) {
+      setToast({ type: 'error', msg: `Erro ao buscar sugestões: ${err?.message ?? ''}` })
+      setTimeout(() => setToast(null), 4000)
+    }
+  }
+
+  async function handleAplicarSelecionadas() {
+    const selecionadas = sugestoes.filter(s => aprovadasIds.has(s.mov_id))
+    if (selecionadas.length === 0) return
+    try {
+      const r = await aplicarAuto.mutateAsync(
+        selecionadas.map(s => ({ mov_id: s.mov_id, tipo_match: s.tipo_match, cand_id: s.cand_id }))
+      )
+      setShowAutoModal(false)
+      setToast({ type: 'success', msg: `${r.aplicadas} conciliação(ões) aplicada(s)` })
+      setTimeout(() => setToast(null), 4000)
+    } catch (err: any) {
+      setToast({ type: 'error', msg: `Erro ao aplicar: ${err?.message ?? ''}` })
+      setTimeout(() => setToast(null), 4000)
+    }
+  }
 
   // Data
   const { data: contasCP = [], isLoading: loadingCP } = useContasPagar()
@@ -475,14 +515,23 @@ export default function Conciliacao() {
       )}
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          <Landmark size={20} className="text-emerald-600" />
-          Conciliação Manual
-        </h1>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Classificação em lote — centro de custo, classe financeira e projeto
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Landmark size={20} className="text-emerald-600" />
+            Conciliação Manual
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Classificação em lote — centro de custo, classe financeira e projeto
+          </p>
+        </div>
+        <button
+          onClick={handleAbrirConciliacaoAuto}
+          className="shrink-0 flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-colors"
+          title="Sugere matches automáticos entre extrato bancário e CPs/CRs em aberto"
+        >
+          <Upload size={13} /> Conciliação automática
+        </button>
       </div>
 
       {/* ── KPIs ────────────────────────────────────────────── */}
@@ -1051,6 +1100,120 @@ export default function Conciliacao() {
                   {classModalMode === 'conciliar'
                     ? `Conciliar ${modalSelectedCount} ${modalSelectedCount === 1 ? 'título' : 'títulos'}`
                     : `Aplicar a ${modalSelectedCount} ${modalSelectedCount === 1 ? 'título' : 'títulos'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Conciliação Automática (matches sugeridos do extrato) ──── */}
+      {showAutoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAutoModal(false)}>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              <div>
+                <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Conciliação Automática</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Matches entre extrato bancário e títulos em aberto (valor exato + data ±3 dias)</p>
+              </div>
+              <button onClick={() => setShowAutoModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {sugerirAuto.isPending && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {!sugerirAuto.isPending && sugestoes.length === 0 && (
+                <div className="text-center py-12 text-sm text-slate-400">
+                  Nenhuma sugestão encontrada. Importe um OFX em Tesouraria primeiro, ou verifique se há títulos com valor/data correspondentes.
+                </div>
+              )}
+              {sugestoes.map(s => {
+                const aprovada = aprovadasIds.has(s.mov_id)
+                const valor = Math.abs(s.mov_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                const scoreColor = s.score >= 95 ? 'text-emerald-600' : s.score >= 90 ? 'text-amber-600' : 'text-orange-600'
+                return (
+                  <div
+                    key={s.mov_id}
+                    onClick={() => {
+                      setAprovadasIds(prev => {
+                        const n = new Set(prev)
+                        n.has(s.mov_id) ? n.delete(s.mov_id) : n.add(s.mov_id)
+                        return n
+                      })
+                    }}
+                    className={`rounded-xl border p-3 cursor-pointer transition-all ${
+                      aprovada
+                        ? 'bg-emerald-50 border-emerald-300'
+                        : isDark ? 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {aprovada
+                          ? <CheckSquare size={16} className="text-emerald-600" />
+                          : <Square size={16} className="text-slate-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0 grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Extrato</p>
+                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                            {s.mov_tipo === 'debito' ? '↓' : '↑'} {valor}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">{s.mov_descricao || '—'}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{fmtData(s.mov_data)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                            {s.tipo_match === 'cp' ? 'Conta a Pagar' : 'Conta a Receber'}
+                          </p>
+                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'} truncate`}>{s.cand_nome}</p>
+                          <p className="text-[11px] text-slate-500 truncate">{s.cand_descricao || '—'}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">venc. {fmtData(s.cand_vencimento)}</p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`text-base font-extrabold ${scoreColor}`}>{s.score}</p>
+                        <p className="text-[9px] uppercase tracking-wider text-slate-400">score</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className={`px-5 py-3 border-t flex items-center justify-between gap-3 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-slate-50'}`}>
+              <div className="text-xs text-slate-500">
+                {aprovadasIds.size} de {sugestoes.length} selecionada(s)
+                {sugestoes.length > 0 && (
+                  <button
+                    onClick={() => setAprovadasIds(new Set(aprovadasIds.size === sugestoes.length ? [] : sugestoes.map(s => s.mov_id)))}
+                    className="ml-2 text-indigo-600 hover:underline font-semibold"
+                  >
+                    {aprovadasIds.size === sugestoes.length ? 'Desmarcar todas' : 'Marcar todas'}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAutoModal(false)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={handleAplicarSelecionadas}
+                  disabled={aprovadasIds.size === 0 || aplicarAuto.isPending}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {aplicarAuto.isPending ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={13} />
+                  )}
+                  Conciliar {aprovadasIds.size} selecionada(s)
                 </button>
               </div>
             </div>

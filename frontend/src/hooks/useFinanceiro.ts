@@ -828,3 +828,64 @@ export function useObras() {
     staleTime: 300_000,
   })
 }
+
+// ── Conciliacao automatica via OFX (mig 130) ─────────────────────────────────
+
+export interface SugestaoConciliacao {
+  mov_id: string
+  mov_tipo: 'debito' | 'credito'
+  mov_valor: number
+  mov_data: string
+  mov_descricao: string | null
+  mov_conta_id: string | null
+  tipo_match: 'cp' | 'cr'
+  cand_id: string
+  cand_nome: string
+  cand_descricao: string | null
+  cand_valor: number
+  cand_vencimento: string
+  cand_status: string
+  score: number
+}
+
+// Sugere matches entre extrato bancario e CPs/CRs em aberto.
+// Filtros opcionais: conta, janela em dias (default 3), periodo.
+export function useSugerirConciliacao() {
+  return useMutation({
+    mutationFn: async (opts?: {
+      conta_id?: string
+      dias_janela?: number
+      periodo_inicio?: string
+      periodo_fim?: string
+    }) => {
+      const { data, error } = await supabase.rpc('fn_sugerir_conciliacao_tesouraria', {
+        p_conta_id: opts?.conta_id ?? null,
+        p_dias_janela: opts?.dias_janela ?? 3,
+        p_periodo_inicio: opts?.periodo_inicio ?? null,
+        p_periodo_fim: opts?.periodo_fim ?? null,
+      })
+      if (error) throw error
+      return data as { ok: boolean; count: number; sugestoes: SugestaoConciliacao[] }
+    },
+  })
+}
+
+// Aplica matches aprovados pelo usuario em batch.
+export function useAplicarConciliacaoAuto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (matches: Array<{ mov_id: string; tipo_match: 'cp' | 'cr'; cand_id: string }>) => {
+      const { data, error } = await supabase.rpc('fn_aplicar_conciliacao_tesouraria', {
+        p_matches: matches as any,
+      })
+      if (error) throw error
+      return data as { ok: boolean; aplicadas: number }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes-tesouraria'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
