@@ -22,7 +22,6 @@ import {
   useEmitirPedido,
   type ImpostoPayload,
 } from '../hooks/usePedidos'
-import PedidoDiretoModal from '../components/PedidoDiretoModal'
 import { useCadFornecedores } from '../hooks/useCadastros'
 import { useCotacoes } from '../hooks/useCotacoes'
 import {
@@ -2330,7 +2329,6 @@ export default function Pedidos() {
   const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
   const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
   const [receberPedido, setReceberPedido]           = useState<Pedido | null>(null)
-  const [showPedidoDireto, setShowPedidoDireto]     = useState(false)
   const [toast, setToast]                           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
 
@@ -2517,13 +2515,6 @@ export default function Pedidos() {
           <Truck size={18} className="text-teal-500" />
           Pedidos
         </h2>
-        <button
-          onClick={() => setShowPedidoDireto(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm shadow-orange-500/20 transition-colors"
-        >
-          <ShoppingCart size={13} />
-          Pedido Direto
-        </button>
       </div>
 
       {/* Pipeline tabs */}
@@ -2730,13 +2721,6 @@ export default function Pedidos() {
       {receberPedido && (
         <RecebimentoModal pedido={receberPedido} onClose={() => setReceberPedido(null)} />
       )}
-
-      {/* Pedido Direto modal */}
-      <PedidoDiretoModal
-        open={showPedidoDireto}
-        onClose={() => setShowPedidoDireto(false)}
-        onSuccess={num => { setShowPedidoDireto(false); showToast('success', `Pedido ${num} emitido com sucesso!`) }}
-      />
     </div>
   )
 }
