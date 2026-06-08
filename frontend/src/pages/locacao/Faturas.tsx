@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura } from '../../hooks/useLocacao'
+import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura, useEnviarFaturasFinanceiro } from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
@@ -203,6 +203,7 @@ function ImovelFaturasModal({
 }) {
   const [modalCompetencia, setModalCompetencia] = useState(currentYYYYMM)
   const [editingRow, setEditingRow] = useState<{ tipo: TipoFatura; fatura: LocFatura | null } | null>(null)
+  const enviarFinanceiro = useEnviarFaturasFinanceiro()
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -398,10 +399,24 @@ function ImovelFaturasModal({
               <Download size={13} /> Exportar PDF
             </button>
             <button
-              onClick={() => alert('Enviar para Financeiro — em breve!')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              onClick={async () => {
+                const elegiveis = mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status) && getFaturaValor(f) > 0)
+                if (elegiveis.length === 0) {
+                  alert('Nenhuma fatura elegível neste mês (precisa estar em "previsto" ou "lançado" com valor > 0).')
+                  return
+                }
+                if (!confirm(`Enviar ${elegiveis.length} fatura(s) deste imóvel para o Financeiro? Cria uma Conta a Pagar para cada.`)) return
+                try {
+                  const r = await enviarFinanceiro.mutateAsync({ faturaIds: elegiveis.map(f => f.id) })
+                  alert(`✓ ${r.enviadas} fatura(s) enviada(s) ao Financeiro${r.puladas > 0 ? ` (${r.puladas} pulada(s))` : ''}.`)
+                } catch (err: any) {
+                  alert(`Erro ao enviar: ${err?.message ?? 'desconhecido'}`)
+                }
+              }}
+              disabled={enviarFinanceiro.isPending}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send size={13} /> Enviar p/ Financeiro
+              <Send size={13} /> {enviarFinanceiro.isPending ? 'Enviando...' : 'Enviar p/ Financeiro'}
             </button>
           </div>
         </div>

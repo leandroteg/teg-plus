@@ -418,6 +418,27 @@ export function useAtualizarFatura() {
   })
 }
 
+// Envia faturas selecionadas pro financeiro (RPC migration 124).
+// Cria 1 fin_contas_pagar por fatura elegivel (status previsto/lancado) e
+// muda status da fatura pra enviado_pagamento. Retorna { enviadas, puladas }.
+export function useEnviarFaturasFinanceiro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ faturaIds }: { faturaIds: string[] }) => {
+      const { data, error } = await supabase.rpc('loc_enviar_faturas_financeiro', {
+        p_fatura_ids: faturaIds,
+      })
+      if (error) throw error
+      return data as { enviadas: number; puladas: number }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 // ── Solicitacoes ──────────────────────────────────────────────────────────────
 
 export function useSolicitacoesLocacao(filtros?: { status?: string; tipo?: string }) {
