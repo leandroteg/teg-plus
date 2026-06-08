@@ -16,7 +16,7 @@ const fmtData = (d: string) =>
 const fmtTimestamp = (d: string) =>
   new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
-type Tab = 'pendentes' | 'aprovadas' | 'rejeitadas'
+type Tab = 'pendentes' | 'aprovadas'
 
 export default function AprovacoesPagamento() {
   const { isDark } = useTheme()
@@ -32,11 +32,8 @@ export default function AprovacoesPagamento() {
   const aprovadas = contas.filter(cp =>
     ['aprovado_pgto', 'em_pagamento', 'pago', 'conciliado'].includes(cp.status)
   )
-  const rejeitadas = contas.filter(cp => cp.status === 'cancelado')
 
-  const current = tab === 'pendentes' ? pendentes
-    : tab === 'aprovadas' ? aprovadas
-    : rejeitadas
+  const current = tab === 'pendentes' ? pendentes : aprovadas
 
   const filtered = current.filter(cp =>
     !busca || cp.fornecedor_nome.toLowerCase().includes(busca.toLowerCase())
@@ -49,7 +46,6 @@ export default function AprovacoesPagamento() {
   const tabs: { key: Tab; label: string; count: number; active: string }[] = [
     { key: 'pendentes',  label: 'Pendentes',  count: pendentes.length,  active: 'bg-amber-600 text-white shadow-sm'   },
     { key: 'aprovadas',  label: 'Aprovadas',  count: aprovadas.length,  active: 'bg-emerald-600 text-white shadow-sm' },
-    { key: 'rejeitadas', label: 'Rejeitadas', count: rejeitadas.length, active: 'bg-red-600 text-white shadow-sm'     },
   ]
 
   const showToast = (type: 'success' | 'error', msg: string) => {
@@ -65,11 +61,12 @@ export default function AprovacoesPagamento() {
     })
   }
 
-  const handleRejeitar = (cp: typeof contas[0]) => {
-    if (!confirm(`Rejeitar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
-    // Rejection is a status change to 'cancelado' — uses direct supabase update
-    // For now we just show feedback; full rejection flow requires a dedicated hook
-    showToast('error', 'Rejeição não implementada — use o módulo Contas a Pagar')
+  const handleRejeitar = (_cp: typeof contas[0]) => {
+    // Rejeicao individual nesta tela legada foi descontinuada. O fluxo correto
+    // de "nao concordo com o pagamento" e via AprovAi, que devolve o item pra
+    // fila com observacao (sem cancelar). Cancelar pagamento e ato exclusivo
+    // do financeiro (CPPipeline → previsto).
+    showToast('error', 'Para devolver com esclarecimento, use a tela AprovAi (mobile).')
   }
 
   return (
