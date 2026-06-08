@@ -1,4 +1,4 @@
-import { LayoutDashboard, UserPlus, Users, TrendingUp, UserMinus } from 'lucide-react'
+import { LayoutDashboard, UserPlus, Users, TrendingUp, UserMinus, Receipt } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
@@ -7,6 +7,7 @@ const NAV = [
   { to: '/rh/headcount/colaboradores', icon: Users,           label: 'Colaboradores' },
   { to: '/rh/headcount/movimentacoes', icon: TrendingUp,      label: 'Movimentações' },
   { to: '/rh/headcount/desligamento',  icon: UserMinus,       label: 'Desligamento' },
+  { to: '/rh/headcount/holerites',     icon: Receipt,         label: 'Holerites' },
 ]
 
 export default function HeadcountLayout() {
