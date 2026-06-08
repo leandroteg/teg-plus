@@ -550,6 +550,42 @@ export function useConcluirInventario() {
 }
 
 // ── Adicionar item avulso ao inventário ──────────────────────────────────────
+// Importa contagem de inventario via RPC (mig 127). Recebe linhas parseadas
+// do CSV: [{codigo, quantidade, observacao?}]. Resolve item pelo codigo,
+// calcula saldo_sistema e divergencia, UPSERT em est_inventario_itens.
+export function useImportarInventarioCSV() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      inventarioId,
+      linhas,
+      contadoPor,
+    }: {
+      inventarioId: string
+      linhas: Array<{ codigo: string; quantidade: number | string; observacao?: string }>
+      contadoPor?: string
+    }) => {
+      const { data, error } = await supabase.rpc('est_importar_inventario', {
+        p_inventario_id: inventarioId,
+        p_linhas: linhas as any,
+        p_contado_por: contadoPor ?? null,
+      })
+      if (error) throw error
+      return data as {
+        ok: boolean
+        importados?: number
+        erros_count?: number
+        erros?: Array<{ linha: any; motivo: string }>
+        erro?: string
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-inventario'] })
+      qc.invalidateQueries({ queryKey: ['est-inventarios'] })
+    },
+  })
+}
+
 export function useAdicionarItemInventario() {
   const qc = useQueryClient()
   return useMutation({

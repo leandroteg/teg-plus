@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   ClipboardList, Plus, CheckCircle2, Clock, X, Search,
-  Save, Loader2, ChevronDown, ChevronRight, PackagePlus,
+  Save, Loader2, ChevronDown, ChevronRight, PackagePlus, Upload,
 } from 'lucide-react'
 import {
   useInventarios, useInventario,
   useAbrirInventario, useSalvarContagem, useConcluirInventario,
   useBases, useAdicionarItemInventario, useInventarioItemSearch,
+  useImportarInventarioCSV,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { EstInventario, EstItem, TipoInventario } from '../../types/estoque'
@@ -189,6 +190,7 @@ function InventarioCard({
   const salvarContagem = useSalvarContagem()
   const [contagens, setContagens] = useState<Record<string, number>>({})
   const [showAddItem, setShowAddItem] = useState(false)
+  const [showImportCSV, setShowImportCSV] = useState(false)
 
   const itens = detail?.itens ?? []
   const contados = itens.filter(i => i.saldo_contado != null).length
@@ -246,6 +248,14 @@ function InventarioCard({
         />
       )}
 
+      {showImportCSV && (
+        <ImportarCSVModal
+          inventarioId={inventario.id}
+          isLight={isLight}
+          onClose={() => setShowImportCSV(false)}
+        />
+      )}
+
       {isExpanded && (
         <div className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
           {inventario.status !== 'concluido' && inventario.status !== 'cancelado' && (
@@ -264,6 +274,14 @@ function InventarioCard({
                     Adicionar Item
                   </button>
                 )}
+                <button
+                  onClick={() => setShowImportCSV(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700
+                    text-white text-xs font-semibold transition-colors"
+                >
+                  <Upload size={12} />
+                  Importar CSV
+                </button>
                 <button
                   onClick={onConcluir}
                   disabled={concluding || contados === 0}
@@ -326,6 +344,186 @@ function InventarioCard({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Modal: Importar Contagem via CSV ────────────────────────────────────────
+// Aceita 2-3 colunas: codigo, quantidade, observacao (opcional).
+// Cabecalho na 1a linha e detectado e ignorado. Separador: ; ou ,
+function ImportarCSVModal({
+  inventarioId, isLight, onClose,
+}: {
+  inventarioId: string
+  isLight: boolean
+  onClose: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const importar = useImportarInventarioCSV()
+  const [csvText, setCsvText] = useState('')
+  const [result, setResult] = useState<Awaited<ReturnType<typeof importar.mutateAsync>> | null>(null)
+
+  const bg = isLight ? 'bg-white' : 'bg-[#0f172a]'
+  const border = isLight ? 'border-slate-200' : 'border-white/[0.06]'
+  const txtMain = isLight ? 'text-slate-800' : 'text-slate-100'
+  const txtMuted = isLight ? 'text-slate-500' : 'text-slate-400'
+  const inputCls = `w-full rounded-xl border px-3 py-2 text-sm font-mono ${
+    isLight ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-white/[0.06] bg-white/[0.02] text-slate-200'
+  } focus:outline-none focus:ring-2 focus:ring-indigo-400/40`
+
+  function handleFile(file: File | null) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setCsvText(String(reader.result ?? ''))
+    reader.readAsText(file, 'utf-8')
+  }
+
+  function parseCsv(text: string): Array<{ codigo: string; quantidade: string; observacao?: string }> {
+    const out: Array<{ codigo: string; quantidade: string; observacao?: string }> = []
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    if (lines.length === 0) return out
+
+    for (let i = 0; i < lines.length; i++) {
+      const sep = lines[i].includes(';') ? ';' : ','
+      const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
+      if (cols.length < 2) continue
+      const [codigo, quantidade, ...resto] = cols
+      if (i === 0 && isNaN(Number(quantidade.replace(',', '.')))) continue
+      out.push({
+        codigo,
+        quantidade: quantidade.replace(',', '.'),
+        observacao: resto.length ? resto.join(' ') : undefined,
+      })
+    }
+    return out
+  }
+
+  async function handleImport() {
+    setResult(null)
+    const linhas = parseCsv(csvText)
+    if (linhas.length === 0) {
+      alert('CSV vazio ou invalido. Use: codigo;quantidade;observacao (uma linha por item)')
+      return
+    }
+    try {
+      const r = await importar.mutateAsync({ inventarioId, linhas })
+      setResult(r)
+    } catch (e: any) {
+      alert(`Erro: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`${bg} rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${border}`}>
+          <h3 className={`text-sm font-bold ${txtMain}`}>Importar contagem (CSV)</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {!result && (
+            <>
+              <div className={`rounded-xl p-3 ${isLight ? 'bg-indigo-50 border border-indigo-200' : 'bg-indigo-500/10 border border-indigo-500/20'}`}>
+                <p className={`text-[11px] ${isLight ? 'text-indigo-700' : 'text-indigo-300'}`}>
+                  <strong>Formato:</strong> 1 item por linha, separado por <code>;</code> ou <code>,</code>.{' '}
+                  <code>codigo;quantidade;observacao</code> (observacao opcional). Cabecalho na 1a linha e ignorado se a quantidade nao for numero.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  ref={fileRef}
+                  onChange={e => handleFile(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold ${
+                    isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.10]'
+                  }`}
+                >
+                  <Upload size={12} /> Selecionar arquivo .csv
+                </button>
+                <span className={`text-[11px] ${txtMuted}`}>ou cole o conteudo abaixo:</span>
+              </div>
+
+              <textarea
+                rows={10}
+                placeholder={'codigo;quantidade;observacao\nIT-001;15;contagem ok\nIT-002;3,5'}
+                value={csvText}
+                onChange={e => setCsvText(e.target.value)}
+                className={inputCls}
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={onClose}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
+                    isLight ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={importar.isPending || !csvText.trim()}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {importar.isPending ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  {importar.isPending ? 'Importando...' : 'Importar'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {result && (
+            <div className="space-y-3">
+              {result.ok ? (
+                <div className={`rounded-xl p-4 ${isLight ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
+                  <p className={`text-sm font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>
+                    {result.importados ?? 0} linha(s) importada(s)
+                  </p>
+                  {result.erros_count ? (
+                    <p className={`text-xs mt-1 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                      {result.erros_count} linha(s) ignorada(s)
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className={`rounded-xl p-4 ${isLight ? 'bg-red-50 border border-red-200' : 'bg-red-500/10 border border-red-500/20'}`}>
+                  <p className={`text-sm font-bold ${isLight ? 'text-red-700' : 'text-red-300'}`}>Erro: {result.erro}</p>
+                </div>
+              )}
+
+              {result.erros && result.erros.length > 0 && (
+                <div className={`rounded-xl border ${border} max-h-48 overflow-y-auto`}>
+                  <p className={`text-[11px] font-bold uppercase tracking-wider px-3 py-2 ${txtMuted}`}>Linhas ignoradas</p>
+                  <ul className="px-3 pb-3 space-y-1">
+                    {result.erros.map((e, i) => (
+                      <li key={i} className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        <span className="font-mono">{(e.linha?.codigo ?? '?')}</span>
+                        <span className="text-amber-600"> - {e.motivo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -565,3 +763,4 @@ function AdicionarItemModal({
     </div>
   )
 }
+
