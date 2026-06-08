@@ -5,10 +5,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useMemo, useRef, useState } from 'react'
-import { Receipt, Upload, Loader2, X, Search, CheckCircle2, AlertTriangle, FileText } from 'lucide-react'
+import { Receipt, Upload, Loader2, X, Search, CheckCircle2, AlertTriangle, FileText, FilePlus2 } from 'lucide-react'
 import { useUploadHolerite, useHolerites, useRemoverHolerite, type TipoHolerite } from '../../hooks/useHolerites'
 import { useRHColaboradores } from '../../hooks/useRH'
 import { useTheme } from '../../contexts/ThemeContext'
+import ImportarHoleritesZipModal from '../../components/rh/ImportarHoleritesZipModal'
 
 const TIPOS: { value: TipoHolerite; label: string }[] = [
   { value: 'mensal', label: 'Mensal' },
@@ -43,6 +44,7 @@ export default function RHHolerites() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [filtroColab, setFiltroColab] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [showImportZip, setShowImportZip] = useState(false)
 
   const { data: lista = [] } = useHolerites(colaboradorId || undefined)
 
@@ -111,15 +113,28 @@ export default function RHHolerites() {
         </div>
       )}
 
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txtMain}`}>
-          <Receipt size={20} className="text-emerald-600" />
-          Holerites (RH)
-        </h1>
-        <p className={`text-xs mt-0.5 ${txtMuted}`}>
-          Envie holerite por colaborador. Cada colaborador vê os seus em <code>/meus-holerites</code>.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txtMain}`}>
+            <Receipt size={20} className="text-emerald-600" />
+            Holerites (RH)
+          </h1>
+          <p className={`text-xs mt-0.5 ${txtMuted}`}>
+            Envie holerite por colaborador ou em lote (ZIP). Cada colaborador vê os seus em <code>/meus-holerites</code>.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowImportZip(true)}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors"
+          title="Subir vários holerites de uma vez via ZIP"
+        >
+          <FilePlus2 size={13} /> Importar ZIP
+        </button>
       </div>
+
+      {showImportZip && (
+        <ImportarHoleritesZipModal isLight={isLight} onClose={() => setShowImportZip(false)} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Form de upload */}
