@@ -1442,3 +1442,33 @@ export function useReenviarEsclarecimentoContrato() {
     },
   })
 }
+
+// Cria con_solicitacoes a partir de uma cmp_requisicoes (RPC mig 126).
+// Idempotente: retorna a solicitacao existente nao-cancelada se ja tiver uma.
+// Herda fornecedor do pedido emitido (se houver) + dados da RC (solicitante,
+// obra, escopo, valor estimado, centro_custo).
+export function useCriarSolicitacaoContratoFromRC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      observacao,
+      responsavelNome,
+    }: {
+      requisicaoId: string
+      observacao?: string
+      responsavelNome?: string
+    }) => {
+      const { data, error } = await supabase.rpc('cmp_criar_solicitacao_contrato_from_rc', {
+        p_requisicao_id: requisicaoId,
+        p_observacao: observacao ?? null,
+        p_responsavel_nome: responsavelNome ?? null,
+      })
+      if (error) throw error
+      return data as { ok: boolean; reused?: boolean; id?: string; numero?: string; erro?: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+    },
+  })
+}

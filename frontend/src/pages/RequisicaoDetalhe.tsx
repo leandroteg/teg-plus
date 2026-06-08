@@ -7,6 +7,7 @@ import {
   FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
 import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useCriarSolicitacaoContratoFromRC } from '../hooks/useSolicitacoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -38,6 +39,97 @@ const fmtItemLinha = (it: AlteracaoItemSnapshot) => {
   const marca = it.marca ? ` (${it.marca})` : ''
   const valor = it.valor_unitario_estimado ? ` · ${fmt(it.valor_unitario_estimado)}` : ''
   return `${it.descricao}${marca} — ${it.quantidade} ${it.unidade}${valor}`
+}
+
+// Banner pra criar solicitacao de elaboracao de contrato a partir desta RC.
+// Idempotente: o backend reaproveita solicitacao existente nao-cancelada.
+function SolicitarContratoBanner({
+  requisicaoId, requisicaoNumero, responsavelNome,
+}: {
+  requisicaoId: string
+  requisicaoNumero: string
+  responsavelNome?: string
+}) {
+  const navigate = useNavigate()
+  const criar = useCriarSolicitacaoContratoFromRC()
+  const [observacao, setObservacao] = useState('')
+  const [expanded, setExpanded] = useState(false)
+
+  if (criar.isSuccess && criar.data?.ok && criar.data.id) {
+    const reused = criar.data.reused
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <CheckCircle size={15} className="text-emerald-600 shrink-0" />
+          <p className="text-sm text-emerald-700">
+            {reused
+              ? `Já existe solicitação de contrato vinculada${criar.data.numero ? ` (${criar.data.numero})` : ''}.`
+              : `Solicitação de contrato ${criar.data.numero ?? ''} criada com sucesso.`}
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/contratos/solicitacoes/${criar.data!.id}`)}
+          className="shrink-0 flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+        >
+          <ExternalLink size={12} /> Abrir
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText size={15} className="text-indigo-500 shrink-0" />
+          <p className="text-sm text-indigo-700">Esta RC precisa de contrato formal com o fornecedor?</p>
+        </div>
+        {!expanded && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="shrink-0 flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 transition-colors"
+          >
+            <FileText size={12} /> Solicitar contrato
+          </button>
+        )}
+      </div>
+      {expanded && (
+        <div className="space-y-2 pt-1">
+          <UpperTextarea
+            rows={2}
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+            placeholder="Observação (opcional, vai no histórico da solicitação)..."
+            className="w-full border border-indigo-300 bg-white rounded-xl px-3 py-2 text-sm
+              focus:ring-2 focus:ring-indigo-400 outline-none placeholder-indigo-300"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setExpanded(false); setObservacao('') }}
+              disabled={criar.isPending}
+              className="py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => criar.mutate({
+                requisicaoId,
+                observacao: observacao.trim() || undefined,
+                responsavelNome,
+              })}
+              disabled={criar.isPending}
+              className="py-1.5 px-3 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {criar.isPending ? 'Criando...' : `Criar solicitação a partir da RC ${requisicaoNumero}`}
+            </button>
+          </div>
+          {criar.isError && (
+            <p className="text-xs text-red-600">Erro: {(criar.error as Error)?.message ?? 'desconhecido'}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function RequisicaoDetalhe() {
@@ -300,6 +392,11 @@ export default function RequisicaoDetalhe() {
             <Pencil size={12} /> Editar e reenviar
           </button>
         </div>
+      )}
+
+      {/* Solicitar elaboracao de contrato — RC aprovada ou em fase posterior */}
+      {['aprovada', 'cotacao_em_andamento', 'cotacao_aprovada', 'pedido_emitido', 'em_andamento'].includes(req.status) && (
+        <SolicitarContratoBanner requisicaoId={req.id} requisicaoNumero={req.numero} responsavelNome={perfil?.nome} />
       )}
 
       {/* Alerta Esclarecimento */}
