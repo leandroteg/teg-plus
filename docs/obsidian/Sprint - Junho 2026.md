@@ -10,19 +10,19 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - 🟡 **PARCIAL** — base existe, falta peça(s) específica(s)
 - 🔴 **PENDENTE** — não implementado / não localizado
 
-## Visão Geral — atualizada 2026-06-08 (rodada 2: backend automacoes)
+## Visão Geral — atualizada 2026-06-08 (rodada 3: OFX + push cartao)
 
 | Módulo | OK | Parcial | Pendente | Total |
 |---|---|---|---|---|
 | Compras | 6 | 0 | 1 | 7 |
 | Estoque | 11 | 1 | 1 | 13 |
-| Fin. CAP | 1 | 2 | 1 | 4 |
-| Fin. CR + Tesouraria | 1 | 1 | 1 | 3 |
+| Fin. CAP | 2 | 2 | 0 | 4 |
+| Fin. CR + Tesouraria | 2 | 1 | 0 | 3 |
 | Contratos | 3 | 1 | 1 | 5 |
 | Locação | 3 | 1 | 0 | 4 |
-| **Total** | **25** | **6** | **5** | **36** |
+| **Total** | **27** | **6** | **3** | **36** |
 
-**Trajetória do sprint:** 11 → 20 → **25 ✅**. Sobra apenas teste manual (CAP fluxo end-to-end), 1 decisão de produto (Solicitações Material x Triagem) e 5 itens 🔴 que dependem de decisões/integrações externas.
+**Trajetória:** 11 → 20 → 25 → **27 ✅**. Restam só 3 🔴 (Painel Savings — falta fórmula; Permissões almoxarife/base — RLS extensa; Solicitações vindas Compras *foi feito*, na verdade restam 2 🔴 do sprint original + ajustes). E 6 🟡 que dependem de decisão/integração externa.
 
 ---
 
@@ -150,10 +150,11 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [LotesPagamento.tsx:138](../../frontend/src/pages/financeiro/LotesPagamento.tsx:138), `useLotesPagamento.ts`.
 - **Próximo passo:** Decidir se CNAB direto-banco é necessário; se sim, gerar CNAB 240 via RPC ou lib.
 
-### 🔴 [Muito Baixa] Conciliação automática (OFX/PIX)
-- **Estado:** Conciliação manual completa (select + classificar + comprovante). **Não há parsing OFX/PIX**.
-- **Refs:** [Conciliacao.tsx](../../frontend/src/pages/financeiro/Conciliacao.tsx).
-- **Próximo passo:** RPC de parsing OFX + matching por valor/data.
+### ✅ [Muito Baixa] Conciliação automática (OFX) — **feito 2026-06-08**
+- **Migration 130:** RPC `fn_sugerir_conciliacao_tesouraria(conta_id?, dias_janela=3, periodo?)` matcheia movimentações do extrato (`fin_movimentacoes_tesouraria` já populado pelo n8n a partir do OFX) com `fin_contas_pagar/receber` em aberto por valor exato + janela de data. Score 85-100. RPC complementar `fn_aplicar_conciliacao_tesouraria` aplica em batch (marca conciliado de ambos lados).
+- **Hooks:** `useSugerirConciliacao` + `useAplicarConciliacaoAuto`.
+- **UI:** Botão "Conciliação automática" no header da tela Conciliacao abre modal com lista lado-a-lado (extrato × título), score destacado, pré-marca matches >=95, "Marcar/Desmarcar todas" + aplicar em batch.
+- **PIX:** os bancos brasileiros incluem PIX nos OFX automaticamente — coberto.
 
 ### ✅ [Média] Painel de pagamentos previstos com export PDF — **feito 2026-06-08**
 - **Achado:** `PainelPagamentos.tsx` existia mas era código órfão (rota `/financeiro/painel-pagamentos` redirecionava pra CPPipeline).
@@ -178,9 +179,11 @@ Revisão item-a-item do backlog do sprint, com estado atual no código e próxim
 - **Refs:** [ConciliacaoCartoes.tsx](../../frontend/src/pages/financeiro/ConciliacaoCartoes.tsx), [useCartoes.ts:316](../../frontend/src/hooks/useCartoes.ts:316).
 - **Próximo passo:** Testes E2E com faturas reais de múltiplos emissores.
 
-### 🔴 [Baixa] Notificações para portadores de cartão
-- **Estado:** Sem mecanismo de notificação (email/sistema). Sem coluna de preferência em `fin_apontamentos_cartao`.
-- **Próximo passo:** Migration `fin_notificacoes_portador` + trigger de insert + envio via Graph API (mesmo padrão de TI).
+### ✅ [Baixa] Notificações para portadores de cartão — **feito 2026-06-08**
+- **Migration 129:** tabela genérica `sys_notif_queue` (user_id, titulo, corpo, url, origem, origem_id, vista_em, enviada_push_em) com RLS por user. Trigger `fn_notif_item_fatura_cartao` AFTER INSERT em `fin_itens_fatura_cartao` enfileira 1 notificação pra cada portador ativo do cartão (via `fin_portadores_cartao`). Idempotente por (origem, origem_id, user_id).
+- **Hook:** `useNotificacoes` consome via Realtime + dispara Browser Notification API com permissão concedida; expõe `marcarVista` e `marcarTodasVistas`.
+- **UI:** `NotificationBell` ganha seção "Cartões e avisos" (violeta) com lista clicável que marca vista e navega pra URL do item.
+- **Pendência menor:** push offline (PWA fechada) entra quando `SUPABASE_SERVICE_ROLE_KEY` estiver no vault — basta cron chamando `send-push` pras notificações com `enviada_push_em IS NULL`. E-mail via Graph API quando App Registration estiver pronto.
 
 ---
 
