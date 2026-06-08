@@ -946,12 +946,16 @@ export function useDecisaoGenerica() {
       } = payload
 
       // 1. Update the specific aprovacao record
+      // Sobrescreve aprovador_nome/email com QUEM realmente decidiu (e nao
+      // quem era o destinatario esperado hardcoded no insert do enviador).
       const { error: updateError } = await supabase
         .from(TABLE_APR)
         .update({
           status: decisao,
           observacao: observacao || null,
           data_decisao: new Date().toISOString(),
+          aprovador_nome: aprovadorNome,
+          aprovador_email: payload.aprovadorEmail || null,
         })
         .eq('id', aprovacaoId)
 
@@ -963,6 +967,8 @@ export function useDecisaoGenerica() {
         .update({
           status: decisao,
           data_decisao: new Date().toISOString(),
+          aprovador_nome: aprovadorNome,
+          aprovador_email: payload.aprovadorEmail || null,
         })
         .eq('entidade_id', entidadeId)
         .eq('status', 'pendente')

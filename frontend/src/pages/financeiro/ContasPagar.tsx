@@ -7,6 +7,7 @@ import {
   ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorByReference } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
@@ -937,10 +938,11 @@ export default function ContasPagar() {
     statusFilter ? { status: statusFilter } : undefined
   )
   const aprovarMutation = useAprovarPagamento()
+  const { perfil: perfilAuth } = useAuth()
 
   const handleAprovarPgto = (cp: ContaPagar) => {
     if (!confirm(`Autorizar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
-    aprovarMutation.mutate({ cpId: cp.id }, {
+    aprovarMutation.mutate({ cpId: cp.id, aprovadorNome: perfilAuth?.nome }, {
       onSuccess: () => {
         setToast({ type: 'success', msg: `Pagamento autorizado ✓ — ${cp.fornecedor_nome}` })
         setTimeout(() => setToast(null), 4000)

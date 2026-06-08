@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, Clock, Eye,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { UpperInput } from '../../components/UpperInput'
 import { useContasPagar, useAprovarPagamento } from '../../hooks/useFinanceiro'
 
@@ -20,6 +21,7 @@ type Tab = 'pendentes' | 'aprovadas'
 
 export default function AprovacoesPagamento() {
   const { isDark } = useTheme()
+  const { perfil } = useAuth()
   const [tab, setTab] = useState<Tab>('pendentes')
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -55,7 +57,7 @@ export default function AprovacoesPagamento() {
 
   const handleAprovar = (cp: typeof contas[0]) => {
     if (!confirm(`Aprovar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
-    aprovarMutation.mutate({ cpId: cp.id }, {
+    aprovarMutation.mutate({ cpId: cp.id, aprovadorNome: perfil?.nome }, {
       onSuccess: () => showToast('success', `Pagamento aprovado — ${cp.fornecedor_nome}`),
       onError: () => showToast('error', 'Erro ao aprovar pagamento'),
     })

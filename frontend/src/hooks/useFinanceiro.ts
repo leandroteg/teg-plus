@@ -456,11 +456,13 @@ export function useAprovarPagamento() {
       if (error) throw error
 
       // 2. Resolve any pending apr_aprovacoes for this CP
+      // Sobrescreve aprovador_nome real (em vez do destinatario esperado).
       await supabase
         .from('apr_aprovacoes')
         .update({
           status: 'aprovada',
           data_decisao: new Date().toISOString(),
+          aprovador_nome: nome,
         })
         .eq('entidade_id', cpId)
         .eq('tipo_aprovacao', 'autorizacao_pagamento')
