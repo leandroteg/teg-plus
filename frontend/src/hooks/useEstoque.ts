@@ -648,15 +648,17 @@ export function useAguardandoEntrada() {
 }
 
 // ── Confirm entry: move from aguardando_entrada → confirmado ─────────────────
+// Usa RPC fn_confirmar_entrada_estoque (mig 125) que tambem gera movimentacao
+// de entrada automatica em est_movimentacoes pra itens vinculados ao catalogo.
 export function useConfirmarEntrada() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (itemIds: string[]) => {
-      const { error } = await supabase
-        .from('cmp_recebimento_itens')
-        .update({ status: 'confirmado' })
-        .in('id', itemIds)
+      const { data, error } = await supabase.rpc('fn_confirmar_entrada_estoque', {
+        p_item_ids: itemIds,
+      })
       if (error) throw error
+      return data as { confirmados: number; puladas: number }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['est-aguardando-entrada'] })
