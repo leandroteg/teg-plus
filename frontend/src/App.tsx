@@ -50,6 +50,7 @@ const MinhasSolicitacoes = lazy(() => import('./pages/MinhasSolicitacoes'))
 const MinhasCautelas = lazy(() => import('./pages/MinhasCautelas'))
 const MinhasTarefas = lazy(() => import('./pages/MinhasTarefas'))
 const Pedidos = lazy(() => import('./pages/Pedidos'))
+const LeadTimeCompras = lazy(() => import('./pages/LeadTimeCompras'))
 const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
 const SSMA = lazy(() => import('./pages/SSMA'))
 
@@ -154,6 +155,7 @@ const Inventario = lazy(() => import('./pages/estoque/Inventario'))
 const Patrimonial = lazy(() => import('./pages/estoque/Patrimonial'))
 const SolicitacoesEstoque = lazy(() => import('./pages/estoque/Solicitacoes'))
 const CautelaHome = lazy(() => import('./pages/estoque/CautelaHome'))
+const PainelEstoque = lazy(() => import('./pages/estoque/PainelEstoque'))
 const NovaCautela = lazy(() => import('./pages/estoque/NovaCautela'))
 
 // Logistica
@@ -304,6 +306,7 @@ export default function App() {
               <Route path="/estoque/patrimonial"   element={<Lazy><Patrimonial /></Lazy>} />
               <Route path="/estoque/solicitacoes" element={<Lazy><SolicitacoesEstoque /></Lazy>} />
               <Route path="/estoque/recebimentos" element={<Navigate to="/estoque" replace />} />
+              <Route path="/estoque/painel" element={<Lazy><PainelEstoque /></Lazy>} />
               <Route path="/estoque/cautelas" element={<Lazy><CautelaHome /></Lazy>} />
               <Route path="/estoque/cautelas/nova" element={<Lazy><NovaCautela /></Lazy>} />
             </Route>
@@ -498,6 +501,7 @@ export default function App() {
               <Route path="/cotacoes"    element={<Lazy><FilaCotacoes /></Lazy>} />
               <Route path="/cotacoes/:id" element={<Lazy><CotacaoForm /></Lazy>} />
               <Route path="/pedidos"     element={<Lazy><Pedidos /></Lazy>} />
+              <Route path="/compras/lead-time" element={<Lazy><LeadTimeCompras /></Lazy>} />
             </Route>
           </Route>
         </Route>

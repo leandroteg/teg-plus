@@ -9,6 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useCautelas, useAtualizarCautela } from '../../hooks/useCautelas'
 import type { Cautela, StatusCautela } from '../../types/cautela'
 import { CAUTELA_PIPELINE_STAGES } from '../../types/cautela'
+import TermoAceiteModal from '../../components/cautela/TermoAceiteModal'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -90,6 +91,7 @@ export default function CautelaHome() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [termoCautela, setTermoCautela] = useState<Cautela | null>(null)
 
   const grouped = useMemo(() => {
     const map = new Map<StatusCautela, Cautela[]>()
@@ -184,16 +186,24 @@ export default function CautelaHome() {
             <HandHelping size={40} className="mb-3" /><p className="text-sm font-medium">Nenhuma cautela nesta etapa</p>
           </div>
         ) : viewMode === 'cards' ? (
-          <div className="space-y-2 p-4">{activeItems.map(c => <CautelaCardItem key={c.id} cautela={c} onClick={() => {}} isDark={isDark} />)}</div>
+          <div className="space-y-2 p-4">{activeItems.map(c => <CautelaCardItem key={c.id} cautela={c} onClick={() => setTermoCautela(c)} isDark={isDark} />)}</div>
         ) : (
           <div>
             <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
               <span className="w-2 shrink-0" /><span className="w-[90px] shrink-0">Nº</span><span className="flex-1">Solicitante</span><span className="w-[120px] shrink-0">Obra</span><span className="w-[70px] shrink-0 text-right">Data</span>
             </div>
-            {activeItems.map(c => <CautelaRow key={c.id} cautela={c} onClick={() => {}} isDark={isDark} />)}
+            {activeItems.map(c => <CautelaRow key={c.id} cautela={c} onClick={() => setTermoCautela(c)} isDark={isDark} />)}
           </div>
         )}
       </div>
+
+      {termoCautela && (
+        <TermoAceiteModal
+          cautela={termoCautela}
+          isDark={isDark}
+          onClose={() => setTermoCautela(null)}
+        />
+      )}
     </div>
   )
 }

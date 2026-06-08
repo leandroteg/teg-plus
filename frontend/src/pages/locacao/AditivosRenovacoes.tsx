@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { RefreshCw, Search, List, LayoutGrid, Plus, X, Loader2 } from 'lucide-react'
+import { RefreshCw, Search, List, LayoutGrid, Plus, X, Loader2, Send, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAditivos, useCriarAditivo, useImoveis } from '../../hooks/useLocacao'
+import { useAditivos, useCriarAditivo, useImoveis, useAtualizarStatusAditivo } from '../../hooks/useLocacao'
 import { STATUS_ADITIVO_LABEL } from '../../types/locacao'
 import type { StatusAditivo, TipoAditivo, LocAditivo } from '../../types/locacao'
 
@@ -147,8 +147,38 @@ function NovoAditivoModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ── Ações de status (rascunho → aguardando_assinatura → assinado) ─────────────
+function AditivoActions({ ad, onStatus, isBusy }: {
+  ad: LocAditivo
+  onStatus: (id: string, status: StatusAditivo) => void
+  isBusy: boolean
+}) {
+  if (ad.status === 'rascunho') {
+    return (
+      <button type="button" disabled={isBusy}
+        onClick={e => { e.stopPropagation(); onStatus(ad.id, 'aguardando_assinatura') }}
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-500 hover:text-indigo-700 disabled:opacity-50">
+        <Send size={12} /> Enviar p/ assinatura
+      </button>
+    )
+  }
+  if (ad.status === 'aguardando_assinatura') {
+    return (
+      <button type="button" disabled={isBusy}
+        onClick={e => { e.stopPropagation(); onStatus(ad.id, 'assinado') }}
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-green-600 hover:text-green-700 disabled:opacity-50">
+        <CheckCircle2 size={12} /> Marcar assinado
+      </button>
+    )
+  }
+  return <span className="text-[11px] text-slate-400">—</span>
+}
+
 // ── Table Row ─────────────────────────────────────────────────────────────────
-function TableRow({ ad, isDark }: { ad: LocAditivo; isDark: boolean }) {
+function TableRow({ ad, isDark, onStatus, isBusy }: {
+  ad: LocAditivo; isDark: boolean
+  onStatus: (id: string, status: StatusAditivo) => void; isBusy: boolean
+}) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   return (
@@ -176,12 +206,18 @@ function TableRow({ ad, isDark }: { ad: LocAditivo; isDark: boolean }) {
       <td className="px-4 py-3">
         <StatusBadge status={ad.status} />
       </td>
+      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+        <AditivoActions ad={ad} onStatus={onStatus} isBusy={isBusy} />
+      </td>
     </tr>
   )
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
-function AditivoCard({ ad, isDark }: { ad: LocAditivo; isDark: boolean }) {
+function AditivoCard({ ad, isDark, onStatus, isBusy }: {
+  ad: LocAditivo; isDark: boolean
+  onStatus: (id: string, status: StatusAditivo) => void; isBusy: boolean
+}) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
@@ -217,6 +253,9 @@ function AditivoCard({ ad, isDark }: { ad: LocAditivo; isDark: boolean }) {
         )}
         {ad.indice_reajuste && <span>Índice: {ad.indice_reajuste}</span>}
       </div>
+      <div className={`mt-2 pt-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <AditivoActions ad={ad} onStatus={onStatus} isBusy={isBusy} />
+      </div>
     </div>
   )
 }
@@ -225,6 +264,8 @@ function AditivoCard({ ad, isDark }: { ad: LocAditivo; isDark: boolean }) {
 export default function AditivosRenovacoes() {
   const { isDark } = useTheme()
   const { data: aditivos = [], isLoading } = useAditivos()
+  const atualizarStatus = useAtualizarStatusAditivo()
+  const onStatus = (id: string, status: StatusAditivo) => atualizarStatus.mutate({ id, status })
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'table' | 'card'>('table')
   const [showModal, setShowModal] = useState(false)
@@ -309,7 +350,7 @@ export default function AditivosRenovacoes() {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Imóvel', 'Tipo', 'Período', 'Valor Anterior → Novo', 'Status'].map(h => (
+                  {['Imóvel', 'Tipo', 'Período', 'Valor Anterior → Novo', 'Status', 'Ações'].map(h => (
                     <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>
                       {h}
                     </th>
@@ -318,7 +359,7 @@ export default function AditivosRenovacoes() {
               </thead>
               <tbody>
                 {filtered.map(ad => (
-                  <TableRow key={ad.id} ad={ad} isDark={isDark} />
+                  <TableRow key={ad.id} ad={ad} isDark={isDark} onStatus={onStatus} isBusy={atualizarStatus.isPending} />
                 ))}
               </tbody>
             </table>
@@ -328,7 +369,7 @@ export default function AditivosRenovacoes() {
         /* Card View */
         <div className="space-y-2">
           {filtered.map(ad => (
-            <AditivoCard key={ad.id} ad={ad} isDark={isDark} />
+            <AditivoCard key={ad.id} ad={ad} isDark={isDark} onStatus={onStatus} isBusy={atualizarStatus.isPending} />
           ))}
         </div>
       )}

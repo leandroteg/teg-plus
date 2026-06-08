@@ -17,7 +17,9 @@ export default function MinhasCautelas() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const navigate = useNavigate()
-  const { data: cautelas = [], isLoading } = useMinhasCautelas(perfil?.id)
+  // solicitante_id das cautelas é o id do colaborador (rh_colaboradores),
+  // resolvido pelo vínculo sys_perfis.colaborador_id do usuário logado.
+  const { data: cautelas = [], isLoading } = useMinhasCautelas(perfil?.colaborador_id)
 
   const ativas = useMemo(() => cautelas.filter(c => c.status !== 'encerrada'), [cautelas])
   const encerradas = useMemo(() => cautelas.filter(c => c.status === 'encerrada').slice(0, 10), [cautelas])
