@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, X, AlertCircle, ChevronRight, UserPlus, FileText } from 'lucide-react'
+import { Bell, Check, X, AlertCircle, ChevronRight, UserPlus, FileText, CreditCard } from 'lucide-react'
 import { usePreCadastros, getEntityLabel, type PreCadastro } from '../hooks/usePreCadastros'
 import { useRCsEmTriagemCD, useBases } from '../hooks/useEstoque'
+import { useNotificacoes } from '../hooks/useNotificacoes'
 import { useAuth } from '../contexts/AuthContext'
 import { useSound } from '../hooks/useSound'
 import ItemFormModal from './ItemFormModal'
@@ -20,7 +21,8 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
   const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
   const { data: rcsTriagem = [] } = useRCsEmTriagemCD()
   const triagemVisible = isTriador ? rcsTriagem : []
-  const count = countPre + triagemVisible.length
+  const { lista: notifQueue, count: countQueue, marcarVista } = useNotificacoes()
+  const count = countPre + triagemVisible.length + countQueue
   const { play } = useSound()
   const [open, setOpen] = useState(false)
   const prevCountRef = useRef(count)
@@ -168,6 +170,45 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
                 <p className="text-sm">Nenhuma notificação pendente</p>
               </div>
             )}
+            {!selected && notifQueue.length > 0 && (
+              <div>
+                <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                  isDark ? 'text-violet-400 bg-violet-500/5' : 'text-violet-600 bg-violet-50/60'
+                }`}>
+                  Cartões e avisos ({notifQueue.length})
+                </div>
+                {notifQueue.map(n => {
+                  const horas = Math.max(1, Math.floor((Date.now() - new Date(n.criada_em).getTime()) / 3600000))
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        marcarVista(n.id)
+                        setOpen(false)
+                        if (n.url) navigate(n.url)
+                      }}
+                      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 border-b last:border-b-0 ${
+                        isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-50 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
+                        <CreditCard className="w-4 h-4 text-violet-500" strokeWidth={2} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                          {n.titulo}
+                        </p>
+                        <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {n.corpo} · {horas < 24 ? `${horas}h` : `${Math.floor(horas / 24)}d`}
+                        </p>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {!selected && triagemVisible.length > 0 && (
               <div>
                 <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
