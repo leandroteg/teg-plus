@@ -43,7 +43,7 @@ function guessTipo(name: string): string {
 
 export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => void; onCreated: () => void }) {
   const { perfil } = useAuth()
-  const { data: centrosCusto = [] } = useLookupCentrosCusto()
+  const centrosCusto = useLookupCentrosCusto()
   const { data: bases = [] } = useBasesAdmissao()
   const criar = useCriarAdmissao()
   const fileRef = useRef<HTMLInputElement>(null)
