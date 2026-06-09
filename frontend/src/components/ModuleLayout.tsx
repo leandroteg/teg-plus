@@ -429,7 +429,9 @@ export default function ModuleLayout({
   }
 
   function goBack() {
-    if (typeof backRoute === 'number') navigate(backRoute)
+    // Volta para a tela anterior (de onde o usuário veio); fallback para backRoute
+    if (typeof backRoute === 'number') { navigate(backRoute); return }
+    if (window.history.length > 1) navigate(-1)
     else navigate(backRoute)
   }
 
