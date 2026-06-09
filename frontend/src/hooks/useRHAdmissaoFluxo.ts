@@ -220,9 +220,10 @@ export function useTransicaoAdmissao() {
         }
         histAcao = 'aprovou'
       } else if (acao === 'rejeitar') {
-        para = 'requisicao'
+        // Rejeição encerra a requisição: vai para etapa terminal e some das abas do fluxo
+        para = 'cancelada'
         patch = {
-          etapa: 'requisicao', status_aprovacao: 'rejeitado',
+          etapa: 'cancelada', status: 'cancelada', status_aprovacao: 'rejeitado',
           aprovador_id: autorId ?? null, aprovador_nome: autorNome ?? null,
           data_decisao: new Date().toISOString(), motivo_decisao: motivo ?? null,
         }
