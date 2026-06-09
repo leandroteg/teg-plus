@@ -2,7 +2,7 @@
 // pages/rh/RHAdmissao.tsx — Fluxo de Admissão (7 etapas)
 // Rail de abas no padrão do Financeiro (CPPipeline · PipelineRail).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAdmissoesFluxo } from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
+import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
 type EtapaAdmissao = EtapaAdmissaoFluxo
@@ -59,6 +60,10 @@ export default function RHAdmissao() {
   const [view, setView] = useState<'fluxo' | 'nova'>('fluxo')
   const [etapa, setEtapa] = useState<EtapaAdmissao>('requisicao')
   const [selecionada, setSelecionada] = useState<RHAdmissao | null>(null)
+  const [busca, setBusca] = useState('')
+  const [sortField, setSortField] = useState('data')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const { data: admissoes = [], isLoading } = useAdmissoesFluxo()
 
@@ -77,6 +82,29 @@ export default function RHAdmissao() {
     return acc
   }, {} as Record<EtapaAdmissao, number>)
   const itensEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === etapa)
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    let l = itensEtapa
+    if (q) {
+      l = l.filter(a => {
+        const nomes = (a.candidatos ?? []).map(c => c.nome).join(' ').toLowerCase()
+        return nomes.includes(q)
+          || (a.base ?? '').toLowerCase().includes(q)
+          || (a.centro_custo?.codigo ?? '').toLowerCase().includes(q)
+          || (a.motivo ?? '').toLowerCase().includes(q)
+      })
+    }
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...l].sort((x, y) => {
+      if (sortField === 'candidato') {
+        const nx = (x.candidatos?.[0]?.nome ?? '').toLowerCase()
+        const ny = (y.candidatos?.[0]?.nome ?? '').toLowerCase()
+        return nx < ny ? -dir : nx > ny ? dir : 0
+      }
+      return (new Date(x.created_at).getTime() - new Date(y.created_at).getTime()) * dir
+    })
+  }, [itensEtapa, busca, sortField, sortDir])
 
   if (view === 'nova') {
     return (
@@ -116,14 +144,28 @@ export default function RHAdmissao() {
         {(etapa === 'requisicao' || etapa === 'aprovacao') ? (
           isLoading ? (
             <div className="flex justify-center py-12"><Loader2 size={26} className="animate-spin text-slate-300" /></div>
-          ) : itensEtapa.length === 0 ? (
-            <PlaceholderVazio etapa={ativa} isDark={isDark} />
           ) : (
-            <div className="space-y-2">
-              {itensEtapa.map(a => (
-                <AdmissaoCard key={a.id} adm={a} isDark={isDark} onClick={() => setSelecionada(a)} />
-              ))}
-            </div>
+            <>
+              <RHFluxoToolbar
+                isDark={isDark} busca={busca} setBusca={setBusca}
+                placeholder="Buscar candidato, base, CC..."
+                sortOptions={[{ field: 'data', label: 'Data' }, { field: 'candidato', label: 'Candidato' }]}
+                sortField={sortField} setSortField={setSortField} sortDir={sortDir} setSortDir={setSortDir}
+                viewMode={viewMode} setViewMode={setViewMode}
+                count={filtrados.length} total={itensEtapa.length}
+              />
+              {filtrados.length === 0 ? (
+                <PlaceholderVazio etapa={ativa} isDark={isDark} />
+              ) : viewMode === 'cards' ? (
+                <div className="space-y-2">
+                  {filtrados.map(a => (
+                    <AdmissaoCard key={a.id} adm={a} isDark={isDark} onClick={() => setSelecionada(a)} />
+                  ))}
+                </div>
+              ) : (
+                <AdmissaoLista itens={filtrados} isDark={isDark} onSelect={setSelecionada} />
+              )}
+            </>
           )
         ) : (
           <PlaceholderConstrucao etapa={ativa} isDark={isDark} />
@@ -183,6 +225,53 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       </div>
       <ChevR size={14} className={`shrink-0 ${isDark ? 'text-slate-600 group-hover:text-violet-400' : 'text-slate-300 group-hover:text-violet-500'} transition-colors`} />
     </button>
+  )
+}
+
+// ── Visão lista (tabela) ──────────────────────────────────────────────────────
+function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDark: boolean; onSelect: (a: RHAdmissao) => void }) {
+  const th = 'text-left px-3 py-2 font-semibold'
+  return (
+    <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
+            <th className={th}>Candidato(s)</th>
+            <th className={th}>Base</th>
+            <th className={th}>CC</th>
+            <th className="text-center px-3 py-2 font-semibold">Docs</th>
+            <th className={th}>Status</th>
+            <th className={th}>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map(a => {
+            const cands = a.candidatos ?? []
+            const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
+            const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
+            const statusTxt = a.status_aprovacao === 'rejeitado' ? 'Rejeitado'
+              : a.status_aprovacao === 'esclarecimento' ? 'Esclarecer'
+              : a.etapa === 'aprovacao' ? 'Aguardando aprovação' : 'Pendente'
+            const statusCls = a.status_aprovacao === 'rejeitado' ? 'bg-red-100 text-red-700'
+              : a.status_aprovacao === 'esclarecimento' ? 'bg-amber-100 text-amber-700'
+              : 'bg-amber-100 text-amber-700'
+            return (
+              <tr key={a.id} onClick={() => onSelect(a)}
+                className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
+                <td className={`px-3 py-2 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                  {nome}{a.urgente && <span className="ml-1.5 text-[9px] font-bold text-orange-600">URGENTE</span>}
+                </td>
+                <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.base || '—'}</td>
+                <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
+                <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
+                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusCls}`}>{statusTxt}</span></td>
+                <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(a.created_at).toLocaleDateString('pt-BR')}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
