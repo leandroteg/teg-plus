@@ -19,7 +19,7 @@ import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 type EtapaAdmissao = EtapaAdmissaoFluxo
 
 const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
-  { key: 'requisicao',          num: 1, label: 'Requisição',              descricao: 'Gestor solicita a admissão (após aceite da vaga).',              icon: ClipboardList },
+  { key: 'requisicao',          num: 1, label: 'Pendente',                 descricao: 'Requisições aguardando envio para aprovação.',                   icon: ClipboardList },
   { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
   { key: 'documentacao',        num: 3, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
   { key: 'exames_treinamentos', num: 4, label: 'Exames e Treinamentos',   descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).', icon: Stethoscope },
@@ -200,9 +200,6 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
           <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{titulo}</p>
           {nCand > 1 && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{nCand} CANDIDATOS</span>
-          )}
-          {adm.etapa === 'requisicao' && !adm.status_aprovacao && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">PENDENTE</span>
           )}
           {adm.etapa === 'aprovacao' && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">AGUARDANDO APROVAÇÃO</span>
