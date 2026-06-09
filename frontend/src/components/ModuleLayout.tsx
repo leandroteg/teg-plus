@@ -739,16 +739,6 @@ export default function ModuleLayout({
             <HandHelping size={15} className="shrink-0 opacity-50" />
             Minhas Cautelas
           </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/meus-holerites') }}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-              ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-          >
-            <Receipt size={15} className="shrink-0 opacity-50" />
-            Meus Holerites
-          </button>
-
           {/* Cadastros: visível para não-admins que têm o módulo (admin já vê no bloco abaixo) */}
           {!isAdmin && !isRequisitante && hasModule('cadastros') && (
             <>

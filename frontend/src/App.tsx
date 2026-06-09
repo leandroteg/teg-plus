@@ -49,7 +49,6 @@ const AprovAi = lazy(() => import('./pages/AprovAi'))
 const Perfil = lazy(() => import('./pages/Perfil'))
 const MinhasSolicitacoes = lazy(() => import('./pages/MinhasSolicitacoes'))
 const MinhasCautelas = lazy(() => import('./pages/MinhasCautelas'))
-const MeusHolerites = lazy(() => import('./pages/MeusHolerites'))
 const MinhasTarefas = lazy(() => import('./pages/MinhasTarefas'))
 const Pedidos = lazy(() => import('./pages/Pedidos'))
 const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
@@ -253,7 +252,6 @@ export default function App() {
           <Route path="/minhas-tarefas" element={<Lazy><MinhasTarefas /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
-          <Route path="/meus-holerites" element={<Lazy><MeusHolerites /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 
           {/* TI / Help Desk — aberto a qualquer autenticado */}

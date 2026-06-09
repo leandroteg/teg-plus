@@ -121,7 +121,7 @@ export default function RHHolerites() {
             Holerites (RH)
           </h1>
           <p className={`text-xs mt-0.5 ${txtMuted}`}>
-            Envie holerite por colaborador ou em lote (ZIP). Cada colaborador vê os seus em <code>/meus-holerites</code>.
+            Envie holerite por colaborador ou em lote (ZIP). Cada colaborador vê os seus no <strong>Portal TEG</strong>.
           </p>
         </div>
         <button
