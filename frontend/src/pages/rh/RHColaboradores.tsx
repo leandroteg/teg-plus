@@ -326,7 +326,7 @@ export default function RHColaboradores() {
                   <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Colaborador</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden md:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Cargo</th>
-                    <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden lg:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Obra</th>
+                    <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden lg:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden sm:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden lg:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Admissão</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden xl:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tempo</th>
@@ -368,12 +368,12 @@ export default function RHColaboradores() {
                             <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{c.departamento}</p>
                           )}
                         </td>
-                        {/* Obra */}
+                        {/* Base */}
                         <td className="px-4 py-3 hidden lg:table-cell">
-                          {c.obra?.nome ? (
+                          {c.base?.nome ? (
                             <span className={`text-[10px] px-2 py-1 rounded-xl font-semibold ${
                               isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-500/15 text-indigo-400'
-                            }`}>{c.obra.nome}</span>
+                            }`}>{c.base.nome}</span>
                           ) : (
                             <span className={`text-xs ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>
                           )}
@@ -454,10 +454,10 @@ export default function RHColaboradores() {
                               <Building2 size={9} />{c.departamento}
                             </span>
                           )}
-                          {c.obra?.nome && (
+                          {c.base?.nome && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
                               isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-500/15 text-indigo-400'
-                            }`}>{c.obra.nome}</span>
+                            }`}>{c.base.nome}</span>
                           )}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                             (c.tipo_contrato || 'CLT') === 'PJ'

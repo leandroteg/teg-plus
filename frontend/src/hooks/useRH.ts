@@ -17,7 +17,7 @@ export function useRHColaboradores(filtros?: FiltrosColaboradores) {
     queryFn: async () => {
       let q = supabase
         .from('rh_colaboradores')
-        .select('*, obra:sys_obras!obra_id(id, codigo, nome), gestor:rh_colaboradores!gestor_id(id, nome)')
+        .select('*, obra:sys_obras!obra_id(id, codigo, nome), base:est_bases!base_id(id, codigo, nome), gestor:rh_colaboradores!gestor_id(id, nome)')
         .order('nome')
 
       if (filtros?.ativo !== undefined) q = q.eq('ativo', filtros.ativo)
@@ -40,7 +40,7 @@ export function useRHColaborador(id?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rh_colaboradores')
-        .select('*, obra:sys_obras!obra_id(id, codigo, nome), gestor:rh_colaboradores!gestor_id(id, nome)')
+        .select('*, obra:sys_obras!obra_id(id, codigo, nome), base:est_bases!base_id(id, codigo, nome), gestor:rh_colaboradores!gestor_id(id, nome)')
         .eq('id', id!)
         .single()
       if (error) return null
@@ -53,7 +53,7 @@ export function useSalvarRHColaborador() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<RHColaborador> & { id?: string }) => {
-      const { id, obra, gestor, ...rest } = payload as any
+      const { id, obra, base, gestor, ...rest } = payload as any
       if (id) {
         const { data, error } = await supabase.from('rh_colaboradores').update(rest).eq('id', id).select('*').single()
         if (error) throw error
