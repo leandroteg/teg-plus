@@ -110,6 +110,63 @@ export function useUploadHolerite() {
 // Pra futuro: parser de planilha de RH com competencia+colaborador+valor.
 // Por ora a UI faz upload individual por colaborador.
 
+// ── Lote consolidado → SuperTEG (split por colaborador) ──────────────────────
+// Sobe 1 PDF consolidado no bucket e dispara o SuperTEG via webhook n8n
+// (a SUPERTEG_API_KEY fica como secret no n8n; nunca no browser).
+export type TipoLoteHolerite = 'mensal' | '13_salario' | 'ferias'
+
+const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+export interface LoteResultado {
+  job_id?: string
+  status?: string
+  recebido_em?: string
+  error?: string
+  storage_path: string
+  uploaded: boolean
+  [k: string]: unknown
+}
+
+export function useEnviarLoteHolerites() {
+  const { perfil } = useAuth()
+  return useMutation<LoteResultado, Error, { competencia: string; tipo: TipoLoteHolerite; file: File }>({
+    mutationFn: async ({ competencia, tipo, file }) => {
+      const comp = competencia.slice(0, 7) // YYYY-MM
+      const safe = file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `lote/${comp}/${Date.now()}_${safe}`
+
+      // 1) sobe o PDF consolidado
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+        contentType: file.type || 'application/pdf', upsert: false,
+      })
+      if (upErr) throw upErr
+
+      // 2) URL assinada (1h) do arquivo
+      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+      const fileUrl = signed?.signedUrl
+      if (!fileUrl) throw new Error('Falha ao gerar URL do arquivo no Storage')
+
+      // 3) dispara o SuperTEG via n8n (key fica no n8n)
+      let data: Record<string, unknown> = {}
+      let ok = false
+      try {
+        const resp = await fetch(`${N8N_URL}/rh/holerites/processar`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_url: fileUrl, competencia: comp, tipo, perfil_id: perfil?.id }),
+        })
+        data = await resp.json().catch(() => ({}))
+        ok = resp.ok
+      } catch (e) {
+        data = { error: String(e) }
+      }
+
+      const result: LoteResultado = { ...data, storage_path: path, uploaded: true }
+      if (!ok && !result.status) result.status = 'erro'
+      return result
+    },
+  })
+}
+
 // ── Remover holerite (RH/admin) ──────────────────────────────────────────────
 export function useRemoverHolerite() {
   const qc = useQueryClient()

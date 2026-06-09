@@ -10,6 +10,7 @@ import { useUploadHolerite, useHolerites, useRemoverHolerite, type TipoHolerite 
 import { useRHColaboradores } from '../../hooks/useRH'
 import { useTheme } from '../../contexts/ThemeContext'
 import ImportarHoleritesZipModal from '../../components/rh/ImportarHoleritesZipModal'
+import EnviarLoteHoleritesCard from '../../components/rh/EnviarLoteHoleritesCard'
 
 const TIPOS: { value: TipoHolerite; label: string }[] = [
   { value: 'mensal', label: 'Mensal' },
@@ -136,10 +137,13 @@ export default function RHHolerites() {
         <ImportarHoleritesZipModal isLight={isLight} onClose={() => setShowImportZip(false)} />
       )}
 
+      {/* Lote consolidado → SuperTEG */}
+      <EnviarLoteHoleritesCard isDark={isDark} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Form de upload */}
         <div className={`${cardCls} p-4 space-y-3`}>
-          <h2 className={`text-sm font-bold ${txtMain}`}>Enviar holerite</h2>
+          <h2 className={`text-sm font-bold ${txtMain}`}>Enviar holerite (individual)</h2>
 
           <div>
             <label className={`text-[11px] font-semibold ${txtMuted}`}>Colaborador</label>
