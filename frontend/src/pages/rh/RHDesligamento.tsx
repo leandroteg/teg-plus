@@ -257,39 +257,20 @@ function EtapaRail({
   )
 }
 
-// ── Painel da etapa (placeholder — conteúdo será montado depois) ───────────────
+// ── Painel da etapa (apenas o conteúdo; a aba ativa já indica a etapa) ──────────
 function EtapaPanel({ etapa, isDark }: { etapa: typeof ETAPAS[number]; isDark: boolean }) {
-  const Icon = ETAPA_ICON[etapa.key]
-  const accent = isDark ? ACCENT_DARK[etapa.key] : ACCENT[etapa.key]
   return (
-    <div className={`rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-      {/* Cabeçalho da etapa */}
-      <div className={`flex items-center gap-3 px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent.bgActive}`}>
-          <Icon size={20} className={accent.icon} />
-        </div>
-        <div className="min-w-0">
-          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Etapa {etapa.num} de {ETAPAS.length}
-          </span>
-          <h2 className={`text-base font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.label}</h2>
-          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{etapa.descricao}</p>
-        </div>
-      </div>
-
-      {/* Corpo — placeholder */}
-      <div className="p-5">
-        <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${
-          isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'
-        }`}>
-          <Construction size={34} className={isDark ? 'text-slate-600 mb-3' : 'text-slate-300 mb-3'} />
-          <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Conteúdo da etapa “{etapa.label}” em construção
-          </p>
-          <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            A estrutura do fluxo está pronta. Os campos e ações desta etapa serão montados em seguida.
-          </p>
-        </div>
+    <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+      <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${
+        isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'
+      }`}>
+        <Construction size={34} className={isDark ? 'text-slate-600 mb-3' : 'text-slate-300 mb-3'} />
+        <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          Conteúdo da etapa “{etapa.label}” em construção
+        </p>
+        <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          A estrutura do fluxo está pronta. Os campos e ações desta etapa serão montados em seguida.
+        </p>
       </div>
     </div>
   )

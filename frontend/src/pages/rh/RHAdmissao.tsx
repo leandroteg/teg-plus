@@ -302,25 +302,11 @@ function PlaceholderConstrucao({ etapa, isDark }: { etapa: typeof ETAPAS[number]
   )
 }
 
-// ── Painel da etapa (cabeçalho + conteúdo) ─────────────────────────────────────
-function EtapaPanel({ etapa, isDark, children }: { etapa: typeof ETAPAS[number]; isDark: boolean; children: React.ReactNode }) {
-  const Icon = ETAPA_ICON[etapa.key]
-  const accent = isDark ? ACCENT_DARK[etapa.key] : ACCENT[etapa.key]
+// ── Painel da etapa (apenas o conteúdo; a aba ativa já indica a etapa) ──────────
+function EtapaPanel({ isDark, children }: { etapa: typeof ETAPAS[number]; isDark: boolean; children: React.ReactNode }) {
   return (
-    <div className={`rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-      <div className={`flex items-center gap-3 px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent.bgActive}`}>
-          <Icon size={20} className={accent.icon} />
-        </div>
-        <div className="min-w-0">
-          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Etapa {etapa.num} de {ETAPAS.length}
-          </span>
-          <h2 className={`text-base font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.label}</h2>
-          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{etapa.descricao}</p>
-        </div>
-      </div>
-      <div className="p-5">{children}</div>
+    <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+      {children}
     </div>
   )
 }
