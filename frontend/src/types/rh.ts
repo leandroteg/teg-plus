@@ -262,6 +262,7 @@ export interface FiltrosColaboradores {
   departamento?: string
   setor?: string
   obra_id?: string
+  base_id?: string
   idade_min?: number
   idade_max?: number
   tempo_empresa_min?: number  // em meses

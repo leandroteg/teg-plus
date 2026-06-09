@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaboradores } from '../../hooks/useRH'
-import { useCadObras } from '../../hooks/useCadastros'
+import { useBases } from '../../hooks/useEstoque'
 import type { RHColaborador, FiltrosColaboradores } from '../../types/rh'
 import { TIPOS_CONTRATO, UFS, ESTADOS_CIVIS, GENEROS } from '../../types/rh'
 import RHColaboradorDetalhe from './RHColaboradorDetalhe'
@@ -37,7 +37,7 @@ export default function RHColaboradores() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
 
   const { data: todos = [], isLoading } = useRHColaboradores()
-  const { data: obras = [] } = useCadObras()
+  const { data: bases = [] } = useBases()
 
   // Extrair departamentos e setores únicos
   const departamentos = useMemo(() => [...new Set(todos.map(c => c.departamento).filter(Boolean))] as string[], [todos])
@@ -54,8 +54,8 @@ export default function RHColaboradores() {
       if (filtros.departamento && c.departamento !== filtros.departamento) return false
       // Setor
       if (filtros.setor && c.setor !== filtros.setor) return false
-      // Obra
-      if (filtros.obra_id && c.obra_id !== filtros.obra_id) return false
+      // Base
+      if (filtros.base_id && c.base_id !== filtros.base_id) return false
       // Idade
       if (c.data_nascimento && (filtros.idade_min || filtros.idade_max)) {
         const hoje = new Date()
@@ -100,7 +100,7 @@ export default function RHColaboradores() {
 
   const activeFilterCount = [
     filtros.tipo_contrato, filtros.departamento, filtros.setor,
-    filtros.obra_id, filtros.idade_min, filtros.idade_max,
+    filtros.base_id, filtros.idade_min, filtros.idade_max,
     filtros.tempo_empresa_min, filtros.tempo_empresa_max,
   ].filter(Boolean).length
 
@@ -275,11 +275,11 @@ export default function RHColaboradores() {
               </select>
             </div>
             <div>
-              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Obra</label>
-              <select value={filtros.obra_id || ''} onChange={e => setFiltros(f => ({ ...f, obra_id: e.target.value || undefined }))}
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</label>
+              <select value={filtros.base_id || ''} onChange={e => setFiltros(f => ({ ...f, base_id: e.target.value || undefined }))}
                 className={`w-full px-2 py-1.5 rounded-lg border text-xs ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`}>
                 <option value="">Todas</option>
-                {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>)}
+                {bases.map(b => <option key={b.id} value={b.id}>{b.codigo} — {b.nome}</option>)}
               </select>
             </div>
             <div>
