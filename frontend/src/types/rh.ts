@@ -132,6 +132,28 @@ export interface RHMovimentacao {
 
 export type StatusAdmissao = 'pendente' | 'avaliacao_documentos' | 'aguardando_cadastro' | 'concluida' | 'cancelada'
 
+// Etapas do fluxo de admissão (RH-only)
+export type EtapaAdmissaoFluxo =
+  | 'requisicao' | 'aprovacao' | 'documentacao'
+  | 'exames_treinamentos' | 'mobilizacao' | 'integracao' | 'liberado'
+
+export type StatusAprovacaoAdmissao = 'pendente' | 'aprovado' | 'rejeitado' | 'esclarecimento'
+
+export type TipoMovimentacaoAdmissao = 'substituicao' | 'aumento_quadro'
+
+export interface RHAdmissaoAnexo {
+  id: string
+  admissao_id: string
+  tipo: string            // ctps|cv|cnh|rg|cpf|comprovante|outro
+  obrigatorio: boolean
+  arquivo_nome: string
+  arquivo_path: string
+  tamanho_bytes?: number
+  mime_type?: string
+  uploaded_por?: string
+  created_at: string
+}
+
 export interface RHAdmissao {
   id: string
   colaborador_id?: string
@@ -151,10 +173,40 @@ export interface RHAdmissao {
   created_at: string
   updated_at: string
 
+  // Fluxo de admissão (RH-only)
+  etapa?: EtapaAdmissaoFluxo
+  status_aprovacao?: StatusAprovacaoAdmissao | null
+  motivo?: string
+  tipo_movimentacao?: TipoMovimentacaoAdmissao
+  colaborador_substituido_id?: string
+  urgente?: boolean
+  solicitante_id?: string
+  solicitante_nome?: string
+  aprovador_id?: string
+  aprovador_nome?: string
+  data_decisao?: string
+  motivo_decisao?: string
+
   // Joins
   obra_prevista?: { id: string; codigo: string; nome: string }
   colaborador?: { id: string; nome: string }
+  anexos?: RHAdmissaoAnexo[]
 }
+
+export const TIPOS_ANEXO_ADMISSAO = [
+  { value: 'ctps', label: 'CTPS', obrigatorio: true },
+  { value: 'cv', label: 'Currículo (CV)', obrigatorio: false },
+  { value: 'cnh', label: 'CNH', obrigatorio: false },
+  { value: 'rg', label: 'RG', obrigatorio: false },
+  { value: 'cpf', label: 'CPF', obrigatorio: false },
+  { value: 'comprovante', label: 'Comprovante de Endereço', obrigatorio: false },
+  { value: 'outro', label: 'Outro documento', obrigatorio: false },
+]
+
+export const TIPOS_MOVIMENTACAO_ADMISSAO = [
+  { value: 'substituicao', label: 'Substituição' },
+  { value: 'aumento_quadro', label: 'Aumento de quadro' },
+]
 
 export type TipoDesligamento = 'sem_justa_causa' | 'com_justa_causa' | 'pedido_demissao' | 'acordo_mutuo' | 'termino_contrato'
 export type StatusDesligamento = 'em_andamento' | 'concluido' | 'cancelado'

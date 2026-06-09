@@ -21,7 +21,7 @@ export default function HeadcountLayout() {
             label: 'Admissão',
             description: 'Solicitar a admissão de um novo colaborador.',
             tone: 'emerald' as const,
-            action: () => navigate('/rh/headcount/admissao'),
+            action: () => navigate('/rh/headcount/admissao?nova=1'),
           },
           {
             icon: TrendingUp,
