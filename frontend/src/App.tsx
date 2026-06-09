@@ -32,6 +32,7 @@ import LogisticaLayout from './components/LogisticaLayout'
 import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
+import DPLayout from './components/DPLayout'
 import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
 import LocacaoLayout from './components/LocacaoLayout'
@@ -125,6 +126,10 @@ const RHPainel = lazy(() => import('./pages/rh/RHPainel'))
 const RHAdmissao = lazy(() => import('./pages/rh/RHAdmissao'))
 const RHColaboradores = lazy(() => import('./pages/rh/RHColaboradores'))
 const RHHolerites = lazy(() => import('./pages/rh/RHHolerites'))
+const DPPainel = lazy(() => import('./pages/rh/DPPainel'))
+const DPBeneficios = lazy(() => import('./pages/rh/DPBeneficios'))
+const DPPonto = lazy(() => import('./pages/rh/DPPonto'))
+const DPFolha = lazy(() => import('./pages/rh/DPFolha'))
 const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
 const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
 
@@ -374,7 +379,13 @@ export default function App() {
               <Route path="/rh/headcount/colaboradores" element={<Lazy><RHColaboradores /></Lazy>} />
               <Route path="/rh/headcount/movimentacoes" element={<Lazy><RHMovimentacoes /></Lazy>} />
               <Route path="/rh/headcount/desligamento"  element={<Lazy><RHDesligamento /></Lazy>} />
-              <Route path="/rh/headcount/holerites"     element={<Lazy><RHHolerites /></Lazy>} />
+            </Route>
+            <Route element={<DPLayout />}>
+              <Route path="/rh/dp"            element={<LazyDash><DPPainel /></LazyDash>} />
+              <Route path="/rh/dp/beneficios" element={<Lazy><DPBeneficios /></Lazy>} />
+              <Route path="/rh/dp/ponto"      element={<Lazy><DPPonto /></Lazy>} />
+              <Route path="/rh/dp/folha"      element={<Lazy><DPFolha /></Lazy>} />
+              <Route path="/rh/dp/holerites"  element={<Lazy><RHHolerites /></Lazy>} />
             </Route>
           </Route>
 

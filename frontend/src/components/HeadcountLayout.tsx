@@ -43,7 +43,6 @@ export default function HeadcountLayout() {
     { to: '/rh/headcount/admissao',      icon: UserPlus,        label: 'Admissão' },
     { to: '/rh/headcount/colaboradores', icon: Users,           label: 'Colaboradores' },
     { to: '/rh/headcount/desligamento',  icon: UserMinus,       label: 'Desligamento' },
-    { to: '/rh/headcount/holerites',     icon: Receipt,         label: 'Holerites' },
   ]
 
   return (

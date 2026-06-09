@@ -11,6 +11,7 @@ export interface RHColaborador {
   departamento?: string
   setor?: string
   obra_id?: string
+  base_id?: string
   email?: string
   telefone?: string
   foto_url?: string
@@ -67,6 +68,7 @@ export interface RHColaborador {
 
   // Joins
   obra?: { id: string; codigo: string; nome: string }
+  base?: { id: string; codigo: string; nome: string }
   gestor?: { id: string; nome: string }
 }
 
