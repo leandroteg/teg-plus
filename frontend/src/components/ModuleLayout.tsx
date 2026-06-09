@@ -21,7 +21,7 @@ export interface NavActionMenuItem {
   icon: LucideIcon
   label: string
   description?: string
-  tone?: 'amber' | 'emerald'
+  tone?: 'amber' | 'emerald' | 'sky' | 'violet' | 'rose' | 'blue'
   action: () => void
 }
 
@@ -457,14 +457,14 @@ export default function ModuleLayout({
   }
 
   function navActionMenuToneClasses(tone: NavActionMenuItem['tone']) {
-    if (tone === 'amber') {
-      return ls
-        ? 'bg-amber-50 text-amber-600'
-        : 'bg-amber-500/15 text-amber-300'
+    switch (tone) {
+      case 'amber':  return ls ? 'bg-amber-50 text-amber-600'   : 'bg-amber-500/15 text-amber-300'
+      case 'sky':    return ls ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/15 text-sky-300'
+      case 'violet': return ls ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'
+      case 'rose':   return ls ? 'bg-rose-50 text-rose-600'     : 'bg-rose-500/15 text-rose-300'
+      case 'blue':   return ls ? 'bg-blue-50 text-blue-600'     : 'bg-blue-500/15 text-blue-300'
+      default:       return ls ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-300'
     }
-    return ls
-      ? 'bg-emerald-50 text-emerald-600'
-      : 'bg-emerald-500/15 text-emerald-300'
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
