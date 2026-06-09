@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/rh/RHAdmissao.tsx — Fluxo de Admissão (7 etapas)
-// Estrutura/esqueleto: rail de sub-abas no padrão visual do Financeiro.
+// Rail de abas no padrão do Financeiro (CPPipeline · PipelineRail).
 // O conteúdo de cada etapa será montado nas próximas iterações.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef, useEffect } from 'react'
 import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
-  HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction,
+  HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -20,93 +20,45 @@ export type EtapaAdmissao =
   | 'integracao'
   | 'liberado'
 
-interface EtapaMeta {
-  key: EtapaAdmissao
-  num: number
-  label: string
-  descricao: string
-  icon: typeof UserPlus
-  iconColor: string
-  // Estados ativos do rail (light / dark)
-  bgActive: string
-  bgActiveDark: string
-  textActive: string
-  textActiveDark: string
-  border: string
-  borderDark: string
-  circle: string      // bolinha numerada quando ativa (light)
-  circleDark: string  // bolinha numerada quando ativa (dark)
+const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
+  { key: 'requisicao',          num: 1, label: 'Requisição',              descricao: 'Gestor solicita a admissão (após aceite da vaga).',              icon: ClipboardList },
+  { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
+  { key: 'documentacao',        num: 3, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
+  { key: 'exames_treinamentos', num: 4, label: 'Exames e Treinamentos',   descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).', icon: Stethoscope },
+  { key: 'mobilizacao',         num: 5, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
+  { key: 'integracao',          num: 6, label: 'Integração',              descricao: 'Onboarding com RH e Gestor.',                                    icon: HeartHandshake },
+  { key: 'liberado',            num: 7, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
+]
+
+const ETAPA_ICON: Record<EtapaAdmissao, typeof Receipt> = Object.fromEntries(
+  ETAPAS.map(e => [e.key, e.icon]),
+) as Record<EtapaAdmissao, typeof Receipt>
+
+// Acentos por etapa — mesma estrutura do STATUS_ACCENT do Financeiro
+const ACCENT: Record<EtapaAdmissao, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+  requisicao:          { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    border: 'border-blue-500',    badge: 'bg-blue-100 text-blue-700',       icon: 'text-blue-500' },
+  aprovacao:           { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700',     icon: 'text-amber-500' },
+  documentacao:        { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700',   icon: 'text-violet-500' },
+  exames_treinamentos: { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     badge: 'bg-sky-100 text-sky-700',         icon: 'text-sky-500' },
+  mobilizacao:         { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  border: 'border-orange-500',  badge: 'bg-orange-100 text-orange-700',   icon: 'text-orange-500' },
+  integracao:          { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',    text: 'text-teal-600',    textActive: 'text-teal-800',    border: 'border-teal-500',    badge: 'bg-teal-100 text-teal-700',       icon: 'text-teal-500' },
+  liberado:            { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-500' },
 }
 
-const ETAPAS: EtapaMeta[] = [
-  {
-    key: 'requisicao', num: 1, label: 'Requisição',
-    descricao: 'Gestor solicita a admissão (após aceite da vaga).',
-    icon: ClipboardList, iconColor: 'text-blue-500',
-    bgActive: 'bg-blue-50', bgActiveDark: 'bg-blue-500/10',
-    textActive: 'text-blue-700', textActiveDark: 'text-blue-300',
-    border: 'border-blue-300', borderDark: 'border-blue-500/40',
-    circle: 'bg-blue-600 text-white', circleDark: 'bg-blue-500/30 text-blue-200',
-  },
-  {
-    key: 'aprovacao', num: 2, label: 'Aprovação',
-    descricao: 'Diretoria autoriza a admissão solicitada.',
-    icon: ShieldCheck, iconColor: 'text-indigo-500',
-    bgActive: 'bg-indigo-50', bgActiveDark: 'bg-indigo-500/10',
-    textActive: 'text-indigo-700', textActiveDark: 'text-indigo-300',
-    border: 'border-indigo-300', borderDark: 'border-indigo-500/40',
-    circle: 'bg-indigo-600 text-white', circleDark: 'bg-indigo-500/30 text-indigo-200',
-  },
-  {
-    key: 'documentacao', num: 3, label: 'Documentação',
-    descricao: 'Envio e conferência da documentação do colaborador.',
-    icon: FileText, iconColor: 'text-violet-500',
-    bgActive: 'bg-violet-50', bgActiveDark: 'bg-violet-500/10',
-    textActive: 'text-violet-700', textActiveDark: 'text-violet-300',
-    border: 'border-violet-300', borderDark: 'border-violet-500/40',
-    circle: 'bg-violet-600 text-white', circleDark: 'bg-violet-500/30 text-violet-200',
-  },
-  {
-    key: 'exames_treinamentos', num: 4, label: 'Exames e Treinamentos',
-    descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).',
-    icon: Stethoscope, iconColor: 'text-amber-500',
-    bgActive: 'bg-amber-50', bgActiveDark: 'bg-amber-500/10',
-    textActive: 'text-amber-700', textActiveDark: 'text-amber-300',
-    border: 'border-amber-300', borderDark: 'border-amber-500/40',
-    circle: 'bg-amber-500 text-white', circleDark: 'bg-amber-500/30 text-amber-200',
-  },
-  {
-    key: 'mobilizacao', num: 5, label: 'Mobilização',
-    descricao: 'Logística de deslocamento e chegada à obra.',
-    icon: Truck, iconColor: 'text-orange-500',
-    bgActive: 'bg-orange-50', bgActiveDark: 'bg-orange-500/10',
-    textActive: 'text-orange-700', textActiveDark: 'text-orange-300',
-    border: 'border-orange-300', borderDark: 'border-orange-500/40',
-    circle: 'bg-orange-500 text-white', circleDark: 'bg-orange-500/30 text-orange-200',
-  },
-  {
-    key: 'integracao', num: 6, label: 'Integração',
-    descricao: 'Onboarding com RH e Gestor.',
-    icon: HeartHandshake, iconColor: 'text-teal-500',
-    bgActive: 'bg-teal-50', bgActiveDark: 'bg-teal-500/10',
-    textActive: 'text-teal-700', textActiveDark: 'text-teal-300',
-    border: 'border-teal-300', borderDark: 'border-teal-500/40',
-    circle: 'bg-teal-600 text-white', circleDark: 'bg-teal-500/30 text-teal-200',
-  },
-  {
-    key: 'liberado', num: 7, label: 'Liberado para Atividades',
-    descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.',
-    icon: CheckCircle2, iconColor: 'text-emerald-500',
-    bgActive: 'bg-emerald-50', bgActiveDark: 'bg-emerald-500/10',
-    textActive: 'text-emerald-700', textActiveDark: 'text-emerald-300',
-    border: 'border-emerald-300', borderDark: 'border-emerald-500/40',
-    circle: 'bg-emerald-600 text-white', circleDark: 'bg-emerald-500/30 text-emerald-200',
-  },
-]
+const ACCENT_DARK: Record<EtapaAdmissao, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+  requisicao:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    border: 'border-blue-400/40',    badge: 'bg-blue-500/15 text-blue-200',       icon: 'text-blue-400' },
+  aprovacao:           { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200',     icon: 'text-amber-400' },
+  documentacao:        { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200',   icon: 'text-violet-400' },
+  exames_treinamentos: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200',         icon: 'text-sky-400' },
+  mobilizacao:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  border: 'border-orange-400/40',  badge: 'bg-orange-500/15 text-orange-200',   icon: 'text-orange-400' },
+  integracao:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300',    border: 'border-teal-400/40',    badge: 'bg-teal-500/15 text-teal-200',       icon: 'text-teal-400' },
+  liberado:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200', icon: 'text-emerald-400' },
+}
 
 // ── Tela principal ────────────────────────────────────────────────────────────
 export default function RHAdmissao() {
   const { isLightSidebar: isLight } = useTheme()
+  const isDark = !isLight
   const [etapa, setEtapa] = useState<EtapaAdmissao>('requisicao')
 
   const ativa = ETAPAS.find(e => e.key === etapa) ?? ETAPAS[0]
@@ -138,205 +90,208 @@ export default function RHAdmissao() {
         </button>
       </div>
 
-      {/* Rail de sub-abas (etapas do fluxo) */}
-      <EtapaRail isLight={isLight} etapa={etapa} setEtapa={setEtapa} counts={counts} />
+      {/* Rail de abas (etapas do fluxo) — padrão Financeiro */}
+      <EtapaRail isDark={isDark} etapa={etapa} setEtapa={setEtapa} counts={counts} />
 
       {/* Conteúdo da etapa ativa (placeholder por enquanto) */}
-      <EtapaPanel etapa={ativa} isLight={isLight} />
+      <EtapaPanel etapa={ativa} isDark={isDark} />
     </div>
   )
 }
 
-// ── Rail de etapas (padrão visual do Financeiro: scrollável + drag + chevrons) ─
+// ── Rail de etapas (cópia fiel do PipelineRail do Financeiro) ──────────────────
 function EtapaRail({
-  isLight,
+  isDark,
   etapa,
   setEtapa,
   counts,
 }: {
-  isLight: boolean
+  isDark: boolean
   etapa: EtapaAdmissao
   setEtapa: (e: EtapaAdmissao) => void
   counts: Record<EtapaAdmissao, number>
 }) {
-  const isDark = !isLight
   const railRef = useRef<HTMLDivElement | null>(null)
-  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number; moved: boolean }>({
-    active: false, startX: 0, startScrollLeft: 0, moved: false,
+  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number }>({
+    active: false, startX: 0, startScrollLeft: 0,
   })
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
-  const updateScrollState = () => {
-    const el = railRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 8)
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8)
-  }
-
   useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const updateScrollState = () => {
+      const maxScroll = rail.scrollWidth - rail.clientWidth
+      setCanScrollLeft(rail.scrollLeft > 8)
+      setCanScrollRight(maxScroll - rail.scrollLeft > 8)
+    }
     updateScrollState()
-    const el = railRef.current
-    if (!el) return
-    el.addEventListener('scroll', updateScrollState, { passive: true })
-    const resizeObserver = new ResizeObserver(() => updateScrollState())
-    resizeObserver.observe(el)
+    rail.addEventListener('scroll', updateScrollState, { passive: true })
+    const resizeObserver = new ResizeObserver(updateScrollState)
+    resizeObserver.observe(rail)
+    Array.from(rail.children).forEach(child => resizeObserver.observe(child))
     return () => {
-      el.removeEventListener('scroll', updateScrollState)
+      rail.removeEventListener('scroll', updateScrollState)
       resizeObserver.disconnect()
     }
-  }, [])
+  }, [etapa])
 
-  const scrollByAmount = (direction: -1 | 1) => {
-    railRef.current?.scrollBy({ left: direction * 240, behavior: 'smooth' })
+  const scrollByOffset = (direction: 'left' | 'right') => {
+    const rail = railRef.current
+    if (!rail) return
+    const offset = Math.max(rail.clientWidth * 0.72, 220)
+    rail.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' })
   }
 
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current = { active: true, startX: event.clientX, startScrollLeft: rail.scrollLeft }
+    rail.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current.active) return
+    const rail = railRef.current
+    if (!rail) return
+    const delta = event.clientX - dragRef.current.startX
+    rail.scrollLeft = dragRef.current.startScrollLeft - delta
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current.active = false
+    if (rail.hasPointerCapture(event.pointerId)) {
+      rail.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+    event.preventDefault()
+    rail.scrollLeft += event.deltaY
+  }
+
+  const arrowBaseClass = isDark
+    ? 'border-white/[0.08] bg-slate-950/80 text-slate-200 hover:bg-slate-900'
+    : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50'
+
   return (
-    <div className="relative min-w-0">
+    <div className={`relative min-w-0 rounded-2xl border p-1.5 ${
+      isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
+    }`}>
       {canScrollLeft && (
         <>
-          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-10 rounded-l-2xl bg-gradient-to-r ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-16 rounded-l-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-r from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-r from-white via-white/85 to-transparent'
+          }`} />
           <button
             type="button"
-            onClick={() => scrollByAmount(-1)}
-            className={`absolute left-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
-              isDark
-                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
-                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
-            }`}
             aria-label="Rolar etapas para a esquerda"
+            onClick={() => scrollByOffset('left')}
+            className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
           >
-            <ChevronLeft size={14} className="mx-auto" />
+            <ChevronLeft size={16} />
           </button>
         </>
       )}
+
       {canScrollRight && (
         <>
-          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-10 rounded-r-2xl bg-gradient-to-l ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-16 rounded-r-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-l from-white via-white/85 to-transparent'
+          }`} />
           <button
             type="button"
-            onClick={() => scrollByAmount(1)}
-            className={`absolute right-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
-              isDark
-                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
-                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
-            }`}
             aria-label="Rolar etapas para a direita"
+            onClick={() => scrollByOffset('right')}
+            className={`absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
           >
-            <ChevronRight size={14} className="mx-auto" />
+            <ChevronRight size={16} />
           </button>
         </>
       )}
 
       <div
         ref={railRef}
-        onMouseDown={e => {
-          dragRef.current = {
-            active: true, startX: e.clientX,
-            startScrollLeft: railRef.current?.scrollLeft ?? 0, moved: false,
-          }
-        }}
-        onMouseMove={e => {
-          if (!dragRef.current.active || !railRef.current) return
-          const delta = e.clientX - dragRef.current.startX
-          if (Math.abs(delta) > 4) dragRef.current.moved = true
-          railRef.current.scrollLeft = dragRef.current.startScrollLeft - delta
-        }}
-        onMouseUp={() => { window.setTimeout(() => { dragRef.current.active = false }, 0) }}
-        onMouseLeave={() => { dragRef.current.active = false }}
-        onClickCapture={e => {
-          if (dragRef.current.moved) {
-            e.preventDefault()
-            e.stopPropagation()
-            dragRef.current.moved = false
-          }
-        }}
-        onWheel={e => {
-          const el = railRef.current
-          if (!el) return
-          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-            e.preventDefault()
-            el.scrollLeft += e.deltaY
-          }
-        }}
-        className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar pr-12 ${canScrollLeft ? 'pl-12' : ''} ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'} cursor-grab active:cursor-grabbing`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+        className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
       >
-        {ETAPAS.map(e => {
-          const Icon = e.icon
-          const isActive = etapa === e.key
-          const count = counts[e.key]
-          return (
-            <button
-              key={e.key}
-              onClick={() => setEtapa(e.key)}
-              className={`min-w-fit flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
-                isActive
-                  ? isDark
-                    ? `${e.bgActiveDark} ${e.textActiveDark} ${e.borderDark} shadow-sm`
-                    : `${e.bgActive} ${e.textActive} ${e.border} shadow-sm`
-                  : isDark
-                    ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
-                    : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
-              }`}
-            >
-              {/* Bolinha numerada (passo do fluxo) */}
-              <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                isActive
-                  ? isDark ? e.circleDark : e.circle
-                  : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200 text-slate-500'
-              }`}>
-                {e.num}
-              </span>
-              <Icon size={15} className="shrink-0" />
-              {e.label}
-              {count > 0 && (
-                <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:w-full">
+          {ETAPAS.map(e => {
+            const count = counts[e.key] || 0
+            const isActive = etapa === e.key
+            const Icon = e.icon
+            const accent = isDark ? ACCENT_DARK[e.key] : ACCENT[e.key]
+            return (
+              <button
+                key={e.key}
+                onClick={() => setEtapa(e.key)}
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
                   isActive
-                    ? isDark ? 'bg-white/[0.12] text-slate-100' : 'bg-white text-slate-700'
-                    : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+                    ? `${accent.bgActive} ${accent.textActive} border font-bold shadow-sm ${accent.border}`
+                    : `${accent.bg} ${accent.text} font-medium`
+                }`}
+              >
+                <Icon size={15} className="shrink-0" />
+                {e.label}
+                {count > 0 && (
+                  <span className={`rounded-full min-w-[24px] h-[24px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
+                    isActive
+                      ? accent.badge
+                      : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
 // ── Painel da etapa (placeholder — conteúdo será montado depois) ───────────────
-function EtapaPanel({ etapa, isLight }: { etapa: EtapaMeta; isLight: boolean }) {
-  const Icon = etapa.icon
+function EtapaPanel({ etapa, isDark }: { etapa: typeof ETAPAS[number]; isDark: boolean }) {
+  const Icon = ETAPA_ICON[etapa.key]
+  const accent = isDark ? ACCENT_DARK[etapa.key] : ACCENT[etapa.key]
   return (
-    <div className={`rounded-2xl border ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+    <div className={`rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
       {/* Cabeçalho da etapa */}
-      <div className={`flex items-center gap-3 px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isLight ? 'bg-slate-100' : 'bg-white/[0.05]'}`}>
-          <Icon size={20} className={etapa.iconColor} />
+      <div className={`flex items-center gap-3 px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent.bgActive}`}>
+          <Icon size={20} className={accent.icon} />
         </div>
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-              Etapa {etapa.num} de {ETAPAS.length}
-            </span>
-          </div>
-          <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{etapa.label}</h2>
-          <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{etapa.descricao}</p>
+          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Etapa {etapa.num} de {ETAPAS.length}
+          </span>
+          <h2 className={`text-base font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.label}</h2>
+          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{etapa.descricao}</p>
         </div>
       </div>
 
       {/* Corpo — placeholder */}
       <div className="p-5">
         <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${
-          isLight ? 'border-slate-300 bg-slate-50/60' : 'border-white/[0.10] bg-white/[0.02]'
+          isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'
         }`}>
-          <Construction size={34} className={isLight ? 'text-slate-300 mb-3' : 'text-slate-600 mb-3'} />
-          <p className={`text-sm font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <Construction size={34} className={isDark ? 'text-slate-600 mb-3' : 'text-slate-300 mb-3'} />
+          <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             Conteúdo da etapa “{etapa.label}” em construção
           </p>
-          <p className={`text-xs mt-1 max-w-md ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             A estrutura do fluxo está pronta. Os campos e ações desta etapa serão montados em seguida.
           </p>
         </div>
