@@ -16,6 +16,22 @@ const SELECT =
   'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*)), ' +
   'anexos:rh_admissao_anexos!admissao_id(*)'
 
+// Bases operacionais (cadastro est_bases) — leitura para o select da requisição
+export function useBasesAdmissao() {
+  return useQuery<{ id: string; nome: string; codigo?: string }[]>({
+    queryKey: ['rh-bases-admissao'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('est_bases')
+        .select('id,nome,codigo')
+        .eq('ativa', true)
+        .order('nome')
+      if (error) { console.error('useBasesAdmissao:', error); return [] }
+      return (data ?? []) as { id: string; nome: string; codigo?: string }[]
+    },
+  })
+}
+
 export function useAdmissoesFluxo() {
   return useQuery<RHAdmissao[]>({
     queryKey: ['rh-admissoes-fluxo'],

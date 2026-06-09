@@ -10,8 +10,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
-import { useCriarAdmissao, parseDocumentoAdmissao } from '../../hooks/useRHAdmissaoFluxo'
-import { TIPOS_CONTRATO, TIPOS_ANEXO_ADMISSAO, TIPOS_MOVIMENTACAO_ADMISSAO, BASES_ADMISSAO } from '../../types/rh'
+import { useCriarAdmissao, parseDocumentoAdmissao, useBasesAdmissao } from '../../hooks/useRHAdmissaoFluxo'
+import { TIPOS_CONTRATO, TIPOS_ANEXO_ADMISSAO, TIPOS_MOVIMENTACAO_ADMISSAO } from '../../types/rh'
 
 const LABEL = 'text-xs font-semibold text-slate-500 mb-1 block'
 const INPUT = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -44,6 +44,7 @@ function guessTipo(name: string): string {
 export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => void; onCreated: () => void }) {
   const { perfil } = useAuth()
   const { data: centrosCusto = [] } = useLookupCentrosCusto()
+  const { data: bases = [] } = useBasesAdmissao()
   const criar = useCriarAdmissao()
   const fileRef = useRef<HTMLInputElement>(null)
   const uidRef = useRef(1)
@@ -209,7 +210,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
             <label className={LABEL}>Base <span className="text-red-400">*</span></label>
             <select value={base} onChange={e => setBase(e.target.value)} className={INPUT}>
               <option value="">Selecione a base</option>
-              {BASES_ADMISSAO.map(b => <option key={b} value={b}>{b}</option>)}
+              {bases.map(b => <option key={b.id} value={b.nome}>{b.nome}</option>)}
             </select>
           </div>
           <div>

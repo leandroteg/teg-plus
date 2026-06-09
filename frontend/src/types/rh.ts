@@ -214,18 +214,6 @@ export interface RHAdmissao {
   candidatos?: RHAdmissaoCandidato[]
 }
 
-// Bases operacionais (polos) — usadas na requisição de admissão
-export const BASES_ADMISSAO = [
-  'Frutal',
-  'Perdizes',
-  'Rio Paranaíba',
-  'Três Marias',
-  'Araxá',
-  'Ituiutaba',
-  'Paracatu',
-  'Outra',
-]
-
 export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'ctps', label: 'CTPS', obrigatorio: true },
   { value: 'cv', label: 'Currículo (CV)', obrigatorio: false },
