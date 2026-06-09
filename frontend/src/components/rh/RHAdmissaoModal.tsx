@@ -25,7 +25,9 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   const autorNome = perfil?.nome || perfil?.email || 'Usuário'
   const etapa = adm.etapa ?? 'requisicao'
   const candidatos = adm.candidatos ?? []
-  const obraTxt = adm.obra_prevista ? `${adm.obra_prevista.codigo ?? ''} ${adm.obra_prevista.nome}`.trim() : '—'
+  const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : ''
+  const baseTxt = adm.base || ''
+  const localTxt = [baseTxt, ccTxt].filter(Boolean).join(' · ') || '—'
 
   async function executar(acao: AcaoAdmissao, motivo?: string) {
     await transicao.mutateAsync({ adm, acao, autorId: perfil?.id, autorNome, motivo })
@@ -53,7 +55,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             </div>
             <div className="min-w-0">
               <h2 className="text-base font-bold text-slate-800 truncate">Solicitação de Admissão</h2>
-              <p className="text-xs text-slate-500 truncate">{candidatos.length} candidato(s) · {obraTxt}</p>
+              <p className="text-xs text-slate-500 truncate">{candidatos.length} candidato(s) · {localTxt}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
@@ -89,7 +91,8 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
 
           {/* Dados compartilhados */}
           <div className="grid grid-cols-2 gap-3">
-            <Info icon={Building2} label="Obra" value={obraTxt} />
+            <Info icon={Building2} label="Base" value={baseTxt} />
+            <Info icon={Briefcase} label="Centro de Custo" value={ccTxt} />
             <Info icon={Calendar} label="Início previsto" value={adm.data_prevista_inicio ? new Date(adm.data_prevista_inicio).toLocaleDateString('pt-BR') : undefined} />
             <Info icon={Briefcase} label="Contrato / Movimentação" value={[adm.tipo_contrato, movLabel(adm.tipo_movimentacao)].filter(Boolean).join(' · ')} />
             <Info icon={Building2} label="Departamento" value={adm.departamento_previsto} />

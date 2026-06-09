@@ -9,9 +9,9 @@ import {
   Sparkles, Plus, Trash2, Users,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useCadObras } from '../../hooks/useCadastros'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import { useCriarAdmissao, parseDocumentoAdmissao } from '../../hooks/useRHAdmissaoFluxo'
-import { TIPOS_CONTRATO, TIPOS_ANEXO_ADMISSAO, TIPOS_MOVIMENTACAO_ADMISSAO } from '../../types/rh'
+import { TIPOS_CONTRATO, TIPOS_ANEXO_ADMISSAO, TIPOS_MOVIMENTACAO_ADMISSAO, BASES_ADMISSAO } from '../../types/rh'
 
 const LABEL = 'text-xs font-semibold text-slate-500 mb-1 block'
 const INPUT = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -43,13 +43,14 @@ function guessTipo(name: string): string {
 
 export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => void; onCreated: () => void }) {
   const { perfil } = useAuth()
-  const { data: obras = [] } = useCadObras()
+  const { data: centrosCusto = [] } = useLookupCentrosCusto()
   const criar = useCriarAdmissao()
   const fileRef = useRef<HTMLInputElement>(null)
   const uidRef = useRef(1)
 
   // Compartilhados
-  const [obraId, setObraId] = useState('')
+  const [centroCustoId, setCentroCustoId] = useState('')
+  const [base, setBase] = useState('')
   const [departamento, setDepartamento] = useState('')
   const [tipoMov, setTipoMov] = useState('substituicao')
   const [tipoContrato, setTipoContrato] = useState('CLT')
@@ -124,7 +125,8 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
 
   function validar(): string[] {
     const e: string[] = []
-    if (!obraId) e.push('Selecione a obra')
+    if (!centroCustoId) e.push('Selecione o centro de custo')
+    if (!base) e.push('Selecione a base')
     if (!motivo.trim()) e.push('Informe o motivo da admissão')
     if (candidatos.length === 0) e.push('Adicione pelo menos um candidato')
     if (candidatos.some(c => !c.nome.trim())) e.push('Todos os candidatos precisam ter nome')
@@ -138,7 +140,8 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
     try {
       await criar.mutateAsync({
         dados: {
-          obra_prevista_id: obraId || undefined,
+          centro_custo_id: centroCustoId || undefined,
+          base: base || undefined,
           departamento_previsto: departamento.trim() || undefined,
           tipo_movimentacao: tipoMov as 'substituicao' | 'aumento_quadro',
           tipo_contrato: tipoContrato,
@@ -193,13 +196,20 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none" />
         </div>
 
-        {/* Compartilhados: Obra + Data */}
+        {/* Compartilhados: Centro de Custo + Base + Data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="md:col-span-2">
-            <label className={LABEL}>Obra <span className="text-red-400">*</span></label>
-            <select value={obraId} onChange={e => setObraId(e.target.value)} className={INPUT}>
-              <option value="">Selecione a obra</option>
-              {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+          <div>
+            <label className={LABEL}>Centro de Custo <span className="text-red-400">*</span></label>
+            <select value={centroCustoId} onChange={e => setCentroCustoId(e.target.value)} className={INPUT}>
+              <option value="">Selecione o CC</option>
+              {centrosCusto.map(cc => <option key={cc.id} value={cc.id}>{cc.codigo} - {cc.descricao}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={LABEL}>Base <span className="text-red-400">*</span></label>
+            <select value={base} onChange={e => setBase(e.target.value)} className={INPUT}>
+              <option value="">Selecione a base</option>
+              {BASES_ADMISSAO.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
           <div>

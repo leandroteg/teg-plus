@@ -170,7 +170,8 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
           )}
         </div>
         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-          {adm.obra_prevista && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{adm.obra_prevista.codigo ?? adm.obra_prevista.nome}</span>}
+          {adm.base && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{adm.base}</span>}
+          {adm.centro_custo && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{adm.centro_custo.codigo}</span>}
           <span className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Paperclip size={9} />{nDocs} doc(s)</span>
         </div>
       </div>

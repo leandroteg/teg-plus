@@ -202,12 +202,29 @@ export interface RHAdmissao {
   data_decisao?: string
   motivo_decisao?: string
 
+  // Centro de Custo + Base (RH-only)
+  centro_custo_id?: string
+  base?: string
+
   // Joins
   obra_prevista?: { id: string; codigo: string; nome: string }
+  centro_custo?: { id: string; codigo: string; descricao: string }
   colaborador?: { id: string; nome: string }
   anexos?: RHAdmissaoAnexo[]
   candidatos?: RHAdmissaoCandidato[]
 }
+
+// Bases operacionais (polos) — usadas na requisição de admissão
+export const BASES_ADMISSAO = [
+  'Frutal',
+  'Perdizes',
+  'Rio Paranaíba',
+  'Três Marias',
+  'Araxá',
+  'Ituiutaba',
+  'Paracatu',
+  'Outra',
+]
 
 export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'ctps', label: 'CTPS', obrigatorio: true },

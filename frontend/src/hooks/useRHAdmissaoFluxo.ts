@@ -12,7 +12,7 @@ const BUCKET = 'rh-admissao-docs'
 const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
 const SELECT =
-  '*, obra_prevista:sys_obras!obra_prevista_id(id,codigo,nome), ' +
+  '*, centro_custo:sys_centros_custo!centro_custo_id(id,codigo,descricao), ' +
   'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*)), ' +
   'anexos:rh_admissao_anexos!admissao_id(*)'
 
