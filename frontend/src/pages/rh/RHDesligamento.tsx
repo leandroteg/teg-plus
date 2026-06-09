@@ -67,22 +67,14 @@ export default function RHDesligamento() {
   return (
     <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <UserMinus size={20} className="text-rose-400" />
-            Desligamento
-          </h1>
-          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Fluxo de desligamento — da requisição ao encerramento
-          </p>
-        </div>
-        <button
-          onClick={() => setEtapa('requisicao')}
-          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
-        >
-          <Plus size={15} /> Novo Desligamento
-        </button>
+      <div>
+        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <UserMinus size={20} className="text-rose-400" />
+          Desligamento
+        </h1>
+        <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          Fluxo de desligamento — da requisição ao encerramento
+        </p>
       </div>
 
       {/* Rail de abas (etapas do fluxo) — padrão Financeiro */}

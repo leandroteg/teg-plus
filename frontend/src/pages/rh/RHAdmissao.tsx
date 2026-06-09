@@ -118,22 +118,14 @@ export default function RHAdmissao() {
   return (
     <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <UserPlus size={20} className="text-violet-400" />
-            Admissão
-          </h1>
-          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Fluxo de admissão — da requisição à liberação para atividades
-          </p>
-        </div>
-        <button
-          onClick={() => setView('nova')}
-          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
-        >
-          <Plus size={15} /> Nova Requisição
-        </button>
+      <div>
+        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <UserPlus size={20} className="text-violet-400" />
+          Admissão
+        </h1>
+        <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          Fluxo de admissão — da requisição à liberação para atividades
+        </p>
       </div>
 
       {/* Rail de abas */}
