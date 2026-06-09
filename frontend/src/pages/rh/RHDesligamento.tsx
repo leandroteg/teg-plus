@@ -1,348 +1,296 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// pages/rh/RHDesligamento.tsx — Fluxo de Desligamento
+// pages/rh/RHDesligamento.tsx — Fluxo de Desligamento (6 etapas)
+// Rail de abas no padrão do Financeiro (CPPipeline · PipelineRail).
+// O conteúdo de cada etapa será montado nas próximas iterações.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
-  UserMinus, Plus, X, Search, User, Calendar, CheckSquare,
-  Square, ChevronRight, AlertTriangle, CheckCircle2, Clock,
+  UserMinus, ClipboardList, ShieldCheck, ClipboardCheck, FileCheck, DollarSign,
+  CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAuth } from '../../contexts/AuthContext'
-import { useRHColaboradores, useRHDesligamentos, useSalvarRHDesligamento } from '../../hooks/useRH'
-import type { RHDesligamento, StatusDesligamento } from '../../types/rh'
-import { TIPOS_DESLIGAMENTO, CHECKLIST_DESLIGAMENTO } from '../../types/rh'
 
+// ── Etapas do fluxo ───────────────────────────────────────────────────────────
+export type EtapaDesligamento =
+  | 'requisicao'
+  | 'aprovacao'
+  | 'preparo'
+  | 'nada_consta'
+  | 'rescisao'
+  | 'encerrados'
+
+const ETAPAS: { key: EtapaDesligamento; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
+  { key: 'requisicao',  num: 1, label: 'Requisição',  descricao: 'Gestor solicita o desligamento do colaborador.',                  icon: ClipboardList },
+  { key: 'aprovacao',   num: 2, label: 'Aprovação',   descricao: 'Diretoria autoriza o desligamento solicitado.',                   icon: ShieldCheck },
+  { key: 'preparo',     num: 3, label: 'Preparo',     descricao: 'Comunicação, aviso prévio e organização do processo.',            icon: ClipboardCheck },
+  { key: 'nada_consta', num: 4, label: 'Nada Consta', descricao: 'Devolução de equipamentos/EPIs e quitação de pendências.',        icon: FileCheck },
+  { key: 'rescisao',    num: 5, label: 'Rescisão',    descricao: 'Cálculo, homologação e pagamento das verbas rescisórias.',        icon: DollarSign },
+  { key: 'encerrados',  num: 6, label: 'Encerrados',  descricao: 'Desligamento concluído e arquivado.',                            icon: CheckCircle2 },
+]
+
+const ETAPA_ICON: Record<EtapaDesligamento, typeof Receipt> = Object.fromEntries(
+  ETAPAS.map(e => [e.key, e.icon]),
+) as Record<EtapaDesligamento, typeof Receipt>
+
+// Acentos por etapa — mesma estrutura do STATUS_ACCENT do Financeiro
+const ACCENT: Record<EtapaDesligamento, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+  requisicao:  { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    border: 'border-blue-500',    badge: 'bg-blue-100 text-blue-700',       icon: 'text-blue-500' },
+  aprovacao:   { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700',     icon: 'text-amber-500' },
+  preparo:     { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700',   icon: 'text-violet-500' },
+  nada_consta: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-500' },
+  rescisao:    { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  border: 'border-orange-500',  badge: 'bg-orange-100 text-orange-700',   icon: 'text-orange-500' },
+  encerrados:  { bg: 'hover:bg-slate-100',  bgActive: 'bg-slate-100',  text: 'text-slate-600',   textActive: 'text-slate-800',   border: 'border-slate-500',   badge: 'bg-slate-200 text-slate-700',     icon: 'text-slate-500' },
+}
+
+const ACCENT_DARK: Record<EtapaDesligamento, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+  requisicao:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    border: 'border-blue-400/40',    badge: 'bg-blue-500/15 text-blue-200',       icon: 'text-blue-400' },
+  aprovacao:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200',     icon: 'text-amber-400' },
+  preparo:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200',   icon: 'text-violet-400' },
+  nada_consta: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200', icon: 'text-emerald-400' },
+  rescisao:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  border: 'border-orange-400/40',  badge: 'bg-orange-500/15 text-orange-200',   icon: 'text-orange-400' },
+  encerrados:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/15',   text: 'text-slate-400',   textActive: 'text-slate-200',   border: 'border-slate-400/40',   badge: 'bg-slate-500/20 text-slate-200',     icon: 'text-slate-400' },
+}
+
+// ── Tela principal ────────────────────────────────────────────────────────────
 export default function RHDesligamento() {
   const { isLightSidebar: isLight } = useTheme()
-  const { perfil } = useAuth()
-  const { data: desligamentos = [], isLoading } = useRHDesligamentos()
-  const { data: colaboradores = [] } = useRHColaboradores({ ativo: true })
-  const salvar = useSalvarRHDesligamento()
+  const isDark = !isLight
+  const [etapa, setEtapa] = useState<EtapaDesligamento>('requisicao')
 
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<Partial<RHDesligamento>>({})
-  const [buscaColab, setBuscaColab] = useState('')
-  const [activeTab, setActiveTab] = useState<StatusDesligamento | 'todos'>('todos')
-  const [editDetail, setEditDetail] = useState<RHDesligamento | null>(null)
+  const ativa = ETAPAS.find(e => e.key === etapa) ?? ETAPAS[0]
 
-  const filtered = activeTab === 'todos' ? desligamentos : desligamentos.filter(d => d.status === activeTab)
-
-  const colabsFiltrados = buscaColab.trim()
-    ? colaboradores.filter(c => c.nome.toLowerCase().includes(buscaColab.toLowerCase()))
-    : []
-
-  function openNew() {
-    setForm({
-      tipo: 'sem_justa_causa',
-      data_desligamento: new Date().toISOString().split('T')[0],
-      cumpriu_aviso: true,
-      checklist: Object.fromEntries(Object.keys(CHECKLIST_DESLIGAMENTO).map(k => [k, false])),
-      registrado_por: perfil?.id,
-      status: 'em_andamento',
-    })
-    setBuscaColab('')
-    setShowForm(true)
-  }
-
-  function selectColab(id: string) {
-    const c = colaboradores.find(x => x.id === id)
-    if (!c) return
-    setForm(f => ({ ...f, colaborador_id: c.id }))
-    setBuscaColab(c.nome)
-  }
-
-  async function handleSave() {
-    if (!form.colaborador_id || !form.data_desligamento) return
-    await salvar.mutateAsync(form)
-    setShowForm(false)
-  }
-
-  async function toggleCheckItem(desl: RHDesligamento, key: string) {
-    const checklist = { ...(desl.checklist || {}) }
-    checklist[key] = !checklist[key]
-    await salvar.mutateAsync({ id: desl.id, checklist })
-  }
-
-  async function concluirDesligamento(desl: RHDesligamento) {
-    await salvar.mutateAsync({
-      id: desl.id,
-      status: 'concluido',
-      colaborador_id: desl.colaborador_id,
-      data_desligamento: desl.data_desligamento,
-      motivo: desl.motivo,
-    })
-    setEditDetail(null)
-  }
-
-  const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }))
-
-  const counts = {
-    todos: desligamentos.length,
-    em_andamento: desligamentos.filter(d => d.status === 'em_andamento').length,
-    concluido: desligamentos.filter(d => d.status === 'concluido').length,
+  // Contagens por etapa (serão ligadas aos dados nas próximas iterações)
+  const counts: Record<EtapaDesligamento, number> = {
+    requisicao: 0, aprovacao: 0, preparo: 0, nada_consta: 0, rescisao: 0, encerrados: 0,
   }
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <UserMinus size={20} className="text-red-400" />
+            <UserMinus size={20} className="text-rose-400" />
             Desligamento
           </h1>
-          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Fluxo de offboarding de colaboradores</p>
+          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Fluxo de desligamento — da requisição ao encerramento
+          </p>
         </div>
-        <button onClick={openNew}
-          className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+        <button
+          onClick={() => setEtapa('requisicao')}
+          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
+        >
           <Plus size={15} /> Novo Desligamento
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1.5">
-        {[
-          { key: 'todos' as const, label: 'Todos', count: counts.todos },
-          { key: 'em_andamento' as const, label: 'Em Andamento', count: counts.em_andamento },
-          { key: 'concluido' as const, label: 'Concluídos', count: counts.concluido },
-        ].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeTab === t.key
-                ? isLight ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-transparent'
-            }`}>
-            {t.label}
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              activeTab === t.key
-                ? isLight ? 'bg-red-200 text-red-700' : 'bg-red-500/30 text-red-200'
-                : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
-            }`}>{t.count}</span>
-          </button>
-        ))}
-      </div>
+      {/* Rail de abas (etapas do fluxo) — padrão Financeiro */}
+      <EtapaRail isDark={isDark} etapa={etapa} setEtapa={setEtapa} counts={counts} />
 
-      {/* Lista */}
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-red-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className={`rounded-2xl border p-12 text-center ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-          <UserMinus size={40} className={isLight ? 'text-slate-200 mx-auto mb-3' : 'text-slate-600 mx-auto mb-3'} />
-          <p className={`font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum desligamento encontrado</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(desl => {
-            const checkTotal = Object.keys(CHECKLIST_DESLIGAMENTO).length
-            const checkDone = Object.values(desl.checklist || {}).filter(Boolean).length
-            const tipoLabel = TIPOS_DESLIGAMENTO.find(t => t.value === desl.tipo)?.label || desl.tipo
+      {/* Conteúdo da etapa ativa (placeholder por enquanto) */}
+      <EtapaPanel etapa={ativa} isDark={isDark} />
+    </div>
+  )
+}
+
+// ── Rail de etapas (cópia fiel do PipelineRail do Financeiro) ──────────────────
+function EtapaRail({
+  isDark,
+  etapa,
+  setEtapa,
+  counts,
+}: {
+  isDark: boolean
+  etapa: EtapaDesligamento
+  setEtapa: (e: EtapaDesligamento) => void
+  counts: Record<EtapaDesligamento, number>
+}) {
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number }>({
+    active: false, startX: 0, startScrollLeft: 0,
+  })
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const updateScrollState = () => {
+      const maxScroll = rail.scrollWidth - rail.clientWidth
+      setCanScrollLeft(rail.scrollLeft > 8)
+      setCanScrollRight(maxScroll - rail.scrollLeft > 8)
+    }
+    updateScrollState()
+    rail.addEventListener('scroll', updateScrollState, { passive: true })
+    const resizeObserver = new ResizeObserver(updateScrollState)
+    resizeObserver.observe(rail)
+    Array.from(rail.children).forEach(child => resizeObserver.observe(child))
+    return () => {
+      rail.removeEventListener('scroll', updateScrollState)
+      resizeObserver.disconnect()
+    }
+  }, [etapa])
+
+  const scrollByOffset = (direction: 'left' | 'right') => {
+    const rail = railRef.current
+    if (!rail) return
+    const offset = Math.max(rail.clientWidth * 0.72, 220)
+    rail.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' })
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current = { active: true, startX: event.clientX, startScrollLeft: rail.scrollLeft }
+    rail.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current.active) return
+    const rail = railRef.current
+    if (!rail) return
+    const delta = event.clientX - dragRef.current.startX
+    rail.scrollLeft = dragRef.current.startScrollLeft - delta
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current.active = false
+    if (rail.hasPointerCapture(event.pointerId)) {
+      rail.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+    event.preventDefault()
+    rail.scrollLeft += event.deltaY
+  }
+
+  const arrowBaseClass = isDark
+    ? 'border-white/[0.08] bg-slate-950/80 text-slate-200 hover:bg-slate-900'
+    : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50'
+
+  return (
+    <div className={`relative min-w-0 rounded-2xl border p-1.5 ${
+      isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
+    }`}>
+      {canScrollLeft && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-16 rounded-l-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-r from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-r from-white via-white/85 to-transparent'
+          }`} />
+          <button
+            type="button"
+            aria-label="Rolar etapas para a esquerda"
+            onClick={() => scrollByOffset('left')}
+            className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
+          >
+            <ChevronLeft size={16} />
+          </button>
+        </>
+      )}
+
+      {canScrollRight && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-16 rounded-r-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-l from-white via-white/85 to-transparent'
+          }`} />
+          <button
+            type="button"
+            aria-label="Rolar etapas para a direita"
+            onClick={() => scrollByOffset('right')}
+            className={`absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </>
+      )}
+
+      <div
+        ref={railRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+        className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:w-full">
+          {ETAPAS.map(e => {
+            const count = counts[e.key] || 0
+            const isActive = etapa === e.key
+            const Icon = e.icon
+            const accent = isDark ? ACCENT_DARK[e.key] : ACCENT[e.key]
             return (
-              <div key={desl.id} onClick={() => setEditDetail(desl)}
-                className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
-                  isLight ? 'bg-white border-slate-200 shadow-sm hover:shadow-md' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.05]'
-                }`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    desl.status === 'concluido'
-                      ? isLight ? 'bg-emerald-50 border border-emerald-100' : 'bg-emerald-500/15 border border-emerald-500/20'
-                      : isLight ? 'bg-red-50 border border-red-100' : 'bg-red-500/15 border border-red-500/20'
+              <button
+                key={e.key}
+                onClick={() => setEtapa(e.key)}
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
+                  isActive
+                    ? `${accent.bgActive} ${accent.textActive} border font-bold shadow-sm ${accent.border}`
+                    : `${accent.bg} ${accent.text} font-medium`
+                }`}
+              >
+                <Icon size={15} className="shrink-0" />
+                {e.label}
+                {count > 0 && (
+                  <span className={`rounded-full min-w-[24px] h-[24px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
+                    isActive
+                      ? accent.badge
+                      : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
                   }`}>
-                    {desl.status === 'concluido'
-                      ? <CheckCircle2 size={18} className="text-emerald-500" />
-                      : <Clock size={18} className="text-red-500" />
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                      {desl.colaborador?.nome || '—'}
-                    </p>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                        isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/15 text-red-400'
-                      }`}>{tipoLabel}</span>
-                      <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <Calendar size={9} />{new Date(desl.data_desligamento).toLocaleDateString('pt-BR')}
-                      </span>
-                      {desl.colaborador?.cargo && (
-                        <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{desl.colaborador.cargo}</span>
-                      )}
-                      <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Checklist: {checkDone}/{checkTotal}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className={`shrink-0 ${isLight ? 'text-slate-300' : 'text-slate-600'} transition-colors`} />
-                </div>
-              </div>
+                    {count}
+                  </span>
+                )}
+              </button>
             )
           })}
         </div>
-      )}
+      </div>
+    </div>
+  )
+}
 
-      {/* Modal Detalhe/Checklist */}
-      {editDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setEditDetail(null)}>
-          <div onClick={e => e.stopPropagation()}
-            className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl ${
-              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-700'
-            }`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-slate-700'}`}>
-              <div>
-                <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{editDetail.colaborador?.nome}</h2>
-                <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {TIPOS_DESLIGAMENTO.find(t => t.value === editDetail.tipo)?.label} — {new Date(editDetail.data_desligamento).toLocaleDateString('pt-BR')}
-                </p>
-              </div>
-              <button onClick={() => setEditDetail(null)} className={`p-1.5 rounded-lg ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}>
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3">
-              <p className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Checklist de Desligamento</p>
-              {Object.entries(CHECKLIST_DESLIGAMENTO).map(([key, label]) => {
-                const checked = editDetail.checklist?.[key] || false
-                return (
-                  <button key={key} onClick={() => editDetail.status !== 'concluido' && toggleCheckItem(editDetail, key)}
-                    disabled={editDetail.status === 'concluido'}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                      checked
-                        ? isLight ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-500/10 border border-emerald-500/20'
-                        : isLight ? 'bg-slate-50 border border-slate-200 hover:bg-slate-100' : 'bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05]'
-                    } ${editDetail.status === 'concluido' ? 'cursor-default' : 'cursor-pointer'}`}>
-                    {checked ? (
-                      <CheckSquare size={16} className="text-emerald-500 shrink-0" />
-                    ) : (
-                      <Square size={16} className={`shrink-0 ${isLight ? 'text-slate-300' : 'text-slate-600'}`} />
-                    )}
-                    <span className={`text-xs font-medium ${
-                      checked
-                        ? isLight ? 'text-emerald-700' : 'text-emerald-300'
-                        : isLight ? 'text-slate-600' : 'text-slate-400'
-                    }`}>{label}</span>
-                  </button>
-                )
-              })}
-
-              {editDetail.motivo && (
-                <div className={`mt-3 p-3 rounded-xl ${isLight ? 'bg-amber-50 border border-amber-200' : 'bg-amber-500/10 border border-amber-500/20'}`}>
-                  <p className={`text-[10px] font-bold mb-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>Motivo</p>
-                  <p className={`text-xs ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>{editDetail.motivo}</p>
-                </div>
-              )}
-            </div>
-
-            {editDetail.status === 'em_andamento' && (
-              <div className={`px-5 py-4 border-t ${isLight ? 'border-slate-100' : 'border-slate-700'}`}>
-                <button onClick={() => concluirDesligamento(editDetail)}
-                  disabled={salvar.isPending}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
-                  <CheckCircle2 size={15} /> Concluir Desligamento
-                </button>
-                <p className={`text-[10px] text-center mt-1.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Isso irá inativar o colaborador no sistema
-                </p>
-              </div>
-            )}
-          </div>
+// ── Painel da etapa (placeholder — conteúdo será montado depois) ───────────────
+function EtapaPanel({ etapa, isDark }: { etapa: typeof ETAPAS[number]; isDark: boolean }) {
+  const Icon = ETAPA_ICON[etapa.key]
+  const accent = isDark ? ACCENT_DARK[etapa.key] : ACCENT[etapa.key]
+  return (
+    <div className={`rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+      {/* Cabeçalho da etapa */}
+      <div className={`flex items-center gap-3 px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent.bgActive}`}>
+          <Icon size={20} className={accent.icon} />
         </div>
-      )}
-
-      {/* Modal Novo Desligamento */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowForm(false)}>
-          <div onClick={e => e.stopPropagation()}
-            className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl ${
-              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-700'
-            }`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-slate-700'}`}>
-              <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Desligamento</h2>
-              <button onClick={() => setShowForm(false)} className={`p-1.5 rounded-lg ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}>
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Buscar colaborador */}
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Colaborador *</label>
-                <div className="relative">
-                  <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
-                  <input value={buscaColab} onChange={e => { setBuscaColab(e.target.value); if (form.colaborador_id) setForm(f => ({ ...f, colaborador_id: undefined })) }}
-                    placeholder="Buscar colaborador..."
-                    className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`} />
-                </div>
-                {colabsFiltrados.length > 0 && !form.colaborador_id && (
-                  <div className={`mt-1 rounded-xl border max-h-40 overflow-y-auto ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800'}`}>
-                    {colabsFiltrados.slice(0, 8).map(c => (
-                      <button key={c.id} onClick={() => selectColab(c.id)}
-                        className={`w-full text-left px-3 py-2 text-xs hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 ${
-                          isLight ? 'text-slate-700' : 'text-slate-300'
-                        }`}>
-                        <User size={12} className="text-red-400" />
-                        <span className="font-semibold">{c.nome}</span>
-                        {c.cargo && <span className="text-slate-400">• {c.cargo}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Tipo *</label>
-                  <select value={form.tipo || ''} onChange={e => set('tipo', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl border text-sm ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`}>
-                    {TIPOS_DESLIGAMENTO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Data Desligamento *</label>
-                  <input type="date" value={form.data_desligamento || ''} onChange={e => set('data_desligamento', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl border text-sm ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Data Aviso</label>
-                  <input type="date" value={form.data_aviso || ''} onChange={e => set('data_aviso', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl border text-sm ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`} />
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 cursor-pointer pb-2">
-                    <input type="checkbox" checked={form.cumpriu_aviso ?? true} onChange={e => set('cumpriu_aviso', e.target.checked)}
-                      className="rounded border-slate-300 text-red-600 focus:ring-red-500" />
-                    <span className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Cumpriu aviso prévio</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Motivo</label>
-                <textarea rows={2} value={form.motivo || ''} onChange={e => set('motivo', e.target.value)}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm resize-none ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`} />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Observações</label>
-                <textarea rows={2} value={form.observacoes || ''} onChange={e => set('observacoes', e.target.value)}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm resize-none ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`} />
-              </div>
-            </div>
-
-            <div className={`flex justify-end gap-2 px-5 py-4 border-t ${isLight ? 'border-slate-100' : 'border-slate-700'}`}>
-              <button onClick={() => setShowForm(false)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/10'}`}>
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={salvar.isPending || !form.colaborador_id}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">
-                {salvar.isPending ? 'Salvando...' : 'Iniciar Desligamento'}
-              </button>
-            </div>
-          </div>
+        <div className="min-w-0">
+          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Etapa {etapa.num} de {ETAPAS.length}
+          </span>
+          <h2 className={`text-base font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.label}</h2>
+          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{etapa.descricao}</p>
         </div>
-      )}
+      </div>
+
+      {/* Corpo — placeholder */}
+      <div className="p-5">
+        <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${
+          isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'
+        }`}>
+          <Construction size={34} className={isDark ? 'text-slate-600 mb-3' : 'text-slate-300 mb-3'} />
+          <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            Conteúdo da etapa “{etapa.label}” em construção
+          </p>
+          <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            A estrutura do fluxo está pronta. Os campos e ações desta etapa serão montados em seguida.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
