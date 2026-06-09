@@ -137,7 +137,14 @@ export default function RHAdmissao() {
 
 // ── Card de admissão na lista ─────────────────────────────────────────────────
 function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boolean; onClick: () => void }) {
-  const nAnexos = adm.anexos?.length ?? 0
+  const candidatos = adm.candidatos ?? []
+  const nCand = candidatos.length
+  const nDocs = candidatos.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
+  const titulo = nCand === 1
+    ? (candidatos[0].nome || adm.nome_candidato || 'Candidato')
+    : nCand > 1
+      ? `${candidatos[0].nome || 'Candidato'} +${nCand - 1}`
+      : (adm.nome_candidato || 'Solicitação de admissão')
   return (
     <button onClick={onClick}
       className={`w-full text-left rounded-2xl border p-4 transition-all group flex items-center gap-3 ${
@@ -148,7 +155,10 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{adm.nome_candidato}</p>
+          <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{titulo}</p>
+          {nCand > 1 && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{nCand} CANDIDATOS</span>
+          )}
           {adm.urgente && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex items-center gap-0.5"><AlertTriangle size={9} />URGENTE</span>
           )}
@@ -160,9 +170,8 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
           )}
         </div>
         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-          {adm.cargo_previsto && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{adm.cargo_previsto}</span>}
           {adm.obra_prevista && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{adm.obra_prevista.codigo ?? adm.obra_prevista.nome}</span>}
-          <span className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Paperclip size={9} />{nAnexos} doc(s)</span>
+          <span className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Paperclip size={9} />{nDocs} doc(s)</span>
         </div>
       </div>
       <ChevR size={14} className={`shrink-0 ${isDark ? 'text-slate-600 group-hover:text-violet-400' : 'text-slate-300 group-hover:text-violet-500'} transition-colors`} />

@@ -1,18 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// components/rh/RHAdmissaoForm.tsx — Nova Solicitação de Admissão
-// Padrão visual da Solicitação de Compra (passo 2). RH-only.
+// components/rh/RHAdmissaoForm.tsx — Nova Solicitação de Admissão (multi-candidato)
+// Campos compartilhados da requisição + N candidatos (como itens de um pedido).
+// Anexar vários documentos → IA (n8n) pré-preenche um candidato por arquivo.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef } from 'react'
 import {
-  UserPlus, ArrowLeft, Upload, FileUp, X, Send, Loader2, AlertCircle, Paperclip,
+  UserPlus, ArrowLeft, Upload, FileUp, X, Send, Loader2, AlertCircle,
+  Sparkles, Plus, Trash2, Users,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadObras } from '../../hooks/useCadastros'
-import { useCriarAdmissao, type ArquivoAdmissao } from '../../hooks/useRHAdmissaoFluxo'
+import { useCriarAdmissao, parseDocumentoAdmissao } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_CONTRATO, TIPOS_ANEXO_ADMISSAO, TIPOS_MOVIMENTACAO_ADMISSAO } from '../../types/rh'
 
 const LABEL = 'text-xs font-semibold text-slate-500 mb-1 block'
 const INPUT = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
+const INPUT_SM = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
+
+interface ArqForm { file: File; tipo: string }
+interface CandForm {
+  uid: number
+  nome: string
+  cpf: string
+  cargo: string
+  salario: string
+  dados_extras?: Record<string, unknown>
+  arquivos: ArqForm[]
+  lendo?: boolean
+  confianca?: number
+}
 
 function guessTipo(name: string): string {
   const n = name.toLowerCase()
@@ -30,47 +46,88 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
   const { data: obras = [] } = useCadObras()
   const criar = useCriarAdmissao()
   const fileRef = useRef<HTMLInputElement>(null)
+  const uidRef = useRef(1)
 
-  const [nomeCandidato, setNomeCandidato] = useState('')
-  const [cpf, setCpf] = useState('')
-  const [cargo, setCargo] = useState('')
-  const [departamento, setDepartamento] = useState('')
+  // Compartilhados
   const [obraId, setObraId] = useState('')
-  const [tipoContrato, setTipoContrato] = useState('CLT')
+  const [departamento, setDepartamento] = useState('')
   const [tipoMov, setTipoMov] = useState('substituicao')
-  const [salario, setSalario] = useState('')
+  const [tipoContrato, setTipoContrato] = useState('CLT')
   const [dataInicio, setDataInicio] = useState('')
   const [urgente, setUrgente] = useState(false)
   const [motivo, setMotivo] = useState('')
   const [observacoes, setObservacoes] = useState('')
-  const [arquivos, setArquivos] = useState<ArquivoAdmissao[]>([])
+
+  // Candidatos
+  const [candidatos, setCandidatos] = useState<CandForm[]>([])
   const [erros, setErros] = useState<string[]>([])
 
   const solicitante = perfil?.nome || perfil?.email || 'Usuário'
 
-  function addFiles(files: FileList | null) {
+  function novoUid() { return uidRef.current++ }
+
+  // Anexa vários arquivos → cria 1 candidato por arquivo + IA preenche
+  function addArquivosComoCandidatos(files: FileList | null) {
     if (!files) return
-    const novos: ArquivoAdmissao[] = Array.from(files).map(file => {
-      const tipo = guessTipo(file.name)
-      return { file, tipo, obrigatorio: tipo === 'ctps' }
+    const lista = Array.from(files)
+    const novos: CandForm[] = lista.map(file => ({
+      uid: novoUid(),
+      nome: '', cpf: '', cargo: '', salario: '',
+      arquivos: [{ file, tipo: guessTipo(file.name) }],
+      lendo: true,
+    }))
+    setCandidatos(prev => [...prev, ...novos])
+    // dispara IA para cada um
+    novos.forEach(c => {
+      const arq = c.arquivos[0]
+      parseDocumentoAdmissao(arq.file, arq.tipo).then(ext => {
+        setCandidatos(prev => prev.map(x => x.uid === c.uid ? {
+          ...x,
+          lendo: false,
+          nome: x.nome || String(ext?.nome || ''),
+          cpf: x.cpf || String(ext?.cpf || ''),
+          cargo: x.cargo || String(ext?.cargo_pretendido || ''),
+          dados_extras: (ext && typeof ext === 'object') ? (ext as Record<string, unknown>) : undefined,
+          confianca: typeof ext?.confianca === 'number' ? ext.confianca : undefined,
+        } : x))
+      }).catch(() => {
+        setCandidatos(prev => prev.map(x => x.uid === c.uid ? { ...x, lendo: false } : x))
+      })
     })
-    setArquivos(prev => [...prev, ...novos])
   }
 
-  function setTipoArquivo(idx: number, tipo: string) {
-    setArquivos(prev => prev.map((a, i) => i === idx ? { ...a, tipo, obrigatorio: tipo === 'ctps' } : a))
+  function addCandidatoManual() {
+    setCandidatos(prev => [...prev, { uid: novoUid(), nome: '', cpf: '', cargo: '', salario: '', arquivos: [] }])
   }
 
-  function removeArquivo(idx: number) {
-    setArquivos(prev => prev.filter((_, i) => i !== idx))
+  function updCand(uid: number, patch: Partial<CandForm>) {
+    setCandidatos(prev => prev.map(c => c.uid === uid ? { ...c, ...patch } : c))
+  }
+
+  function removeCand(uid: number) {
+    setCandidatos(prev => prev.filter(c => c.uid !== uid))
+  }
+
+  function addDocToCand(uid: number, files: FileList | null) {
+    if (!files) return
+    const novos: ArqForm[] = Array.from(files).map(file => ({ file, tipo: guessTipo(file.name) }))
+    setCandidatos(prev => prev.map(c => c.uid === uid ? { ...c, arquivos: [...c.arquivos, ...novos] } : c))
+  }
+
+  function setDocTipo(uid: number, idx: number, tipo: string) {
+    setCandidatos(prev => prev.map(c => c.uid === uid ? { ...c, arquivos: c.arquivos.map((a, i) => i === idx ? { ...a, tipo } : a) } : c))
+  }
+
+  function removeDoc(uid: number, idx: number) {
+    setCandidatos(prev => prev.map(c => c.uid === uid ? { ...c, arquivos: c.arquivos.filter((_, i) => i !== idx) } : c))
   }
 
   function validar(): string[] {
     const e: string[] = []
-    if (!nomeCandidato.trim()) e.push('Informe o nome do candidato')
     if (!obraId) e.push('Selecione a obra')
     if (!motivo.trim()) e.push('Informe o motivo da admissão')
-    if (!arquivos.some(a => a.tipo === 'ctps')) e.push('Anexe a CTPS (obrigatório)')
+    if (candidatos.length === 0) e.push('Adicione pelo menos um candidato')
+    if (candidatos.some(c => !c.nome.trim())) e.push('Todos os candidatos precisam ter nome')
     return e
   }
 
@@ -78,25 +135,27 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
     const e = validar()
     setErros(e)
     if (e.length) return
-    const obra = obras.find(o => o.id === obraId)
     try {
       await criar.mutateAsync({
         dados: {
-          nome_candidato: nomeCandidato.trim(),
-          cpf: cpf.trim() || undefined,
-          cargo_previsto: cargo.trim() || undefined,
-          departamento_previsto: departamento.trim() || undefined,
           obra_prevista_id: obraId || undefined,
-          tipo_contrato: tipoContrato,
+          departamento_previsto: departamento.trim() || undefined,
           tipo_movimentacao: tipoMov as 'substituicao' | 'aumento_quadro',
-          salario_previsto: salario ? Number(salario) : undefined,
+          tipo_contrato: tipoContrato,
           data_prevista_inicio: dataInicio || undefined,
           urgente,
           motivo: motivo.trim(),
           observacoes: observacoes.trim() || undefined,
           solicitante_nome: solicitante,
         },
-        arquivos,
+        candidatos: candidatos.map(c => ({
+          nome: c.nome.trim(),
+          cpf: c.cpf.trim() || undefined,
+          cargo: c.cargo.trim() || undefined,
+          salario: c.salario ? Number(c.salario) : undefined,
+          dados_extras: c.dados_extras,
+          arquivos: c.arquivos,
+        })),
         autorId: perfil?.id,
         autorNome: solicitante,
       })
@@ -105,7 +164,6 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
       setErros(['Erro ao enviar a solicitação. Tente novamente.'])
       console.error(err)
     }
-    void obra
   }
 
   return (
@@ -122,7 +180,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
           </div>
           <div>
             <h1 className="text-base font-bold text-slate-800 leading-tight">Nova Solicitação de Admissão</h1>
-            <p className="text-xs text-slate-500">Preencha os dados e anexe os documentos do candidato</p>
+            <p className="text-xs text-slate-500">Dados da requisição valem para todos os candidatos</p>
           </div>
         </div>
       </div>
@@ -135,82 +193,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none" />
         </div>
 
-        {/* Candidato */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Nome do candidato <span className="text-red-400">*</span></label>
-            <input value={nomeCandidato} onChange={e => setNomeCandidato(e.target.value)}
-              placeholder="Nome completo" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>CPF</label>
-            <input value={cpf} onChange={e => setCpf(e.target.value)} placeholder="000.000.000-00" className={INPUT} />
-          </div>
-        </div>
-
-        {/* Motivo */}
-        <div>
-          <label className={LABEL}>Motivo <span className="text-red-400">*</span></label>
-          <textarea rows={3} value={motivo} onChange={e => setMotivo(e.target.value)}
-            placeholder="Por que essa admissão é necessária? Substituição de quem, ou aumento de quadro para qual finalidade?"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none resize-none" />
-        </div>
-
-        {/* Documentos / Anexos */}
-        <div>
-          <label className="text-xs font-semibold text-slate-500 mb-1.5 block">
-            Documentos do candidato <span className="text-red-400">*</span>
-            <span className="font-normal text-slate-400"> — CTPS obrigatório · CV / CNH e outros opcionais</span>
-          </label>
-          <div
-            className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20 p-4 transition-all cursor-pointer"
-            onClick={() => fileRef.current?.click()}
-            onDragOver={e => { e.preventDefault() }}
-            onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-          >
-            <input ref={fileRef} type="file" multiple className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-              onChange={e => { addFiles(e.target.files); if (fileRef.current) fileRef.current.value = '' }} />
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
-                <Upload size={18} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Anexar documentos (vários de uma vez)</p>
-                <p className="text-[11px] text-slate-400">Arraste aqui ou clique para selecionar · PDF, imagem ou documento.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de arquivos */}
-          {arquivos.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {arquivos.map((a, idx) => (
-                <div key={idx} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600 shrink-0">
-                    <FileUp size={15} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-slate-700">{a.file.name}</p>
-                    <p className="text-[10px] text-slate-400">{(a.file.size / 1024).toFixed(1)} KB</p>
-                  </div>
-                  <select value={a.tipo} onChange={e => setTipoArquivo(idx, e.target.value)}
-                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:ring-2 focus:ring-teal-300 shrink-0">
-                    {TIPOS_ANEXO_ADMISSAO.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}{t.value === 'ctps' ? ' *' : ''}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => removeArquivo(idx)}
-                    className="rounded-full p-1.5 text-slate-400 hover:text-red-500 transition shrink-0">
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Obra + Data */}
+        {/* Compartilhados: Obra + Data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2">
             <label className={LABEL}>Obra <span className="text-red-400">*</span></label>
@@ -225,25 +208,11 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
           </div>
         </div>
 
-        {/* Cargo + Departamento */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Cargo previsto</label>
-            <input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Ex: Montador III" className={INPUT} />
-          </div>
+        {/* Compartilhados: Depto + tipo mov + tipo contrato */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className={LABEL}>Departamento</label>
             <input value={departamento} onChange={e => setDepartamento(e.target.value)} placeholder="Opcional" className={INPUT} />
-          </div>
-        </div>
-
-        {/* Tipo contrato + Tipo movimentação + Salário */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className={LABEL}>Tipo de contrato</label>
-            <select value={tipoContrato} onChange={e => setTipoContrato(e.target.value)} className={INPUT}>
-              {TIPOS_CONTRATO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
           </div>
           <div>
             <label className={LABEL}>Tipo de movimentação</label>
@@ -252,9 +221,19 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
             </select>
           </div>
           <div>
-            <label className={LABEL}>Salário previsto</label>
-            <input type="number" step="0.01" value={salario} onChange={e => setSalario(e.target.value)} placeholder="0,00" className={INPUT} />
+            <label className={LABEL}>Tipo de contrato</label>
+            <select value={tipoContrato} onChange={e => setTipoContrato(e.target.value)} className={INPUT}>
+              {TIPOS_CONTRATO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
           </div>
+        </div>
+
+        {/* Motivo */}
+        <div>
+          <label className={LABEL}>Motivo <span className="text-red-400">*</span></label>
+          <textarea rows={2} value={motivo} onChange={e => setMotivo(e.target.value)}
+            placeholder="Por que essa admissão é necessária? Substituição de quem, ou aumento de quadro para qual finalidade?"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none resize-none" />
         </div>
 
         {/* Urgente */}
@@ -275,10 +254,105 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
           </div>
         </div>
 
+        {/* Candidatos */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+              <Users size={13} /> Candidatos {candidatos.length > 0 && `(${candidatos.length})`} <span className="text-red-400">*</span>
+            </label>
+            <button type="button" onClick={addCandidatoManual}
+              className="flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800">
+              <Plus size={13} /> Adicionar manualmente
+            </button>
+          </div>
+
+          {/* Dropzone — vários arquivos = vários candidatos */}
+          <div
+            className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20 p-4 transition-all cursor-pointer"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); addArquivosComoCandidatos(e.dataTransfer.files) }}
+          >
+            <input ref={fileRef} type="file" multiple className="hidden"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+              onChange={e => { addArquivosComoCandidatos(e.target.files); if (fileRef.current) fileRef.current.value = '' }} />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Anexar documentos — a IA cria um candidato por arquivo</p>
+                <p className="text-[11px] text-slate-400">Solte vários CTPS/CV/CNH de uma vez · nome, CPF e cargo são preenchidos automaticamente.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards de candidatos */}
+          <div className="mt-3 space-y-3">
+            {candidatos.map((c, i) => (
+              <div key={c.uid} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
+                    Candidato {i + 1}
+                    {c.lendo && <span className="flex items-center gap-1 text-teal-600 normal-case"><Loader2 size={11} className="animate-spin" /> lendo com IA…</span>}
+                    {!c.lendo && typeof c.confianca === 'number' && (
+                      <span className="flex items-center gap-1 text-teal-600 normal-case"><Sparkles size={10} /> IA {Math.round(c.confianca * 100)}%</span>
+                    )}
+                  </span>
+                  <button type="button" onClick={() => removeCand(c.uid)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className={LABEL}>Nome <span className="text-red-400">*</span></label>
+                    <input value={c.nome} onChange={e => updCand(c.uid, { nome: e.target.value })} placeholder="Nome completo" className={INPUT_SM} />
+                  </div>
+                  <div>
+                    <label className={LABEL}>CPF</label>
+                    <input value={c.cpf} onChange={e => updCand(c.uid, { cpf: e.target.value })} placeholder="000.000.000-00" className={INPUT_SM} />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Cargo</label>
+                    <input value={c.cargo} onChange={e => updCand(c.uid, { cargo: e.target.value })} placeholder="Ex: Montador III" className={INPUT_SM} />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Salário <span className="font-normal text-slate-400">(opcional)</span></label>
+                    <input type="number" step="0.01" value={c.salario} onChange={e => updCand(c.uid, { salario: e.target.value })} placeholder="0,00" className={INPUT_SM} />
+                  </div>
+                </div>
+
+                {/* Docs do candidato */}
+                <div className="mt-2.5">
+                  {c.arquivos.length > 0 && (
+                    <div className="space-y-1.5 mb-2">
+                      {c.arquivos.map((a, idx) => (
+                        <div key={idx} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                          <FileUp size={13} className="text-teal-600 shrink-0" />
+                          <span className="truncate text-[11px] font-semibold text-slate-600 flex-1">{a.file.name}</span>
+                          <select value={a.tipo} onChange={e => setDocTipo(c.uid, idx, e.target.value)}
+                            className="text-[11px] border border-slate-200 rounded px-1.5 py-1 bg-white outline-none shrink-0">
+                            {TIPOS_ANEXO_ADMISSAO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                          <button type="button" onClick={() => removeDoc(c.uid, idx)} className="text-slate-400 hover:text-red-500 shrink-0"><X size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-teal-700 hover:text-teal-800 cursor-pointer">
+                    <Upload size={12} /> Anexar documento
+                    <input type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                      onChange={e => { addDocToCand(c.uid, e.target.files); e.currentTarget.value = '' }} />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Observações */}
         <div>
           <label className={LABEL}>Detalhes adicionais</label>
-          <textarea rows={3} value={observacoes} onChange={e => setObservacoes(e.target.value)}
+          <textarea rows={2} value={observacoes} onChange={e => setObservacoes(e.target.value)}
             placeholder="Informações complementares (opcional)"
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none resize-none" />
         </div>
@@ -287,9 +361,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
         {erros.length > 0 && (
           <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-1">
             {erros.map((e, i) => (
-              <p key={i} className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
-                <AlertCircle size={13} /> {e}
-              </p>
+              <p key={i} className="flex items-center gap-1.5 text-xs text-red-600 font-medium"><AlertCircle size={13} /> {e}</p>
             ))}
           </div>
         )}
@@ -299,7 +371,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur px-4 sm:px-6 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <span className="text-xs text-slate-500 flex items-center gap-1.5">
-            <Paperclip size={13} /> {arquivos.length} arquivo(s) anexado(s)
+            <Users size={13} /> {candidatos.length} candidato(s)
           </span>
           <div className="flex items-center gap-2">
             <button onClick={onBack}

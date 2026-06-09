@@ -144,6 +144,7 @@ export type TipoMovimentacaoAdmissao = 'substituicao' | 'aumento_quadro'
 export interface RHAdmissaoAnexo {
   id: string
   admissao_id: string
+  candidato_id?: string
   tipo: string            // ctps|cv|cnh|rg|cpf|comprovante|outro
   obrigatorio: boolean
   arquivo_nome: string
@@ -154,10 +155,24 @@ export interface RHAdmissaoAnexo {
   created_at: string
 }
 
+// Candidato individual dentro de uma requisição de admissão (RH-only)
+export interface RHAdmissaoCandidato {
+  id: string
+  admissao_id: string
+  nome: string
+  cpf?: string
+  cargo?: string
+  salario?: number
+  colaborador_id?: string
+  dados_extras?: Record<string, unknown>
+  created_at: string
+  anexos?: RHAdmissaoAnexo[]
+}
+
 export interface RHAdmissao {
   id: string
   colaborador_id?: string
-  nome_candidato: string
+  nome_candidato?: string
   cpf?: string
   cargo_previsto?: string
   departamento_previsto?: string
@@ -191,6 +206,7 @@ export interface RHAdmissao {
   obra_prevista?: { id: string; codigo: string; nome: string }
   colaborador?: { id: string; nome: string }
   anexos?: RHAdmissaoAnexo[]
+  candidatos?: RHAdmissaoCandidato[]
 }
 
 export const TIPOS_ANEXO_ADMISSAO = [

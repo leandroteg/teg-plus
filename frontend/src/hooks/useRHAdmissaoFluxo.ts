@@ -1,15 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // hooks/useRHAdmissaoFluxo.ts — Fluxo de Admissão (RH-only)
-// Lê/escreve apenas tabelas RH: rh_admissoes, rh_admissao_anexos, rh_admissao_historico
-// e o bucket privado rh-admissao-docs. Não toca em nada de outros módulos.
+// Tabelas RH: rh_admissoes (requisição), rh_admissao_candidatos (N por requisição),
+// rh_admissao_anexos, rh_admissao_historico. Bucket privado rh-admissao-docs.
+// IA via webhook n8n RH-only. Não toca em nada de outros módulos.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type { RHAdmissao } from '../types/rh'
 
 const BUCKET = 'rh-admissao-docs'
+const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
 const SELECT =
-  '*, obra_prevista:sys_obras!obra_prevista_id(id,codigo,nome), anexos:rh_admissao_anexos(*)'
+  '*, obra_prevista:sys_obras!obra_prevista_id(id,codigo,nome), ' +
+  'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*)), ' +
+  'anexos:rh_admissao_anexos!admissao_id(*)'
 
 export function useAdmissoesFluxo() {
   return useQuery<RHAdmissao[]>({
@@ -28,15 +33,62 @@ export function useAdmissoesFluxo() {
   })
 }
 
-export interface ArquivoAdmissao {
+// ── IA: extrai dados de 1 documento de candidato via webhook n8n ──────────────
+export interface CandidatoExtraido {
+  nome?: string
+  cpf?: string
+  cargo_pretendido?: string
+  confianca?: number
+  success?: boolean
+  [k: string]: unknown
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      resolve(res.includes(',') ? res.split(',')[1] : res)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function parseDocumentoAdmissao(file: File, tipo?: string): Promise<CandidatoExtraido | null> {
+  try {
+    const base64 = await fileToBase64(file)
+    const resp = await fetch(`${N8N_URL}/rh/admissao/parse-documento-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, nome: file.name, mime_type: file.type || 'application/pdf', tipo: tipo || '' }),
+    })
+    if (!resp.ok) return null
+    return (await resp.json()) as CandidatoExtraido
+  } catch (e) {
+    console.warn('parseDocumentoAdmissao:', e)
+    return null
+  }
+}
+
+// ── Criar requisição com N candidatos ─────────────────────────────────────────
+export interface ArquivoCandidato {
   file: File
   tipo: string
-  obrigatorio: boolean
+}
+
+export interface CandidatoInput {
+  nome: string
+  cpf?: string
+  cargo?: string
+  salario?: number
+  dados_extras?: Record<string, unknown>
+  arquivos: ArquivoCandidato[]
 }
 
 export interface NovaAdmissaoInput {
-  dados: Partial<RHAdmissao>
-  arquivos: ArquivoAdmissao[]
+  dados: Partial<RHAdmissao>           // campos compartilhados da requisição
+  candidatos: CandidatoInput[]
   autorId?: string
   autorNome?: string
 }
@@ -44,10 +96,11 @@ export interface NovaAdmissaoInput {
 export function useCriarAdmissao() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ dados, arquivos, autorId, autorNome }: NovaAdmissaoInput) => {
-      // 1) cria a admissão (etapa = requisição, pendente)
+    mutationFn: async ({ dados, candidatos, autorId, autorNome }: NovaAdmissaoInput) => {
+      // 1) cria a requisição (compartilhada)
       const insert = {
         ...dados,
+        nome_candidato: candidatos[0]?.nome ?? null,   // fallback de exibição
         etapa: 'requisicao',
         status: 'pendente',
         status_aprovacao: null,
@@ -60,28 +113,43 @@ export function useCriarAdmissao() {
         .insert(insert)
         .select('id')
         .single()
-      if (error || !adm) throw error ?? new Error('Falha ao criar admissão')
+      if (error || !adm) throw error ?? new Error('Falha ao criar requisição')
       const admissaoId = (adm as { id: string }).id
 
-      // 2) upload dos arquivos + registro dos anexos
-      for (const a of arquivos) {
-        const safeName = a.file.name.replace(/[^\w.\-]+/g, '_')
-        const path = `${admissaoId}/${a.tipo}_${Date.now()}_${safeName}`
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, a.file, { upsert: false })
-        if (upErr) {
-          console.error('upload anexo:', upErr)
-          continue
+      // 2) candidatos + seus anexos
+      for (const c of candidatos) {
+        const { data: cand, error: cErr } = await supabase
+          .from('rh_admissao_candidatos')
+          .insert({
+            admissao_id: admissaoId,
+            nome: c.nome,
+            cpf: c.cpf || null,
+            cargo: c.cargo || null,
+            salario: c.salario ?? null,
+            dados_extras: c.dados_extras ?? null,
+          })
+          .select('id')
+          .single()
+        if (cErr || !cand) { console.error('candidato:', cErr); continue }
+        const candidatoId = (cand as { id: string }).id
+
+        for (const a of c.arquivos) {
+          const safeName = a.file.name.replace(/[^\w.\-]+/g, '_')
+          const path = `${admissaoId}/${candidatoId}/${a.tipo}_${Date.now()}_${safeName}`
+          const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, a.file, { upsert: false })
+          if (upErr) { console.error('upload anexo:', upErr); continue }
+          await supabase.from('rh_admissao_anexos').insert({
+            admissao_id: admissaoId,
+            candidato_id: candidatoId,
+            tipo: a.tipo,
+            obrigatorio: a.tipo === 'ctps',
+            arquivo_nome: a.file.name,
+            arquivo_path: path,
+            tamanho_bytes: a.file.size,
+            mime_type: a.file.type || null,
+            uploaded_por: autorId ?? null,
+          })
         }
-        await supabase.from('rh_admissao_anexos').insert({
-          admissao_id: admissaoId,
-          tipo: a.tipo,
-          obrigatorio: a.obrigatorio,
-          arquivo_nome: a.file.name,
-          arquivo_path: path,
-          tamanho_bytes: a.file.size,
-          mime_type: a.file.type || null,
-          uploaded_por: autorId ?? null,
-        })
       }
 
       // 3) histórico
@@ -91,6 +159,7 @@ export function useCriarAdmissao() {
         para_etapa: 'requisicao',
         autor_id: autorId ?? null,
         autor_nome: autorNome ?? null,
+        observacao: `${candidatos.length} candidato(s)`,
       })
 
       return admissaoId
@@ -102,6 +171,7 @@ export function useCriarAdmissao() {
   })
 }
 
+// ── Transições do fluxo (RH-only) ─────────────────────────────────────────────
 export type AcaoAdmissao = 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
 
 export interface TransicaoInput {
