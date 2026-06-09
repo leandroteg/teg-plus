@@ -159,6 +159,12 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
           {nCand > 1 && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{nCand} CANDIDATOS</span>
           )}
+          {adm.etapa === 'requisicao' && !adm.status_aprovacao && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">PENDENTE</span>
+          )}
+          {adm.etapa === 'aprovacao' && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">AGUARDANDO APROVAÇÃO</span>
+          )}
           {adm.urgente && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex items-center gap-0.5"><AlertTriangle size={9} />URGENTE</span>
           )}
