@@ -71,7 +71,7 @@ const SUB_MODULES: SubModule[] = [
     desc: 'Folha de pagamento, ponto, benefícios e obrigações',
     icon: Calculator,
     route: '/rh/dp',
-    active: false,
+    active: true,
     color: 'text-amber-500',
     bgLight: 'bg-amber-50 border-amber-200',
     bgDark: 'bg-amber-500/10 border-amber-500/25',
