@@ -54,7 +54,7 @@ export default function HeadcountLayout() {
       accent="violet"
       nav={NAV}
       moduleSubtitle="Admissão, Gestão & Movimentações"
-      backRoute="/rh"
+      backRoute={-1}
     />
   )
 }
