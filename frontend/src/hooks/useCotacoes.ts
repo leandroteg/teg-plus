@@ -447,3 +447,41 @@ export function useDevolverRequisicaoCotacao() {
     },
   })
 }
+
+// ── Trocar fornecedor escolhido durante cotacao_em_esclarecimento ──────────────
+// Permite ao comprador, enquanto a RC está em esclarecimento da cotação, alterar
+// o fornecedor selecionado entre os já cotados. RPC SECURITY DEFINER (migration
+// 132) cuida da validação de status, troca atômica do flag selecionado e do
+// registro em cmp_historico_status.
+
+export function useTrocarFornecedorEsclarecimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cotacaoId,
+      novoFornecedorId,
+    }: {
+      cotacaoId: string
+      novoFornecedorId: string
+    }) => {
+      const { data, error } = await supabase.rpc('cmp_trocar_fornecedor_em_esclarecimento', {
+        p_cotacao_id: cotacaoId,
+        p_novo_fornecedor_id: novoFornecedorId,
+      })
+      if (error) throw new Error(error.message)
+      return data as {
+        changed: boolean
+        fornecedor_selecionado_id: string
+        fornecedor_selecionado_nome: string
+        valor_selecionado: number
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+    },
+  })
+}

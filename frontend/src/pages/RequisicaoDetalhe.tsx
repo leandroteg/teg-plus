@@ -9,7 +9,7 @@ import {
 import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useCriarSolicitacaoContratoFromRC } from '../hooks/useSolicitacoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
-import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
+import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useBases } from '../hooks/useEstoque'
@@ -150,8 +150,10 @@ export default function RequisicaoDetalhe() {
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   // Cotação vinculada à RC
-  const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
+  const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_em_esclarecimento', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
   const { data: cotacao } = useCotacaoByRequisicao(showCotacao ? id : undefined)
+  const trocarFornecedorMutation = useTrocarFornecedorEsclarecimento()
+  const [trocaToast, setTrocaToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // Triador do CD (admin ou lotado em base que faz_triagem)
   const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
@@ -411,6 +413,41 @@ export default function RequisicaoDetalhe() {
             <span>Por: {req.esclarecimento_por}</span>
             {req.esclarecimento_em && <span>· {fmtData(req.esclarecimento_em)}</span>}
           </div>
+
+          {/* Trocar fornecedor escolhido (apenas em esclarecimento de cotação) */}
+          {req.status === 'cotacao_em_esclarecimento' && canResponderEsteEsclarecimento
+            && cotacao?.fornecedores && cotacao.fornecedores.length > 1 && !reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 space-y-2">
+              <p className="text-xs font-semibold text-amber-700">
+                Quer trocar o fornecedor escolhido antes de reenviar? Clique em "Escolher" no fornecedor desejado.
+              </p>
+              <CotacaoComparativo
+                fornecedores={cotacao.fornecedores}
+                onSelect={fornId => {
+                  if (!cotacao.id || isLocked || trocarFornecedorMutation.isPending) return
+                  setTrocaToast(null)
+                  trocarFornecedorMutation.mutate(
+                    { cotacaoId: cotacao.id, novoFornecedorId: fornId },
+                    {
+                      onSuccess: res => {
+                        if (res.changed) {
+                          setTrocaToast({ type: 'success', msg: `Fornecedor alterado para ${res.fornecedor_selecionado_nome}.` })
+                        }
+                      },
+                      onError: err => {
+                        setTrocaToast({ type: 'error', msg: err instanceof Error ? err.message : 'Erro ao trocar fornecedor.' })
+                      },
+                    },
+                  )
+                }}
+              />
+              {trocaToast && (
+                <p className={`text-xs font-semibold ${trocaToast.type === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {trocaToast.msg}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Reenviar para aprovador */}
           {canResponderEsteEsclarecimento && !reenviarMutation.isSuccess && (
