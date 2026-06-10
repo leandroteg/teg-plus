@@ -185,6 +185,13 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         condicao_pagamento?: string | null
         observacao?: string | null
         selecionado?: boolean | null
+        itens_precos?: Array<{
+          descricao: string
+          qtd: number
+          valor_unitario: number
+          valor_total: number
+          selecionado?: boolean
+        }> | null
       }
       const cotMap = new Map<string, CotResumo>()
       const cotForMap = new Map<string, CotFornecedor[]>()
@@ -192,7 +199,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, concluido_por_nome, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, fornecedor_nome, valor_total, valor_frete, prazo_entrega_dias, condicao_pagamento, observacao, selecionado)')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, concluido_por_nome, comprador:cmp_compradores(nome), fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, fornecedor_nome, valor_total, valor_frete, prazo_entrega_dias, condicao_pagamento, observacao, selecionado, itens_precos)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
@@ -1351,15 +1358,22 @@ export function useDecisaoRequisicao() {
       if (reqError) throw reqError
 
       // 2. Create apr_aprovacoes record (audit trail + feeds AprovAi)
+      // tipo_aprovacao reflete a etapa em que a decisão foi tomada:
+      //   - cotacao_enviada  → 'cotacao'           (aprovação financeira)
+      //   - demais statuses  → 'requisicao_compra' (validação técnica)
+      // Antes era hardcoded 'requisicao_compra', o que poluía o histórico com
+      // registros do tipo errado quando a decisão era financeira.
       const aprStatus = decisao === 'aprovada' ? 'aprovada'
                       : decisao === 'rejeitada' ? 'rejeitada'
                       : 'esclarecimento'
+      const aprTipo: TipoAprovacao = isFinancialApproval ? 'cotacao' : 'requisicao_compra'
+      const decisionAt = new Date().toISOString()
 
       const { error: aprError } = await supabase
         .from(TABLE_APR)
         .insert({
           modulo: 'cmp',
-          tipo_aprovacao: 'requisicao_compra',
+          tipo_aprovacao: aprTipo,
           entidade_id: requisicaoId,
           entidade_numero: requisicaoNumero,
           aprovador_nome: aprovadorNome,
@@ -1367,16 +1381,25 @@ export function useDecisaoRequisicao() {
           nivel: alcadaNivel,
           status: aprStatus,
           observacao: observacao || null,
-          data_decisao: new Date().toISOString(),
+          data_decisao: decisionAt,
         })
 
       // Non-critical: log warning but don't throw
       if (aprError) console.warn('Aviso: apr_aprovacoes nao inserido:', aprError.message)
 
       // 2b. Marca aprovacoes pendentes anteriores como resolvidas
+      // IMPORTANTE: sobrescreve aprovador_nome/email com QUEM realmente decidiu
+      // (não o destinatário esperado gravado no insert original). Sem isto,
+      // quando um admin/aprovador da allowlist decide por outro, a auditoria
+      // fica mentindo — o registro fica em nome do destinatário hardcoded.
       await supabase
         .from(TABLE_APR)
-        .update({ status: aprStatus, data_decisao: new Date().toISOString() })
+        .update({
+          status: aprStatus,
+          data_decisao: decisionAt,
+          aprovador_nome: aprovadorNome,
+          aprovador_email: aprovadorEmail,
+        })
         .eq('entidade_id', requisicaoId)
         .eq('modulo', 'cmp')
         .eq('status', 'pendente')
