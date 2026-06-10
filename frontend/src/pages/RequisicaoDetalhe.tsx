@@ -881,7 +881,7 @@ export default function RequisicaoDetalhe() {
       {/* Comprador */}
       {req.comprador_nome && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-xs text-slate-400 mb-1">Comprador designado</p>
+          <p className="text-xs text-slate-400 mb-1">Comprador</p>
           <p className="text-sm font-bold text-slate-700">{req.comprador_nome}</p>
         </div>
       )}

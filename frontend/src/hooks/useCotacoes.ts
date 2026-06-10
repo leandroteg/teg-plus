@@ -236,19 +236,43 @@ export function useFinalizarCotacao() {
         ? fornecedoresComTotalEscolhido.reduce((sum, f) => sum + f.totalEscolhido, 0)
         : (vencedor?.valor_total ?? null)
 
-      // Captura quem clicou em Concluir (sys_perfis via auth)
+      // Captura quem clicou em Concluir (sys_perfis via auth) e tenta resolver
+      // o cmp_compradores correspondente p/ sobrescrever o "comprador designado"
+      // que veio default da categoria.
       const { data: authData } = await supabase.auth.getUser()
       let concluido_por_id: string | null = null
       let concluido_por_nome: string | null = null
+      let compradorRealId: string | null = null
       if (authData?.user?.id) {
         const { data: perfil } = await supabase
           .from('sys_perfis')
-          .select('id, nome')
+          .select('id, nome, email')
           .eq('auth_id', authData.user.id)
           .maybeSingle()
         if (perfil) {
           concluido_por_id = perfil.id as string
           concluido_por_nome = perfil.nome as string
+          // Mapeia sys_perfis -> cmp_compradores: tenta usuario_id, depois email
+          const perfilEmail = (perfil as { email?: string }).email
+          const { data: compByUsuario } = await supabase
+            .from('cmp_compradores')
+            .select('id')
+            .eq('usuario_id', perfil.id)
+            .eq('ativo', true)
+            .limit(1)
+            .maybeSingle()
+          if (compByUsuario?.id) {
+            compradorRealId = compByUsuario.id as string
+          } else if (perfilEmail) {
+            const { data: compByEmail } = await supabase
+              .from('cmp_compradores')
+              .select('id')
+              .ilike('email', perfilEmail)
+              .eq('ativo', true)
+              .limit(1)
+              .maybeSingle()
+            compradorRealId = compByEmail?.id ?? null
+          }
         }
       }
 
@@ -264,15 +288,20 @@ export function useFinalizarCotacao() {
           concluido_por_nome,
           sem_cotacoes_minimas: payload.sem_cotacoes_minimas ?? false,
           justificativa_sem_cotacoes: payload.justificativa_sem_cotacoes ?? null,
+          ...(compradorRealId ? { comprador_id: compradorRealId } : {}),
         })
         .eq('id', cotacao_id)
 
       if (cotError) throw new Error(cotError.message)
 
       // 4. Atualiza RC → cotacao_enviada (aguardando aprovação financeira)
+      //    e sincroniza comprador_id com quem realmente cotou (se mapeado).
       const { error: reqError } = await supabase
         .from('cmp_requisicoes')
-        .update({ status: 'cotacao_enviada' })
+        .update({
+          status: 'cotacao_enviada',
+          ...(compradorRealId ? { comprador_id: compradorRealId } : {}),
+        })
         .eq('id', requisicao_id)
 
       if (reqError) console.warn('Aviso: RC não atualizada:', reqError.message)

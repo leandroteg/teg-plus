@@ -1863,7 +1863,7 @@ function DetailModal({
             atualizadoPor={pedido.atualizado_por_nome}
             extra={[
               { label: 'Solicitante', value: (pedido.requisicao as any)?.solicitante_nome },
-              { label: 'Comprador designado', value: pedido.comprador?.nome },
+              { label: 'Comprador', value: pedido.comprador?.nome },
               { label: 'Cotou', value: pedido.cotacao?.concluido_por_nome },
               { label: 'Liberado por', value: pedido.liberado_pagamento_por },
             ]}
