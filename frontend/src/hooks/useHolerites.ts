@@ -154,7 +154,9 @@ export function useEnviarLoteHolerites() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_url: fileUrl, competencia: comp, tipo, perfil_id: perfil?.id }),
         })
-        data = await resp.json().catch(() => ({}))
+        const raw = await resp.json().catch(() => ({}))
+        // n8n responde dentro de um array: [{ job_id, status, ... }]
+        data = (Array.isArray(raw) ? (raw[0] ?? {}) : raw) as Record<string, unknown>
         ok = resp.ok
       } catch (e) {
         data = { error: String(e) }
