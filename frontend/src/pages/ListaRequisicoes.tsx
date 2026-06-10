@@ -326,7 +326,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           {r.descricao && r.descricao !== r.justificativa && (
             <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-100'}`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Detalhes adicionais</p>
-              <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{r.descricao}</p>
+              <p className={`text-xs leading-relaxed whitespace-pre-wrap break-all ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{r.descricao}</p>
             </div>
           )}
 

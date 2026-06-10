@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
-  MessageSquare, ExternalLink, ArrowLeft,
+  MessageSquare, ExternalLink, ArrowLeft, Home,
   FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
@@ -25,7 +25,7 @@ import FluxoTimeline from '../components/FluxoTimeline'
 import { useLinhaTempoCompra } from '../hooks/useLinhaTempoCompra'
 import { UpperTextarea } from '../components/UpperInput'
 import { AnexoReferencia } from '../components/AnexoReferencia'
-import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, ItemPreco } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -195,6 +195,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
   const [hidden, setHidden] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
+  const [showMatriz, setShowMatriz] = useState(false)
   const { data: marcos } = useLinhaTempoCompra(showTimeline ? aprovacao.requisicao_id : undefined)
 
   useEffect(() => {
@@ -430,15 +431,42 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </div>
 
         {/* Comparativo completo de fornecedores (somente p/ aprovacao de cotacao) */}
-        {aprovacao.tipo_aprovacao === 'cotacao' && aprovacao.cotacao_fornecedores && aprovacao.cotacao_fornecedores.length > 0 && (
+        {aprovacao.tipo_aprovacao === 'cotacao' && aprovacao.cotacao_fornecedores && aprovacao.cotacao_fornecedores.length > 0 && (() => {
+          const fornecedores = aprovacao.cotacao_fornecedores
+          const temItens = fornecedores.some(f => (f.itens_precos?.length ?? 0) > 0)
+          const normalizeKey = (s: string) => s.toLowerCase().trim()
+          const matriz: { key: string; label: string; precos: (ItemPreco | null)[]; minValor: number | null }[] = []
+          if (temItens) {
+            const keyMap = new Map<string, string>()
+            for (const f of fornecedores) for (const it of (f.itens_precos ?? [])) {
+              const k = normalizeKey(it.descricao)
+              if (!keyMap.has(k)) keyMap.set(k, it.descricao)
+            }
+            for (const [k, label] of keyMap.entries()) {
+              const precos: (ItemPreco | null)[] = fornecedores.map(f => (f.itens_precos ?? []).find(it => normalizeKey(it.descricao) === k) ?? null)
+              const vals = precos.filter(Boolean).map(p => p!.valor_total)
+              matriz.push({ key: k, label, precos, minValor: vals.length ? Math.min(...vals) : null })
+            }
+          }
+          return (
           <div className="mt-3 rounded-2xl border border-slate-200 overflow-hidden">
             <div className="bg-slate-50 px-3 py-2 flex items-center justify-between">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                Comparativo de Fornecedores ({aprovacao.cotacao_fornecedores.length})
+                Comparativo de Fornecedores ({fornecedores.length})
               </p>
+              {temItens && (
+                <button
+                  type="button"
+                  onClick={() => setShowMatriz(v => !v)}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-500 hover:text-indigo-700"
+                >
+                  {showMatriz ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  {showMatriz ? 'Ocultar' : 'Ver'} detalhe por item
+                </button>
+              )}
             </div>
             <div className="divide-y divide-slate-100">
-              {aprovacao.cotacao_fornecedores.map(f => (
+              {fornecedores.map(f => (
                 <div key={f.id} className={`px-3 py-2.5 ${f.selecionado ? 'bg-emerald-50/50' : ''}`}>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -473,8 +501,56 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                 </div>
               ))}
             </div>
+
+            {/* Matriz item x fornecedor (expansivel) */}
+            {temItens && showMatriz && matriz.length > 0 && (
+              <div className="border-t border-slate-200 bg-slate-50/40 overflow-x-auto">
+                <table className="w-full text-[10px] min-w-[420px]">
+                  <thead>
+                    <tr className="text-left text-[9px] text-slate-500 font-semibold uppercase tracking-wide bg-slate-100/60">
+                      <th className="px-2 py-1.5">
+                        <span className="inline-flex items-center gap-1">
+                          <Package size={9} className="text-teal-500" /> Item
+                        </span>
+                      </th>
+                      {fornecedores.map(f => (
+                        <th key={f.id} className="px-2 py-1.5 text-right">
+                          <span className="truncate block max-w-[90px] ml-auto">{f.fornecedor_nome}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {matriz.map(({ key, label, precos, minValor }) => (
+                      <tr key={key}>
+                        <td className="px-2 py-1.5 text-slate-700 align-top">
+                          <span className="line-clamp-2 leading-tight">{label}</span>
+                        </td>
+                        {precos.map((p, i) => {
+                          const f = fornecedores[i]
+                          const isBest = p && minValor !== null && p.valor_total === minValor
+                          return (
+                            <td key={f.id} className={`px-2 py-1.5 text-right align-top ${isBest ? 'bg-emerald-50' : ''}`}>
+                              {p ? (
+                                <div className="leading-tight">
+                                  <div className={`font-semibold ${isBest ? 'text-emerald-700' : 'text-slate-700'}`}>{fmt(p.valor_total)}</div>
+                                  <div className="text-[9px] text-slate-400">{p.qtd}× {fmt(p.valor_unitario)}</div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
+          )
+        })()}
 
         {/* Alerta: cotacoes obrigatorias faltantes (#38) */}
         {alertaCotacao?.sem_cotacoes_minimas && (
@@ -1972,13 +2048,23 @@ export default function AprovAi() {
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
         <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-xs font-semibold">Voltar</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span className="text-xs font-semibold">Voltar</span>
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
+              title="Ir para o TEG+ ERP"
+            >
+              <Home size={13} />
+              TEG+
+            </button>
+          </div>
           {/* Botão "Instalar App" — leva pra /aprovaai (HTML standalone com manifest próprio) */}
           {!window.matchMedia?.('(display-mode: standalone)').matches && !(window.navigator as Navigator & { standalone?: boolean }).standalone && (
             <a
