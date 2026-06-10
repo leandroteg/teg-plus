@@ -1,23 +1,63 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// pages/rh/RHPainel.tsx — Dashboard do módulo RH
+// pages/rh/RHPainel.tsx — Painel do Headcount (padrão dos dashboards TEG+)
+// 3 indicadores · 2 urgentes · pulso (composição) · 2 listas
 // ─────────────────────────────────────────────────────────────────────────────
 import {
-  Users, UserPlus, UserMinus, Briefcase, Building2, Cake,
-  TrendingUp, TrendingDown, HardHat, FileText,
+  Users, UserPlus, UserMinus, TrendingUp, RefreshCw, ChevronRight,
+  Zap, AlertTriangle, Activity, Building2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHStats } from '../../hooks/useRH'
+import { useAdmissoesFluxo } from '../../hooks/useRHAdmissaoFluxo'
+
+const ETAPA_LABEL: Record<string, string> = {
+  requisicao: 'Pendente', aprovacao: 'Aprovação', documentacao: 'Documentação',
+  exames_treinamentos: 'Exames/Trein.', mobilizacao: 'Mobilização', integracao: 'Integração', liberado: 'Liberado',
+}
+const EM_ANDAMENTO = ['requisicao', 'aprovacao', 'documentacao', 'exames_treinamentos', 'mobilizacao', 'integracao']
+
+function SpotlightMetric({ label, value, tone, note, isDark }: {
+  label: string; value: string | number; tone: string; note?: string; isDark: boolean
+}) {
+  const tones: Record<string, string> = {
+    violet: isDark ? 'text-violet-400' : 'text-violet-600',
+    emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    red: isDark ? 'text-red-400' : 'text-red-600',
+    amber: isDark ? 'text-amber-400' : 'text-amber-600',
+    slate: isDark ? 'text-slate-400' : 'text-slate-500',
+  }
+  return (
+    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+    </div>
+  )
+}
+
+function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
+  label: string; value: string | number; note?: string; icon: typeof Users; iconTone: string; isDark: boolean
+}) {
+  return (
+    <div className={`rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 flex-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <Icon size={16} className={iconTone} />
+      <p className={`text-2xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+      <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      {note && <p className={`text-[8px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+    </div>
+  )
+}
 
 export default function RHPainel() {
-  const { isLightSidebar: isLight } = useTheme()
-  const navigate = useNavigate()
-  const { data: stats, isLoading } = useRHStats()
+  const { isDark } = useTheme()
+  const nav = useNavigate()
+  const { data: stats, isLoading, refetch } = useRHStats()
+  const { data: admissoes = [] } = useAdmissoesFluxo()
 
-  const card = (bg: string, border: string) =>
-    `rounded-2xl border p-4 ${isLight ? `bg-white ${border} shadow-sm` : `bg-white/[0.03] border-white/[0.06]`}`
+  const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
-  if (isLoading) {
+  if (isLoading || !stats) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" />
@@ -25,141 +65,175 @@ export default function RHPainel() {
     )
   }
 
-  if (!stats) return null
+  // ── Métricas ───────────────────────────────────────────────────────────────
+  const admMes = stats.admissoesMes
+  const saiMes = stats.desligamentosMes
+  const ativos = stats.totalAtivos || 1
+  // Turnover mensal = média(admissões, saídas) / headcount
+  const turnover = (((admMes + saiMes) / 2) / ativos) * 100
 
-  const kpis = [
-    { label: 'Ativos', value: stats.totalAtivos, icon: Users, color: 'text-emerald-500', bg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/15' },
-    { label: 'CLT', value: stats.totalCLT, icon: Briefcase, color: 'text-blue-500', bg: isLight ? 'bg-blue-50' : 'bg-blue-500/15' },
-    { label: 'PJ', value: stats.totalPJ, icon: FileText, color: 'text-orange-500', bg: isLight ? 'bg-orange-50' : 'bg-orange-500/15' },
-    { label: 'Inativos', value: stats.totalInativos, icon: UserMinus, color: 'text-slate-400', bg: isLight ? 'bg-slate-50' : 'bg-slate-500/15' },
-    { label: 'Admissões (mês)', value: stats.admissoesMes, icon: UserPlus, color: 'text-violet-500', bg: isLight ? 'bg-violet-50' : 'bg-violet-500/15' },
-    { label: 'Desligamentos (mês)', value: stats.desligamentosMes, icon: TrendingDown, color: 'text-red-500', bg: isLight ? 'bg-red-50' : 'bg-red-500/15' },
-  ]
+  const emAndamento = admissoes.filter(a => EM_ANDAMENTO.includes(a.etapa ?? 'requisicao'))
+  const urgentes = emAndamento.filter(a => a.urgente).length
+
+  // Composição da equipe por tipo de contrato
+  const clt = stats.totalCLT
+  const pj = stats.totalPJ
+  const outros = Math.max(stats.totalAtivos - clt - pj, 0)
+  const compTotal = clt + pj + outros || 1
+  const comp = [
+    { key: 'clt', label: 'CLT', total: clt, color: 'bg-violet-500' },
+    { key: 'pj', label: 'PJ', total: pj, color: 'bg-orange-400' },
+    { key: 'outros', label: 'Outros', total: outros, color: 'bg-slate-400' },
+  ].filter(c => c.total > 0)
+
+  const porDept = stats.porDepartamento ?? []
+  const maxDept = Math.max(...porDept.map(d => d.total), 1)
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className="space-y-3">
       {/* Header */}
-      <div>
-        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <Users size={20} className="text-violet-400" />
-          Painel RH
-        </h1>
-        <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Visão geral da gestão de colaboradores</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Headcount</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admissões, saídas e composição da equipe</p>
+        </div>
+        <button onClick={() => refetch()} className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-violet-400' : 'text-slate-400 hover:text-violet-600'}`}>
+          <RefreshCw size={12} />
+        </button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {kpis.map(k => (
-          <div key={k.label} className={card('', 'border-slate-200')}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${k.bg}`}>
-                <k.icon size={15} className={k.color} />
+      {/* Hero: Indicadores + Janela Crítica */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Núcleo de Pessoas</p>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do mês</h2>
+              </div>
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
+                <Users size={18} className="text-violet-500" />
               </div>
             </div>
-            <p className={`text-2xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{k.value}</p>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{k.label}</p>
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric label="Admissões" value={admMes} tone="violet" isDark={isDark} note={`${ativos} ativos`} />
+              <SpotlightMetric label="Saídas" value={saiMes} tone={saiMes > 0 ? 'amber' : 'slate'} isDark={isDark} note="no mês" />
+              <SpotlightMetric label="Turnover" value={`${turnover.toFixed(1)}%`} tone={turnover >= 5 ? 'red' : 'emerald'} isDark={isDark} note="mensal" />
+            </div>
           </div>
-        ))}
+        </section>
+
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Janela Crítica</p>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>O que exige ação agora</h2>
+              </div>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <Zap size={14} className={urgentes > 0 ? 'text-red-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MiniInfoCard label="Adm. Urgentes" value={urgentes} icon={AlertTriangle}
+                iconTone={urgentes > 0 ? 'text-orange-500' : 'text-slate-400'} note={urgentes > 0 ? 'priorizar!' : 'nenhuma'} isDark={isDark} />
+              <MiniInfoCard label="Em Andamento" value={emAndamento.length} icon={Activity}
+                iconTone={emAndamento.length > 0 ? 'text-violet-500' : 'text-slate-400'} note="no fluxo" isDark={isDark} />
+            </div>
+          </div>
+        </section>
       </div>
 
-      {/* Admissões pendentes alert */}
-      {stats.admissoesPendentes > 0 && (
-        <button onClick={() => navigate('/rh/admissao')}
-          className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all ${
-            isLight
-              ? 'bg-amber-50 border-amber-200 hover:bg-amber-100'
-              : 'bg-amber-500/10 border-amber-500/25 hover:bg-amber-500/15'
-          }`}>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isLight ? 'bg-amber-100' : 'bg-amber-500/20'}`}>
-            <UserPlus size={18} className="text-amber-500" />
-          </div>
-          <div className="text-left flex-1">
-            <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              {stats.admissoesPendentes} admiss{stats.admissoesPendentes === 1 ? 'ão pendente' : 'ões pendentes'}
-            </p>
-            <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Clique para gerenciar o pipeline de admissão</p>
-          </div>
-          <TrendingUp size={16} className="text-amber-500" />
-        </button>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Por departamento */}
-        <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-          <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-            <h2 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <Building2 size={14} className="text-violet-400" /> Por Departamento
-            </h2>
-          </div>
-          <div className="px-5 py-3 space-y-2">
-            {stats.porDepartamento.slice(0, 8).map(d => (
-              <div key={d.departamento} className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className={`text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{d.departamento}</p>
-                  <div className={`h-1.5 rounded-full mt-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
-                    <div className="h-full rounded-full bg-violet-500"
-                      style={{ width: `${Math.min(100, (d.total / stats.totalAtivos) * 100)}%` }} />
-                  </div>
-                </div>
-                <span className={`text-xs font-bold min-w-[24px] text-right ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{d.total}</span>
-              </div>
+      {/* Pulso: composição da equipe */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <TrendingUp size={14} className="text-violet-500" /> Composição da Equipe
+          </h2>
+          <div className="flex items-center gap-3">
+            {comp.map(c => (
+              <span key={c.key} className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-full ${c.color}`} />
+                <span className="text-[10px] text-slate-500">{c.label}</span>
+              </span>
             ))}
-            {stats.porDepartamento.length === 0 && (
-              <p className={`text-xs text-center py-4 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum dado</p>
-            )}
           </div>
         </div>
-
-        {/* Por obra */}
-        <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-          <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-            <h2 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <HardHat size={14} className="text-orange-400" /> Por Obra
-            </h2>
-          </div>
-          <div className="px-5 py-3 space-y-2">
-            {stats.porObra.slice(0, 8).map(o => (
-              <div key={o.obra} className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className={`text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{o.obra}</p>
-                  <div className={`h-1.5 rounded-full mt-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
-                    <div className="h-full rounded-full bg-orange-500"
-                      style={{ width: `${Math.min(100, (o.total / stats.totalAtivos) * 100)}%` }} />
+        <div className="px-4 py-3">
+          {comp.length === 0 ? (
+            <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>Sem colaboradores ativos</div>
+          ) : (
+            <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+              {comp.map(c => {
+                const pct = (c.total / compTotal) * 100
+                return (
+                  <div key={c.key} className={`${c.color} flex items-center justify-center transition-all`} style={{ width: `${Math.max(pct, 4)}%` }} title={`${c.label}: ${c.total}`}>
+                    {pct >= 12 && <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{c.label} {c.total}</span>}
                   </div>
-                </div>
-                <span className={`text-xs font-bold min-w-[24px] text-right ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{o.total}</span>
-              </div>
-            ))}
-            {stats.porObra.length === 0 && (
-              <p className={`text-xs text-center py-4 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum dado</p>
-            )}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Aniversariantes */}
-      {stats.aniversariantes.length > 0 && (
-        <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-          <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-            <h2 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <Cake size={14} className="text-pink-400" /> Aniversariantes do Mês
+      {/* Listas: Admissões em andamento + Por Departamento */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <UserPlus size={14} className="text-violet-500" /> Admissões em Andamento
             </h2>
+            <button onClick={() => nav('/rh/headcount/admissao')} className="flex items-center gap-0.5 text-[10px] text-violet-600 font-semibold">Ver todas <ChevronRight size={11} /></button>
           </div>
-          <div className="px-5 py-3 flex flex-wrap gap-2">
-            {stats.aniversariantes.map(c => {
-              const dia = c.data_nascimento ? new Date(c.data_nascimento).getDate() : '?'
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+            {emAndamento.length === 0 ? (
+              <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma admissão em andamento</p>
+            ) : emAndamento.slice(0, 6).map(a => {
+              const cand = a.candidatos?.[0]?.nome || a.nome_candidato || 'Candidato'
+              const n = a.candidatos?.length ?? 0
               return (
-                <div key={c.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  isLight ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-pink-500/15 text-pink-300 border border-pink-500/25'
-                }`}>
-                  <span className="font-bold">{dia}</span>
-                  <span>{c.nome?.split(' ')[0]}</span>
+                <div key={a.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
+                    <UserPlus size={14} className="text-violet-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                      {cand}{n > 1 && <span className="text-violet-500 font-bold"> +{n - 1}</span>}
+                    </p>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{a.base || a.centro_custo?.codigo || '—'}</p>
+                  </div>
+                  {a.urgente && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 shrink-0">URGENTE</span>}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{ETAPA_LABEL[a.etapa ?? 'requisicao']}</span>
                 </div>
               )
             })}
           </div>
-        </div>
-      )}
+        </section>
+
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Building2 size={14} className="text-violet-500" /> Por Departamento
+            </h2>
+          </div>
+          <div className="p-4 space-y-2.5">
+            {porDept.length === 0 ? (
+              <p className={`text-center text-sm py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados por departamento</p>
+            ) : porDept.slice(0, 8).map(d => (
+              <div key={d.departamento} className="flex items-center gap-3">
+                <p className={`text-[11px] font-semibold text-right shrink-0 w-[90px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d.departamento}</p>
+                <div className="flex-1 relative">
+                  <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-600 transition-all duration-500" style={{ width: `${Math.max((d.total / maxDept) * 100, 4)}%` }} />
+                  </div>
+                </div>
+                <p className={`text-[11px] font-extrabold shrink-0 w-[36px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{d.total}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
