@@ -54,6 +54,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   const editadoMap = adm.editado_rh ?? {}
   const foiEditado = Object.keys(editadoMap).length > 0
   const podeEditar = etapa !== 'cancelada' && etapa !== 'liberado'
+  const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
 
   async function executar(acao: AcaoAdmissao, motivo?: string) {
     await transicao.mutateAsync({ adm, acao, autorId: perfil?.id, autorNome, motivo })
@@ -128,15 +129,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
               <p className="text-xs text-slate-500 truncate">{candidatos.length} candidato(s) · {localTxt}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            {podeEditar && !editando && (
-              <button onClick={iniciarEdicao} title="Editar dados (fica registrado)"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100">
-                <Pencil size={12} /> Editar
-              </button>
-            )}
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
-          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -156,6 +149,11 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
           {adm.urgente && (
             <div className="rounded-xl bg-orange-50 border border-orange-200 p-2.5 flex items-center gap-1.5 text-xs font-bold text-orange-700">
               <AlertTriangle size={14} /> Solicitação urgente
+            </div>
+          )}
+          {criadoPorSuperTEG && (
+            <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-2.5 flex items-center gap-1.5 text-xs font-bold text-indigo-700">
+              <span className="text-sm leading-none">🦸</span> Criada pelo SuperTEG a partir de e-mail
             </div>
           )}
           {foiEditado && !editando && (
@@ -313,7 +311,16 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
 
         {/* Ações por etapa */}
         {!pedindo && !editando && (
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 sticky bottom-0 bg-white">
+          <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-slate-100 sticky bottom-0 bg-white">
+            <div>
+              {podeEditar && (
+                <button onClick={iniciarEdicao} title="Editar dados (fica registrado)"
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100">
+                  <Pencil size={14} /> Editar
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
             {etapa === 'requisicao' && (
               <button onClick={() => executar('solicitar_aprovacao')} disabled={transicao.isPending}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60 shadow-sm">
@@ -345,6 +352,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 </button>
               </>
             )}
+            </div>
           </div>
         )}
       </div>
