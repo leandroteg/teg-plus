@@ -495,6 +495,45 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                       <span className="text-slate-700 truncate block">{f.condicao_pagamento || '—'}</span>
                     </div>
                   </div>
+
+                  {/* Itens deste fornecedor: detalhe por item se cotou, fallback pros itens da RC */}
+                  {(() => {
+                    const itensFn = (f.itens_precos ?? []).filter(it => it && it.descricao)
+                    if (itensFn.length > 0) {
+                      return (
+                        <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/60 px-2 py-1.5 space-y-0.5">
+                          {itensFn.map((it, idx) => (
+                            <div key={idx} className="flex items-center justify-between gap-2 text-[10px]">
+                              <span className="text-slate-600 truncate flex-1">
+                                <span className="font-semibold text-slate-500">{it.qtd}×</span> {it.descricao}
+                              </span>
+                              <span className="shrink-0 text-slate-500">
+                                {fmt(it.valor_unitario)} <span className="text-slate-400">·</span> <span className="font-semibold text-slate-700">{fmt(it.valor_total)}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }
+                    const itensRc = (req.itens ?? []).filter(i => i && i.descricao)
+                    if (itensRc.length === 0) return null
+                    return (
+                      <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50/40 px-2 py-1.5 space-y-0.5">
+                        <p className="text-[9px] uppercase tracking-wider font-bold text-amber-600 mb-0.5">
+                          Itens (cotação só do total)
+                        </p>
+                        {itensRc.map((it, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 text-[10px]">
+                            <span className="text-slate-600 truncate flex-1">
+                              <span className="font-semibold text-slate-500">{it.quantidade}×</span> {it.descricao}
+                            </span>
+                            <span className="shrink-0 text-slate-400 italic">—</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
                   {f.observacao && (
                     <p className="text-[10px] text-slate-400 italic mt-1.5 leading-snug">"{f.observacao}"</p>
                   )}
