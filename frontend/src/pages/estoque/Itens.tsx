@@ -145,7 +145,8 @@ export default function Itens() {
 
   const liberadosFiltrados = useMemo(() => {
     let list = liberados
-    if (baseFilter) list = list.filter(s => s.base_id === baseFilter)
+    // est_solicitacoes tem base_destino_id (não base_id) — fix do filtro silencioso
+    if (baseFilter) list = list.filter(s => (s as any).base_destino_id === baseFilter)
     if (busca.trim()) {
       const t = busca.toLowerCase()
       list = list.filter(s =>

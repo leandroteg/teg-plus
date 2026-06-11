@@ -105,6 +105,10 @@ export default function RecebimentoModal({
       setErro('Informe a quantidade recebida em pelo menos 1 item.')
       return
     }
+    if (!baseId) {
+      setErro('Selecione a Base / Almoxarifado de destino do recebimento.')
+      return
+    }
     if (!nfNumero.trim()) {
       setErro('Informe o numero da Nota Fiscal (necessaria para liberar o pagamento).')
       return
