@@ -9,7 +9,7 @@ import {
 import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useCriarSolicitacaoContratoFromRC } from '../hooks/useSolicitacoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
-import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento } from '../hooks/useCotacoes'
+import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento, useRenegociarValorEsclarecimento } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useBases } from '../hooks/useEstoque'
@@ -21,6 +21,7 @@ import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { UpperTextarea } from '../components/UpperInput'
+import NumericInput from '../components/NumericInput'
 import type { StatusRequisicao } from '../types'
 
 const fmt = (v: number) =>
@@ -154,6 +155,11 @@ export default function RequisicaoDetalhe() {
   const { data: cotacao } = useCotacaoByRequisicao(showCotacao ? id : undefined)
   const trocarFornecedorMutation = useTrocarFornecedorEsclarecimento()
   const [trocaToast, setTrocaToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const renegociarValorMutation = useRenegociarValorEsclarecimento()
+  const [renegOpen, setRenegOpen] = useState(false)
+  const [renegValor, setRenegValor] = useState(0)
+  const [renegObs, setRenegObs] = useState('')
+  const [renegToast, setRenegToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // Triador do CD (admin ou lotado em base que faz_triagem)
   const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
@@ -444,6 +450,109 @@ export default function RequisicaoDetalhe() {
               {trocaToast && (
                 <p className={`text-xs font-semibold ${trocaToast.type === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
                   {trocaToast.msg}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Renegociar valor do fornecedor selecionado (sem trocar fornecedor) */}
+          {req.status === 'cotacao_em_esclarecimento' && canResponderEsteEsclarecimento
+            && cotacao?.status === 'concluida' && cotacao.fornecedor_selecionado_id
+            && cotacao.fornecedor_selecionado_nome && !reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-amber-700">
+                  Renegociou o valor com {cotacao.fornecedor_selecionado_nome}? Atual: {fmt(cotacao.valor_selecionado ?? 0)}
+                </p>
+                <button
+                  type="button"
+                  disabled={isLocked}
+                  onClick={() => {
+                    setRenegToast(null)
+                    setRenegValor(cotacao.valor_selecionado ?? 0)
+                    setRenegObs('')
+                    setRenegOpen(o => !o)
+                  }}
+                  className="shrink-0 flex items-center gap-1 py-1 px-2.5 rounded-lg text-xs font-bold
+                    border border-amber-300 bg-white text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  {renegOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Renegociar valor
+                </button>
+              </div>
+              {renegOpen && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-amber-700">Novo valor total (R$)</label>
+                  <NumericInput
+                    value={renegValor}
+                    onChange={setRenegValor}
+                    step="0.01"
+                    min="0"
+                    disabled={isLocked || renegociarValorMutation.isPending}
+                    className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm
+                      focus:ring-2 focus:ring-amber-400 outline-none"
+                  />
+                  <label className="block text-xs font-semibold text-amber-700">Observação (mínimo 5 caracteres)</label>
+                  <UpperTextarea
+                    rows={2}
+                    value={renegObs}
+                    disabled={isLocked || renegociarValorMutation.isPending}
+                    onChange={e => setRenegObs(e.target.value)}
+                    placeholder="Descreva o motivo da renegociação..."
+                    className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm
+                      focus:ring-2 focus:ring-amber-400 outline-none placeholder-amber-300"
+                  />
+                  <button
+                    type="button"
+                    disabled={
+                      isLocked
+                      || renegociarValorMutation.isPending
+                      || !cotacao.id
+                      || !cotacao.fornecedor_selecionado_id
+                      || renegValor <= 0
+                      || renegValor === (cotacao.valor_selecionado ?? 0)
+                      || renegObs.trim().length < 5
+                    }
+                    onClick={() => {
+                      if (!cotacao.id || !cotacao.fornecedor_selecionado_id) return
+                      setRenegToast(null)
+                      renegociarValorMutation.mutate(
+                        {
+                          cotacaoId: cotacao.id,
+                          fornecedorId: cotacao.fornecedor_selecionado_id,
+                          novoValorTotal: renegValor,
+                          observacao: renegObs.trim(),
+                        },
+                        {
+                          onSuccess: res => {
+                            if (res.changed) {
+                              setRenegToast({ type: 'success', msg: `Valor renegociado: ${fmt(res.valor_anterior)} → ${fmt(res.valor_selecionado)}.` })
+                              setRenegObs('')
+                              setRenegValor(0)
+                              setRenegOpen(false)
+                            } else {
+                              setRenegToast({ type: 'error', msg: 'Valor informado é igual ao atual — nada para alterar.' })
+                            }
+                          },
+                          onError: err => {
+                            setRenegToast({ type: 'error', msg: err instanceof Error ? err.message : 'Erro ao renegociar valor.' })
+                          },
+                        },
+                      )
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                      bg-amber-500 text-white text-sm font-bold hover:bg-amber-600
+                      active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {renegociarValorMutation.isPending
+                      ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <Pencil size={14} />}
+                    Renegociar valor
+                  </button>
+                </div>
+              )}
+              {renegToast && (
+                <p className={`text-xs font-semibold ${renegToast.type === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {renegToast.msg}
                 </p>
               )}
             </div>

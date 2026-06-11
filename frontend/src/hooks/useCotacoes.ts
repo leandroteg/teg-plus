@@ -485,3 +485,46 @@ export function useTrocarFornecedorEsclarecimento() {
     },
   })
 }
+
+// ── Renegociar valor do fornecedor escolhido durante cotacao_em_esclarecimento ─
+// Mantém o mesmo fornecedor selecionado e atualiza apenas o valor_total. RPC
+// migration 133.
+
+export function useRenegociarValorEsclarecimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cotacaoId,
+      fornecedorId,
+      novoValorTotal,
+      observacao,
+    }: {
+      cotacaoId: string
+      fornecedorId: string
+      novoValorTotal: number
+      observacao?: string
+    }) => {
+      const { data, error } = await supabase.rpc('cmp_renegociar_valor_em_esclarecimento', {
+        p_cotacao_id: cotacaoId,
+        p_fornecedor_id: fornecedorId,
+        p_novo_valor_total: novoValorTotal,
+        p_observacao: observacao ?? '',
+      })
+      if (error) throw new Error(error.message)
+      return data as {
+        changed: boolean
+        valor_anterior: number
+        valor_selecionado: number
+        fornecedor_selecionado_id: string
+        fornecedor_selecionado_nome: string
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+    },
+  })
+}
