@@ -35,6 +35,25 @@ export default function Inventario() {
   const { data: bases = [] } = useBases()
   const abrirInventario = useAbrirInventario()
   const concluir = useConcluirInventario()
+  const [importTargetId, setImportTargetId] = useState<string | null>(null)
+  const [showPickerImport, setShowPickerImport] = useState(false)
+
+  // Inventários abertos/em contagem (elegíveis pra receber import)
+  const inventariosElegiveis = inventarios.filter(
+    inv => inv.status === 'aberto' || inv.status === 'em_contagem',
+  )
+
+  function handleImportClick() {
+    if (inventariosElegiveis.length === 0) {
+      alert('Crie um inventário primeiro (status Aberto ou Em Contagem) e tente novamente.')
+      return
+    }
+    if (inventariosElegiveis.length === 1) {
+      setImportTargetId(inventariosElegiveis[0].id)
+      return
+    }
+    setShowPickerImport(true)
+  }
 
   async function handleAbrir() {
     await abrirInventario.mutateAsync({
@@ -68,14 +87,66 @@ export default function Inventario() {
           <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Invent\u00e1rios'}</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{inventarios.length} {'invent\u00e1rios'}</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-        >
-          <Plus size={15} /> Novo Inventario
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImportClick}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white
+              text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+            title="Importar contagem em lote (CSV)"
+          >
+            <Upload size={15} /> Importar CSV
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
+              text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+          >
+            <Plus size={15} /> Novo Inventario
+          </button>
+        </div>
       </div>
+
+      {importTargetId && (
+        <ImportarCSVModal
+          inventarioId={importTargetId}
+          isLight={isLight}
+          onClose={() => setImportTargetId(null)}
+        />
+      )}
+
+      {showPickerImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowPickerImport(false)}>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isLight ? 'bg-white' : 'bg-[#111827]'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Importar em qual inventário?</h2>
+              <button onClick={() => setShowPickerImport(false)} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+              {inventariosElegiveis.map(inv => {
+                const baseNome = bases.find(b => b.id === inv.base_id)?.nome ?? 'Todas as bases'
+                return (
+                  <button
+                    key={inv.id}
+                    onClick={() => { setImportTargetId(inv.id); setShowPickerImport(false) }}
+                    className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+                      isLight ? 'bg-white hover:bg-slate-50 border-slate-200' : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06]'
+                    }`}
+                  >
+                    <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                      {inv.numero} <span className={`text-[10px] font-semibold ml-1 px-1.5 py-0.5 rounded ${STATUS_CONFIG[inv.status]?.bg} ${STATUS_CONFIG[inv.status]?.text}`}>{STATUS_CONFIG[inv.status]?.label}</span>
+                    </p>
+                    <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {inv.tipo} · {baseNome} · aberto em {fmtData(inv.data_abertura)}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* -- Lista --------------------------------------------------- */}
       {isLoading ? (
