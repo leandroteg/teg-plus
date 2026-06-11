@@ -53,7 +53,8 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   const localTxt = [baseTxt, ccTxt].filter(Boolean).join(' · ') || '—'
   const editadoMap = adm.editado_rh ?? {}
   const foiEditado = Object.keys(editadoMap).length > 0
-  const podeEditar = etapa !== 'cancelada' && etapa !== 'liberado'
+  // Sem edição na Aprovação (decisão é sobre o que foi solicitado) nem em etapas terminais
+  const podeEditar = etapa !== 'aprovacao' && etapa !== 'cancelada' && etapa !== 'liberado'
   const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
 
   async function executar(acao: AcaoAdmissao, motivo?: string) {
