@@ -44,7 +44,7 @@ export function useAdmissoesFluxo() {
         console.error('useAdmissoesFluxo:', error)
         return []
       }
-      return (data ?? []) as RHAdmissao[]
+      return (data ?? []) as unknown as RHAdmissao[]
     },
   })
 }
@@ -252,6 +252,85 @@ export function useTransicaoAdmissao() {
         autor_nome: autorNome ?? null,
         observacao: motivo ?? null,
       })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
+// ── Edição pelo RH (campos corrigidos ficam tagueados) ───────────────────────
+const LABELS_EDICAO: Record<string, string> = {
+  base: 'Base', centro_custo_id: 'Centro de Custo', departamento_previsto: 'Departamento',
+  tipo_contrato: 'Tipo de contrato', data_prevista_inicio: 'Início previsto', motivo: 'Motivo',
+  nome: 'Nome', cpf: 'CPF', data_nascimento: 'Data de nascimento', cargo: 'Cargo', salario: 'Salário',
+}
+
+export interface EdicaoAdmissaoInput {
+  adm: RHAdmissao
+  patch: Partial<Record<string, unknown>>                       // campos da requisição alterados
+  candidatos: { id: string; nome?: string; patch: Partial<Record<string, unknown>> }[]
+  autorId?: string
+  autorNome?: string
+}
+
+export function useEditarAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ adm, patch, candidatos, autorId, autorNome }: EdicaoAdmissaoInput) => {
+      const editado: Record<string, boolean> = { ...(adm.editado_rh ?? {}) }
+      const mudancas: string[] = []
+
+      const reqPatch: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(patch)) {
+        const atual = (adm as unknown as Record<string, unknown>)[k] ?? null
+        const novo = (v === '' ? null : v) as unknown
+        if (String(atual ?? '') === String(novo ?? '')) continue
+        reqPatch[k] = novo
+        editado[k] = true
+        mudancas.push(`${LABELS_EDICAO[k] ?? k}: "${atual ?? '—'}" → "${novo ?? '—'}"`)
+      }
+
+      const candUpdates: { id: string; patch: Record<string, unknown> }[] = []
+      for (const c of candidatos) {
+        const original = (adm.candidatos ?? []).find(x => x.id === c.id)
+        if (!original) continue
+        const cp: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(c.patch)) {
+          const atual = (original as unknown as Record<string, unknown>)[k] ?? null
+          const novo = (v === '' ? null : v) as unknown
+          if (String(atual ?? '') === String(novo ?? '')) continue
+          cp[k] = novo
+          editado[`cand:${c.id}:${k}`] = true
+          mudancas.push(`${c.nome || original.nome || 'Candidato'} · ${LABELS_EDICAO[k] ?? k}: "${atual ?? '—'}" → "${novo ?? '—'}"`)
+        }
+        if (Object.keys(cp).length) candUpdates.push({ id: c.id, patch: cp })
+      }
+
+      if (!Object.keys(reqPatch).length && !candUpdates.length) return { mudancas: 0 }
+
+      const { error } = await supabase
+        .from('rh_admissoes')
+        .update({ ...reqPatch, editado_rh: editado })
+        .eq('id', adm.id)
+      if (error) throw error
+
+      for (const cu of candUpdates) {
+        const { error: cErr } = await supabase.from('rh_admissao_candidatos').update(cu.patch).eq('id', cu.id)
+        if (cErr) throw cErr
+      }
+
+      await supabase.from('rh_admissao_historico').insert({
+        admissao_id: adm.id,
+        acao: 'edicao_rh',
+        de_etapa: adm.etapa ?? null,
+        para_etapa: adm.etapa ?? null,
+        autor_id: autorId ?? null,
+        autor_nome: autorNome ?? null,
+        observacao: `[Editado pelo RH] ${mudancas.join('; ')}`,
+      })
+
+      return { mudancas: mudancas.length }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })

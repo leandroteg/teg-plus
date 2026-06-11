@@ -138,6 +138,7 @@ export type StatusAdmissao = 'pendente' | 'avaliacao_documentos' | 'aguardando_c
 export type EtapaAdmissaoFluxo =
   | 'requisicao' | 'aprovacao' | 'documentacao'
   | 'exames_treinamentos' | 'mobilizacao' | 'integracao' | 'liberado'
+  | 'cancelada'
 
 export type StatusAprovacaoAdmissao = 'pendente' | 'aprovado' | 'rejeitado' | 'esclarecimento'
 
@@ -208,6 +209,9 @@ export interface RHAdmissao {
   // Centro de Custo + Base (RH-only)
   centro_custo_id?: string
   base?: string
+
+  // Campos corrigidos pelo RH (chave: 'base', 'cand:<id>:cpf', ...) — tag visual
+  editado_rh?: Record<string, boolean>
 
   // Joins
   obra_prevista?: { id: string; codigo: string; nome: string }

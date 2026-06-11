@@ -28,11 +28,11 @@ const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: strin
   { key: 'liberado',            num: 7, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
-const ETAPA_ICON: Record<EtapaAdmissao, typeof Receipt> = Object.fromEntries(
+const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = Object.fromEntries(
   ETAPAS.map(e => [e.key, e.icon]),
-) as Record<EtapaAdmissao, typeof Receipt>
+) as Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt>
 
-const ACCENT: Record<EtapaAdmissao, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+const ACCENT: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
   requisicao:          { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    border: 'border-blue-500',    badge: 'bg-blue-100 text-blue-700',       icon: 'text-blue-500' },
   aprovacao:           { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700',     icon: 'text-amber-500' },
   documentacao:        { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700',   icon: 'text-violet-500' },
@@ -42,7 +42,7 @@ const ACCENT: Record<EtapaAdmissao, { bg: string; bgActive: string; text: string
   liberado:            { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-500' },
 }
 
-const ACCENT_DARK: Record<EtapaAdmissao, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
+const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
   requisicao:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    border: 'border-blue-400/40',    badge: 'bg-blue-500/15 text-blue-200',       icon: 'text-blue-400' },
   aprovacao:           { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200',     icon: 'text-amber-400' },
   documentacao:        { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200',   icon: 'text-violet-400' },
