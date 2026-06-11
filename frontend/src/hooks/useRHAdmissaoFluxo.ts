@@ -114,6 +114,22 @@ export function useCriarAdmissao() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ dados, candidatos, autorId, autorNome }: NovaAdmissaoInput) => {
+      // 0) trava de duplicidade: CPF (ou nome) com requisição ainda aberta
+      for (const c of candidatos) {
+        const { data: dup } = await supabase.rpc('rh_admissao_existe_aberta', {
+          p_cpf: c.cpf || null,
+          p_nome: c.nome || null,
+        })
+        const d = dup as { existe?: boolean; criterio?: string; etapa?: string; candidato_nome?: string } | null
+        if (d?.existe) {
+          const etapaLabel = String(d.etapa ?? '').replace(/_/g, ' ')
+          throw new Error(
+            `${d.candidato_nome ?? c.nome} já possui uma requisição de admissão aberta (etapa: ${etapaLabel}), ` +
+            `identificada por ${d.criterio === 'cpf' ? 'CPF' : 'nome'}. Conclua ou cancele a requisição existente antes de criar outra.`,
+          )
+        }
+      }
+
       // 1) cria a requisição (compartilhada)
       const insert = {
         ...dados,

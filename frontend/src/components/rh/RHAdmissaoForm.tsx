@@ -168,7 +168,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
       })
       onCreated()
     } catch (err) {
-      setErros(['Erro ao enviar a solicitação. Tente novamente.'])
+      setErros([err instanceof Error && err.message ? err.message : 'Erro ao enviar a solicitação. Tente novamente.'])
       console.error(err)
     }
   }
