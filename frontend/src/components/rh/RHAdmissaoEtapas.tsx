@@ -3,16 +3,17 @@
 // Exames e Treinamentos · Mobilização · Integração · Liberado
 // Ação do candidato → missão no Portal; ação interna → checklist aqui.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine,
+  Briefcase, User, PenLine, Handshake, Upload, FileText,
 } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
-  useMobilizacao, useIntegracao,
-  type RHExame, type RHMobilizacao, type RHIntegracao,
+  useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato,
+  type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
@@ -76,6 +77,102 @@ function CheckRow({ checked, label, onToggle, disabled }: { checked: boolean; la
       {checked ? <CheckCircle2 size={13} className="text-emerald-500 shrink-0" /> : <Circle size={13} className="text-slate-300 shrink-0" />}
       <span className={checked ? 'text-slate-700 font-semibold' : 'text-slate-500'}>{label}</span>
     </button>
+  )
+}
+
+// ════════════════ ETAPA 3 · PROPOSTA E ALINHAMENTO ════════════════
+// RH contata o candidato fora do sistema: envia a proposta de contratação
+// (condições de trabalho), registra o aceite e alinha chegada/deslocamento/
+// responsável pelo recebimento. Anexos (ex.: proposta assinada) entram aqui.
+export function PropostaCard({ adm, isDark, onClick }: {
+  adm: RHAdmissao; isDark: boolean; onClick: () => void
+}) {
+  return (
+    <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
+      {(adm.candidatos ?? []).map(c => <PropostaCandidato key={c.id} cand={c} adm={adm} isDark={isDark} />)}
+    </VagaCard>
+  )
+}
+
+function PropostaCandidato({ cand, adm, isDark }: { cand: RHAdmissaoCandidato; adm: RHAdmissao; isDark: boolean }) {
+  const { perfil } = useAuth()
+  const { data, isLoading } = useEtapaCandidato(cand.id)
+  const { atualizar } = useProposta()
+  const uploadAnexo = useUploadAnexoCandidato()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const prop = data?.proposta ?? null
+  const anexosRH = (cand.anexos ?? []).filter(a => a.arquivo_path.includes('/rh_'))
+
+  function upd(patch: Partial<RHProposta>) { atualizar.mutate({ candidatoId: cand.id, patch }) }
+
+  const statusChip = prop?.proposta_aceita
+    ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Proposta aceita ✓</span>
+    : prop?.proposta_enviada
+      ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">Proposta enviada</span>
+      : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-500">Contato pendente</span>
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+      <CandHeader nome={cand.nome} isDark={isDark} right={isLoading ? <Loader2 size={12} className="animate-spin text-slate-400" /> : statusChip} />
+
+      {/* Proposta */}
+      <div className="space-y-1">
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Handshake size={11} /> Proposta de contratação</span>
+        <div className="flex items-center gap-4 flex-wrap">
+          <CheckRow checked={!!prop?.proposta_enviada} label="Proposta enviada ao candidato" onToggle={() => upd({ proposta_enviada: !prop?.proposta_enviada })} />
+          <CheckRow checked={!!prop?.proposta_aceita} label="Proposta aceita" onToggle={() => upd({ proposta_aceita: !prop?.proposta_aceita })} />
+        </div>
+        <textarea defaultValue={prop?.condicoes ?? ''} key={`cond-${prop?.condicoes ?? ''}`} rows={2}
+          onBlur={e => upd({ condicoes: e.target.value || null })}
+          placeholder="Condições oferecidas (salário, benefícios, jornada, alojamento...)"
+          className={`${IN} resize-none`} />
+      </div>
+
+      {/* Alinhamento (após o aceite) */}
+      <div className="space-y-1">
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Calendar size={11} /> Alinhamento de chegada</span>
+        <div className="grid grid-cols-2 gap-1.5">
+          <div>
+            <label className="text-[9px] font-bold uppercase text-slate-400">Prazo de chegada</label>
+            <input type="date" value={prop?.data_chegada ?? ''} onChange={e => upd({ data_chegada: e.target.value || null })} className={IN} />
+          </div>
+          <div>
+            <label className="text-[9px] font-bold uppercase text-slate-400">Responsável por recebê-lo</label>
+            <input defaultValue={prop?.responsavel_recebimento ?? ''} key={`resp-${prop?.responsavel_recebimento ?? ''}`}
+              onBlur={e => upd({ responsavel_recebimento: e.target.value || null })} placeholder="Nome do responsável" className={IN} />
+          </div>
+        </div>
+        <input defaultValue={prop?.deslocamento_detalhes ?? ''} key={`desl-${prop?.deslocamento_detalhes ?? ''}`}
+          onBlur={e => upd({ deslocamento_detalhes: e.target.value || null })}
+          placeholder="Detalhes do deslocamento (como chega, quem busca, horário...)" className={IN} />
+      </div>
+
+      {/* Anexos do RH nesta etapa */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><FileText size={11} /> Anexos</span>
+          <button onClick={() => fileRef.current?.click()} disabled={uploadAnexo.isPending}
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50">
+            {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} Anexar
+          </button>
+          <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+            onChange={e => {
+              Array.from(e.target.files ?? []).forEach(file =>
+                uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file, tipo: 'proposta', autorId: perfil?.id }))
+              e.currentTarget.value = ''
+            }} />
+        </div>
+        {anexosRH.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {anexosRH.map(a => (
+              <span key={a.id} className="flex items-center gap-1 text-[10px] text-slate-500">
+                <FileText size={10} className="text-teal-600" /> {a.arquivo_nome}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 

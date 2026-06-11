@@ -136,7 +136,7 @@ export type StatusAdmissao = 'pendente' | 'avaliacao_documentos' | 'aguardando_c
 
 // Etapas do fluxo de admissão (RH-only)
 export type EtapaAdmissaoFluxo =
-  | 'requisicao' | 'aprovacao' | 'documentacao'
+  | 'requisicao' | 'aprovacao' | 'proposta_alinhamento' | 'documentacao'
   | 'exames_treinamentos' | 'mobilizacao' | 'integracao' | 'liberado'
   | 'cancelada'
 

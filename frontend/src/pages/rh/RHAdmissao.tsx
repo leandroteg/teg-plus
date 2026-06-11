@@ -8,14 +8,14 @@ import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
   HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
   ChevronRight as ChevR, Paperclip, AlertTriangle, XCircle, HelpCircle, Loader2,
-  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase,
+  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAdmissoesFluxo, useMissoesDocsStatus } from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
-import { ExamesCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
+import { PropostaCard, ExamesCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
 import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
@@ -24,11 +24,12 @@ type EtapaAdmissao = EtapaAdmissaoFluxo
 const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
   { key: 'requisicao',          num: 1, label: 'Pendente',                 descricao: 'Requisições aguardando envio para aprovação.',                   icon: ClipboardList },
   { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
-  { key: 'documentacao',        num: 3, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
-  { key: 'exames_treinamentos', num: 4, label: 'Exames e Treinamentos',   descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).', icon: Stethoscope },
-  { key: 'mobilizacao',         num: 5, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
-  { key: 'integracao',          num: 6, label: 'Integração',              descricao: 'Onboarding com RH e Gestor.',                                    icon: HeartHandshake },
-  { key: 'liberado',            num: 7, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
+  { key: 'proposta_alinhamento', num: 3, label: 'Proposta e Alinhamento', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
+  { key: 'documentacao',        num: 4, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
+  { key: 'exames_treinamentos', num: 5, label: 'Exames e Treinamentos',   descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).', icon: Stethoscope },
+  { key: 'mobilizacao',         num: 6, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
+  { key: 'integracao',          num: 7, label: 'Integração',              descricao: 'Onboarding com RH e Gestor.',                                    icon: HeartHandshake },
+  { key: 'liberado',            num: 8, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
 const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = Object.fromEntries(
@@ -38,6 +39,7 @@ const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = 
 const ACCENT: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
   requisicao:          { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    border: 'border-blue-500',    badge: 'bg-blue-100 text-blue-700',       icon: 'text-blue-500' },
   aprovacao:           { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700',     icon: 'text-amber-500' },
+  proposta_alinhamento:{ bg: 'hover:bg-rose-50',    bgActive: 'bg-rose-50',    text: 'text-rose-600',    textActive: 'text-rose-800',    border: 'border-rose-500',    badge: 'bg-rose-100 text-rose-700',       icon: 'text-rose-500' },
   documentacao:        { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700',   icon: 'text-violet-500' },
   exames_treinamentos: { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     badge: 'bg-sky-100 text-sky-700',         icon: 'text-sky-500' },
   mobilizacao:         { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  border: 'border-orange-500',  badge: 'bg-orange-100 text-orange-700',   icon: 'text-orange-500' },
@@ -48,6 +50,7 @@ const ACCENT: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive
 const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string; icon: string }> = {
   requisicao:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    border: 'border-blue-400/40',    badge: 'bg-blue-500/15 text-blue-200',       icon: 'text-blue-400' },
   aprovacao:           { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200',     icon: 'text-amber-400' },
+  proposta_alinhamento:{ bg: 'hover:bg-white/[0.03]', bgActive: 'bg-rose-500/10',    text: 'text-rose-400',    textActive: 'text-rose-300',    border: 'border-rose-400/40',    badge: 'bg-rose-500/15 text-rose-200',       icon: 'text-rose-400' },
   documentacao:        { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200',   icon: 'text-violet-400' },
   exames_treinamentos: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200',         icon: 'text-sky-400' },
   mobilizacao:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  border: 'border-orange-400/40',  badge: 'bg-orange-500/15 text-orange-200',   icon: 'text-orange-400' },
@@ -158,6 +161,7 @@ export default function RHAdmissao() {
               <div className="space-y-2">
                 {filtrados.map(a => {
                   const props = { key: a.id, adm: a, isDark, onClick: () => setSelecionada(a) }
+                  if (etapa === 'proposta_alinhamento') return <PropostaCard {...props} />
                   if (etapa === 'documentacao') return <DocumentacaoCard {...props} />
                   if (etapa === 'exames_treinamentos') return <ExamesCard {...props} autorNome={autorNome} />
                   if (etapa === 'mobilizacao') return <MobilizacaoCard {...props} autorNome={autorNome} />

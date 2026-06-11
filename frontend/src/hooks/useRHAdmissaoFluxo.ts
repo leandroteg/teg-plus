@@ -192,7 +192,7 @@ export function useCriarAdmissao() {
 // ── Transições do fluxo (RH-only) ─────────────────────────────────────────────
 export type AcaoAdmissao =
   | 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
-  | 'documentacao_recebida' | 'apto_mobilizacao' | 'mobilizacao_concluida'
+  | 'enviar_documentacao' | 'documentacao_recebida' | 'apto_mobilizacao' | 'mobilizacao_concluida'
 
 export interface TransicaoInput {
   adm: RHAdmissao
@@ -216,13 +216,17 @@ export function useTransicaoAdmissao() {
         patch = { etapa: 'aprovacao', status: 'pendente', status_aprovacao: 'pendente', motivo_decisao: null }
         histAcao = 'solicitou_aprovacao'
       } else if (acao === 'aprovar') {
-        para = 'documentacao'
+        para = 'proposta_alinhamento'
         patch = {
-          etapa: 'documentacao', status_aprovacao: 'aprovado',
+          etapa: 'proposta_alinhamento', status_aprovacao: 'aprovado',
           aprovador_id: autorId ?? null, aprovador_nome: autorNome ?? null,
           data_decisao: new Date().toISOString(),
         }
         histAcao = 'aprovou'
+      } else if (acao === 'enviar_documentacao') {
+        para = 'documentacao'
+        patch = { etapa: 'documentacao' }
+        histAcao = 'proposta_concluida'
       } else if (acao === 'rejeitar') {
         // Rejeição encerra a requisição: vai para etapa terminal e some das abas do fluxo
         para = 'cancelada'
@@ -449,6 +453,17 @@ export interface AceiteStatus {
   concluida_em: string | null
 }
 
+export interface RHProposta {
+  candidato_id: string
+  proposta_enviada: boolean
+  proposta_aceita: boolean
+  condicoes: string | null
+  data_chegada: string | null
+  deslocamento_detalhes: string | null
+  responsavel_recebimento: string | null
+  observacoes: string | null
+}
+
 // Dados de etapa por candidato (1 fetch por card)
 export function useEtapaCandidato(candidatoId?: string) {
   return useQuery({
@@ -456,7 +471,8 @@ export function useEtapaCandidato(candidatoId?: string) {
     enabled: !!candidatoId,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const [ex, tr, mob, integ, ace] = await Promise.all([
+      const [prop, ex, tr, mob, integ, ace] = await Promise.all([
+        supabase.from('rh_admissao_proposta').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_exame').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_treinamentos').select('*').eq('candidato_id', candidatoId).order('created_at'),
         supabase.from('rh_admissao_mobilizacao').select('*').eq('candidato_id', candidatoId).maybeSingle(),
@@ -464,6 +480,7 @@ export function useEtapaCandidato(candidatoId?: string) {
         supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
       ])
       return {
+        proposta: (prop.data ?? null) as RHProposta | null,
         exame: (ex.data ?? null) as RHExame | null,
         treinamentos: (tr.data ?? []) as RHTreinamento[],
         mobilizacao: (mob.data ?? null) as RHMobilizacao | null,
@@ -471,6 +488,45 @@ export function useEtapaCandidato(candidatoId?: string) {
         aceites: (ace.data ?? []) as AceiteStatus[],
       }
     },
+  })
+}
+
+export function useProposta() {
+  const qc = useQueryClient()
+  const atualizar = useMutation({
+    mutationFn: async (i: { candidatoId: string; patch: Partial<RHProposta> }) => {
+      const { error } = await supabase.from('rh_admissao_proposta')
+        .upsert({ candidato_id: i.candidatoId, ...i.patch, updated_at: new Date().toISOString() }, { onConflict: 'candidato_id' })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { atualizar }
+}
+
+// Upload de anexo pelo RH em qualquer etapa (ex.: proposta assinada)
+export function useUploadAnexoCandidato() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { admissaoId: string; candidatoId: string; file: File; tipo?: string; autorId?: string }) => {
+      const safeName = i.file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `${i.admissaoId}/${i.candidatoId}/rh_${i.tipo ?? 'outro'}_${Date.now()}_${safeName}`
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, i.file, { upsert: false })
+      if (upErr) throw upErr
+      const { error } = await supabase.from('rh_admissao_anexos').insert({
+        admissao_id: i.admissaoId,
+        candidato_id: i.candidatoId,
+        tipo: i.tipo ?? 'outro',
+        obrigatorio: false,
+        arquivo_nome: i.file.name,
+        arquivo_path: path,
+        tamanho_bytes: i.file.size,
+        mime_type: i.file.type || null,
+        uploaded_por: i.autorId ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
   })
 }
 
