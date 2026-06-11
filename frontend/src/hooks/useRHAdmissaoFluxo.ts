@@ -192,7 +192,8 @@ export function useCriarAdmissao() {
 // ── Transições do fluxo (RH-only) ─────────────────────────────────────────────
 export type AcaoAdmissao =
   | 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
-  | 'enviar_documentacao' | 'documentacao_recebida' | 'apto_mobilizacao' | 'mobilizacao_concluida'
+  | 'enviar_documentacao' | 'documentacao_recebida' | 'apto_registro'
+  | 'registro_concluido' | 'mobilizacao_concluida'
 
 export interface TransicaoInput {
   adm: RHAdmissao
@@ -244,10 +245,14 @@ export function useTransicaoAdmissao() {
         para = 'exames_treinamentos'
         patch = { etapa: 'exames_treinamentos' }
         histAcao = 'documentacao_recebida'
-      } else if (acao === 'apto_mobilizacao') {
+      } else if (acao === 'apto_registro') {
+        para = 'registro'
+        patch = { etapa: 'registro' }
+        histAcao = 'apto_registro'
+      } else if (acao === 'registro_concluido') {
         para = 'mobilizacao'
         patch = { etapa: 'mobilizacao' }
-        histAcao = 'apto_mobilizacao'
+        histAcao = 'registro_concluido'
       } else if (acao === 'mobilizacao_concluida') {
         para = 'integracao'
         patch = { etapa: 'integracao' }
@@ -454,6 +459,13 @@ export interface AceiteStatus {
   concluida_em: string | null
 }
 
+export interface RHRegistro {
+  candidato_id: string
+  ficha_gerada_em: string | null
+  missao_assinatura_id: string | null
+  observacoes: string | null
+}
+
 export interface RHProposta {
   candidato_id: string
   proposta_enviada: boolean
@@ -473,14 +485,17 @@ export function useEtapaCandidato(candidatoId?: string) {
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,   // não recarregar enquanto o RH preenche
     queryFn: async () => {
-      const [prop, ex, tr, mob, integ, ace] = await Promise.all([
+      const [prop, ex, tr, mob, integ, ace, reg, ass] = await Promise.all([
         supabase.from('rh_admissao_proposta').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_exame').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_treinamentos').select('*').eq('candidato_id', candidatoId).order('created_at'),
         supabase.from('rh_admissao_mobilizacao').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_integracao').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
+        supabase.from('rh_admissao_registro').select('*').eq('candidato_id', candidatoId).maybeSingle(),
+        supabase.rpc('rh_admissao_assinatura_status', { p_candidato_id: candidatoId }),
       ])
+      const assRow = (Array.isArray(ass.data) ? ass.data[0] : ass.data) as { status?: string; concluida_em?: string } | undefined
       return {
         proposta: (prop.data ?? null) as RHProposta | null,
         exame: (ex.data ?? null) as RHExame | null,
@@ -488,6 +503,8 @@ export function useEtapaCandidato(candidatoId?: string) {
         mobilizacao: (mob.data ?? null) as RHMobilizacao | null,
         integracao: (integ.data ?? null) as RHIntegracao | null,
         aceites: (ace.data ?? []) as AceiteStatus[],
+        registro: (reg.data ?? null) as RHRegistro | null,
+        assinatura: assRow ? { status: assRow.status ?? 'pendente', concluida_em: assRow.concluida_em ?? null } : null,
       }
     },
   })
@@ -640,6 +657,62 @@ export function useIntegracao() {
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
   return { enviarAceites, atualizar }
+}
+
+// Etapa Registro: ficha p/ contabilidade, contrato p/ assinatura, matrícula
+export function useRegistro() {
+  const qc = useQueryClient()
+  const gerarFicha = useMutation({
+    mutationFn: async (i: { candidatoId: string }) => {
+      const { data, error } = await supabase.functions.invoke('rh-ficha-colaborador', {
+        body: { candidato_id: i.candidatoId },
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; url?: string; motivo?: string }
+      if (!r.ok) throw new Error(r.motivo || 'Falha ao gerar a ficha')
+      return r
+    },
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+  const enviarAssinatura = useMutation({
+    mutationFn: async (i: { candidatoId: string; contratoPath: string; autorNome?: string }) => {
+      // URL assinada de 7 dias pro colaborador abrir o contrato no Portal
+      const { data: signed, error: sErr } = await supabase.storage
+        .from(BUCKET).createSignedUrl(i.contratoPath, 7 * 24 * 3600)
+      if (sErr || !signed?.signedUrl) throw new Error('Falha ao gerar o link do contrato')
+      const { data, error } = await supabase.rpc('rh_admissao_reg_enviar_assinatura', {
+        p_candidato_id: i.candidatoId, p_acao_url: signed.signedUrl, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar para assinatura')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  const setMatricula = useMutation({
+    mutationFn: async (i: { colaboradorId: string; candidatoId: string; matricula: string }) => {
+      const { error } = await supabase.from('rh_colaboradores')
+        .update({ matricula: i.matricula || null }).eq('id', i.colaboradorId)
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { gerarFicha, enviarAssinatura, setMatricula }
+}
+
+// Matrícula atual do colaborador vinculado (etapa Registro)
+export function useMatriculaColaborador(colaboradorId?: string) {
+  return useQuery<string | null>({
+    queryKey: ['rh-colab-matricula', colaboradorId],
+    enabled: !!colaboradorId,
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_colaboradores').select('matricula').eq('id', colaboradorId).maybeSingle()
+      return (data?.matricula ?? null) as string | null
+    },
+  })
 }
 
 export function useLiberarAdmissao() {

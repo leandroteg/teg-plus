@@ -15,7 +15,7 @@ import { useAdmissoesFluxo, useMissoesDocsStatus } from '../../hooks/useRHAdmiss
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
-import { PropostaCard, ExamesCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
+import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
 import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
@@ -26,10 +26,11 @@ const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: strin
   { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
   { key: 'proposta_alinhamento', num: 3, label: 'Proposta e Alinhamento', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
   { key: 'documentacao',        num: 4, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
-  { key: 'exames_treinamentos', num: 5, label: 'Exames e Treinamentos',   descricao: 'Exame admissional (NR-7) + treinamentos obrigatórios (NRs e matriz).', icon: Stethoscope },
-  { key: 'mobilizacao',         num: 6, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
-  { key: 'integracao',          num: 7, label: 'Integração',              descricao: 'Onboarding com RH e Gestor.',                                    icon: HeartHandshake },
-  { key: 'liberado',            num: 8, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
+  { key: 'exames_treinamentos', num: 5, label: 'Exames',                  descricao: 'Exame admissional (ASO) — agendamento e resultado.',             icon: Stethoscope },
+  { key: 'registro',            num: 6, label: 'Registro',                descricao: 'Ficha p/ contabilidade, contrato, assinatura e matrícula.',      icon: ClipboardList },
+  { key: 'mobilizacao',         num: 7, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
+  { key: 'integracao',          num: 8, label: 'Treinamentos e Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
+  { key: 'liberado',            num: 9, label: 'Liberado para Atividades', descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
 const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = Object.fromEntries(
@@ -42,6 +43,7 @@ const ACCENT: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgActive
   proposta_alinhamento:{ bg: 'hover:bg-rose-50',    bgActive: 'bg-rose-50',    text: 'text-rose-600',    textActive: 'text-rose-800',    border: 'border-rose-500',    badge: 'bg-rose-100 text-rose-700',       icon: 'text-rose-500' },
   documentacao:        { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700',   icon: 'text-violet-500' },
   exames_treinamentos: { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     badge: 'bg-sky-100 text-sky-700',         icon: 'text-sky-500' },
+  registro:            { bg: 'hover:bg-indigo-50',  bgActive: 'bg-indigo-50',  text: 'text-indigo-600',  textActive: 'text-indigo-800',  border: 'border-indigo-500',  badge: 'bg-indigo-100 text-indigo-700',   icon: 'text-indigo-500' },
   mobilizacao:         { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  border: 'border-orange-500',  badge: 'bg-orange-100 text-orange-700',   icon: 'text-orange-500' },
   integracao:          { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',    text: 'text-teal-600',    textActive: 'text-teal-800',    border: 'border-teal-500',    badge: 'bg-teal-100 text-teal-700',       icon: 'text-teal-500' },
   liberado:            { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-500' },
@@ -53,6 +55,7 @@ const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgA
   proposta_alinhamento:{ bg: 'hover:bg-white/[0.03]', bgActive: 'bg-rose-500/10',    text: 'text-rose-400',    textActive: 'text-rose-300',    border: 'border-rose-400/40',    badge: 'bg-rose-500/15 text-rose-200',       icon: 'text-rose-400' },
   documentacao:        { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200',   icon: 'text-violet-400' },
   exames_treinamentos: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200',         icon: 'text-sky-400' },
+  registro:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-indigo-500/10',  text: 'text-indigo-400',  textActive: 'text-indigo-300',  border: 'border-indigo-400/40',  badge: 'bg-indigo-500/15 text-indigo-200',   icon: 'text-indigo-400' },
   mobilizacao:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  border: 'border-orange-400/40',  badge: 'bg-orange-500/15 text-orange-200',   icon: 'text-orange-400' },
   integracao:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300',    border: 'border-teal-400/40',    badge: 'bg-teal-500/15 text-teal-200',       icon: 'text-teal-400' },
   liberado:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200', icon: 'text-emerald-400' },
@@ -172,6 +175,7 @@ export default function RHAdmissao() {
                   if (etapa === 'proposta_alinhamento') return <PropostaCard {...props} />
                   if (etapa === 'documentacao') return <DocumentacaoCard {...props} />
                   if (etapa === 'exames_treinamentos') return <ExamesCard {...props} autorNome={autorNome} />
+                  if (etapa === 'registro') return <RegistroCard {...props} autorNome={autorNome} />
                   if (etapa === 'mobilizacao') return <MobilizacaoCard {...props} autorNome={autorNome} />
                   if (etapa === 'integracao') return <IntegracaoCard {...props} autorNome={autorNome} />
                   if (etapa === 'liberado') return <LiberadoCard {...props} />

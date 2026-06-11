@@ -137,7 +137,7 @@ export type StatusAdmissao = 'pendente' | 'avaliacao_documentos' | 'aguardando_c
 // Etapas do fluxo de admissão (RH-only)
 export type EtapaAdmissaoFluxo =
   | 'requisicao' | 'aprovacao' | 'proposta_alinhamento' | 'documentacao'
-  | 'exames_treinamentos' | 'mobilizacao' | 'integracao' | 'liberado'
+  | 'exames_treinamentos' | 'registro' | 'mobilizacao' | 'integracao' | 'liberado'
   | 'cancelada'
 
 export type StatusAprovacaoAdmissao = 'pendente' | 'aprovado' | 'rejeitado' | 'esclarecimento'
@@ -234,6 +234,8 @@ export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'declaracao_etnia', label: 'Declaração de Etnia', obrigatorio: false },
   { value: 'pesquisa_historico', label: 'Pesquisa Histórico', obrigatorio: false },
   { value: 'proposta', label: 'Proposta', obrigatorio: false },
+  { value: 'ficha_registro', label: 'Ficha de Registro', obrigatorio: false },
+  { value: 'contrato', label: 'Contrato de Trabalho', obrigatorio: false },
   { value: 'outro', label: 'Outro documento', obrigatorio: false },
 ]
 

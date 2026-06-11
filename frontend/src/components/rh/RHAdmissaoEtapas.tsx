@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato,
+  useRegistro, useMatriculaColaborador,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
@@ -211,10 +212,8 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
   const { data, isLoading } = useEtapaCandidato(cand.id)
   const agendar = useAsoAgendar()
   const setStatus = useAsoSetStatus()
-  const trein = useTreinamentos()
   const [formAberto, setFormAberto] = useState(false)
   const [f, setF] = useState({ clinica: '', endereco: '', data: '', hora: '', instrucoes: '' })
-  const [novoTrein, setNovoTrein] = useState({ nome: '', norma: '' })
   const [erro, setErro] = useState<string | null>(null)
 
   const exame = data?.exame ?? null
@@ -292,31 +291,163 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
         )}
       </div>
 
-      {/* Treinamentos */}
-      <div className="space-y-1.5">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><GraduationCap size={11} /> Treinamentos obrigatórios</span>
-        {(data?.treinamentos ?? []).map(t => (
-          <div key={t.id} className="flex items-center gap-1.5">
-            <CheckRow checked={t.status === 'concluido'} label={`${t.nome}${t.norma ? ` (${t.norma})` : ''}`}
-              onToggle={() => trein.toggle.mutate({ id: t.id, candidatoId: cand.id, concluido: t.status !== 'concluido' })} />
-            <button onClick={() => trein.remover.mutate({ id: t.id, candidatoId: cand.id })} className="text-slate-300 hover:text-red-400"><Trash2 size={11} /></button>
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <input placeholder="Treinamento (ex: Trabalho em Altura)" value={novoTrein.nome}
-            onChange={e => setNovoTrein(p => ({ ...p, nome: e.target.value }))} className={`${IN} flex-1`} />
-          <input placeholder="NR" value={novoTrein.norma}
-            onChange={e => setNovoTrein(p => ({ ...p, norma: e.target.value }))} className={`${IN} w-20`} />
-          <button disabled={!novoTrein.nome.trim() || trein.add.isPending}
-            onClick={() => { trein.add.mutate({ candidatoId: cand.id, nome: novoTrein.nome.trim(), norma: novoTrein.norma.trim() || undefined }); setNovoTrein({ nome: '', norma: '' }) }}
-            className="p-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40"><Plus size={12} /></button>
+    </div>
+  )
+}
+
+// Bloco de treinamentos (usado na etapa Treinamentos e Integração)
+function TreinamentosBlock({ cand, treinamentos }: { cand: RHAdmissaoCandidato; treinamentos: { id: string; nome: string; norma: string | null; status: string }[] }) {
+  const trein = useTreinamentos()
+  const [novoTrein, setNovoTrein] = useState({ nome: '', norma: '' })
+  return (
+    <div className="space-y-1.5">
+      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><GraduationCap size={11} /> Treinamentos obrigatórios</span>
+      {treinamentos.map(t => (
+        <div key={t.id} className="flex items-center gap-1.5">
+          <CheckRow checked={t.status === 'concluido'} label={`${t.nome}${t.norma ? ` (${t.norma})` : ''}`}
+            onToggle={() => trein.toggle.mutate({ id: t.id, candidatoId: cand.id, concluido: t.status !== 'concluido' })} />
+          <button onClick={() => trein.remover.mutate({ id: t.id, candidatoId: cand.id })} className="text-slate-300 hover:text-red-400"><Trash2 size={11} /></button>
         </div>
+      ))}
+      <div className="flex items-center gap-1.5">
+        <input placeholder="Treinamento (ex: Trabalho em Altura)" value={novoTrein.nome}
+          onChange={e => setNovoTrein(p => ({ ...p, nome: e.target.value }))} className={`${IN} flex-1`} />
+        <input placeholder="NR" value={novoTrein.norma}
+          onChange={e => setNovoTrein(p => ({ ...p, norma: e.target.value }))} className={`${IN} w-20`} />
+        <button disabled={!novoTrein.nome.trim() || trein.add.isPending}
+          onClick={() => { trein.add.mutate({ candidatoId: cand.id, nome: novoTrein.nome.trim(), norma: novoTrein.norma.trim() || undefined }); setNovoTrein({ nome: '', norma: '' }) }}
+          className="p-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40"><Plus size={12} /></button>
       </div>
     </div>
   )
 }
 
-// ════════════════ ETAPA 5 · MOBILIZAÇÃO ════════════════
+// ════════════════ ETAPA · REGISTRO ════════════════
+// Ficha do colaborador (PDF p/ contabilidade) → contrato anexado → assinatura
+// via missão no Portal → RH define a matrícula e conclui o registro.
+export function RegistroCard({ adm, isDark, onClick, autorNome }: {
+  adm: RHAdmissao; isDark: boolean; onClick: () => void; autorNome?: string
+}) {
+  return (
+    <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
+      {(adm.candidatos ?? []).map(c => <RegistroCandidato key={c.id} cand={c} adm={adm} isDark={isDark} autorNome={autorNome} />)}
+    </VagaCard>
+  )
+}
+
+function RegistroCandidato({ cand, adm, isDark, autorNome }: {
+  cand: RHAdmissaoCandidato; adm: RHAdmissao; isDark: boolean; autorNome?: string
+}) {
+  const { perfil } = useAuth()
+  const { data, isLoading } = useEtapaCandidato(cand.id)
+  const { gerarFicha, enviarAssinatura, setMatricula } = useRegistro()
+  const { data: matricula } = useMatriculaColaborador(cand.colaborador_id)
+  const uploadAnexo = useUploadAnexoCandidato()
+  const contratoRef = useRef<HTMLInputElement>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const registro = data?.registro ?? null
+  const assinatura = data?.assinatura ?? null
+  const fichas = (cand.anexos ?? []).filter(a => a.tipo === 'ficha_registro')
+  const contratos = (cand.anexos ?? []).filter(a => a.tipo === 'contrato')
+  const ultimoContrato = contratos[contratos.length - 1]
+  const assinado = assinatura?.status === 'concluida'
+
+  async function handleGerarFicha() {
+    setErro(null)
+    try {
+      const r = await gerarFicha.mutateAsync({ candidatoId: cand.id })
+      if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer')
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao gerar ficha') }
+  }
+
+  async function handleEnviarAssinatura() {
+    if (!ultimoContrato) return
+    setErro(null)
+    try {
+      await enviarAssinatura.mutateAsync({ candidatoId: cand.id, contratoPath: ultimoContrato.arquivo_path, autorNome })
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao enviar para assinatura') }
+  }
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+      <CandHeader nome={cand.nome} isDark={isDark} right={
+        isLoading ? <Loader2 size={12} className="animate-spin text-slate-400" /> :
+        assinado && matricula
+          ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Registro completo ✓</span>
+          : assinado
+            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Contrato assinado ✓</span>
+            : registro?.missao_assinatura_id
+              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Aguardando assinatura</span>
+              : null
+      } />
+
+      {/* 1 · Ficha p/ contabilidade */}
+      <div className="space-y-1">
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><FileText size={11} /> 1 · Ficha de registro (contabilidade)</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleGerarFicha} disabled={gerarFicha.isPending}
+            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">
+            {gerarFicha.isPending ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}
+            {fichas.length ? 'Gerar nova ficha (PDF)' : 'Gerar ficha (PDF)'}
+          </button>
+          {registro?.ficha_gerada_em && (
+            <span className="text-[10px] text-slate-500">
+              gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · exporte e envie à contabilidade
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 2 · Contrato + assinatura */}
+      <div className="space-y-1">
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><PenLine size={11} /> 2 · Contrato de trabalho</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => contratoRef.current?.click()} disabled={uploadAnexo.isPending}
+            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50">
+            {uploadAnexo.isPending ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+            {ultimoContrato ? 'Substituir contrato' : 'Anexar contrato recebido'}
+          </button>
+          <input ref={contratoRef} type="file" className="hidden" accept=".pdf"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file, tipo: 'contrato', autorId: perfil?.id })
+              e.currentTarget.value = ''
+            }} />
+          {ultimoContrato && !assinado && (
+            <button onClick={handleEnviarAssinatura} disabled={enviarAssinatura.isPending}
+              className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+              {enviarAssinatura.isPending ? <Loader2 size={11} className="animate-spin" /> : <Smartphone size={11} />}
+              {registro?.missao_assinatura_id ? 'Reenviar p/ assinatura' : 'Enviar p/ assinatura no Portal'}
+            </button>
+          )}
+          {assinado && assinatura?.concluida_em && (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+              <CheckCircle2 size={11} /> assinado em {new Date(assinatura.concluida_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+        {ultimoContrato && <p className="text-[10px] text-slate-400 truncate">{ultimoContrato.arquivo_nome}</p>}
+      </div>
+
+      {/* 3 · Matrícula */}
+      <div className="space-y-1">
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><User size={11} /> 3 · Matrícula</span>
+        <div className="flex items-center gap-2">
+          <CampoTexto valor={matricula} onSave={v => {
+            if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
+          }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[260px]`} />
+          {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
+          {matricula && !setMatricula.isPending && <CheckCircle2 size={13} className="text-emerald-500" />}
+        </div>
+      </div>
+
+      {erro && <p className="text-[10px] text-red-600 font-semibold">{erro}</p>}
+    </div>
+  )
+}
+
+// ════════════════ ETAPA · MOBILIZAÇÃO ════════════════
 export function MobilizacaoCard({ adm, isDark, onClick, autorNome }: {
   adm: RHAdmissao; isDark: boolean; onClick: () => void; autorNome?: string
 }) {
@@ -469,6 +600,9 @@ function IntCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
           </div>
         )}
       </div>
+
+      {/* Treinamentos obrigatórios (matriz por cargo pluga aqui) */}
+      <TreinamentosBlock cand={cand} treinamentos={data?.treinamentos ?? []} />
     </div>
   )
 }
