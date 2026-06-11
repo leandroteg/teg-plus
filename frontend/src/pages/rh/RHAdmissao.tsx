@@ -11,7 +11,7 @@ import {
   Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAdmissoesFluxo, useMissoesDocsStatus } from '../../hooks/useRHAdmissaoFluxo'
+import { useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao } from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
@@ -242,6 +242,7 @@ function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico 
   candidatoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
 }) {
   const { data: docs = [], isLoading } = useMissoesDocsStatus(candidatoId)
+  const { data: parecer } = useParecerQualificacao(candidatoId)
   const total = docs.length
   const ok = docs.filter(d => d.status === 'concluida' || d.status === 'dispensada').length
   const completo = total > 0 && ok === total && !!temPesquisaHistorico
@@ -251,6 +252,13 @@ function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico 
       <div className="flex items-center gap-2">
         <User size={12} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
         <span className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{nome || 'Candidato'}</span>
+        {parecer && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            parecer.aprovado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
+            title="Parecer de Qualificação do SuperTEG (detalhes no modal)">
+            Qualificação: {parecer.aprovado ? 'Aprovado' : 'Reprovado'}
+          </span>
+        )}
         {isLoading ? (
           <Loader2 size={12} className="animate-spin text-slate-400" />
         ) : total === 0 ? (

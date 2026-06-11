@@ -5,13 +5,14 @@ import { useState } from 'react'
 import {
   X, Send, CheckCircle2, XCircle, HelpCircle, FileText, ExternalLink, Loader2,
   Building2, Calendar, Briefcase, AlertTriangle, User, Users, Smartphone, Circle, MinusCircle,
-  Pencil,
+  Pencil, ShieldCheck, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
   useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao, useUploadAnexoCandidato,
+  useParecerQualificacao,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
@@ -532,6 +533,44 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
           </label>
         )}
       </div>
+
+      {/* Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP */}
+      <ParecerQualificacaoBloco candidatoId={cand.id} />
+    </div>
+  )
+}
+
+// TAG Aprovado/Reprovado + balão com os 3 parágrafos do parecer do SuperTEG
+function ParecerQualificacaoBloco({ candidatoId }: { candidatoId: string }) {
+  const { data: p } = useParecerQualificacao(candidatoId)
+  const [aberto, setAberto] = useState(false)
+  if (!p) return null
+  const aprovado = p.aprovado === true
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-100">
+      <button type="button" onClick={() => setAberto(a => !a)} className="w-full flex items-center gap-1.5">
+        <ShieldCheck size={13} className={aprovado ? 'text-emerald-600 shrink-0' : 'text-red-500 shrink-0'} />
+        <span className="text-[11px] font-semibold text-slate-600 flex-1 text-left">
+          Parecer de Qualificação <span className="text-[9px] text-slate-400">(SuperTEG · interno)</span>
+        </span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          aprovado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+          {aprovado ? 'Aprovado' : 'Reprovado'}
+        </span>
+        {aberto ? <ChevronUp size={12} className="text-slate-400" /> : <ChevronDown size={12} className="text-slate-400" />}
+      </button>
+      {aberto && (
+        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+          {(p.paragrafos ?? []).map((t, i) => (
+            <p key={i} className="text-[11px] text-slate-600 leading-relaxed">{t}</p>
+          ))}
+          <p className="text-[9px] text-slate-400 pt-1 border-t border-slate-200">
+            Regra aplicada ({p.cargo}): {p.regra} — Matriz CEMIG OD/ST-06114/2025 rev. f
+            {typeof p.confianca === 'number' && ` · confiança ${Math.round(p.confianca * 100)}%`}
+            {` · ${new Date(p.gerado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

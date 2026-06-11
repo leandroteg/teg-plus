@@ -406,6 +406,32 @@ export function useMissoesDocsStatus(candidatoId?: string) {
   })
 }
 
+// ── Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP ───────
+export interface ParecerQualificacao {
+  candidato_id: string
+  cargo: string | null
+  regra_chave: string | null
+  regra: string | null
+  aprovado: boolean | null
+  paragrafos: string[] | null
+  confianca: number | null
+  gerado_em: string
+}
+
+export function useParecerQualificacao(candidatoId?: string) {
+  return useQuery<ParecerQualificacao | null>({
+    queryKey: ['rh-parecer-qual', candidatoId],
+    enabled: !!candidatoId,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_admissao_pareceres')
+        .select('*').eq('candidato_id', candidatoId).maybeSingle()
+      return (data ?? null) as ParecerQualificacao | null
+    },
+  })
+}
+
 // ── Etapas 4-7: Exames/Treinamentos, Mobilização, Integração, Liberado ───────
 
 export interface RHExame {
