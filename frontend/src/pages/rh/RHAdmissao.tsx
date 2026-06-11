@@ -66,7 +66,15 @@ export default function RHAdmissao() {
   const autorNome = perfil?.nome || perfil?.email || 'Usuário'
   const [searchParams, setSearchParams] = useSearchParams()
   const [view, setView] = useState<'fluxo' | 'nova'>('fluxo')
-  const [etapa, setEtapa] = useState<EtapaAdmissao>('requisicao')
+  // Aba ativa persistida na URL: sobrevive a reload/auto-update do PWA
+  const etapaUrl = searchParams.get('etapa') as EtapaAdmissao | null
+  const [etapa, setEtapaState] = useState<EtapaAdmissao>(
+    etapaUrl && ETAPAS.some(e => e.key === etapaUrl) ? etapaUrl : 'requisicao',
+  )
+  const setEtapa = (e: EtapaAdmissao) => {
+    setEtapaState(e)
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('etapa', e); return p }, { replace: true })
+  }
   const [selecionada, setSelecionada] = useState<RHAdmissao | null>(null)
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState('data')

@@ -390,6 +390,7 @@ export function useMissoesDocsStatus(candidatoId?: string) {
     queryKey: ['rh-admissao-missoes-docs', candidatoId],
     enabled: !!candidatoId,
     refetchInterval: 30_000,   // RH vê os checks chegando quase em tempo real
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('rh_admissao_missoes_status', {
         p_candidato_id: candidatoId,
@@ -469,7 +470,8 @@ export function useEtapaCandidato(candidatoId?: string) {
   return useQuery({
     queryKey: ['rh-admissao-etapa-cand', candidatoId],
     enabled: !!candidatoId,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,   // não recarregar enquanto o RH preenche
     queryFn: async () => {
       const [prop, ex, tr, mob, integ, ace] = await Promise.all([
         supabase.from('rh_admissao_proposta').select('*').eq('candidato_id', candidatoId).maybeSingle(),

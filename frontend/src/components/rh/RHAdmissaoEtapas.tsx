@@ -3,7 +3,7 @@
 // Exames e Treinamentos · Mobilização · Integração · Liberado
 // Ação do candidato → missão no Portal; ação interna → checklist aqui.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
@@ -18,6 +18,28 @@ import {
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const IN = 'w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-teal-300 outline-none'
+
+// ── Campos com estado local: salvam no blur e só sincronizam com o servidor
+//    quando NÃO estão em foco (refetch não atrapalha quem está digitando) ─────
+function CampoTexto({ valor, onSave, textarea, ...props }: {
+  valor: string | null | undefined
+  onSave: (v: string) => void
+  textarea?: boolean
+} & Record<string, unknown>) {
+  const [v, setV] = useState(valor ?? '')
+  const [focado, setFocado] = useState(false)
+  useEffect(() => { if (!focado) setV(valor ?? '') }, [valor, focado])
+  const shared = {
+    ...props,
+    value: v,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV(e.target.value),
+    onFocus: () => setFocado(true),
+    onBlur: () => { setFocado(false); if ((valor ?? '') !== v) onSave(v) },
+  }
+  return textarea
+    ? <textarea {...(shared as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} />
+    : <input {...(shared as React.InputHTMLAttributes<HTMLInputElement>)} />
+}
 
 const ASO_LABEL: Record<RHExame['status'], { label: string; cls: string }> = {
   pendente_agendamento: { label: 'Aguardando agendamento', cls: 'bg-slate-100 text-slate-500' },
@@ -122,8 +144,7 @@ function PropostaCandidato({ cand, adm, isDark }: { cand: RHAdmissaoCandidato; a
           <CheckRow checked={!!prop?.proposta_enviada} label="Proposta enviada ao candidato" onToggle={() => upd({ proposta_enviada: !prop?.proposta_enviada })} />
           <CheckRow checked={!!prop?.proposta_aceita} label="Proposta aceita" onToggle={() => upd({ proposta_aceita: !prop?.proposta_aceita })} />
         </div>
-        <textarea defaultValue={prop?.condicoes ?? ''} key={`cond-${prop?.condicoes ?? ''}`} rows={2}
-          onBlur={e => upd({ condicoes: e.target.value || null })}
+        <CampoTexto textarea valor={prop?.condicoes} onSave={v => upd({ condicoes: v || null })} rows={2}
           placeholder="Condições oferecidas (salário, benefícios, jornada, alojamento...)"
           className={`${IN} resize-none`} />
       </div>
@@ -134,16 +155,15 @@ function PropostaCandidato({ cand, adm, isDark }: { cand: RHAdmissaoCandidato; a
         <div className="grid grid-cols-2 gap-1.5">
           <div>
             <label className="text-[9px] font-bold uppercase text-slate-400">Prazo de chegada</label>
-            <input type="date" value={prop?.data_chegada ?? ''} onChange={e => upd({ data_chegada: e.target.value || null })} className={IN} />
+            <CampoTexto type="date" valor={prop?.data_chegada} onSave={v => upd({ data_chegada: v || null })} className={IN} />
           </div>
           <div>
             <label className="text-[9px] font-bold uppercase text-slate-400">Responsável por recebê-lo</label>
-            <input defaultValue={prop?.responsavel_recebimento ?? ''} key={`resp-${prop?.responsavel_recebimento ?? ''}`}
-              onBlur={e => upd({ responsavel_recebimento: e.target.value || null })} placeholder="Nome do responsável" className={IN} />
+            <CampoTexto valor={prop?.responsavel_recebimento} onSave={v => upd({ responsavel_recebimento: v || null })}
+              placeholder="Nome do responsável" className={IN} />
           </div>
         </div>
-        <input defaultValue={prop?.deslocamento_detalhes ?? ''} key={`desl-${prop?.deslocamento_detalhes ?? ''}`}
-          onBlur={e => upd({ deslocamento_detalhes: e.target.value || null })}
+        <CampoTexto valor={prop?.deslocamento_detalhes} onSave={v => upd({ deslocamento_detalhes: v || null })}
           placeholder="Detalhes do deslocamento (como chega, quem busca, horário...)" className={IN} />
       </div>
 
@@ -347,12 +367,11 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
       <div className="grid grid-cols-2 gap-1.5">
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Data de apresentação</label>
-          <input type="date" value={mob?.data_apresentacao ?? ''} onChange={e => upd({ data_apresentacao: e.target.value || null })} className={IN} />
+          <CampoTexto type="date" valor={mob?.data_apresentacao} onSave={v => upd({ data_apresentacao: v || null })} className={IN} />
         </div>
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Local</label>
-          <input defaultValue={mob?.local_apresentacao ?? ''} key={`loc-${mob?.local_apresentacao ?? ''}`}
-            onBlur={e => upd({ local_apresentacao: e.target.value || null })} placeholder="Obra / base" className={IN} />
+          <CampoTexto valor={mob?.local_apresentacao} onSave={v => upd({ local_apresentacao: v || null })} placeholder="Obra / base" className={IN} />
         </div>
       </div>
 
@@ -364,8 +383,8 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
             <option value="">Transporte…</option>
             {TRANSPORTES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-          <input defaultValue={mob?.transporte_detalhes ?? ''} key={`td-${mob?.transporte_detalhes ?? ''}`}
-            onBlur={e => upd({ transporte_detalhes: e.target.value || null })} placeholder="Detalhes (horário, ponto de encontro...)" className={`${IN} flex-1`} />
+          <CampoTexto valor={mob?.transporte_detalhes} onSave={v => upd({ transporte_detalhes: v || null })}
+            placeholder="Detalhes (horário, ponto de encontro...)" className={`${IN} flex-1`} />
         </div>
         <CheckRow checked={!!mob?.transporte_ok} label="Deslocamento providenciado" onToggle={() => upd({ transporte_ok: !mob?.transporte_ok })} />
       </div>
@@ -374,10 +393,10 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
       <div className="space-y-1">
         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Home size={11} /> Alojamento</span>
         <div className="flex items-center gap-1.5">
-          <input defaultValue={mob?.alojamento_endereco ?? ''} key={`ae-${mob?.alojamento_endereco ?? ''}`}
-            onBlur={e => upd({ alojamento_endereco: e.target.value || null })} placeholder="Endereço do alojamento" className={`${IN} flex-1`} />
-          <input defaultValue={mob?.alojamento_detalhes ?? ''} key={`ad-${mob?.alojamento_detalhes ?? ''}`}
-            onBlur={e => upd({ alojamento_detalhes: e.target.value || null })} placeholder="Quarto, regras..." className={`${IN} flex-1`} />
+          <CampoTexto valor={mob?.alojamento_endereco} onSave={v => upd({ alojamento_endereco: v || null })}
+            placeholder="Endereço do alojamento" className={`${IN} flex-1`} />
+          <CampoTexto valor={mob?.alojamento_detalhes} onSave={v => upd({ alojamento_detalhes: v || null })}
+            placeholder="Quarto, regras..." className={`${IN} flex-1`} />
         </div>
         <CheckRow checked={!!mob?.alojamento_ok} label="Alojamento garantido" onToggle={() => upd({ alojamento_ok: !mob?.alojamento_ok })} />
       </div>
