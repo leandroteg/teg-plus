@@ -40,9 +40,12 @@ function StackedBar({ cat }: { cat: LeadTimeCategoria }) {
 
 interface Props {
   isDark: boolean
+  // Quando true: esconde tabela detalhada por categoria e legenda das fases
+  // (mostra só os 4 KPIs + título). Default false (mostra tudo).
+  compact?: boolean
 }
 
-export default function LeadTimePainel({ isDark }: Props) {
+export default function LeadTimePainel({ isDark, compact = false }: Props) {
   const { data, isLoading } = useLeadTimeCompras()
 
   const txtMain = isDark ? 'text-white' : 'text-slate-900'
@@ -79,15 +82,17 @@ export default function LeadTimePainel({ isDark }: Props) {
             Tempo do ciclo por categoria e por fase do pipeline
           </p>
         </div>
-        {/* Legenda das fases */}
-        <div className="hidden md:flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          {PHASES.map(p => (
-            <span key={p.key} className={`flex items-center gap-1 text-[10px] ${txtMuted}`}>
-              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: p.color }} />
-              {p.label}
-            </span>
-          ))}
-        </div>
+        {/* Legenda das fases — só no modo detalhado */}
+        {!compact && (
+          <div className="hidden md:flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {PHASES.map(p => (
+              <span key={p.key} className={`flex items-center gap-1 text-[10px] ${txtMuted}`}>
+                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: p.color }} />
+                {p.label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="p-4 space-y-4">
@@ -108,7 +113,8 @@ export default function LeadTimePainel({ isDark }: Props) {
           })}
         </div>
 
-        {/* Tabela por categoria */}
+        {/* Tabela por categoria — só no modo detalhado */}
+        {!compact && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -151,11 +157,14 @@ export default function LeadTimePainel({ isDark }: Props) {
             </tbody>
           </table>
         </div>
+        )}
 
+        {!compact && (
         <p className={`text-[10px] ${txtMuted}`}>
           Médias em dias corridos, calculadas a partir dos marcos de cada requisição (criação, aprovação, conclusão da cotação,
           emissão do pedido e entrega real). Células com "—" ainda não têm amostra suficiente.
         </p>
+        )}
       </div>
     </section>
   )

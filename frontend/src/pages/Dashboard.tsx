@@ -420,6 +420,16 @@ export default function Dashboard() {
   const [periodo, setPeriodo] = useState('trimestre')
   const [obraFilter, setObraFilter] = useState('')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
+  // Visão do painel: 'resumo' (default, compacto) | 'detalhada' (expande Lead Time).
+  // Preferência persiste em localStorage.
+  const [visao, setVisao] = useState<'resumo' | 'detalhada'>(() => {
+    if (typeof window === 'undefined') return 'resumo'
+    return (localStorage.getItem('painel-compras-visao') as 'resumo' | 'detalhada') || 'resumo'
+  })
+  function trocarVisao(v: 'resumo' | 'detalhada') {
+    setVisao(v)
+    try { localStorage.setItem('painel-compras-visao', v) } catch { /* ignore */ }
+  }
   const obras = useLookupObras()
   const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs = [] } = useRequisicoes()
@@ -612,6 +622,23 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Visão: Resumo (compacto) vs Detalhada (mostra Lead Time completo) */}
+          <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
+            {([['resumo', 'Resumo'], ['detalhada', 'Detalhada']] as const).map(([val, lbl]) => (
+              <button
+                key={val}
+                onClick={() => trocarVisao(val)}
+                title={val === 'resumo' ? 'Visão compacta — esconde tabela de Lead Time' : 'Visão completa — mostra tabela detalhada de Lead Time'}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                  visao === val
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
           <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
             <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
             {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
@@ -733,7 +760,7 @@ export default function Dashboard() {
       </div>
 
       {/* Lead Time de Compras (por categoria/fase) */}
-      <LeadTimePainel isDark={isDark} />
+      <LeadTimePainel isDark={isDark} compact={visao === 'resumo'} />
 
       {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
