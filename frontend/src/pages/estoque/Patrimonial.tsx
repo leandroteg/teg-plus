@@ -894,13 +894,13 @@ function ImobilizadoFormModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>
-              {'C\u00f3digo antigo'}
+              Codigo antigo
               <span className={`ml-2 font-normal text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                {'(sistema/planilha legado \u2014 confer\u00eancia da migra\u00e7\u00e3o)'}
+                (sistema/planilha legado - usado na conferencia da migracao)
               </span>
             </label>
             <UpperInput value={item.codigo_antigo ?? ''} onChange={e => set('codigo_antigo', e.target.value)}
-              className={inputCls} placeholder={'Ex: 12345 (deixe vazio se nasceu no TEG+)'} />
+              className={inputCls} placeholder="Ex: 12345 (deixe vazio se nasceu no TEG+)" />
           </div>
 
           <div>
