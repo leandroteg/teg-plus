@@ -190,7 +190,9 @@ export function useCriarAdmissao() {
 }
 
 // ── Transições do fluxo (RH-only) ─────────────────────────────────────────────
-export type AcaoAdmissao = 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer' | 'documentacao_recebida'
+export type AcaoAdmissao =
+  | 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
+  | 'documentacao_recebida' | 'apto_mobilizacao' | 'mobilizacao_concluida'
 
 export interface TransicaoInput {
   adm: RHAdmissao
@@ -238,6 +240,14 @@ export function useTransicaoAdmissao() {
         para = 'exames_treinamentos'
         patch = { etapa: 'exames_treinamentos' }
         histAcao = 'documentacao_recebida'
+      } else if (acao === 'apto_mobilizacao') {
+        para = 'mobilizacao'
+        patch = { etapa: 'mobilizacao' }
+        histAcao = 'apto_mobilizacao'
+      } else if (acao === 'mobilizacao_concluida') {
+        para = 'integracao'
+        patch = { etapa: 'integracao' }
+        histAcao = 'mobilizacao_concluida'
       }
 
       const { error } = await supabase.from('rh_admissoes').update(patch).eq('id', adm.id)
@@ -382,6 +392,213 @@ export function useMissoesDocsStatus(candidatoId?: string) {
       })
       if (error) { console.error('useMissoesDocsStatus:', error); return [] }
       return (data ?? []) as MissaoDocStatus[]
+    },
+  })
+}
+
+// ── Etapas 4-7: Exames/Treinamentos, Mobilização, Integração, Liberado ───────
+
+export interface RHExame {
+  candidato_id: string
+  clinica: string | null
+  endereco: string | null
+  data_hora: string | null
+  instrucoes: string | null
+  status: 'pendente_agendamento' | 'agendado' | 'realizado' | 'apto' | 'inapto'
+}
+
+export interface RHTreinamento {
+  id: string
+  candidato_id: string
+  nome: string
+  norma: string | null
+  status: 'pendente' | 'concluido'
+}
+
+export interface RHMobilizacao {
+  candidato_id: string
+  missao_id?: string | null
+  data_apresentacao: string | null
+  local_apresentacao: string | null
+  transporte_tipo: string | null
+  transporte_detalhes: string | null
+  transporte_ok: boolean
+  alojamento_endereco: string | null
+  alojamento_detalhes: string | null
+  alojamento_ok: boolean
+  kit_epi_ok: boolean
+  acessos_ok: boolean
+  dados_confirmados: boolean
+  respostas: Record<string, string> | null
+}
+
+export interface RHIntegracao {
+  candidato_id: string
+  contrato_assinado: boolean
+  ficha_epi_assinada: boolean
+  integracao_presencial: boolean
+  aceites_enviados: boolean
+  observacoes: string | null
+}
+
+export interface AceiteStatus {
+  missao_id: string
+  aceite: string
+  titulo: string
+  status: string
+  concluida_em: string | null
+}
+
+// Dados de etapa por candidato (1 fetch por card)
+export function useEtapaCandidato(candidatoId?: string) {
+  return useQuery({
+    queryKey: ['rh-admissao-etapa-cand', candidatoId],
+    enabled: !!candidatoId,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const [ex, tr, mob, integ, ace] = await Promise.all([
+        supabase.from('rh_admissao_exame').select('*').eq('candidato_id', candidatoId).maybeSingle(),
+        supabase.from('rh_admissao_treinamentos').select('*').eq('candidato_id', candidatoId).order('created_at'),
+        supabase.from('rh_admissao_mobilizacao').select('*').eq('candidato_id', candidatoId).maybeSingle(),
+        supabase.from('rh_admissao_integracao').select('*').eq('candidato_id', candidatoId).maybeSingle(),
+        supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
+      ])
+      return {
+        exame: (ex.data ?? null) as RHExame | null,
+        treinamentos: (tr.data ?? []) as RHTreinamento[],
+        mobilizacao: (mob.data ?? null) as RHMobilizacao | null,
+        integracao: (integ.data ?? null) as RHIntegracao | null,
+        aceites: (ace.data ?? []) as AceiteStatus[],
+      }
+    },
+  })
+}
+
+function invalidateEtapa(qc: ReturnType<typeof useQueryClient>, candidatoId: string) {
+  qc.invalidateQueries({ queryKey: ['rh-admissao-etapa-cand', candidatoId] })
+}
+
+export function useAsoAgendar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { candidatoId: string; clinica: string; endereco: string; dataHora: string; instrucoes?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_aso_agendar', {
+        p_candidato_id: i.candidatoId, p_clinica: i.clinica, p_endereco: i.endereco,
+        p_data_hora: i.dataHora, p_instrucoes: i.instrucoes ?? null, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao agendar')
+      return r
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+}
+
+export function useAsoSetStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { candidatoId: string; status: RHExame['status'] }) => {
+      const { error } = await supabase.from('rh_admissao_exame')
+        .upsert({ candidato_id: i.candidatoId, status: i.status, updated_at: new Date().toISOString() }, { onConflict: 'candidato_id' })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+}
+
+export function useTreinamentos() {
+  const qc = useQueryClient()
+  const add = useMutation({
+    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string }) => {
+      const { error } = await supabase.from('rh_admissao_treinamentos')
+        .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  const toggle = useMutation({
+    mutationFn: async (i: { id: string; candidatoId: string; concluido: boolean }) => {
+      const { error } = await supabase.from('rh_admissao_treinamentos')
+        .update({ status: i.concluido ? 'concluido' : 'pendente', concluido_em: i.concluido ? new Date().toISOString() : null })
+        .eq('id', i.id)
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  const remover = useMutation({
+    mutationFn: async (i: { id: string; candidatoId: string }) => {
+      const { error } = await supabase.from('rh_admissao_treinamentos').delete().eq('id', i.id)
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { add, toggle, remover }
+}
+
+export function useMobilizacao() {
+  const qc = useQueryClient()
+  const enviarMissao = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_mob_enviar_missao', {
+        p_candidato_id: i.candidatoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar missão')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  const atualizar = useMutation({
+    mutationFn: async (i: { candidatoId: string; patch: Partial<RHMobilizacao> }) => {
+      const { error } = await supabase.from('rh_admissao_mobilizacao')
+        .upsert({ candidato_id: i.candidatoId, ...i.patch, updated_at: new Date().toISOString() }, { onConflict: 'candidato_id' })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { enviarMissao, atualizar }
+}
+
+export function useIntegracao() {
+  const qc = useQueryClient()
+  const enviarAceites = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_int_enviar_aceites', {
+        p_candidato_id: i.candidatoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar aceites')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  const atualizar = useMutation({
+    mutationFn: async (i: { candidatoId: string; patch: Partial<RHIntegracao> }) => {
+      const { error } = await supabase.from('rh_admissao_integracao')
+        .upsert({ candidato_id: i.candidatoId, ...i.patch, updated_at: new Date().toISOString() }, { onConflict: 'candidato_id' })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { enviarAceites, atualizar }
+}
+
+export function useLiberarAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { admissaoId: string; autorId?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_liberar', {
+        p_admissao_id: i.admissaoId, p_autor_id: i.autorId ?? null, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; liberados?: number }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao liberar')
+      return r
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
     },
   })
 }

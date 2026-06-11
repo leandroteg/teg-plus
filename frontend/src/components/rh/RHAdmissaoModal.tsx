@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
-  useEditarAdmissao, useBasesAdmissao,
+  useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
@@ -35,6 +35,7 @@ const movLabel = (m?: string) => m === 'substituicao' ? 'Substituição' : m ===
 export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onClose: () => void }) {
   const { perfil } = useAuth()
   const transicao = useTransicaoAdmissao()
+  const liberar = useLiberarAdmissao()
   const editar = useEditarAdmissao()
   const centrosCusto = useLookupCentrosCusto()
   const { data: bases = [] } = useBasesAdmissao()
@@ -334,6 +335,29 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
                 {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 Documentação Recebida
+              </button>
+            )}
+            {etapa === 'exames_treinamentos' && (
+              <button onClick={() => executar('apto_mobilizacao')} disabled={transicao.isPending}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                Apto para Mobilização
+              </button>
+            )}
+            {etapa === 'mobilizacao' && (
+              <button onClick={() => executar('mobilizacao_concluida')} disabled={transicao.isPending}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                Mobilização Concluída
+              </button>
+            )}
+            {etapa === 'integracao' && (
+              <button
+                onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }); onClose() }}
+                disabled={liberar.isPending}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+                {liberar.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                Concluir Integração e Liberar
               </button>
             )}
             {etapa === 'aprovacao' && (

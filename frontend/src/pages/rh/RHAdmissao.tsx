@@ -15,6 +15,8 @@ import { useAdmissoesFluxo, useMissoesDocsStatus } from '../../hooks/useRHAdmiss
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
+import { ExamesCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
+import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
 type EtapaAdmissao = EtapaAdmissaoFluxo
@@ -57,6 +59,8 @@ const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgA
 export default function RHAdmissao() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
+  const { perfil } = useAuth()
+  const autorNome = perfil?.nome || perfil?.email || 'Usuário'
   const [searchParams, setSearchParams] = useSearchParams()
   const [view, setView] = useState<'fluxo' | 'nova'>('fluxo')
   const [etapa, setEtapa] = useState<EtapaAdmissao>('requisicao')
@@ -134,40 +138,36 @@ export default function RHAdmissao() {
 
       {/* Conteúdo da etapa ativa */}
       <EtapaPanel etapa={ativa} isDark={isDark}>
-        {(etapa === 'requisicao' || etapa === 'aprovacao' || etapa === 'documentacao') ? (
-          isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 size={26} className="animate-spin text-slate-300" /></div>
-          ) : (
-            <>
-              <RHFluxoToolbar
-                isDark={isDark} busca={busca} setBusca={setBusca}
-                placeholder="Buscar candidato, base, CC..."
-                sortOptions={[{ field: 'data', label: 'Data' }, { field: 'candidato', label: 'Candidato' }]}
-                sortField={sortField} setSortField={setSortField} sortDir={sortDir} setSortDir={setSortDir}
-                viewMode={viewMode} setViewMode={setViewMode}
-                count={filtrados.length} total={itensEtapa.length}
-              />
-              {filtrados.length === 0 ? (
-                <PlaceholderVazio etapa={ativa} isDark={isDark} />
-              ) : etapa === 'documentacao' && viewMode === 'cards' ? (
-                <div className="space-y-2">
-                  {filtrados.map(a => (
-                    <DocumentacaoCard key={a.id} adm={a} isDark={isDark} onClick={() => setSelecionada(a)} />
-                  ))}
-                </div>
-              ) : viewMode === 'cards' ? (
-                <div className="space-y-2">
-                  {filtrados.map(a => (
-                    <AdmissaoCard key={a.id} adm={a} isDark={isDark} onClick={() => setSelecionada(a)} />
-                  ))}
-                </div>
-              ) : (
-                <AdmissaoLista itens={filtrados} isDark={isDark} onSelect={setSelecionada} />
-              )}
-            </>
-          )
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Loader2 size={26} className="animate-spin text-slate-300" /></div>
         ) : (
-          <PlaceholderConstrucao etapa={ativa} isDark={isDark} />
+          <>
+            <RHFluxoToolbar
+              isDark={isDark} busca={busca} setBusca={setBusca}
+              placeholder="Buscar candidato, base, CC..."
+              sortOptions={[{ field: 'data', label: 'Data' }, { field: 'candidato', label: 'Candidato' }]}
+              sortField={sortField} setSortField={setSortField} sortDir={sortDir} setSortDir={setSortDir}
+              viewMode={viewMode} setViewMode={setViewMode}
+              count={filtrados.length} total={itensEtapa.length}
+            />
+            {filtrados.length === 0 ? (
+              <PlaceholderVazio etapa={ativa} isDark={isDark} />
+            ) : viewMode !== 'cards' ? (
+              <AdmissaoLista itens={filtrados} isDark={isDark} onSelect={setSelecionada} />
+            ) : (
+              <div className="space-y-2">
+                {filtrados.map(a => {
+                  const props = { key: a.id, adm: a, isDark, onClick: () => setSelecionada(a) }
+                  if (etapa === 'documentacao') return <DocumentacaoCard {...props} />
+                  if (etapa === 'exames_treinamentos') return <ExamesCard {...props} autorNome={autorNome} />
+                  if (etapa === 'mobilizacao') return <MobilizacaoCard {...props} autorNome={autorNome} />
+                  if (etapa === 'integracao') return <IntegracaoCard {...props} autorNome={autorNome} />
+                  if (etapa === 'liberado') return <LiberadoCard {...props} />
+                  return <AdmissaoCard {...props} />
+                })}
+              </div>
+            )}
+          </>
         )}
       </EtapaPanel>
 
