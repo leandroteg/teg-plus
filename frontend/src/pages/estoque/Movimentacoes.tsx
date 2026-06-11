@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeftRight, Plus, Search, X, Save, Loader2,
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   useMovimentacoes, useRegistrarMovimentacao,
-  useEstoqueItens, useBases,
+  useEstoqueItens, useBases, useSaldos,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/estoque'
@@ -47,6 +47,23 @@ export default function Movimentacoes() {
   const registrar = useRegistrarMovimentacao()
   const { data: itens = [] } = useEstoqueItens()
   const { data: bases = [] } = useBases()
+
+  // Tipos que consomem estoque — só faz sentido escolher item com saldo
+  const TIPOS_CONSUMO: TipoMovimentacao[] = ['saida', 'transferencia_out', 'ajuste_negativo', 'baixa']
+  const tipoConsumo = TIPOS_CONSUMO.includes(payload.tipo as TipoMovimentacao)
+  // Só busca saldos quando faz sentido (tipo de consumo + base selecionada)
+  const { data: saldos = [] } = useSaldos(
+    tipoConsumo && payload.base_id ? payload.base_id : undefined,
+  )
+  const saldoPorItem = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const s of saldos) if (s.saldo > 0) m.set(s.item_id, s.saldo)
+    return m
+  }, [saldos])
+  const itensSelecionaveis = useMemo(() => {
+    if (!tipoConsumo || !payload.base_id) return itens
+    return itens.filter(i => saldoPorItem.has(i.id))
+  }, [itens, saldoPorItem, tipoConsumo, payload.base_id])
 
   const filtradas = busca.trim()
     ? movs.filter(m =>
@@ -231,14 +248,33 @@ export default function Movimentacoes() {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Item *</label>
+                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                  Item *
+                  {tipoConsumo && payload.base_id && (
+                    <span className={`ml-2 font-normal text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      ({itensSelecionaveis.length} com saldo na base)
+                    </span>
+                  )}
+                  {tipoConsumo && !payload.base_id && (
+                    <span className="ml-2 font-normal text-[10px] text-amber-600">
+                      Selecione a base primeiro pra filtrar por saldo
+                    </span>
+                  )}
+                </label>
                 <select value={payload.item_id ?? ''} onChange={e => set('item_id', e.target.value)}
                   className={inputCls}>
                   <option value="">Selecione...</option>
-                  {itens.map(i => (
-                    <option key={i.id} value={i.id}>{i.codigo} -- {i.descricao}</option>
-                  ))}
+                  {itensSelecionaveis.map(i => {
+                    const saldo = saldoPorItem.get(i.id)
+                    const label = tipoConsumo && payload.base_id && saldo != null
+                      ? `${i.codigo} -- ${i.descricao}  (saldo: ${saldo})`
+                      : `${i.codigo} -- ${i.descricao}`
+                    return <option key={i.id} value={i.id}>{label}</option>
+                  })}
                 </select>
+                {tipoConsumo && payload.base_id && itensSelecionaveis.length === 0 && (
+                  <p className="mt-1 text-[11px] text-amber-600">Nenhum item com saldo nesta base.</p>
+                )}
               </div>
 
               <div>
