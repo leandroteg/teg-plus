@@ -760,7 +760,7 @@ export default function Dashboard() {
       </div>
 
       {/* Lead Time de Compras (por categoria/fase) */}
-      <LeadTimePainel isDark={isDark} compact={visao === 'resumo'} />
+      {visao === 'detalhada' && <LeadTimePainel isDark={isDark} />}
 
       {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
