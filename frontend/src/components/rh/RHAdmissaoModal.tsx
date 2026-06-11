@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
-  useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao,
+  useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao, useUploadAnexoCandidato,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
@@ -442,10 +442,13 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
   cand: RHAdmissaoCandidato; autorId?: string; autorNome?: string
 }) {
   const enviar = useEnviarMissaoDocs()
+  const uploadAnexo = useUploadAnexoCandidato()
   const { data: docs = [], isLoading } = useMissoesDocsStatus(cand.id)
   const [erro, setErro] = useState<string | null>(null)
 
   const missaoEnviada = docs.length > 0
+  // Pesquisa Histórico: documento interno do RH — não vira missão do colaborador
+  const temPesquisa = (cand.anexos ?? []).some(a => a.tipo === 'pesquisa_historico')
 
   async function handleEnviar() {
     setErro(null)
@@ -500,6 +503,27 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
             </span>
           </div>
         ))}
+      </div>
+
+      {/* Pesquisa Histórico — interno do RH (o colaborador não vê) */}
+      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
+        {temPesquisa
+          ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+          : <Circle size={13} className="text-slate-300 shrink-0" />}
+        <span className={`text-[11px] flex-1 ${temPesquisa ? 'text-slate-700 font-semibold' : 'text-slate-500'}`}>
+          Pesquisa Histórico <span className="text-[9px] text-slate-400">(interno RH)</span>
+        </span>
+        {!temPesquisa && (
+          <label className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 cursor-pointer">
+            {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : null} Anexar
+            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) uploadAnexo.mutate({ admissaoId: cand.admissao_id, candidatoId: cand.id, file, tipo: 'pesquisa_historico', autorId })
+                e.currentTarget.value = ''
+              }} />
+          </label>
+        )}
       </div>
     </div>
   )

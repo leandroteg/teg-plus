@@ -222,7 +222,10 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
 
       {/* Progresso de docs por candidato */}
       <div className="space-y-1.5">
-        {candidatos.map(c => <DocCandidatoProgress key={c.id} candidatoId={c.id} nome={c.nome} isDark={isDark} />)}
+        {candidatos.map(c => (
+          <DocCandidatoProgress key={c.id} candidatoId={c.id} nome={c.nome} isDark={isDark}
+            temPesquisaHistorico={(c.anexos ?? []).some(a => a.tipo === 'pesquisa_historico')} />
+        ))}
         {candidatos.length === 0 && (
           <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum candidato.</p>
         )}
@@ -231,11 +234,13 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
   )
 }
 
-function DocCandidatoProgress({ candidatoId, nome, isDark }: { candidatoId: string; nome?: string; isDark: boolean }) {
+function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico }: {
+  candidatoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
+}) {
   const { data: docs = [], isLoading } = useMissoesDocsStatus(candidatoId)
   const total = docs.length
   const ok = docs.filter(d => d.status === 'concluida' || d.status === 'dispensada').length
-  const completo = total > 0 && ok === total
+  const completo = total > 0 && ok === total && !!temPesquisaHistorico
 
   return (
     <div className={`rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
@@ -276,6 +281,17 @@ function DocCandidatoProgress({ candidatoId, nome, isDark }: { candidatoId: stri
               </span>
             </span>
           ))}
+          {/* Pesquisa Histórico — interno do RH */}
+          <span className="flex items-center gap-1 min-w-0">
+            {temPesquisaHistorico
+              ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+              : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
+            <span className={`text-[10px] truncate ${temPesquisaHistorico
+              ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
+              : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
+              Pesquisa Histórico 🔒
+            </span>
+          </span>
         </div>
       )}
     </div>
