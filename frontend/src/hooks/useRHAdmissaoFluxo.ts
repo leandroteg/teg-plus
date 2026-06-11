@@ -96,6 +96,7 @@ export interface ArquivoCandidato {
 export interface CandidatoInput {
   nome: string
   cpf?: string
+  data_nascimento?: string
   cargo?: string
   salario?: number
   dados_extras?: Record<string, unknown>
@@ -140,6 +141,7 @@ export function useCriarAdmissao() {
             admissao_id: admissaoId,
             nome: c.nome,
             cpf: c.cpf || null,
+            data_nascimento: c.data_nascimento || null,
             cargo: c.cargo || null,
             salario: c.salario ?? null,
             dados_extras: c.dados_extras ?? null,
@@ -188,7 +190,7 @@ export function useCriarAdmissao() {
 }
 
 // ── Transições do fluxo (RH-only) ─────────────────────────────────────────────
-export type AcaoAdmissao = 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
+export type AcaoAdmissao = 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer' | 'documentacao_recebida'
 
 export interface TransicaoInput {
   adm: RHAdmissao
@@ -232,6 +234,10 @@ export function useTransicaoAdmissao() {
         para = 'requisicao'
         patch = { etapa: 'requisicao', status_aprovacao: 'esclarecimento', motivo_decisao: motivo ?? null }
         histAcao = 'esclarecimento'
+      } else if (acao === 'documentacao_recebida') {
+        para = 'exames_treinamentos'
+        patch = { etapa: 'exames_treinamentos' }
+        histAcao = 'documentacao_recebida'
       }
 
       const { error } = await supabase.from('rh_admissoes').update(patch).eq('id', adm.id)
@@ -249,6 +255,54 @@ export function useTransicaoAdmissao() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
+// ── Missão de envio de documentos (Portal TEG) ────────────────────────────────
+// RH dispara: cadastra colaborador em admissão + cria missões de documentação.
+export function useEnviarMissaoDocs() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ candidatoId, autorId, autorNome }: { candidatoId: string; autorId?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_enviar_missao_docs', {
+        p_candidato_id: candidatoId,
+        p_autor_id: autorId ?? null,
+        p_autor_nome: autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; colaborador_id?: string; missoes_criadas?: number }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar a missão')
+      return r
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-admissao-missoes-docs'] })
+    },
+  })
+}
+
+export interface MissaoDocStatus {
+  missao_id: string
+  doc_tipo: string
+  titulo: string
+  status: 'pendente' | 'concluida' | 'dispensada'
+  opcional: boolean
+  concluida_em: string | null
+}
+
+// Checklist dos docs da missão de um candidato (pra etapa Documentação)
+export function useMissoesDocsStatus(candidatoId?: string) {
+  return useQuery<MissaoDocStatus[]>({
+    queryKey: ['rh-admissao-missoes-docs', candidatoId],
+    enabled: !!candidatoId,
+    refetchInterval: 30_000,   // RH vê os checks chegando quase em tempo real
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rh_admissao_missoes_status', {
+        p_candidato_id: candidatoId,
+      })
+      if (error) { console.error('useMissoesDocsStatus:', error); return [] }
+      return (data ?? []) as MissaoDocStatus[]
     },
   })
 }

@@ -163,6 +163,7 @@ export interface RHAdmissaoCandidato {
   admissao_id: string
   nome: string
   cpf?: string
+  data_nascimento?: string
   cargo?: string
   salario?: number
   colaborador_id?: string
@@ -222,8 +223,22 @@ export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'cnh', label: 'CNH', obrigatorio: false },
   { value: 'rg', label: 'RG', obrigatorio: false },
   { value: 'cpf', label: 'CPF', obrigatorio: false },
+  { value: 'titulo_eleitor', label: 'Título de Eleitor', obrigatorio: false },
   { value: 'comprovante', label: 'Comprovante de Endereço', obrigatorio: false },
+  { value: 'certidao', label: 'Certidão Nasc./Casamento', obrigatorio: false },
+  { value: 'reservista', label: 'Reservista', obrigatorio: false },
   { value: 'outro', label: 'Outro documento', obrigatorio: false },
+]
+
+// Documentos da missão de envio (Portal TEG) — espelho da RPC rh_admissao_enviar_missao_docs
+export const DOCS_MISSAO_ADMISSAO = [
+  { value: 'ctps', label: 'CTPS', opcional: false },
+  { value: 'rg', label: 'RG', opcional: false },
+  { value: 'cpf', label: 'CPF', opcional: false },
+  { value: 'titulo_eleitor', label: 'Título de Eleitor', opcional: false },
+  { value: 'comprovante', label: 'Comprovante de Endereço', opcional: false },
+  { value: 'certidao', label: 'Certidão Nasc./Casamento', opcional: false },
+  { value: 'reservista', label: 'Reservista', opcional: true },
 ]
 
 export const TIPOS_MOVIMENTACAO_ADMISSAO = [

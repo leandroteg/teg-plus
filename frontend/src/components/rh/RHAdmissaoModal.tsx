@@ -4,10 +4,13 @@
 import { useState } from 'react'
 import {
   X, Send, CheckCircle2, XCircle, HelpCircle, FileText, ExternalLink, Loader2,
-  Building2, Calendar, Briefcase, AlertTriangle, User, Users,
+  Building2, Calendar, Briefcase, AlertTriangle, User, Users, Smartphone, Circle, MinusCircle,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTransicaoAdmissao, getAnexoSignedUrl, type AcaoAdmissao } from '../../hooks/useRHAdmissaoFluxo'
+import {
+  useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
+  type AcaoAdmissao,
+} from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO } from '../../types/rh'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
@@ -109,7 +112,8 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             </p>
             <div className="space-y-2">
               {candidatos.map((c, i) => (
-                <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo} />
+                <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo}
+                  etapa={etapa} autorId={perfil?.id} autorNome={autorNome} />
               ))}
               {candidatos.length === 0 && <p className="text-xs text-slate-400">Nenhum candidato.</p>}
             </div>
@@ -145,6 +149,13 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 Solicitar Aprovação
               </button>
             )}
+            {etapa === 'documentacao' && (
+              <button onClick={() => executar('documentacao_recebida')} disabled={transicao.isPending}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                Documentação Recebida
+              </button>
+            )}
             {etapa === 'aprovacao' && (
               <>
                 <button onClick={() => { setPedindo('esclarecer'); setMotivoAcao('') }}
@@ -169,10 +180,12 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   )
 }
 
-function CandidatoBloco({ cand, idx, abrindo, onAbrir }: {
+function CandidatoBloco({ cand, idx, abrindo, onAbrir, etapa, autorId, autorNome }: {
   cand: RHAdmissaoCandidato; idx: number; abrindo: string | null; onAbrir: (path: string, id: string) => void
+  etapa: string; autorId?: string; autorNome?: string
 }) {
   const anexos = cand.anexos ?? []
+  const dataNasc = cand.data_nascimento ? new Date(cand.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : null
   return (
     <div className="rounded-xl border border-slate-200 p-3">
       <div className="flex items-center gap-2">
@@ -183,6 +196,7 @@ function CandidatoBloco({ cand, idx, abrindo, onAbrir }: {
           <p className="text-sm font-bold text-slate-800 truncate">{cand.nome || `Candidato ${idx + 1}`}</p>
           <div className="flex items-center gap-2 flex-wrap">
             {cand.cpf && <span className="text-[10px] text-slate-400">CPF {cand.cpf}</span>}
+            {dataNasc && <span className="text-[10px] text-slate-400">Nasc. {dataNasc}</span>}
             {cand.cargo && <span className="text-[10px] text-slate-400">{cand.cargo}</span>}
             {cand.salario ? <span className="text-[10px] text-slate-400">{fmtMoney(cand.salario)}</span> : null}
           </div>
@@ -201,6 +215,79 @@ function CandidatoBloco({ cand, idx, abrindo, onAbrir }: {
           ))}
         </div>
       )}
+      {etapa === 'documentacao' && (
+        <MissaoDocsSection cand={cand} autorId={autorId} autorNome={autorNome} />
+      )}
+    </div>
+  )
+}
+
+// ── Missão de envio de documentos (etapa Documentação) ────────────────────────
+// Sem missão: botão dispara RPC (cadastra colaborador em admissão + cria missões).
+// Com missão: checklist com os checks chegando conforme o SuperTEG valida.
+function MissaoDocsSection({ cand, autorId, autorNome }: {
+  cand: RHAdmissaoCandidato; autorId?: string; autorNome?: string
+}) {
+  const enviar = useEnviarMissaoDocs()
+  const { data: docs = [], isLoading } = useMissoesDocsStatus(cand.id)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const missaoEnviada = docs.length > 0
+
+  async function handleEnviar() {
+    setErro(null)
+    try {
+      await enviar.mutateAsync({ candidatoId: cand.id, autorId, autorNome })
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao enviar a missão')
+    }
+  }
+
+  if (!missaoEnviada) {
+    return (
+      <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+        <button onClick={handleEnviar} disabled={enviar.isPending || isLoading}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 transition-all">
+          {enviar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Smartphone size={13} />}
+          Enviar Missão de Envio Documentos
+        </button>
+        <p className="text-[10px] text-slate-400 mt-1 text-center">
+          Libera o acesso do candidato ao Portal TEG (CPF + data de nascimento) só para enviar os documentos.
+        </p>
+        {erro && <p className="text-[11px] text-red-600 font-semibold mt-1 text-center">{erro}</p>}
+      </div>
+    )
+  }
+
+  const concluidos = docs.filter(d => d.status === 'concluida').length
+  const dispensados = docs.filter(d => d.status === 'dispensada').length
+  const total = docs.length
+
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600 flex items-center gap-1">
+          <Smartphone size={11} /> Missão de documentos enviada
+        </p>
+        <span className="text-[10px] font-bold text-slate-500">{concluidos + dispensados}/{total}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+        {docs.map(d => (
+          <div key={d.missao_id} className="flex items-center gap-1.5 min-w-0">
+            {d.status === 'concluida'
+              ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+              : d.status === 'dispensada'
+                ? <MinusCircle size={13} className="text-slate-300 shrink-0" />
+                : <Circle size={13} className="text-slate-300 shrink-0" />}
+            <span className={`text-[11px] truncate ${
+              d.status === 'concluida' ? 'text-slate-700 font-semibold'
+              : d.status === 'dispensada' ? 'text-slate-400 line-through'
+              : 'text-slate-500'}`}>
+              {d.titulo.replace(/^Enviar /, '')}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

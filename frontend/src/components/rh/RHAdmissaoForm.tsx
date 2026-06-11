@@ -22,6 +22,7 @@ interface CandForm {
   uid: number
   nome: string
   cpf: string
+  dataNascimento: string
   cargo: string
   salario: string
   dados_extras?: Record<string, unknown>
@@ -74,7 +75,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
     const lista = Array.from(files)
     const novos: CandForm[] = lista.map(file => ({
       uid: novoUid(),
-      nome: '', cpf: '', cargo: '', salario: '',
+      nome: '', cpf: '', dataNascimento: '', cargo: '', salario: '',
       arquivos: [{ file, tipo: guessTipo(file.name) }],
       lendo: true,
     }))
@@ -88,6 +89,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
           lendo: false,
           nome: x.nome || String(ext?.nome || ''),
           cpf: x.cpf || String(ext?.cpf || ''),
+          dataNascimento: x.dataNascimento || String(ext?.data_nascimento || ''),
           cargo: x.cargo || String(ext?.cargo_pretendido || ''),
           dados_extras: (ext && typeof ext === 'object') ? (ext as Record<string, unknown>) : undefined,
           confianca: typeof ext?.confianca === 'number' ? ext.confianca : undefined,
@@ -99,7 +101,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
   }
 
   function addCandidatoManual() {
-    setCandidatos(prev => [...prev, { uid: novoUid(), nome: '', cpf: '', cargo: '', salario: '', arquivos: [] }])
+    setCandidatos(prev => [...prev, { uid: novoUid(), nome: '', cpf: '', dataNascimento: '', cargo: '', salario: '', arquivos: [] }])
   }
 
   function updCand(uid: number, patch: Partial<CandForm>) {
@@ -155,6 +157,7 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
         candidatos: candidatos.map(c => ({
           nome: c.nome.trim(),
           cpf: c.cpf.trim() || undefined,
+          data_nascimento: c.dataNascimento || undefined,
           cargo: c.cargo.trim() || undefined,
           salario: c.salario ? Number(c.salario) : undefined,
           dados_extras: c.dados_extras,
@@ -321,6 +324,10 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
                   <div>
                     <label className={LABEL}>CPF</label>
                     <input value={c.cpf} onChange={e => updCand(c.uid, { cpf: e.target.value })} placeholder="000.000.000-00" className={INPUT_SM} />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Data de nascimento</label>
+                    <input type="date" value={c.dataNascimento} onChange={e => updCand(c.uid, { dataNascimento: e.target.value })} className={INPUT_SM} />
                   </div>
                   <div>
                     <label className={LABEL}>Cargo</label>
