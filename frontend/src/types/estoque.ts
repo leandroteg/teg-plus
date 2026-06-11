@@ -240,6 +240,8 @@ export interface EstoqueKPIs {
 export interface PatImobilizado {
   id: string
   numero_patrimonio: string
+  /** Código no sistema/planilha legado. Usado na conferência da migração. */
+  codigo_antigo?: string
   descricao: string
   categoria: string
   marca?: string

@@ -140,6 +140,7 @@ export default function Patrimonial({
       ? base.filter(i =>
           i.descricao.toLowerCase().includes(busca.toLowerCase()) ||
           i.numero_patrimonio.toLowerCase().includes(busca.toLowerCase()) ||
+          i.codigo_antigo?.toLowerCase().includes(busca.toLowerCase()) ||
           i.categoria?.toLowerCase().includes(busca.toLowerCase())
         )
       : base
@@ -526,8 +527,14 @@ function ImobilizadoCard({
           <Landmark size={16} className="text-cyan-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
+            {imob.codigo_antigo && (
+              <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 font-mono ${isLight ? 'bg-amber-50 text-amber-700' : 'bg-amber-500/15 text-amber-400'}`}
+                title="Código no sistema legado">
+                cod. antigo: {imob.codigo_antigo}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
               {cfg.label}
@@ -883,6 +890,17 @@ function ImobilizadoFormModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>
+              C\u00f3digo antigo
+              <span className={`ml-2 font-normal text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                (sistema/planilha legado \u2014 confer\u00eancia da migra\u00e7\u00e3o)
+              </span>
+            </label>
+            <UpperInput value={item.codigo_antigo ?? ''} onChange={e => set('codigo_antigo', e.target.value)}
+              className={inputCls} placeholder="Ex: 12345 (deixe vazio se nasceu no TEG+)" />
           </div>
 
           <div>
