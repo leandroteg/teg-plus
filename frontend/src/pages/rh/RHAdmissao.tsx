@@ -8,9 +8,10 @@ import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
   HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
   ChevronRight as ChevR, Paperclip, AlertTriangle, XCircle, HelpCircle, Loader2,
+  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAdmissoesFluxo } from '../../hooks/useRHAdmissaoFluxo'
+import { useAdmissoesFluxo, useMissoesDocsStatus } from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
@@ -133,7 +134,7 @@ export default function RHAdmissao() {
 
       {/* Conteúdo da etapa ativa */}
       <EtapaPanel etapa={ativa} isDark={isDark}>
-        {(etapa === 'requisicao' || etapa === 'aprovacao') ? (
+        {(etapa === 'requisicao' || etapa === 'aprovacao' || etapa === 'documentacao') ? (
           isLoading ? (
             <div className="flex justify-center py-12"><Loader2 size={26} className="animate-spin text-slate-300" /></div>
           ) : (
@@ -148,6 +149,12 @@ export default function RHAdmissao() {
               />
               {filtrados.length === 0 ? (
                 <PlaceholderVazio etapa={ativa} isDark={isDark} />
+              ) : etapa === 'documentacao' && viewMode === 'cards' ? (
+                <div className="space-y-2">
+                  {filtrados.map(a => (
+                    <DocumentacaoCard key={a.id} adm={a} isDark={isDark} onClick={() => setSelecionada(a)} />
+                  ))}
+                </div>
               ) : viewMode === 'cards' ? (
                 <div className="space-y-2">
                   {filtrados.map(a => (
@@ -165,6 +172,100 @@ export default function RHAdmissao() {
       </EtapaPanel>
 
       {selecionada && <RHAdmissaoModal adm={selecionada} onClose={() => setSelecionada(null)} />}
+    </div>
+  )
+}
+
+// ── Card da etapa Documentação: vaga + progresso dos docs por candidato ──────
+function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boolean; onClick: () => void }) {
+  const candidatos = adm.candidatos ?? []
+  const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
+  const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
+  return (
+    <button onClick={onClick}
+      className={`w-full text-left rounded-2xl border p-4 transition-all group ${
+        isDark
+          ? 'bg-white/[0.02] border-white/[0.06] hover:border-violet-400/40 hover:bg-violet-500/5'
+          : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-md'
+      }`}>
+      {/* Dados da vaga */}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            {candidatos[0]?.cargo || adm.cargo_previsto || 'Vaga'}
+            {adm.urgente && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Urgente</span>}
+            {criadoPorSuperTEG && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">🦸 SuperTEG</span>}
+          </p>
+          <div className={`flex items-center gap-3 flex-wrap mt-0.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {adm.base && <span className="flex items-center gap-1"><Building2 size={11} /> {adm.base}</span>}
+            {ccTxt && <span className="flex items-center gap-1"><Briefcase size={11} /> {ccTxt}</span>}
+            {adm.departamento_previsto && <span>{adm.departamento_previsto}</span>}
+            {adm.data_prevista_inicio && (
+              <span className="flex items-center gap-1"><Calendar size={11} /> início {new Date(adm.data_prevista_inicio).toLocaleDateString('pt-BR')}</span>
+            )}
+          </div>
+        </div>
+        <ChevR size={16} className={`shrink-0 mt-1 ${isDark ? 'text-slate-500' : 'text-slate-300'} group-hover:text-violet-400`} />
+      </div>
+
+      {/* Progresso de docs por candidato */}
+      <div className="space-y-1.5">
+        {candidatos.map(c => <DocCandidatoProgress key={c.id} candidatoId={c.id} nome={c.nome} isDark={isDark} />)}
+        {candidatos.length === 0 && (
+          <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum candidato.</p>
+        )}
+      </div>
+    </button>
+  )
+}
+
+function DocCandidatoProgress({ candidatoId, nome, isDark }: { candidatoId: string; nome?: string; isDark: boolean }) {
+  const { data: docs = [], isLoading } = useMissoesDocsStatus(candidatoId)
+  const total = docs.length
+  const ok = docs.filter(d => d.status === 'concluida' || d.status === 'dispensada').length
+  const completo = total > 0 && ok === total
+
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+      <div className="flex items-center gap-2">
+        <User size={12} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
+        <span className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{nome || 'Candidato'}</span>
+        {isLoading ? (
+          <Loader2 size={12} className="animate-spin text-slate-400" />
+        ) : total === 0 ? (
+          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-500">
+            <Smartphone size={10} /> Missão não enviada
+          </span>
+        ) : (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            completo ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'
+          }`}>
+            {completo ? '✓ Documentação completa' : `${ok}/${total} documentos`}
+          </span>
+        )}
+      </div>
+      {total > 0 && (
+        <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap mt-1.5">
+          {docs.map(d => (
+            <span key={d.missao_id} className="flex items-center gap-1 min-w-0">
+              {d.status === 'concluida'
+                ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                : d.status === 'dispensada'
+                  ? <MinusCircle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                  : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
+              <span className={`text-[10px] truncate ${
+                d.status === 'concluida'
+                  ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
+                  : d.status === 'dispensada'
+                    ? (isDark ? 'text-slate-600 line-through' : 'text-slate-400 line-through')
+                    : (isDark ? 'text-slate-500' : 'text-slate-400')
+              }`}>
+                {d.titulo.replace(/^Enviar /, '').replace(/ \(se aplicável\)$/, '')}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
