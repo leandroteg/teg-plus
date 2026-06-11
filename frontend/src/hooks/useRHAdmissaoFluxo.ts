@@ -506,6 +506,7 @@ export interface RHRegistro {
   ficha_gerada_em: string | null
   missao_assinatura_id: string | null
   observacoes: string | null
+  ficha_dados: Record<string, unknown> | null
 }
 
 export interface RHProposta {
@@ -705,9 +706,9 @@ export function useIntegracao() {
 export function useRegistro() {
   const qc = useQueryClient()
   const gerarFicha = useMutation({
-    mutationFn: async (i: { candidatoId: string }) => {
+    mutationFn: async (i: { candidatoId: string; dados?: Record<string, unknown> }) => {
       const { data, error } = await supabase.functions.invoke('rh-ficha-colaborador', {
-        body: { candidato_id: i.candidatoId },
+        body: { candidato_id: i.candidatoId, dados: i.dados ?? {} },
       })
       if (error) throw error
       const r = data as { ok: boolean; url?: string; motivo?: string }
@@ -742,7 +743,19 @@ export function useRegistro() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
-  return { gerarFicha, enviarAssinatura, setMatricula }
+  // Envia a ficha + documentos do candidato por e-mail (caixa do RH via n8n)
+  const enviarEmail = useMutation({
+    mutationFn: async (i: { candidatoId: string; destinatario: string }) => {
+      const resp = await fetch(`${N8N_URL}/rh/ficha/enviar-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidato_id: i.candidatoId, destinatario: i.destinatario }),
+      })
+      const r = (await resp.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!resp.ok || !r.ok) throw new Error(r.message || 'Falha ao enviar o e-mail')
+    },
+  })
+  return { gerarFicha, enviarAssinatura, setMatricula, enviarEmail }
 }
 
 // Matrícula atual do colaborador vinculado (etapa Registro)

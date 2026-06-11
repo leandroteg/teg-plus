@@ -17,6 +17,7 @@ import {
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
+import RHFichaRegistroModal, { type FichaDados } from './RHFichaRegistroModal'
 
 const IN = 'w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-teal-300 outline-none'
 
@@ -340,11 +341,14 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 }) {
   const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { gerarFicha, enviarAssinatura, setMatricula } = useRegistro()
+  const { gerarFicha, enviarAssinatura, setMatricula, enviarEmail } = useRegistro()
   const { data: matricula } = useMatriculaColaborador(cand.colaborador_id)
   const uploadAnexo = useUploadAnexoCandidato()
   const contratoRef = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [modalFicha, setModalFicha] = useState(false)
+  const [destinatario, setDestinatario] = useState('dp@eloocontabilidade.com.br')
+  const [emailOk, setEmailOk] = useState(false)
 
   const registro = data?.registro ?? null
   const assinatura = data?.assinatura ?? null
@@ -353,12 +357,22 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
   const ultimoContrato = contratos[contratos.length - 1]
   const assinado = assinatura?.status === 'concluida'
 
-  async function handleGerarFicha() {
+  async function handleGerarFicha(dados: FichaDados) {
     setErro(null)
     try {
-      const r = await gerarFicha.mutateAsync({ candidatoId: cand.id })
+      const r = await gerarFicha.mutateAsync({ candidatoId: cand.id, dados })
+      setModalFicha(false)
       if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer')
     } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao gerar ficha') }
+  }
+
+  async function handleEnviarEmail() {
+    setErro(null)
+    setEmailOk(false)
+    try {
+      await enviarEmail.mutateAsync({ candidatoId: cand.id, destinatario: destinatario.trim() })
+      setEmailOk(true)
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao enviar e-mail') }
   }
 
   async function handleEnviarAssinatura() {
@@ -386,18 +400,39 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
       <div className="space-y-1">
         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><FileText size={11} /> 1 · Ficha de registro (contabilidade)</span>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleGerarFicha} disabled={gerarFicha.isPending}
+          <button onClick={() => setModalFicha(true)} disabled={gerarFicha.isPending}
             className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">
             {gerarFicha.isPending ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}
-            {fichas.length ? 'Gerar nova ficha (PDF)' : 'Gerar ficha (PDF)'}
+            {fichas.length ? 'Revisar e gerar nova ficha' : 'Preencher e gerar ficha'}
           </button>
           {registro?.ficha_gerada_em && (
             <span className="text-[10px] text-slate-500">
-              gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · exporte e envie à contabilidade
+              gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
         </div>
+        {registro?.ficha_gerada_em && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <input value={destinatario} onChange={e => setDestinatario(e.target.value)}
+              placeholder="E-mail da contabilidade" className={`${IN} max-w-[240px]`} />
+            <button onClick={handleEnviarEmail} disabled={enviarEmail.isPending || !destinatario.trim()}
+              className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50">
+              {enviarEmail.isPending ? <Loader2 size={11} className="animate-spin" /> : <Smartphone size={11} />}
+              Enviar por e-mail (ficha + documentos)
+            </button>
+            {emailOk && <span className="text-[10px] font-bold text-emerald-600">✓ E-mail enviado</span>}
+          </div>
+        )}
       </div>
+      {modalFicha && (
+        <RHFichaRegistroModal
+          cand={cand} adm={adm}
+          fichaDados={(registro?.ficha_dados ?? null) as FichaDados | null}
+          gerando={gerarFicha.isPending}
+          onGerar={handleGerarFicha}
+          onClose={() => setModalFicha(false)}
+        />
+      )}
 
       {/* 2 · Contrato + assinatura */}
       <div className="space-y-1">
