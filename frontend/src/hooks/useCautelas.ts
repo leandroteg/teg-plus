@@ -240,3 +240,48 @@ export function useCautelaKPIs(colaboradorId: string | undefined) {
     refetchInterval: 60_000,
   })
 }
+
+// Salva termo de aceite no Storage (PNG + PDF) e transita status via RPC (mig 136).
+// Aceita já as Blobs prontas (geradas no modal) para evitar acoplamento de geração.
+export function useSalvarTermoCautela() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cautelaId,
+      assinaturaBlob,
+      termoBlob,
+    }: {
+      cautelaId: string
+      assinaturaBlob: Blob
+      termoBlob: Blob
+    }) => {
+      const ts = Date.now()
+      const assPath = `${cautelaId}/assinatura_${ts}.png`
+      const pdfPath = `${cautelaId}/termo_${ts}.pdf`
+
+      const { error: errAss } = await supabase.storage
+        .from('cautelas-termos')
+        .upload(assPath, assinaturaBlob, { contentType: 'image/png', upsert: false })
+      if (errAss) throw errAss
+
+      const { error: errPdf } = await supabase.storage
+        .from('cautelas-termos')
+        .upload(pdfPath, termoBlob, { contentType: 'application/pdf', upsert: false })
+      if (errPdf) throw errPdf
+
+      const { data, error } = await supabase.rpc('est_cautela_salvar_termo', {
+        p_cautela_id: cautelaId,
+        p_assinatura_path: assPath,
+        p_termo_path: pdfPath,
+      })
+      if (error) throw error
+      return data as { ok: boolean; status_anterior: string; status_novo: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-cautelas'] })
+      qc.invalidateQueries({ queryKey: ['est-cautelas-minhas'] })
+      qc.invalidateQueries({ queryKey: ['est-cautela'] })
+      qc.invalidateQueries({ queryKey: ['est-cautela-kpis'] })
+    },
+  })
+}
