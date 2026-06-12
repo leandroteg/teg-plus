@@ -223,6 +223,9 @@ export function useMovimentacoes(filtros?: {
   base_id?: string
   tipo?: string
   obra?: string
+  busca?: string         // matches item.descricao/codigo OR responsavel_nome
+  dateFrom?: string      // ISO yyyy-mm-dd inclusive
+  dateTo?: string        // ISO yyyy-mm-dd inclusive
   page?: number
 }) {
   const limit = 50
@@ -241,10 +244,19 @@ export function useMovimentacoes(filtros?: {
         .order('criado_em', { ascending: false })
         .range(offset, offset + limit - 1)
 
-      if (filtros?.item_id) q = q.eq('item_id', filtros.item_id)
-      if (filtros?.base_id) q = q.eq('base_id', filtros.base_id)
-      if (filtros?.tipo)    q = q.eq('tipo', filtros.tipo)
-      if (filtros?.obra)    q = q.ilike('obra_nome', `%${filtros.obra}%`)
+      if (filtros?.item_id)  q = q.eq('item_id', filtros.item_id)
+      if (filtros?.base_id)  q = q.eq('base_id', filtros.base_id)
+      if (filtros?.tipo)     q = q.eq('tipo', filtros.tipo)
+      if (filtros?.obra)     q = q.ilike('obra_nome', `%${filtros.obra}%`)
+      if (filtros?.dateFrom) q = q.gte('criado_em', `${filtros.dateFrom}T00:00:00`)
+      if (filtros?.dateTo)   q = q.lte('criado_em', `${filtros.dateTo}T23:59:59`)
+
+      // Busca server-side em obra_nome OU responsavel_nome
+      // (descricao/codigo do item viriam via embed e .or não suporta — fica client-side)
+      if (filtros?.busca && filtros.busca.trim().length >= 2) {
+        const s = filtros.busca.trim().replace(/[%,]/g, '')
+        q = q.or(`responsavel_nome.ilike.%${s}%,obra_nome.ilike.%${s}%,nf_numero.ilike.%${s}%`)
+      }
 
       const { data, error } = await q
       if (error) return []

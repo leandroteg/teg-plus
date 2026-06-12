@@ -128,6 +128,9 @@ export interface EstMovimentacao {
   responsavel_nome?: string
   observacao?: string
   documento_url?: string
+  cautela_id?: string
+  cautela_item_id?: string
+  recebimento_item_id?: string
   criado_em: string
   // Joins
   item?: Pick<EstItem, 'codigo' | 'descricao' | 'unidade'>
