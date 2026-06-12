@@ -35,6 +35,9 @@ export interface Cautela {
   motivo_rejeicao?: string
   assinatura_retirada_url?: string
   assinatura_devolucao_url?: string
+  assinatura_recebedor_devolucao_url?: string
+  recebedor_id?: string
+  recebedor_nome?: string
   foto_retirada_url?: string[]
   foto_devolucao_url?: string[]
   termo_url?: string
