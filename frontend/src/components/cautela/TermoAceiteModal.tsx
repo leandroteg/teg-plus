@@ -1,8 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2 } from 'lucide-react'
+import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react'
 import type { Cautela } from '../../types/cautela'
 import { abrirTermoPdf, downloadTermoPdf, gerarTermoPdfBlob } from '../../utils/termo-aceite-cautela-pdf'
-import { useSalvarTermoCautela } from '../../hooks/useCautelas'
+import { useSalvarTermoCautela, useAtualizarCautela } from '../../hooks/useCautelas'
+import { useAuth } from '../../contexts/AuthContext'
+import { UpperTextarea } from '../UpperInput'
 
 interface Props {
   cautela: Cautela
@@ -15,11 +17,17 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const [hasSignature, setHasSignature] = useState(false)
-  const [busy, setBusy] = useState<'open' | 'download' | 'save' | null>(null)
+  const [busy, setBusy] = useState<'open' | 'download' | 'save' | 'aprovar' | 'rejeitar' | null>(null)
   const [savedOk, setSavedOk] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const salvarMutation = useSalvarTermoCautela()
+  const atualizarMutation = useAtualizarCautela()
+  const { perfil } = useAuth()
   const jaSalvo = !!cautela.assinatura_retirada_url
+  const isPendente = cautela.status === 'pendente'
+  const [showRejeitar, setShowRejeitar] = useState(false)
+  const [motivoRejeicao, setMotivoRejeicao] = useState('')
+  const [decisao, setDecisao] = useState<null | 'aprovada' | 'rejeitada'>(null)
 
   const totalItens = cautela.itens?.length ?? 0
 
@@ -101,6 +109,51 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
     })
   }
 
+  async function handleAprovar() {
+    if (busy) return
+    setErro(null)
+    setBusy('aprovar')
+    try {
+      await atualizarMutation.mutateAsync({
+        id: cautela.id,
+        status: 'aprovada',
+        aprovador_id: perfil?.id,
+        aprovador_nome: perfil?.nome,
+      })
+      setDecisao('aprovada')
+      setTimeout(() => onClose(), 1500)
+    } catch (e: any) {
+      setErro(e?.message ?? 'Erro ao aprovar cautela.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleRejeitar() {
+    if (busy) return
+    setErro(null)
+    if (motivoRejeicao.trim().length < 3) {
+      setErro('Informe um motivo de pelo menos 3 caracteres.')
+      return
+    }
+    setBusy('rejeitar')
+    try {
+      await atualizarMutation.mutateAsync({
+        id: cautela.id,
+        status: 'rejeitada',
+        motivo_rejeicao: motivoRejeicao.trim(),
+        aprovador_id: perfil?.id,
+        aprovador_nome: perfil?.nome,
+      })
+      setDecisao('rejeitada')
+      setTimeout(() => onClose(), 1500)
+    } catch (e: any) {
+      setErro(e?.message ?? 'Erro ao rejeitar cautela.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function handleSalvar() {
     if (busy) return
     setErro(null)
@@ -161,6 +214,78 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
         </div>
 
         <div className="p-4 space-y-4">
+          {/* Banner de decisao (cautela pendente) */}
+          {isPendente && decisao !== 'aprovada' && decisao !== 'rejeitada' && (
+            <div className={`rounded-xl border p-3 ${isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={14} className="text-amber-600" />
+                <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+                  Cautela aguardando decisão
+                </p>
+              </div>
+              <p className={`text-[11px] mb-3 ${isDark ? 'text-amber-200/80' : 'text-amber-700'}`}>
+                Aprove pra liberar a retirada (depois assina o termo); rejeite com motivo se não puder atender.
+              </p>
+              {!showRejeitar ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAprovar}
+                    disabled={!!busy}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition disabled:opacity-50"
+                  >
+                    {busy === 'aprovar' ? <Loader2 size={13} className="animate-spin" /> : <ThumbsUp size={13} />}
+                    Aprovar
+                  </button>
+                  <button
+                    onClick={() => setShowRejeitar(true)}
+                    disabled={!!busy}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 text-xs font-bold transition disabled:opacity-50"
+                  >
+                    <ThumbsDown size={13} /> Rejeitar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <UpperTextarea
+                    rows={2}
+                    value={motivoRejeicao}
+                    onChange={e => setMotivoRejeicao(e.target.value)}
+                    placeholder="Motivo da rejeição (obrigatório)"
+                    className="w-full border border-red-300 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowRejeitar(false); setMotivoRejeicao(''); setErro(null) }}
+                      disabled={!!busy}
+                      className="flex-1 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition disabled:opacity-50"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={handleRejeitar}
+                      disabled={!!busy || motivoRejeicao.trim().length < 3}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition disabled:opacity-50"
+                    >
+                      {busy === 'rejeitar' ? <Loader2 size={13} className="animate-spin" /> : <ThumbsDown size={13} />}
+                      Confirmar rejeição
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {decisao === 'aprovada' && (
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-2 flex items-center gap-2">
+              <CheckCircle2 size={14} /> Cautela aprovada. Próximo passo: assinar o termo na retirada.
+            </div>
+          )}
+          {decisao === 'rejeitada' && (
+            <div className="rounded-xl border border-red-300 bg-red-50 text-red-700 text-xs font-bold px-3 py-2 flex items-center gap-2">
+              <ThumbsDown size={14} /> Cautela rejeitada.
+            </div>
+          )}
+
           {/* Resumo */}
           <div className={`rounded-xl border p-3 space-y-1.5 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
             <div className={`flex items-center gap-2 text-sm font-semibold ${txtMain}`}>
@@ -175,6 +300,12 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
             <div className={`text-xs ${txtMuted}`}>
               {totalItens} {totalItens === 1 ? 'item' : 'itens'} · Retirada {cautela.data_retirada ? new Date(cautela.data_retirada).toLocaleDateString('pt-BR') : new Date(cautela.criado_em).toLocaleDateString('pt-BR')}
             </div>
+            {cautela.status === 'rejeitada' && cautela.motivo_rejeicao && (
+              <div className={`mt-1 pt-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <p className={`text-[10px] uppercase tracking-wider font-bold ${isDark ? 'text-red-400' : 'text-red-600'}`}>Motivo da rejeição</p>
+                <p className={`text-[11px] ${isDark ? 'text-red-300' : 'text-red-700'}`}>{cautela.motivo_rejeicao}</p>
+              </div>
+            )}
           </div>
 
           {/* Assinatura */}

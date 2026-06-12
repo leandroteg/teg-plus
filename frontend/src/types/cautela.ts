@@ -5,6 +5,7 @@
 export type StatusCautela =
   | 'pendente'
   | 'aprovada'
+  | 'rejeitada'
   | 'em_aberto'
   | 'em_devolucao'
   | 'encerrada'
