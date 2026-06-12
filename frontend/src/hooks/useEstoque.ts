@@ -616,21 +616,67 @@ export function useAbrirInventario() {
         .single()
       if (error) throw error
 
-      // 2. Popular itens com saldo atual
-      const { data: saldos } = await supabase
-        .from('est_saldos')
-        .select('item_id, base_id, saldo')
-        .eq(payload.base_id ? 'base_id' : 'id', payload.base_id ?? '%')
+      // 2. Popular est_inventario_itens com saldos atuais.
+      //    Regras:
+      //    - Se base_id informado: filtra por base; senao pega TODAS as bases.
+      //    - Inventario ciclico/surpresa => so itens com saldo > 0 (nao faz
+      //      sentido contar item zerado em amostragem).
+      //    - Inventario periodico => carrega tudo (precisa fechar a base
+      //      inteira, incluindo zerados).
+      //    - Pagina em loop de 1000 (PostgREST capa).
+      const PAGE = 1000
+      const todos: Array<{ item_id: string; base_id: string; saldo: number }> = []
+      const somenteComSaldo = payload.tipo === 'ciclico' || payload.tipo === 'surpresa'
 
-      if (saldos && saldos.length > 0) {
-        const itensInv = saldos.map((s: any) => ({
+      for (let from = 0; ; from += PAGE) {
+        let q = supabase
+          .from('est_saldos')
+          .select('item_id, base_id, saldo')
+          .range(from, from + PAGE - 1)
+        if (payload.base_id) q = q.eq('base_id', payload.base_id)
+        if (somenteComSaldo)  q = q.gt('saldo', 0)
+
+        const { data: pageData, error: pageErr } = await q
+        if (pageErr) break
+        if (!pageData || pageData.length === 0) break
+        todos.push(...(pageData as any[]))
+        if (pageData.length < PAGE) break
+      }
+
+      // 3. Aplica filtro de curva ABC (cliente — exige join em est_itens)
+      let saldosPraInserir = todos
+      if (payload.curva_filtro && todos.length > 0) {
+        const itemIds = Array.from(new Set(todos.map(s => s.item_id)))
+        // Carrega curva_abc dos itens em paginas de 1000
+        const curvaPorItem = new Map<string, string | null>()
+        for (let i = 0; i < itemIds.length; i += PAGE) {
+          const slice = itemIds.slice(i, i + PAGE)
+          const { data: itensCurva } = await supabase
+            .from('est_itens')
+            .select('id, curva_abc')
+            .in('id', slice)
+          for (const it of (itensCurva ?? []) as any[]) curvaPorItem.set(it.id, it.curva_abc)
+        }
+        saldosPraInserir = todos.filter(s => curvaPorItem.get(s.item_id) === payload.curva_filtro)
+      }
+
+      // 4. Insere em paginas (PostgREST aceita batches grandes mas seguramos em 500)
+      if (saldosPraInserir.length > 0) {
+        const itensInv = saldosPraInserir.map(s => ({
           inventario_id: inv.id,
           item_id: s.item_id,
           base_id: s.base_id,
           saldo_sistema: s.saldo,
         }))
-        await supabase.from('est_inventario_itens').insert(itensInv)
+        const BATCH = 500
+        for (let i = 0; i < itensInv.length; i += BATCH) {
+          const slice = itensInv.slice(i, i + BATCH)
+          const { error: insErr } = await supabase.from('est_inventario_itens').insert(slice)
+          if (insErr) throw insErr
+        }
       }
+
+      return { inventario_id: inv.id, itens_carregados: saldosPraInserir.length }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['est-inventarios'] }),
   })

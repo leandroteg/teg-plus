@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   ClipboardList, Plus, CheckCircle2, Clock, X, Search,
   Save, Loader2, ChevronDown, ChevronRight, PackagePlus, Upload,
+  Inbox,
 } from 'lucide-react'
 import {
   useInventarios, useInventario,
@@ -10,6 +11,7 @@ import {
   useImportarInventarioCSV,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { EstInventario, EstItem, TipoInventario } from '../../types/estoque'
 
 const STATUS_CONFIG = {
@@ -24,12 +26,18 @@ const fmtData = (d: string) =>
 
 export default function Inventario() {
   const { isLightSidebar: isLight } = useTheme()
+  const { perfil } = useAuth()
   const [showForm, setShowForm] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tipo, setTipo] = useState<TipoInventario>('ciclico')
   const [baseId, setBaseId] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [responsavel, setResponsavel] = useState('')
+
+  // Pre-preenche responsavel com o nome do usuario logado quando abrir o modal
+  useEffect(() => {
+    if (showForm && !responsavel && perfil?.nome) setResponsavel(perfil.nome)
+  }, [showForm, perfil?.nome, responsavel])
 
   const { data: inventarios = [], isLoading } = useInventarios()
   const { data: bases = [] } = useBases()
@@ -167,7 +175,7 @@ export default function Inventario() {
               inventario={inv}
               isExpanded={selectedId === inv.id}
               onToggle={() => setSelectedId(selectedId === inv.id ? null : inv.id)}
-              onConcluir={() => concluir.mutateAsync({ inventario_id: inv.id, aprovado_por: '' })}
+              onConcluir={() => concluir.mutateAsync({ inventario_id: inv.id, aprovado_por: perfil?.nome ?? '' })}
               concluding={concluir.isPending}
               isLight={isLight}
             />
@@ -257,7 +265,7 @@ function InventarioCard({
   isLight: boolean
 }) {
   const cfg = STATUS_CONFIG[inventario.status]
-  const { data: detail } = useInventario(isExpanded ? inventario.id : undefined)
+  const { data: detail, isLoading: loadingDetail } = useInventario(isExpanded ? inventario.id : undefined)
   const salvarContagem = useSalvarContagem()
   const [contagens, setContagens] = useState<Record<string, number>>({})
   const [showAddItem, setShowAddItem] = useState(false)
@@ -265,6 +273,7 @@ function InventarioCard({
 
   const itens = detail?.itens ?? []
   const contados = itens.filter(i => i.saldo_contado != null).length
+  const semItens = isExpanded && !loadingDetail && itens.length === 0
 
   async function handleSalvarContagem(itemId: string) {
     const valor = contagens[itemId]
@@ -367,8 +376,18 @@ function InventarioCard({
           )}
 
           <div className={`divide-y max-h-80 overflow-y-auto ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-            {itens.length === 0 ? (
+            {loadingDetail ? (
               <p className={`text-center text-sm py-8 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Carregando itens...</p>
+            ) : semItens ? (
+              <div className={`flex flex-col items-center justify-center py-10 px-6 text-center ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                <Inbox size={32} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
+                <p className="font-semibold mt-2 text-sm">Nenhum item nesse inventário</p>
+                <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {inventario.status === 'aberto'
+                    ? 'Use Adicionar Item para incluir um por um ou Importar CSV pra trazer em lote.'
+                    : 'O inventário foi aberto sem itens (provavelmente sem saldo na época).'}
+                </p>
+              </div>
             ) : itens.map(item => (
               <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="flex-1 min-w-0">
