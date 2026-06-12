@@ -373,7 +373,7 @@ export function useAcompanhamentoCD() {
       // RCs em triagem
       const { data: emTriagem } = await supabase
         .from('cmp_requisicoes')
-        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id, base_destino_nome')
+        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id')
         .eq('status', 'em_triagem_cd')
 
       // RCs com algum item ja atendido pelo CD (mesmo se hoje status virou outro)
@@ -389,13 +389,25 @@ export function useAcompanhamentoCD() {
 
       const { data: rcs } = await supabase
         .from('cmp_requisicoes')
-        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id, base_destino_nome')
+        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id')
         .in('id', Array.from(todosIds))
 
       const { data: itensTodos } = await supabase
         .from('cmp_requisicao_itens')
         .select('id, requisicao_id, descricao, codigo, unidade, quantidade, qtd_atendida_cd, atendimento_cd_em, atendido_em_pedido_id')
         .in('requisicao_id', Array.from(todosIds))
+
+      // Resolve nome da base pelo id (cmp_requisicoes nao tem desnormalizado)
+      const baseIds = new Set<string>()
+      for (const r of (rcs ?? []) as any[]) if (r.base_destino_id) baseIds.add(r.base_destino_id)
+      const basesMap = new Map<string, string>()
+      if (baseIds.size > 0) {
+        const { data: basesData } = await supabase
+          .from('est_bases')
+          .select('id, nome')
+          .in('id', Array.from(baseIds))
+        for (const b of (basesData ?? []) as any[]) basesMap.set(b.id, b.nome)
+      }
 
       const itensByRc = new Map<string, any[]>()
       for (const it of (itensTodos ?? []) as any[]) {
@@ -434,7 +446,7 @@ export function useAcompanhamentoCD() {
           solicitante_nome: rc.solicitante_nome ?? null,
           obra_nome: rc.obra_nome ?? null,
           base_destino_id: rc.base_destino_id ?? null,
-          base_destino_nome: rc.base_destino_nome ?? null,
+          base_destino_nome: rc.base_destino_id ? (basesMap.get(rc.base_destino_id) ?? null) : null,
           urgencia: rc.urgencia ?? null,
           status_rc: String(rc.status ?? ''),
           status_acomp,
