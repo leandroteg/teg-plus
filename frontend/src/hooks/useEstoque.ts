@@ -332,6 +332,125 @@ export function useRCsEmTriagemCD() {
   })
 }
 
+// ── Acompanhamento do CD ──────────────────────────────────────────────────────
+// Lista RCs (cmp_requisicoes) que estao em triagem OU ja tiveram pelo menos 1
+// item atendido pelo CD. Visao read-only pro almoxarife acompanhar o fluxo
+// 'atendimento pelo estoque' sem precisar abrir o modulo Compras.
+export type AcompCDStatus = 'em_triagem' | 'parcial_cd' | 'total_cd' | 'liberada_compras'
+
+export interface AcompCDItem {
+  id: string
+  descricao: string
+  codigo?: string | null
+  unidade?: string | null
+  quantidade: number
+  qtd_atendida_cd: number
+  qtd_pra_compras: number
+  atendimento_cd_em?: string | null
+}
+
+export interface AcompCD {
+  id: string
+  numero: string
+  solicitante_nome?: string | null
+  obra_nome?: string | null
+  base_destino_id?: string | null
+  base_destino_nome?: string | null
+  urgencia?: string | null
+  status_rc: string
+  status_acomp: AcompCDStatus
+  criado_em: string
+  total_itens: number
+  itens_atendidos_cd: number
+  itens_compras: number
+  itens: AcompCDItem[]
+}
+
+export function useAcompanhamentoCD() {
+  return useQuery<AcompCD[]>({
+    queryKey: ['est-acomp-cd'],
+    queryFn: async () => {
+      // RCs em triagem
+      const { data: emTriagem } = await supabase
+        .from('cmp_requisicoes')
+        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id, base_destino_nome')
+        .eq('status', 'em_triagem_cd')
+
+      // RCs com algum item ja atendido pelo CD (mesmo se hoje status virou outro)
+      const { data: itensAtendidos } = await supabase
+        .from('cmp_requisicao_itens')
+        .select('requisicao_id')
+        .gt('qtd_atendida_cd', 0)
+
+      const idsCom = new Set((itensAtendidos ?? []).map((r: any) => r.requisicao_id))
+      const idsTriagem = new Set((emTriagem ?? []).map((r: any) => r.id))
+      const todosIds = new Set<string>([...idsCom, ...idsTriagem])
+      if (todosIds.size === 0) return []
+
+      const { data: rcs } = await supabase
+        .from('cmp_requisicoes')
+        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id, base_destino_nome')
+        .in('id', Array.from(todosIds))
+
+      const { data: itensTodos } = await supabase
+        .from('cmp_requisicao_itens')
+        .select('id, requisicao_id, descricao, codigo, unidade, quantidade, qtd_atendida_cd, atendimento_cd_em, atendido_em_pedido_id')
+        .in('requisicao_id', Array.from(todosIds))
+
+      const itensByRc = new Map<string, any[]>()
+      for (const it of (itensTodos ?? []) as any[]) {
+        const arr = itensByRc.get(it.requisicao_id) ?? []
+        arr.push(it)
+        itensByRc.set(it.requisicao_id, arr)
+      }
+
+      return ((rcs ?? []) as any[]).map(rc => {
+        const items = (itensByRc.get(rc.id) ?? []).map(it => {
+          const qtd = Number(it.quantidade ?? 0)
+          const qcd = Number(it.qtd_atendida_cd ?? 0)
+          return {
+            id: String(it.id),
+            descricao: String(it.descricao ?? ''),
+            codigo: it.codigo ?? null,
+            unidade: it.unidade ?? null,
+            quantidade: qtd,
+            qtd_atendida_cd: qcd,
+            qtd_pra_compras: Math.max(0, qtd - qcd),
+            atendimento_cd_em: it.atendimento_cd_em ?? null,
+          } as AcompCDItem
+        })
+        const itens_atendidos_cd = items.filter(i => i.qtd_atendida_cd > 0).length
+        const itens_compras      = items.filter(i => i.qtd_pra_compras > 0).length
+
+        let status_acomp: AcompCDStatus
+        if (rc.status === 'em_triagem_cd') status_acomp = 'em_triagem'
+        else if (itens_compras === 0 && itens_atendidos_cd > 0) status_acomp = 'total_cd'
+        else if (itens_atendidos_cd > 0) status_acomp = 'parcial_cd'
+        else status_acomp = 'liberada_compras'
+
+        return {
+          id: String(rc.id),
+          numero: String(rc.numero ?? ''),
+          solicitante_nome: rc.solicitante_nome ?? null,
+          obra_nome: rc.obra_nome ?? null,
+          base_destino_id: rc.base_destino_id ?? null,
+          base_destino_nome: rc.base_destino_nome ?? null,
+          urgencia: rc.urgencia ?? null,
+          status_rc: String(rc.status ?? ''),
+          status_acomp,
+          criado_em: String(rc.created_at ?? ''),
+          total_itens: items.length,
+          itens_atendidos_cd,
+          itens_compras,
+          itens: items,
+        } as AcompCD
+      }).sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? ''))
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+}
+
 // ── Solicitações ──────────────────────────────────────────────────────────────
 export function useSolicitacoes(status?: StatusSolicitacao) {
   return useQuery<EstSolicitacao[]>({
