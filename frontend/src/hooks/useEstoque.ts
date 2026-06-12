@@ -370,10 +370,10 @@ export function useAcompanhamentoCD() {
   return useQuery<AcompCD[]>({
     queryKey: ['est-acomp-cd'],
     queryFn: async () => {
-      // RCs em triagem
+      // RCs em triagem (status atual)
       const { data: emTriagem } = await supabase
         .from('cmp_requisicoes')
-        .select('id, numero, solicitante_nome, obra_nome, urgencia, status, created_at, base_destino_id')
+        .select('id')
         .eq('status', 'em_triagem_cd')
 
       // RCs com algum item ja atendido pelo CD (mesmo se hoje status virou outro)
@@ -382,9 +382,19 @@ export function useAcompanhamentoCD() {
         .select('requisicao_id')
         .gt('qtd_atendida_cd', 0)
 
+      // RCs que JA passaram pela triagem em algum momento (historico de status)
+      const [{ data: histA }, { data: histB }] = await Promise.all([
+        supabase.from('cmp_historico_status').select('requisicao_id').eq('status_anterior', 'em_triagem_cd'),
+        supabase.from('cmp_historico_status').select('requisicao_id').eq('status_novo',      'em_triagem_cd'),
+      ])
+
       const idsCom = new Set((itensAtendidos ?? []).map((r: any) => r.requisicao_id))
       const idsTriagem = new Set((emTriagem ?? []).map((r: any) => r.id))
-      const todosIds = new Set<string>([...idsCom, ...idsTriagem])
+      const idsHist = new Set<string>([
+        ...((histA ?? []) as any[]).map(r => r.requisicao_id),
+        ...((histB ?? []) as any[]).map(r => r.requisicao_id),
+      ])
+      const todosIds = new Set<string>([...idsCom, ...idsTriagem, ...idsHist])
       if (todosIds.size === 0) return []
 
       const { data: rcs } = await supabase
