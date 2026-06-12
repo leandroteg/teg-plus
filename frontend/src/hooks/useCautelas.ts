@@ -128,6 +128,9 @@ export function useAtualizarCautela() {
 }
 
 // ── Return items (partial/full) ─────────────────────────────────────────────
+// Usa RPC est_cautela_devolver_itens que: (1) atualiza est_cautela_itens,
+// (2) insere mov de devolucao em est_movimentacoes pelo delta (atualizando
+// est_saldos via trigger), (3) transita status pra em_devolucao ou encerrada.
 export function useDevolverItens() {
   const qc = useQueryClient()
   return useMutation({
@@ -135,35 +138,12 @@ export function useDevolverItens() {
       cautela_id: string
       itens: Array<{ id: string; quantidade_devolvida: number; condicao_devolucao?: string }>
     }) => {
-      for (const item of itens) {
-        const { error } = await supabase
-          .from('est_cautela_itens')
-          .update({
-            quantidade_devolvida: item.quantidade_devolvida,
-            condicao_devolucao: item.condicao_devolucao,
-          })
-          .eq('id', item.id)
-        if (error) throw error
-      }
-      // Check if all returned → update cautela status
-      const { data: allItems } = await supabase
-        .from('est_cautela_itens')
-        .select('quantidade, quantidade_devolvida')
-        .eq('cautela_id', cautela_id)
-
-      const allReturned = (allItems ?? []).every(
-        (i: any) => (i.quantidade_devolvida ?? 0) >= i.quantidade
-      )
-
-      const { error } = await supabase
-        .from('est_cautelas')
-        .update({
-          status: allReturned ? 'encerrada' : 'em_devolucao',
-          ...(allReturned ? { data_devolucao_real: new Date().toISOString() } : {}),
-          atualizado_em: new Date().toISOString(),
-        })
-        .eq('id', cautela_id)
+      const { data, error } = await supabase.rpc('est_cautela_devolver_itens', {
+        p_cautela_id: cautela_id,
+        p_itens: itens,
+      })
       if (error) throw error
+      return data
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['est-cautelas'] })
