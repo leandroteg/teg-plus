@@ -1,10 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react'
+import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, PackageCheck } from 'lucide-react'
 import type { Cautela } from '../../types/cautela'
 import { abrirTermoPdf, downloadTermoPdf, gerarTermoPdfBlob } from '../../utils/termo-aceite-cautela-pdf'
 import { useSalvarTermoCautela, useAtualizarCautela } from '../../hooks/useCautelas'
 import { useAuth } from '../../contexts/AuthContext'
 import { UpperTextarea } from '../UpperInput'
+import DevolucaoModal from './DevolucaoModal'
 
 interface Props {
   cautela: Cautela
@@ -25,9 +26,11 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
   const { perfil } = useAuth()
   const jaSalvo = !!cautela.assinatura_retirada_url
   const isPendente = cautela.status === 'pendente'
+  const podeDevolver = cautela.status === 'em_aberto' || cautela.status === 'em_devolucao'
   const [showRejeitar, setShowRejeitar] = useState(false)
   const [motivoRejeicao, setMotivoRejeicao] = useState('')
   const [decisao, setDecisao] = useState<null | 'aprovada' | 'rejeitada'>(null)
+  const [showDevolucao, setShowDevolucao] = useState(false)
 
   const totalItens = cautela.itens?.length ?? 0
 
@@ -214,6 +217,28 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
         </div>
 
         <div className="p-4 space-y-4">
+          {/* Banner Devolver (cautela liberada, aguardando ou em devolução parcial) */}
+          {podeDevolver && (
+            <div className={`rounded-xl border p-3 ${isDark ? 'bg-violet-500/10 border-violet-500/30' : 'bg-violet-50 border-violet-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <PackageCheck size={14} className="text-violet-600" />
+                <p className={`text-sm font-bold ${isDark ? 'text-violet-300' : 'text-violet-800'}`}>
+                  {cautela.status === 'em_devolucao' ? 'Devolução em andamento' : 'Material em poder do colaborador'}
+                </p>
+              </div>
+              <p className={`text-[11px] mb-3 ${isDark ? 'text-violet-200/80' : 'text-violet-700'}`}>
+                Registre a devolução total ou parcial. O estoque volta automaticamente conforme a quantidade devolvida.
+              </p>
+              <button
+                onClick={() => setShowDevolucao(true)}
+                disabled={!!busy}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition disabled:opacity-50"
+              >
+                <PackageCheck size={13} /> Registrar devolução
+              </button>
+            </div>
+          )}
+
           {/* Banner de decisao (cautela pendente) */}
           {isPendente && decisao !== 'aprovada' && decisao !== 'rejeitada' && (
             <div className={`rounded-xl border p-3 ${isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'}`}>
@@ -392,6 +417,17 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
           </div>
         </div>
       </div>
+
+      {showDevolucao && (
+        <DevolucaoModal
+          cautela={cautela}
+          isDark={isDark}
+          onClose={() => {
+            setShowDevolucao(false)
+            onClose()
+          }}
+        />
+      )}
     </div>
   )
 }
