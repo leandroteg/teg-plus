@@ -2,8 +2,13 @@ import { useState } from 'react'
 import {
   FileBox, Plus, X, Save, Loader2, Trash2,
   CheckCircle2, PackageCheck, Clock, Ban, ShoppingCart,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, Info,
 } from 'lucide-react'
+
+// Pagina convertida em ACOMPANHAMENTO apenas: solicitacoes hoje sao criadas
+// via fluxo de Compras (cmp_requisicoes -> triagem CD). Toggle READONLY pra
+// reativar acoes diretas se o fluxo legado voltar.
+const READONLY = true
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarSolicitacao,
   useEstoqueItens, useAtenderItemSolicitacao, useBases, useEncaminharParaCompras,
@@ -86,14 +91,26 @@ export default function Solicitacoes() {
           <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Solicita\u00e7\u00f5es de Material'}</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{solicitacoes.length} {'solicita\u00e7\u00f5es'}</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-        >
-          <Plus size={15} /> Nova Solicitacao
-        </button>
+        {!READONLY && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
+              text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+          >
+            <Plus size={15} /> Nova Solicitacao
+          </button>
+        )}
       </div>
+
+      {READONLY && (
+        <div className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-blue-500/10 border-blue-500/30 text-blue-200'}`}>
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <p className="text-[11px] leading-snug">
+            <span className="font-bold">Apenas acompanhamento.</span>{' '}
+            Solicita\u00e7\u00f5es s\u00e3o criadas via <span className="font-semibold">Compras \u2192 Nova Requisi\u00e7\u00e3o</span> e passam pela triagem do CD. Esta tela mostra o andamento.
+          </p>
+        </div>
+      )}
 
       {/* -- Filtros ------------------------------------------------- */}
       <div className="flex gap-2 flex-wrap">
@@ -122,8 +139,10 @@ export default function Solicitacoes() {
       ) : solicitacoes.length === 0 ? (
         <div className={`rounded-2xl border p-12 text-center ${card}`}>
           <FileBox size={40} className={isLight ? 'text-slate-200' : 'text-slate-600'} />
-          <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma solicitacao encontrada</p>
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Crie uma nova solicitacao de material</p>
+          <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma solicitação no momento</p>
+          <p className={`text-sm mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            {READONLY ? 'Solicitações criadas via Compras aparecem aqui' : 'Crie uma nova solicitação de material'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -193,7 +212,7 @@ export default function Solicitacoes() {
                               <span className={`text-xs font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                                 {atendida > 0 ? `${atendida}/${item.quantidade}` : item.quantidade} {item.unidade ?? item.item?.unidade ?? ''}
                               </span>
-                              {podeAtender && (
+                              {!READONLY && podeAtender && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); atenderItem.mutate({ itemId: item.id, quantidade: pend }) }}
                                   disabled={atenderItem.isPending}
@@ -224,7 +243,7 @@ export default function Solicitacoes() {
                     )}
 
                     {/* Status transition buttons */}
-                    {transitions.length > 0 && (
+                    {!READONLY && transitions.length > 0 && (
                       <div className="flex gap-2 pt-1">
                         {transitions.map(t => {
                           const Icon = t.icon
@@ -248,7 +267,7 @@ export default function Solicitacoes() {
                     )}
 
                     {/* Encaminhar pendente para Compras (triador) */}
-                    {isTriador && sol.status !== 'cancelada' && sol.status !== 'encaminhada_compras' && !sol.cmp_requisicao_id
+                    {!READONLY && isTriador && sol.status !== 'cancelada' && sol.status !== 'encaminhada_compras' && !sol.cmp_requisicao_id
                       && (sol.itens ?? []).some(i => (i.quantidade - Number((i as any).quantidade_atendida ?? 0)) > 0) && (
                       <div className="pt-1">
                         <button
@@ -278,7 +297,7 @@ export default function Solicitacoes() {
       )}
 
       {/* -- Modal Nova Solicitacao ---------------------------------- */}
-      {showForm && (
+      {!READONLY && showForm && (
         <NovaSolicitacaoModal
           onClose={() => setShowForm(false)}
           onSave={async (data) => {
