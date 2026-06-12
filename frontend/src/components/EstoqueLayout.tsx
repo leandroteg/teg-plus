@@ -25,7 +25,6 @@ export default function EstoqueLayout() {
       label: 'Nova Movimenta\u00e7\u00e3o',
       action: () => navigate('/estoque/movimentacoes?nova=1'),
     },
-    { to: '/estoque/solicitacoes', icon: FileBox, label: 'Solicitações', end: false },
     { to: '/estoque/cautelas', icon: KeyRound, label: 'Cautelas', end: false },
     { to: '/estoque/itens', icon: Package2, label: 'Estoque', end: false },
     { to: '/estoque/inventario', icon: ClipboardList, label: 'Invent\u00e1rio', end: false },
