@@ -438,9 +438,6 @@ export default function EmitirPedidoModal({
         naoSolicitarContrato && justNaoContrato.trim()
           ? `[Contrato dispensado: ${justNaoContrato.trim()}]`
           : null,
-        formaPagamento === 'cartao' && cartaoSelecionado?.nome
-          ? `[Cartao selecionado: ${cartaoSelecionado.nome}]`
-          : null,
         observacoes?.trim() || null,
       ].filter(Boolean).join('\n') || undefined,
       dataPrevistaEntrega,
