@@ -21,6 +21,7 @@ import {
   useOmieSyncContasPagar,
   useOmieAtualizarRemessas,
 } from '../../hooks/useOmieApi'
+import CartoesSection from '../../components/financeiro/CartoesSection'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -740,6 +741,9 @@ export default function Configuracoes() {
 
       {/* ── Section 3: Sincronização n8n ────────────────────── */}
       <SyncSection webhookUrl={form.n8n_webhook_url} isDark={isDark} />
+
+      {/* ── Section 3b: Cartões de Crédito ──────────────────── */}
+      <CartoesSection isDark={isDark} isAdmin={isAdmin} />
 
       {/* ── Section 3: Webhooks n8n ─────────────────────────── */}
       <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
