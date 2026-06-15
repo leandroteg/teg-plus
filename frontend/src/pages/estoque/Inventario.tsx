@@ -396,10 +396,14 @@ function InventarioCard({
                   </p>
                   <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                     Sistema: {item.saldo_sistema ?? '--'} {item.item?.unidade}
-                    {item.divergencia !== 0 && (
-                      <span className={`ml-2 font-semibold ${item.divergencia < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                        ({item.divergencia > 0 ? '+' : ''}{item.divergencia})
+                    {item.saldo_contado == null ? (
+                      <span className={`ml-2 italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>· aguardando contagem</span>
+                    ) : item.divergencia !== 0 ? (
+                      <span className={`ml-2 font-semibold ${item.divergencia! < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                        ({item.divergencia! > 0 ? '+' : ''}{item.divergencia})
                       </span>
+                    ) : (
+                      <span className="ml-2 text-emerald-500 font-semibold">OK</span>
                     )}
                   </p>
                 </div>
