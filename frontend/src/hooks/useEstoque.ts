@@ -714,6 +714,41 @@ export function useSalvarContagem() {
   })
 }
 
+// ── Disparo automatico de OC por estoque minimo ──────────────────────────────
+// Chama RPC est_gerar_oc_minimo (mig 128). Cria 1 RC em rascunho por base com
+// os itens abaixo do minimo. Idempotente — pula itens ja cobertos por RC em
+// aberto. p_base_id=null roda em todas as bases.
+export interface OcMinimoResult {
+  ok: boolean
+  rcs_criadas: number
+  itens_inclusos: number
+  itens_ja_pendentes: number
+  resumo: Array<{
+    base: string
+    rc_numero: string
+    rc_id: string
+    valor_estimado: number
+  }>
+}
+
+export function useGerarOcMinimo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (baseId?: string): Promise<OcMinimoResult> => {
+      const { data, error } = await supabase.rpc('est_gerar_oc_minimo', {
+        p_base_id: baseId ?? null,
+      })
+      if (error) throw error
+      return data as OcMinimoResult
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-saldos-alerta'] })
+      qc.invalidateQueries({ queryKey: ['est-kpis'] })
+      qc.invalidateQueries({ queryKey: ['cmp-requisicoes'] })
+    },
+  })
+}
+
 export function useConcluirInventario() {
   const qc = useQueryClient()
   return useMutation({
