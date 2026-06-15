@@ -632,6 +632,7 @@ export function useAbrirInventario() {
         let q = supabase
           .from('est_saldos')
           .select('item_id, base_id, saldo')
+          .not('base_id', 'is', null)  // exclui saldos orfaos (base_id NULL)
           .range(from, from + PAGE - 1)
         if (payload.base_id) q = q.eq('base_id', payload.base_id)
         if (somenteComSaldo)  q = q.gt('saldo', 0)
@@ -717,33 +718,30 @@ export function useConcluirInventario() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ inventario_id, aprovado_por }: { inventario_id: string; aprovado_por: string }) => {
-      // Calcular acurácia
-      const { data: itens } = await supabase
-        .from('est_inventario_itens')
-        .select('saldo_sistema, saldo_contado')
-        .eq('inventario_id', inventario_id)
-
-      const total = itens?.length ?? 0
-      const sem_divergencia = itens?.filter((i: any) =>
-        Math.abs((i.saldo_contado ?? 0) - (i.saldo_sistema ?? 0)) < 0.001
-      ).length ?? 0
-      const acuracia = total > 0 ? (sem_divergencia / total) * 100 : 100
-
-      const { error } = await supabase
-        .from('est_inventarios')
-        .update({
-          status: 'concluido',
-          data_conclusao: new Date().toISOString().split('T')[0],
-          aprovado_por,
-          acuracia: Math.round(acuracia * 100) / 100,
-        })
-        .eq('id', inventario_id)
+      // RPC est_concluir_inventario (mig 142):
+      //   1) Calcula acuracia
+      //   2) Marca status='concluido' (idempotente)
+      //   3) Gera movs ajuste_positivo/negativo por item com divergencia
+      //   4) Trigger fn_atualiza_saldo_estoque propaga pra est_saldos
+      const { data, error } = await supabase.rpc('est_concluir_inventario', {
+        p_inventario_id: inventario_id,
+        p_aprovado_por: aprovado_por || null,
+      })
       if (error) throw error
+      return data as {
+        ok: boolean
+        numero: string
+        acuracia: number
+        movs_inseridas: number
+        movs_existentes: number
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['est-inventarios'] })
       qc.invalidateQueries({ queryKey: ['est-inventario'] })
       qc.invalidateQueries({ queryKey: ['est-kpis'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
     },
   })
 }
