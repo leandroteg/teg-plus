@@ -372,12 +372,33 @@ import type { EmpresaData } from '../services/empresa'
 const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
 const fmtDate = (d?: string) => d ? new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
+// Rateia o valor_total negociado do pedido proporcionalmente ao valor_unitario_estimado
+// original de cada item, devolvendo o preco unitario efetivo por item. Quando a cotacao
+// negocia so o total (sem precos por item), evita que a tabela de itens exiba o preco
+// inicial enquanto o cabecalho mostra o negociado.
+function calcUnitariosEfetivos<T extends { quantidade: number; valor_unitario_estimado: number }>(
+  itens: T[],
+  valorTotalNegociado?: number | null,
+): number[] {
+  const somaEstimados = itens.reduce((s, i) => s + (i.quantidade ?? 0) * (i.valor_unitario_estimado ?? 0), 0)
+  if (!valorTotalNegociado || somaEstimados <= 0 || Math.abs(somaEstimados - valorTotalNegociado) < 0.01) {
+    return itens.map(i => i.valor_unitario_estimado ?? 0)
+  }
+  return itens.map(i => {
+    const subtotalEstimado = (i.quantidade ?? 0) * (i.valor_unitario_estimado ?? 0)
+    const peso = subtotalEstimado / somaEstimados
+    const subtotalNegociado = peso * valorTotalNegociado
+    return (i.quantidade ?? 0) > 0 ? subtotalNegociado / i.quantidade : 0
+  })
+}
+
 function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
   const numero = esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())
   const itens = pedido.requisicao?.itens ?? []
   const parcelas = pedido.parcelas_preview ?? []
 
+  const unitariosHtml = calcUnitariosEfetivos(itens, pedido.valor_total)
   const itensHtml = itens.length > 0 ? `
     <div class="section">
       <div class="section-title">Itens do Pedido</div>
@@ -392,8 +413,8 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
               <td>${esc(item.descricao)}</td>
               <td style="text-align:center">${item.quantidade}</td>
               <td style="text-align:center">${esc(item.unidade)}</td>
-              <td style="text-align:right">${fmtBRL(item.valor_unitario_estimado)}</td>
-              <td style="text-align:right;font-weight:600">${fmtBRL(item.quantidade * item.valor_unitario_estimado)}</td>
+              <td style="text-align:right">${fmtBRL(unitariosHtml[i])}</td>
+              <td style="text-align:right;font-weight:600">${fmtBRL(item.quantidade * unitariosHtml[i])}</td>
             </tr>
           `).join('')}
           <tr class="total-row">
@@ -656,15 +677,17 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DARK)
+    const unitariosPdf = calcUnitariosEfetivos(itens, pedido.valor_total)
     itens.forEach((item, i) => {
       if (y > 265) { doc.addPage(); y = M }
-      const subtotal = item.quantidade * item.valor_unitario_estimado
+      const unit = unitariosPdf[i]
+      const subtotal = item.quantidade * unit
       doc.text(String(i + 1), cols[0], y)
       const desc = item.descricao.length > 45 ? item.descricao.slice(0, 42) + '...' : item.descricao
       doc.text(desc, cols[1], y)
       doc.text(String(item.quantidade), cols[2], y)
       doc.text(item.unidade, cols[3], y)
-      doc.text(fmtBRL(item.valor_unitario_estimado), cols[4], y)
+      doc.text(fmtBRL(unit), cols[4], y)
       doc.setFont('helvetica', 'bold')
       doc.text(fmtBRL(subtotal), cols[5], y)
       doc.setFont('helvetica', 'normal')
@@ -2077,10 +2100,12 @@ function DetailModal({
           {/* Itens da requisição — agrupados por natureza (produto/servico) */}
           {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
             const todos = pedido.requisicao!.itens!
-            const produtos = todos.filter(i => (i.natureza ?? 'produto') === 'produto')
-            const servicos = todos.filter(i => i.natureza === 'servico')
-            const subtotal = (arr: typeof todos) => arr.reduce((s, i) => s + (i.quantidade * i.valor_unitario_estimado), 0)
-            const grupos: { label: string; chip: string; itens: typeof todos; total: number }[] = []
+            const unitariosEf = calcUnitariosEfetivos(todos, pedido.valor_total)
+            const todosEf = todos.map((it, i) => ({ ...it, valor_unitario_efetivo: unitariosEf[i] }))
+            const produtos = todosEf.filter(i => (i.natureza ?? 'produto') === 'produto')
+            const servicos = todosEf.filter(i => i.natureza === 'servico')
+            const subtotal = (arr: typeof todosEf) => arr.reduce((s, i) => s + (i.quantidade * i.valor_unitario_efetivo), 0)
+            const grupos: { label: string; chip: string; itens: typeof todosEf; total: number }[] = []
             if (produtos.length) grupos.push({ label: `Produtos (${produtos.length})`, chip: 'bg-sky-100 text-sky-700', itens: produtos, total: subtotal(produtos) })
             if (servicos.length) grupos.push({ label: `Servicos (${servicos.length})`, chip: 'bg-violet-100 text-violet-700', itens: servicos, total: subtotal(servicos) })
 
@@ -2116,7 +2141,7 @@ function DetailModal({
                               <td className={`px-3 py-2 ${txt}`}>{item.descricao}</td>
                               <td className={`px-2 py-2 text-center ${sub}`}>{item.quantidade}</td>
                               <td className={`px-2 py-2 text-center ${sub}`}>{item.unidade}</td>
-                              <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_estimado)}</td>
+                              <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_efetivo)}</td>
                             </tr>
                           ))}
                         </tbody>
