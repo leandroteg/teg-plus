@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Settings, Key, Link, RefreshCw, CheckCircle2, XCircle,
-  Eye, EyeOff, Save, Zap, AlertTriangle, Clock, Wifi,
-  Building2, DollarSign, ArrowDownUp, FlaskConical, ShieldCheck,
+  Save, Zap, AlertTriangle, Clock, FlaskConical, ShieldCheck,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,12 +14,6 @@ import {
   type OmieConfig,
   type SyncLog as OmieSyncLog,
 } from '../../hooks/useOmie'
-import {
-  useOmieCredentials,
-  useOmieTestarConexao,
-  useOmieSyncContasPagar,
-  useOmieAtualizarRemessas,
-} from '../../hooks/useOmieApi'
 import CartoesSection from '../../components/financeiro/CartoesSection'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -177,176 +170,6 @@ function SyncSection({ webhookUrl, isDark }: { webhookUrl: string; isDark: boole
   )
 }
 
-// ── OmieApiDireta section ─────────────────────────────────────────────────────
-
-function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
-  const { data: result, isLoading } = useOmieCredentials()
-  const credentials = result?.credentials ?? null
-  const isSandbox   = result?.isSandbox ?? false
-
-  const testar = useOmieTestarConexao()
-  const syncCP = useOmieSyncContasPagar()
-  const atualizarRemessas = useOmieAtualizarRemessas()
-
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [syncResult, setSyncResult] = useState<string | null>(null)
-  const [remessaResult, setRemessaResult] = useState<string | null>(null)
-
-  async function handleTestar() {
-    if (!credentials) return
-    setTestResult(null)
-    try {
-      await testar.mutateAsync(credentials)
-      setTestResult({ ok: true, msg: `API Omie respondeu com sucesso${isSandbox ? ' (Sandbox)' : ''}` })
-    } catch (err) {
-      setTestResult({ ok: false, msg: err instanceof Error ? err.message : 'Falha na conexão' })
-    }
-  }
-
-  async function handleSyncCP() {
-    if (!credentials) return
-    setSyncResult(null)
-    try {
-      const res = await syncCP.mutateAsync(credentials)
-      setSyncResult(`${res.novas} novas, ${res.atualizadas} atualizadas, ${res.erros} erros (total ${res.total})`)
-    } catch (err) {
-      setSyncResult(`Erro: ${err instanceof Error ? err.message : 'Desconhecido'}`)
-    }
-  }
-
-  async function handleAtualizarRemessas() {
-    if (!credentials) return
-    setRemessaResult(null)
-    try {
-      const res = await atualizarRemessas.mutateAsync({ credentials })
-      const confirmadas = res.filter(r => r.novoStatus === 'pago').length
-      setRemessaResult(`${res.length} remessa(s) verificada(s), ${confirmadas} confirmada(s) como pago`)
-    } catch (err) {
-      setRemessaResult(`Erro: ${err instanceof Error ? err.message : 'Desconhecido'}`)
-    }
-  }
-
-  const row = `flex items-center gap-3 py-3 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`
-  const btnPrimary = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0'
-  const card = `rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`
-
-  return (
-    <div className={card}>
-      <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-        <Wifi size={16} className="text-emerald-600" />
-        <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>API Omie — Integração Direta</h2>
-        <div className="ml-auto flex items-center gap-2">
-          {isSandbox && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              SANDBOX
-            </span>
-          )}
-          {credentials ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Conectado
-            </span>
-          ) : !isLoading ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              Não configurado
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Sandbox warning banner */}
-      {isSandbox && credentials && (
-        <div className="mx-5 mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-bold text-amber-700">Modo Sandbox ativo</p>
-            <p className="text-[11px] text-amber-600 mt-0.5">
-              Usando credenciais de homologação Omie. Nenhuma operação afetará dados de produção.
-              Para criar uma aplicação de teste, acesse{' '}
-              <a href="https://app.omie.com.br" target="_blank" rel="noopener noreferrer" className="underline">app.omie.com.br</a>
-              {' '}→ Minhas Aplicações → + Nova Aplicação → Testar grátis.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!credentials && !isLoading ? (
-        <div className="px-5 py-4">
-          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Configure APP_KEY e APP_SECRET na seção acima e habilite a integração Omie.
-          </p>
-        </div>
-      ) : (
-        <div className="px-5">
-          {/* Testar conexão */}
-          <div className={row}>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Zap size={13} className="text-emerald-600" />
-                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Testar Conexão</p>
-              </div>
-              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Valida {isSandbox ? 'credenciais sandbox' : 'APP_KEY e APP_SECRET'} diretamente na API Omie
-              </p>
-              {testResult && (
-                <p className={`text-xs mt-1 font-medium ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {testResult.ok ? '✓' : '✗'} {testResult.msg}
-                </p>
-              )}
-            </div>
-            <button onClick={handleTestar} disabled={testar.isPending || !credentials} className={btnPrimary}>
-              {testar.isPending ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
-              {testar.isPending ? 'Testando...' : 'Testar'}
-            </button>
-          </div>
-
-          {/* Sync Contas a Pagar */}
-          <div className={row}>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <DollarSign size={13} className="text-blue-500" />
-                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Importar CPs do Omie</p>
-              </div>
-              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Importa contas a pagar em aberto do Omie para o TEG+</p>
-              {syncResult && (
-                <p className={`text-xs mt-1 font-medium ${syncResult.startsWith('Erro') ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {syncResult}
-                </p>
-              )}
-            </div>
-            <button onClick={handleSyncCP} disabled={syncCP.isPending || !credentials} className={btnPrimary}>
-              {syncCP.isPending ? <RefreshCw size={11} className="animate-spin" /> : <Building2 size={11} />}
-              {syncCP.isPending ? 'Importando...' : 'Importar'}
-            </button>
-          </div>
-
-          {/* Atualizar remessas */}
-          <div className={row}>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <ArrowDownUp size={13} className="text-indigo-500" />
-                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Atualizar Status de Remessas</p>
-              </div>
-              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Consulta Omie e atualiza pagamentos enviados (enviada → pago/cancelado)</p>
-              {remessaResult && (
-                <p className={`text-xs mt-1 font-medium ${remessaResult.startsWith('Erro') ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {remessaResult}
-                </p>
-              )}
-            </div>
-            <button onClick={handleAtualizarRemessas} disabled={atualizarRemessas.isPending || !credentials} className={btnPrimary}>
-              {atualizarRemessas.isPending ? <RefreshCw size={11} className="animate-spin" /> : <ArrowDownUp size={11} />}
-              {atualizarRemessas.isPending ? 'Atualizando...' : 'Atualizar'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Configuracoes() {
@@ -357,21 +180,12 @@ export default function Configuracoes() {
   const testConnection = useTestOmieConnection()
 
   const [form, setForm] = useState<OmieConfig>({
-    omie_app_key: '',
-    omie_app_secret: '',
     n8n_webhook_url: '',
     omie_enabled: 'false',
     cp_remessa_webhook_url: '',
     cp_remessa_status_webhook_url: '',
     omie_sandbox_mode: 'false',
-    omie_sandbox_app_key: '',
-    omie_sandbox_app_secret: '',
   })
-
-  const [showKey, setShowKey]               = useState(false)
-  const [showSecret, setShowSecret]         = useState(false)
-  const [showSandboxKey, setShowSandboxKey] = useState(false)
-  const [showSandboxSec, setShowSandboxSec] = useState(false)
   const [testStatus, setTestStatus]   = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -380,15 +194,11 @@ export default function Configuracoes() {
   useEffect(() => {
     if (config) {
       setForm({
-        omie_app_key:    config.omie_app_key    ?? '',
-        omie_app_secret: config.omie_app_secret ?? '',
         n8n_webhook_url: config.n8n_webhook_url ?? '',
         omie_enabled:    config.omie_enabled    ?? 'false',
         cp_remessa_webhook_url:        config.cp_remessa_webhook_url        ?? '',
         cp_remessa_status_webhook_url: config.cp_remessa_status_webhook_url ?? '',
         omie_sandbox_mode:       config.omie_sandbox_mode       ?? 'false',
-        omie_sandbox_app_key:    config.omie_sandbox_app_key    ?? '',
-        omie_sandbox_app_secret: config.omie_sandbox_app_secret ?? '',
       })
     }
   }, [config])
@@ -533,131 +343,19 @@ export default function Configuracoes() {
             </div>
 
             {/* ── Credenciais de Produção ──────────────────────────── */}
-            <div className={`rounded-xl border p-4 space-y-3 transition-all ${
-              form.omie_sandbox_mode !== 'true'
-                ? isDark ? 'bg-emerald-500/5 border-emerald-500/25' : 'bg-emerald-50/50 border-emerald-200'
-                : isDark ? 'bg-white/[0.01] border-white/[0.04] opacity-60' : 'bg-slate-50/50 border-slate-150 opacity-60'
+            <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+              isDark ? 'bg-sky-500/10 border-sky-500/20' : 'bg-sky-50 border-sky-200'
             }`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${form.omie_sandbox_mode !== 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <p className={`text-xs font-bold ${form.omie_sandbox_mode !== 'true' ? isDark ? 'text-emerald-400' : 'text-emerald-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Credenciais de Produção
+              <ShieldCheck size={16} className="text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <p className={`text-xs font-bold ${isDark ? 'text-sky-300' : 'text-sky-800'}`}>
+                  Credenciais Omie protegidas
                 </p>
-                {form.omie_sandbox_mode !== 'true' && (
-                  <span className="text-[9px] font-extrabold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">ATIVO</span>
-                )}
-              </div>
-              {/* App Key Produção */}
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  App Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={form.omie_app_key}
-                    onChange={e => handleChange('omie_app_key', e.target.value)}
-                    disabled={!isAdmin}
-                    placeholder="App Key de produção..."
-                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
-                      focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                  />
-                  <button type="button" onClick={() => setShowKey(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
-                </div>
-              </div>
-              {/* App Secret Produção */}
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  App Secret
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecret ? 'text' : 'password'}
-                    value={form.omie_app_secret}
-                    onChange={e => handleChange('omie_app_secret', e.target.value)}
-                    disabled={!isAdmin}
-                    placeholder="App Secret de produção..."
-                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
-                      focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                  />
-                  <button type="button" onClick={() => setShowSecret(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
-                </div>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-sky-200/80' : 'text-sky-700'}`}>
+                  App Key e App Secret nao sao mais lidos ou salvos pelo navegador. Configure essas credenciais no n8n/proxy server-side e mantenha aqui apenas a URL base do webhook.
+                </p>
               </div>
             </div>
-
-            {/* ── Credenciais de Teste ─────────────────────────────── */}
-            <div className={`rounded-xl border p-4 space-y-3 transition-all ${
-              form.omie_sandbox_mode === 'true'
-                ? isDark ? 'bg-amber-500/5 border-amber-500/25' : 'bg-amber-50/50 border-amber-200'
-                : isDark ? 'bg-white/[0.01] border-white/[0.04] opacity-60' : 'bg-slate-50/50 border-slate-150 opacity-60'
-            }`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${form.omie_sandbox_mode === 'true' ? 'bg-amber-500' : 'bg-slate-300'}`} />
-                <p className={`text-xs font-bold ${form.omie_sandbox_mode === 'true' ? isDark ? 'text-amber-400' : 'text-amber-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Credenciais de Teste
-                </p>
-                {form.omie_sandbox_mode === 'true' && (
-                  <span className="text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">ATIVO</span>
-                )}
-              </div>
-              {/* Sandbox App Key */}
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  App Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSandboxKey ? 'text' : 'password'}
-                    value={form.omie_sandbox_app_key}
-                    onChange={e => handleChange('omie_sandbox_app_key', e.target.value)}
-                    disabled={!isAdmin}
-                    placeholder="App Key da aplicação de teste..."
-                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
-                      focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                  />
-                  <button type="button" onClick={() => setShowSandboxKey(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showSandboxKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
-                </div>
-              </div>
-              {/* Sandbox App Secret */}
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  App Secret
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSandboxSec ? 'text' : 'password'}
-                    value={form.omie_sandbox_app_secret}
-                    onChange={e => handleChange('omie_sandbox_app_secret', e.target.value)}
-                    disabled={!isAdmin}
-                    placeholder="App Secret da aplicação de teste..."
-                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
-                      focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                  />
-                  <button type="button" onClick={() => setShowSandboxSec(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showSandboxSec ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* n8n Webhook URL */}
             <div>
               <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -735,14 +433,10 @@ export default function Configuracoes() {
           </div>
         )}
       </div>
-
-      {/* ── Section 2: API Direta Omie ──────────────────────── */}
-      <OmieApiDiretaSection isDark={isDark} />
-
-      {/* ── Section 3: Sincronização n8n ────────────────────── */}
+      {/* ── Section 2: Sincronização n8n ────────────────────── */}
       <SyncSection webhookUrl={form.n8n_webhook_url} isDark={isDark} />
 
-      {/* ── Section 3b: Cartões de Crédito ──────────────────── */}
+      {/* ── Section 2b: Cartões de Crédito ──────────────────── */}
       <CartoesSection isDark={isDark} isAdmin={isAdmin} />
 
       {/* ── Section 3: Webhooks n8n ─────────────────────────── */}

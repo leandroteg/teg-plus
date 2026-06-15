@@ -102,7 +102,11 @@ export default function CartoesSection({ isDark, isAdmin }: { isDark: boolean; i
       }
       setOpen(false)
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Falha ao salvar.')
+      const msg =
+        e instanceof Error ? e.message :
+        typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) :
+        'Falha ao salvar.'
+      setErr(msg)
     }
   }
 
