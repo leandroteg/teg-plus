@@ -226,21 +226,18 @@ export function useImportExtrato() {
         .single()
       if (insErr) throw insErr
 
-      const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
-      try {
-        await fetch(`${BASE}/tesouraria/import-extrato`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            import_id: importRec.id,
-            conta_id: contaId,
-            arquivo_url: urlData.publicUrl,
-            formato: ext,
-          }),
-        })
-      } catch { /* n8n may not be configured yet */ }
+      // Dispara o parser na Edge Function (parseia OFX/CSV e popula fin_movimentacoes_tesouraria)
+      const { data: parseResult, error: parseErr } = await supabase.functions.invoke('parse-extrato', {
+        body: { import_id: importRec.id },
+      })
+      if (parseErr) {
+        throw new Error(parseErr.message || 'Falha ao processar extrato')
+      }
+      if (parseResult?.error) {
+        throw new Error(parseResult.error)
+      }
 
-      return importRec
+      return { ...importRec, ...parseResult }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['movimentacoes-tesouraria'] })
