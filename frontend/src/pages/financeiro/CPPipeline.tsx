@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   Receipt, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
@@ -2108,7 +2108,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           )}
 
           {/* Alerta de diverg\u00EAncia */}
-          {cp.observacoes && cp.observacoes.includes('Diverg\u00EAncia') && (
+          {cp.observacoes && cp.observacoes.includes('Divergência') && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               <AlertTriangle size={14} className="text-amber-500 shrink-0" />
               <p className="text-xs text-amber-700 font-semibold">{cp.observacoes}</p>
@@ -2118,7 +2118,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <div><span className="text-slate-400">Vencimento:</span> <span className="font-semibold">{fmtData(cp.data_vencimento)}</span></div>
-              <div><span className="text-slate-400">Emiss\u00E3o:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
+              <div><span className="text-slate-400">Emissão:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
               {cp.numero_documento && <div><span className="text-slate-400">Documento:</span> <span className="font-mono">{cp.numero_documento}</span></div>}
               {cp.natureza && <div><span className="text-slate-400">Natureza:</span> <span>{cp.natureza}</span></div>}
               {cp.forma_pagamento && <div><span className="text-slate-400">Forma Pgto:</span> <span>{cp.forma_pagamento}</span></div>}
@@ -2138,7 +2138,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               {cp.remessa_enviada_em && <div><span className="text-slate-400">Enviada em:</span> <span>{fmtDateTime(cp.remessa_enviada_em)}</span></div>}
             </div>
             {cp.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cp.descricao}</p>}
-            {cp.observacoes && !cp.observacoes.includes('Diverg\u00EAncia') && (
+            {cp.observacoes && !cp.observacoes.includes('Divergência') && (
               <p className="text-xs text-slate-400 mt-1 italic">{cp.observacoes}</p>
             )}
             {cp.remessa_erro && (
@@ -2704,11 +2704,11 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       {/* Observações / Alerta de divergência */}
       {cp.observacoes && (
         <div className={`flex items-start gap-1.5 mt-1.5 ml-10 px-2 py-1 rounded-lg text-[10px] ${
-          cp.observacoes.includes('Diverg\u00EAncia')
+          cp.observacoes.includes('Divergência')
             ? 'bg-amber-50 border border-amber-200 text-amber-700'
             : isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'
         }`}>
-          {cp.observacoes.includes('Diverg\u00EAncia') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
+          {cp.observacoes.includes('Divergência') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
           <span className="font-medium">{cp.observacoes}</span>
         </div>
       )}
