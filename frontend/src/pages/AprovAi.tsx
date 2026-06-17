@@ -324,7 +324,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </button>
 
         {showItens && (() => {
-          const itens = (req as any).itens as { descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }[] | undefined
+          const itens = (req as any).itens as { descricao: string; descricao_complementar?: string; quantidade: number; unidade: string; valor_unitario_estimado: number }[] | undefined
           if (!itens || itens.length === 0) return (
             <p className="text-xs text-slate-400 italic mb-3">Nenhum item cadastrado.</p>
           )
@@ -343,7 +343,12 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                 <tbody>
                   {itens.map((item, i) => (
                     <tr key={i} className="border-t border-slate-100">
-                      <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
+                      <td className="px-3 py-2 text-slate-700">
+                        {item.descricao}
+                        {item.descricao_complementar && (
+                          <div className="text-[11px] italic text-slate-500 mt-0.5">{item.descricao_complementar}</div>
+                        )}
+                      </td>
                       <td className="px-2 py-2 text-center text-slate-500">{item.quantidade}</td>
                       <td className="px-2 py-2 text-center text-slate-500">{item.unidade}</td>
                       <td className="px-3 py-2 text-right text-slate-600">{fmt(item.valor_unitario_estimado)}</td>
@@ -1303,7 +1308,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             </div>
 
             {/* Item list */}
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            <div className="space-y-1.5 max-h-[28rem] overflow-y-auto">
               {itens.map(item => {
                 const checked = selectedItemIds?.has(item.id) ?? true
                 return (
@@ -1337,11 +1342,45 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                             {item.solicitante_nome && <span>• {item.solicitante_nome}</span>}
                           </div>
                         )}
-                        {(item.requisicao_descricao || item.requisicao_justificativa) && (
+                        {item.cotacao_vencedora ? (
+                          <div onClick={e => e.stopPropagation()}>
+                            <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 mt-1">
+                              <div>
+                                <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Frete</span>
+                                <span className="text-slate-700">{item.cotacao_vencedora.valor_frete && item.cotacao_vencedora.valor_frete > 0 ? fmt(item.cotacao_vencedora.valor_frete) : '—'}</span>
+                              </div>
+                              <div>
+                                <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Entrega</span>
+                                <span className="text-slate-700">{item.cotacao_vencedora.prazo_entrega_dias ? `${item.cotacao_vencedora.prazo_entrega_dias}d` : '—'}</span>
+                              </div>
+                              <div>
+                                <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[9px]">Pagamento</span>
+                                <span className="text-slate-700 truncate block">{item.cotacao_vencedora.condicao_pagamento || '—'}</span>
+                              </div>
+                            </div>
+                            {item.cotacao_vencedora.itens_precos && item.cotacao_vencedora.itens_precos.length > 0 && (
+                              <div className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50/60 px-2 py-1.5 space-y-0.5">
+                                {item.cotacao_vencedora.itens_precos.map((it, idx) => (
+                                  <div key={idx} className="flex items-center justify-between gap-2 text-[10px]">
+                                    <span className="text-slate-600 truncate flex-1">
+                                      <span className="font-semibold text-slate-500">{it.qtd}×</span> {it.descricao}
+                                    </span>
+                                    <span className="shrink-0 text-slate-500">
+                                      {fmt(it.valor_unitario)} <span className="text-slate-400">·</span> <span className="font-semibold text-slate-700">{fmt(it.valor_total)}</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {item.cotacao_vencedora.observacao && (
+                              <p className="text-[10px] text-slate-400 italic mt-1.5 leading-snug">"{item.cotacao_vencedora.observacao}"</p>
+                            )}
+                          </div>
+                        ) : (item.requisicao_descricao || item.requisicao_justificativa) ? (
                           <p className="text-[10px] text-slate-500 italic leading-snug line-clamp-2">
                             {item.requisicao_descricao || item.requisicao_justificativa}
                           </p>
-                        )}
+                        ) : null}
                         {item.anexos && item.anexos.length > 0 && (
                           <div className="flex gap-1.5 mt-0.5">
                             {item.anexos.map((anexo, idx) => (

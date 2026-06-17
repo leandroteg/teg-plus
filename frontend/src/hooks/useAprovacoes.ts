@@ -162,7 +162,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (cmpIds.length > 0) {
         const { data: reqData } = await supabase
           .from(TABLE_REQ)
-          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at, arquivo_url, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
+          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at, arquivo_url, itens:cmp_requisicao_itens(descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado)')
           .in('id', cmpIds)
         reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
       }
@@ -341,11 +341,34 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
           // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome, itens }
           if (reqIds.length > 0) {
+            const uniqReqIds = [...new Set(reqIds)]
             const { data: rcData } = await supabase
               .from('cmp_requisicoes')
-              .select('id, numero, descricao, justificativa, solicitante_nome, arquivo_url, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)')
-              .in('id', [...new Set(reqIds)])
+              .select('id, numero, descricao, justificativa, solicitante_nome, arquivo_url, itens:cmp_requisicao_itens(descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado)')
+              .in('id', uniqReqIds)
             for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
+
+            // Map: requisicao_id -> dados do fornecedor vencedor (p/ exibir comparativo no LP)
+            const { data: cotLpData } = await supabase
+              .from('cmp_cotacoes')
+              .select('requisicao_id, fornecedores:cmp_cotacao_fornecedores!cotacao_id(fornecedor_nome, valor_frete, prazo_entrega_dias, condicao_pagamento, observacao, selecionado, itens_precos)')
+              .in('requisicao_id', uniqReqIds)
+              .eq('status', 'concluida')
+            for (const c of cotLpData ?? []) {
+              const rcId = (c as Record<string, unknown>).requisicao_id as string
+              const fornecedores = (((c as Record<string, unknown>).fornecedores as Record<string, unknown>[]) ?? [])
+              const vencedor = fornecedores.find(f => f.selecionado) ?? fornecedores[0]
+              if (vencedor && rcMap.has(rcId)) {
+                const rc = rcMap.get(rcId)!
+                rc._cotacao_vencedora = {
+                  condicao_pagamento: (vencedor.condicao_pagamento as string) ?? null,
+                  valor_frete: (vencedor.valor_frete as number) ?? null,
+                  prazo_entrega_dias: (vencedor.prazo_entrega_dias as number) ?? null,
+                  observacao: (vencedor.observacao as string) ?? null,
+                  itens_precos: (vencedor.itens_precos as Array<{ descricao: string; qtd: number; valor_unitario: number; valor_total: number }>) ?? null,
+                }
+              }
+            }
           }
 
           // Map: pedido_id -> anexos[]
@@ -600,6 +623,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                     requisicao_justificativa: (rc?.justificativa as string) ?? undefined,
                     solicitante_nome: (rc?.solicitante_nome as string) ?? undefined,
                     anexos: anexos.length > 0 ? anexos : undefined,
+                    cotacao_vencedora: (rc as Record<string, unknown> | undefined)?._cotacao_vencedora as
+                      | { condicao_pagamento?: string | null; valor_frete?: number | null; prazo_entrega_dias?: number | null; observacao?: string | null; itens_precos?: Array<{ descricao: string; qtd: number; valor_unitario: number; valor_total: number }> | null }
+                      | undefined,
                   }
                 }),
               }

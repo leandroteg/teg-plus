@@ -110,6 +110,8 @@ export interface RequisicaoItem {
   qtd_atendida_cd?: number
   atendimento_cd_em?: string
   natureza?: 'produto' | 'servico'
+  descricao_complementar?: string
+  exige_detalhe?: boolean
 }
 
 export interface Requisicao {
@@ -199,6 +201,7 @@ export interface AprovacaoPendente extends Aprovacao {
     condicao_pagamento?: string | null
     observacao?: string | null
     selecionado?: boolean | null
+    itens_precos?: ItemPreco[] | null
   }[]
   minuta_resumo?: {
     objeto: string
@@ -249,6 +252,13 @@ export interface AprovacaoPendente extends Aprovacao {
       requisicao_justificativa?: string
       solicitante_nome?: string
       anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
+      cotacao_vencedora?: {
+        condicao_pagamento?: string | null
+        valor_frete?: number | null
+        prazo_entrega_dias?: number | null
+        observacao?: string | null
+        itens_precos?: Array<{ descricao: string; qtd: number; valor_unitario: number; valor_total: number }> | null
+      }
     }[]
   }
   transporte_detalhes?: {
