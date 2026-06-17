@@ -201,30 +201,19 @@ export function useAvancarEtapa() {
       observacao?: string
       dadosEtapa?: Record<string, unknown>
     }) => {
-      // Update solicitacao etapa
-      const { error: updateErr } = await supabase
-        .from('con_solicitacoes')
-        .update({
-          etapa_atual: payload.etapaPara,
-          status: payload.etapaPara === 'concluido' ? 'concluido'
-            : payload.etapaPara === 'cancelado' ? 'cancelado'
-            : 'em_andamento',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', payload.solicitacaoId)
-      if (updateErr) throw updateErr
-
-      // Insert historico
-      const { error: histErr } = await supabase
-        .from('con_solicitacao_historico')
-        .insert({
-          solicitacao_id: payload.solicitacaoId,
-          etapa_de: payload.etapaDe,
-          etapa_para: payload.etapaPara,
-          observacao: payload.observacao,
-          dados_etapa: payload.dadosEtapa ?? null,
-        })
-      if (histErr) throw histErr
+      // RPC SECURITY DEFINER faz validacao + UPDATE solicitacao + INSERT historico
+      // em uma transacao. Bloqueia avanco de preparar_minuta sem minuta final.
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc('con_avancar_etapa', {
+        p_solicitacao_id: payload.solicitacaoId,
+        p_etapa_de: payload.etapaDe,
+        p_etapa_para: payload.etapaPara,
+        p_observacao: payload.observacao ?? null,
+        p_dados_etapa: payload.dadosEtapa ?? null,
+      })
+      if (rpcErr) throw rpcErr
+      if (!(rpcResult as { ok?: boolean })?.ok) {
+        throw new Error((rpcResult as { erro?: string })?.erro ?? 'Falha ao avancar etapa')
+      }
 
       // ── Criar aprovação ao avançar para aprovacao_diretoria ──
       if (payload.etapaPara === 'aprovacao_diretoria') {
@@ -282,6 +271,16 @@ export function useAvancarEtapa() {
             const tipoContrato = sol.tipo_contrato === 'receita' ? 'receita' : 'despesa'
             const valorContrato = Number(resumo?.valor_total ?? sol.valor_estimado ?? 0)
 
+            // Herda o PDF da minuta final ao criar o contrato.
+            const { data: minutaFinal } = await supabase
+              .from('con_minutas')
+              .select('arquivo_url, onedrive_url, sharepoint_path')
+              .eq('solicitacao_id', payload.solicitacaoId)
+              .eq('tipo', 'final')
+              .order('versao', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
             const { data: contratoExistente } = await supabase
               .from('con_contratos')
               .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
@@ -312,6 +311,9 @@ export function useAvancarEtapa() {
                   indice_reajuste:    sol.indice_reajuste ?? undefined,
                   status:             'vigente',
                   solicitacao_id:     payload.solicitacaoId,
+                  arquivo_url:        minutaFinal?.arquivo_url ?? undefined,
+                  onedrive_url:       minutaFinal?.onedrive_url ?? undefined,
+                  sharepoint_path:    minutaFinal?.sharepoint_path ?? undefined,
                 })
                 .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
                 .single()
