@@ -8,6 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/useLotesPagamento'
 import type { ContaPagar } from '../../types/financeiro'
 import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../utils/pagamentos-previstos-pdf'
+import { useFaturaConciliacaoStatus } from '../../hooks/useCartoes'
 import { supabase } from '../../services/supabase'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,6 +50,26 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 }
 
 const podePagar = (cp: ContaPagar) => cp.status === 'aprovado_pgto'
+
+function FaturaConciliacaoBadge({ faturaId }: { faturaId: string }) {
+  const { data } = useFaturaConciliacaoStatus(faturaId)
+  if (!data || data.total === 0) return null
+  const tudoOk = data.conciliados === data.total
+  return (
+    <span
+      title={tudoOk
+        ? 'Fatura totalmente conciliada com apontamentos'
+        : `Faltam ${data.total - data.conciliados} item(ns) sem apontamento conciliado`}
+      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+        tudoOk
+          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+      }`}
+    >
+      Fatura {data.conciliados}/{data.total}
+    </span>
+  )
+}
 
 interface GroupedSection {
   key: string
@@ -494,6 +515,8 @@ export default function PainelPagamentos() {
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusInfo.color}`}>
                         {statusInfo.label}
                       </span>
+
+                      {cp.fatura_id && <FaturaConciliacaoBadge faturaId={cp.fatura_id} />}
 
                       {cp.forma_pagamento && (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${

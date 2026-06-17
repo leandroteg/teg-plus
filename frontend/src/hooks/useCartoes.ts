@@ -440,6 +440,53 @@ export function useUploadFatura() {
   })
 }
 
+// ── Enviar fatura ao financeiro (cria CP previsto vinculado) ──────────────────
+
+export function useEnviarFaturaFinanceiro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (faturaIds: string[]) => {
+      const { data, error } = await supabase.rpc('cartao_enviar_fatura_financeiro', {
+        p_fatura_ids: faturaIds,
+      })
+      if (error) throw error
+      return data as { enviadas: number; puladas: number; motivos?: { fatura_id: string; motivo: string }[] }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['faturas-cartao'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
+  })
+}
+
+// ── Status de conciliação de uma fatura (resumo p/ badge no Painel) ──────────
+
+export interface ConciliacaoStatus {
+  total: number
+  conciliados: number
+  pct: number
+}
+
+export function useFaturaConciliacaoStatus(faturaId?: string) {
+  return useQuery<ConciliacaoStatus | null>({
+    queryKey: ['fatura-conciliacao-status', faturaId],
+    enabled: !!faturaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_itens_fatura_cartao')
+        .select('id,conciliado')
+        .eq('fatura_id', faturaId!)
+      if (error) throw error
+      const total = (data ?? []).length
+      const conciliados = (data ?? []).filter(i => i.conciliado).length
+      const pct = total === 0 ? 0 : Math.round((conciliados / total) * 100)
+      return { total, conciliados, pct }
+    },
+    retry: false,
+  })
+}
+
 export function useDesconciliarItem() {
   const qc = useQueryClient()
   return useMutation({

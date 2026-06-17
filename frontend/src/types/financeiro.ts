@@ -64,7 +64,7 @@ export interface Fornecedor {
   created_at: string
 }
 
-export type OrigemCP = 'compras' | 'logistica' | 'manual'
+export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao'
 
 export interface ContaPagar {
   id: string
@@ -86,6 +86,7 @@ export interface ContaPagar {
   natureza?: string
   forma_pagamento?: string
   cartao_id?: string
+  fatura_id?: string
   numero_documento?: string
   status: StatusCP
   aprovado_por?: string

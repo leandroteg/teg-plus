@@ -5,6 +5,8 @@ import {
   RefreshCw, FileText, Clock, Filter, Loader2, Info, Split,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
   useCartoesCredito,
   useApontamentosCartao,
@@ -14,6 +16,7 @@ import {
   useConciliarMultiplos,
   useDesconciliarItem,
   useUploadFatura,
+  useEnviarFaturaFinanceiro,
 } from '../../hooks/useCartoes'
 import type {
   CartaoCredito, ApontamentoCartao, FaturaCartao, ItemFaturaCartao,
@@ -537,7 +540,23 @@ export default function ConciliacaoCartoes() {
   const conciliar    = useConciliarItem()
   const conciliarMultiplos = useConciliarMultiplos()
   const desconciliar = useDesconciliarItem()
+  const enviarFatura = useEnviarFaturaFinanceiro()
   const isBusy = conciliar.isPending || conciliarMultiplos.isPending || desconciliar.isPending
+
+  // CP ja existente p/ a fatura selecionada (mostra o link em vez do botao)
+  const { data: cpDaFatura } = useQuery({
+    queryKey: ['cp-da-fatura', faturaSelecionada],
+    enabled: !!faturaSelecionada,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, status, fornecedor_nome, valor_original, data_vencimento')
+        .eq('fatura_id', faturaSelecionada)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -760,6 +779,62 @@ export default function ConciliacaoCartoes() {
           </div>
         </div>
       </div>
+
+      {/* ── Envio ao Financeiro ─────────────────────────────────── */}
+      {faturaSelecionada && (() => {
+        const faturaSel = faturas.find(f => f.id === faturaSelecionada)
+        if (!faturaSel) return null
+        const podeEnviar = !!faturaSel.valor_total && !!faturaSel.data_vencimento && faturaSel.status !== 'processando'
+        if (cpDaFatura) {
+          return (
+            <div className={`rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3
+              ${isDark ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50'}`}>
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 size={13} />
+                Fatura enviada ao Financeiro · CP {cpDaFatura.status}
+                {totalItens > 0 && concItens < totalItens && (
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-200/60 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                    Conciliação parcial ({concItens}/{totalItens})
+                  </span>
+                )}
+              </div>
+              <a
+                href="/financeiro/painel-pagamentos"
+                className="text-[11px] font-semibold text-emerald-600 hover:underline"
+              >
+                Ver no Painel de Pagamentos →
+              </a>
+            </div>
+          )
+        }
+        return (
+          <div className={`rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3
+            ${isDark ? 'border-amber-500/20 bg-amber-500/5' : 'border-amber-200 bg-amber-50'}`}>
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              <AlertCircle size={13} />
+              {podeEnviar
+                ? 'Fatura ainda nao enviada ao Financeiro. Envie para gerar a Previsao de Pagamento.'
+                : 'Fatura sem valor ou vencimento — aguarde processamento.'}
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const r = await enviarFatura.mutateAsync([faturaSelecionada])
+                  if (r.enviadas > 0) showToast('success', 'Fatura enviada ao Financeiro')
+                  else showToast('error', `Nao foi possivel enviar (${r.motivos?.[0]?.motivo ?? 'erro'})`)
+                } catch {
+                  showToast('error', 'Erro ao enviar fatura')
+                }
+              }}
+              disabled={!podeEnviar || enviarFatura.isPending}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            >
+              {enviarFatura.isPending ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+              Enviar ao Financeiro
+            </button>
+          </div>
+        )
+      })()}
 
       {/* ── Hint ────────────────────────────────────────────────── */}
       {!showBar && (selectedItemId || selectedApId) && (
