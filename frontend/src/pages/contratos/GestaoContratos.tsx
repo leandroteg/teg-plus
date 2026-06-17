@@ -6,9 +6,9 @@ import {
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Filter, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
-  LayoutList, LayoutGrid, Eye,
+  LayoutList, LayoutGrid, Eye, Receipt, Send,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
@@ -30,10 +30,11 @@ const fmtPct = (v: number) =>
   `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
+type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText; border: string; bg: string; text: string; dot: string }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText,      border: 'border-l-indigo-500',  bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500' },
+  { key: 'medicoes',     label: 'Medições',     icon: Receipt,       border: 'border-l-fuchsia-500', bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', dot: 'bg-fuchsia-500' },
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote,      border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard,    border: 'border-l-amber-500',   bg: 'bg-amber-50',  text: 'text-amber-700',   dot: 'bg-amber-500' },
   { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature, border: 'border-l-violet-500',  bg: 'bg-violet-50', text: 'text-violet-700',  dot: 'bg-violet-500' },
@@ -1154,6 +1155,218 @@ function TabProvisionado() {
   )
 }
 
+// ── Tab: Medições ───────────────────────────────────────────────────────────
+const STATUS_MEDICAO: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  rascunho:     { label: 'Rascunho',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-600' },
+  em_aprovacao: { label: 'Em Aprovação',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700' },
+  aprovado:     { label: 'Aprovado',      dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700' },
+  rejeitado:    { label: 'Rejeitado',     dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
+  faturado:     { label: 'No Financeiro', dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700' },
+}
+
+function TabMedicoes() {
+  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [busca, setBusca] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const { data: medicoes = [], isLoading } = useMedicoes()
+  const { data: contratos = [] } = useContratos()
+  const faturar = useFaturarMedicao()
+
+  const contratoMap = new Map(contratos.map(c => [c.id, c]))
+
+  const filtered = medicoes.filter(m => {
+    if (statusFilter && m.status !== statusFilter) return false
+    if (busca) {
+      const q = busca.toLowerCase()
+      return (
+        m.numero_bm.toLowerCase().includes(q) ||
+        m.contrato?.numero?.toLowerCase().includes(q) ||
+        m.contrato?.objeto?.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
+  const aprovadas       = medicoes.filter(m => m.status === 'aprovado').length
+  const faturadas       = medicoes.filter(m => m.status === 'faturado').length
+  const totalAFaturar   = medicoes.filter(m => m.status === 'aprovado').reduce((s, m) => s + m.valor_liquido, 0)
+  const totalFaturado   = medicoes.filter(m => m.status === 'faturado').reduce((s, m) => s + m.valor_liquido, 0)
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  const handleEnviar = (medicaoId: string) => {
+    if (!confirm('Enviar esta medição ao Financeiro?\n\nIsso cria automaticamente uma conta a pagar/receber a partir do valor líquido e do prazo do contrato.')) return
+    faturar.mutate(medicaoId, {
+      onSuccess: (res) => {
+        if (res.ok) {
+          const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+          showToast('success', `Enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
+        } else {
+          showToast('error', `Não enviada: ${res.motivo ?? 'desconhecido'}`)
+        }
+      },
+      onError: () => showToast('error', 'Erro ao enviar medição'),
+    })
+  }
+
+  const FILTROS = [
+    { label: 'Todas',         value: '' },
+    { label: 'Em Aprovação',  value: 'em_aprovacao' },
+    { label: 'Aprovadas',     value: 'aprovado' },
+    { label: 'No Financeiro', value: 'faturado' },
+    { label: 'Rejeitadas',    value: 'rejeitado' },
+    { label: 'Rascunho',      value: 'rascunho' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-emerald-600 uppercase">Aprovadas</p>
+          <p className="text-xl font-extrabold text-emerald-700 mt-1">{aprovadas}</p>
+        </div>
+        <div className="bg-fuchsia-50 rounded-2xl border border-fuchsia-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-fuchsia-600 uppercase">A Faturar</p>
+          <p className="text-lg font-extrabold text-fuchsia-700 mt-1">{fmt(totalAFaturar)}</p>
+        </div>
+        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-blue-600 uppercase">No Financeiro</p>
+          <p className="text-xl font-extrabold text-blue-700 mt-1">{faturadas}</p>
+        </div>
+        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-slate-500 uppercase">Total Enviado</p>
+          <p className="text-lg font-extrabold text-slate-700 mt-1">{fmt(totalFaturado)}</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar BM, contrato..."
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
+            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+        {FILTROS.map(f => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${statusFilter === f.value
+                ? 'bg-fuchsia-600 text-white shadow-sm'
+                : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-[3px] border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-14 h-14 rounded-2xl bg-fuchsia-50 flex items-center justify-center mx-auto mb-3">
+            <Receipt size={24} className="text-fuchsia-300" />
+          </div>
+          <p className="text-sm font-semibold text-slate-500">Nenhuma medição encontrada</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-3">Contrato</th>
+                  <th className="px-4 py-3">BM</th>
+                  <th className="px-4 py-3">Período</th>
+                  <th className="px-4 py-3 text-center">Tipo</th>
+                  <th className="px-4 py-3 text-right">Valor Líquido</th>
+                  <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-center">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(m => {
+                  const sc = STATUS_MEDICAO[m.status] ?? STATUS_MEDICAO.rascunho
+                  const c  = contratoMap.get(m.contrato_id)
+                  const isReceita = c?.tipo_contrato === 'receita'
+                  const podeEnviar = m.status === 'aprovado'
+                  const jaEnviada  = m.status === 'faturado'
+                  return (
+                    <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-bold text-slate-800">{m.contrato?.numero ?? '-'}</p>
+                        <p className="text-[10px] truncate max-w-[180px] text-slate-400">{m.contrato?.objeto}</p>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono font-semibold text-slate-700">{m.numero_bm}</td>
+                      <td className="px-4 py-3 text-[11px] text-slate-500">
+                        {fmtData(m.periodo_inicio)} — {fmtData(m.periodo_fim)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {c ? (
+                          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            isReceita ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {isReceita ? 'Receita' : 'Despesa'}
+                          </span>
+                        ) : <span className="text-[10px] text-slate-400">—</span>}
+                      </td>
+                      <td className={`px-4 py-3 text-xs font-bold text-right ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {fmtFull(m.valor_liquido)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {podeEnviar && (
+                          <button
+                            onClick={() => handleEnviar(m.id)}
+                            disabled={faturar.isPending}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                              bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
+                              hover:bg-fuchsia-100 transition-all disabled:opacity-50"
+                            title="Cria CP/CR previsto a partir desta medição"
+                          >
+                            {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                            Enviar ao Financeiro
+                          </button>
+                        )}
+                        {jaEnviada && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
+                            <CheckCircle2 size={11} /> Enviada
+                          </span>
+                        )}
+                        {!podeEnviar && !jaEnviada && (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
   const nav = useNavigate()
@@ -1227,6 +1440,7 @@ export default function GestaoContratos() {
 
       {/* Tab Content */}
       {tab === 'contratos' && <TabContratos />}
+      {tab === 'medicoes' && <TabMedicoes />}
       {tab === 'recebiveis' && <TabRecebiveis />}
       {tab === 'provisionado' && <TabProvisionado />}
       {tab === 'aditivos' && <TabAditivos />}

@@ -481,6 +481,35 @@ export function useAtualizarMedicao() {
   })
 }
 
+// ── Faturar Medição (envia ao Financeiro) ──────────────────────────────────
+export type FaturarMedicaoResult = {
+  ok: boolean
+  motivo?: string
+  medicao_id?: string
+  tipo_contrato?: 'receita' | 'despesa'
+  cp_id?: string | null
+  cr_id?: string | null
+  data_vencimento?: string
+  valor?: number
+}
+
+export function useFaturarMedicao() {
+  const qc = useQueryClient()
+  return useMutation<FaturarMedicaoResult, Error, string>({
+    mutationFn: async (medicaoId: string) => {
+      const { data, error } = await supabase.rpc('con_faturar_medicao', { p_medicao_id: medicaoId })
+      if (error) throw error
+      return data as FaturarMedicaoResult
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-medicoes'] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['fin-contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['fin-contas-receber'] })
+    },
+  })
+}
+
 // ── Criar Itens de Medição ─────────────────────────────────────────────────
 export function useCriarMedicaoItens() {
   const qc = useQueryClient()

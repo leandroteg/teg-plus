@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Receipt, Search, Filter, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
-import { useMedicoes, useContratos, useAtualizarMedicao } from '../../hooks/useContratos'
+import { useMedicoes, useContratos, useAtualizarMedicao, useFaturarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { StatusMedicao, ContratoMedicao } from '../../types/contratos'
@@ -54,6 +54,7 @@ export default function MedicoesPage() {
   const { data: medicoes = [], isLoading } = useMedicoes(contratoFilter || undefined)
   const { data: contratos = [] } = useContratos()
   const atualizarMedicao = useAtualizarMedicao()
+  const faturarMedicao = useFaturarMedicao()
 
   const filtered = medicoes.filter(m => {
     if (statusFilter && m.status !== statusFilter) return false
@@ -91,6 +92,25 @@ export default function MedicoesPage() {
         },
       }
     )
+  }
+
+  const handleFaturar = (id: string) => {
+    if (!confirm('Enviar esta medição ao Financeiro?\n\nIsso cria automaticamente uma conta a pagar/receber a partir do valor líquido e do prazo do contrato.')) return
+    faturarMedicao.mutate(id, {
+      onSuccess: (res) => {
+        if (res.ok) {
+          const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+          setToast({ type: 'success', msg: `Enviada ao ${destino}` })
+        } else {
+          setToast({ type: 'error', msg: `Não enviada: ${res.motivo ?? 'desconhecido'}` })
+        }
+        setTimeout(() => setToast(null), 5000)
+      },
+      onError: () => {
+        setToast({ type: 'error', msg: 'Erro ao enviar ao Financeiro' })
+        setTimeout(() => setToast(null), 5000)
+      },
+    })
   }
 
   const cardCls = `rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`
@@ -283,16 +303,16 @@ export default function MedicoesPage() {
                         )}
                         {m.status === 'aprovado' && (
                           <button
-                            onClick={() => handleStatusChange(m.id, 'faturado')}
-                            disabled={atualizarMedicao.isPending}
-                            title="Marcar como faturado"
+                            onClick={() => handleFaturar(m.id)}
+                            disabled={faturarMedicao.isPending}
+                            title="Envia ao Financeiro (cria CP/CR previsto)"
                             className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
                               ${isLight
-                                ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                : 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25'
+                                ? 'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100'
+                                : 'bg-fuchsia-500/15 text-fuchsia-400 hover:bg-fuchsia-500/25'
                               }`}
                           >
-                            Faturar
+                            Enviar ao Financeiro
                           </button>
                         )}
                         {(m.status === 'faturado' || m.status === 'rejeitado') && (
