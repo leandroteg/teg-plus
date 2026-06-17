@@ -648,9 +648,18 @@ function RelatorioHistorico({ colaboradorId, sectionCls, isLight }: { colaborado
   }
 
   async function baixar(rel: Relatorio) {
-    const { data } = await supabase.functions.invoke('rh-colaborador-relatorio', { body: { action: 'link', relatorio_id: rel.id } })
-    const url = (data as { url?: string })?.url
-    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    // Abre a aba JÁ no gesto do toque — mobile (Safari/iOS/PWA) bloqueia window.open chamado após o await.
+    const win = window.open('', '_blank')
+    try {
+      const { data } = await supabase.functions.invoke('rh-colaborador-relatorio', { body: { action: 'link', relatorio_id: rel.id } })
+      const url = (data as { url?: string })?.url
+      if (!url) { win?.close(); setErro('Não foi possível gerar o link do PDF.'); return }
+      if (win) win.location.href = url           // redireciona a aba já aberta
+      else window.location.href = url            // pop-up bloqueado → baixa na mesma aba
+    } catch (e) {
+      win?.close()
+      setErro(e instanceof Error ? e.message : 'Erro ao baixar o relatório.')
+    }
   }
 
   return (
