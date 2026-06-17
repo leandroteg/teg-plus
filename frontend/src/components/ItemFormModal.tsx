@@ -362,6 +362,23 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
               </div>
             </div>
 
+            <div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!editItem.exige_detalhe}
+                  onChange={(e) => setEditItem({ ...editItem, exige_detalhe: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-300"
+                />
+                <div className="flex-1">
+                  <span className="block text-xs font-bold text-slate-600">Exige detalhamento na RC</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">
+                    Marque para itens genericos (ex.: MAO DE OBRA - MANUTENCAO DE VEICULOS). O solicitante sera obrigado a preencher o Detalhamento por linha.
+                  </span>
+                </div>
+              </label>
+            </div>
+
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <p className="text-[11px] font-semibold text-slate-500">Resumo operacional</p>
               <p className="mt-1 text-xs text-slate-600">

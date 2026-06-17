@@ -744,7 +744,12 @@ export default function RequisicaoDetalhe() {
                 }`}>
                   {/* Header item */}
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-800 truncate flex-1">{item.descricao}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{item.descricao}</p>
+                      {item.descricao_complementar && (
+                        <p className="text-[11px] italic text-slate-500 mt-0.5">{item.descricao_complementar}</p>
+                      )}
+                    </div>
                     {totalmenteAtendido && (
                       <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
                         <CheckCircle size={11} /> Atendido
@@ -949,6 +954,9 @@ export default function RequisicaoDetalhe() {
                     <tr key={item.id ?? idx} className="border-t border-slate-100 hover:bg-slate-50/50">
                       <td className="px-3 py-2 text-slate-700">
                         {item.descricao}
+                        {item.descricao_complementar && (
+                          <div className="text-[11px] italic text-slate-500 mt-0.5">{item.descricao_complementar}</div>
+                        )}
                         {item.est_item_id && saldosItens && (() => {
                           const s = saldosItens[item.est_item_id] ?? { saldo: 0, reservado: 0, disponivel: 0 }
                           const cobre = s.disponivel >= item.quantidade

@@ -1018,10 +1018,23 @@ export default function NovaRequisicao() {
                   categoria_financeira_codigo: cat.categoria_financeira_codigo,
                   categoria_financeira_descricao: cat.categoria_financeira_descricao,
                   destino_operacional: cat.destino_operacional ?? 'estoque',
+                  exige_detalhe: cat.exige_detalhe ?? false,
                 } : it))
               }}
               categoriaRC={categoria?.codigo ?? ''}
             />
+            <div>
+              <label className="text-[10px] text-slate-400">
+                Detalhamento {item.exige_detalhe && <span className="text-red-500">*</span>}
+              </label>
+              <UpperTextarea rows={2}
+                className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+                placeholder={item.exige_detalhe
+                  ? 'EX: TROCA DO RADIADOR - CAMINHAO PLACA ABC-1234'
+                  : 'Especificacao, modelo, dimensoes... (opcional)'}
+                value={item.descricao_complementar ?? ''}
+                onChange={e => updateItem(idx, 'descricao_complementar', e.target.value)} />
+            </div>
             <div>
               <label className="text-[10px] text-slate-400">Marca / Fabricante</label>
               <input
@@ -1128,6 +1141,8 @@ export default function NovaRequisicao() {
               if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
               if (!obraNome) errs.push('Selecione a obra')
               if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+              const semDetalhe = itens.findIndex(i => i.exige_detalhe && !(i.descricao_complementar ?? '').trim())
+              if (semDetalhe >= 0) errs.push(`Item ${semDetalhe + 1}: preencha o Detalhamento (obrigatorio para este item)`)
               if (dataNecessidade) {
                 const today = new Date().toISOString().split('T')[0]
                 if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
@@ -1303,10 +1318,23 @@ export default function NovaRequisicao() {
                   categoria_financeira_codigo: cat.categoria_financeira_codigo,
                   categoria_financeira_descricao: cat.categoria_financeira_descricao,
                   destino_operacional: cat.destino_operacional ?? 'estoque',
+                  exige_detalhe: cat.exige_detalhe ?? false,
                 } : it))
               }}
               categoriaRC={categoria?.codigo ?? ''}
             />
+            <div>
+              <label className="text-[10px] text-slate-400">
+                Detalhamento {item.exige_detalhe && <span className="text-red-500">*</span>}
+              </label>
+              <UpperTextarea rows={2}
+                className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+                placeholder={item.exige_detalhe
+                  ? 'EX: TROCA DO RADIADOR - CAMINHAO PLACA ABC-1234'
+                  : 'Especificacao, modelo, dimensoes... (opcional)'}
+                value={item.descricao_complementar ?? ''}
+                onChange={e => updateItem(idx, 'descricao_complementar', e.target.value)} />
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
@@ -1376,6 +1404,8 @@ export default function NovaRequisicao() {
               if (!obraNome) errs.push('Selecione a obra')
               if (!descricao.trim()) errs.push('Informe a descricao do que precisa ser comprado')
               if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+              const semDetalhe = itens.findIndex(i => i.exige_detalhe && !(i.descricao_complementar ?? '').trim())
+              if (semDetalhe >= 0) errs.push(`Item ${semDetalhe + 1}: preencha o Detalhamento (obrigatorio para este item)`)
               if (dataNecessidade) {
                 const today = new Date().toISOString().split('T')[0]
                 if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')

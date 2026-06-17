@@ -85,6 +85,7 @@ interface ItemAutocompleteProps {
     categoria_financeira_descricao?: string
     destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
     grupo_compra_codigo?: string
+    exige_detalhe?: boolean
   }) => void
   categoriaRC: string
   placeholder?: string
@@ -145,6 +146,7 @@ export default function ItemAutocomplete({
       categoria_financeira_descricao: item.categoria_financeira_descricao,
       destino_operacional: item.destino_operacional,
       grupo_compra_codigo: item.subcategoria,
+      exige_detalhe: item.exige_detalhe,
     })
     setShowDropdown(false)
     setShowCreateForm(false)

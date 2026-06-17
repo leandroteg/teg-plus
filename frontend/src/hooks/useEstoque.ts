@@ -20,7 +20,8 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
         .select(`
           id, codigo, descricao, descricao_complementar, categoria, subcategoria, unidade, valor_medio,
           classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
-          categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
+          categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional,
+          exige_detalhe
         `)
         .eq('ativo', true)
         .order('descricao')

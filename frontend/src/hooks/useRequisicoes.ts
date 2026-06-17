@@ -331,6 +331,7 @@ export function useCriarRequisicao() {
             categoria_financeira_descricao: item.categoria_financeira_descricao || null,
             destino_operacional:      item.destino_operacional || 'estoque',
             natureza:                 item.natureza || 'produto',
+            descricao_complementar:   item.descricao_complementar?.trim() || null,
           }))
         if (itens.length > 0) {
           const { error: itensError } = await supabase
@@ -587,6 +588,7 @@ export function useAtualizarRequisicao() {
           categoria_financeira_descricao: item.categoria_financeira_descricao || null,
           destino_operacional:      item.destino_operacional || 'estoque',
           natureza:                 item.natureza || 'produto',
+          descricao_complementar:   item.descricao_complementar?.trim() || null,
         }))
       const { error: rpcError } = await supabase.rpc('replace_requisicao_itens', {
         p_requisicao_id: requisicaoId,
@@ -809,7 +811,7 @@ export function useRequisicao(id?: string) {
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           comprador:cmp_compradores(nome, email),
           itens:cmp_requisicao_itens(
-            id, descricao, quantidade, unidade, valor_unitario_estimado, marca,
+            id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, marca,
             est_item_id, est_item_codigo,
             classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
             categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional,

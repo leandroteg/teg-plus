@@ -124,7 +124,7 @@ export default function EmitirPedidoModal({
           centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id,
           itens:cmp_requisicao_itens(
-            id, descricao, quantidade, unidade,
+            id, descricao, descricao_complementar, quantidade, unidade,
             valor_unitario_estimado,
             classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao
           )
@@ -701,6 +701,9 @@ export default function EmitirPedidoModal({
                     <div key={item.id || `${item.descricao}-${index}`} className="px-4 py-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 truncate">{item.descricao}</p>
+                        {item.descricao_complementar && (
+                          <p className="text-[11px] italic text-slate-500 truncate">{item.descricao_complementar}</p>
+                        )}
                         <p className="text-[11px] text-slate-500">{item.quantidade} {item.unidade}</p>
                       </div>
                       <div className="shrink-0 text-right">

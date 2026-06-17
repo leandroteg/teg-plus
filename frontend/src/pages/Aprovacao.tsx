@@ -583,7 +583,12 @@ export default function Aprovacao() {
                           key={item.id ?? idx}
                           className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
                         >
-                          <td className="px-3 py-2.5 text-slate-700">{item.descricao}</td>
+                          <td className="px-3 py-2.5 text-slate-700">
+                            {item.descricao}
+                            {item.descricao_complementar && (
+                              <div className="text-[11px] italic text-slate-500 mt-0.5">{item.descricao_complementar}</div>
+                            )}
+                          </td>
                           <td className="px-3 py-2.5 text-slate-600 text-right font-mono">
                             {item.quantidade}
                           </td>

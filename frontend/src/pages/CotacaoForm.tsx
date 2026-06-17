@@ -667,7 +667,7 @@ function buildSolicitacaoHtml(cotacao: Cotacao, EMPRESA: EmpresaData = EMPRESA_F
   const itensHtml = itens.map((item: any, i: number) => `
     <tr>
       <td style="text-align:center;color:#64748b">${i + 1}</td>
-      <td>${esc(item.descricao)}${item.marca ? `<br><span style="font-size:9px;color:#94a3b8">Marca ref.: ${esc(item.marca)}</span>` : ''}</td>
+      <td>${esc(item.descricao)}${item.descricao_complementar ? `<br><span style="font-size:10px;color:#475569;font-style:italic">${esc(item.descricao_complementar)}</span>` : ''}${item.marca ? `<br><span style="font-size:9px;color:#94a3b8">Marca ref.: ${esc(item.marca)}</span>` : ''}</td>
       <td style="text-align:center">${item.quantidade}</td>
       <td style="text-align:center">${esc(item.unidade)}</td>
       <td style="text-align:right;color:#94a3b8;font-style:italic">${fmtBRL(item.valor_unitario_estimado)}</td>

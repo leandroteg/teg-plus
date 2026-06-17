@@ -410,7 +410,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
           ${itens.map((item, i) => `
             <tr>
               <td style="text-align:center">${i + 1}</td>
-              <td>${esc(item.descricao)}</td>
+              <td>${esc(item.descricao)}${(item as any).descricao_complementar ? `<br><span style="font-size:10px;color:#475569;font-style:italic">${esc((item as any).descricao_complementar)}</span>` : ''}</td>
               <td style="text-align:center">${item.quantidade}</td>
               <td style="text-align:center">${esc(item.unidade)}</td>
               <td style="text-align:right">${fmtBRL(unitariosHtml[i])}</td>
@@ -692,6 +692,18 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
       doc.text(fmtBRL(subtotal), cols[5], y)
       doc.setFont('helvetica', 'normal')
       y += 5
+      const dc = (item as any).descricao_complementar as string | undefined
+      if (dc && dc.trim()) {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(7)
+        doc.setTextColor(100, 116, 139)
+        const dcText = dc.length > 70 ? dc.slice(0, 67) + '...' : dc
+        doc.text(dcText, cols[1], y)
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        y += 4
+      }
       doc.setDrawColor(241, 245, 249)
       doc.line(M, y - 2, W - M, y - 2)
     })
@@ -1148,6 +1160,9 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
+                              {(item as any).descricao_complementar && (
+                                <p className="text-[10px] italic text-slate-500 truncate">{(item as any).descricao_complementar}</p>
+                              )}
                               <p className="text-[10px] text-slate-400">{item.quantidade} {item.unidade} · {valorItem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                             </div>
                             <button
@@ -2138,7 +2153,12 @@ function DetailModal({
                         <tbody>
                           {g.itens.map((item, i) => (
                             <tr key={i} className={`border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
-                              <td className={`px-3 py-2 ${txt}`}>{item.descricao}</td>
+                              <td className={`px-3 py-2 ${txt}`}>
+                                {item.descricao}
+                                {(item as any).descricao_complementar && (
+                                  <div className={`text-[10px] italic ${sub} mt-0.5`}>{(item as any).descricao_complementar}</div>
+                                )}
+                              </td>
                               <td className={`px-2 py-2 text-center ${sub}`}>{item.quantidade}</td>
                               <td className={`px-2 py-2 text-center ${sub}`}>{item.unidade}</td>
                               <td className={`px-3 py-2 text-right font-semibold ${txt}`}>{fmt(item.valor_unitario_efetivo)}</td>

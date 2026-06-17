@@ -81,6 +81,7 @@ export interface EstItem {
   valor_ultima_entrada: number
   totvs_codigo?: string
   ncm?: string
+  exige_detalhe?: boolean
   ativo: boolean
   criado_em: string
   atualizado_em: string
