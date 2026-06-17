@@ -1093,10 +1093,13 @@ export default function SolicitacaoDetalhe() {
             <EtapaBadge etapa={etapa} />
             <UrgenciaBadge urgencia={s.urgencia} />
           </div>
-          <h1 className="text-xl font-extrabold text-slate-800 mt-1.5 leading-tight">
-            {s.objeto}
+          <h1 className="text-xl font-extrabold text-slate-800 mt-1.5 leading-tight truncate">
+            {s.contraparte_nome}
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-1 line-clamp-2" title={s.objeto}>
+            {s.objeto}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1">
             Solicitado por {s.solicitante_nome} em {fmtData(s.created_at)}
           </p>
         </div>
