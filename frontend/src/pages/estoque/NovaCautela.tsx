@@ -1,15 +1,16 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Search, Plus, Minus, X, Camera, Loader2, Save,
-  User, Package, Calendar,
+  User, Package, Calendar, PenLine, Eraser,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useCriarCautela } from '../../hooks/useCautelas'
+import { useCriarCautela, useSalvarTermoCautela } from '../../hooks/useCautelas'
 import { useCadObras, useCadColaboradores } from '../../hooks/useCadastros'
 import { useBases, useEstoqueItens, useSaldos } from '../../hooks/useEstoque'
 import { supabase } from '../../services/supabase'
-import type { NovaCautelaPayload } from '../../types/cautela'
+import { gerarTermoPdfBlob } from '../../utils/termo-aceite-cautela-pdf'
+import type { Cautela, NovaCautelaPayload } from '../../types/cautela'
 
 type ItemLinha = {
   item_id: string
@@ -24,6 +25,7 @@ export default function NovaCautela() {
   const isDark = !isLight
   const navigate = useNavigate()
   const criarCautela = useCriarCautela()
+  const salvarTermo = useSalvarTermoCautela()
 
   // ── Data sources ────────────────────────────────────────────────────────
   const { data: colaboradores = [] } = useCadColaboradores()
@@ -55,6 +57,60 @@ export default function NovaCautela() {
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Assinatura do termo de aceite (capturada na criação) ────────────────
+  const sigCanvasRef = useRef<HTMLCanvasElement>(null)
+  const sigDrawing = useRef(false)
+  const [hasSignature, setHasSignature] = useState(false)
+
+  useEffect(() => {
+    const canvas = sigCanvasRef.current
+    if (!canvas) return
+    const ratio = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = Math.max(1, rect.width * ratio)
+    canvas.height = Math.max(1, rect.height * ratio)
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.scale(ratio, ratio)
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#0f172a'
+    }
+  }, [])
+
+  const sigPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = sigCanvasRef.current!.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+  const sigStart = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    const ctx = sigCanvasRef.current?.getContext('2d')
+    if (!ctx) return
+    sigDrawing.current = true
+    const { x, y } = sigPos(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    sigCanvasRef.current?.setPointerCapture(e.pointerId)
+  }
+  const sigMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!sigDrawing.current) return
+    e.preventDefault()
+    const ctx = sigCanvasRef.current?.getContext('2d')
+    if (!ctx) return
+    const { x, y } = sigPos(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    if (!hasSignature) setHasSignature(true)
+  }
+  const sigEnd = () => { sigDrawing.current = false }
+  const sigClear = () => {
+    const c = sigCanvasRef.current
+    const ctx = c?.getContext('2d')
+    if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
+    setHasSignature(false)
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [erro, setErro] = useState('')
@@ -129,7 +185,13 @@ export default function NovaCautela() {
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────
-  const canSubmit = solicitanteId && obraId && baseId && itens.length > 0 && dataDevolucao
+  const canSubmit = solicitanteId && obraId && baseId && itens.length > 0 && dataDevolucao && hasSignature
+
+  function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('falha ao gerar PNG'))), 'image/png')
+    })
+  }
 
   async function handleSubmit() {
     if (!canSubmit || submitting) return
@@ -154,6 +216,7 @@ export default function NovaCautela() {
       }
 
       const obraSel = obras.find(o => o.id === obraId)
+      const baseSel = bases.find(b => b.id === baseId)
       const payload = {
         solicitante_id: solicitanteId,
         solicitante_nome: solicitanteNome,
@@ -171,7 +234,52 @@ export default function NovaCautela() {
         })),
       } as NovaCautelaPayload & { status: string; data_retirada: string; foto_retirada_url?: string[] }
 
-      await criarCautela.mutateAsync(payload)
+      const created = await criarCautela.mutateAsync(payload)
+
+      // Salva termo de aceite (assinatura + PDF) — assinatura é obrigatória.
+      const canvas = sigCanvasRef.current
+      if (canvas) {
+        try {
+          const assinaturaDataUrl = canvas.toDataURL('image/png')
+          const assinaturaBlob = await canvasToPngBlob(canvas)
+
+          // Busca o registro recém-criado pra ter numero/data_retirada canônicos
+          const { data: row } = await supabase
+            .from('est_cautelas')
+            .select('*')
+            .eq('id', created.id)
+            .single()
+
+          const cautelaForPdf: Cautela = {
+            ...(row as Cautela),
+            itens: itens.map((it, idx) => ({
+              id: String(idx),
+              cautela_id: created.id,
+              item_id: it.item_id,
+              quantidade: it.quantidade,
+              quantidade_devolvida: 0,
+              criado_em: new Date().toISOString(),
+              item: { codigo: it.codigo, descricao: it.descricao, unidade: it.unidade },
+            })),
+          }
+
+          const termoBlob = await gerarTermoPdfBlob({
+            cautela: cautelaForPdf,
+            baseNome: baseSel?.nome,
+            assinaturaDataUrl,
+          })
+
+          await salvarTermo.mutateAsync({
+            cautelaId: created.id,
+            assinaturaBlob,
+            termoBlob,
+          })
+        } catch (termoErr: any) {
+          // Não bloqueia a navegação — cautela já foi criada. Loga e segue.
+          console.warn('Falha ao salvar termo de aceite:', termoErr)
+        }
+      }
+
       navigate('/estoque/cautelas')
     } catch (err: any) {
       setErro(err?.message || 'Erro ao registrar cautela')
@@ -491,6 +599,43 @@ export default function NovaCautela() {
             <span className="text-xs font-semibold">Tirar foto ou selecionar</span>
           </button>
         )}
+      </div>
+
+      {/* ── Assinatura do termo de aceite ───────────────────────────── */}
+      <div className={cardCls}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <PenLine size={15} className="text-teal-500" />
+            <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Assinatura do Termo de Aceite
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={sigClear}
+            disabled={!hasSignature || submitting}
+            className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-40 ${
+              isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <Eraser size={12} /> Limpar
+          </button>
+        </div>
+        <canvas
+          ref={sigCanvasRef}
+          onPointerDown={sigStart}
+          onPointerMove={sigMove}
+          onPointerUp={sigEnd}
+          onPointerLeave={sigEnd}
+          onPointerCancel={sigEnd}
+          className={`w-full h-40 rounded-xl border-2 border-dashed bg-white touch-none cursor-crosshair ${
+            isDark ? 'border-white/[0.12]' : 'border-slate-300'
+          }`}
+          style={{ touchAction: 'none' }}
+        />
+        <p className={`text-[11px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          O colaborador assina aqui ao retirar o material. A assinatura fica embutida no PDF e o termo é arquivado.
+        </p>
       </div>
 
       {/* ── Error message ────────────────────────────────────────────── */}

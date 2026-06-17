@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, PackageCheck } from 'lucide-react'
+import { X, FileText, Download, Printer, Eraser, Loader2, PenLine, User, Building2, Save, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, PackageCheck, Lock } from 'lucide-react'
 import type { Cautela } from '../../types/cautela'
-import { abrirTermoPdf, downloadTermoPdf, gerarTermoPdfBlob } from '../../utils/termo-aceite-cautela-pdf'
+import { abrirTermoPdf, downloadTermoPdf, gerarTermoPdfBlob, getTermoPdfFileName } from '../../utils/termo-aceite-cautela-pdf'
 import { useSalvarTermoCautela, useAtualizarCautela } from '../../hooks/useCautelas'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../services/supabase'
 import { UpperTextarea } from '../UpperInput'
 import DevolucaoModal from './DevolucaoModal'
 
@@ -58,6 +59,7 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
   }
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (jaSalvo) return
     e.preventDefault()
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
@@ -69,7 +71,7 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
   }
 
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return
+    if (!drawing.current || jaSalvo) return
     e.preventDefault()
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
@@ -92,6 +94,25 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
     if (busy) return
     setBusy(mode)
     try {
+      // Termo já salvo → abre/baixa o PDF arquivado direto do Storage (não regera)
+      if (jaSalvo && cautela.termo_url) {
+        const { data: signed } = await supabase.storage
+          .from('cautelas-termos')
+          .createSignedUrl(cautela.termo_url, 60)
+        if (signed?.signedUrl) {
+          if (mode === 'open') {
+            window.open(signed.signedUrl, '_blank')
+          } else {
+            const a = document.createElement('a')
+            a.href = signed.signedUrl
+            a.download = getTermoPdfFileName({ cautela, baseNome })
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          }
+          return
+        }
+      }
       const assinaturaDataUrl = hasSignature
         ? canvasRef.current?.toDataURL('image/png')
         : undefined
@@ -338,41 +359,57 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
             <div className="flex items-center justify-between mb-1.5">
               <label className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${txtMuted}`}>
                 <PenLine size={13} /> Assinatura do colaborador
+                {jaSalvo && <Lock size={11} className="text-emerald-500" />}
               </label>
-              <button
-                onClick={clear}
-                disabled={!hasSignature}
-                className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-40 ${
-                  isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                <Eraser size={12} /> Limpar
-              </button>
+              {!jaSalvo && (
+                <button
+                  onClick={clear}
+                  disabled={!hasSignature}
+                  className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-40 ${
+                    isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  <Eraser size={12} /> Limpar
+                </button>
+              )}
             </div>
-            <canvas
-              ref={canvasRef}
-              onPointerDown={start}
-              onPointerMove={move}
-              onPointerUp={end}
-              onPointerLeave={end}
-              onPointerCancel={end}
-              className={`w-full h-40 rounded-xl border-2 border-dashed touch-none cursor-crosshair ${
-                isDark ? 'bg-white border-white/[0.12]' : 'bg-white border-slate-300'
-              }`}
-            />
-            <p className={`text-[11px] mt-1.5 ${txtMuted}`}>
-              Assine no campo acima usando o dedo ou a caneta do tablet. A assinatura é opcional e fica embutida no PDF.
-            </p>
+            {jaSalvo ? (
+              <div className={`rounded-xl border-2 border-dashed p-4 text-center ${
+                isDark ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <CheckCircle2 size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                  <p className={`text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>
+                    Termo assinado e arquivado
+                  </p>
+                </div>
+                <p className={`text-[11px] ${isDark ? 'text-emerald-200/80' : 'text-emerald-700'}`}>
+                  A assinatura foi capturada na criação da cautela. Use os botões abaixo para visualizar ou baixar o PDF.
+                </p>
+              </div>
+            ) : (
+              <>
+                <canvas
+                  ref={canvasRef}
+                  onPointerDown={start}
+                  onPointerMove={move}
+                  onPointerUp={end}
+                  onPointerLeave={end}
+                  onPointerCancel={end}
+                  className={`w-full h-40 rounded-xl border-2 border-dashed touch-none cursor-crosshair ${
+                    isDark ? 'bg-white border-white/[0.12]' : 'bg-white border-slate-300'
+                  }`}
+                />
+                <p className={`text-[11px] mt-1.5 ${txtMuted}`}>
+                  Assine no campo acima usando o dedo ou a caneta do tablet. A assinatura fica embutida no PDF.
+                </p>
+              </>
+            )}
           </div>
 
           {erro && (
             <div className="rounded-xl border border-red-300 bg-red-50 text-red-700 text-xs font-semibold px-3 py-2">
               {erro}
-            </div>
-          )}
-          {jaSalvo && !savedOk && (
-            <div className={`rounded-xl border text-xs font-semibold px-3 py-2 ${isDark ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-              Termo já salvo anteriormente. Assinar novamente sobrescreve.
             </div>
           )}
           {savedOk && (
@@ -403,17 +440,19 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
               {busy === 'download' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Baixar PDF
             </button>
-            <button
-              onClick={handleSalvar}
-              disabled={!!busy || !hasSignature}
-              title={!hasSignature ? 'Assine no campo acima antes de salvar' : undefined}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold
-                bg-teal-600 hover:bg-teal-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                shadow-lg shadow-teal-600/20 active:scale-[0.98]"
-            >
-              {busy === 'save' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {jaSalvo ? 'Reassinar e salvar' : 'Salvar termo'}
-            </button>
+            {!jaSalvo && (
+              <button
+                onClick={handleSalvar}
+                disabled={!!busy || !hasSignature}
+                title={!hasSignature ? 'Assine no campo acima antes de salvar' : undefined}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold
+                  bg-teal-600 hover:bg-teal-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                  shadow-lg shadow-teal-600/20 active:scale-[0.98]"
+              >
+                {busy === 'save' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                Salvar termo
+              </button>
+            )}
           </div>
         </div>
       </div>
