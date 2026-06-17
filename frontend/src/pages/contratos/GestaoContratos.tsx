@@ -1,15 +1,16 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
-  ArrowDownRight, Filter, Clock, Banknote, CreditCard,
+  ArrowDownRight, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
-  LayoutList, LayoutGrid, Eye, Receipt, Send,
+  LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
@@ -32,15 +33,37 @@ const fmtPct = (v: number) =>
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
-const TABS: { key: Tab; label: string; icon: typeof FileText; border: string; bg: string; text: string; dot: string }[] = [
-  { key: 'contratos',    label: 'Contratos',    icon: FileText,      border: 'border-l-indigo-500',  bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500' },
-  { key: 'medicoes',     label: 'Medições',     icon: Receipt,       border: 'border-l-fuchsia-500', bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', dot: 'bg-fuchsia-500' },
-  { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote,      border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  { key: 'provisionado', label: 'Provisionado', icon: CreditCard,    border: 'border-l-amber-500',   bg: 'bg-amber-50',  text: 'text-amber-700',   dot: 'bg-amber-500' },
-  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature, border: 'border-l-violet-500',  bg: 'bg-violet-50', text: 'text-violet-700',  dot: 'bg-violet-500' },
-  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp,    border: 'border-l-cyan-500',    bg: 'bg-cyan-50',   text: 'text-cyan-700',    dot: 'bg-cyan-500' },
-  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock, border: 'border-l-red-500',     bg: 'bg-red-50',    text: 'text-red-700',     dot: 'bg-red-500' },
+const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
+  { key: 'contratos',    label: 'Contratos',    icon: FileText },
+  { key: 'medicoes',     label: 'Medições',     icon: Receipt },
+  { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
+  { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
+  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature },
+  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp },
+  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
 ]
+
+type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
+
+const TAB_ACCENT: Record<Tab, AccentSet> = {
+  contratos:    { bg:'bg-indigo-50',  bgActive:'bg-indigo-100',  text:'text-indigo-500',  textActive:'text-indigo-800',  dot:'bg-indigo-500',  badge:'bg-indigo-200/80 text-indigo-700',  border:'border-indigo-200' },
+  medicoes:     { bg:'bg-fuchsia-50', bgActive:'bg-fuchsia-100', text:'text-fuchsia-500', textActive:'text-fuchsia-800', dot:'bg-fuchsia-500', badge:'bg-fuchsia-200/80 text-fuchsia-700', border:'border-fuchsia-200' },
+  recebiveis:   { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
+  provisionado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
+  aditivos:     { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
+  reajustes:    { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',    border:'border-cyan-200' },
+  vencimentos:  { bg:'bg-red-50',     bgActive:'bg-red-100',     text:'text-red-500',     textActive:'text-red-800',     dot:'bg-red-500',     badge:'bg-red-200/80 text-red-700',     border:'border-red-200' },
+}
+
+const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
+  contratos:    { bg:'bg-indigo-500/5',  bgActive:'bg-indigo-500/15',  text:'text-indigo-400',  textActive:'text-indigo-200',  dot:'bg-indigo-400',  badge:'bg-indigo-500/15 text-indigo-300',  border:'border-indigo-500/20' },
+  medicoes:     { bg:'bg-fuchsia-500/5', bgActive:'bg-fuchsia-500/15', text:'text-fuchsia-400', textActive:'text-fuchsia-200', dot:'bg-fuchsia-400', badge:'bg-fuchsia-500/15 text-fuchsia-300', border:'border-fuchsia-500/20' },
+  recebiveis:   { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
+  provisionado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
+  aditivos:     { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
+  reajustes:    { bg:'bg-cyan-500/5',    bgActive:'bg-cyan-500/15',    text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
+  vencimentos:  { bg:'bg-red-500/5',     bgActive:'bg-red-500/15',     text:'text-red-400',     textActive:'text-red-200',     dot:'bg-red-400',     badge:'bg-red-500/15 text-red-300',     border:'border-red-500/20' },
+}
 
 // ── Status configs ──────────────────────────────────────────────────────────
 const STATUS_CONTRATO: Record<string, { label: string; dot: string; bg: string; text: string }> = {
@@ -1164,10 +1187,200 @@ const STATUS_MEDICAO: Record<string, { label: string; dot: string; bg: string; t
   faturado:     { label: 'No Financeiro', dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700' },
 }
 
+// ── Nova Medição modal ──────────────────────────────────────────────────────
+function NovaMedicaoModal({
+  open, onClose, contratos, onToast,
+}: {
+  open: boolean
+  onClose: () => void
+  contratos: Contrato[]
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const criar = useCriarMedicao()
+  const today = new Date().toISOString().slice(0, 10)
+  const [contratoId, setContratoId] = useState('')
+  const [numeroBm, setNumeroBm] = useState('')
+  const [periodoInicio, setPeriodoInicio] = useState(today)
+  const [periodoFim, setPeriodoFim] = useState(today)
+  const [valorMedido, setValorMedido] = useState('')
+  const [valorRetencao, setValorRetencao] = useState('')
+  const [observacoes, setObservacoes] = useState('')
+
+  const contratosElegiveis = useMemo(
+    () => contratos.filter(c => c.status === 'vigente' || c.status === 'assinado'),
+    [contratos]
+  )
+
+  const medido = parseFloat(valorMedido.replace(',', '.')) || 0
+  const retencao = parseFloat(valorRetencao.replace(',', '.')) || 0
+  const liquido = Math.max(medido - retencao, 0)
+
+  const reset = () => {
+    setContratoId(''); setNumeroBm(''); setPeriodoInicio(today); setPeriodoFim(today)
+    setValorMedido(''); setValorRetencao(''); setObservacoes('')
+  }
+
+  const handleSave = () => {
+    if (!contratoId || !numeroBm.trim() || !periodoInicio || !periodoFim || medido <= 0) {
+      onToast('error', 'Preencha contrato, BM, período e valor medido')
+      return
+    }
+    criar.mutate(
+      {
+        contrato_id: contratoId,
+        numero_bm: numeroBm.trim().toUpperCase(),
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim,
+        valor_medido: medido,
+        valor_retencao: retencao,
+        valor_liquido: liquido,
+        status: 'rascunho',
+        observacoes: observacoes.trim() || undefined,
+      } as any,
+      {
+        onSuccess: () => {
+          onToast('success', 'Medição criada com sucesso')
+          reset(); onClose()
+        },
+        onError: () => onToast('error', 'Erro ao criar medição'),
+      }
+    )
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-auto"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Receipt size={16} className="text-fuchsia-600" />
+            <h2 className="text-sm font-bold text-slate-800">Nova Medição de Contrato</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contrato</label>
+            <select
+              value={contratoId}
+              onChange={e => setContratoId(e.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+            >
+              <option value="">Selecione um contrato vigente</option>
+              {contratosElegiveis.map(c => {
+                const cp = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                return (
+                  <option key={c.id} value={c.id}>{c.numero} — {cp}</option>
+                )
+              })}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número BM</label>
+              <UpperInput
+                value={numeroBm}
+                onChange={e => setNumeroBm(e.target.value)}
+                placeholder="BM-001"
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Início</label>
+                <input
+                  type="date"
+                  value={periodoInicio}
+                  onChange={e => setPeriodoInicio(e.target.value)}
+                  className="mt-1 w-full px-2 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fim</label>
+                <input
+                  type="date"
+                  value={periodoFim}
+                  onChange={e => setPeriodoFim(e.target.value)}
+                  className="mt-1 w-full px-2 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Valor Medido</label>
+              <input
+                inputMode="decimal"
+                value={valorMedido}
+                onChange={e => setValorMedido(e.target.value)}
+                placeholder="0,00"
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Retenção</label>
+              <input
+                inputMode="decimal"
+                value={valorRetencao}
+                onChange={e => setValorRetencao(e.target.value)}
+                placeholder="0,00"
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Líquido</label>
+              <div className="mt-1 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 text-sm font-bold text-fuchsia-700">
+                {fmtFull(liquido)}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Observações</label>
+            <UpperTextarea
+              value={observacoes}
+              onChange={e => setObservacoes(e.target.value)}
+              rows={2}
+              placeholder="Detalhes da medição..."
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <button
+            onClick={onClose}
+            disabled={criar.isPending}
+            className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-all disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={criar.isPending}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all disabled:opacity-50"
+          >
+            {criar.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            Criar Medição
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TabMedicoes() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
 
   const { data: medicoes = [], isLoading } = useMedicoes()
   const { data: contratos = [] } = useContratos()
@@ -1252,12 +1465,22 @@ function TabMedicoes() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar BM, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar BM, contrato..."
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
+              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
+        </div>
+        <button
+          onClick={() => setNovaMedicaoOpen(true)}
+          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-fuchsia-600 text-white
+            text-xs font-bold hover:bg-fuchsia-700 transition-all shadow-sm whitespace-nowrap"
+        >
+          <Plus size={14} />
+          Nova Medição de Contrato
+        </button>
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
@@ -1271,6 +1494,13 @@ function TabMedicoes() {
           </button>
         ))}
       </div>
+
+      <NovaMedicaoModal
+        open={novaMedicaoOpen}
+        onClose={() => setNovaMedicaoOpen(false)}
+        contratos={contratos}
+        onToast={showToast}
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -1369,83 +1599,73 @@ function TabMedicoes() {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
-  const nav = useNavigate()
+  const { isDark } = useTheme()
   const [tab, setTab] = useState<Tab>('contratos')
   const { data: contratos = [] } = useContratos()
   const { data: aditivos = [] } = useAditivos()
   const { data: reajustes = [] } = useReajustes()
+  const { data: medicoes = [] } = useMedicoes()
+  const { data: parcelas = [] } = useParcelas()
 
-  const vigentes = contratos.filter(c => c.status === 'vigente').length
-  const totalReceita = contratos
-    .filter(c => c.tipo_contrato === 'receita')
-    .reduce((s, c) => s + c.valor_total + c.valor_aditivos, 0)
-  const totalDespesa = contratos
-    .filter(c => c.tipo_contrato === 'despesa')
-    .reduce((s, c) => s + c.valor_total + c.valor_aditivos, 0)
+  const counts: Record<Tab, number> = useMemo(() => ({
+    contratos: contratos.length,
+    medicoes: medicoes.length,
+    recebiveis: parcelas.filter(p => p.contrato?.tipo_contrato === 'receita').length,
+    provisionado: parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa').length,
+    aditivos: aditivos.length,
+    reajustes: reajustes.length,
+    vencimentos: contratos.filter(c => c.status === 'vigente').length,
+  }), [contratos, medicoes, parcelas, aditivos, reajustes])
 
   return (
-    <div className="space-y-5">
+    <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-          <Briefcase size={20} className="text-indigo-500" />
-          Gestão de Contratos
+      <div className="px-4 pt-4 pb-2">
+        <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <Briefcase size={18} className="text-indigo-500" /> Gestão de Contratos
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           Contratos ativos, aditivos, reajustes e vencimentos
         </p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total</p>
-          <p className="text-2xl font-extrabold text-slate-800 mt-1">{contratos.length}</p>
-          <p className="text-[10px] text-slate-400">{vigentes} vigentes</p>
-        </div>
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-4">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Receita</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalReceita)}</p>
-        </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4">
-          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Despesa</p>
-          <p className="text-lg font-extrabold text-amber-700 mt-1">{fmt(totalDespesa)}</p>
-        </div>
-        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-4">
-          <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Aditivos</p>
-          <p className="text-2xl font-extrabold text-indigo-700 mt-1">{aditivos.length}</p>
-          <p className="text-[10px] text-indigo-500">{reajustes.length} reajustes</p>
-        </div>
-      </div>
-
       {/* Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
+      <div className={`flex gap-1 p-1 pb-2 border-b overflow-x-auto hide-scrollbar ${
+        isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
+      }`}>
         {TABS.map(t => {
+          const count = counts[t.key] ?? 0
+          const isActive = tab === t.key
           const Icon = t.icon
-          const active = tab === t.key
+          const a = isDark ? TAB_ACCENT_DARK[t.key] : TAB_ACCENT[t.key]
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
-                active
-                  ? `${t.bg} ${t.text} font-bold shadow-sm ring-1 ${t.border.replace('border-l-', 'ring-')}`
-                  : `bg-slate-50 text-slate-500 font-medium`
-              }`}
-            >
-              <Icon size={13} className="shrink-0" />
-              {t.label}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
+                isActive
+                  ? `${a.bgActive} ${a.textActive} ${a.border} font-bold shadow-sm`
+                  : `${a.bg} ${a.text} font-medium border-transparent ${isDark ? '' : 'hover:bg-white hover:shadow-sm'}`
+              }`}>
+              <Icon size={15} className="shrink-0" /> {t.label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 ${
+                  isActive ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
+                }`}>{count}</span>
+              )}
             </button>
           )
         })}
       </div>
 
       {/* Tab Content */}
-      {tab === 'contratos' && <TabContratos />}
-      {tab === 'medicoes' && <TabMedicoes />}
-      {tab === 'recebiveis' && <TabRecebiveis />}
-      {tab === 'provisionado' && <TabProvisionado />}
-      {tab === 'aditivos' && <TabAditivos />}
-      {tab === 'reajustes' && <TabReajustes />}
-      {tab === 'vencimentos' && <TabVencimentos />}
+      <div className="p-4 min-h-[300px]">
+        {tab === 'contratos' && <TabContratos />}
+        {tab === 'medicoes' && <TabMedicoes />}
+        {tab === 'recebiveis' && <TabRecebiveis />}
+        {tab === 'provisionado' && <TabProvisionado />}
+        {tab === 'aditivos' && <TabAditivos />}
+        {tab === 'reajustes' && <TabReajustes />}
+        {tab === 'vencimentos' && <TabVencimentos />}
+      </div>
     </div>
   )
 }
