@@ -34,6 +34,22 @@ const isDueThisWeek = (d: string) => {
 
 type GroupBy = 'vencimento' | 'fornecedor' | 'forma'
 
+const STATUS_POR_ESCOPO: Record<EscopoRelatorio, string[]> = {
+  todos: ['previsto', 'confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
+  previstos: ['previsto'],
+  confirmados: ['confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
+}
+
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  previsto:              { label: 'Previsto',    color: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
+  confirmado:            { label: 'Confirmado',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  aguardando_aprovacao:  { label: 'Aguard. Aprov.', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  aprovado_pgto:         { label: 'Aprovado',    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  em_pagamento:          { label: 'Em pagamento', color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+}
+
+const podePagar = (cp: ContaPagar) => cp.status === 'aprovado_pgto'
+
 interface GroupedSection {
   key: string
   label: string
@@ -46,7 +62,8 @@ interface GroupedSection {
 
 export default function PainelPagamentos() {
   const { isDark } = useTheme()
-  const { data: cps = [], isLoading } = useCPsParaPagamento()
+  const [escopoPdf, setEscopoPdfRaw] = useState<EscopoRelatorio>('todos')
+  const { data: cps = [], isLoading } = useCPsParaPagamento(STATUS_POR_ESCOPO[escopoPdf])
   const registrarBatch = useRegistrarPagamentoBatch()
 
   const [busca, setBusca] = useState('')
@@ -57,9 +74,13 @@ export default function PainelPagamentos() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [exporting, setExporting] = useState(false)
-  const [escopoPdf, setEscopoPdf] = useState<EscopoRelatorio>('todos')
   const [pendentesComprovante, setPendentesComprovante] = useState<ContaPagar[]>([])
   const [checandoComprovantes, setChecandoComprovantes] = useState(false)
+
+  const setEscopoPdf = useCallback((e: EscopoRelatorio) => {
+    setEscopoPdfRaw(e)
+    setSelected(new Set())
+  }, [])
 
   // ── Filter ──
   const filtered = useMemo(() => {
@@ -134,8 +155,9 @@ export default function PainelPagamentos() {
     return arr
   }, [filtered, groupBy])
 
-  // ── Selection helpers ──
-  const toggle = useCallback((id: string) => {
+  // ── Selection helpers (só CPs aprovado_pgto entram na seleção) ──
+  const toggle = useCallback((id: string, cp: ContaPagar) => {
+    if (!podePagar(cp)) return
     setSelected(prev => {
       const n = new Set(prev)
       n.has(id) ? n.delete(id) : n.add(id)
@@ -144,13 +166,14 @@ export default function PainelPagamentos() {
   }, [])
 
   const toggleAll = useCallback(() => {
-    const allIds = filtered.map(c => c.id)
-    const allSel = allIds.every(id => selected.has(id))
-    setSelected(allSel ? new Set() : new Set(allIds))
+    const pagaveis = filtered.filter(podePagar).map(c => c.id)
+    const allSel = pagaveis.length > 0 && pagaveis.every(id => selected.has(id))
+    setSelected(allSel ? new Set() : new Set(pagaveis))
   }, [filtered, selected])
 
   const toggleSection = useCallback((sectionCps: ContaPagar[]) => {
-    const ids = sectionCps.map(c => c.id)
+    const ids = sectionCps.filter(podePagar).map(c => c.id)
+    if (ids.length === 0) return
     const allSel = ids.every(id => selected.has(id))
     setSelected(prev => {
       const n = new Set(prev)
@@ -233,29 +256,17 @@ export default function PainelPagamentos() {
     if (exporting) return
     setExporting(true)
     try {
-      const statusPorEscopo: Record<EscopoRelatorio, string[]> = {
-        todos: ['previsto', 'confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
-        previstos: ['previsto'],
-        confirmados: ['confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
-      }
-      const { data, error } = await supabase
-        .from('fin_contas_pagar')
-        .select('*')
-        .in('status', statusPorEscopo[escopoPdf])
-        .order('data_vencimento', { ascending: true })
-      if (error) throw error
       const titulos: Record<EscopoRelatorio, string> = {
         todos: 'pagamento em aberto',
         previstos: 'pagamento previsto',
         confirmados: 'pagamento confirmado',
       }
-      const previstos = (data ?? []) as ContaPagar[]
-      if (previstos.length === 0) {
+      if (cps.length === 0) {
         setToast({ type: 'error', msg: `Nenhum ${titulos[escopoPdf]} para exportar` })
         setTimeout(() => setToast(null), 3000)
         return
       }
-      await downloadPagamentosPrevistosPdf(previstos, escopoPdf)
+      await downloadPagamentosPrevistosPdf(cps, escopoPdf)
     } catch {
       setToast({ type: 'error', msg: 'Erro ao gerar o PDF' })
       setTimeout(() => setToast(null), 3000)
@@ -357,20 +368,25 @@ export default function PainelPagamentos() {
           ))}
         </div>
 
-        {/* Select all */}
-        <button
-          onClick={toggleAll}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-500 transition-colors"
-        >
-          {filtered.length > 0 && filtered.every(c => selected.has(c.id)) ? (
-            <CheckSquare size={14} />
-          ) : selected.size > 0 ? (
-            <Minus size={14} />
-          ) : (
-            <Square size={14} />
-          )}
-          Selecionar todos
-        </button>
+        {/* Select all (aprovados) */}
+        {(() => {
+          const pagaveis = filtered.filter(podePagar)
+          const semPagaveis = pagaveis.length === 0
+          const todosSel = pagaveis.length > 0 && pagaveis.every(c => selected.has(c.id))
+          return (
+            <button
+              onClick={toggleAll}
+              disabled={semPagaveis}
+              title={semPagaveis ? 'Nenhum CP aprovado neste escopo' : 'Seleciona apenas CPs aprovados para pagamento'}
+              className={`flex items-center gap-1.5 text-xs transition-colors ${
+                semPagaveis ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-emerald-500'
+              }`}
+            >
+              {todosSel ? <CheckSquare size={14} /> : selected.size > 0 ? <Minus size={14} /> : <Square size={14} />}
+              Selecionar aprovados
+            </button>
+          )
+        })()}
       </div>
 
       {/* Loading */}
@@ -389,8 +405,10 @@ export default function PainelPagamentos() {
       {/* Sections */}
       {sections.map(section => {
         const isCollapsed = collapsed.has(section.key)
-        const sectionAllSelected = section.cps.every(c => selected.has(c.id))
-        const sectionSome = section.cps.some(c => selected.has(c.id))
+        const pagaveisIds = section.cps.filter(podePagar).map(c => c.id)
+        const sectionAllSelected = pagaveisIds.length > 0 && pagaveisIds.every(id => selected.has(id))
+        const sectionSome = pagaveisIds.some(id => selected.has(id))
+        const semPagaveis = pagaveisIds.length === 0
 
         return (
           <div
@@ -410,7 +428,9 @@ export default function PainelPagamentos() {
             >
               <button
                 onClick={e => { e.stopPropagation(); toggleSection(section.cps) }}
-                className="text-slate-400 hover:text-emerald-500 transition-colors"
+                disabled={semPagaveis}
+                title={semPagaveis ? 'Nenhum CP aprovado nesta seção' : undefined}
+                className={`transition-colors ${semPagaveis ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-emerald-500'}`}
               >
                 {sectionAllSelected ? <CheckSquare size={16} /> : sectionSome ? <Minus size={16} /> : <Square size={16} />}
               </button>
@@ -432,44 +452,59 @@ export default function PainelPagamentos() {
             {/* Section items */}
             {!isCollapsed && (
               <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {section.cps.map(cp => (
-                  <div
-                    key={cp.id}
-                    onClick={() => toggle(cp.id)}
-                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                      selected.has(cp.id)
-                        ? isDark ? 'bg-emerald-900/10' : 'bg-emerald-50/50'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
-                    }`}
-                  >
-                    <span className="text-slate-400">
-                      {selected.has(cp.id) ? <CheckSquare size={15} className="text-emerald-500" /> : <Square size={15} />}
-                    </span>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{cp.fornecedor_nome}</div>
-                      <div className="text-[11px] text-slate-400 truncate">
-                        {cp.numero_documento && <span className="mr-2">{cp.numero_documento}</span>}
-                        {cp.descricao && <span>{cp.descricao}</span>}
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-bold">{fmtFull(cp.valor_original)}</div>
-                      <div className={`text-[10px] ${isOverdue(cp.data_vencimento) ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
-                        Venc. {fmtData(cp.data_vencimento)}
-                      </div>
-                    </div>
-
-                    {cp.forma_pagamento && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                        isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {cp.forma_pagamento}
+                {section.cps.map(cp => {
+                  const pagavel = podePagar(cp)
+                  const statusInfo = STATUS_LABEL[cp.status] ?? { label: cp.status, color: 'bg-slate-200 text-slate-700' }
+                  return (
+                    <div
+                      key={cp.id}
+                      onClick={() => toggle(cp.id, cp)}
+                      title={pagavel ? undefined : 'Somente CPs com status "Aprovado" podem ser pagas em lote'}
+                      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                        pagavel ? 'cursor-pointer' : 'cursor-not-allowed'
+                      } ${
+                        selected.has(cp.id)
+                          ? isDark ? 'bg-emerald-900/10' : 'bg-emerald-50/50'
+                          : pagavel
+                            ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                            : ''
+                      }`}
+                    >
+                      <span className={pagavel ? 'text-slate-400' : 'text-slate-300 dark:text-slate-600'}>
+                        {selected.has(cp.id)
+                          ? <CheckSquare size={15} className="text-emerald-500" />
+                          : <Square size={15} />}
                       </span>
-                    )}
-                  </div>
-                ))}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{cp.fornecedor_nome}</div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {cp.numero_documento && <span className="mr-2">{cp.numero_documento}</span>}
+                          {cp.descricao && <span>{cp.descricao}</span>}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold">{fmtFull(cp.valor_original)}</div>
+                        <div className={`text-[10px] ${isOverdue(cp.data_vencimento) ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+                          Venc. {fmtData(cp.data_vencimento)}
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusInfo.color}`}>
+                        {statusInfo.label}
+                      </span>
+
+                      {cp.forma_pagamento && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {cp.forma_pagamento}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

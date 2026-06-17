@@ -443,14 +443,15 @@ export function useDecidirLoteCompleto() {
 
 // ── Query: CPs prontas para pagamento (aprovado_pgto) ────────────────────────
 
-export function useCPsParaPagamento() {
+export function useCPsParaPagamento(statuses: string[] = ['aprovado_pgto']) {
+  const key = [...statuses].sort().join(',')
   return useQuery<ContaPagar[]>({
-    queryKey: ['cps-para-pagamento'],
+    queryKey: ['cps-para-pagamento', key],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fin_contas_pagar')
         .select(SELECT_CP)
-        .eq('status', 'aprovado_pgto')
+        .in('status', statuses)
         .order('data_vencimento', { ascending: true })
       if (error) throw error
       return (data ?? []) as ContaPagar[]
