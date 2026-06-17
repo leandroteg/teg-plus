@@ -337,7 +337,7 @@ export interface PatrimonialKPIs {
 // Pipeline Estoque — Abas
 // =============================================================================
 
-export type EstoquePipelineTab = 'aguardando_entrada' | 'em_estoque' | 'liberado_retirada' | 'em_movimentacao'
+export type EstoquePipelineTab = 'aguardando_entrada' | 'em_estoque' | 'liberado_retirada' | 'em_movimentacao' | 'historico'
 
 export interface EstoquePipelineStage {
   tab: EstoquePipelineTab
@@ -350,6 +350,7 @@ export const ESTOQUE_PIPELINE_STAGES: EstoquePipelineStage[] = [
   { tab: 'em_estoque',         label: 'Em Estoque',            color: 'emerald' },
   { tab: 'liberado_retirada',  label: 'Liberado p/ Retirada',  color: 'blue'    },
   { tab: 'em_movimentacao',    label: 'Em Movimentação',       color: 'amber'   },
+  { tab: 'historico',          label: 'Histórico',             color: 'violet'  },
 ]
 
 // ── Aggregated item for pipeline views ──────────────────────────────────────

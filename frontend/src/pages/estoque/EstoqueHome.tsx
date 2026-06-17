@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package2, DollarSign, AlertTriangle, ArrowRight, RefreshCw,
   TrendingUp, Zap, BarChart3, ShieldAlert, Clock, FileText,
-  ArrowLeftRight,
+  ArrowLeftRight, MapPin, ChevronDown,
 } from 'lucide-react'
+
+const PainelEstoque = lazy(() => import('./PainelEstoque'))
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEstoqueKPIs, useSaldosAbaixoMinimo, useMovimentacoes, useSolicitacoes, useAguardandoEntrada, useLiberadosRetirada, useBases, useRCsEmTriagemCD } from '../../hooks/useEstoque'
 import { useCautelas } from '../../hooks/useCautelas'
@@ -96,6 +98,7 @@ export default function EstoqueHome() {
   const nav = useNavigate()
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'indicadores'>('painel')
 
   const { data: kpis, isLoading, refetch } = useEstoqueKPIs()
   const { data: abaixoMinimo = [] } = useSaldosAbaixoMinimo()
@@ -107,7 +110,9 @@ export default function EstoqueHome() {
   const { data: bases = [] } = useBases()
   const { data: rcsEmTriagem = [] } = useRCsEmTriagemCD()
   const { perfil, isAdmin } = useAuth()
-  const isTriador = isAdmin || Boolean((bases.find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
+  const minhaBase = perfil?.base_id ? bases.find(b => b.id === perfil.base_id) : null
+  const isTriador = isAdmin || Boolean((minhaBase as any)?.faz_triagem)
+  const restritoABase = Boolean(minhaBase) && !isAdmin && !isTriador
 
   const cardClass = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -155,18 +160,55 @@ export default function EstoqueHome() {
   return (
     <div className="space-y-4 p-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
-            <Package2 size={22} className="text-teal-500" /> Estoque
-          </h1>
-          <p className={`text-xs mt-0.5 ${txtMuted}`}>Almoxarifado, cautelas e movimentações</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
+              <Package2 size={22} className="text-teal-500" /> Estoque
+            </h1>
+            <p className={`text-xs mt-0.5 ${txtMuted}`}>Almoxarifado, cautelas e movimentações</p>
+          </div>
+          <div className="relative">
+            <select
+              value={painelAtivo}
+              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'indicadores')}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark
+                  ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <option value="painel">Painel</option>
+              <option value="indicadores">Indicadores</option>
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${txtMuted}`} />
+          </div>
         </div>
-        <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
-          <RefreshCw size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {restritoABase && minhaBase && (
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+              isDark ? 'bg-teal-500/10 text-teal-300' : 'bg-teal-500/10 text-teal-700'
+            }`}
+              title="Você está vendo apenas materiais e movimentações do seu polo"
+            >
+              <MapPin size={12} />
+              {minhaBase.nome}
+              <span className="opacity-70 ml-1 hidden sm:inline text-[10px]">apenas seu polo</span>
+            </div>
+          )}
+          <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+            <RefreshCw size={16} />
+          </button>
+        </div>
       </div>
 
+      {painelAtivo === 'indicadores' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <PainelEstoque />
+        </Suspense>
+      )}
+
+      {painelAtivo === 'painel' && (<>
       {/* Aviso de triagem — só para quem está lotado no CD (faz triagem) */}
       {isTriador && solicitacoesPendentes.length > 0 && (
         <button
@@ -434,6 +476,7 @@ export default function EstoqueHome() {
           )}
         </div>
       </div>
+      </>)}
     </div>
   )
 }

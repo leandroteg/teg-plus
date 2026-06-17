@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
   CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react'
+
+const Movimentacoes = lazy(() => import('./Movimentacoes'))
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
@@ -23,12 +25,14 @@ const STATUS_ACCENT: Record<EstoquePipelineTab, { bg: string; text: string; bord
   em_estoque:         { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-400', badge: 'bg-emerald-100 text-emerald-700', ring: 'ring-emerald-400' },
   liberado_retirada:  { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-400',    badge: 'bg-blue-100 text-blue-700',       ring: 'ring-blue-400'    },
   em_movimentacao:    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-400',   badge: 'bg-amber-100 text-amber-700',     ring: 'ring-amber-400'   },
+  historico:          { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-400',  badge: 'bg-violet-100 text-violet-700',   ring: 'ring-violet-400'  },
 }
 const STATUS_ACCENT_DARK: Record<EstoquePipelineTab, { bg: string; text: string; border: string; badge: string; ring: string }> = {
   aguardando_entrada: { bg: 'bg-slate-500/10',   text: 'text-slate-300',   border: 'border-slate-500',   badge: 'bg-slate-500/20 text-slate-300',     ring: 'ring-slate-500'   },
   em_estoque:         { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500', badge: 'bg-emerald-500/20 text-emerald-400', ring: 'ring-emerald-500' },
   liberado_retirada:  { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500',    badge: 'bg-blue-500/20 text-blue-400',       ring: 'ring-blue-500'    },
   em_movimentacao:    { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500',   badge: 'bg-amber-500/20 text-amber-400',     ring: 'ring-amber-500'   },
+  historico:          { bg: 'bg-violet-500/10',  text: 'text-violet-400',  border: 'border-violet-500',  badge: 'bg-violet-500/20 text-violet-400',   ring: 'ring-violet-500'  },
 }
 
 const CURVA_COLOR: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
@@ -163,6 +167,7 @@ export default function Itens() {
     em_estoque: saldosFiltrados.length,
     liberado_retirada: liberadosFiltrados.length,
     em_movimentacao: movsFiltradas.length,
+    historico: 0,
   }
 
   const isLoading = activeTab === 'em_estoque' ? loadingSaldos
@@ -249,17 +254,28 @@ export default function Itens() {
               {stage.tab === 'em_estoque' && <Package2 size={15} />}
               {stage.tab === 'liberado_retirada' && <ClipboardCheck size={15} />}
               {stage.tab === 'em_movimentacao' && <Truck size={15} />}
+              {stage.tab === 'historico' && <History size={15} />}
               {stage.label}
-              <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full
-                ${active ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                {counts[stage.tab]}
-              </span>
+              {stage.tab !== 'historico' && (
+                <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                  ${active ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                  {counts[stage.tab]}
+                </span>
+              )}
             </button>
           )
         })}
       </div>
 
+      {/* ── Histórico (Movimentações) ─────────────────────────── */}
+      {activeTab === 'historico' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <Movimentacoes />
+        </Suspense>
+      )}
+
       {/* ── Content Card ─────────────────────────────────────────── */}
+      {activeTab !== 'historico' && (
       <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`}>
 
         {/* ── Toolbar ─────────────────────────────────────────────── */}
@@ -372,6 +388,7 @@ export default function Itens() {
           </>
         )}
       </div>
+      )}
 
       {/* ── Item Form Modal ────────────────────────────────────────── */}
       {showForm && editItem && (

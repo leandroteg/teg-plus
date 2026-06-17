@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Package2,
-  ClipboardList, Plus, KeyRound, History, FileBox, ShoppingCart, BarChart3,
+  ClipboardList, Plus, KeyRound,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -12,25 +12,15 @@ export default function EstoqueLayout() {
   const NAV: NavItem[] = [
     { to: '/estoque', icon: LayoutDashboard, label: 'Painel', end: true },
     {
-      to: '/requisicoes/nova',
-      icon: ShoppingCart,
-      label: 'Nova Requisi\u00e7\u00e3o',
-      action: () => navigate(`/requisicoes/nova?nova=${Date.now()}`),
-      accent: true,
-      requisitanteAllowed: true,
-    },
-    {
       to: '/estoque/movimentacoes?nova=1',
       icon: Plus,
-      label: 'Nova Movimenta\u00e7\u00e3o',
+      label: 'Nova Movimentação',
       action: () => navigate('/estoque/movimentacoes?nova=1'),
+      accent: true,
     },
-    { to: '/estoque/solicitacoes', icon: FileBox, label: 'Solicitações', end: false },
     { to: '/estoque/cautelas', icon: KeyRound, label: 'Cautelas', end: false },
     { to: '/estoque/itens', icon: Package2, label: 'Estoque', end: false },
-    { to: '/estoque/inventario', icon: ClipboardList, label: 'Invent\u00e1rio', end: false },
-    { to: '/estoque/movimentacoes', icon: History, label: 'Hist\u00f3rico', end: false },
-    { to: '/estoque/painel', icon: BarChart3, label: 'Indicadores', end: false },
+    { to: '/estoque/inventario', icon: ClipboardList, label: 'Inventário', end: false },
   ]
 
   return (
@@ -41,7 +31,6 @@ export default function EstoqueLayout() {
       accent="blue"
       nav={NAV}
       truncateBottomLabels
-      requisitanteAllowedPaths={['/requisicoes/']}
     />
   )
 }
