@@ -108,7 +108,7 @@ export function useRecebimentosPedido(pedidoId?: string) {
           nf_numero, nf_chave, data_recebimento, observacao, created_at,
           base:est_bases(codigo, nome),
           itens:cmp_recebimento_itens(
-            id, descricao, quantidade_esperada, quantidade_recebida,
+            id, requisicao_item_id, descricao, quantidade_esperada, quantidade_recebida,
             valor_unitario, tipo_destino
           )
         `)

@@ -11,6 +11,7 @@ import {
   useItensRequisicao,
   useBases,
   useCriarRecebimento,
+  useRecebimentosPedido,
 } from '../hooks/useRecebimento'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,7 +45,23 @@ export default function RecebimentoModal({
 }) {
   const { data: itensRC, isLoading: loadingItens } = useItensRequisicao(pedido.requisicao_id)
   const { data: bases, isLoading: loadingBases }   = useBases()
+  const { data: recebimentosAnteriores, isLoading: loadingRecebs } = useRecebimentosPedido(pedido.id)
   const criarRecebimento = useCriarRecebimento()
+
+  // qty already received per requisicao_item_id (sum across previous recebimentos)
+  const jaRecebidoPorItem = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of recebimentosAnteriores ?? []) {
+      for (const it of (r.itens ?? []) as any[]) {
+        const key = it.requisicao_item_id
+        if (!key) continue
+        map.set(key, (map.get(key) ?? 0) + Number(it.quantidade_recebida ?? 0))
+      }
+    }
+    return map
+  }, [recebimentosAnteriores])
+
+  const temRecebimentoAnterior = (recebimentosAnteriores?.length ?? 0) > 0
 
   // Form state
   const [baseId, setBaseId]                 = useState('')
@@ -59,22 +76,26 @@ export default function RecebimentoModal({
   const [itens, setItens] = useState<RecebimentoItemForm[]>([])
   const [initialized, setInitialized]       = useState(false)
 
-  // Initialize items when RC items load — with smart pre-fill from catalog
-  if (itensRC && !initialized) {
+  // Initialize items when RC items load — pre-fill with REMAINING qty (suporta multiplas NFs)
+  if (itensRC && !loadingRecebs && !initialized) {
     setItens(
       itensRC.map(item => {
         const destino = derivarDestinoPadrao(item.destino_operacional)
+        const jaRecebido = jaRecebidoPorItem.get(item.id) ?? 0
+        const saldo = Math.max(0, item.quantidade - jaRecebido)
         return {
           requisicao_item_id: item.id,
           item_estoque_id: item.est_item_id,
           descricao: item.descricao,
-          quantidade_esperada: item.quantidade,
-          quantidade_recebida: item.quantidade,
+          quantidade_esperada: saldo,
+          quantidade_recebida: saldo,
           valor_unitario: item.valor_unitario_estimado,
           tipo_destino: destino,
           destino_padrao: item.est_item_id ? destino : undefined,
         }
       })
+        // Esconde itens 100% recebidos
+        .filter(it => it.quantidade_esperada > 0)
     )
     setInitialized(true)
   }
@@ -135,7 +156,7 @@ export default function RecebimentoModal({
     }
   }
 
-  const isLoading = loadingItens || loadingBases
+  const isLoading = loadingItens || loadingBases || loadingRecebs
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -179,6 +200,27 @@ export default function RecebimentoModal({
             </div>
           ) : (
             <>
+              {/* ── NFs ja recebidas (multiplas NFs por pedido) ─────── */}
+              {temRecebimentoAnterior && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1.5">
+                    NFs ja recebidas neste pedido
+                  </p>
+                  <div className="space-y-1">
+                    {(recebimentosAnteriores ?? []).map(r => {
+                      const dt = r.data_recebimento ? new Date(r.data_recebimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+                      const qtdItens = (r.itens ?? []).filter((i: any) => Number(i.quantidade_recebida ?? 0) > 0).length
+                      return (
+                        <div key={r.id} className="flex items-center justify-between text-[11px] text-blue-900">
+                          <span className="font-semibold">NF {r.nf_numero || '—'}</span>
+                          <span className="text-blue-600">{qtdItens} {qtdItens === 1 ? 'item' : 'itens'} · {dt}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ── Base de destino ──────────────────────────────── */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">
