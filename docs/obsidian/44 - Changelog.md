@@ -23,6 +23,23 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[17 - Roadmap]]", "[[15 - Deploy e GitHub
 
 ---
 
+## [2026-06-17] — Painel de Pagamentos Previstos + Fatura ↔ CP (Cartão & Locação)
+
+### Added
+- **Painel de Pagamentos — filtro de escopo**: dropdown ao lado de "Exportar PDF" com opções **Todos em aberto / Apenas previstos / Apenas confirmados**. Filtra a lista exibida na tela (`useCPsParaPagamento` aceita lista de statuses) e o título/rodapé/arquivo do PDF gerencial refletem o escopo. CPs não-aprovados ficam visíveis mas não-selecionáveis para batch payment; cada linha ganha badge de status (`Previsto` / `Confirmado` / `Aguard. Aprov.` / `Aprovado` / `Em pagamento`).
+- **Cartão → CP (Previsão de Pagamento)** — migration **146**: `fin_contas_pagar.fatura_id` (FK `fin_faturas_cartao`) + RPC `cartao_enviar_fatura_financeiro(uuid[])` cria CP `previsto` por fatura, idempotente (pula se já enviada, sem valor ou sem vencimento), retorna `{enviadas, puladas, motivos[]}`. Botão **"Enviar ao Financeiro"** na tela de Conciliação Cartões; faixa verde "Fatura enviada · CP {status}" com pílula amber "Conciliação parcial (X/Y)" enquanto itens não estão 100% conciliados. Badge **"Fatura X/Y"** no Painel de Pagamentos por linha de CP de fatura (verde se 100%, amber se parcial).
+- **Locação → CP** — migration **147**: `fin_contas_pagar.loc_fatura_id` (FK `loc_faturas`) + RPC `loc_enviar_faturas_financeiro` atualizado para preencher o vínculo, ficar idempotente e retornar `motivos[]`. Badge indigo **"Locação YYYY-MM"** no Painel de Pagamentos com tooltip de imóvel + tipo de fatura.
+
+### Fixed
+- **Check constraint `fin_contas_pagar_origem_check`** (migration 146b) — ampliada para aceitar `'cartao_fatura'` e `'locacao'`. Antes do fix, **TODO envio de fatura de locação ao financeiro falhava em silêncio** porque a constraint não incluía `'locacao'`. RPC `loc_enviar_faturas_financeiro` (criado em 124) ficou inerte por meses por causa disso.
+- **Label `Emissão`** com escape Unicode literal (`Emissão`) no card de Contas a Pagar — JSX text não processa `\u`, renderizava cru. Mesmo bug em 4 ocorrências de `Divergência` no mesmo arquivo (essas funcionavam por estarem dentro de strings JS).
+
+### Changed
+- `useEnviarFaturasFinanceiro` (locação) e novo `useEnviarFaturaFinanceiro` (cartão) retornam `motivos[]` para feedback granular ao operador.
+- `OrigemCP` aceita `'cartao_fatura' | 'locacao'` (TS).
+
+---
+
 ## [2026-04-08] — Correções Contratos & Docs Overhaul
 
 ### Fixed

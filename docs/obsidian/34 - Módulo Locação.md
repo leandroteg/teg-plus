@@ -98,6 +98,18 @@ O módulo gerencia faturas recorrentes vinculadas a cada imóvel:
 
 **Status da fatura:** `previsto` → `lancado` → `enviado_pagamento` → `pago`
 
+### Envio ao Financeiro (Previsão de Pagamento)
+
+Faturas em status `previsto` ou `lancado` com valor > 0 podem ser enviadas ao Financeiro via botão **"Enviar p/ Financeiro"** no modal de detalhe do imóvel (Faturas.tsx).
+
+- **RPC**: `loc_enviar_faturas_financeiro(p_fatura_ids uuid[])` — cria 1 `fin_contas_pagar` por fatura elegível, status `previsto`, `origem='locacao'`, `natureza='locacao_imovel'`, fornecedor = `locador_nome` do imóvel.
+- **Link FK**: o CP guarda `loc_fatura_id` apontando para a fatura origem (migration 147).
+- **Idempotência**: reenvio da mesma fatura é pulado com motivo `ja_enviada` — não duplica CP.
+- **Status da fatura** vira `enviado_pagamento` após geração do CP.
+- **Marcação no Painel de Pagamentos**: linhas de CP com `loc_fatura_id` ganham badge indigo "Locação YYYY-MM" com tooltip mostrando imóvel + tipo.
+
+> **Atenção histórica:** o check constraint de `origem` em `fin_contas_pagar` não incluía `'locacao'` até a migration 146b (junho/2026). O RPC criado em 124 ficou inerte por meses — todo envio falhava em silêncio. Verificar antes de assumir que CPs históricos de locação foram gerados.
+
 ---
 
 ## Vistorias — Checklist Comparativo
@@ -336,7 +348,7 @@ supabase/
 | Módulo | Integração |
 |--------|-----------|
 | **Contratos** | Imóvel pode ser vinculado a `con_contratos` para gestão contratual formal |
-| **Financeiro** | Faturas de locação podem gerar CP para pagamento |
+| **Financeiro** | Faturas de locação geram CP via RPC `loc_enviar_faturas_financeiro` com link FK `loc_fatura_id` (idempotente) — ver seção "Envio ao Financeiro" |
 | **Compras** | Solicitações de manutenção podem gerar requisição de compras |
 | **Cadastros** | Centro de custo e obra referenciados em `sys_centros_custo` e `cad_obras` |
 | **Obras** | Cada imóvel pode ser vinculado a uma obra específica |

@@ -273,6 +273,15 @@ supabase/
 #### `055_recebimento_aguardando_entrada.sql` — Aguardando Entrada
 **Cria:** Status `aguardando_entrada` em `cmp_recebimento_itens`. Trigger só processa quando `confirmado`.
 
+#### `146_cartao_enviar_fatura_financeiro.sql` — Cartão → CP
+**Cria:** Coluna `fin_contas_pagar.fatura_id` (FK `fin_faturas_cartao`) + RPC `cartao_enviar_fatura_financeiro(uuid[])` que cria 1 CP `previsto` por fatura de cartão, idempotente (pula se já enviada, sem valor ou sem vencimento), retorna `{enviadas, puladas, motivos[]}`.
+
+#### `146b_fin_contas_pagar_origem_cartao_locacao.sql` — Fix Constraint
+**Corrige:** Check `fin_contas_pagar_origem_check` ampliado para aceitar `'cartao_fatura'` e `'locacao'`. Antes desse fix, todo envio de fatura de locação ao financeiro (RPC criada em 124) falhava em silêncio.
+
+#### `147_loc_fatura_id_em_cp.sql` — Locação → CP (link FK)
+**Cria:** Coluna `fin_contas_pagar.loc_fatura_id` (FK `loc_faturas`) e atualiza o RPC `loc_enviar_faturas_financeiro` para preencher o vínculo, ficar idempotente e retornar `motivos[]` por fatura pulada.
+
 ---
 
 ### Runners e Referência
