@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/rh/RHColaboradorDetalhe.tsx — Ficha completa do colaborador
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowLeft, Save, User, Briefcase, MapPin, Building2, CreditCard,
   FileText, Users2, Phone, Mail, Calendar, Hash, Edit3, Plus, Trash2,
   ChevronDown, ChevronUp, Clock, TrendingUp,
   Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
+  Sparkles, FileBarChart, X, Paperclip, AlertCircle,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -387,6 +388,9 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
       {/* Documentos (OneDrive) */}
       <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
 
+      {/* Relatório histórico (SuperTEG) */}
+      <RelatorioHistorico colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
+
       {/* Observações */}
       <div className={sectionCls}>
         <div className="px-5 py-3">
@@ -555,6 +559,196 @@ function OneDriveDocs({ colaboradorId, sectionCls, isLight }: { colaboradorId: s
               ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Relatório Histórico gerado pelo SuperTEG ─────────────────────────────────
+const OBJETIVOS = [
+  { key: 'geral',         label: 'Histórico geral',                texto: 'Histórico geral do colaborador' },
+  { key: 'desempenho',    label: 'Desempenho e conduta',           texto: 'Histórico com foco em desempenho e conduta do colaborador' },
+  { key: 'conformidade',  label: 'Conformidade documental',        texto: 'Histórico com foco na conformidade documental (admissão e documentos obrigatórios)' },
+  { key: 'defesa',        label: 'Subsídio para defesa trabalhista', texto: 'Histórico factual como subsídio para defesa trabalhista (sem argumentação jurídica)' },
+  { key: 'desligamento',  label: 'Rescisão / desligamento',        texto: 'Histórico com foco em informações relevantes para rescisão/desligamento' },
+  { key: 'promocao',      label: 'Promoção / mudança de função',   texto: 'Histórico com foco em qualificação e experiência para promoção ou mudança de função' },
+]
+
+interface Relatorio {
+  id: string; objetivo_key: string | null; objetivo_texto: string | null
+  status: 'processando' | 'concluido' | 'erro'; erro: string | null
+  docs_analisados: number | null; created_at: string
+}
+
+function fileToB64(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => { const s = r.result as string; res(s.includes(',') ? s.split(',')[1] : s) }
+    r.onerror = rej
+    r.readAsDataURL(file)
+  })
+}
+
+function RelatorioHistorico({ colaboradorId, sectionCls, isLight }: { colaboradorId: string; sectionCls: string; isLight: boolean }) {
+  const [aberto, setAberto] = useState(false)
+  const [lista, setLista] = useState<Relatorio[]>([])
+  const [modal, setModal] = useState(false)
+  const [objKey, setObjKey] = useState('geral')
+  const [contexto, setContexto] = useState('')
+  const [processo, setProcesso] = useState<File | null>(null)
+  const [gerando, setGerando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+
+  async function carregar() {
+    const { data } = await supabase.from('rh_colaborador_relatorios')
+      .select('id, objetivo_key, objetivo_texto, status, erro, docs_analisados, created_at')
+      .eq('colaborador_id', colaboradorId).order('created_at', { ascending: false }).limit(20)
+    setLista((data ?? []) as Relatorio[])
+  }
+
+  function abrir() { setAberto(true); carregar() }
+
+  // Poll a cada 8s enquanto houver relatório processando
+  const temProcessando = lista.some(r => r.status === 'processando')
+  useEffect(() => {
+    if (!aberto || !temProcessando) return
+    const t = setInterval(() => { carregar() }, 8000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, temProcessando])
+
+  async function gerar() {
+    setGerando(true); setErro(null)
+    try {
+      const obj = OBJETIVOS.find(o => o.key === objKey)!
+      const body: Record<string, unknown> = {
+        colaborador_id: colaboradorId, objetivo_key: obj.key, objetivo_texto: obj.texto,
+        contexto: contexto.trim() || null,
+      }
+      if (processo) {
+        body.processo_base64 = await fileToB64(processo)
+        body.processo_mime = processo.type || 'application/pdf'
+        body.processo_nome = processo.name
+      }
+      const { data, error } = await supabase.functions.invoke('rh-colaborador-relatorio', { body })
+      if (error) throw error
+      const r = data as { ok?: boolean; motivo?: string }
+      if (!r.ok) throw new Error(r.motivo || 'Falha ao gerar')
+      setModal(false); setContexto(''); setProcesso(null)
+      await carregar()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao gerar relatório')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  async function baixar(rel: Relatorio) {
+    const { data } = await supabase.functions.invoke('rh-colaborador-relatorio', { body: { action: 'link', relatorio_id: rel.id } })
+    const url = (data as { url?: string })?.url
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <div className={sectionCls}>
+      <div className={`flex items-center justify-between px-5 py-3 cursor-pointer ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => (aberto ? setAberto(false) : abrir())}>
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <FileBarChart size={14} className="text-violet-500" /> Relatório Histórico (SuperTEG)
+        </h3>
+        {aberto ? <ChevronUp size={16} className={muted} /> : <ChevronDown size={16} className={muted} />}
+      </div>
+
+      {aberto && (
+        <div className="px-5 pb-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className={`text-[11px] ${muted}`}>O SuperTEG lê os documentos do colaborador e monta um histórico factual.</p>
+            <button onClick={() => { setModal(true); setErro(null) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white shrink-0">
+              <Sparkles size={13} /> Gerar Relatório
+            </button>
+          </div>
+
+          {lista.length === 0 ? (
+            <p className={`text-xs ${muted} py-2 text-center`}>Nenhum relatório gerado ainda.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {lista.map(rel => {
+                const obj = OBJETIVOS.find(o => o.key === rel.objetivo_key)
+                return (
+                  <div key={rel.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border ${isLight ? 'border-slate-100 bg-slate-50/60' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                    <FileBarChart size={15} className="text-violet-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${txt}`}>{obj?.label ?? rel.objetivo_texto ?? 'Relatório'}</p>
+                      <p className={`text-[10px] ${muted}`}>
+                        {new Date(rel.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {rel.docs_analisados != null && ` · ${rel.docs_analisados} documentos`}
+                      </p>
+                    </div>
+                    {rel.status === 'processando' ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-violet-500"><Loader2 size={12} className="animate-spin" /> Gerando…</span>
+                    ) : rel.status === 'erro' ? (
+                      <span className="text-[10px] font-bold text-red-500" title={rel.erro ?? ''}>Erro</span>
+                    ) : (
+                      <button onClick={() => baixar(rel)} title="Baixar PDF"
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isLight ? 'text-violet-700 bg-violet-50 hover:bg-violet-100' : 'text-violet-300 bg-violet-500/15 hover:bg-violet-500/25'}`}>
+                        <Download size={12} /> Baixar
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal gerar */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setModal(false)}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><Sparkles size={18} className="text-violet-600" /> Gerar Relatório Histórico</h2>
+              <button onClick={() => setModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Objetivo do relatório</label>
+                <select value={objKey} onChange={e => setObjKey(e.target.value)}
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-violet-300 outline-none">
+                  {OBJETIVOS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">O documento é sempre um histórico factual — o objetivo só ajusta o foco.</p>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Contexto (opcional)</label>
+                <textarea rows={2} value={contexto} onChange={e => setContexto(e.target.value)}
+                  placeholder="Ex.: detalhes do processo, período de interesse, fatos a destacar…"
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-violet-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Anexar processo (opcional)</label>
+                <label className="mt-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 cursor-pointer hover:border-violet-300">
+                  <Paperclip size={14} /> {processo ? processo.name : 'Selecionar PDF/imagem do processo'}
+                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={e => setProcesso(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+              {erro && <p className="text-xs text-red-600 font-semibold flex items-center gap-1.5"><AlertCircle size={13} /> {erro}</p>}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancelar</button>
+              <button onClick={gerar} disabled={gerando}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60">
+                {gerando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {gerando ? 'Iniciando…' : 'Gerar agora'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
