@@ -1307,39 +1307,17 @@ export function useConfirmarAssinatura() {
         documento_assinado_url = publicUrl
       }
 
-      // 2) Atualizar ou criar registro con_assinaturas com status 'assinado'
-      const { data: existing } = await supabase
-        .from('con_assinaturas')
-        .select('id')
-        .eq('solicitacao_id', payload.solicitacao_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (existing) {
-        const updatePayload: Record<string, unknown> = {
-          status: 'assinado',
-          concluido_em: new Date().toISOString(),
-        }
-        if (documento_assinado_url) updatePayload.documento_assinado_url = documento_assinado_url
-        const { error } = await supabase
-          .from('con_assinaturas')
-          .update(updatePayload)
-          .eq('id', existing.id)
-        if (error) throw new Error('Erro ao atualizar assinatura: ' + error.message)
-      } else {
-        const { error } = await supabase
-          .from('con_assinaturas')
-          .insert({
-            solicitacao_id: payload.solicitacao_id,
-            provedor: 'manual',
-            tipo_assinatura: 'eletronica',
-            status: 'assinado',
-            concluido_em: new Date().toISOString(),
-            documento_assinado_url,
-            signatarios: [],
-          })
-        if (error) throw new Error('Erro ao registrar assinatura: ' + error.message)
+      // 2) RPC SECURITY DEFINER: insert ou update idempotente.
+      //    O trigger trg_con_assinaturas_auto_avancar avanca a etapa para
+      //    'arquivar' quando a solicitacao esta em 'enviar_assinatura'.
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc('con_confirmar_assinatura', {
+        p_solicitacao_id: payload.solicitacao_id,
+        p_documento_assinado_url: documento_assinado_url,
+        p_observacao: payload.observacao ?? null,
+      })
+      if (rpcErr) throw new Error('Erro ao confirmar assinatura: ' + rpcErr.message)
+      if (!(rpcResult as { ok?: boolean })?.ok) {
+        throw new Error('RPC retornou ok=false')
       }
 
       return { documento_assinado_url }
