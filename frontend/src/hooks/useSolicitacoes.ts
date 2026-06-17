@@ -114,34 +114,20 @@ export function useCriarSolicitacao() {
       status?: string
       etapa_atual?: string
     }) => {
-      // Generate sequential number: SOL-CON-YYYY-NNN
-      const year = new Date().getFullYear()
-      const prefix = `SOL-CON-${year}-`
-
-      const { count, error: countError } = await supabase
-        .from('con_solicitacoes')
-        .select('id', { count: 'exact', head: true })
-        .like('numero', `${prefix}%`)
-      if (countError) throw countError
-
-      const seq = String((count ?? 0) + 1).padStart(3, '0')
-      const numero = `${prefix}${seq}`
-
-      const { status: overrideStatus, etapa_atual: overrideEtapa, ...rest } = payload
-
-      const { data, error } = await supabase
-        .from('con_solicitacoes')
-        .insert({
-          ...rest,
-          numero,
-          urgencia: rest.urgencia ?? 'normal',
-          etapa_atual: overrideEtapa ?? 'solicitacao',
-          status: overrideStatus ?? 'rascunho',
-          documentos_ref: [],
-        })
-        .select(SELECT_SOLICITACAO)
-        .single()
+      // Numeração e RLS gerenciadas pela RPC SECURITY DEFINER con_criar_solicitacao.
+      const { data: result, error } = await supabase.rpc('con_criar_solicitacao', {
+        p_payload: payload as Record<string, unknown>,
+      })
       if (error) throw error
+      const id = (result as { id?: string })?.id
+      if (!id) throw new Error('RPC nao retornou id da solicitacao')
+
+      const { data, error: fetchErr } = await supabase
+        .from('con_solicitacoes')
+        .select(SELECT_SOLICITACAO)
+        .eq('id', id)
+        .single()
+      if (fetchErr) throw fetchErr
       return data as Solicitacao
     },
     onSuccess: () => {

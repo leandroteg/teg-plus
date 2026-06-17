@@ -403,7 +403,7 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* Solicitar elaboracao de contrato — RC aprovada ou em fase posterior */}
-      {['aprovada', 'cotacao_em_andamento', 'cotacao_aprovada', 'pedido_emitido', 'em_andamento'].includes(req.status) && (
+      {['aprovada', 'em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'pedido_emitido', 'em_entrega', 'entregue', 'aguardando_contrato'].includes(req.status) && (
         <SolicitarContratoBanner requisicaoId={req.id} requisicaoNumero={req.numero} responsavelNome={perfil?.nome} />
       )}
 

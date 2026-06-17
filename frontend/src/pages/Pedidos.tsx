@@ -68,26 +68,27 @@ function SolicitarContratoForm({ valorMensal, pedido, onSuccess }: {
     if (prazoMeses < 1) return
     setEnviando(true)
     try {
-      const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
-      const { error: solErr } = await supabase.from('con_solicitacoes').insert({
-        numero: num,
-        objeto: pedido.requisicao?.descricao || 'Contrato recorrente',
-        solicitante_nome: (pedido.requisicao as any)?.solicitante_nome || 'Solicitante',
-        tipo_contraparte: 'fornecedor',
-        contraparte_nome: pedido.fornecedor_nome || 'A definir',
-        tipo_contrato: 'despesa',
-        categoria_contrato: 'prestacao_servico',
-        grupo_contrato: 'prestacao_servicos',
-        obra_id: (pedido.requisicao as any)?.obra_id || null,
-        valor_estimado: valorTotal,
-        valor_mensal: valorMensal,
-        prazo_meses: prazoMeses,
-        recorrente: true,
-        etapa_atual: 'solicitacao',
-        status: 'em_andamento',
-        requisicao_origem_id: pedido.requisicao_id,
+      const { data: result, error: solErr } = await supabase.rpc('con_criar_solicitacao', {
+        p_payload: {
+          objeto: pedido.requisicao?.descricao || 'Contrato recorrente',
+          solicitante_nome: (pedido.requisicao as any)?.solicitante_nome || 'Solicitante',
+          tipo_contraparte: 'fornecedor',
+          contraparte_nome: pedido.fornecedor_nome || 'A definir',
+          tipo_contrato: 'despesa',
+          categoria_contrato: 'prestacao_servico',
+          grupo_contrato: 'prestacao_servicos',
+          obra_id: (pedido.requisicao as any)?.obra_id || null,
+          valor_estimado: valorTotal,
+          valor_mensal: valorMensal,
+          prazo_meses: prazoMeses,
+          recorrente: true,
+          etapa_atual: 'solicitacao',
+          status: 'em_andamento',
+          requisicao_origem_id: pedido.requisicao_id,
+        },
       })
       if (solErr) throw solErr
+      if (!(result as any)?.ok) throw new Error((result as any)?.erro || 'falha ao criar solicitação')
       await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', pedido.requisicao_id)
       onSuccess()
     } catch (err: any) {
