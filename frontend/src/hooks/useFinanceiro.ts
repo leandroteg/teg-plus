@@ -870,6 +870,48 @@ export function useSugerirConciliacao() {
   })
 }
 
+// Busca candidatos do extrato bancario p/ um titulo (CP=saida ou CR=entrada).
+// Filtra por: nao conciliado, valor exato, dentro de janela em torno da data de referencia.
+export function useExtratoCandidatos(opts: {
+  tipo: 'cp' | 'cr'
+  valor: number
+  dataRef: string  // YYYY-MM-DD
+  janelaDias?: number
+  enabled?: boolean
+}) {
+  const dias = opts.janelaDias ?? 30
+  return useQuery({
+    queryKey: ['extrato-candidatos', opts.tipo, opts.valor, opts.dataRef, dias],
+    enabled: opts.enabled !== false && opts.valor > 0 && !!opts.dataRef,
+    queryFn: async () => {
+      const ref = new Date(opts.dataRef + 'T00:00:00')
+      const ini = new Date(ref); ini.setDate(ini.getDate() - dias)
+      const fim = new Date(ref); fim.setDate(fim.getDate() + dias)
+      const iniIso = ini.toISOString().split('T')[0]
+      const fimIso = fim.toISOString().split('T')[0]
+      const tipoMov = opts.tipo === 'cp' ? 'saida' : 'entrada'
+
+      const { data, error } = await supabase
+        .from('fin_movimentacoes_tesouraria')
+        .select('id, tipo, valor, data_movimentacao, descricao, conta_id, conta:fin_contas_bancarias(nome, cor)')
+        .eq('conciliado', false)
+        .eq('tipo', tipoMov)
+        .gte('data_movimentacao', iniIso)
+        .lte('data_movimentacao', fimIso)
+        .gte('valor', opts.valor - 0.01)
+        .lte('valor', opts.valor + 0.01)
+        .order('data_movimentacao', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      return (data ?? []).map((m: any) => ({
+        ...m,
+        conta_nome: m.conta?.nome,
+        conta_cor: m.conta?.cor,
+      }))
+    },
+  })
+}
+
 // Aplica matches aprovados pelo usuario em batch.
 export function useAplicarConciliacaoAuto() {
   const qc = useQueryClient()

@@ -41,6 +41,7 @@ import SearchableSelect from '../../components/SearchableSelect'
 import { AnexoReferencia } from '../../components/AnexoReferencia'
 import type { SelectOption } from '../../components/SearchableSelect'
 import FornecedorCadastroModal, { type FornecedorFormData } from '../../components/FornecedorCadastroModal'
+import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
@@ -3068,6 +3069,7 @@ export default function CPPipeline() {
   }, [])
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showNovaMenu, setShowNovaMenu] = useState(false)
+  const [conciliarModalItems, setConciliarModalItems] = useState<ConciliarItem[]>([])
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
   const [pagData, setPagData] = useState(new Date().toISOString().split('T')[0])
   const [pagFile, setPagFile] = useState<File | null>(null)
@@ -3514,14 +3516,30 @@ export default function CPPipeline() {
     }
   }
 
-  const handleConciliar = async (ids: string[]) => {
+  const handleConciliarSemExtrato = async (id: string) => {
     try {
-      await conciliarMut.mutateAsync({ ids })
-      showToast('success', `${ids.length} t\u00EDtulo(s) conciliado(s)`)
-      setSelectedIds(new Set())
+      await conciliarMut.mutateAsync({ ids: [id] })
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar')
+      throw error
     }
+  }
+
+  const handleConciliar = (ids: string[]) => {
+    if (ids.length === 0) return
+    const items: ConciliarItem[] = ids
+      .map(id => contasById.get(id))
+      .filter((cp): cp is ContaPagar => Boolean(cp))
+      .map(cp => ({
+        id: cp.id,
+        tipo: 'cp' as const,
+        nome: cp.fornecedor_nome,
+        descricao: cp.descricao || cp.numero_documento || undefined,
+        valor: cp.valor_original,
+        dataRef: cp.data_vencimento,
+      }))
+    if (items.length === 0) return
+    setConciliarModalItems(items)
   }
 
   const handleExcluirPrevistos = async (ids: string[]) => {
@@ -3555,9 +3573,7 @@ export default function CPPipeline() {
         break
       }
       case 'pago':
-        if (window.confirm(`Conciliar ${ids.length} título(s) selecionado(s)?`)) {
-          handleConciliar(ids)
-        }
+        handleConciliar(ids)
         break
     }
   }
@@ -4295,6 +4311,26 @@ export default function CPPipeline() {
           isDark={isDark}
         />
       )}
+
+      {/* Conciliar com extrato */}
+      <ConciliarComExtratoModal
+        open={conciliarModalItems.length > 0}
+        items={conciliarModalItems}
+        onClose={() => setConciliarModalItems([])}
+        onConciliarSemExtrato={handleConciliarSemExtrato}
+        onDone={(resumo) => {
+          const total = resumo.vinculados + resumo.semVinculo
+          if (total > 0) {
+            const msg = resumo.vinculados > 0 && resumo.semVinculo > 0
+              ? `${resumo.vinculados} conciliado(s) com extrato + ${resumo.semVinculo} sem vínculo`
+              : resumo.vinculados > 0
+                ? `${resumo.vinculados} título(s) conciliado(s) com extrato`
+                : `${resumo.semVinculo} título(s) conciliado(s) sem vínculo`
+            showToast('success', msg)
+          }
+          setSelectedIds(new Set())
+        }}
+      />
     </div>
   )
 }

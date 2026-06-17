@@ -14,6 +14,7 @@ import {
   useCompartilharNFEmail, useConciliarCRBatch,
 } from '../../hooks/useFinanceiro'
 import { UpperInput } from '../../components/UpperInput'
+import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { supabase } from '../../services/supabase'
@@ -676,6 +677,7 @@ export default function ContasReceber() {
   const [faturarModal, setFaturarModal] = useState<ContaReceber | null>(null)
   const [recebimentoModal, setRecebimentoModal] = useState<ContaReceber | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [conciliarModalItems, setConciliarModalItems] = useState<ConciliarItem[]>([])
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [sortField, setSortField] = useState<SortField>('vencimento')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -825,12 +827,30 @@ export default function ContasReceber() {
     } catch { showToast('error', 'Erro ao atualizar status') }
   }
 
-  const handleConciliar = async (ids: string[]) => {
+  const handleConciliarSemExtrato = async (id: string) => {
     try {
-      await conciliarMut.mutateAsync({ ids })
-      showToast('success', `${ids.length} titulo(s) conciliado(s)`)
-      setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao conciliar') }
+      await conciliarMut.mutateAsync({ ids: [id] })
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar')
+      throw error
+    }
+  }
+
+  const handleConciliar = (ids: string[]) => {
+    if (ids.length === 0) return
+    const items: ConciliarItem[] = ids
+      .map(id => contas.find(cr => cr.id === id))
+      .filter((cr): cr is ContaReceber => Boolean(cr))
+      .map(cr => ({
+        id: cr.id,
+        tipo: 'cr' as const,
+        nome: cr.cliente_nome,
+        descricao: cr.descricao || (cr.numero_nf ? `NF ${cr.numero_nf}` : undefined),
+        valor: cr.valor_original,
+        dataRef: cr.data_vencimento,
+      }))
+    if (items.length === 0) return
+    setConciliarModalItems(items)
   }
 
   const handleEmail = async (cr: ContaReceber) => {
@@ -1191,6 +1211,26 @@ export default function ContasReceber() {
           onClose={() => { setRecebimentoModal(null); showToast('success', 'Recebimento registrado') }}
         />
       )}
+
+      {/* Conciliar com extrato */}
+      <ConciliarComExtratoModal
+        open={conciliarModalItems.length > 0}
+        items={conciliarModalItems}
+        onClose={() => setConciliarModalItems([])}
+        onConciliarSemExtrato={handleConciliarSemExtrato}
+        onDone={(resumo) => {
+          const total = resumo.vinculados + resumo.semVinculo
+          if (total > 0) {
+            const msg = resumo.vinculados > 0 && resumo.semVinculo > 0
+              ? `${resumo.vinculados} conciliado(s) com extrato + ${resumo.semVinculo} sem vínculo`
+              : resumo.vinculados > 0
+                ? `${resumo.vinculados} título(s) conciliado(s) com extrato`
+                : `${resumo.semVinculo} título(s) conciliado(s) sem vínculo`
+            showToast('success', msg)
+          }
+          setSelectedIds(new Set())
+        }}
+      />
     </div>
   )
 }
