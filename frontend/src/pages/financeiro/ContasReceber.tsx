@@ -12,6 +12,7 @@ import {
   useContasReceber, useAutorizarCR, useFaturarCR,
   useAvancarStatusCR, useRegistrarRecebimentoCR,
   useCompartilharNFEmail, useConciliarCRBatch,
+  useExtratoCandidatos, useAplicarConciliacaoAuto,
 } from '../../hooks/useFinanceiro'
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
@@ -358,6 +359,14 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
 }) {
   const urgency = getUrgency(cr)
   const stage = CR_PIPELINE_STAGES.find(s => s.status === cr.status)
+  const [selExtratoMovId, setSelExtratoMovId] = useState<string | null>(null)
+  const aplicarConcil = useAplicarConciliacaoAuto()
+  const { data: extratoCandidatos = [], isLoading: loadingExtrato } = useExtratoCandidatos({
+    tipo: 'cr',
+    valor: cr.valor_original,
+    dataRef: cr.data_vencimento,
+    enabled: cr.status === 'recebido',
+  })
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -465,6 +474,66 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
             </div>
           </div>
 
+          {/* Extrato bancário disponível — visível p/ status recebido */}
+          {cr.status === 'recebido' && (
+            <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Extrato bancário disponível
+              </p>
+              {loadingExtrato ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : extratoCandidatos.length === 0 ? (
+                <div className={`flex items-start gap-2 text-xs rounded-lg px-2 py-2 ${
+                  isDark ? 'text-amber-300 bg-amber-500/10' : 'text-amber-700 bg-amber-50'
+                }`}>
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span>
+                    Nenhum lançamento bancário corresponde a este valor (±30 dias). Você ainda pode conciliar sem vínculo.
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {extratoCandidatos.map((mov: any) => {
+                    const ativo = selExtratoMovId === mov.id
+                    return (
+                      <button
+                        key={mov.id}
+                        type="button"
+                        onClick={() => setSelExtratoMovId(ativo ? null : mov.id)}
+                        className={`w-full text-left rounded-lg border px-2.5 py-2 transition-all ${
+                          ativo
+                            ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
+                            : isDark ? 'border-white/[0.06] bg-white/[0.02] hover:border-emerald-400/40' : 'border-slate-200 bg-white hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                              {mov.descricao || 'Lançamento bancário'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 truncate">
+                              {mov.conta_nome ?? 'Conta'} · {new Date(mov.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-xs font-extrabold ${ativo ? 'text-emerald-700' : isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                            {Math.abs(mov.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {selExtratoMovId && (
+                    <p className="text-[10px] text-emerald-600 font-semibold pt-1">
+                      ✓ Lançamento selecionado — clique Conciliar pra fechar o vínculo.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
@@ -490,8 +559,28 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
               </button>
             )}
             {cr.status === 'recebido' && (
-              <button onClick={() => onAction('conciliar', cr)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Conciliar
+              <button
+                disabled={aplicarConcil.isPending}
+                onClick={async () => {
+                  if (selExtratoMovId) {
+                    try {
+                      await aplicarConcil.mutateAsync([{ mov_id: selExtratoMovId, tipo_match: 'cr', cand_id: cr.id }])
+                      onClose()
+                    } catch (err) {
+                      console.error('Erro ao conciliar com extrato:', err)
+                    }
+                    return
+                  }
+                  onAction('conciliar', cr)
+                }}
+                className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {aplicarConcil.isPending ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle2 size={15} />
+                )}
+                {selExtratoMovId ? 'Conciliar com extrato' : 'Conciliar'}
               </button>
             )}
           </div>

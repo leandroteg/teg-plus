@@ -22,6 +22,8 @@ import {
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
   useObras,
+  useExtratoCandidatos,
+  useAplicarConciliacaoAuto,
 } from '../../hooks/useFinanceiro'
 import {
   useLotesPagamento,
@@ -1929,6 +1931,14 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
   const [editObra, setEditObra] = useState((cp as any).projeto_id ?? '')
   const [savingClass, setSavingClass] = useState(false)
+  const [selExtratoMovId, setSelExtratoMovId] = useState<string | null>(null)
+  const aplicarConcil = useAplicarConciliacaoAuto()
+  const { data: extratoCandidatos = [], isLoading: loadingExtrato } = useExtratoCandidatos({
+    tipo: 'cp',
+    valor: cp.valor_original,
+    dataRef: cp.data_vencimento,
+    enabled: cp.status === 'pago',
+  })
   const { data: obrasList = [] } = useObras()
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
@@ -2411,6 +2421,66 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             </div>
           )}
 
+          {/* Extrato bancário disponível — visível p/ status pago */}
+          {cp.status === 'pago' && (
+            <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Extrato bancário disponível
+              </p>
+              {loadingExtrato ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : extratoCandidatos.length === 0 ? (
+                <div className={`flex items-start gap-2 text-xs rounded-lg px-2 py-2 ${
+                  isDark ? 'text-amber-300 bg-amber-500/10' : 'text-amber-700 bg-amber-50'
+                }`}>
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span>
+                    Nenhum lançamento bancário corresponde a este valor (±30 dias). Você ainda pode conciliar sem vínculo.
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {extratoCandidatos.map((mov: any) => {
+                    const ativo = selExtratoMovId === mov.id
+                    return (
+                      <button
+                        key={mov.id}
+                        type="button"
+                        onClick={() => setSelExtratoMovId(ativo ? null : mov.id)}
+                        className={`w-full text-left rounded-lg border px-2.5 py-2 transition-all ${
+                          ativo
+                            ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
+                            : isDark ? 'border-white/[0.06] bg-white/[0.02] hover:border-emerald-400/40' : 'border-slate-200 bg-white hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                              {mov.descricao || 'Lançamento bancário'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 truncate">
+                              {mov.conta_nome ?? 'Conta'} · {new Date(mov.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-xs font-extrabold ${ativo ? 'text-emerald-700' : isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                            {Math.abs(mov.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {selExtratoMovId && (
+                    <p className="text-[10px] text-emerald-600 font-semibold pt-1">
+                      ✓ Lançamento selecionado — clique Conciliar pra fechar o vínculo.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
@@ -2452,9 +2522,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             )}
             {cp.status === 'pago' && (
               <button
-                disabled={savingClass}
+                disabled={savingClass || aplicarConcil.isPending}
                 onClick={async () => {
-                  // Salvar CC/classe se alterados antes de conciliar
+                  // 1. Salvar CC/classe se alterados antes de conciliar
                   const updates: Record<string, string | null> = {}
                   if (editCC !== (cp.centro_custo ?? '')) updates.centro_custo = editCC || null
                   if (editClasse !== (cp.classe_financeira ?? '')) updates.classe_financeira = editClasse || null
@@ -2465,11 +2535,27 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                     setSavingClass(false)
                     if (error) { console.error('Erro ao salvar classificação:', error); return }
                   }
+                  // 2a. Se usuário escolheu um lançamento do extrato, casa direto aqui
+                  if (selExtratoMovId) {
+                    try {
+                      await aplicarConcil.mutateAsync([{ mov_id: selExtratoMovId, tipo_match: 'cp', cand_id: cp.id }])
+                      onClose()
+                    } catch (err) {
+                      console.error('Erro ao conciliar com extrato:', err)
+                    }
+                    return
+                  }
+                  // 2b. Caso contrário, delega pro fluxo padrão (modal sem candidato → "conciliar sem vínculo")
                   onAction('conciliar', cp)
                 }}
                 className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <CheckCircle2 size={15} /> Conciliar
+                {aplicarConcil.isPending ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle2 size={15} />
+                )}
+                {selExtratoMovId ? 'Conciliar com extrato' : 'Conciliar'}
               </button>
             )}
           </div>
