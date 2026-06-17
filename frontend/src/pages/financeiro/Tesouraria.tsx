@@ -14,7 +14,7 @@ import {
 import {
   useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao, useImportExtrato,
 } from '../../hooks/useTesouraria'
-import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
+import { useContasPagar, useContasReceber, useAplicarConciliacaoAuto } from '../../hooks/useFinanceiro'
 import type { TesourariaDashboardData, CategoriaMovimentacao, MovimentacaoTesouraria } from '../../types/financeiro'
 import DetalheDrawer from '../../components/DetalheDrawer'
 import AuditoriaCard from '../../components/AuditoriaCard'
@@ -419,43 +419,105 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
 }) {
   const { data: contasPagar = [] } = useContasPagar()
   const { data: contasReceber = [] } = useContasReceber()
+  const aplicar = useAplicarConciliacaoAuto()
+
+  const [selMov, setSelMov] = useState<string | null>(null)
+  const [selTitulo, setSelTitulo] = useState<{ id: string; tipo: 'CP' | 'CR' } | null>(null)
+  const [toast, setToast] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3500)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const movimentacoesBanco = useMemo(
-    () => movimentacoes.filter((mov) => !mov.conciliado).slice(0, 20),
+    () => movimentacoes.filter((mov) => !mov.conciliado && mov.tipo !== 'transferencia').slice(0, 30),
     [movimentacoes],
   )
 
   const sistemaPendente = useMemo(() => {
     const cp = contasPagar
-      .filter((item) => !['pago', 'conciliado', 'cancelado'].includes(item.status))
-      .slice(0, 10)
+      .filter((item) => !['conciliado', 'cancelado'].includes(item.status))
       .map((item) => ({
         id: item.id,
-        tipo: 'CP',
+        tipo: 'CP' as const,
         titulo: item.fornecedor_nome,
         descricao: item.descricao || item.numero_documento || 'Conta a pagar do sistema',
         valor: item.valor_original - (item.valor_pago || 0),
+        valorOriginal: item.valor_original,
         data: item.data_vencimento,
         status: item.status,
       }))
 
     const cr = contasReceber
-      .filter((item) => !['recebido', 'conciliado', 'cancelado'].includes(item.status))
-      .slice(0, 10)
+      .filter((item) => !['conciliado', 'cancelado'].includes(item.status))
       .map((item) => ({
         id: item.id,
-        tipo: 'CR',
+        tipo: 'CR' as const,
         titulo: item.cliente_nome,
         descricao: item.descricao || item.numero_nf || 'Conta a receber do sistema',
         valor: item.valor_original - (item.valor_recebido || 0),
+        valorOriginal: item.valor_original,
         data: item.data_vencimento,
         status: item.status,
       }))
 
-    return [...cp, ...cr]
-      .sort((a, b) => a.data.localeCompare(b.data))
-      .slice(0, 20)
+    return [...cp, ...cr].sort((a, b) => a.data.localeCompare(b.data))
   }, [contasPagar, contasReceber])
+
+  const movSelecionado = useMemo(
+    () => movimentacoesBanco.find((m) => m.id === selMov) ?? null,
+    [movimentacoesBanco, selMov],
+  )
+
+  // Quando ha movimento selecionado, ranqueia candidatos por (tipo certo, valor batendo)
+  const sistemaOrdenado = useMemo(() => {
+    if (!movSelecionado) return sistemaPendente.slice(0, 40)
+    const tipoEsperado: 'CP' | 'CR' = movSelecionado.tipo === 'saida' ? 'CP' : 'CR'
+    const valorMov = Math.abs(movSelecionado.valor)
+    const compativeis = sistemaPendente
+      .filter((t) => t.tipo === tipoEsperado)
+      .map((t) => ({ ...t, _delta: Math.abs(t.valorOriginal - valorMov) }))
+      .sort((a, b) => a._delta - b._delta)
+    return compativeis.slice(0, 40)
+  }, [movSelecionado, sistemaPendente])
+
+  const tituloSelecionado = useMemo(
+    () => sistemaPendente.find((t) => t.id === selTitulo?.id && t.tipo === selTitulo?.tipo) ?? null,
+    [sistemaPendente, selTitulo],
+  )
+
+  const valoresBatem = movSelecionado && tituloSelecionado
+    ? Math.abs(Math.abs(movSelecionado.valor) - tituloSelecionado.valorOriginal) < 0.01
+    : false
+
+  const tipoCompativel = movSelecionado && tituloSelecionado
+    ? (movSelecionado.tipo === 'saida' && tituloSelecionado.tipo === 'CP')
+      || (movSelecionado.tipo === 'entrada' && tituloSelecionado.tipo === 'CR')
+    : false
+
+  const podeCasar = !!(movSelecionado && tituloSelecionado && valoresBatem && tipoCompativel && !aplicar.isPending)
+
+  async function handleCasar() {
+    if (!movSelecionado || !tituloSelecionado) return
+    try {
+      const r = await aplicar.mutateAsync([{
+        mov_id: movSelecionado.id,
+        tipo_match: tituloSelecionado.tipo === 'CP' ? 'cp' : 'cr',
+        cand_id: tituloSelecionado.id,
+      }])
+      if (r.aplicadas > 0) {
+        setToast({ kind: 'ok', msg: `Conciliacao realizada — ${tituloSelecionado.titulo}` })
+      } else {
+        setToast({ kind: 'err', msg: 'Nenhuma conciliacao aplicada (titulo pode ja estar conciliado).' })
+      }
+      setSelMov(null)
+      setSelTitulo(null)
+    } catch (err: any) {
+      setToast({ kind: 'err', msg: `Erro: ${err?.message ?? 'falha ao conciliar'}` })
+    }
+  }
 
   const cardCls = isDark
     ? 'border border-white/[0.08] bg-white/[0.04]'
@@ -463,76 +525,187 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold ${
+          toast.kind === 'ok' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className={`rounded-2xl p-4 ${cardCls}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pendencias do sistema</p>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Titulos do sistema</p>
           <p className={`mt-2 text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{sistemaPendente.length}</p>
         </div>
         <div className={`rounded-2xl p-4 ${cardCls}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Movimentos bancarios pendentes</p>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Extrato sem conciliar</p>
           <p className={`mt-2 text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{movimentacoesBanco.length}</p>
         </div>
         <div className={`rounded-2xl p-4 ${cardCls}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao operacional</p>
-          <p className={`mt-2 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Sistema de um lado e banco do outro, para conciliacao tradicional.
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Como usar</p>
+          <p className={`mt-2 text-[11px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            Clique 1 linha do extrato e 1 titulo do sistema com mesmo valor, depois confirme.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {/* Coluna Extrato */}
         <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
-          <div className={`flex items-center gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <FileText size={14} className="text-violet-500" />
-            <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Movimentacoes do sistema</h3>
+          <div className={`flex items-center justify-between gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <div className="flex items-center gap-2">
+              <Landmark size={14} className="text-teal-500" />
+              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Extrato bancario</h3>
+            </div>
+            {selMov && (
+              <button onClick={() => setSelMov(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
+            )}
           </div>
-          <div className="divide-y divide-slate-100 p-2">
-            {sistemaPendente.length === 0 ? (
-              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma pendencia do sistema</p>
-            ) : sistemaPendente.map((item) => (
-              <div key={`${item.tipo}-${item.id}`} className="rounded-xl px-3 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.titulo}</p>
-                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.descricao}</p>
+          <div className="divide-y divide-slate-100 p-2 max-h-[60vh] overflow-y-auto">
+            {movimentacoesBanco.length === 0 ? (
+              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum movimento bancario pendente</p>
+            ) : movimentacoesBanco.map((mov) => {
+              const ativo = mov.id === selMov
+              return (
+                <button
+                  key={mov.id}
+                  type="button"
+                  onClick={() => setSelMov(ativo ? null : mov.id)}
+                  className={`w-full text-left rounded-xl px-3 py-3 transition-all ${
+                    ativo
+                      ? 'bg-emerald-50 ring-2 ring-emerald-400/40'
+                      : isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{mov.descricao || mov.categoria || 'Movimentacao bancaria'}</p>
+                      <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{mov.conta_nome || 'Conta bancaria'}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${mov.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{mov.tipo}</span>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.tipo === 'CP' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.tipo}</span>
-                </div>
-                <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <span>{new Date(item.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  <span className="font-bold">{fmtFull(item.valor)}</span>
-                </div>
-              </div>
-            ))}
+                  <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span>{new Date(mov.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                    <span className="font-bold">{fmtFull(Math.abs(mov.valor))}</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
+        {/* Coluna Sistema */}
         <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
-          <div className={`flex items-center gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <Landmark size={14} className="text-teal-500" />
-            <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Extrato bancario</h3>
+          <div className={`flex items-center justify-between gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <div className="flex items-center gap-2">
+              <FileText size={14} className="text-violet-500" />
+              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Titulos do sistema</h3>
+              {movSelecionado && (
+                <span className="ml-1 rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-bold">
+                  filtrando {movSelecionado.tipo === 'saida' ? 'CP' : 'CR'} compativel
+                </span>
+              )}
+            </div>
+            {selTitulo && (
+              <button onClick={() => setSelTitulo(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
+            )}
           </div>
-          <div className="divide-y divide-slate-100 p-2">
-            {movimentacoesBanco.length === 0 ? (
-              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum movimento bancario pendente</p>
-            ) : movimentacoesBanco.map((mov) => (
-              <div key={mov.id} className="rounded-xl px-3 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{mov.descricao || mov.categoria || 'Movimentacao bancaria'}</p>
-                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{mov.conta_nome || 'Conta bancaria'}</p>
+          <div className="divide-y divide-slate-100 p-2 max-h-[60vh] overflow-y-auto">
+            {sistemaOrdenado.length === 0 ? (
+              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {movSelecionado ? 'Nenhum titulo compativel encontrado' : 'Nenhum titulo pendente'}
+              </p>
+            ) : sistemaOrdenado.map((item) => {
+              const ativo = item.id === selTitulo?.id && item.tipo === selTitulo?.tipo
+              const valorBate = movSelecionado
+                ? Math.abs(item.valorOriginal - Math.abs(movSelecionado.valor)) < 0.01
+                : false
+              return (
+                <button
+                  key={`${item.tipo}-${item.id}`}
+                  type="button"
+                  onClick={() => setSelTitulo(ativo ? null : { id: item.id, tipo: item.tipo })}
+                  className={`w-full text-left rounded-xl px-3 py-3 transition-all ${
+                    ativo
+                      ? 'bg-emerald-50 ring-2 ring-emerald-400/40'
+                      : valorBate
+                        ? 'bg-emerald-50/40'
+                        : isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.titulo}</p>
+                      <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.descricao}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {valorBate && <Check size={12} className="text-emerald-600" />}
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.tipo === 'CP' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.tipo}</span>
+                    </div>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${mov.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{mov.tipo}</span>
-                </div>
-                <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <span>{new Date(mov.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  <span className="font-bold">{fmtFull(mov.valor)}</span>
-                </div>
-              </div>
-            ))}
+                  <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span>{new Date(item.data + 'T00:00:00').toLocaleDateString('pt-BR')} · {item.status}</span>
+                    <span className="font-bold">{fmtFull(item.valorOriginal)}</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
+
+      {/* Barra de acao sticky */}
+      {(selMov || selTitulo) && (
+        <div className={`sticky bottom-3 z-30 rounded-2xl backdrop-blur-lg border shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap ${
+          isDark ? 'bg-[#1e293b]/95 border-white/[0.08]' : 'bg-white/95 border-slate-200'
+        }`}>
+          <Link2 size={16} className="text-emerald-600 shrink-0" />
+          <div className="flex-1 min-w-0 text-xs">
+            {movSelecionado && (
+              <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                Extrato: {fmtFull(Math.abs(movSelecionado.valor))}
+              </span>
+            )}
+            {movSelecionado && tituloSelecionado && <span className="mx-2 text-slate-400">×</span>}
+            {tituloSelecionado && (
+              <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                {tituloSelecionado.tipo} {tituloSelecionado.titulo} — {fmtFull(tituloSelecionado.valorOriginal)}
+              </span>
+            )}
+            {movSelecionado && tituloSelecionado && !valoresBatem && (
+              <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-bold">
+                <AlertTriangle size={11} /> valores nao batem
+              </span>
+            )}
+            {movSelecionado && tituloSelecionado && !tipoCompativel && (
+              <span className="ml-2 inline-flex items-center gap-1 text-red-600 font-bold">
+                <AlertTriangle size={11} /> tipo incompativel
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => { setSelMov(null); setSelTitulo(null) }}
+            className={`px-3 py-2 rounded-xl border text-[11px] font-semibold ${
+              isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Limpar
+          </button>
+          <button
+            onClick={handleCasar}
+            disabled={!podeCasar}
+            className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            {aplicar.isPending ? (
+              <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Check size={13} />
+            )}
+            Casar selecionados
+          </button>
+        </div>
+      )}
     </div>
   )
 }
