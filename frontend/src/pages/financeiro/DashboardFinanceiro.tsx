@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   DollarSign, TrendingDown, TrendingUp, AlertTriangle,
   Clock, CheckCircle2, RefreshCw, ArrowRight,
-  Receipt, Zap, CalendarClock, ChevronRight,
+  Receipt, Zap, CalendarClock, ChevronRight, ChevronDown,
 } from 'lucide-react'
+
+const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 import { useTheme } from '../../contexts/ThemeContext'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
 import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
@@ -85,6 +87,7 @@ export default function DashboardFinanceiro() {
   const nav = useNavigate()
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'pgtos_previstos'>('painel')
 
   useEffect(() => { setPeriodo('30d') }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
@@ -122,30 +125,59 @@ export default function DashboardFinanceiro() {
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Financeiro</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao geral de pagamentos e recebimentos</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Financeiro</h1>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao geral de pagamentos e recebimentos</p>
+          </div>
+          <div className="relative">
+            <select
+              value={painelAtivo}
+              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'pgtos_previstos')}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark
+                  ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <option value="painel">Painel</option>
+              <option value="pgtos_previstos">Pgtos Previstos</option>
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Periodo */}
-          <div className="flex gap-1">
-            {[['7d', '7d'], ['30d', '30d'], ['90d', '90d'], ['365d', 'Ano']].map(([val, lbl]) => (
-              <button key={val} onClick={() => setPeriodo(val)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                  periodo === val
-                    ? 'bg-emerald-600 text-white'
-                    : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
-                }`}>
-                {lbl}
+          {painelAtivo === 'painel' && (
+            <>
+              {/* Periodo */}
+              <div className="flex gap-1">
+                {[['7d', '7d'], ['30d', '30d'], ['90d', '90d'], ['365d', 'Ano']].map(([val, lbl]) => (
+                  <button key={val} onClick={() => setPeriodo(val)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                      periodo === val
+                        ? 'bg-emerald-600 text-white'
+                        : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
+                    }`}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => refetch()}
+                className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-600'}`}>
+                <RefreshCw size={12} />
               </button>
-            ))}
-          </div>
-          <button onClick={() => refetch()}
-            className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-600'}`}>
-            <RefreshCw size={12} />
-          </button>
+            </>
+          )}
         </div>
       </div>
+
+      {painelAtivo === 'pgtos_previstos' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <PainelPagamentos />
+        </Suspense>
+      )}
+
+      {painelAtivo === 'painel' && (<>
 
       {/* ── Hero: Indicadores + Janela Critica ── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
@@ -309,6 +341,7 @@ export default function DashboardFinanceiro() {
           </div>
         </section>
       </div>
+      </>)}
     </div>
   )
 }
