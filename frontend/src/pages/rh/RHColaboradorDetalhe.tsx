@@ -6,7 +6,9 @@ import {
   ArrowLeft, Save, User, Briefcase, MapPin, Building2, CreditCard,
   FileText, Users2, Phone, Mail, Calendar, Hash, Edit3, Plus, Trash2,
   ChevronDown, ChevronUp, Clock, TrendingUp,
+  Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
 } from 'lucide-react'
+import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes } from '../../hooks/useRH'
 import { useCadObras } from '../../hooks/useCadastros'
@@ -382,6 +384,9 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      {/* Documentos (OneDrive) */}
+      <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
+
       {/* Observações */}
       <div className={sectionCls}>
         <div className="px-5 py-3">
@@ -396,6 +401,162 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Documentos do colaborador no OneDrive (RH > FICHAS E DOCUMENTOS) ──────────
+interface DriveItem {
+  id: string; nome: string; pasta: boolean
+  tamanho: number | null; mime: string | null
+  web_url: string | null; download_url: string | null
+}
+interface DriveResp {
+  ok: boolean; encontrado?: boolean; motivo?: string
+  pasta_nome?: string; pasta_web_url?: string | null; itens?: DriveItem[]
+}
+
+function fmtTam(bytes: number | null) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function OneDriveDocs({ colaboradorId, sectionCls, isLight }: { colaboradorId: string; sectionCls: string; isLight: boolean }) {
+  const [aberto, setAberto] = useState(false)
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [carregado, setCarregado] = useState(false)
+  const [trilha, setTrilha] = useState<{ id?: string; nome: string }[]>([])
+  const [resp, setResp] = useState<DriveResp | null>(null)
+  const [copiado, setCopiado] = useState(false)
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+  const rowCls = `flex items-center gap-2.5 px-3 py-2 rounded-xl border ${isLight ? 'border-slate-100 bg-slate-50/60 hover:bg-slate-100' : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'}`
+
+  async function carregar(itemId?: string) {
+    setCarregando(true); setErro(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('rh-colaborador-onedrive', {
+        body: { colaborador_id: colaboradorId, item_id: itemId },
+      })
+      if (error) throw error
+      const r = data as DriveResp
+      if (!r.ok) throw new Error(r.motivo || 'Falha ao carregar')
+      setResp(r)
+      setCarregado(true)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao carregar documentos')
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  function abrir() {
+    setAberto(true)
+    if (!carregado) { setTrilha([{ nome: 'Documentos' }]); carregar() }
+  }
+  function entrarPasta(it: DriveItem) {
+    setTrilha(t => [...t, { id: it.id, nome: it.nome }])
+    carregar(it.id)
+  }
+  function irPara(idx: number) {
+    const novo = trilha.slice(0, idx + 1)
+    setTrilha(novo)
+    carregar(novo[idx].id)
+  }
+  async function copiarLink() {
+    const url = resp?.pasta_web_url
+    if (!url) return
+    try { await navigator.clipboard.writeText(url); setCopiado(true); setTimeout(() => setCopiado(false), 2000) } catch { /* */ }
+  }
+  function abrirArquivo(it: DriveItem, baixar = false) {
+    if (!it.download_url) return
+    if (baixar) {
+      const a = document.createElement('a')
+      a.href = it.download_url; a.download = it.nome
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    } else {
+      window.open(it.download_url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  return (
+    <div className={sectionCls}>
+      <div className={`flex items-center justify-between px-5 py-3 cursor-pointer ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => (aberto ? setAberto(false) : abrir())}>
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <Cloud size={14} className="text-sky-500" /> Documentos (OneDrive)
+        </h3>
+        {aberto ? <ChevronUp size={16} className={muted} /> : <ChevronDown size={16} className={muted} />}
+      </div>
+
+      {aberto && (
+        <div className="px-5 pb-4 space-y-3">
+          {/* Trilha + copiar link */}
+          {carregado && resp?.encontrado && (
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1 flex-wrap text-xs">
+                {trilha.map((t, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span className={muted}>/</span>}
+                    <button onClick={() => irPara(i)} disabled={i === trilha.length - 1}
+                      className={`font-semibold ${i === trilha.length - 1 ? txt : 'text-sky-500 hover:underline'}`}>
+                      {i === 0 ? 'Documentos' : t.nome}
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button onClick={copiarLink}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                  copiado ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : isLight ? 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50' : 'bg-white/[0.04] text-sky-300 border-sky-500/30 hover:bg-white/[0.08]'}`}>
+                {copiado ? <Check size={12} /> : <Copy size={12} />} {copiado ? 'Copiado!' : 'Copiar link da pasta'}
+              </button>
+            </div>
+          )}
+
+          {carregando ? (
+            <div className="flex items-center justify-center py-8"><Loader2 size={22} className="animate-spin text-sky-500" /></div>
+          ) : erro ? (
+            <p className="text-xs text-red-500 py-2">{erro}</p>
+          ) : carregado && !resp?.encontrado ? (
+            <p className={`text-xs ${muted} py-4 text-center`}>
+              Pasta deste colaborador não encontrada no OneDrive (RH &gt; FICHAS E DOCUMENTOS FUNCIONÁRIOS TEG).
+            </p>
+          ) : carregado && (resp?.itens?.length ?? 0) === 0 ? (
+            <p className={`text-xs ${muted} py-4 text-center`}>Pasta vazia.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {(resp?.itens ?? []).map((it) => (
+                it.pasta ? (
+                  <button key={it.id} onClick={() => entrarPasta(it)} className={`${rowCls} w-full text-left`}>
+                    <FolderOpen size={16} className="text-amber-500 shrink-0" />
+                    <span className={`flex-1 text-sm font-semibold truncate ${txt}`}>{it.nome}</span>
+                    <ChevronDown size={14} className={`${muted} -rotate-90`} />
+                  </button>
+                ) : (
+                  <div key={it.id} className={rowCls}>
+                    <FileText size={16} className="text-slate-400 shrink-0" />
+                    <span className={`flex-1 min-w-0 text-sm truncate ${txt}`}>{it.nome}</span>
+                    {it.tamanho ? <span className={`text-[10px] ${muted} shrink-0`}>{fmtTam(it.tamanho)}</span> : null}
+                    <button onClick={() => abrirArquivo(it, false)} title="Visualizar"
+                      className={`p-1.5 rounded-lg shrink-0 ${isLight ? 'text-sky-600 hover:bg-sky-50' : 'text-sky-300 hover:bg-white/[0.06]'}`}>
+                      <ExternalLink size={14} />
+                    </button>
+                    <button onClick={() => abrirArquivo(it, true)} title="Baixar"
+                      className={`p-1.5 rounded-lg shrink-0 ${isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-300 hover:bg-white/[0.06]'}`}>
+                      <Download size={14} />
+                    </button>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
