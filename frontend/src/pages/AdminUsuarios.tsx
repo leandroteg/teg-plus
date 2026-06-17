@@ -6,7 +6,7 @@ import {
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
   Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2,
-  LayoutGrid, LayoutList, SlidersHorizontal,
+  LayoutGrid, LayoutList, SlidersHorizontal, MapPin,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../contexts/ThemeContext'
@@ -626,7 +626,7 @@ function useCadastrarUsuario() {
 
   return useMutation({
     mutationFn: async ({
-      nome, email_contato, whatsapp, username, papel_global, alcada_nivel, modulos,
+      nome, email_contato, whatsapp, username, papel_global, alcada_nivel, modulos, base_id,
     }: {
       nome: string
       email_contato?: string
@@ -634,6 +634,7 @@ function useCadastrarUsuario() {
       username?: string
       papel_global: PapelGlobal
       alcada_nivel: number; modulos: Record<string, boolean>
+      base_id?: string | null
     }) => {
       const role = mapPapelToLegacyRole(papel_global)
       const baseUsername = normalizeUsername(username || nome)
@@ -667,6 +668,11 @@ function useCadastrarUsuario() {
               .maybeSingle()
 
             if (perfilN8n?.id) {
+              if (base_id !== undefined) {
+                await supabase.from('sys_perfis')
+                  .update({ base_id: base_id || null })
+                  .eq('id', perfilN8n.id)
+              }
               await syncPerfilSetores(perfilN8n.id, modulos, undefined, papel_global)
               return {
                 nome, username: finalUsername, login_email: loginEmail,
@@ -699,6 +705,7 @@ function useCadastrarUsuario() {
       // Atualizar perfil com role, modulos e demais campos
       const { error: updErr } = await supabase.from('sys_perfis').update({
         nome, email: loginEmail, role, alcada_nivel, modulos,
+        base_id: base_id || null,
         senha_definida: true, ativo: true,
       }).eq('id', perfilCriado.id)
       if (updErr) throw updErr
@@ -1124,6 +1131,7 @@ function UserDetailPanel({
 function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
   const { isDark } = useTheme()
   const cadastrar = useCadastrarUsuario()
+  const { data: bases = [] } = useBases()
   const [form, setForm] = useState({
     nome: '',
     username: '',
@@ -1131,6 +1139,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
     whatsapp: '',
     papel_global: 'requisitante' as PapelGlobal,
     alcada_nivel: 0,
+    base_id: '' as string,
     modulos: { compras: true } as Record<string, boolean>,
   })
   const [result, setResult] = useState<CadastroResult | null>(null)
@@ -1151,6 +1160,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
       whatsapp: form.whatsapp.trim() || undefined,
       papel_global: form.papel_global,
       alcada_nivel: form.alcada_nivel,
+      base_id: form.base_id || null,
       modulos: form.modulos,
     })
     setResult(output)
@@ -1322,6 +1332,27 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
                   <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Lotação / Base */}
+            <div>
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Lotação / Base</label>
+              <select
+                value={form.base_id}
+                onChange={e => setForm(f => ({ ...f, base_id: e.target.value }))}
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-slate-50 border-slate-200'}`}
+              >
+                <option value="">Escritório / sem vínculo (vê todas as bases)</option>
+                {bases.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.nome}{(b as any).faz_triagem ? ' — CD (triagem)' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Define o polo do usuário no Estoque. Vazio = vê todos os almoxarifados (gestor/financeiro).
+              </p>
             </div>
 
             {/* Módulos */}
@@ -1542,7 +1573,13 @@ export default function AdminUsuarios() {
   const { isDark } = useTheme()
   const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
+  const { data: bases = [] } = useBases()
   const bulkUpdate = useBulkUpdateUsers()
+  const baseNomeById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const b of bases) map[b.id] = b.nome
+    return map
+  }, [bases])
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState<Role | 'todos'>('todos')
@@ -2242,7 +2279,17 @@ export default function AdminUsuarios() {
                         <td className="px-3 py-3">
                           <RoleBadge role={displayPapel} />
                         </td>
-                        <td className={`px-3 py-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{ALCADA_LABEL[p.alcada_nivel]}</td>
+                        <td className={`px-3 py-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <div className="flex flex-col gap-1">
+                            <span>{ALCADA_LABEL[p.alcada_nivel]}</span>
+                            {p.base_id && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/10 text-amber-600 w-fit">
+                                <MapPin size={9} />
+                                {baseNomeById[p.base_id] ?? '—'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1 max-w-[240px]">
                             {enabledModulos.length === 0 && (
@@ -2318,6 +2365,11 @@ export default function AdminUsuarios() {
                         {p.alcada_nivel > 0 && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[10px] font-semibold">
                             <Shield size={9} /> N{p.alcada_nivel}
+                          </span>
+                        )}
+                        {p.base_id && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[10px] font-semibold">
+                            <MapPin size={9} /> {baseNomeById[p.base_id] ?? '—'}
                           </span>
                         )}
                         {p.modulos && (
