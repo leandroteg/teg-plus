@@ -418,9 +418,10 @@ export function useAtualizarFatura() {
   })
 }
 
-// Envia faturas selecionadas pro financeiro (RPC migration 124).
-// Cria 1 fin_contas_pagar por fatura elegivel (status previsto/lancado) e
-// muda status da fatura pra enviado_pagamento. Retorna { enviadas, puladas }.
+// Envia faturas selecionadas pro financeiro (RPC migrations 124 + 147).
+// Cria 1 fin_contas_pagar por fatura elegivel (status previsto/lancado) com
+// loc_fatura_id vinculado, e muda status da fatura pra enviado_pagamento.
+// Pula faturas ja enviadas (mesma fatura nao gera CP duplicado).
 export function useEnviarFaturasFinanceiro() {
   const qc = useQueryClient()
   return useMutation({
@@ -429,13 +430,44 @@ export function useEnviarFaturasFinanceiro() {
         p_fatura_ids: faturaIds,
       })
       if (error) throw error
-      return data as { enviadas: number; puladas: number }
+      return data as {
+        enviadas: number
+        puladas: number
+        motivos?: { fatura_id: string; motivo: string }[]
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loc_faturas'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
     },
+  })
+}
+
+// Resumo de uma loc_fatura p/ badge no Painel de Pagamentos (imovel/competencia)
+export function useLocFaturaResumo(locFaturaId?: string) {
+  return useQuery({
+    queryKey: ['loc-fatura-resumo', locFaturaId],
+    enabled: !!locFaturaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loc_faturas')
+        .select(`
+          id, competencia, tipo,
+          imovel:loc_imoveis(id, codigo, descricao, endereco, numero, cidade)
+        `)
+        .eq('id', locFaturaId!)
+        .maybeSingle()
+      if (error) throw error
+      return data as {
+        id: string
+        competencia: string | null
+        tipo: string
+        imovel: { id: string; codigo: string | null; descricao: string | null; endereco: string | null; numero: string | null; cidade: string | null } | null
+      } | null
+    },
+    retry: false,
   })
 }
 

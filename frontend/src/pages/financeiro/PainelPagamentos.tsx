@@ -9,6 +9,7 @@ import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/use
 import type { ContaPagar } from '../../types/financeiro'
 import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../utils/pagamentos-previstos-pdf'
 import { useFaturaConciliacaoStatus } from '../../hooks/useCartoes'
+import { useLocFaturaResumo } from '../../hooks/useLocacao'
 import { supabase } from '../../services/supabase'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,6 +51,23 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 }
 
 const podePagar = (cp: ContaPagar) => cp.status === 'aprovado_pgto'
+
+function LocFaturaBadge({ locFaturaId }: { locFaturaId: string }) {
+  const { data } = useLocFaturaResumo(locFaturaId)
+  if (!data) return null
+  const competencia = data.competencia ? data.competencia.slice(0, 7) : '—'
+  const imovel = data.imovel
+    ? (data.imovel.codigo || data.imovel.descricao || [data.imovel.endereco, data.imovel.numero].filter(Boolean).join(', ') || '—')
+    : '—'
+  return (
+    <span
+      title={`Locação · ${imovel} · ${competencia} · ${data.tipo}`}
+      className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+    >
+      Locação {competencia}
+    </span>
+  )
+}
 
 function FaturaConciliacaoBadge({ faturaId }: { faturaId: string }) {
   const { data } = useFaturaConciliacaoStatus(faturaId)
@@ -517,6 +535,8 @@ export default function PainelPagamentos() {
                       </span>
 
                       {cp.fatura_id && <FaturaConciliacaoBadge faturaId={cp.fatura_id} />}
+
+                      {cp.loc_fatura_id && <LocFaturaBadge locFaturaId={cp.loc_fatura_id} />}
 
                       {cp.forma_pagamento && (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${
