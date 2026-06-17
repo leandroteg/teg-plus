@@ -336,7 +336,9 @@ const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; c
   { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
   { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
-  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'cancelado'].includes(stage.status)),
+  ...CP_PIPELINE_STAGES.filter(stage => stage.status === 'pago'),
+  { status: 'conciliado', label: 'Conciliados', color: 'green', borderColor: 'border-t-green-500' },
+  ...CP_PIPELINE_STAGES.filter(stage => stage.status === 'cancelado'),
 ]
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -3154,7 +3156,6 @@ export default function CPPipeline() {
     document.addEventListener('mouseup', onUp)
   }, [])
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
-  const [showNovaMenu, setShowNovaMenu] = useState(false)
   const [conciliarModalItems, setConciliarModalItems] = useState<ConciliarItem[]>([])
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
   const [pagData, setPagData] = useState(new Date().toISOString().split('T')[0])
@@ -3162,33 +3163,15 @@ export default function CPPipeline() {
   const [pagUploading, setPagUploading] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
-  const novaMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const novaIntent = searchParams.get('nova')
     if (novaIntent === 'extraordinario' || novaIntent === 'previsao') {
       setNovaSolicitacaoKind(novaIntent)
       setShowNovaSolicitacao(true)
-      setShowNovaMenu(false)
-      setSearchParams({}, { replace: true })
-      return
-    }
-    if (novaIntent) {
-      setShowNovaMenu(true)
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    if (!showNovaMenu) return
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!novaMenuRef.current?.contains(event.target as Node)) {
-        setShowNovaMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showNovaMenu])
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -3882,65 +3865,15 @@ export default function CPPipeline() {
         </div>
       )}
 
-      {/* Nova Solicitação modal */}
-      {showNovaMenu && (
-        <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setShowNovaMenu(false)} />
-      )}
-
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Receipt size={20} className="text-emerald-600" />
-            Contas a Pagar
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
-          </p>
-        </div>
-        <div ref={novaMenuRef} className="relative z-50">
-          <button
-            type="button"
-            onClick={() => setShowNovaMenu(prev => !prev)}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
-          >
-            <Plus size={15} />
-            <ChevronDown size={15} className={`transition-transform ${showNovaMenu ? 'rotate-180' : ''}`} />
-            Nova Solicitação
-          </button>
-          {showNovaMenu && (
-            <div
-              onClick={e => e.stopPropagation()}
-              className={`absolute left-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
-            >
-            <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
-            <button type="button"
-              onClick={() => { setNovaSolicitacaoKind('extraordinario'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
-              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-600'}`}>
-                <Receipt size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pagamento Extraordinário</span>
-                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solicitação manual urgente com entrada direta em Confirmados.</span>
-              </span>
-            </button>
-            <button type="button"
-              onClick={() => { setNovaSolicitacaoKind('previsao'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
-              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
-                <Calendar size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Previsão de Pagamento</span>
-                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
-              </span>
-            </button>
-            </div>
-          )}
-        </div>
+      <div>
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          <Receipt size={20} className="text-emerald-600" />
+          Contas a Pagar
+        </h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+        </p>
       </div>
 
       {/* ══ Horizontal Tabs ══ */}
