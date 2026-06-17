@@ -6,7 +6,7 @@ import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
   ChevronRight, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
-  LayoutList, LayoutGrid,
+  LayoutList, LayoutGrid, GraduationCap,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaboradores } from '../../hooks/useRH'
@@ -92,10 +92,11 @@ export default function RHColaboradores() {
     const ativos = todos.filter(c => c.ativo)
     const clt = ativos.filter(c => (c.tipo_contrato || 'CLT').toUpperCase() === 'CLT').length
     const pj = ativos.filter(c => (c.tipo_contrato || '').toUpperCase() === 'PJ').length
+    const aprendiz = ativos.filter(c => (c.tipo_contrato || '').toUpperCase() === 'APRENDIZ').length
     const hoje = new Date()
     const trintaDiasAtras = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000)
     const admissoes30d = ativos.filter(c => c.data_admissao && new Date(c.data_admissao) >= trintaDiasAtras).length
-    return { ativos: ativos.length, clt, pj, admissoes30d }
+    return { ativos: ativos.length, clt, pj, aprendiz, admissoes30d }
   }, [todos])
 
   const activeFilterCount = [
@@ -149,17 +150,19 @@ export default function RHColaboradores() {
       </div>
 
       {/* KPI Summary Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           { label: 'Ativos', value: kpis.ativos, icon: Users, color: 'teal' },
           { label: 'CLT', value: kpis.clt, icon: BadgeCheck, color: 'emerald' },
           { label: 'PJ', value: kpis.pj, icon: Briefcase, color: 'amber' },
+          { label: 'Aprendiz', value: kpis.aprendiz, icon: GraduationCap, color: 'sky' },
           { label: 'Admissões 30d', value: kpis.admissoes30d, icon: Calendar, color: 'indigo' },
         ].map(kpi => {
           const colorMap: Record<string, { light: string; dark: string; iconLight: string; iconDark: string }> = {
             teal:    { light: 'bg-teal-50 border-teal-100',    dark: 'bg-teal-500/10 border-teal-500/20',    iconLight: 'text-teal-500',    iconDark: 'text-teal-400' },
             emerald: { light: 'bg-emerald-50 border-emerald-100', dark: 'bg-emerald-500/10 border-emerald-500/20', iconLight: 'text-emerald-500', iconDark: 'text-emerald-400' },
             amber:   { light: 'bg-amber-50 border-amber-100',   dark: 'bg-amber-500/10 border-amber-500/20',   iconLight: 'text-amber-500',   iconDark: 'text-amber-400' },
+            sky:     { light: 'bg-sky-50 border-sky-100',       dark: 'bg-sky-500/10 border-sky-500/20',       iconLight: 'text-sky-500',     iconDark: 'text-sky-400' },
             indigo:  { light: 'bg-indigo-50 border-indigo-100', dark: 'bg-indigo-500/10 border-indigo-500/20', iconLight: 'text-indigo-500', iconDark: 'text-indigo-400' },
           }
           const c = colorMap[kpi.color]
@@ -383,8 +386,10 @@ export default function RHColaboradores() {
                           <span className={`text-[10px] px-2 py-1 rounded-xl font-bold ${
                             tipo === 'PJ'
                               ? isLight ? 'bg-amber-50 text-amber-600' : 'bg-amber-500/15 text-amber-400'
-                              : isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-400'
-                          }`}>{c.tipo_contrato || 'CLT'}</span>
+                              : tipo === 'APRENDIZ'
+                                ? isLight ? 'bg-sky-50 text-sky-600' : 'bg-sky-500/15 text-sky-400'
+                                : isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-400'
+                          }`}>{tipo === 'APRENDIZ' ? 'Aprendiz' : (c.tipo_contrato || 'CLT')}</span>
                         </td>
                         {/* Admissão */}
                         <td className={`px-4 py-3 hidden lg:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -460,10 +465,12 @@ export default function RHColaboradores() {
                             }`}>{c.base.nome}</span>
                           )}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                            (c.tipo_contrato || 'CLT') === 'PJ'
+                            (c.tipo_contrato || 'CLT').toUpperCase() === 'PJ'
                               ? isLight ? 'bg-orange-50 text-orange-600' : 'bg-orange-500/15 text-orange-400'
-                              : isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-500/15 text-blue-400'
-                          }`}>{c.tipo_contrato || 'CLT'}</span>
+                              : (c.tipo_contrato || '').toUpperCase() === 'APRENDIZ'
+                                ? isLight ? 'bg-sky-50 text-sky-600' : 'bg-sky-500/15 text-sky-400'
+                                : isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-500/15 text-blue-400'
+                          }`}>{(c.tipo_contrato || '').toUpperCase() === 'APRENDIZ' ? 'Aprendiz' : (c.tipo_contrato || 'CLT')}</span>
                           {tempoEmpresa && (
                             <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                               <Clock size={9} />{tempoEmpresa}

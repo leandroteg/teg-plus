@@ -298,9 +298,9 @@ export interface FiltrosColaboradores {
 export const TIPOS_CONTRATO = [
   { value: 'CLT', label: 'CLT' },
   { value: 'PJ', label: 'Equipe PJ' },
+  { value: 'aprendiz', label: 'Jovem Aprendiz' },
   { value: 'estagiario', label: 'Estagiário' },
   { value: 'temporario', label: 'Temporário' },
-  { value: 'aprendiz', label: 'Aprendiz' },
 ]
 
 export const TIPOS_MOVIMENTACAO = [
