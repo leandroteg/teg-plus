@@ -80,7 +80,15 @@ function agruparPorVencimento(cps: ContaPagar[]): Faixa[] {
     .filter(f => f.cps.length > 0)
 }
 
-function buildDoc(cps: ContaPagar[], empresa: EmpresaData, logo: string | null) {
+export type EscopoRelatorio = 'todos' | 'previstos' | 'confirmados'
+
+const TITULOS: Record<EscopoRelatorio, string> = {
+  todos: 'PAGAMENTOS EM ABERTO',
+  previstos: 'PAGAMENTOS PREVISTOS',
+  confirmados: 'PAGAMENTOS CONFIRMADOS',
+}
+
+function buildDoc(cps: ContaPagar[], empresa: EmpresaData, logo: string | null, escopo: EscopoRelatorio) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210, M = 15, CW = W - 2 * M
   let y = M
@@ -101,7 +109,7 @@ function buildDoc(cps: ContaPagar[], empresa: EmpresaData, logo: string | null) 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(180, 190, 200)
   doc.text(`CNPJ: ${empresa.cnpj}`, M + 20, 17)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(255, 255, 255)
-  doc.text('PAGAMENTOS PREVISTOS', W - M, 13, { align: 'right' })
+  doc.text(TITULOS[escopo], W - M, 13, { align: 'right' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(180, 190, 200)
   doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, W - M, 19, { align: 'right' })
   y = 38
@@ -185,30 +193,35 @@ function buildDoc(cps: ContaPagar[], empresa: EmpresaData, logo: string | null) 
 
   // ── Footer ──
   doc.setFontSize(6); doc.setTextColor(180, 180, 180)
-  doc.text(`TEG+ ERP · ${empresa.fantasia} · Relatório gerencial de pagamentos previstos`, W / 2, 290, { align: 'center' })
+  const rodapeLabel = escopo === 'previstos'
+    ? 'Relatório gerencial de pagamentos previstos'
+    : escopo === 'confirmados'
+      ? 'Relatório gerencial de pagamentos confirmados'
+      : 'Relatório gerencial de pagamentos em aberto'
+  doc.text(`TEG+ ERP · ${empresa.fantasia} · ${rodapeLabel}`, W / 2, 290, { align: 'center' })
 
   return doc
 }
 
-export async function gerarPagamentosPrevistosPdfBlob(cps: ContaPagar[]): Promise<Blob> {
+export async function gerarPagamentosPrevistosPdfBlob(cps: ContaPagar[], escopo: EscopoRelatorio = 'todos'): Promise<Blob> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
   const logo = await loadLogoBase64(empresa.logoUrl)
-  return buildDoc(cps, empresa, logo).output('blob')
+  return buildDoc(cps, empresa, logo, escopo).output('blob')
 }
 
-export async function downloadPagamentosPrevistosPdf(cps: ContaPagar[]): Promise<void> {
-  const blob = await gerarPagamentosPrevistosPdfBlob(cps)
+export async function downloadPagamentosPrevistosPdf(cps: ContaPagar[], escopo: EscopoRelatorio = 'todos'): Promise<void> {
+  const blob = await gerarPagamentosPrevistosPdfBlob(cps, escopo)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `pagamentos-previstos-${hoje()}.pdf`
+  a.download = `pagamentos-${escopo}-${hoje()}.pdf`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
 
-export async function abrirPagamentosPrevistosPdf(cps: ContaPagar[]): Promise<void> {
-  const blob = await gerarPagamentosPrevistosPdfBlob(cps)
+export async function abrirPagamentosPrevistosPdf(cps: ContaPagar[], escopo: EscopoRelatorio = 'todos'): Promise<void> {
+  const blob = await gerarPagamentosPrevistosPdfBlob(cps, escopo)
   window.open(URL.createObjectURL(blob), '_blank')
 }

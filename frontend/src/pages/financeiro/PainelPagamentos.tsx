@@ -7,7 +7,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCPsParaPagamento, useRegistrarPagamentoBatch } from '../../hooks/useLotesPagamento'
 import type { ContaPagar } from '../../types/financeiro'
-import { downloadPagamentosPrevistosPdf } from '../../utils/pagamentos-previstos-pdf'
+import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../utils/pagamentos-previstos-pdf'
 import { supabase } from '../../services/supabase'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,6 +57,7 @@ export default function PainelPagamentos() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [escopoPdf, setEscopoPdf] = useState<EscopoRelatorio>('todos')
   const [pendentesComprovante, setPendentesComprovante] = useState<ContaPagar[]>([])
   const [checandoComprovantes, setChecandoComprovantes] = useState(false)
 
@@ -232,21 +233,29 @@ export default function PainelPagamentos() {
     if (exporting) return
     setExporting(true)
     try {
-      // Forecast gerencial = todos os títulos em aberto (não só os aprovados p/
-      // pagamento que a tela lista), ordenados por vencimento.
+      const statusPorEscopo: Record<EscopoRelatorio, string[]> = {
+        todos: ['previsto', 'confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
+        previstos: ['previsto'],
+        confirmados: ['confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'],
+      }
       const { data, error } = await supabase
         .from('fin_contas_pagar')
         .select('*')
-        .in('status', ['previsto', 'confirmado', 'aguardando_aprovacao', 'aprovado_pgto', 'em_pagamento'])
+        .in('status', statusPorEscopo[escopoPdf])
         .order('data_vencimento', { ascending: true })
       if (error) throw error
+      const titulos: Record<EscopoRelatorio, string> = {
+        todos: 'pagamento em aberto',
+        previstos: 'pagamento previsto',
+        confirmados: 'pagamento confirmado',
+      }
       const previstos = (data ?? []) as ContaPagar[]
       if (previstos.length === 0) {
-        setToast({ type: 'error', msg: 'Nenhum pagamento previsto para exportar' })
+        setToast({ type: 'error', msg: `Nenhum ${titulos[escopoPdf]} para exportar` })
         setTimeout(() => setToast(null), 3000)
         return
       }
-      await downloadPagamentosPrevistosPdf(previstos)
+      await downloadPagamentosPrevistosPdf(previstos, escopoPdf)
     } catch {
       setToast({ type: 'error', msg: 'Erro ao gerar o PDF' })
       setTimeout(() => setToast(null), 3000)
@@ -270,14 +279,29 @@ export default function PainelPagamentos() {
           <span className="text-xs text-slate-400">
             {filtered.length} pagamento(s) pendente(s)
           </span>
-          <button
-            onClick={handleExportPdf}
-            disabled={exporting}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-600/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
-          >
-            {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-            Exportar previstos (PDF)
-          </button>
+          <div className="flex items-center rounded-lg border border-emerald-600/40 overflow-hidden">
+            <select
+              value={escopoPdf}
+              onChange={e => setEscopoPdf(e.target.value as EscopoRelatorio)}
+              disabled={exporting}
+              title="Escopo do relatório"
+              className={`text-xs font-semibold px-2 py-1.5 border-r border-emerald-600/40 focus:outline-none ${
+                isDark ? 'bg-slate-800 text-slate-200' : 'bg-white text-slate-700'
+              }`}
+            >
+              <option value="todos">Todos em aberto</option>
+              <option value="previstos">Apenas previstos</option>
+              <option value="confirmados">Apenas confirmados</option>
+            </select>
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+            >
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+              Exportar PDF
+            </button>
+          </div>
         </div>
       </div>
 
