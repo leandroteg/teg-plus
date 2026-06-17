@@ -328,13 +328,10 @@ export default function SolicitacoesLista() {
                   <span className="text-[10px] text-slate-400 shrink-0">{fmtData(s.created_at)}</span>
                 </div>
 
-                <p className="text-sm font-bold text-slate-800 mt-2 truncate">{s.objeto}</p>
+                <p className="text-sm font-bold text-slate-800 mt-2 truncate">{s.contraparte_nome}</p>
+                <p className="text-xs text-slate-500 mt-0.5 truncate" title={s.objeto}>{s.objeto}</p>
 
                 <div className="flex items-center gap-3 mt-2">
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <Building2 size={11} className="text-slate-400" />
-                    <span className="truncate max-w-[140px]">{s.contraparte_nome}</span>
-                  </div>
                   {s.obra?.nome && (
                     <div className="flex items-center gap-1 text-[10px] text-slate-400">
                       <Tag size={9} />
