@@ -8,10 +8,10 @@ import { PanelCard, Kpi, HBarRow, Heatmap } from './_ui'
 
 const FAIXA_COR: Record<string, string> = { m1: '#dc2626', m1_6: '#d97706', m6_12: '#ca8a04', a1_2: '#16a34a', a2: '#0891b2' }
 
-export default function TurnoverHeadcount() {
+export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
-  const agg = useMemo(() => turnoverAgg(rows), [rows])
+  const agg = useMemo(() => turnoverAgg(rows, de, ate), [rows, de, ate])
 
   if (isLoading) return <Spinner />
 

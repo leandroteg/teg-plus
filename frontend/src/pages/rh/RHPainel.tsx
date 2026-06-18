@@ -68,11 +68,22 @@ function PainelSpinner() {
   return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
 }
 
+function ymHoje() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 export default function RHPainel() {
   const { isDark } = useTheme()
   const [painel, setPainel] = useState<PainelKey>('geral')
+  const [de, setDe] = useState('2025-01')
+  const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
   const { data: admissoes = [] } = useAdmissoesFluxo()
+
+  const inputCls = `rounded-lg px-2 py-1 border text-xs font-semibold cursor-pointer ${
+    isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+  }`
 
   return (
     <div className="space-y-3">
@@ -93,16 +104,22 @@ export default function RHPainel() {
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
         </div>
-        {painel === 'geral' && (
+        {painel === 'geral' ? (
           <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
             <RefreshCw size={16} />
           </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <input type="month" value={de} min="2021-01" max={ate} onChange={e => e.target.value && setDe(e.target.value)} className={inputCls} aria-label="Data início" />
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+            <input type="month" value={ate} min={de} max={ymHoje()} onChange={e => e.target.value && setAte(e.target.value)} className={inputCls} aria-label="Data fim" />
+          </div>
         )}
       </div>
 
-      {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount /></Suspense>}
-      {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount /></Suspense>}
-      {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount /></Suspense>}
+      {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount de={de} ate={ate} /></Suspense>}
+      {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount de={de} ate={ate} /></Suspense>}
+      {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'geral' && (
         (isLoading || !stats) ? <PainelSpinner /> : <VisaoGeral stats={stats} admissoes={admissoes} isDark={isDark} />
       )}

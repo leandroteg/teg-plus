@@ -5,21 +5,19 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useHeadcountDataset } from '../../../hooks/useRH'
 import {
   composicaoAtual, evolucaoPorSetor, tempoEmpresaDist, cargoParaSetor,
-  listaMeses, ymKey, ymLabel, parseData, tempoEmpresaTexto, type HeadcountRow,
+  listaMeses, ymLabel, parseData, tempoEmpresaTexto, type HeadcountRow,
 } from '../../../lib/headcountAnalytics'
 import { PanelCard, Kpi, StackedMonthChart, Legenda, ProporcaoBar } from './_ui'
 
-export default function ComposicaoHeadcount() {
+export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
   const [aberto, setAberto] = useState<string | null>(null)
 
   const dados = useMemo(() => {
     const comp = composicaoAtual(rows)
-    const toYM = ymKey(new Date())
-    // últimos 12 meses terminando hoje
-    const ultimos12 = listaMeses('2025-01', toYM).slice(-12)
-    const evo = evolucaoPorSetor(rows, ultimos12)
+    const meses = listaMeses(de, ate)
+    const evo = evolucaoPorSetor(rows, meses)
     const tempo = tempoEmpresaDist(rows)
     // colaboradores por setor (ativos + saíram) para as tabelas
     const porSetor = new Map<string, HeadcountRow[]>()
@@ -28,8 +26,8 @@ export default function ComposicaoHeadcount() {
       if (!porSetor.has(k)) porSetor.set(k, [])
       porSetor.get(k)!.push(r)
     }
-    return { comp, evo: { meses: ultimos12.map(ymLabel), series: evo.series }, tempo, porSetor }
-  }, [rows])
+    return { comp, evo: { meses: meses.map(ymLabel), series: evo.series }, tempo, porSetor }
+  }, [rows, de, ate])
 
   if (isLoading) return <Spinner />
 
@@ -66,7 +64,7 @@ export default function ComposicaoHeadcount() {
       </PanelCard>
 
       {/* Evolução por setor + proporção */}
-      <PanelCard title="Evolução por Área — últimos 12 meses" icon={<Layers size={14} className="text-violet-500" />} isDark={isDark}
+      <PanelCard title="Evolução por Área — no período" icon={<Layers size={14} className="text-violet-500" />} isDark={isDark}
         right={<Legenda items={evo.series} isDark={isDark} />}>
         {evo.series.length === 0 ? <Vazio isDark={isDark} /> : <StackedMonthChart meses={evo.meses} series={evo.series} isDark={isDark} height={200} />}
       </PanelCard>

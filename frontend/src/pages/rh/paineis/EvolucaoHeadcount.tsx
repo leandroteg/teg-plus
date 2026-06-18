@@ -3,18 +3,17 @@ import { useMemo } from 'react'
 import { TrendingUp, Table2 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useHeadcountDataset } from '../../../hooks/useRH'
-import { serieMensal, ymKey } from '../../../lib/headcountAnalytics'
+import { serieMensal } from '../../../lib/headcountAnalytics'
 import { PanelCard, Kpi, StackedMonthChart, Legenda } from './_ui'
 
 const COR_CLT = '#7c3aed', COR_PJ = '#f59e0b', COR_OUTROS = '#94a3b8'
 
-export default function EvolucaoHeadcount() {
+export default function EvolucaoHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
 
   const { serie, kpis } = useMemo(() => {
-    const toYM = ymKey(new Date())
-    const s = serieMensal(rows, '2025-01', toYM)
+    const s = serieMensal(rows, de, ate)
     const ultimo = s[s.length - 1]
     const primeiro = s.find(m => m.total > 0) ?? s[0]
     const pico = s.reduce((mx, m) => Math.max(mx, m.total), 0)
@@ -26,7 +25,7 @@ export default function EvolucaoHeadcount() {
       serie: s,
       kpis: { atual, pico, cresc, entradas, saidas, turnover: atual ? (saidas / atual) * 100 : 0, ultimo },
     }
-  }, [rows])
+  }, [rows, de, ate])
 
   if (isLoading) return <Spinner />
 
@@ -41,9 +40,9 @@ export default function EvolucaoHeadcount() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <Kpi label="Headcount" value={kpis.atual} tone="violet" note="ativos hoje" isDark={isDark} />
         <Kpi label="Pico" value={kpis.pico} tone="sky" note="no período" isDark={isDark} />
-        <Kpi label="Crescimento" value={`${kpis.cresc >= 0 ? '+' : ''}${kpis.cresc.toFixed(0)}%`} tone={kpis.cresc >= 0 ? 'emerald' : 'red'} note="vs início 2025" isDark={isDark} />
-        <Kpi label="Entradas" value={kpis.entradas} tone="emerald" note="Jan/25→hoje" isDark={isDark} />
-        <Kpi label="Saídas" value={kpis.saidas} tone="amber" note="Jan/25→hoje" isDark={isDark} />
+        <Kpi label="Crescimento" value={`${kpis.cresc >= 0 ? '+' : ''}${kpis.cresc.toFixed(0)}%`} tone={kpis.cresc >= 0 ? 'emerald' : 'red'} note="no período" isDark={isDark} />
+        <Kpi label="Entradas" value={kpis.entradas} tone="emerald" note="no período" isDark={isDark} />
+        <Kpi label="Saídas" value={kpis.saidas} tone="amber" note="no período" isDark={isDark} />
         <Kpi label="Turnover" value={`${kpis.turnover.toFixed(0)}%`} tone={kpis.turnover >= 50 ? 'red' : 'emerald'} note="acumulado" isDark={isDark} />
       </div>
 

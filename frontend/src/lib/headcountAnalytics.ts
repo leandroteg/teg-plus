@@ -217,9 +217,14 @@ export interface TurnoverAgg {
   porCargo: Array<{ cargo: string; popTotal: number; saidas: number; pctTurnover: number; custo: number }>
   heatmap: Record<number, { meses: number[]; linhas: Array<{ key: string; label: string; color: string; valores: number[]; total: number }>; totalMes: number[] }>
 }
-export function turnoverAgg(rows: HeadcountRow[], anos: number[] = [2025, 2026]): TurnoverAgg {
-  const saidas = rows.filter(r => parseData(r.data_demissao))
+export function turnoverAgg(rows: HeadcountRow[], fromYM?: string, toYM?: string): TurnoverAgg {
+  const noIntervalo = (d: Date) => { const k = ymKey(d); return (!fromYM || k >= fromYM) && (!toYM || k <= toYM) }
+  const saidas = rows.filter(r => { const d = parseData(r.data_demissao); return d && noIntervalo(d) })
   const saidasSemData = rows.filter(r => !r.ativo && !parseData(r.data_demissao)).length
+  const anoIni = fromYM ? Number(fromYM.slice(0, 4)) : 2025
+  const anoFim = toYM ? Number(toYM.slice(0, 4)) : new Date().getFullYear()
+  const anos: number[] = []
+  for (let y = anoIni; y <= anoFim; y++) anos.push(y)
 
   // por faixa de tempo na saída + custo
   const porFaixaMap = new Map(FAIXAS_TEMPO.map(f => [f.key, { key: f.key, label: f.label, saidas: 0, custo: 0 }]))
