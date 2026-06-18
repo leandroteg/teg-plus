@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Radio, ChevronLeft, ChevronRight, Info as InfoIcon } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, AttributionControl } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -10,6 +10,7 @@ import type { TelUltimaPosicao } from '../../../types/telemetria'
 import type { FroVeiculo, FroAlocacao } from '../../../types/frotas'
 import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
 import { FiltroProvedor, type ProviderFilter } from './FiltroProvedor'
+import TelemetriaSyncStatus from '../../../pages/frotas/operacao/TelemetriaSyncStatus'
 
 // Fix leaflet default icon issue (safely)
 try {
@@ -311,11 +312,14 @@ export default function MapaAoVivo() {
           zoom={5}
           className="h-full w-full z-0"
           zoomControl={false}
+          attributionControl={false}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {/* Atribuição à esquerda p/ liberar o canto inferior direito ao indicador de sync */}
+          <AttributionControl position="bottomleft" prefix={false} />
 
           <FitBounds positions={posicoesFiltradas} />
           <FlyTo position={flyToPosition} />
@@ -361,6 +365,11 @@ export default function MapaAoVivo() {
             )
           })}
         </MapContainer>
+
+        {/* Indicador discreto de saúde da sincronização — canto inferior direito do mapa */}
+        <div className="absolute bottom-3 right-3 z-[1000]">
+          <TelemetriaSyncStatus placement="up" />
+        </div>
       </div>
 
       {/* Modal fusao Frotas + Telemetria */}

@@ -32,7 +32,7 @@ function explicarErro(erro: string | null): string {
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
-export default function TelemetriaSyncStatus() {
+export default function TelemetriaSyncStatus({ placement = 'down' }: { placement?: 'up' | 'down' }) {
   const { isDark } = useTheme()
   const { data: logs = [], isLoading, isError } = useTelSyncLog(20)
   const [open, setOpen] = useState(false)
@@ -71,8 +71,8 @@ export default function TelemetriaSyncStatus() {
         : isDark ? 'bg-slate-500' : 'bg-slate-400'
 
   const pillCls = isDark
-    ? 'border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]'
-    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+    ? 'border-white/[0.1] bg-[#1e293b]/90 backdrop-blur text-slate-300 hover:bg-[#1e293b] shadow-md'
+    : 'border-slate-200 bg-white/95 backdrop-blur text-slate-600 hover:bg-white shadow-md'
 
   const label =
     isError ? 'Telemetria: status indisponível'
@@ -99,9 +99,9 @@ export default function TelemetriaSyncStatus() {
 
       {open && (
         <div
-          className={`absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border shadow-xl ${
-            isDark ? 'border-white/[0.08] bg-[#1e293b]' : 'border-slate-200 bg-white'
-          }`}
+          className={`absolute right-0 z-[1000] w-80 overflow-hidden rounded-2xl border shadow-xl ${
+            placement === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+          } ${isDark ? 'border-white/[0.08] bg-[#1e293b]' : 'border-slate-200 bg-white'}`}
         >
           <div className={`flex items-center gap-2 border-b px-4 py-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
             <RadioTower size={15} className="text-teal-500" />
