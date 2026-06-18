@@ -1,15 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/rh/RHPainel.tsx — Painel do Headcount (padrão dos dashboards TEG+)
-// 3 indicadores · 2 urgentes · pulso (composição) · 2 listas
+// Seletor de painel (Visão Geral · Evolução · Composição · Turnover), igual ao Frotas.
 // ─────────────────────────────────────────────────────────────────────────────
+import { useState, lazy, Suspense } from 'react'
 import {
   Users, UserPlus, UserMinus, TrendingUp, RefreshCw, ChevronRight,
-  Zap, AlertTriangle, Activity, Building2,
+  Zap, AlertTriangle, Activity, Building2, ChevronDown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHStats } from '../../hooks/useRH'
 import { useAdmissoesFluxo } from '../../hooks/useRHAdmissaoFluxo'
+import type { RHStats } from '../../hooks/useRH'
+import type { RHAdmissao } from '../../types/rh'
+
+const EvolucaoHeadcount = lazy(() => import('./paineis/EvolucaoHeadcount'))
+const ComposicaoHeadcount = lazy(() => import('./paineis/ComposicaoHeadcount'))
+const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
+
+type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
+const PAINEIS: Array<{ key: PainelKey; label: string }> = [
+  { key: 'geral', label: 'Visão Geral' },
+  { key: 'evolucao', label: 'Evolução' },
+  { key: 'composicao', label: 'Composição' },
+  { key: 'turnover', label: 'Turnover' },
+]
 
 const ETAPA_LABEL: Record<string, string> = {
   requisicao: 'Pendente', aprovacao: 'Aprovação', documentacao: 'Documentação',
@@ -49,33 +64,65 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
   )
 }
 
+function PainelSpinner() {
+  return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+}
+
 export default function RHPainel() {
   const { isDark } = useTheme()
-  const nav = useNavigate()
+  const [painel, setPainel] = useState<PainelKey>('geral')
   const { data: stats, isLoading, refetch } = useRHStats()
   const { data: admissoes = [] } = useAdmissoesFluxo()
 
-  const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
-
-  if (isLoading || !stats) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" />
+  return (
+    <div className="space-y-3">
+      {/* Header + seletor de painel (padrão Frotas) */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Headcount</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admissões, saídas e composição da equipe</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select value={painel} onChange={e => setPainel(e.target.value as PainelKey)}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}>
+              {PAINEIS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          </div>
+          {painel === 'geral' && (
+            <button onClick={() => refetch()} className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-violet-400' : 'text-slate-400 hover:text-violet-600'}`}>
+              <RefreshCw size={12} />
+            </button>
+          )}
+        </div>
       </div>
-    )
-  }
+
+      {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount /></Suspense>}
+      {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount /></Suspense>}
+      {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount /></Suspense>}
+      {painel === 'geral' && (
+        (isLoading || !stats) ? <PainelSpinner /> : <VisaoGeral stats={stats} admissoes={admissoes} isDark={isDark} />
+      )}
+    </div>
+  )
+}
+
+function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: RHAdmissao[]; isDark: boolean }) {
+  const nav = useNavigate()
+  const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
   // ── Métricas ───────────────────────────────────────────────────────────────
   const admMes = stats.admissoesMes
   const saiMes = stats.desligamentosMes
   const ativos = stats.totalAtivos || 1
-  // Turnover mensal = média(admissões, saídas) / headcount
   const turnover = (((admMes + saiMes) / 2) / ativos) * 100
 
   const emAndamento = admissoes.filter(a => EM_ANDAMENTO.includes(a.etapa ?? 'requisicao'))
   const urgentes = emAndamento.filter(a => a.urgente).length
 
-  // Composição da equipe por tipo de contrato
   const clt = stats.totalCLT
   const pj = stats.totalPJ
   const outros = Math.max(stats.totalAtivos - clt - pj, 0)
@@ -91,17 +138,6 @@ export default function RHPainel() {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Headcount</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admissões, saídas e composição da equipe</p>
-        </div>
-        <button onClick={() => refetch()} className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-violet-400' : 'text-slate-400 hover:text-violet-600'}`}>
-          <RefreshCw size={12} />
-        </button>
-      </div>
-
       {/* Hero: Indicadores + Janela Crítica */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>

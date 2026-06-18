@@ -8,6 +8,22 @@ import type {
   RHMovimentacao, RHAdmissao, RHDesligamento,
   FiltrosColaboradores,
 } from '../types/rh'
+import type { HeadcountRow } from '../lib/headcountAnalytics'
+
+// Dataset enxuto p/ os painéis de Headcount (ativos + inativos, campos temporais).
+export function useHeadcountDataset() {
+  return useQuery<HeadcountRow[]>({
+    queryKey: ['rh-headcount-dataset'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rh_colaboradores')
+        .select('id, nome, cargo, tipo_contrato, data_admissao, data_demissao, salario, ativo')
+      if (error) { console.error('useHeadcountDataset:', error); return [] }
+      return (data ?? []) as HeadcountRow[]
+    },
+  })
+}
 
 // ── Colaboradores ────────────────────────────────────────────────────────────
 
