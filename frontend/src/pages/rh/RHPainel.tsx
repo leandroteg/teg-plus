@@ -21,8 +21,8 @@ const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
 type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
   { key: 'geral', label: 'Visão Geral' },
-  { key: 'evolucao', label: 'Evolução' },
   { key: 'composicao', label: 'Composição' },
+  { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
 ]
 
