@@ -73,21 +73,22 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
         <ProporcaoBar segments={comp.setores.map(s => ({ label: s.label, value: s.total, color: s.color }))} isDark={isDark} />
       </PanelCard>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
       {/* Tempo de empresa */}
-      <PanelCard title="Tempo de Empresa" icon={<Clock size={14} className="text-violet-500" />} isDark={isDark}>
-        <div className="space-y-2">
+      <PanelCard title="Tempo de Empresa" icon={<Clock size={15} className="text-violet-500" />} isDark={isDark}>
+        <div className="space-y-2.5">
           {tempo.map(t => (
             <div key={t.key} className="flex items-center gap-2">
-              <p className={`text-[10px] font-semibold text-right shrink-0 w-[96px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.label}</p>
-              <div className={`flex-1 h-5 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+              <p className={`text-[13px] font-semibold text-right shrink-0 w-[112px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.label}</p>
+              <div className={`flex-1 h-7 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                 <div className="h-full rounded-md bg-emerald-500/80" style={{ width: `${Math.max((t.ativos / maxTempo) * 100, 2)}%` }} title={`Ativos: ${t.ativos}`} />
               </div>
-              <p className={`text-[10px] font-extrabold shrink-0 w-[40px] text-right ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>{t.ativos}</p>
-              <p className={`text-[9px] shrink-0 w-[58px] text-right ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t.saiu} saíram</p>
+              <p className={`text-[15px] font-extrabold shrink-0 w-[44px] text-right ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>{t.ativos}</p>
+              <p className={`text-[12px] shrink-0 w-[74px] text-right ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t.saiu} saíram</p>
             </div>
           ))}
         </div>
-        <p className={`mt-2 text-[9px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Barra = ativos por faixa (tempo real de admissão). "Saíram" = quem desligou naquela faixa.</p>
+        <p className={`mt-2.5 text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Barra = ativos por faixa (tempo real de admissão). "Saíram" = quem desligou naquela faixa.</p>
       </PanelCard>
 
       {/* Tabelas por setor (colapsáveis) */}
@@ -99,11 +100,11 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
             const open = aberto === s.key
             return (
               <div key={s.key}>
-                <button onClick={() => setAberto(open ? null : s.key)} className={`w-full flex items-center gap-2 px-4 py-2.5 ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                  {open ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-                  <span className={`text-xs font-bold flex-1 text-left ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.label}</span>
-                  <span className={`text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ativos} ativos · {lista.length} no histórico</span>
+                <button onClick={() => setAberto(open ? null : s.key)} className={`w-full flex items-center gap-2 px-4 py-3 ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  {open ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                  <span className={`text-sm font-bold flex-1 text-left ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.label}</span>
+                  <span className={`text-[12px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ativos} ativos · {lista.length} no histórico</span>
                 </button>
                 {open && (
                   <div className="px-4 pb-3 overflow-x-auto">
@@ -144,8 +145,9 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
           })}
         </div>
       </PanelCard>
+      </div>
 
-      <p className={`text-[9px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Setor derivado do cargo por regras de palavra-chave (rh_colaboradores.setor está vazio). Refinável depois.</p>
+      <p className={`text-[11px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Setor derivado do cargo por regras de palavra-chave (rh_colaboradores.setor está vazio). Refinável depois.</p>
     </div>
   )
 }
