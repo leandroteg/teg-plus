@@ -26,22 +26,32 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
       if (!porSetor.has(k)) porSetor.set(k, [])
       porSetor.get(k)!.push(r)
     }
-    return { comp, evo: { meses: meses.map(ymLabel), series: evo.series }, tempo, porSetor }
+    // contagem por tipo de contrato (ativos)
+    const ativos = rows.filter(r => r.ativo)
+    const up = (t?: string) => (t || '').toUpperCase()
+    const contratos = {
+      total: ativos.length,
+      clt: ativos.filter(r => { const u = up(r.tipo_contrato); return u === '' || u === 'CLT' }).length,
+      pj: ativos.filter(r => up(r.tipo_contrato) === 'PJ').length,
+      aprendiz: ativos.filter(r => up(r.tipo_contrato) === 'APRENDIZ').length,
+    }
+    return { comp, evo: { meses: meses.map(ymLabel), series: evo.series }, tempo, porSetor, contratos }
   }, [rows, de, ate])
 
   if (isLoading) return <Spinner />
 
-  const { comp, evo, tempo, porSetor } = dados
+  const { comp, evo, tempo, porSetor, contratos } = dados
+  const pctC = (n: number) => contratos.total ? `${((n / contratos.total) * 100).toFixed(1)}%` : '0%'
   const maxTempo = Math.max(...tempo.map(t => t.ativos), 1)
   const hoje = new Date()
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <Kpi label="Total Ativos" value={comp.total} tone="violet" isDark={isDark} />
-        {comp.setores.slice(0, 3).map((s, i) => (
-          <Kpi key={s.key} label={s.label} value={s.total} tone={['emerald', 'sky', 'amber'][i]} note={`${s.pct.toFixed(1)}%`} isDark={isDark} />
-        ))}
+        <Kpi label="Total" value={contratos.total} tone="violet" note="ativos" isDark={isDark} />
+        <Kpi label="CLT" value={contratos.clt} tone="emerald" note={pctC(contratos.clt)} isDark={isDark} />
+        <Kpi label="PJ" value={contratos.pj} tone="amber" note={pctC(contratos.pj)} isDark={isDark} />
+        <Kpi label="Aprendiz" value={contratos.aprendiz} tone="sky" note={pctC(contratos.aprendiz)} isDark={isDark} />
       </div>
 
       {/* Evolução por setor + proporção */}
