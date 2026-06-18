@@ -1,6 +1,6 @@
 // pages/rh/paineis/TurnoverHeadcount.tsx — saídas por faixa/cargo/mês + custo (salário do cadastro).
 import { useMemo } from 'react'
-import { UserMinus, Briefcase, Grid3x3, DollarSign } from 'lucide-react'
+import { UserMinus, Briefcase, Grid3x3 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useHeadcountDataset } from '../../../hooks/useRH'
 import { turnoverAgg, fmtBRL } from '../../../lib/headcountAnalytics'
@@ -27,13 +27,6 @@ export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string
         <Kpi label="Custo / Saída" value={agg.temSalario ? fmtBRL(custoMed) : 'R$ 0'} tone="orange" note="média" isDark={isDark} />
         <Kpi label="Faixa crítica" value={agg.porFaixa[0]?.saidas ?? 0} tone="violet" note="< 1 mês" isDark={isDark} />
       </div>
-
-      {!agg.temSalario && (
-        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] ${isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
-          <DollarSign size={13} className="shrink-0" />
-          O custo em R$ aparece zerado porque o salário ainda não está cadastrado. Assim que o campo <b>salário</b> do colaborador for preenchido, o custo é calculado automaticamente (salário × multiplicador por tempo de casa).
-        </div>
-      )}
 
       {/* Saídas por faixa de tempo de casa */}
       <PanelCard title="Saídas por Tempo de Casa" icon={<UserMinus size={14} className="text-violet-500" />} isDark={isDark}>

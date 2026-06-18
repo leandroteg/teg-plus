@@ -136,11 +136,11 @@ export function HBarRow({ label, value, max, color, suffix, isDark }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <p className={`text-[12px] font-semibold text-right shrink-0 w-[120px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={label}>{label}</p>
+      <p className={`text-[13px] font-semibold text-right shrink-0 w-[190px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={label}>{label}</p>
       <div className={`flex-1 h-6 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
         <div className="h-full rounded-md transition-all" style={{ width: `${Math.max((value / (max || 1)) * 100, 3)}%`, background: color }} />
       </div>
-      <p className={`text-[12px] font-extrabold shrink-0 w-[72px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{suffix ?? value}</p>
+      <p className={`text-[13px] font-extrabold shrink-0 w-[80px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{suffix ?? value}</p>
     </div>
   )
 }
@@ -154,33 +154,33 @@ export function Heatmap({ linhas, totalMes, isDark }: {
   const cellTxt = isDark ? 'text-slate-300' : 'text-slate-600'
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-separate" style={{ borderSpacing: 2 }}>
+      <table className="w-full border-separate" style={{ borderSpacing: 3 }}>
         <thead>
           <tr>
             <th />
-            {MESES.map((m, i) => <th key={i} className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m}</th>)}
-            <th className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Σ</th>
+            {MESES.map((m, i) => <th key={i} className={`text-[12px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m}</th>)}
+            <th className={`text-[12px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Σ</th>
           </tr>
         </thead>
         <tbody>
           {linhas.map(l => (
             <tr key={l.label}>
-              <td className={`text-[11px] font-semibold pr-1.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{l.label}</td>
+              <td className={`text-[13px] font-semibold pr-2 whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{l.label}</td>
               {l.valores.map((v, i) => {
                 const a = v ? 0.18 + 0.82 * (v / max) : 0
                 return (
-                  <td key={i} className="w-7 h-7 text-center text-[11px] font-bold rounded" style={{ background: v ? hexA(l.color, a) : (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9'), color: v && a > 0.55 ? '#fff' : undefined }}>
+                  <td key={i} className="w-9 h-9 text-center text-[13px] font-bold rounded" style={{ background: v ? hexA(l.color, a) : (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9'), color: v && a > 0.55 ? '#fff' : undefined }}>
                     <span className={v && a > 0.55 ? '' : cellTxt}>{v || ''}</span>
                   </td>
                 )
               })}
-              <td className={`text-[11px] font-extrabold text-center ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{l.total}</td>
+              <td className={`text-[13px] font-extrabold text-center ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{l.total}</td>
             </tr>
           ))}
           <tr>
-            <td className={`text-[11px] font-extrabold pr-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
-            {totalMes.map((t, i) => <td key={i} className={`text-[11px] font-extrabold text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t || ''}</td>)}
-            <td className={`text-[11px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalMes.reduce((a, b) => a + b, 0)}</td>
+            <td className={`text-[13px] font-extrabold pr-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
+            {totalMes.map((t, i) => <td key={i} className={`text-[13px] font-extrabold text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t || ''}</td>)}
+            <td className={`text-[13px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalMes.reduce((a, b) => a + b, 0)}</td>
           </tr>
         </tbody>
       </table>
