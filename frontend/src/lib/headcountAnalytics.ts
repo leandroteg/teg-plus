@@ -215,16 +215,16 @@ export interface TurnoverAgg {
   temSalario: boolean
   porFaixa: Array<{ key: string; label: string; saidas: number; custo: number }>
   porCargo: Array<{ cargo: string; popTotal: number; saidas: number; pctTurnover: number; custo: number }>
-  heatmap: Record<number, { meses: number[]; linhas: Array<{ key: string; label: string; color: string; valores: number[]; total: number }>; totalMes: number[] }>
+  heatmap: {
+    meses: Array<{ ym: string; mes: string; ano: string }>
+    linhas: Array<{ key: string; label: string; color: string; valores: number[]; total: number }>
+    totalMes: number[]
+  }
 }
 export function turnoverAgg(rows: HeadcountRow[], fromYM?: string, toYM?: string): TurnoverAgg {
   const noIntervalo = (d: Date) => { const k = ymKey(d); return (!fromYM || k >= fromYM) && (!toYM || k <= toYM) }
   const saidas = rows.filter(r => { const d = parseData(r.data_demissao); return d && noIntervalo(d) })
   const saidasSemData = rows.filter(r => !r.ativo && !parseData(r.data_demissao)).length
-  const anoIni = fromYM ? Number(fromYM.slice(0, 4)) : 2025
-  const anoFim = toYM ? Number(toYM.slice(0, 4)) : new Date().getFullYear()
-  const anos: number[] = []
-  for (let y = anoIni; y <= anoFim; y++) anos.push(y)
 
   // por faixa de tempo na saída + custo
   const porFaixaMap = new Map(FAIXAS_TEMPO.map(f => [f.key, { key: f.key, label: f.label, saidas: 0, custo: 0 }]))
@@ -257,20 +257,20 @@ export function turnoverAgg(rows: HeadcountRow[], fromYM?: string, toYM?: string
     return { cargo, popTotal: pop, saidas: v.saidas, pctTurnover: pop ? (v.saidas / pop) * 100 : 0, custo: v.custo }
   }).sort((a, b) => b.saidas - a.saidas)
 
-  // heatmap setor × mês por ano
-  const heatmap: TurnoverAgg['heatmap'] = {}
-  for (const ano of anos) {
-    const linhas = SETORES.map(s => ({ key: s.key, label: s.label, color: s.color, valores: Array(12).fill(0), total: 0 }))
-    const idx = new Map(linhas.map((l, i) => [l.key, i]))
-    const totalMes = Array(12).fill(0)
-    for (const r of saidas) {
-      const dem = parseData(r.data_demissao)!
-      if (dem.getFullYear() !== ano) continue
-      const li = idx.get(cargoParaSetor(r.cargo))!
-      linhas[li].valores[dem.getMonth()]++; linhas[li].total++; totalMes[dem.getMonth()]++
-    }
-    heatmap[ano] = { meses: Array.from({ length: 12 }, (_, i) => i), linhas: linhas.filter(l => l.total > 0), totalMes }
+  // heatmap setor × mês — único, colunas = meses do intervalo do filtro
+  const mesesYM = listaMeses(fromYM || '2025-01', toYM || ymKey(new Date()))
+  const mesesInfo = mesesYM.map(ym => { const [y, m] = ym.split('-'); return { ym, mes: MESES_ABREV[Number(m) - 1], ano: y.slice(2) } })
+  const idxMes = new Map(mesesYM.map((ym, i) => [ym, i]))
+  const hmLinhas = SETORES.map(s => ({ key: s.key, label: s.label, color: s.color, valores: mesesYM.map(() => 0), total: 0 }))
+  const idxSetor = new Map(hmLinhas.map((l, i) => [l.key, i]))
+  const totalMes = mesesYM.map(() => 0)
+  for (const r of saidas) {
+    const mi = idxMes.get(ymKey(parseData(r.data_demissao)!))
+    if (mi === undefined) continue
+    const li = idxSetor.get(cargoParaSetor(r.cargo))!
+    hmLinhas[li].valores[mi]++; hmLinhas[li].total++; totalMes[mi]++
   }
+  const heatmap = { meses: mesesInfo, linhas: hmLinhas.filter(l => l.total > 0), totalMes }
 
   return { totalSaidas: saidas.length, saidasSemData, custoTotal, temSalario: comSalario > 0, porFaixa: [...porFaixaMap.values()], porCargo, heatmap }
 }

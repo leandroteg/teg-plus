@@ -15,7 +15,7 @@ export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string
 
   if (isLoading) return <Spinner />
 
-  const custoMaxFaixa = Math.max(...agg.porFaixa.map(f => f.custo), 1)
+  const maxSaiFaixa = Math.max(...agg.porFaixa.map(f => f.saidas), 1)
   const maxSaiCargo = Math.max(...agg.porCargo.map(c => c.saidas), 1)
   const custoMed = agg.totalSaidas ? agg.custoTotal / agg.totalSaidas : 0
 
@@ -28,48 +28,35 @@ export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string
         <Kpi label="Faixa crítica" value={agg.porFaixa[0]?.saidas ?? 0} tone="violet" note="< 1 mês" isDark={isDark} />
       </div>
 
-      {/* Saídas por faixa de tempo de casa */}
-      <PanelCard title="Saídas por Tempo de Casa" icon={<UserMinus size={14} className="text-violet-500" />} isDark={isDark}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-          {agg.porFaixa.map(f => (
-            <div key={f.key} className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: FAIXA_COR[f.key] }} />
-                <span className={`text-[9px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{f.label}</span>
-              </div>
-              <p className={`text-xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{f.saidas}</p>
-              <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{agg.temSalario ? fmtBRL(f.custo) : 'saídas'}</p>
-            </div>
-          ))}
-        </div>
-        {agg.temSalario && (
-          <div className="mt-3 space-y-1.5">
-            {agg.porFaixa.filter(f => f.custo > 0).map(f => (
-              <HBarRow key={f.key} label={f.label} value={f.custo} max={custoMaxFaixa} color={FAIXA_COR[f.key]} suffix={fmtBRL(f.custo)} isDark={isDark} />
+      {/* Tempo de casa + Top cargos lado a lado (50/50) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <PanelCard title="Saídas por Tempo de Casa" icon={<UserMinus size={14} className="text-violet-500" />} isDark={isDark}>
+          <div className="space-y-1.5">
+            {agg.porFaixa.map(f => (
+              <HBarRow key={f.key} label={f.label} value={f.saidas} max={maxSaiFaixa} color={FAIXA_COR[f.key]}
+                suffix={agg.temSalario ? `${f.saidas} · ${fmtBRL(f.custo)}` : `${f.saidas}`} isDark={isDark} />
             ))}
           </div>
-        )}
-      </PanelCard>
+          <p className={`mt-2 text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Valor = saídas{agg.temSalario ? ' · custo estimado' : ''} por faixa de tempo na saída.</p>
+        </PanelCard>
 
-      {/* Top cargos por saídas */}
-      <PanelCard title="Top Cargos por Saídas" icon={<Briefcase size={14} className="text-violet-500" />} isDark={isDark}>
-        <div className="space-y-1.5">
-          {agg.porCargo.slice(0, 10).map(c => (
-            <HBarRow key={c.cargo} label={c.cargo} value={c.saidas} max={maxSaiCargo} color="#e87b2a"
-              suffix={`${c.saidas} · ${c.pctTurnover.toFixed(0)}%`} isDark={isDark} />
-          ))}
-        </div>
-        <p className={`mt-2 text-[9px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Valor = saídas · % de turnover do cargo (saídas ÷ total que passou pelo cargo).</p>
-      </PanelCard>
+        <PanelCard title="Top Cargos por Saídas" icon={<Briefcase size={14} className="text-violet-500" />} isDark={isDark}>
+          <div className="space-y-1.5">
+            {agg.porCargo.slice(0, 10).map(c => (
+              <HBarRow key={c.cargo} label={c.cargo} value={c.saidas} max={maxSaiCargo} color="#e87b2a"
+                suffix={`${c.saidas} · ${c.pctTurnover.toFixed(0)}%`} isDark={isDark} />
+            ))}
+          </div>
+          <p className={`mt-2 text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Valor = saídas · % de turnover do cargo (saídas ÷ total que passou pelo cargo).</p>
+        </PanelCard>
+      </div>
 
-      {/* Heatmaps por ano */}
-      {Object.entries(agg.heatmap).map(([ano, hm]) => (
-        hm.linhas.length > 0 && (
-          <PanelCard key={ano} title={`Saídas por Setor × Mês — ${ano}`} icon={<Grid3x3 size={14} className="text-violet-500" />} isDark={isDark}>
-            <Heatmap linhas={hm.linhas} totalMes={hm.totalMes} isDark={isDark} />
-          </PanelCard>
-        )
-      ))}
+      {/* Heatmap único — colunas conforme o filtro */}
+      {agg.heatmap.linhas.length > 0 && (
+        <PanelCard title="Saídas por Setor × Mês" icon={<Grid3x3 size={14} className="text-violet-500" />} isDark={isDark}>
+          <Heatmap meses={agg.heatmap.meses} linhas={agg.heatmap.linhas} totalMes={agg.heatmap.totalMes} isDark={isDark} />
+        </PanelCard>
+      )}
     </div>
   )
 }

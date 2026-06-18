@@ -112,17 +112,36 @@ export function Legenda({ items, isDark }: { items: Array<{ label: string; color
   )
 }
 
-/** Barra horizontal 100% empilhada (proporção). */
+/** Barra horizontal 100% empilhada (proporção) com rótulo (nome + qtd + %) e tooltip. */
 export function ProporcaoBar({ segments, isDark }: { segments: Array<{ label: string; value: number; color: string }>; isDark: boolean }) {
+  const [hover, setHover] = useState<number | null>(null)
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
+  const n = segments.length
   return (
-    <div className={`flex h-9 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-      {segments.map(s => {
+    <div className="flex h-14">
+      {segments.map((s, i) => {
         const pct = (s.value / total) * 100
         if (pct <= 0) return null
+        const rounded = i === 0 ? 'rounded-l-xl' : i === n - 1 ? 'rounded-r-xl' : ''
         return (
-          <div key={s.label} className="flex items-center justify-center" style={{ width: `${pct}%`, background: s.color }} title={`${s.label}: ${s.value} (${pct.toFixed(1)}%)`}>
-            {pct >= 8 && <span className="text-[9px] font-bold text-white drop-shadow-sm truncate px-1">{Math.round(pct)}%</span>}
+          <div key={s.label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+            className={`relative flex flex-col items-center justify-center cursor-pointer overflow-visible ${rounded} ${hover !== null && hover !== i ? 'opacity-60' : ''} transition-opacity`}
+            style={{ width: `${pct}%`, background: s.color }}>
+            {pct >= 7 && (
+              <>
+                <span className="text-[10px] font-semibold text-white/90 leading-tight truncate max-w-full px-1">{s.label}</span>
+                <span className="text-[12px] font-extrabold text-white leading-tight">{s.value} · {Math.round(pct)}%</span>
+              </>
+            )}
+            {hover === i && (
+              <div className={`absolute bottom-full mb-1.5 z-30 ${i === 0 ? 'left-0' : i === n - 1 ? 'right-0' : 'left-1/2 -translate-x-1/2'} rounded-xl px-3 py-2 shadow-xl whitespace-nowrap ${isDark ? 'bg-slate-800 border border-white/10' : 'bg-white border border-slate-200'}`}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
+                  <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.label}</span>
+                </div>
+                <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{s.value} colaboradores · {pct.toFixed(1)}%</div>
+              </div>
+            )}
           </div>
         )
       })}
@@ -145,10 +164,9 @@ export function HBarRow({ label, value, max, color, suffix, isDark }: {
   )
 }
 
-const MESES = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
-/** Heatmap setor × mês (12 colunas). */
-export function Heatmap({ linhas, totalMes, isDark }: {
-  linhas: Array<{ label: string; color: string; valores: number[]; total: number }>; totalMes: number[]; isDark: boolean
+/** Heatmap setor × mês — colunas dinâmicas conforme o intervalo. */
+export function Heatmap({ meses, linhas, totalMes, isDark }: {
+  meses: Array<{ mes: string; ano: string }>; linhas: Array<{ label: string; color: string; valores: number[]; total: number }>; totalMes: number[]; isDark: boolean
 }) {
   const max = Math.max(...linhas.flatMap(l => l.valores), 1)
   const cellTxt = isDark ? 'text-slate-300' : 'text-slate-600'
@@ -158,7 +176,15 @@ export function Heatmap({ linhas, totalMes, isDark }: {
         <thead>
           <tr>
             <th />
-            {MESES.map((m, i) => <th key={i} className={`text-[12px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m}</th>)}
+            {meses.map((m, i) => {
+              const showAno = i === 0 || meses[i - 1].ano !== m.ano
+              return (
+                <th key={i} className="px-0.5">
+                  <div className={`text-[12px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.mes}</div>
+                  <div className={`text-[10px] font-bold ${showAno ? (isDark ? 'text-slate-400' : 'text-slate-500') : 'opacity-0'}`}>{m.ano}</div>
+                </th>
+              )
+            })}
             <th className={`text-[12px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Σ</th>
           </tr>
         </thead>
