@@ -8,11 +8,11 @@ export function card(isDark: boolean) {
   return isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 }
 
-export function PanelCard({ title, icon, right, children, isDark, pad = true }: {
-  title?: string; icon?: ReactNode; right?: ReactNode; children: ReactNode; isDark: boolean; pad?: boolean
+export function PanelCard({ title, icon, right, children, isDark, pad = true, className = '', bodyClassName = '' }: {
+  title?: string; icon?: ReactNode; right?: ReactNode; children: ReactNode; isDark: boolean; pad?: boolean; className?: string; bodyClassName?: string
 }) {
   return (
-    <section className={`rounded-2xl shadow-sm overflow-hidden ${card(isDark)}`}>
+    <section className={`rounded-2xl shadow-sm overflow-hidden ${card(isDark)} ${className}`}>
       {title && (
         <div className={`px-4 py-3 flex items-center justify-between gap-2 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
@@ -21,7 +21,7 @@ export function PanelCard({ title, icon, right, children, isDark, pad = true }: 
           {right}
         </div>
       )}
-      <div className={pad ? 'p-4' : ''}>{children}</div>
+      <div className={`${pad ? 'p-4' : ''} ${bodyClassName}`}>{children}</div>
     </section>
   )
 }
@@ -118,7 +118,7 @@ export function ProporcaoBar({ segments, isDark }: { segments: Array<{ label: st
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
   const n = segments.length
   return (
-    <div className="flex h-11">
+    <div className="flex w-full h-full min-h-[44px]">
       {segments.map((s, i) => {
         const pct = (s.value / total) * 100
         if (pct <= 0) return null

@@ -50,10 +50,10 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
         {evo.series.length === 0 ? <Vazio isDark={isDark} /> : <StackedMonthChart meses={evo.meses} series={evo.series} isDark={isDark} height={200} />}
       </PanelCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
       {/* Coluna esquerda: Composição Equipe + Tempo de Empresa */}
-      <div className="space-y-3">
-      <PanelCard title="Composição Equipe" icon={<PieChart size={14} className="text-violet-500" />} isDark={isDark}>
+      <div className="flex flex-col gap-3">
+      <PanelCard title="Composição Equipe" icon={<PieChart size={14} className="text-violet-500" />} isDark={isDark} className="flex-1 flex flex-col" bodyClassName="flex-1 flex">
         <ProporcaoBar segments={comp.setores.map(s => ({ label: s.label, value: s.total, color: s.color }))} isDark={isDark} />
       </PanelCard>
       <PanelCard title="Tempo de Empresa" icon={<Clock size={15} className="text-violet-500" />} isDark={isDark}>
@@ -69,7 +69,6 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
             </div>
           ))}
         </div>
-        <p className={`mt-2.5 text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Barra = ativos por faixa (tempo real de admissão). "Saíram" = quem desligou naquela faixa.</p>
       </PanelCard>
       </div>
 
