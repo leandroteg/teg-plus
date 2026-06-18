@@ -76,13 +76,13 @@ export default function RHPainel() {
 
   return (
     <div className="space-y-3">
-      {/* Header + seletor de painel (padrão Frotas) */}
+      {/* Header + seletor de painel (padrão Frotas: seletor colado ao título) */}
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Headcount</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admissões, saídas e composição da equipe</p>
-        </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Headcount</h1>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admissões, saídas e composição da equipe</p>
+          </div>
           <div className="relative">
             <select value={painel} onChange={e => setPainel(e.target.value as PainelKey)}
               className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
@@ -92,12 +92,12 @@ export default function RHPainel() {
             </select>
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
-          {painel === 'geral' && (
-            <button onClick={() => refetch()} className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-violet-400' : 'text-slate-400 hover:text-violet-600'}`}>
-              <RefreshCw size={12} />
-            </button>
-          )}
         </div>
+        {painel === 'geral' && (
+          <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+            <RefreshCw size={16} />
+          </button>
+        )}
       </div>
 
       {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount /></Suspense>}
