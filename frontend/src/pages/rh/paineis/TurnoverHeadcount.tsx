@@ -6,7 +6,7 @@ import { useHeadcountDataset } from '../../../hooks/useRH'
 import { turnoverAgg, fmtBRL } from '../../../lib/headcountAnalytics'
 import { PanelCard, Kpi, HBarRow, Heatmap } from './_ui'
 
-const FAIXA_COR: Record<string, string> = { m1: '#dc2626', m1_6: '#d97706', m6_12: '#ca8a04', a1_2: '#16a34a', a2: '#0891b2' }
+const FAIXA_COR: Record<string, string> = { m1: '#dc2626', m1_3: '#ea580c', m3_6: '#d97706', m6_12: '#ca8a04', a1_2: '#16a34a', a2: '#0891b2' }
 
 export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
@@ -42,7 +42,7 @@ export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string
 
         <PanelCard title="Top Cargos por Saídas" icon={<Briefcase size={14} className="text-violet-500" />} isDark={isDark}>
           <div className="space-y-1.5">
-            {agg.porCargo.slice(0, 5).map(c => (
+            {agg.porCargo.slice(0, 6).map(c => (
               <HBarRow key={c.cargo} label={c.cargo} value={c.saidas} max={maxSaiCargo} color="#e87b2a"
                 suffix={`${c.saidas} · ${c.pctTurnover.toFixed(0)}%`} isDark={isDark} />
             ))}

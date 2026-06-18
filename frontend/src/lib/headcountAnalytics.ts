@@ -95,14 +95,16 @@ export function tempoMeses(adm: Date, ref: Date): number {
 export interface FaixaTempo { key: string; label: string }
 export const FAIXAS_TEMPO: FaixaTempo[] = [
   { key: 'm1', label: 'menos de 1 mês' },
-  { key: 'm1_6', label: '1 a 6 meses' },
+  { key: 'm1_3', label: '1 a 3 meses' },
+  { key: 'm3_6', label: '3 a 6 meses' },
   { key: 'm6_12', label: '6 a 12 meses' },
   { key: 'a1_2', label: '1 a 2 anos' },
   { key: 'a2', label: 'mais de 2 anos' },
 ]
 export function faixaTempoKey(meses: number): string {
   if (meses < 1) return 'm1'
-  if (meses < 6) return 'm1_6'
+  if (meses < 3) return 'm1_3'
+  if (meses < 6) return 'm3_6'
   if (meses < 12) return 'm6_12'
   if (meses < 24) return 'a1_2'
   return 'a2'
@@ -206,7 +208,7 @@ export function tempoEmpresaDist(rows: HeadcountRow[], hoje = new Date()): Array
 
 // ── TURNOVER: saídas por faixa/cargo/mês + custo (salário × multiplicador) ────
 // Multiplicadores de custo por faixa de tempo (premissa do modelo; salário vem do banco).
-export const MULT_CUSTO: Record<string, number> = { m1: 1.5, m1_6: 2.0, m6_12: 2.5, a1_2: 3.0, a2: 3.0 }
+export const MULT_CUSTO: Record<string, number> = { m1: 1.5, m1_3: 2.0, m3_6: 2.0, m6_12: 2.5, a1_2: 3.0, a2: 3.0 }
 
 export interface TurnoverAgg {
   totalSaidas: number
