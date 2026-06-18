@@ -517,3 +517,18 @@ export interface FroItemManutencao {
   created_at: string
   updated_at: string
 }
+
+// ── Log de Sincronização de Telemetria ──────────────────────────────────────
+// Resumo por execução dos syncs (Mobi7, Cobli, ...), gravado pelos workflows n8n.
+export interface FroTelSyncLog {
+  id: number
+  provider: string
+  endpoint: string          // positions | behaviors
+  ok: boolean
+  veiculos: number | null
+  inseridos: number | null
+  falhas: number | null
+  erro: string | null
+  detalhe: unknown | null
+  created_at: string
+}

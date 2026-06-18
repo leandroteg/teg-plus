@@ -16,6 +16,7 @@ import type {
   StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
   FrotasCustoKm, FrotasConsumoReal, ScoreMotorista,
   FroIntervaloPreventiva, FroItemManutencao,
+  FroTelSyncLog,
 } from '../types/frotas'
 
 // ── Veículos ──────────────────────────────────────────────────────────────────
@@ -1326,5 +1327,25 @@ export function useInicializarItensVeiculo() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_itens_manutencao'] })
     },
+  })
+}
+
+// ── Log de Sincronização de Telemetria ──────────────────────────────────────
+// Lê o resumo das últimas execuções dos syncs (gravado pelos workflows n8n em
+// tel_sync_log). Usado pelo indicador discreto de saúde na Operação de Frotas.
+export function useTelSyncLog(limit = 20) {
+  return useQuery({
+    queryKey: ['tel_sync_log', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tel_sync_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return (data ?? []) as FroTelSyncLog[]
+    },
+    refetchInterval: 60_000,   // acompanha os ciclos de sync (5/15 min) sem pesar
+    staleTime: 30_000,
   })
 }

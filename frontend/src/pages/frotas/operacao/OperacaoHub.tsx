@@ -5,6 +5,7 @@ import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
+import TelemetriaSyncStatus from './TelemetriaSyncStatus'
 // Reutiliza a tela completa de Telemetria da Logistica (Mapa ao Vivo + Alertas + KM)
 import TelemetriaLogistica from '../../logistica/TelemetriaLogistica'
 
@@ -101,6 +102,9 @@ export default function OperacaoHub() {
   return (
     <div className="flex flex-col h-full -mx-4 md:mx-0">
       <div className="px-3 sm:px-4 md:px-6 pt-4 pb-3">
+        <div className="mb-2 flex justify-end">
+          <TelemetriaSyncStatus />
+        </div>
         <div className={`flex gap-1 overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
           isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'
         }`}>
