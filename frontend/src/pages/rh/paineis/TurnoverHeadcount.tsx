@@ -42,7 +42,7 @@ export default function TurnoverHeadcount({ de = '2025-01', ate }: { de?: string
 
         <PanelCard title="Top Cargos por Saídas" icon={<Briefcase size={14} className="text-violet-500" />} isDark={isDark}>
           <div className="space-y-1.5">
-            {agg.porCargo.slice(0, 10).map(c => (
+            {agg.porCargo.slice(0, 5).map(c => (
               <HBarRow key={c.cargo} label={c.cargo} value={c.saidas} max={maxSaiCargo} color="#e87b2a"
                 suffix={`${c.saidas} · ${c.pctTurnover.toFixed(0)}%`} isDark={isDark} />
             ))}
