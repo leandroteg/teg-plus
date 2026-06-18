@@ -44,25 +44,6 @@ export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: stri
         ))}
       </div>
 
-      {/* Cards por setor */}
-      <PanelCard title="Resumo por Setor" icon={<Layers size={14} className="text-violet-500" />} isDark={isDark}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          {comp.setores.map(s => (
-            <div key={s.key} className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-                <span className={`text-[10px] font-bold truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={s.label}>{s.label}</span>
-              </div>
-              <p className={`text-xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.total}</p>
-              <p className={`text-[9px] mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.pct.toFixed(1)}% do quadro</p>
-              <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
-                <div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </PanelCard>
-
       {/* Evolução por setor + proporção */}
       <PanelCard title="Evolução por Área — no período" icon={<Layers size={14} className="text-violet-500" />} isDark={isDark}
         right={<Legenda items={evo.series} isDark={isDark} />}>
