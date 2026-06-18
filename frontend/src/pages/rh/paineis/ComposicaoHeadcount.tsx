@@ -112,13 +112,13 @@ export default function ComposicaoHeadcount() {
                     {/* cargo pills */}
                     <div className="flex flex-wrap gap-1 mb-2">
                       {s.cargos.slice(0, 16).map(c => (
-                        <span key={c.cargo} className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.cargo} <b>{c.n}</b></span>
+                        <span key={c.cargo} className={`text-[11px] px-2 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.cargo} <b>{c.n}</b></span>
                       ))}
                     </div>
-                    <table className="w-full text-[10px]">
+                    <table className="w-full text-[12px]">
                       <thead>
                         <tr className={isDark ? 'text-slate-500' : 'text-slate-400'}>
-                          {['Nome', 'Cargo', 'Status', 'Admissão', 'Saída', 'Tempo'].map(h => <th key={h} className="px-2 py-1 text-left font-bold uppercase tracking-wider">{h}</th>)}
+                          {['Nome', 'Cargo', 'Status', 'Admissão', 'Saída', 'Tempo'].map(h => <th key={h} className="px-2 py-1.5 text-left text-[11px] font-bold uppercase tracking-wider">{h}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -126,14 +126,14 @@ export default function ComposicaoHeadcount() {
                           const adm = parseData(r.data_admissao), dem = parseData(r.data_demissao)
                           return (
                             <tr key={r.id} className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                              <td className={`px-2 py-1 font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.nome}</td>
-                              <td className={`px-2 py-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.cargo || '—'}</td>
-                              <td className="px-2 py-1">
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${r.ativo ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-600') : (isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600')}`}>{r.ativo ? 'Ativo' : 'Saiu'}</span>
+                              <td className={`px-2 py-1.5 font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{r.nome}</td>
+                              <td className={`px-2 py-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.cargo || '—'}</td>
+                              <td className="px-2 py-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.ativo ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-600') : (isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600')}`}>{r.ativo ? 'Ativo' : 'Saiu'}</span>
                               </td>
-                              <td className={`px-2 py-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{adm ? adm.toLocaleDateString('pt-BR') : '—'}</td>
-                              <td className={`px-2 py-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{dem ? dem.toLocaleDateString('pt-BR') : '—'}</td>
-                              <td className={`px-2 py-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{adm ? tempoEmpresaTexto(adm, dem || hoje) : '—'}</td>
+                              <td className={`px-2 py-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{adm ? adm.toLocaleDateString('pt-BR') : '—'}</td>
+                              <td className={`px-2 py-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{dem ? dem.toLocaleDateString('pt-BR') : '—'}</td>
+                              <td className={`px-2 py-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{adm ? tempoEmpresaTexto(adm, dem || hoje) : '—'}</td>
                             </tr>
                           )
                         })}

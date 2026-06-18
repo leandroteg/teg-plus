@@ -2,7 +2,7 @@
 // pages/rh/paineis/_ui.tsx — primitivos visuais dos painéis de Headcount.
 // Gráficos 100% nativos (Tailwind/SVG), no padrão dos dashboards TEG+.
 // ─────────────────────────────────────────────────────────────────────────────
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 export function card(isDark: boolean) {
   return isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
@@ -52,27 +52,45 @@ export function Kpi({ label, value, note, tone = 'violet', isDark }: {
 export function StackedMonthChart({ meses, series, isDark, height = 200 }: {
   meses: string[]; series: Array<{ label: string; color: string; valores: number[] }>; isDark: boolean; height?: number
 }) {
+  const [hover, setHover] = useState<number | null>(null)
   const totais = meses.map((_, i) => series.reduce((s, sr) => s + (sr.valores[i] || 0), 0))
   const max = Math.max(...totais, 1)
   return (
     <div>
       <div className="flex items-end gap-1" style={{ height }}>
         {meses.map((m, i) => (
-          <div key={m} className="flex-1 flex flex-col items-center justify-end h-full group relative">
-            <span className={`text-[8px] font-bold mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{totais[i] || ''}</span>
-            <div className="w-full flex flex-col-reverse rounded-t overflow-hidden" style={{ height: `${(totais[i] / max) * 100}%` }}>
+          <div key={m} className="flex-1 flex flex-col items-center justify-end h-full relative"
+            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+            {hover === i && (
+              <div className={`absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-20 rounded-xl px-3 py-2 shadow-xl whitespace-nowrap ${isDark ? 'bg-slate-800 border border-white/10' : 'bg-white border border-slate-200'}`}>
+                <p className={`text-xs font-extrabold mb-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{m}</p>
+                {series.map(sr => (sr.valores[i] ? (
+                  <div key={sr.label} className="flex items-center gap-2 text-[11px] leading-5">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: sr.color }} />
+                    <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>{sr.label}</span>
+                    <span className={`ml-3 font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{sr.valores[i]}</span>
+                  </div>
+                ) : null))}
+                <div className={`flex items-center gap-2 text-[11px] mt-1 pt-1 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                  <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Total</span>
+                  <span className={`ml-auto font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>{totais[i]}</span>
+                </div>
+              </div>
+            )}
+            <span className={`text-[11px] font-extrabold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totais[i] || ''}</span>
+            <div className={`w-full flex flex-col-reverse rounded-t overflow-hidden cursor-pointer transition-opacity ${hover !== null && hover !== i ? 'opacity-50' : ''}`} style={{ height: `${(totais[i] / max) * 100}%` }}>
               {series.map(sr => {
                 const v = sr.valores[i] || 0
                 if (!v) return null
-                return <div key={sr.label} style={{ height: `${(v / (totais[i] || 1)) * 100}%`, background: sr.color }} title={`${sr.label}: ${v}`} />
+                return <div key={sr.label} style={{ height: `${(v / (totais[i] || 1)) * 100}%`, background: sr.color }} />
               })}
             </div>
           </div>
         ))}
       </div>
       <div className="flex gap-1 mt-1">
-        {meses.map(m => (
-          <span key={m} className={`flex-1 text-center text-[8px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.split('/')[0]}</span>
+        {meses.map((m, i) => (
+          <span key={`${m}-${i}`} className={`flex-1 text-center text-[10px] font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.split('/')[0]}</span>
         ))}
       </div>
     </div>
@@ -117,11 +135,11 @@ export function HBarRow({ label, value, max, color, suffix, isDark }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <p className={`text-[10px] font-semibold text-right shrink-0 w-[112px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={label}>{label}</p>
-      <div className={`flex-1 h-5 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+      <p className={`text-[12px] font-semibold text-right shrink-0 w-[120px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={label}>{label}</p>
+      <div className={`flex-1 h-6 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
         <div className="h-full rounded-md transition-all" style={{ width: `${Math.max((value / (max || 1)) * 100, 3)}%`, background: color }} />
       </div>
-      <p className={`text-[10px] font-extrabold shrink-0 w-[56px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{suffix ?? value}</p>
+      <p className={`text-[12px] font-extrabold shrink-0 w-[72px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{suffix ?? value}</p>
     </div>
   )
 }
@@ -139,29 +157,29 @@ export function Heatmap({ linhas, totalMes, isDark }: {
         <thead>
           <tr>
             <th />
-            {MESES.map((m, i) => <th key={i} className={`text-[8px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m}</th>)}
-            <th className={`text-[8px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Σ</th>
+            {MESES.map((m, i) => <th key={i} className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m}</th>)}
+            <th className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Σ</th>
           </tr>
         </thead>
         <tbody>
           {linhas.map(l => (
             <tr key={l.label}>
-              <td className={`text-[9px] font-semibold pr-1 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{l.label}</td>
+              <td className={`text-[11px] font-semibold pr-1.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{l.label}</td>
               {l.valores.map((v, i) => {
                 const a = v ? 0.18 + 0.82 * (v / max) : 0
                 return (
-                  <td key={i} className="w-6 h-6 text-center text-[9px] font-bold rounded" style={{ background: v ? hexA(l.color, a) : (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9'), color: v && a > 0.55 ? '#fff' : undefined }}>
+                  <td key={i} className="w-7 h-7 text-center text-[11px] font-bold rounded" style={{ background: v ? hexA(l.color, a) : (isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9'), color: v && a > 0.55 ? '#fff' : undefined }}>
                     <span className={v && a > 0.55 ? '' : cellTxt}>{v || ''}</span>
                   </td>
                 )
               })}
-              <td className={`text-[9px] font-extrabold text-center ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{l.total}</td>
+              <td className={`text-[11px] font-extrabold text-center ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{l.total}</td>
             </tr>
           ))}
           <tr>
-            <td className={`text-[9px] font-extrabold pr-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
-            {totalMes.map((t, i) => <td key={i} className={`text-[9px] font-extrabold text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t || ''}</td>)}
-            <td className={`text-[9px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalMes.reduce((a, b) => a + b, 0)}</td>
+            <td className={`text-[11px] font-extrabold pr-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
+            {totalMes.map((t, i) => <td key={i} className={`text-[11px] font-extrabold text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t || ''}</td>)}
+            <td className={`text-[11px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalMes.reduce((a, b) => a + b, 0)}</td>
           </tr>
         </tbody>
       </table>

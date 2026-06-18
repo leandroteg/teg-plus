@@ -54,25 +54,25 @@ export default function EvolucaoHeadcount() {
 
       <PanelCard title="Detalhamento Mensal" icon={<Table2 size={14} className="text-violet-500" />} isDark={isDark} pad={false}>
         <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
+          <table className="w-full text-[13px]">
             <thead>
               <tr className={isDark ? 'text-slate-500' : 'text-slate-400'}>
                 {['Mês', 'CLT', 'PJ', 'Total', 'Entradas', 'Saídas', 'Saldo', 'Turnover'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2 font-bold uppercase tracking-wider ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+                  <th key={h} className={`px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {serie.map(m => (
                 <tr key={m.ym} className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                  <td className={`px-3 py-1.5 font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{m.label}</td>
-                  <td className={`px-3 py-1.5 text-right ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.clt}</td>
-                  <td className={`px-3 py-1.5 text-right ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.pj || '—'}</td>
-                  <td className={`px-3 py-1.5 text-right font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{m.total}</td>
-                  <td className="px-3 py-1.5 text-right text-emerald-500 font-semibold">{m.entradas || '—'}</td>
-                  <td className="px-3 py-1.5 text-right text-amber-500 font-semibold">{m.saidas || '—'}</td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${m.saldo > 0 ? 'text-emerald-500' : m.saldo < 0 ? 'text-red-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.saldo > 0 ? `+${m.saldo}` : m.saldo}</td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${m.turnover >= 8 ? 'text-red-500' : isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.turnover.toFixed(1)}%</td>
+                  <td className={`px-3 py-2 font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{m.label}</td>
+                  <td className={`px-3 py-2 text-right ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.clt}</td>
+                  <td className={`px-3 py-2 text-right ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.pj || '—'}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{m.total}</td>
+                  <td className="px-3 py-2 text-right text-emerald-500 font-semibold">{m.entradas || '—'}</td>
+                  <td className="px-3 py-2 text-right text-amber-500 font-semibold">{m.saidas || '—'}</td>
+                  <td className={`px-3 py-2 text-right font-semibold ${m.saldo > 0 ? 'text-emerald-500' : m.saldo < 0 ? 'text-red-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.saldo > 0 ? `+${m.saldo}` : m.saldo}</td>
+                  <td className={`px-3 py-2 text-right font-semibold ${m.turnover >= 8 ? 'text-red-500' : isDark ? 'text-slate-400' : 'text-slate-600'}`}>{m.turnover.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
