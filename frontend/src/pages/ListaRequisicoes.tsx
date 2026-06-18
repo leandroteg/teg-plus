@@ -4,7 +4,7 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2, Send, PackageCheck, Undo2, Paperclip, Package, Archive,
+  Loader2, Send, PackageCheck, Undo2, Paperclip, Package,
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
@@ -30,7 +30,7 @@ const fmtData = (d: string) =>
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'em_triagem' | 'em_validacao' | 'aprovada' | 'encerrada'
+type PipelineTab = 'pendente' | 'em_triagem' | 'em_validacao' | 'aprovada'
 type SortField = 'data' | 'valor' | 'obra'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -42,7 +42,6 @@ const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof Clipbo
   { status: 'em_triagem',   label: 'Em Triagem CD',           icon: ClipboardList, statuses: ['em_triagem_cd'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
-  { status: 'encerrada',    label: 'Encerradas',              icon: Archive,       statuses: ['rejeitada', 'cancelada'] },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
@@ -50,7 +49,6 @@ const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: s
   em_triagem:   { bg: 'hover:bg-sky-50',      bgActive: 'bg-sky-50',       text: 'text-sky-600',      textActive: 'text-sky-800',      dot: 'bg-sky-500',      border: 'border-sky-500' },
   em_validacao: { bg: 'hover:bg-violet-50',   bgActive: 'bg-violet-50',    text: 'text-violet-600',   textActive: 'text-violet-800',   dot: 'bg-violet-500',   border: 'border-violet-500' },
   aprovada:     { bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',   text: 'text-emerald-600',  textActive: 'text-emerald-800',  dot: 'bg-emerald-500',  border: 'border-emerald-500' },
-  encerrada:    { bg: 'hover:bg-slate-100',   bgActive: 'bg-slate-100',    text: 'text-slate-500',    textActive: 'text-slate-700',    dot: 'bg-slate-400',    border: 'border-slate-400' },
 }
 
 const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string }> = {
@@ -58,7 +56,6 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   em_triagem:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300' },
   em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
   aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
-  encerrada:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/15',   text: 'text-slate-400',   textActive: 'text-slate-200' },
 }
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -695,7 +692,7 @@ export default function ListaRequisicoes() {
   // (usado p/ links de outros módulos, ex: Estoque -> Janela Crítica)
   const initialTab: PipelineTab = (() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    return (['pendente','em_triagem','em_validacao','aprovada','encerrada'] as PipelineTab[]).includes(t as PipelineTab)
+    return (['pendente','em_triagem','em_validacao','aprovada'] as PipelineTab[]).includes(t as PipelineTab)
       ? (t as PipelineTab) : 'pendente'
   })()
   const [activeTab, setActiveTab] = useState<PipelineTab>(initialTab)
