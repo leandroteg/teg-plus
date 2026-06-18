@@ -118,7 +118,7 @@ export function ProporcaoBar({ segments, isDark }: { segments: Array<{ label: st
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
   const n = segments.length
   return (
-    <div className="flex h-14">
+    <div className="flex h-11">
       {segments.map((s, i) => {
         const pct = (s.value / total) * 100
         if (pct <= 0) return null
