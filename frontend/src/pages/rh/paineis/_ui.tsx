@@ -53,6 +53,7 @@ export function StackedMonthChart({ meses, series, isDark, height = 200 }: {
   meses: string[]; series: Array<{ label: string; color: string; valores: number[] }>; isDark: boolean; height?: number
 }) {
   const [hover, setHover] = useState<number | null>(null)
+  const n = meses.length
   const totais = meses.map((_, i) => series.reduce((s, sr) => s + (sr.valores[i] || 0), 0))
   const max = Math.max(...totais, 1)
   return (
@@ -62,7 +63,7 @@ export function StackedMonthChart({ meses, series, isDark, height = 200 }: {
           <div key={m} className="flex-1 flex flex-col items-center justify-end h-full relative"
             onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
             {hover === i && (
-              <div className={`absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-20 rounded-xl px-3 py-2 shadow-xl whitespace-nowrap ${isDark ? 'bg-slate-800 border border-white/10' : 'bg-white border border-slate-200'}`}>
+              <div className={`absolute top-0 z-30 rounded-xl px-3 py-2 shadow-xl whitespace-nowrap ${i <= 1 ? 'left-0' : i >= n - 2 ? 'right-0' : 'left-1/2 -translate-x-1/2'} ${isDark ? 'bg-slate-800 border border-white/10' : 'bg-white border border-slate-200'}`}>
                 <p className={`text-xs font-extrabold mb-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{m}</p>
                 {series.map(sr => (sr.valores[i] ? (
                   <div key={sr.label} className="flex items-center gap-2 text-[11px] leading-5">
