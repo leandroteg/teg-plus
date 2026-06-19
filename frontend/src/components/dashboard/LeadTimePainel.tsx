@@ -126,7 +126,7 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
                 <th className="text-right font-semibold px-2 py-2">A→C</th>
                 <th className="text-right font-semibold px-2 py-2">C→P</th>
                 <th className="text-right font-semibold px-2 py-2">P→E</th>
-                <th className="text-right font-semibold px-2 py-2">Lead</th>
+                <th className="text-right font-semibold px-2 py-2">Lead Time</th>
                 <th className="text-left font-semibold px-3 py-2 w-36">Composição</th>
               </tr>
             </thead>
@@ -148,7 +148,7 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
                     <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.aprovCotacao)}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.cotacaoPedido)}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.pedidoEntrega)}</td>
-                    <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{fmtD(cat.leadTotal)}</td>
+                    <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{fmtD(leadMode === 'entregues' ? cat.leadTotal : cat.leadGeral)}</td>
                     <td className="px-3 py-2"><StackedBar cat={cat} /></td>
                   </tr>
                 ))

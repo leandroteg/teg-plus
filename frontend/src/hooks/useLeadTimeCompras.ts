@@ -25,6 +25,7 @@ export interface LeadTimeCategoria {
   cotacaoPedido: number | null
   pedidoEntrega: number | null
   leadTotal: number | null
+  leadGeral: number | null  // inclui RCs em aberto (hoje − criação)
 }
 
 export interface LeadTimeCompras {
@@ -170,6 +171,7 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
           cotacaoPedido: avg(list.map(c => c.cotacaoPedido)),
           pedidoEntrega: avg(list.map(c => c.pedidoEntrega)),
           leadTotal: avg(list.map(c => c.leadTotal)),
+          leadGeral: avg(list.map(c => c.geralLead)),
         }))
         .sort((a, b) => b.total - a.total)
 
