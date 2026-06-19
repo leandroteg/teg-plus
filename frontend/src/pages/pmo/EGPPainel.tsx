@@ -940,6 +940,7 @@ export default function EGPPainel() {
         </section>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* Por Obra */}
       {porObra.length > 0 && (
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
@@ -1029,6 +1030,7 @@ export default function EGPPainel() {
           )}
         </div>
       </section>
+      </div>
 
     </div>
   )
