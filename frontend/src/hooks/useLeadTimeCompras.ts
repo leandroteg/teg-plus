@@ -54,7 +54,7 @@ function diffDays(later?: string | null, earlier?: string | null): number | null
   const a = new Date(later).getTime()
   const b = new Date(earlier).getTime()
   if (Number.isNaN(a) || Number.isNaN(b)) return null
-  const d = Math.round((a - b) / DAY * 10) / 10 // dias com 1 casa (ciclos < 1 dia, ex.: 0,7d)
+  const d = (a - b) / DAY // precisão cheia; o formato (h/d) é decidido na exibição
   return d >= 0 ? d : null
 }
 
@@ -68,7 +68,7 @@ function fimDoDia(d?: string | null): string | null {
 function avg(vals: (number | null)[]): number | null {
   const nums = vals.filter((v): v is number => v != null)
   if (!nums.length) return null
-  return Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 10) / 10
+  return nums.reduce((s, n) => s + n, 0) / nums.length // média em precisão cheia (formata na exibição)
 }
 
 interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null; obra_id: string | null }

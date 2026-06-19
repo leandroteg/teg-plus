@@ -16,7 +16,13 @@ const PHASES = [
   { key: 'entrega',          label: 'Entrega',           color: '#ec4899' }, // pink
 ] as const
 
-const fmtD = (v: number | null) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}d`)
+const fmtD = (v: number | null) => {
+  if (v == null) return '—'
+  if (v <= 0) return '0'
+  if (v < 1) { const h = v * 24; return `${h < 10 ? h.toFixed(1).replace('.', ',') : Math.round(h)}h` } // < 1 dia → horas
+  const d = Math.round(v * 10) / 10
+  return `${Number.isInteger(d) ? d : d.toFixed(1).replace('.', ',')}d`
+}
 
 function StackedBar({ vals }: { vals: Record<string, number | null> }) {
   const segs = PHASES
