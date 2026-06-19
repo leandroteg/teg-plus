@@ -454,6 +454,7 @@ export default function Dashboard() {
   const [de, setDe] = useState(addMeses(ymHoje(), -2))
   const [ate, setAte] = useState(ymHoje())
   const [obraFilter, setObraFilter] = useState('')
+  const [leadMode, setLeadMode] = useState<'entregues' | 'geral'>('geral')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
   // Visão do painel: 'resumo' (default, compacto) | 'detalhada' (expande Lead Time).
   // Preferência persiste em localStorage.
@@ -491,6 +492,45 @@ export default function Dashboard() {
       .reduce((sum, s) => sum + (s.total ?? 0), 0),
     [data]
   )
+
+  // Lead time de atendimento (em dias), no período/obra selecionados:
+  //  • entregues = data_entrega_real − created_at da RC (só RCs entregues)
+  //  • geral     = inclui RCs em aberto na média (hoje − created_at)
+  const leadStats = useMemo(() => {
+    const [dy, dm] = de.split('-').map(Number)
+    const [ay, am] = ate.split('-').map(Number)
+    const ini = new Date(dy, dm - 1, 1, 0, 0, 0).getTime()
+    const fim = new Date(ay, am, 0, 23, 59, 59).getTime()
+    const DAY = 86400_000
+    // maior data de entrega por requisição (a partir dos pedidos vinculados)
+    const entregaPorReq = new Map<string, number>()
+    for (const p of todosPedidos as Array<Record<string, unknown>>) {
+      const reqId = p.requisicao_id as string | undefined
+      const dEnt = p.data_entrega_real as string | undefined
+      if (!reqId || !dEnt) continue
+      const t = new Date(`${String(dEnt).slice(0, 10)}T23:59:59`).getTime()
+      const prev = entregaPorReq.get(reqId)
+      if (prev === undefined || t > prev) entregaPorReq.set(reqId, t)
+    }
+    const FECHADO = new Set(['rascunho', 'cancelada', 'rejeitada'])
+    let entSum = 0, entN = 0, gSum = 0, gN = 0
+    for (const r of todasReqs as Array<Record<string, unknown>>) {
+      const cr = r.created_at as string | undefined
+      if (!cr) continue
+      const crc = new Date(cr).getTime()
+      if (crc < ini || crc > fim) continue
+      if (obraFilter && r.obra_id !== obraFilter) continue
+      const entrega = entregaPorReq.get(r.id as string)
+      if (entrega !== undefined) {
+        const dias = Math.max(0, (entrega - crc) / DAY)
+        entSum += dias; entN++; gSum += dias; gN++
+      } else if (!FECHADO.has(r.status as string)) {
+        const dias = Math.max(0, (hoje - crc) / DAY) // em aberto: idade até hoje
+        gSum += dias; gN++
+      }
+    }
+    return { entregues: entN ? entSum / entN : null, geral: gN ? gSum / gN : null }
+  }, [todasReqs, todosPedidos, de, ate, obraFilter, hoje])
 
   // ── Converter tudo para DashItem (sem duplicar fluxo) ───
   // Cada requisição aparece apenas no estágio mais avançado:
@@ -620,11 +660,9 @@ export default function Dashboard() {
     ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
     : reqs.slice(0, 8)
 
-  const tempoMedio = kpis.tempo_medio_aprovacao_horas > 0
-    ? kpis.tempo_medio_aprovacao_horas >= 24
-      ? `${(kpis.tempo_medio_aprovacao_horas / 24).toFixed(1)}d`
-      : `${Math.round(kpis.tempo_medio_aprovacao_horas)}h`
-    : '—'
+  // Lead time exibido conforme o toggle (entregues vs inclui em aberto)
+  const leadVal = leadMode === 'entregues' ? leadStats.entregues : leadStats.geral
+  const leadStr = leadVal == null ? '—' : leadVal >= 1 ? `${leadVal.toFixed(1)}d` : `${Math.round(leadVal * 24)}h`
 
   const cardClass = isDark
     ? 'bg-[#1e293b] border border-white/[0.06]'
@@ -670,6 +708,18 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Toggle elegante: forma de cálculo do Lead Time */}
+          <div className={`flex items-center gap-0.5 p-0.5 rounded-full border ${isDark ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-slate-100 border-slate-200'}`}>
+            {([['entregues', 'Entregues'], ['geral', '+ Em aberto']] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setLeadMode(k)}
+                title={k === 'entregues' ? 'Lead time só dos pedidos entregues (entrega − requisição)' : 'Inclui as requisições em aberto na média (hoje − requisição)'}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                  leadMode === k ? 'bg-teal-600 text-white shadow-sm' : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                {l}
+              </button>
+            ))}
+          </div>
           {/* Filtro De/Até (mês + ano, padrão RH) */}
           <div className="flex items-center gap-1.5">
             <CalendarDays size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -738,9 +788,9 @@ export default function Dashboard() {
               />
               <SpotlightMetric
                 label="Lead Time"
-                value={tempoMedio}
-                tone={kpis.tempo_medio_aprovacao_horas > 48 ? 'amber' : 'emerald'}
-                note={kpis.tempo_medio_aprovacao_horas > 48 ? 'acima SLA 48h' : 'dentro SLA 48h'}
+                value={leadStr}
+                tone={leadVal != null && leadVal > 7 ? 'amber' : 'emerald'}
+                note={leadMode === 'entregues' ? 'entregues · entrega − RC' : 'inclui abertos · hoje − RC'}
               />
             </div>
           </div>
