@@ -170,6 +170,44 @@ export function useDeletarProjeto() {
   })
 }
 
+// ── Obras do contrato/portfolio (Iniciação → Obras/OS Iniciadas) ──────────────
+export interface EGPObraVinc {
+  id: string
+  codigo: string | null
+  nome: string
+  status: string | null
+  pmo_projeto_id: string | null
+  polo_nome: string
+}
+
+export function useObrasDoPortfolio(portfolioId?: string) {
+  return useQuery<EGPObraVinc[]>({
+    queryKey: ['egp-obras-portfolio', portfolioId],
+    enabled: !!portfolioId,
+    queryFn: async () => {
+      // polos (projetos) do portfólio → obras de sys_obras ligadas a eles
+      const { data: polos, error: e1 } = await supabase
+        .from('pmo_projetos')
+        .select('id, nome')
+        .eq('portfolio_id', portfolioId!)
+      if (e1) throw e1
+      const ids = (polos ?? []).map((p: { id: string }) => p.id)
+      if (!ids.length) return []
+      const { data, error } = await supabase
+        .from('sys_obras')
+        .select('id, codigo, nome, status, pmo_projeto_id')
+        .in('pmo_projeto_id', ids)
+        .order('nome')
+      if (error) throw error
+      const pm = new Map((polos ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))
+      return (data ?? []).map((o: Record<string, unknown>) => ({
+        ...(o as object),
+        polo_nome: pm.get(o.pmo_projeto_id as string) ?? '—',
+      })) as EGPObraVinc[]
+    },
+  })
+}
+
 // ── TAP ──────────────────────────────────────────────────────────────────────
 
 export function useTAP(portfolioId: string | undefined) {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, FileStack, Clock, MapPin, Filter,
+  Plus, Trash2, Save, Edit3, X, Check, Building2, Search,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -10,9 +10,9 @@ import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
-  useFluxoOS,
+  useObrasDoPortfolio,
 } from '../../hooks/usePMO'
-import type { PMOTAP, PMOStakeholder, PMOComunicacao, EtapaFluxoOS } from '../../types/pmo'
+import type { PMOTAP, PMOStakeholder, PMOComunicacao } from '../../types/pmo'
 
 type Tab = 'tap' | 'stakeholders' | 'comunicacao' | 'oscs'
 
@@ -20,7 +20,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'tap', label: 'TAP', icon: ClipboardCheck },
   { key: 'stakeholders', label: 'Stakeholders', icon: Users },
   { key: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
-  { key: 'oscs', label: 'OSCs Recebidas', icon: FileStack },
+  { key: 'oscs', label: 'Obras/OS Iniciadas', icon: Building2 },
 ]
 
 const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; textActive: string; border: string; bgDark: string; bgActiveDark: string; textDark: string; textActiveDark: string; borderDark: string }> = {
@@ -107,7 +107,7 @@ export default function EGPIniciacao() {
       {tab === 'tap' && <TAPPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'stakeholders' && <StakeholdersPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'comunicacao' && <ComunicacaoPanel portfolioId={portfolioId} isLight={isLight} />}
-      {tab === 'oscs' && <OSCsPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'oscs' && <ObrasIniciadasPanel portfolioId={portfolioId} isLight={isLight} />}
     </div>
   )
 }
@@ -663,43 +663,23 @@ function ComunicacaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLi
   )
 }
 
-// ── OSCs Recebidas Panel ──────────────────────────────────────────────────────
+// ── Obras / OS Iniciadas Panel ────────────────────────────────────────────────
 
-const ETAPA_MAP: Record<EtapaFluxoOS, { label: string; light: string; dark: string; order: number }> = {
-  recebida:                    { label: 'Recebida',             light: 'bg-slate-100 text-slate-600',    dark: 'bg-slate-500/15 text-slate-400',    order: 0 },
-  classificada:                { label: 'Classificada',         light: 'bg-blue-100 text-blue-700',      dark: 'bg-blue-500/15 text-blue-400',      order: 1 },
-  em_analise:                  { label: 'Em Análise',           light: 'bg-indigo-100 text-indigo-700',  dark: 'bg-indigo-500/15 text-indigo-400',  order: 2 },
-  devolvida_comentarios:       { label: 'Dev. Comentários',     light: 'bg-amber-100 text-amber-700',    dark: 'bg-amber-500/15 text-amber-400',    order: 3 },
-  retornada_cliente:           { label: 'Retornada Cliente',    light: 'bg-purple-100 text-purple-700',  dark: 'bg-purple-500/15 text-purple-400',  order: 4 },
-  cancelada:                   { label: 'Cancelada',            light: 'bg-red-100 text-red-600',        dark: 'bg-red-500/15 text-red-400',        order: 5 },
-  planejamento_logistica:      { label: 'Plan. Logística',      light: 'bg-teal-100 text-teal-700',      dark: 'bg-teal-500/15 text-teal-400',      order: 6 },
-  planejamento_materiais:      { label: 'Plan. Materiais',      light: 'bg-cyan-100 text-cyan-700',      dark: 'bg-cyan-500/15 text-cyan-400',      order: 7 },
-  checagem_materiais:          { label: 'Checagem Materiais',   light: 'bg-sky-100 text-sky-700',        dark: 'bg-sky-500/15 text-sky-400',        order: 8 },
-  aguardando_suprimentos:      { label: 'Ag. Suprimentos',      light: 'bg-orange-100 text-orange-700',  dark: 'bg-orange-500/15 text-orange-400',  order: 9 },
-  aguardando_material_cemig:   { label: 'Ag. Material CEMIG',   light: 'bg-yellow-100 text-yellow-700',  dark: 'bg-yellow-500/15 text-yellow-400',  order: 10 },
-  pronta_iniciar:              { label: 'Pronta Iniciar',       light: 'bg-lime-100 text-lime-700',      dark: 'bg-lime-500/15 text-lime-400',      order: 11 },
-  em_execucao:                 { label: 'Em Execução',          light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400', order: 12 },
+const STATUS_OBRA: Record<string, { label: string; light: string; dark: string }> = {
+  planejada:    { label: 'Planejada',    light: 'bg-slate-100 text-slate-600',     dark: 'bg-slate-500/15 text-slate-400' },
+  em_andamento: { label: 'Em Andamento', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
+  paralisada:   { label: 'Paralisada',   light: 'bg-red-100 text-red-700',         dark: 'bg-red-500/15 text-red-400' },
+  concluida:    { label: 'Concluída',    light: 'bg-blue-100 text-blue-700',       dark: 'bg-blue-500/15 text-blue-400' },
 }
 
-const fmtDataOS = (d?: string) =>
-  d ? new Date(d).toLocaleDateString('pt-BR') : '-'
+function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: obras, isLoading } = useObrasDoPortfolio(portfolioId)
+  const [q, setQ] = useState('')
 
-function OSCsPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
-  const { data: items, isLoading } = useFluxoOS(portfolioId)
-  const [etapaFilter, setEtapaFilter] = useState('')
-
-  const filtered = (items ?? []).filter(
-    os => !etapaFilter || os.etapa_atual === etapaFilter
-  )
-
-  const grouped = Object.entries(ETAPA_MAP)
-    .sort((a, b) => a[1].order - b[1].order)
-    .map(([key, meta]) => ({
-      key: key as EtapaFluxoOS,
-      ...meta,
-      items: filtered.filter(os => os.etapa_atual === key),
-    }))
-    .filter(g => g.items.length > 0)
+  const list = (obras ?? []).filter(o => {
+    const s = q.trim().toLowerCase()
+    return !s || o.nome.toLowerCase().includes(s) || (o.codigo ?? '').toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
+  })
 
   if (isLoading) {
     return (
@@ -709,100 +689,76 @@ function OSCsPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: bo
     )
   }
 
-  const etapaOptions = [
-    { value: '', label: 'Todas as etapas' },
-    ...Object.entries(ETAPA_MAP)
-      .sort((a, b) => a[1].order - b[1].order)
-      .map(([k, v]) => ({ value: k, label: v.label })),
-  ]
+  const thCls = `text-[10px] uppercase tracking-wide font-semibold px-3 py-2 text-left ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+  const tdCls = `px-3 py-2.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`
 
   return (
     <div className="space-y-4">
-      {/* Header + filter */}
+      {/* Header + busca */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className={`text-sm font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-          {filtered.length} OS{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
+          {list.length} obra{list.length !== 1 ? 's' : ''} / OS do contrato
         </p>
         <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
           isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
         }`}>
-          <Filter size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-          <select
-            value={etapaFilter}
-            onChange={e => setEtapaFilter(e.target.value)}
-            className={`text-sm outline-none ${isLight ? 'bg-transparent text-slate-700' : 'bg-transparent text-white'}`}
-          >
-            {etapaOptions.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="buscar obra, OSC, polo…"
+            className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`}
+          />
         </div>
       </div>
 
-      {/* Kanban columns */}
-      {grouped.length === 0 ? (
+      {list.length === 0 ? (
         <div className={`rounded-2xl border p-12 text-center ${
           isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
         }`}>
-          <FileStack size={32} className="mx-auto mb-3 opacity-40" />
+          <Building2 size={32} className="mx-auto mb-3 opacity-40" />
           <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Nenhuma OS encontrada
+            Nenhuma obra vinculada a este contrato
+          </p>
+          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            As obras vêm dos polos do contrato (sys_obras).
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {grouped.map(group => (
-            <div key={group.key} className={`rounded-2xl border overflow-hidden ${
-              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-            }`}>
-              <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
-                isLight ? 'border-slate-100' : 'border-white/[0.04]'
-              }`}>
-                <span className={`inline-flex items-center gap-1.5 rounded-full text-[10px] font-semibold px-2.5 py-1 ${isLight ? group.light : group.dark}`}>
-                  {group.label}
-                </span>
-                <span className={`text-xs font-semibold ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {group.items.length}
-                </span>
-              </div>
-              <div className="p-2 space-y-2 max-h-80 overflow-y-auto">
-                {group.items.map(os => (
-                  <div key={os.id} className={`rounded-xl border p-3 transition-colors ${
-                    isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'
-                  }`}>
-                    <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                      {os.numero_os}
-                    </p>
-                    {os.tipo_servico && (
-                      <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <MapPin size={10} className="inline mr-1" />
-                        {os.tipo_servico}
-                      </p>
-                    )}
-                    {os.data_recebimento && (
-                      <p className={`text-[10px] mt-1 flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <Clock size={10} /> Recebida: {fmtDataOS(os.data_recebimento)}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {os.informacoes_completas && (
-                        <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-400'}`}>
-                          Info OK
-                        </span>
-                      )}
-                      {os.tipo_obra && (
-                        <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-500/15 text-blue-400'}`}>
-                          {os.tipo_obra === 'nova' ? 'Nova' : 'Em Andamento'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className={`rounded-2xl border overflow-hidden ${
+          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
+                  <th className={thCls}>OSC</th>
+                  <th className={thCls}>Obra</th>
+                  <th className={thCls}>Polo</th>
+                  <th className={thCls}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map(o => {
+                  const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
+                  return (
+                    <tr key={o.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
+                      <td className={`px-3 py-2.5 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.codigo ?? '—'}</td>
+                      <td className={`${tdCls} font-medium`}>{o.nome}</td>
+                      <td className={tdCls}>{o.polo_nome}</td>
+                      <td className={tdCls}><span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        Obras do contrato (via polos). A coluna <b>OSC</b> é o código da obra em <code>sys_obras</code> — é o vínculo obra ↔ OSC.
+      </p>
     </div>
   )
 }
