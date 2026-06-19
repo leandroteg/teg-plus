@@ -648,16 +648,16 @@ export default function Dashboard() {
 
       {/* Header + Filtros */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Painel - Compras
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Requisicoes, cotacoes e pedidos de compra
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Seletor de visão (dropdown, padrão RH) */}
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Painel - Compras
+            </h1>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Requisicoes, cotacoes e pedidos de compra
+            </p>
+          </div>
+          {/* Seletor de visão (dropdown) — colado ao título, padrão RH */}
           <div className="relative">
             <select value={visao} onChange={e => trocarVisao(e.target.value as 'resumo' | 'detalhada')}
               className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
@@ -668,6 +668,8 @@ export default function Dashboard() {
             </select>
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Filtro De/Até (mês + ano, padrão RH) */}
           <div className="flex items-center gap-1.5">
             <CalendarDays size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
