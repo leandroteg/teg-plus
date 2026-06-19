@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, AlertTriangle, FileCheck2,
   RefreshCw, BarChart3, PieChart, Zap, CalendarClock,
-  ChevronRight, ArrowRight,
+  ChevronRight, ArrowRight, Archive,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCustoPorObra, useAlertasDesvio, useOrcamentos } from '../../hooks/useControladoria'
@@ -61,6 +61,7 @@ const ACTIONS = [
   { icon: PieChart, label: 'Controle de Custos', to: '/controladoria/controle-custos', color: 'text-violet-600', bg: 'bg-violet-50', darkBg: 'bg-violet-500/10' },
   { icon: TrendingUp, label: 'Controle Projetos', to: '/controladoria/controle-projetos', color: 'text-emerald-600', bg: 'bg-emerald-50', darkBg: 'bg-emerald-500/10' },
   { icon: AlertTriangle, label: 'Cenarios', to: '/controladoria/cenarios', color: 'text-amber-600', bg: 'bg-amber-50', darkBg: 'bg-amber-500/10' },
+  { icon: Archive, label: 'Relatorios Legado', to: '/controladoria/relatorios-legado', color: 'text-rose-600', bg: 'bg-rose-50', darkBg: 'bg-rose-500/10' },
 ]
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -146,7 +147,7 @@ export default function ControladoriaHome() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         {ACTIONS.map(({ icon: Icon, label, to, color, bg, darkBg }) => (
           <button key={to} onClick={() => nav(to)}
             className={`rounded-2xl p-3 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-center group ${

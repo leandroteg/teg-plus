@@ -78,6 +78,7 @@ const ControleOrcamentarioHub = lazy(() => import('./pages/controladoria/Control
 const ControleCustosHub = lazy(() => import('./pages/controladoria/ControleCustosHub'))
 const ControleProjetosHub = lazy(() => import('./pages/controladoria/ControleProjetosHub'))
 const CenariosHub = lazy(() => import('./pages/controladoria/CenariosHub'))
+const RelatoriosLegado = lazy(() => import('./pages/controladoria/RelatoriosLegado'))
 
 // Obras
 const ObrasHome = lazy(() => import('./pages/obras/ObrasHome'))
@@ -417,6 +418,7 @@ export default function App() {
               <Route path="/controladoria/controle-custos"        element={<Lazy><ControleCustosHub /></Lazy>} />
               <Route path="/controladoria/controle-projetos"      element={<Lazy><ControleProjetosHub /></Lazy>} />
               <Route path="/controladoria/cenarios"               element={<Lazy><CenariosHub /></Lazy>} />
+              <Route path="/controladoria/relatorios-legado"      element={<Lazy><RelatoriosLegado /></Lazy>} />
             </Route>
           </Route>
 
