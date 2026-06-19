@@ -15,7 +15,7 @@ const PHASES = [
   { key: 'pedidoEntrega', label: 'Pedido → Entrega',    color: '#14b8a6' }, // teal
 ] as const
 
-const fmtD = (v: number | null) => (v == null ? '—' : `${v}d`)
+const fmtD = (v: number | null) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}d`)
 
 function StackedBar({ cat }: { cat: LeadTimeCategoria }) {
   const segs = PHASES

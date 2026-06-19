@@ -44,8 +44,15 @@ function diffDays(later?: string | null, earlier?: string | null): number | null
   const a = new Date(later).getTime()
   const b = new Date(earlier).getTime()
   if (Number.isNaN(a) || Number.isNaN(b)) return null
-  const d = Math.round((a - b) / DAY)
+  const d = Math.round((a - b) / DAY * 10) / 10 // dias com 1 casa (mostra ciclos < 1 dia, ex.: 0,7d)
   return d >= 0 ? d : null // ignora datas inconsistentes (negativas)
+}
+
+// Datas "só dia" (entrega) viram fim do dia, p/ ciclos no mesmo dia não zerarem.
+function fimDoDia(d?: string | null): string | null {
+  if (!d) return null
+  const s = String(d)
+  return s.length === 10 ? `${s}T23:59:59` : s
 }
 
 function avg(vals: (number | null)[]): number | null {
@@ -116,8 +123,8 @@ export function useLeadTimeCompras() {
           reqAprov: diffDays(r.data_aprovacao, r.created_at),
           aprovCotacao: diffDays(cotConcl, r.data_aprovacao),
           cotacaoPedido: diffDays(ped?.data_pedido, cotConcl ?? r.data_aprovacao),
-          pedidoEntrega: diffDays(ped?.data_entrega_real, ped?.data_pedido),
-          leadTotal: diffDays(ped?.data_entrega_real, r.created_at),
+          pedidoEntrega: diffDays(fimDoDia(ped?.data_entrega_real), ped?.data_pedido),
+          leadTotal: diffDays(fimDoDia(ped?.data_entrega_real), r.created_at),
           temAprov: r.data_aprovacao != null,
           temPedido: ped != null,
           temEntrega: ped?.data_entrega_real != null,
