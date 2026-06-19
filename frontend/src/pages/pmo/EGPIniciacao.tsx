@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Rocket, ClipboardCheck, Users, MessageSquare,
+  Rocket, ClipboardCheck, Users, MessageSquare,
   Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -46,33 +45,22 @@ const fmtBRL = (v: number) =>
 export default function EGPIniciacao() {
   const { isLightSidebar: isLight } = useTheme()
   const portfolioId = useEGPPortfolioId()
-  const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('tap')
 
   const { data: portfolio } = usePortfolio(portfolioId)
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      {/* Back */}
-      <button
-        onClick={() => nav('/egp/iniciacao')}
-        className={`flex items-center gap-1 text-sm transition-colors ${
-          isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <ArrowLeft size={14} /> Voltar
-      </button>
-
-      {/* Header */}
-      <div>
+    <div className="space-y-4 p-4 md:p-6">
+      {/* Header: Iniciação + contrato na mesma linha */}
+      <div className="flex items-center gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Rocket size={20} className="text-amber-500" />
           Iniciação
         </h1>
         {portfolio && (
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            {portfolio.nome_obra} - {portfolio.numero_osc}
-          </p>
+          <span className={`text-sm px-2.5 py-1 rounded-lg ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/[0.06] text-slate-300'}`}>
+            {portfolio.nome_obra}{portfolio.numero_osc ? ` · ${portfolio.numero_osc}` : ''}
+          </span>
         )}
       </div>
 

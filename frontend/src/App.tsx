@@ -88,7 +88,6 @@ const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
 const AlocacaoRecursos = lazy(() => import('./pages/obras/AlocacaoRecursos'))
-const EAP = lazy(() => import('./pages/obras/EAP'))
 
 // EGP — Ciclo de Vida (seletor de contrato persistente)
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
@@ -451,8 +450,6 @@ export default function App() {
               <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramento /></Lazy>} />
               <Route path="/egp/encerramento/:portfolioId"        element={<Lazy><EGPEncerramento /></Lazy>} />
-              {/* EAP - Visão Carteira (Executiva + Detalhada) */}
-              <Route path="/egp/eap"                              element={<Lazy><EAP /></Lazy>} />
               {/* Portfólio (mantido para acesso direto) */}
               <Route path="/egp/portfolio"                        element={<Lazy><Portfolio /></Lazy>} />
               <Route path="/egp/portfolio/novo"                   element={<Lazy><NovoPortfolio /></Lazy>} />
