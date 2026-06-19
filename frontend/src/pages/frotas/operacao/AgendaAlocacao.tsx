@@ -1231,9 +1231,6 @@ export default function AgendaAlocacao() {
                           >
                             {al.obra?.nome ?? '—'}
                           </p>
-                          {al.obra?.codigo && (
-                            <p className="text-[10px] text-slate-500">{al.obra.codigo}</p>
-                          )}
                         </td>
                         <td
                           className={`px-4 py-3 text-sm ${

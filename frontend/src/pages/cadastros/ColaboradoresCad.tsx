@@ -238,7 +238,7 @@ export default function ColaboradoresCad() {
                 <label className="block text-xs font-bold text-slate-600 mb-1">Obra</label>
                 <select value={editItem.obra_id ?? ''} onChange={e => set('obra_id', e.target.value || undefined)} className="input-base">
                   <option value="">Nenhuma</option>
-                  {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>)}
+                  {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
                 </select>
               </div>
               <ConfidenceField label="Data Admissao" value={editItem.data_admissao ?? ''} onChange={v => set('data_admissao', v)}

@@ -873,7 +873,7 @@ export default function NovaRequisicao() {
           }`}
             value={obraId} onChange={e => setObraId(e.target.value)}>
             <option value="">Selecione a obra</option>
-            {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+            {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
           </select>
           {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
             <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
@@ -1205,7 +1205,7 @@ export default function NovaRequisicao() {
         }`}
           value={obraId} onChange={e => setObraId(e.target.value)}>
           <option value="">Selecione a obra</option>
-          {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+          {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
         {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
           <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">

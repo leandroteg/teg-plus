@@ -626,7 +626,7 @@ function UploadModal({ isDark, onClose }: { isDark: boolean; onClose: () => void
                     <option value="">Selecionar...</option>
                     {obras.map(o => (
                       <option key={o.id} value={o.id}>
-                        {o.codigo} - {o.nome}
+                        {o.nome}
                       </option>
                     ))}
                   </select>

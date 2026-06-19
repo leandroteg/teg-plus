@@ -168,7 +168,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
             >
               <option value="">Selecione a obra...</option>
               {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+                <option key={o.id} value={o.id}>{o.nome}</option>
               ))}
             </select>
           </div>

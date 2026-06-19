@@ -186,7 +186,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
               {editMode ? (
                 <select value={data?.obra_id || ''} onChange={e => set('obra_id', e.target.value || undefined)} className={inputCls}>
                   <option value="">Nenhuma</option>
-                  {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>)}
+                  {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
                 </select>
               ) : (
                 <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.obra?.nome || '—'}</p>

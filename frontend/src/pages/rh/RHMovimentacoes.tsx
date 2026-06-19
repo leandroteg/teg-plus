@@ -291,7 +291,7 @@ export default function RHMovimentacoes() {
                       <select value={form.obra_nova_id || ''} onChange={e => set('obra_nova_id', e.target.value || undefined)}
                         className={`w-full px-3 py-2 rounded-xl border text-sm ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`}>
                         <option value="">Selecione</option>
-                        {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>)}
+                        {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
                       </select>
                     </div>
                   )}

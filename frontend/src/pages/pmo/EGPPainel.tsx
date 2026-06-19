@@ -716,7 +716,7 @@ export default function EGPPainel() {
             >
               <option value="">Todas obras</option>
               {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+                <option key={o.id} value={o.id}>{o.nome}</option>
               ))}
             </select>
           </div>

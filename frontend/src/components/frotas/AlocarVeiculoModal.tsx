@@ -215,7 +215,7 @@ export default function AlocarVeiculoModal({ veiculo, onClose }: Props) {
             >
               <option value="">Selecione o projeto</option>
               {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>
+                <option key={o.id} value={o.id}>{o.nome}</option>
               ))}
             </select>
           </div>
