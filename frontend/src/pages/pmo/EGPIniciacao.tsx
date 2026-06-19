@@ -682,6 +682,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [form, setForm] = useState<{ numero_os: string; tipo_servico: string }>({ numero_os: '', tipo_servico: '' })
+  const [collapsedPolos, setCollapsedPolos] = useState<Set<string>>(new Set())
 
   // OSCs agrupadas por obra
   const oscByObra = new Map<string, EGPOscRow[]>()
@@ -698,6 +699,12 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   })
 
   const toggle = (id: string) => setOpen(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const togglePolo = (p: string) => setCollapsedPolos(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+
+  // agrupa obras por polo/projeto
+  const byPolo = new Map<string, typeof list>()
+  for (const o of list) { const k = o.polo_nome || '— Sem polo'; const a = byPolo.get(k) ?? []; a.push(o); byPolo.set(k, a) }
+  const polosOrdenados = [...byPolo.keys()].sort()
 
   const handleAdd = async (obraId: string) => {
     if (!portfolioId || !form.numero_os.trim()) return
@@ -736,52 +743,71 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
           <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma obra vinculada a este contrato</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {list.map(o => {
-            const oscList = oscByObra.get(o.id) ?? []
-            const expanded = open.has(o.id)
-            const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
+        <div className="space-y-3">
+          {polosOrdenados.map(polo => {
+            const obrasDoPolo = byPolo.get(polo) ?? []
+            const poloOpen = !!q.trim() || !collapsedPolos.has(polo)
             return (
-              <div key={o.id} className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-                {/* linha da obra */}
-                <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
-                  <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
-                  <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
-                  <span className={`hidden md:inline text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{o.polo_nome}</span>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
-                    {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
-                  </span>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
+              <div key={polo}>
+                {/* cabeçalho do polo/projeto */}
+                <button onClick={() => togglePolo(polo)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
+                  <ChevronRight size={15} className={`shrink-0 transition-transform ${poloOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <span className={`font-bold text-sm ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{polo}</span>
+                  <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
                 </button>
 
-                {/* OSCs (colapsável) */}
-                {expanded && (
-                  <div className={`px-3 pb-3 pt-1 border-t ${isLight ? 'border-slate-100 bg-slate-50/50' : 'border-white/[0.04] bg-white/[0.01]'}`}>
-                    {oscList.length === 0 && addingFor !== o.id && (
-                      <p className={`text-xs py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma OSC nesta obra ainda.</p>
-                    )}
-                    {oscList.map(osc => (
-                      <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                        <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
-                        {osc.tipo_servico && <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>· {osc.tipo_servico}</span>}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400'}`}>{osc.etapa_atual}</span>
-                        <button onClick={() => portfolioId && delOSC.mutate({ id: osc.id, portfolio_id: portfolioId })} className="ml-auto text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
-                      </div>
-                    ))}
+                {/* obras do polo */}
+                {poloOpen && (
+                  <div className="space-y-2 mt-2 md:pl-3">
+                    {obrasDoPolo.map(o => {
+                      const oscList = oscByObra.get(o.id) ?? []
+                      const expanded = open.has(o.id)
+                      const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
+                      return (
+                        <div key={o.id} className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                          {/* linha da obra */}
+                          <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
+                            <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+                            <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
+                              {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
+                          </button>
 
-                    {/* form de adicionar */}
-                    {addingFor === o.id ? (
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <input autoFocus value={form.numero_os} onChange={e => setForm(f => ({ ...f, numero_os: e.target.value }))} placeholder="Número da OSC *" className={`${inputCls} w-44`} />
-                        <input value={form.tipo_servico} onChange={e => setForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Tipo de serviço (opcional)" className={`${inputCls} flex-1 min-w-[160px]`} />
-                        <button onClick={() => handleAdd(o.id)} disabled={addOSC.isPending || !form.numero_os.trim()} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-40"><Check size={16} /></button>
-                        <button onClick={() => { setAddingFor(null); setForm({ numero_os: '', tipo_servico: '' }) }} className={isLight ? 'text-slate-400' : 'text-slate-500'}><X size={16} /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setAddingFor(o.id); setForm({ numero_os: '', tipo_servico: '' }) }} className={`inline-flex items-center gap-1 mt-1.5 text-xs font-semibold ${isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'}`}>
-                        <Plus size={13} /> Adicionar OSC
-                      </button>
-                    )}
+                          {/* OSCs (colapsável) */}
+                          {expanded && (
+                            <div className={`px-3 pb-3 pt-1 border-t ${isLight ? 'border-slate-100 bg-slate-50/50' : 'border-white/[0.04] bg-white/[0.01]'}`}>
+                              {oscList.length === 0 && addingFor !== o.id && (
+                                <p className={`text-xs py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma OSC nesta obra ainda.</p>
+                              )}
+                              {oscList.map(osc => (
+                                <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                                  <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
+                                  {osc.tipo_servico && <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>· {osc.tipo_servico}</span>}
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400'}`}>{osc.etapa_atual}</span>
+                                  <button onClick={() => portfolioId && delOSC.mutate({ id: osc.id, portfolio_id: portfolioId })} className="ml-auto text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
+                                </div>
+                              ))}
+
+                              {/* form de adicionar */}
+                              {addingFor === o.id ? (
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  <input autoFocus value={form.numero_os} onChange={e => setForm(f => ({ ...f, numero_os: e.target.value }))} placeholder="Número da OSC *" className={`${inputCls} w-44`} />
+                                  <input value={form.tipo_servico} onChange={e => setForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Tipo de serviço (opcional)" className={`${inputCls} flex-1 min-w-[160px]`} />
+                                  <button onClick={() => handleAdd(o.id)} disabled={addOSC.isPending || !form.numero_os.trim()} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-40"><Check size={16} /></button>
+                                  <button onClick={() => { setAddingFor(null); setForm({ numero_os: '', tipo_servico: '' }) }} className={isLight ? 'text-slate-400' : 'text-slate-500'}><X size={16} /></button>
+                                </div>
+                              ) : (
+                                <button onClick={() => { setAddingFor(o.id); setForm({ numero_os: '', tipo_servico: '' }) }} className={`inline-flex items-center gap-1 mt-1.5 text-xs font-semibold ${isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'}`}>
+                                  <Plus size={13} /> Adicionar OSC
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
