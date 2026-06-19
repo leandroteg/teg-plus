@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import {
-  Archive, RefreshCw, Filter, Building2, MapPin, Layers3,
+  Archive, RefreshCw, Filter, Building2, Layers3,
   CalendarRange, Tags, X,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useLegadoResumo, type LegadoResumo } from '../../hooks/useLegado'
+import PainelLegadoBreakdown from './PainelLegadoBreakdown'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (v: number) => {
@@ -24,13 +25,12 @@ const NAT_CFG: Record<string, { label: string; color: string; bar: string }> = {
   receita:         { label: 'Receita',          color: 'text-emerald-500', bar: 'from-emerald-400 to-emerald-600' },
 }
 
-type View = 'polo' | 'obra' | 'grupo' | 'mes' | 'natureza'
+type View = 'breakdown' | 'grupo' | 'mes' | 'natureza'
 const VIEWS: Array<{ key: View; label: string; icon: React.ElementType }> = [
-  { key: 'polo',     label: 'Por Polo',      icon: MapPin },
-  { key: 'obra',     label: 'Por Obra',      icon: Building2 },
-  { key: 'grupo',    label: 'Por Grupo DRE', icon: Layers3 },
-  { key: 'mes',      label: 'Por Mês',       icon: CalendarRange },
-  { key: 'natureza', label: 'Por Natureza',  icon: Tags },
+  { key: 'breakdown', label: 'Por Polo/Obra', icon: Building2 },
+  { key: 'grupo',     label: 'Por Grupo DRE', icon: Layers3 },
+  { key: 'mes',       label: 'Por Mês',       icon: CalendarRange },
+  { key: 'natureza',  label: 'Por Natureza',  icon: Tags },
 ]
 
 function inPeriodoReal(r: LegadoResumo) {
@@ -49,7 +49,7 @@ export default function RelatoriosLegado() {
   const [polo, setPolo] = useState<string>('')
   const [grupo, setGrupo] = useState<string>('')
   const [nat, setNat] = useState<string>('')
-  const [view, setView] = useState<View>('polo')
+  const [view, setView] = useState<View>('breakdown')
 
   const polos = useMemo(() => [...new Set(rows.map(r => r.polo).filter(Boolean))].sort() as string[], [rows])
   const grupos = useMemo(() => [...new Set(rows.map(r => r.grupo_dre).filter(Boolean))].sort() as string[], [rows])
@@ -89,7 +89,7 @@ export default function RelatoriosLegado() {
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const selCls = `text-xs rounded-xl px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200 [&>option]:bg-slate-900' : 'bg-white border-slate-200 text-slate-700'}`
 
-  const activeData = view === 'polo' ? agg.polo : view === 'obra' ? agg.obra.slice(0, 20) : view === 'grupo' ? agg.grupo : view === 'mes' ? agg.mes : agg.natureza.slice(0, 25)
+  const activeData = view === 'grupo' ? agg.grupo : view === 'mes' ? agg.mes : agg.natureza.slice(0, 25)
   const maxV = Math.max(...activeData.map(d => Math.abs(d.v)), 1)
   const barColor = view === 'grupo' ? 'from-violet-400 to-violet-600' : view === 'mes' ? 'from-sky-400 to-sky-600' : view === 'natureza' ? 'from-amber-400 to-amber-600' : 'from-teal-400 to-teal-600'
 
@@ -116,6 +116,7 @@ export default function RelatoriosLegado() {
         </button>
       </div>
 
+      {view !== 'breakdown' && (<>
       {/* Filtros */}
       <div className={`rounded-2xl p-3 flex flex-wrap items-center gap-2 ${cardClass}`}>
         <span className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Filter size={12} /> Filtros</span>
@@ -164,6 +165,7 @@ export default function RelatoriosLegado() {
           )
         })}
       </div>
+      </>)}
 
       {/* Tabs de visão */}
       <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
@@ -181,11 +183,15 @@ export default function RelatoriosLegado() {
       </div>
 
       {/* Conteúdo */}
+      {view === 'breakdown' ? (
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass} p-3`}>
+          <PainelLegadoBreakdown />
+        </section>
+      ) : (<>
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
             {VIEWS.find(v => v.key === view)?.label}
-            {view === 'obra' && <span className="text-[10px] font-normal text-slate-500 ml-1">(top 20)</span>}
             {view === 'natureza' && <span className="text-[10px] font-normal text-slate-500 ml-1">(top 25)</span>}
           </h2>
           <span className={`text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{activeData.length} itens · {fmt(total)}</span>
@@ -211,6 +217,7 @@ export default function RelatoriosLegado() {
       <p className={`text-[10px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
         Fonte: <code>fin_legado_custos</code> · TOTVS jun/25–mai/26 (R$ 26,95 mi) · valores diretos por lançamento; Estrutura/Frota = overhead (rateio em aba própria)
       </p>
+      </>)}
     </div>
   )
 }
