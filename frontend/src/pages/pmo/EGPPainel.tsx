@@ -696,7 +696,7 @@ export default function EGPPainel() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Painel — EGP
+            Painel - EGP
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Portfólio de obras, indicadores e alertas críticos
