@@ -116,7 +116,6 @@ export default function RelatoriosLegado() {
         </button>
       </div>
 
-      {view !== 'breakdown' && (<>
       {/* Filtros */}
       <div className={`rounded-2xl p-3 flex flex-wrap items-center gap-2 ${cardClass}`}>
         <span className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Filter size={12} /> Filtros</span>
@@ -165,7 +164,6 @@ export default function RelatoriosLegado() {
           )
         })}
       </div>
-      </>)}
 
       {/* Tabs de visão */}
       <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
@@ -185,7 +183,7 @@ export default function RelatoriosLegado() {
       {/* Conteúdo */}
       {view === 'breakdown' ? (
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass} p-3`}>
-          <PainelLegadoBreakdown />
+          <PainelLegadoBreakdown rows={filtered} />
         </section>
       ) : (<>
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
