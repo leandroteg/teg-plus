@@ -753,7 +753,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Hero 2 colunas */}
+      {/* Hero 2 colunas — só no Resumo */}
+      {visao === 'resumo' && (
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
 
         {/* Nucleo de Compras */}
@@ -833,10 +834,13 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+      )}
 
-      {/* Lead Time de Compras (por categoria/fase) */}
+      {/* Lead Time de Compras — só na Detalhada (visões exclusivas, sem repetir o Resumo) */}
       {visao === 'detalhada' && <LeadTimePainel isDark={isDark} leadMode={leadMode} de={de} ate={ate} obraId={obraFilter || undefined} />}
 
+      {/* Demais seções do Resumo */}
+      {visao === 'resumo' && (<>
       {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
@@ -933,6 +937,7 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+      </>)}
 
     </div>
   )
