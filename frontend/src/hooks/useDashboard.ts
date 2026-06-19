@@ -30,12 +30,15 @@ function mapRpcToDashboard(raw: Record<string, unknown>): DashboardData {
   }
 }
 
-// Fallback: consultas diretas caso o RPC falhe
-async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
+// Fallback: consultas diretas caso o RPC falhe (e caminho do filtro De/Até absoluto)
+async function fetchDashboardDireto(periodo: string, opts?: { inicio?: Date; fim?: Date; obraId?: string }): Promise<DashboardData> {
   const agora = new Date()
   let dataInicio: Date
+  const dataFim: Date | undefined = opts?.fim
 
-  if (periodo === 'semana') {
+  if (opts?.inicio) {
+    dataInicio = opts.inicio
+  } else if (periodo === 'semana') {
     dataInicio = new Date(agora)
     dataInicio.setDate(agora.getDate() - agora.getDay())
     dataInicio.setHours(0, 0, 0, 0)
@@ -51,12 +54,16 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
     dataInicio = new Date('2000-01-01T00:00:00Z')
   }
 
+  let reqQ = supabase
+    .from(TABLE_REQ)
+    .select('id, numero, solicitante_nome, obra_nome, obra_id, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
+    .gte('created_at', dataInicio.toISOString())
+  if (dataFim) reqQ = reqQ.lte('created_at', dataFim.toISOString())
+  if (opts?.obraId) reqQ = reqQ.eq('obra_id', opts.obraId)
+  reqQ = reqQ.order('created_at', { ascending: false })
+
   const [reqRes, aprRes] = await Promise.all([
-    supabase
-      .from(TABLE_REQ)
-      .select('id, numero, solicitante_nome, obra_nome, obra_id, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
-      .gte('created_at', dataInicio.toISOString())
-      .order('created_at', { ascending: false }),
+    reqQ,
     supabase
       .from(TABLE_APR)
       .select('id, entidade_id, aprovador_nome, aprovador_email, nivel, status, token, data_limite')
@@ -104,10 +111,18 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
   }
 }
 
-export function useDashboard(periodo = 'trimestre', obraId?: string) {
+export function useDashboard(periodo = 'trimestre', obraId?: string, range?: { de: string; ate: string }) {
   return useQuery<DashboardData>({
-    queryKey: ['dashboard', periodo, obraId],
+    queryKey: ['dashboard', periodo, obraId, range?.de, range?.ate],
     queryFn: async () => {
+      // Filtro De/Até absoluto (mês/ano): vai direto pelas consultas, sem o RPC (que só sabe períodos relativos).
+      if (range?.de && range?.ate) {
+        const [dy, dm] = range.de.split('-').map(Number)
+        const [ay, am] = range.ate.split('-').map(Number)
+        const inicio = new Date(dy, dm - 1, 1, 0, 0, 0)
+        const fim = new Date(ay, am, 0, 23, 59, 59) // último dia do mês "até"
+        return fetchDashboardDireto('range', { inicio, fim, obraId })
+      }
       // Para 'tudo' e 'ano', o RPC antigo tem bug no DB (ELSE mapeia para mês atual).
       // Usar direto fetchDashboardDireto que trata todos os períodos corretamente.
       if (periodo === 'tudo' || periodo === 'ano') {

@@ -5,7 +5,7 @@ import {
   RefreshCw, Settings, TrendingUp, AlertTriangle,
   Package, ChevronRight, ShoppingCart, Timer,
   ArrowRight, CalendarClock, XCircle, Zap,
-  CalendarDays, MapPin, Truck,
+  CalendarDays, MapPin, Truck, ChevronDown,
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
@@ -413,11 +413,46 @@ function SetupRequired() {
   )
 }
 
+// ── Seletor de período De/Até (mês + ano), padrão do RH ───────────────────────
+function ymHoje() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function addMeses(ym: string, delta: number) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []
+  for (let a = 2021; a <= anoAtual; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg px-2 py-1 border text-[11px] font-semibold cursor-pointer ${
+    isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
+  }`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">
+        {MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">
+        {anos.map(a => <option key={a} value={a}>{a}</option>)}
+      </select>
+    </span>
+  )
+}
+
 // ── Dashboard principal ───────────────────────────────────────────────────────
 export default function Dashboard() {
   const nav = useNavigate()
   const { isDark } = useTheme()
-  const [periodo, setPeriodo] = useState('trimestre')
+  const [de, setDe] = useState(addMeses(ymHoje(), -2))
+  const [ate, setAte] = useState(ymHoje())
   const [obraFilter, setObraFilter] = useState('')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
   // Visão do painel: 'resumo' (default, compacto) | 'detalhada' (expande Lead Time).
@@ -431,7 +466,7 @@ export default function Dashboard() {
     try { localStorage.setItem('painel-compras-visao', v) } catch { /* ignore */ }
   }
   const obras = useLookupObras()
-  const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
+  const { data, isLoading, isError, refetch } = useDashboard('range', obraFilter || undefined, { de, ate })
   const { data: todasReqs = [] } = useRequisicoes()
   const { data: todosPedidos = [] } = usePedidos()
   const { data: todasCotacoes = [] } = useCotacoes()
@@ -622,35 +657,23 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Visão: Resumo (compacto) vs Detalhada (mostra Lead Time completo) */}
-          <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
-            {([['resumo', 'Resumo'], ['detalhada', 'Detalhada']] as const).map(([val, lbl]) => (
-              <button
-                key={val}
-                onClick={() => trocarVisao(val)}
-                title={val === 'resumo' ? 'Visão compacta — esconde tabela de Lead Time' : 'Visão completa — mostra tabela detalhada de Lead Time'}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
-                  visao === val
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {lbl}
-              </button>
-            ))}
+          {/* Seletor de visão (dropdown, padrão RH) */}
+          <div className="relative">
+            <select value={visao} onChange={e => trocarVisao(e.target.value as 'resumo' | 'detalhada')}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}>
+              <option value="resumo">Resumo</option>
+              <option value="detalhada">Detalhada</option>
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
-          <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
-            <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-            {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
-              <button key={val} onClick={() => setPeriodo(val)}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
-                  periodo === val
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                {lbl}
-              </button>
-            ))}
+          {/* Filtro De/Até (mês + ano, padrão RH) */}
+          <div className="flex items-center gap-1.5">
+            <CalendarDays size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+            <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
           </div>
           <div className="relative flex items-center">
             <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
