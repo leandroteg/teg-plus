@@ -267,6 +267,25 @@ export function useDeletarOSC() {
   })
 }
 
+// cria obra (sys_obras) ligada a um projeto/polo, no contexto do EGP
+export function useCriarObraEGP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { nome: string; codigo: string; pmo_projeto_id: string; portfolio_id: string }) => {
+      const { data, error } = await supabase
+        .from('sys_obras')
+        .insert({ nome: payload.nome, codigo: payload.codigo, pmo_projeto_id: payload.pmo_projeto_id, status: 'ativa' })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-obras-portfolio', vars.portfolio_id] })
+    },
+  })
+}
+
 // ── TAP ──────────────────────────────────────────────────────────────────────
 
 export function useTAP(portfolioId: string | undefined) {

@@ -11,6 +11,7 @@ import {
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
   useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC,
+  useProjetos, useCriarProjeto, useCriarObraEGP,
   type EGPOscRow,
 } from '../../hooks/usePMO'
 import type { PMOTAP, PMOStakeholder, PMOComunicacao } from '../../types/pmo'
@@ -678,11 +679,18 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const { data: oscs } = useOSCsDoPortfolio(portfolioId)
   const addOSC = useAddOSC()
   const delOSC = useDeletarOSC()
+  const { data: projetos } = useProjetos(portfolioId)
+  const { data: portfolio } = usePortfolio(portfolioId)
+  const criarProjeto = useCriarProjeto()
+  const criarObra = useCriarObraEGP()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [form, setForm] = useState<{ numero_os: string; tipo_servico: string }>({ numero_os: '', tipo_servico: '' })
   const [collapsedPolos, setCollapsedPolos] = useState<Set<string>>(new Set())
+  const [modal, setModal] = useState<null | 'projeto' | 'obra'>(null)
+  const [pForm, setPForm] = useState({ nome: '', codigo: '' })
+  const [oForm, setOForm] = useState({ nome: '', codigo: '', pmo_projeto_id: '' })
 
   // OSCs agrupadas por obra
   const oscByObra = new Map<string, EGPOscRow[]>()
@@ -701,10 +709,28 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const toggle = (id: string) => setOpen(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const togglePolo = (p: string) => setCollapsedPolos(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
 
-  // agrupa obras por polo/projeto
-  const byPolo = new Map<string, typeof list>()
-  for (const o of list) { const k = o.polo_nome || '— Sem polo'; const a = byPolo.get(k) ?? []; a.push(o); byPolo.set(k, a) }
-  const polosOrdenados = [...byPolo.keys()].sort()
+  // agrupa obras por projeto (polo); inclui projetos vazios (recém-criados)
+  const byProjeto = new Map<string, typeof list>()
+  for (const o of list) { const k = o.pmo_projeto_id || '__sem__'; const a = byProjeto.get(k) ?? []; a.push(o); byProjeto.set(k, a) }
+  const nomeProjeto = new Map<string, string>()
+  for (const p of projetos ?? []) nomeProjeto.set(p.id, p.nome)
+  for (const o of list) if (o.pmo_projeto_id && !nomeProjeto.has(o.pmo_projeto_id)) nomeProjeto.set(o.pmo_projeto_id, o.polo_nome)
+  const grupos = [
+    ...[...nomeProjeto.keys()].map(id => ({ id, nome: nomeProjeto.get(id) ?? '—' })),
+    ...(byProjeto.has('__sem__') ? [{ id: '__sem__', nome: '— Sem polo' }] : []),
+  ].filter(g => !q.trim() || (byProjeto.get(g.id)?.length ?? 0) > 0).sort((a, b) => a.nome.localeCompare(b.nome))
+
+  const handleCriarProjeto = async () => {
+    if (!pForm.nome.trim() || !portfolioId) return
+    await criarProjeto.mutateAsync({ nome: pForm.nome.trim(), codigo: pForm.codigo.trim() || undefined, portfolio_id: portfolioId, contrato_id: portfolio?.contrato_id ?? undefined })
+    setPForm({ nome: '', codigo: '' }); setModal(null)
+  }
+  const handleCriarObra = async () => {
+    if (!oForm.nome.trim() || !oForm.pmo_projeto_id || !portfolioId) return
+    const codigo = oForm.codigo.trim() || ('OBR-' + Date.now().toString(36).slice(-5).toUpperCase())
+    await criarObra.mutateAsync({ nome: oForm.nome.trim(), codigo, pmo_projeto_id: oForm.pmo_projeto_id, portfolio_id: portfolioId })
+    setOForm({ nome: '', codigo: '', pmo_projeto_id: '' }); setModal(null)
+  }
 
   const handleAdd = async (obraId: string) => {
     if (!portfolioId || !form.numero_os.trim()) return
@@ -730,10 +756,20 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
         <p className={`text-sm font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           {list.length} obra{list.length !== 1 ? 's' : ''} do contrato
         </p>
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-          <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar obra, OSC, polo…"
-            className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+            <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar obra, OSC, polo…"
+              className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+          </div>
+          <button onClick={() => { setPForm({ nome: '', codigo: '' }); setModal('projeto') }}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100' : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'}`}>
+            <Plus size={14} /> Projeto
+          </button>
+          <button onClick={() => { setOForm({ nome: '', codigo: '', pmo_projeto_id: projetos?.[0]?.id ?? '' }); setModal('obra') }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap bg-teal-600 text-white hover:bg-teal-700">
+            <Plus size={14} /> Obra
+          </button>
         </div>
       </div>
 
@@ -744,15 +780,15 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
         </div>
       ) : (
         <div className="space-y-3">
-          {polosOrdenados.map(polo => {
-            const obrasDoPolo = byPolo.get(polo) ?? []
-            const poloOpen = !!q.trim() || !collapsedPolos.has(polo)
+          {grupos.map(g => {
+            const obrasDoPolo = byProjeto.get(g.id) ?? []
+            const poloOpen = !!q.trim() || !collapsedPolos.has(g.id)
             return (
-              <div key={polo}>
+              <div key={g.id}>
                 {/* cabeçalho do polo/projeto */}
-                <button onClick={() => togglePolo(polo)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
+                <button onClick={() => togglePolo(g.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
                   <ChevronRight size={15} className={`shrink-0 transition-transform ${poloOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />
-                  <span className={`font-bold text-sm ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{polo}</span>
+                  <span className={`font-bold text-sm ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{g.nome}</span>
                   <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
                 </button>
 
@@ -819,6 +855,57 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
       <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
         Cada obra pode ter várias OSCs (em <code>pmo_fluxo_os</code>, ligadas à obra). Adicione com o número real da OSC — nada é preenchido automaticamente.
       </p>
+
+      {/* Modal criar projeto / obra */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(null)}>
+          <div onClick={e => e.stopPropagation()} className={`w-full max-w-md rounded-2xl border p-5 shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{modal === 'projeto' ? 'Novo Projeto / Polo' : 'Nova Obra'}</h3>
+              <button onClick={() => setModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            {modal === 'projeto' ? (
+              <div className="space-y-3">
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nome do projeto/polo *</label>
+                  <input autoFocus value={pForm.nome} onChange={e => setPForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex.: F9 - Nova Frente" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Código (opcional)</label>
+                  <input value={pForm.codigo} onChange={e => setPForm(f => ({ ...f, codigo: e.target.value }))} placeholder="Ex.: F9" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button onClick={() => setModal(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Cancelar</button>
+                  <button onClick={handleCriarProjeto} disabled={!pForm.nome.trim() || criarProjeto.isPending} className="px-3 py-1.5 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40">Criar projeto</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Projeto / Polo *</label>
+                  <select value={oForm.pmo_projeto_id} onChange={e => setOForm(f => ({ ...f, pmo_projeto_id: e.target.value }))} className={`${inputCls} w-full mt-1`}>
+                    <option value="">Selecione…</option>
+                    {(projetos ?? []).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nome da obra *</label>
+                  <input autoFocus value={oForm.nome} onChange={e => setOForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex.: LD ... - ..., 138 KV" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Código (opcional — gerado se vazio)</label>
+                  <input value={oForm.codigo} onChange={e => setOForm(f => ({ ...f, codigo: e.target.value }))} placeholder="Ex.: OSC-2026/099" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button onClick={() => setModal(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Cancelar</button>
+                  <button onClick={handleCriarObra} disabled={!oForm.nome.trim() || !oForm.pmo_projeto_id || criarObra.isPending} className="px-3 py-1.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40">Criar obra</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
