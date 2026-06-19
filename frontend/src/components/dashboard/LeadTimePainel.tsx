@@ -126,6 +126,24 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
 
   return (
     <div className="space-y-3">
+    {/* KPIs como cards separados */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {kpis.map(k => {
+        const Icon = k.icon
+        return (
+          <section key={k.label} className={`${cardCls} p-4`}>
+            <div className="flex items-center gap-2 mb-1">
+              <Icon size={14} className="text-teal-500" />
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${txtMuted}`}>{k.label}</span>
+            </div>
+            <p className={`text-2xl font-extrabold ${txtMain}`}>{k.value}</p>
+            <p className={`text-[10px] mt-0.5 ${txtMuted}`}>{k.hint}</p>
+          </section>
+        )
+      })}
+    </div>
+
+    {/* Card da tabela por categoria */}
     <section className={`${cardCls} overflow-hidden`}>
       {/* Header da secao */}
       <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
@@ -149,22 +167,6 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
       </div>
 
       <div className="p-4 space-y-4">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {kpis.map(k => {
-            const Icon = k.icon
-            return (
-              <div key={k.label} className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon size={13} className="text-teal-500" />
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${txtMuted}`}>{k.label}</span>
-                </div>
-                <p className={`text-xl font-extrabold ${txtMain}`}>{k.value}</p>
-                <p className={`text-[10px] mt-0.5 ${txtMuted}`}>{k.hint}</p>
-              </div>
-            )
-          })}
-        </div>
 
         {/* Tabela por categoria */}
         <div className="overflow-x-auto">
