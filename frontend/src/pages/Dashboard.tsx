@@ -835,7 +835,7 @@ export default function Dashboard() {
       </div>
 
       {/* Lead Time de Compras (por categoria/fase) */}
-      {visao === 'detalhada' && <LeadTimePainel isDark={isDark} />}
+      {visao === 'detalhada' && <LeadTimePainel isDark={isDark} leadMode={leadMode} de={de} ate={ate} obraId={obraFilter || undefined} />}
 
       {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>

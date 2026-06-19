@@ -40,10 +40,14 @@ function StackedBar({ cat }: { cat: LeadTimeCategoria }) {
 
 interface Props {
   isDark: boolean
+  leadMode?: 'entregues' | 'geral'
+  de?: string
+  ate?: string
+  obraId?: string
 }
 
-export default function LeadTimePainel({ isDark }: Props) {
-  const { data, isLoading } = useLeadTimeCompras()
+export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, obraId }: Props) {
+  const { data, isLoading } = useLeadTimeCompras({ de, ate, obraId })
 
   const txtMain = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -60,8 +64,9 @@ export default function LeadTimePainel({ isDark }: Props) {
   const geral = data?.geral
   const categorias = data?.categorias ?? []
 
+  const leadMedioVal = leadMode === 'entregues' ? (geral?.leadMedio ?? null) : (geral?.leadMedioGeral ?? null)
   const kpis = [
-    { label: 'Lead time médio', value: fmtD(geral?.leadMedio ?? null), icon: Timer, hint: 'requisição → entrega' },
+    { label: 'Lead time médio', value: fmtD(leadMedioVal), icon: Timer, hint: leadMode === 'entregues' ? 'entregues · entrega − RC' : 'inclui abertos · hoje − RC' },
     { label: 'Compras concluídas', value: String(geral?.concluidas ?? 0), icon: CheckCircle2, hint: 'com entrega registrada' },
     { label: 'Entregas no prazo', value: geral?.noPrazoPct == null ? '—' : `${geral.noPrazoPct}%`, icon: Clock, hint: 'vs. data prevista' },
     { label: 'Requisições', value: String(geral?.totalReq ?? 0), icon: FileText, hint: 'total no período' },

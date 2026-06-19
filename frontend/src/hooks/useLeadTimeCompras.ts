@@ -32,7 +32,8 @@ export interface LeadTimeCompras {
   geral: {
     totalReq: number
     concluidas: number
-    leadMedio: number | null
+    leadMedio: number | null       // entregues: entrega − criação
+    leadMedioGeral: number | null  // inclui RCs em aberto: hoje − criação
     noPrazoPct: number | null
   }
 }
@@ -61,23 +62,31 @@ function avg(vals: (number | null)[]): number | null {
   return Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 10) / 10
 }
 
-interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null }
+interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null; obra_id: string | null }
 interface CotRow { requisicao_id: string | null; data_conclusao: string | null }
 interface PedRow { requisicao_id: string | null; data_pedido: string | null; data_prevista_entrega: string | null; data_entrega_real: string | null }
 
-export function useLeadTimeCompras() {
+export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: string }) {
+  const { de, ate, obraId } = opts ?? {}
   return useQuery<LeadTimeCompras>({
-    queryKey: ['lead-time-compras'],
+    queryKey: ['lead-time-compras', de, ate, obraId],
     queryFn: async () => {
       const [reqRes, cotRes, pedRes, catRes] = await Promise.all([
-        supabase.from('cmp_requisicoes').select('id, categoria, status, created_at, data_aprovacao'),
+        supabase.from('cmp_requisicoes').select('id, categoria, status, created_at, data_aprovacao, obra_id'),
         supabase.from('cmp_cotacoes').select('requisicao_id, data_conclusao').not('requisicao_id', 'is', null),
         supabase.from('cmp_pedidos').select('requisicao_id, data_pedido, data_prevista_entrega, data_entrega_real').not('requisicao_id', 'is', null),
         supabase.from('cmp_categorias').select('codigo, nome'),
       ])
       if (reqRes.error) throw reqRes.error
 
-      const reqs = (reqRes.data ?? []) as ReqRow[]
+      const ini = de ? new Date(Number(de.slice(0, 4)), Number(de.slice(5, 7)) - 1, 1).getTime() : -Infinity
+      const fim = ate ? new Date(Number(ate.slice(0, 4)), Number(ate.slice(5, 7)), 0, 23, 59, 59).getTime() : Infinity
+      const reqs = ((reqRes.data ?? []) as ReqRow[]).filter(r => {
+        if (obraId && r.obra_id !== obraId) return false
+        if (!r.created_at) return false
+        const t = new Date(r.created_at).getTime()
+        return t >= ini && t <= fim
+      })
       const cots = (cotRes.data ?? []) as CotRow[]
       const peds = (pedRes.data ?? []) as PedRow[]
 
@@ -107,16 +116,22 @@ export function useLeadTimeCompras() {
         cotacaoPedido: number | null
         pedidoEntrega: number | null
         leadTotal: number | null
+        geralLead: number | null
         temAprov: boolean
         temPedido: boolean
         temEntrega: boolean
         noPrazo: boolean | null
       }
 
+      const agoraISO = new Date().toISOString()
+      const FECHADO = new Set(['rascunho', 'cancelada', 'rejeitada'])
+
       const calcs: Calc[] = reqs.map(r => {
         const categoria = r.categoria?.trim() || '(sem categoria)'
         const cotConcl = cotByReq.get(r.id) ?? null
         const ped = pedByReq.get(r.id) ?? null
+        const temEnt = ped?.data_entrega_real != null
+        const leadTotal = diffDays(fimDoDia(ped?.data_entrega_real), r.created_at)
 
         return {
           categoria,
@@ -124,10 +139,12 @@ export function useLeadTimeCompras() {
           aprovCotacao: diffDays(cotConcl, r.data_aprovacao),
           cotacaoPedido: diffDays(ped?.data_pedido, cotConcl ?? r.data_aprovacao),
           pedidoEntrega: diffDays(fimDoDia(ped?.data_entrega_real), ped?.data_pedido),
-          leadTotal: diffDays(fimDoDia(ped?.data_entrega_real), r.created_at),
+          leadTotal,
+          // geral: entregue → lead real; em aberto (status ativo, sem entrega) → idade até hoje
+          geralLead: temEnt ? leadTotal : (FECHADO.has(r.status) ? null : diffDays(agoraISO, r.created_at)),
           temAprov: r.data_aprovacao != null,
           temPedido: ped != null,
-          temEntrega: ped?.data_entrega_real != null,
+          temEntrega: temEnt,
           noPrazo: ped?.data_entrega_real && ped?.data_prevista_entrega
             ? new Date(ped.data_entrega_real).getTime() <= new Date(ped.data_prevista_entrega).getTime()
             : null,
@@ -164,6 +181,7 @@ export function useLeadTimeCompras() {
           totalReq: calcs.length,
           concluidas: calcs.filter(c => c.temEntrega).length,
           leadMedio: avg(calcs.map(c => c.leadTotal)),
+          leadMedioGeral: avg(calcs.map(c => c.geralLead)),
           noPrazoPct: noPrazoVals.length
             ? Math.round((noPrazoVals.filter(Boolean).length / noPrazoVals.length) * 100)
             : null,
