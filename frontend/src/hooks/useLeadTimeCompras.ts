@@ -3,14 +3,15 @@ import { supabase } from '../services/supabase'
 
 // =============================================================================
 // useLeadTimeCompras — Lead time do pipeline de compras por categoria e por fase
-// Fases medidas (em dias):
-//   1. Requisição → Aprovação   (cmp_requisicoes.created_at → data_aprovacao)
-//   2. Aprovação → Cotação      (data_aprovacao → cmp_cotacoes.data_conclusao)
-//   3. Cotação → Pedido         (data_conclusao → cmp_pedidos.data_pedido)
-//   4. Pedido → Entrega         (data_pedido → cmp_pedidos.data_entrega_real)
-//   Lead total                  (requisição → entrega)
-// Agrupado por cmp_requisicoes.categoria (nome via cmp_categorias).
-// Join feito no cliente (volume baixo) para evitar ambiguidade de embedding.
+// 5 etapas (em dias), pelos marcos reais:
+//   1. Validação Técnica  (created_at → data_aprovacao)
+//   2. Cotação            (data_aprovacao → cmp_cotacoes.data_conclusao)
+//   3. Aprovação          (data_conclusao → apr_aprovacoes data_decisao [tipo cotacao, aprovada])
+//   4. Pedido             (cotação aprovada → cmp_pedidos.created_at)
+//   5. Entrega            (pedido → cmp_pedidos.data_entrega_real)
+//   Lead total            (criação → entrega)
+// Variante "geral": fase concluída mantém duração; a 1ª fase incompleta (gargalo)
+// conta a idade até hoje (mostra o que está parado). Só leitura.
 // =============================================================================
 
 export interface LeadTimeCategoria {
@@ -20,17 +21,19 @@ export interface LeadTimeCategoria {
   comAprovacao: number
   comPedido: number
   comEntrega: number
-  reqAprov: number | null
-  aprovCotacao: number | null
-  cotacaoPedido: number | null
-  pedidoEntrega: number | null
+  validacaoTecnica: number | null
+  cotacao: number | null
+  aprovacao: number | null
+  pedido: number | null
+  entrega: number | null
   leadTotal: number | null
-  leadGeral: number | null  // inclui RCs em aberto (hoje − criação)
-  // fases na variante "geral" (fase gargalo conta idade até hoje)
-  reqAprovGeral: number | null
-  aprovCotacaoGeral: number | null
-  cotacaoPedidoGeral: number | null
-  pedidoEntregaGeral: number | null
+  leadGeral: number | null
+  // mesmas 5 fases na variante "geral"
+  validacaoTecnicaGeral: number | null
+  cotacaoGeral: number | null
+  aprovacaoGeral: number | null
+  pedidoGeral: number | null
+  entregaGeral: number | null
 }
 
 export interface LeadTimeCompras {
@@ -51,8 +54,8 @@ function diffDays(later?: string | null, earlier?: string | null): number | null
   const a = new Date(later).getTime()
   const b = new Date(earlier).getTime()
   if (Number.isNaN(a) || Number.isNaN(b)) return null
-  const d = Math.round((a - b) / DAY * 10) / 10 // dias com 1 casa (mostra ciclos < 1 dia, ex.: 0,7d)
-  return d >= 0 ? d : null // ignora datas inconsistentes (negativas)
+  const d = Math.round((a - b) / DAY * 10) / 10 // dias com 1 casa (ciclos < 1 dia, ex.: 0,7d)
+  return d >= 0 ? d : null
 }
 
 // Datas "só dia" (entrega) viram fim do dia, p/ ciclos no mesmo dia não zerarem.
@@ -70,18 +73,21 @@ function avg(vals: (number | null)[]): number | null {
 
 interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null; obra_id: string | null }
 interface CotRow { requisicao_id: string | null; data_conclusao: string | null }
-interface PedRow { requisicao_id: string | null; data_pedido: string | null; data_prevista_entrega: string | null; data_entrega_real: string | null }
+interface PedRow { requisicao_id: string | null; created_at: string | null; data_entrega_real: string | null; data_prevista_entrega: string | null }
+interface AprRow { entidade_id: string | null; data_decisao: string | null }
 
 export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: string }) {
   const { de, ate, obraId } = opts ?? {}
   return useQuery<LeadTimeCompras>({
     queryKey: ['lead-time-compras', de, ate, obraId],
     queryFn: async () => {
-      const [reqRes, cotRes, pedRes, catRes] = await Promise.all([
+      const [reqRes, cotRes, pedRes, catRes, aprRes] = await Promise.all([
         supabase.from('cmp_requisicoes').select('id, categoria, status, created_at, data_aprovacao, obra_id'),
         supabase.from('cmp_cotacoes').select('requisicao_id, data_conclusao').not('requisicao_id', 'is', null),
-        supabase.from('cmp_pedidos').select('requisicao_id, data_pedido, data_prevista_entrega, data_entrega_real').not('requisicao_id', 'is', null),
+        supabase.from('cmp_pedidos').select('requisicao_id, created_at, data_entrega_real, data_prevista_entrega').not('requisicao_id', 'is', null),
         supabase.from('cmp_categorias').select('codigo, nome'),
+        // carimbo da APROVAÇÃO da cotação (só leitura)
+        supabase.from('apr_aprovacoes').select('entidade_id, data_decisao').eq('modulo', 'cmp').eq('tipo_aprovacao', 'cotacao').eq('status', 'aprovada').not('data_decisao', 'is', null),
       ])
       if (reqRes.error) throw reqRes.error
 
@@ -95,41 +101,41 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
       })
       const cots = (cotRes.data ?? []) as CotRow[]
       const peds = (pedRes.data ?? []) as PedRow[]
+      const aprs = (aprRes.data ?? []) as AprRow[]
 
       const nomeByCod = new Map<string, string>()
       ;(catRes.data ?? []).forEach((c: { codigo: string; nome: string }) => nomeByCod.set(c.codigo, c.nome))
 
       // Cotação concluída mais antiga por requisição
-      const cotByReq = new Map<string, string>() // requisicao_id → menor data_conclusao
+      const cotByReq = new Map<string, string>()
       for (const c of cots) {
         if (!c.requisicao_id || !c.data_conclusao) continue
         const cur = cotByReq.get(c.requisicao_id)
         if (!cur || c.data_conclusao < cur) cotByReq.set(c.requisicao_id, c.data_conclusao)
       }
 
-      // Pedido mais antigo por requisição (com sua entrega/prazo)
+      // Cotação APROVADA mais antiga por requisição (apr_aprovacoes)
+      const cotAprovByReq = new Map<string, string>()
+      for (const a of aprs) {
+        if (!a.entidade_id || !a.data_decisao) continue
+        const cur = cotAprovByReq.get(a.entidade_id)
+        if (!cur || a.data_decisao < cur) cotAprovByReq.set(a.entidade_id, a.data_decisao)
+      }
+
+      // Pedido mais antigo por requisição (pela criação real)
       const pedByReq = new Map<string, PedRow>()
       for (const p of peds) {
-        if (!p.requisicao_id || !p.data_pedido) continue
+        if (!p.requisicao_id || !p.created_at) continue
         const cur = pedByReq.get(p.requisicao_id)
-        if (!cur || (cur.data_pedido && p.data_pedido < cur.data_pedido)) pedByReq.set(p.requisicao_id, p)
+        if (!cur || (cur.created_at && p.created_at < cur.created_at)) pedByReq.set(p.requisicao_id, p)
       }
 
       interface Calc {
         categoria: string
-        reqAprov: number | null
-        aprovCotacao: number | null
-        cotacaoPedido: number | null
-        pedidoEntrega: number | null
-        leadTotal: number | null
-        geralLead: number | null
-        geralRA: number | null
-        geralAC: number | null
-        geralCP: number | null
-        geralPE: number | null
-        temAprov: boolean
-        temPedido: boolean
-        temEntrega: boolean
+        vtec: number | null; cot: number | null; apr: number | null; ped: number | null; ent: number | null
+        leadTotal: number | null; geralLead: number | null
+        gVtec: number | null; gCot: number | null; gApr: number | null; gPed: number | null; gEnt: number | null
+        temAprov: boolean; temPedido: boolean; temEntrega: boolean
         noPrazo: boolean | null
       }
 
@@ -139,39 +145,43 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
       const calcs: Calc[] = reqs.map(r => {
         const categoria = r.categoria?.trim() || '(sem categoria)'
         const cotConcl = cotByReq.get(r.id) ?? null
+        const cotAprov = cotAprovByReq.get(r.id) ?? null
         const ped = pedByReq.get(r.id) ?? null
-        const temEnt = ped?.data_entrega_real != null
+        const entregaEod = fimDoDia(ped?.data_entrega_real)
+        const basePed = cotAprov ?? cotConcl ?? r.data_aprovacao // início do "Pedido"
+
         const temApr = r.data_aprovacao != null
         const temCot = cotConcl != null
+        const temAprovCot = cotAprov != null
         const temPed = ped != null
+        const temEnt = ped?.data_entrega_real != null
         const ativo = !FECHADO.has(r.status)
-        const baseCP = cotConcl ?? r.data_aprovacao
 
-        // durações concluídas (fase fechada)
-        const cReqAprov = diffDays(r.data_aprovacao, r.created_at)
-        const cAprovCot = diffDays(cotConcl, r.data_aprovacao)
-        const cCotPed = diffDays(ped?.data_pedido, baseCP)
-        const cPedEnt = diffDays(fimDoDia(ped?.data_entrega_real), ped?.data_pedido)
-        const leadTotal = diffDays(fimDoDia(ped?.data_entrega_real), r.created_at)
+        // durações concluídas
+        const vtec = diffDays(r.data_aprovacao, r.created_at)
+        const cot = diffDays(cotConcl, r.data_aprovacao)
+        const apr = diffDays(cotAprov, cotConcl)
+        const pedF = diffDays(ped?.created_at, basePed)
+        const ent = diffDays(entregaEod, ped?.created_at)
+        const leadTotal = diffDays(entregaEod, r.created_at)
 
-        // "geral": fase concluída mantém a duração; a 1ª fase incompleta (gargalo) recebe a idade até hoje
-        let gReqAprov = cReqAprov, gAprovCot = cAprovCot, gCotPed = cCotPed, gPedEnt = cPedEnt
+        // "geral": fase concluída mantém duração; a 1ª incompleta (gargalo) conta até hoje
+        let gVtec = vtec, gCot = cot, gApr = apr, gPed = pedF, gEnt = ent
         if (ativo && !temEnt) {
-          if (!temApr) gReqAprov = diffDays(agoraISO, r.created_at)
-          else if (!temCot) gAprovCot = diffDays(agoraISO, r.data_aprovacao)
-          else if (!temPed) gCotPed = diffDays(agoraISO, baseCP)
-          else gPedEnt = diffDays(agoraISO, ped?.data_pedido)
+          if (!temApr) gVtec = diffDays(agoraISO, r.created_at)
+          else if (!temCot) gCot = diffDays(agoraISO, r.data_aprovacao)
+          else if (!temAprovCot) gApr = diffDays(agoraISO, cotConcl)
+          else if (!temPed) gPed = diffDays(agoraISO, basePed)
+          else gEnt = diffDays(agoraISO, ped?.created_at)
         }
 
         return {
           categoria,
-          reqAprov: cReqAprov, aprovCotacao: cAprovCot, cotacaoPedido: cCotPed, pedidoEntrega: cPedEnt,
+          vtec, cot, apr, ped: pedF, ent,
           leadTotal,
           geralLead: temEnt ? leadTotal : (ativo ? diffDays(agoraISO, r.created_at) : null),
-          geralRA: gReqAprov, geralAC: gAprovCot, geralCP: gCotPed, geralPE: gPedEnt,
-          temAprov: temApr,
-          temPedido: temPed,
-          temEntrega: temEnt,
+          gVtec, gCot, gApr, gPed, gEnt,
+          temAprov: temApr, temPedido: temPed, temEntrega: temEnt,
           noPrazo: ped?.data_entrega_real && ped?.data_prevista_entrega
             ? new Date(ped.data_entrega_real).getTime() <= new Date(ped.data_prevista_entrega).getTime()
             : null,
@@ -192,16 +202,18 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
           comAprovacao: list.filter(c => c.temAprov).length,
           comPedido: list.filter(c => c.temPedido).length,
           comEntrega: list.filter(c => c.temEntrega).length,
-          reqAprov: avg(list.map(c => c.reqAprov)),
-          aprovCotacao: avg(list.map(c => c.aprovCotacao)),
-          cotacaoPedido: avg(list.map(c => c.cotacaoPedido)),
-          pedidoEntrega: avg(list.map(c => c.pedidoEntrega)),
+          validacaoTecnica: avg(list.map(c => c.vtec)),
+          cotacao: avg(list.map(c => c.cot)),
+          aprovacao: avg(list.map(c => c.apr)),
+          pedido: avg(list.map(c => c.ped)),
+          entrega: avg(list.map(c => c.ent)),
           leadTotal: avg(list.map(c => c.leadTotal)),
           leadGeral: avg(list.map(c => c.geralLead)),
-          reqAprovGeral: avg(list.map(c => c.geralRA)),
-          aprovCotacaoGeral: avg(list.map(c => c.geralAC)),
-          cotacaoPedidoGeral: avg(list.map(c => c.geralCP)),
-          pedidoEntregaGeral: avg(list.map(c => c.geralPE)),
+          validacaoTecnicaGeral: avg(list.map(c => c.gVtec)),
+          cotacaoGeral: avg(list.map(c => c.gCot)),
+          aprovacaoGeral: avg(list.map(c => c.gApr)),
+          pedidoGeral: avg(list.map(c => c.gPed)),
+          entregaGeral: avg(list.map(c => c.gEnt)),
         }))
         .sort((a, b) => b.total - a.total)
 

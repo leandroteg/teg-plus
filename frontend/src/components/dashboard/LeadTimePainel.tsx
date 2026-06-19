@@ -9,10 +9,11 @@ import { useLeadTimeCompras } from '../../hooks/useLeadTimeCompras'
 
 // Fases do pipeline (ordem cronologica) + cor
 const PHASES = [
-  { key: 'reqAprov',      label: 'Req → Aprovação',     color: '#f59e0b' }, // amber
-  { key: 'aprovCotacao',  label: 'Aprovação → Cotação', color: '#3b82f6' }, // blue
-  { key: 'cotacaoPedido', label: 'Cotação → Pedido',    color: '#8b5cf6' }, // violet
-  { key: 'pedidoEntrega', label: 'Pedido → Entrega',    color: '#14b8a6' }, // teal
+  { key: 'validacaoTecnica', label: 'Validação Técnica', color: '#f59e0b' }, // amber
+  { key: 'cotacao',          label: 'Cotação',           color: '#3b82f6' }, // blue
+  { key: 'aprovacao',        label: 'Aprovação',         color: '#8b5cf6' }, // violet
+  { key: 'pedido',           label: 'Pedido',            color: '#14b8a6' }, // teal
+  { key: 'entrega',          label: 'Entrega',           color: '#ec4899' }, // pink
 ] as const
 
 const fmtD = (v: number | null) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}d`)
@@ -122,10 +123,11 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
                 <th className="text-right font-semibold px-2 py-2">Req</th>
                 <th className="text-right font-semibold px-2 py-2">Ped</th>
                 <th className="text-right font-semibold px-2 py-2">Entr</th>
-                <th className="text-right font-semibold px-2 py-2">R→A</th>
-                <th className="text-right font-semibold px-2 py-2">A→C</th>
-                <th className="text-right font-semibold px-2 py-2">C→P</th>
-                <th className="text-right font-semibold px-2 py-2">P→E</th>
+                <th className="text-right font-semibold px-2 py-2">Validação Técnica</th>
+                <th className="text-right font-semibold px-2 py-2">Cotação</th>
+                <th className="text-right font-semibold px-2 py-2">Aprovação</th>
+                <th className="text-right font-semibold px-2 py-2">Pedido</th>
+                <th className="text-right font-semibold px-2 py-2">Entrega</th>
                 <th className="text-right font-semibold px-2 py-2">Lead Time</th>
                 <th className="text-left font-semibold px-3 py-2 w-36">Composição</th>
               </tr>
@@ -133,25 +135,26 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
             <tbody>
               {categorias.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className={`text-center py-10 text-xs ${txtMuted}`}>
+                  <td colSpan={11} className={`text-center py-10 text-xs ${txtMuted}`}>
                     Sem requisições de compra registradas no período.
                   </td>
                 </tr>
               ) : (
                 categorias.map(cat => {
                   const fase = leadMode === 'entregues'
-                    ? { reqAprov: cat.reqAprov, aprovCotacao: cat.aprovCotacao, cotacaoPedido: cat.cotacaoPedido, pedidoEntrega: cat.pedidoEntrega }
-                    : { reqAprov: cat.reqAprovGeral, aprovCotacao: cat.aprovCotacaoGeral, cotacaoPedido: cat.cotacaoPedidoGeral, pedidoEntrega: cat.pedidoEntregaGeral }
+                    ? { validacaoTecnica: cat.validacaoTecnica, cotacao: cat.cotacao, aprovacao: cat.aprovacao, pedido: cat.pedido, entrega: cat.entrega }
+                    : { validacaoTecnica: cat.validacaoTecnicaGeral, cotacao: cat.cotacaoGeral, aprovacao: cat.aprovacaoGeral, pedido: cat.pedidoGeral, entrega: cat.entregaGeral }
                   return (
                   <tr key={cat.categoria} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                     <td className={`px-3 py-2 font-semibold text-xs ${txtMain}`}>{cat.nome}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.total}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.comPedido}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.comEntrega}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.reqAprov)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.aprovCotacao)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.cotacaoPedido)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.pedidoEntrega)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.validacaoTecnica)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.cotacao)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.aprovacao)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.pedido)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.entrega)}</td>
                     <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{fmtD(leadMode === 'entregues' ? cat.leadTotal : cat.leadGeral)}</td>
                     <td className="px-3 py-2"><StackedBar vals={fase} /></td>
                   </tr>
@@ -163,8 +166,9 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
         </div>
 
         <p className={`text-[10px] ${txtMuted}`}>
-          Médias em dias corridos, calculadas a partir dos marcos de cada requisição (criação, aprovação, conclusão da cotação,
-          emissão do pedido e entrega real). Células com "—" ainda não têm amostra suficiente.
+          Médias em dias corridos, pelos marcos de cada requisição (criação → aprovação técnica → conclusão da cotação →
+          aprovação da cotação → emissão do pedido → entrega). No modo "+ Em aberto", cada fase também conta a idade do que
+          está parado nela. Células com "—" ainda não têm amostra.
         </p>
       </div>
     </section>
