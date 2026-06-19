@@ -4,7 +4,7 @@
 // de visao agregada (o Painel ja era a porta de entrada natural).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Clock, CheckCircle2, Timer, AlertTriangle } from 'lucide-react'
+import { Clock, CheckCircle2, Timer, AlertTriangle, Users } from 'lucide-react'
 import { useLeadTimeCompras } from '../../hooks/useLeadTimeCompras'
 
 // Fases do pipeline (ordem cronologica) + cor
@@ -40,6 +40,25 @@ function StackedBar({ vals }: { vals: Record<string, number | null> }) {
           style={{ width: `${(s.val / soma) * 100}%`, backgroundColor: s.color }}
           title={`${s.label}: ${s.val}d`}
         />
+      ))}
+    </div>
+  )
+}
+
+// Lista de barras horizontais (label · barra · valor)
+function Bars({ items, isDark, cor }: { items: Array<{ label: string; value: number | null; color?: string }>; isDark: boolean; cor: string }) {
+  const max = Math.max(...items.map(i => i.value ?? 0), 0.0001)
+  if (!items.length) return <div className={`text-[11px] py-3 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados no período</div>
+  return (
+    <div className="space-y-1.5">
+      {items.map(it => (
+        <div key={it.label} className="flex items-center gap-2">
+          <span className={`text-[11px] font-medium text-right shrink-0 w-[116px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={it.label}>{it.label}</span>
+          <div className={`flex-1 h-4 rounded ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            <div className="h-full rounded" style={{ width: `${Math.max(((it.value ?? 0) / max) * 100, 3)}%`, background: it.color ?? cor }} />
+          </div>
+          <span className={`text-[11px] font-bold shrink-0 w-[54px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{fmtD(it.value)}</span>
+        </div>
       ))}
     </div>
   )
@@ -86,6 +105,24 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
     { label: 'Entregas no prazo', value: geral?.noPrazoPct == null ? '—' : `${geral.noPrazoPct}%`, icon: Clock, hint: 'vs. data prevista' },
     { label: 'Parada há mais tempo', value: geral?.maisAntigaAberto == null ? '—' : fmtD(geral.maisAntigaAberto), icon: AlertTriangle, hint: 'RC em aberto mais antiga' },
   ]
+
+  // Datasets dos painéis extras (respeitam o modo)
+  const PHASE_COLOR: Record<string, string> = { 'Validação Técnica': '#f59e0b', 'Cotação': '#3b82f6', 'Aprovação': '#8b5cf6', 'Pedido': '#14b8a6', 'Entrega': '#ec4899' }
+  const fd = leadMode === 'entregues' ? geral?.fases : geral?.fasesGeral
+  const fasesBars = fd ? [
+    { label: 'Validação Técnica', value: fd.validacaoTecnica },
+    { label: 'Cotação', value: fd.cotacao },
+    { label: 'Aprovação', value: fd.aprovacao },
+    { label: 'Pedido', value: fd.pedido },
+    { label: 'Entrega', value: fd.entrega },
+  ].filter(x => x.value != null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)).map(x => ({ ...x, color: PHASE_COLOR[x.label] })) : []
+  const compradoresBars = (data?.compradores ?? [])
+    .map(c => ({ label: c.nome, value: leadMode === 'entregues' ? c.entregues : c.geral }))
+    .filter(x => x.value != null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)).slice(0, 8)
+  const paradas = data?.paradas ?? []
+  const obrasMenor = (data?.obras ?? [])
+    .map(o => ({ label: o.nome, value: leadMode === 'entregues' ? o.entregues : o.geral }))
+    .filter(x => x.value != null).sort((a, b) => (a.value ?? 0) - (b.value ?? 0)).slice(0, 5)
 
   return (
     <section className={`${cardCls} overflow-hidden`}>
@@ -184,6 +221,55 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
           aprovação da cotação → emissão do pedido → entrega). No modo "+ Em aberto", cada fase também conta a idade do que
           está parado nela. Células com "—" ainda não têm amostra.
         </p>
+
+        {/* Linha 1: Fases por tempo + Lead time por comprador */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
+            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+              <Timer size={13} className="text-teal-500" /> Fases por tempo
+            </h3>
+            <Bars items={fasesBars} isDark={isDark} cor="#14b8a6" />
+          </div>
+          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
+            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+              <Users size={13} className="text-sky-500" /> Lead time por comprador
+            </h3>
+            <Bars items={compradoresBars} isDark={isDark} cor="#0ea5e9" />
+          </div>
+        </div>
+
+        {/* Linha 2: RCs paradas + Obras com menor lead time */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
+            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${txtMain}`}>
+              <AlertTriangle size={13} className="text-amber-500" /> Top 5 — paradas há mais tempo
+            </h3>
+            {paradas.length === 0 ? (
+              <div className={`text-[11px] py-3 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma requisição em aberto</div>
+            ) : (
+              <div className="divide-y divide-slate-100/60">
+                {paradas.map((p, i) => (
+                  <div key={p.numero + i} className="flex items-center justify-between gap-2 py-1.5">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className={`text-[10px] font-bold w-4 text-center shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-semibold truncate ${txtMain}`}>{p.numero}</p>
+                        <p className={`text-[10px] truncate ${txtMuted}`}>{p.obra}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold shrink-0 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{fmtD(p.dias)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
+            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+              <CheckCircle2 size={13} className="text-emerald-500" /> Top 5 obras — menor lead time
+            </h3>
+            <Bars items={obrasMenor} isDark={isDark} cor="#10b981" />
+          </div>
+        </div>
       </div>
     </section>
   )

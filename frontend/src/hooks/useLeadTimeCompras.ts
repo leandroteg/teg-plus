@@ -44,8 +44,14 @@ export interface FasesAvg {
   entrega: number | null
 }
 
+export interface LeadEntidade { nome: string; entregues: number | null; geral: number | null; n: number }
+export interface RcParada { numero: string; obra: string; dias: number }
+
 export interface LeadTimeCompras {
   categorias: LeadTimeCategoria[]
+  compradores: LeadEntidade[]
+  obras: LeadEntidade[]
+  paradas: RcParada[]
   geral: {
     totalReq: number
     concluidas: number
@@ -82,7 +88,7 @@ function avg(vals: (number | null)[]): number | null {
   return nums.reduce((s, n) => s + n, 0) / nums.length // média em precisão cheia (formata na exibição)
 }
 
-interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null; obra_id: string | null }
+interface ReqRow { id: string; categoria: string | null; status: string; created_at: string; data_aprovacao: string | null; obra_id: string | null; obra_nome: string | null; comprador_id: string | null; numero: string | null }
 interface CotRow { requisicao_id: string | null; data_conclusao: string | null }
 interface PedRow { requisicao_id: string | null; created_at: string | null; data_entrega_real: string | null; data_prevista_entrega: string | null }
 interface AprRow { entidade_id: string | null; data_decisao: string | null }
@@ -92,13 +98,14 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
   return useQuery<LeadTimeCompras>({
     queryKey: ['lead-time-compras', de, ate, obraId],
     queryFn: async () => {
-      const [reqRes, cotRes, pedRes, catRes, aprRes] = await Promise.all([
-        supabase.from('cmp_requisicoes').select('id, categoria, status, created_at, data_aprovacao, obra_id'),
+      const [reqRes, cotRes, pedRes, catRes, aprRes, perfRes] = await Promise.all([
+        supabase.from('cmp_requisicoes').select('id, categoria, status, created_at, data_aprovacao, obra_id, obra_nome, comprador_id, numero'),
         supabase.from('cmp_cotacoes').select('requisicao_id, data_conclusao').not('requisicao_id', 'is', null),
         supabase.from('cmp_pedidos').select('requisicao_id, created_at, data_entrega_real, data_prevista_entrega').not('requisicao_id', 'is', null),
         supabase.from('cmp_categorias').select('codigo, nome'),
         // carimbo da APROVAÇÃO da cotação (só leitura)
         supabase.from('apr_aprovacoes').select('entidade_id, data_decisao').eq('modulo', 'cmp').eq('tipo_aprovacao', 'cotacao').eq('status', 'aprovada').not('data_decisao', 'is', null),
+        supabase.from('sys_perfis').select('id, nome'),
       ])
       if (reqRes.error) throw reqRes.error
 
@@ -116,6 +123,8 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
 
       const nomeByCod = new Map<string, string>()
       ;(catRes.data ?? []).forEach((c: { codigo: string; nome: string }) => nomeByCod.set(c.codigo, c.nome))
+      const perfilNome = new Map<string, string>()
+      ;(perfRes.data ?? []).forEach((p: { id: string; nome: string }) => perfilNome.set(p.id, p.nome))
 
       // Cotação concluída mais antiga por requisição
       const cotByReq = new Map<string, string>()
@@ -143,6 +152,7 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
 
       interface Calc {
         categoria: string
+        compradorId: string | null; obra: string; numero: string
         vtec: number | null; cot: number | null; apr: number | null; ped: number | null; ent: number | null
         leadTotal: number | null; geralLead: number | null
         gVtec: number | null; gCot: number | null; gApr: number | null; gPed: number | null; gEnt: number | null
@@ -188,6 +198,9 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
 
         return {
           categoria,
+          compradorId: r.comprador_id ?? null,
+          obra: r.obra_nome?.trim() || '(sem obra)',
+          numero: r.numero || '—',
           vtec, cot, apr, ped: pedF, ent,
           leadTotal,
           geralLead: temEnt ? leadTotal : (ativo ? diffDays(agoraISO, r.created_at) : null),
@@ -228,11 +241,32 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
         }))
         .sort((a, b) => b.total - a.total)
 
+      // Lead time por comprador e por obra (entregues + geral)
+      const agruparEntidade = (keyFn: (c: Calc) => string, nomeFn: (k: string) => string): LeadEntidade[] => {
+        const m = new Map<string, Calc[]>()
+        for (const c of calcs) { const k = keyFn(c); if (!m.has(k)) m.set(k, []); m.get(k)!.push(c) }
+        return [...m.entries()].map(([k, list]) => ({
+          nome: nomeFn(k), entregues: avg(list.map(c => c.leadTotal)), geral: avg(list.map(c => c.geralLead)), n: list.length,
+        }))
+      }
+      const compradores = agruparEntidade(c => c.compradorId ?? '—', k => k === '—' ? 'Sem comprador' : (perfilNome.get(k) || 'Comprador'))
+      const obras = agruparEntidade(c => c.obra, k => k)
+
+      // Top RCs paradas há mais tempo (em aberto, sem entrega)
+      const paradas: RcParada[] = calcs
+        .filter(c => !c.temEntrega && c.geralLead != null)
+        .sort((a, b) => (b.geralLead as number) - (a.geralLead as number))
+        .slice(0, 5)
+        .map(c => ({ numero: c.numero, obra: c.obra, dias: c.geralLead as number }))
+
       const noPrazoVals = calcs.map(c => c.noPrazo).filter((v): v is boolean => v != null)
       const abertas = calcs.filter(c => !c.temEntrega && c.geralLead != null).map(c => c.geralLead as number)
 
       return {
         categorias,
+        compradores,
+        obras,
+        paradas,
         geral: {
           totalReq: calcs.length,
           concluidas: calcs.filter(c => c.temEntrega).length,
