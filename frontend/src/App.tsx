@@ -93,7 +93,6 @@ const AlocacaoRecursos = lazy(() => import('./pages/obras/AlocacaoRecursos'))
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
 const EGPIniciacao = lazy(() => import('./pages/pmo/EGPIniciacao'))
 const EGPPlanejamento = lazy(() => import('./pages/pmo/EGPPlanejamento'))
-const EGPExecucao = lazy(() => import('./pages/pmo/EGPExecucao'))
 const EGPControle = lazy(() => import('./pages/pmo/EGPControle'))
 const EGPEncerramento = lazy(() => import('./pages/pmo/EGPEncerramento'))
 const Portfolio = lazy(() => import('./pages/pmo/Portfolio'))
@@ -444,8 +443,8 @@ export default function App() {
               <Route path="/egp/iniciacao/:portfolioId"           element={<Lazy><EGPIniciacao /></Lazy>} />
               <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamento /></Lazy>} />
               <Route path="/egp/planejamento/:portfolioId"        element={<Lazy><EGPPlanejamento /></Lazy>} />
-              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucao /></Lazy>} />
-              <Route path="/egp/execucao/:portfolioId"            element={<Lazy><EGPExecucao /></Lazy>} />
+              <Route path="/egp/execucao"                         element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/execucao/:portfolioId"            element={<Navigate to="/egp/planejamento" replace />} />
               <Route path="/egp/controle"                         element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramento /></Lazy>} />
@@ -459,15 +458,15 @@ export default function App() {
               <Route path="/egp/tap/:portfolioId"                 element={<Navigate to="/egp/iniciacao" replace />} />
               <Route path="/egp/eap"                              element={<Navigate to="/egp/planejamento" replace />} />
               <Route path="/egp/eap/:portfolioId"                 element={<Navigate to="/egp/planejamento" replace />} />
-              <Route path="/egp/cronograma"                       element={<Navigate to="/egp/execucao" replace />} />
-              <Route path="/egp/cronograma/:portfolioId"          element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/cronograma"                       element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/cronograma/:portfolioId"          element={<Navigate to="/egp/planejamento" replace />} />
               <Route path="/egp/medicoes"                         element={<Navigate to="/egp/controle" replace />} />
               <Route path="/egp/medicoes/:portfolioId"            element={<Navigate to="/egp/controle" replace />} />
-              <Route path="/egp/histograma"                       element={<Navigate to="/egp/execucao" replace />} />
-              <Route path="/egp/histograma/:portfolioId"          element={<Navigate to="/egp/execucao" replace />} />
-              <Route path="/egp/custos"                           element={<Navigate to="/egp/execucao" replace />} />
-              <Route path="/egp/custos/:portfolioId"              element={<Navigate to="/egp/execucao" replace />} />
-              <Route path="/egp/fluxo-os"                         element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/histograma"                       element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/histograma/:portfolioId"          element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/custos"                           element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/custos/:portfolioId"              element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/fluxo-os"                         element={<Navigate to="/egp/planejamento" replace />} />
               <Route path="/egp/reunioes"                         element={<Navigate to="/egp/controle" replace />} />
               <Route path="/egp/indicadores"                      element={<Navigate to="/egp/controle" replace />} />
             </Route>

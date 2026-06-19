@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Rocket, Compass, Zap, BarChart3, CheckCircle2,
+  LayoutDashboard, Rocket, Compass, BarChart3, CheckCircle2,
   ChevronDown, Building2,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
@@ -12,7 +12,6 @@ const NAV = [
   { to: '/egp',              icon: LayoutDashboard, label: 'Painel',        end: true },
   { to: '/egp/iniciacao',    icon: Rocket,          label: 'Iniciação' },
   { to: '/egp/planejamento', icon: Compass,         label: 'Planejamento' },
-  { to: '/egp/execucao',     icon: Zap,             label: 'Execução' },
   { to: '/egp/controle',     icon: BarChart3,       label: 'Controle' },
   { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
 ]

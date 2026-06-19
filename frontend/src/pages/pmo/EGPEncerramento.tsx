@@ -18,10 +18,10 @@ import type { PMOStatusReport, PMOLicaoAprendida, PMOAceite, PMODesmobilizacao }
 type Tab = 'status_report' | 'licoes' | 'aceite' | 'desmobilizacao'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: 'status_report', label: 'Status Report', icon: FileText },
+  { key: 'status_report', label: 'Relatório Final', icon: FileText },
   { key: 'licoes', label: 'Lições Aprendidas', icon: Lightbulb },
   { key: 'aceite', label: 'Aceite', icon: Award },
-  { key: 'desmobilizacao', label: 'Desmobilização', icon: PackageX },
+  { key: 'desmobilizacao', label: 'Resultado', icon: PackageX },
 ]
 
 const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; textActive: string; border: string; bgDark: string; bgActiveDark: string; textDark: string; textActiveDark: string; borderDark: string }> = {
