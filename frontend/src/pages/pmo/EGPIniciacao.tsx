@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
+import { ContractSelector } from '../../components/EGPLayout'
 import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
@@ -51,17 +52,13 @@ export default function EGPIniciacao() {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      {/* Header: Iniciação + contrato na mesma linha */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Header: título + seletor de contrato */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Rocket size={20} className="text-amber-500" />
           Iniciação
         </h1>
-        {portfolio && (
-          <span className={`text-sm px-2.5 py-1 rounded-lg ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/[0.06] text-slate-300'}`}>
-            {portfolio.nome_obra}{portfolio.numero_osc ? ` · ${portfolio.numero_osc}` : ''}
-          </span>
-        )}
+        <ContractSelector />
       </div>
 
       {/* Tab bar */}

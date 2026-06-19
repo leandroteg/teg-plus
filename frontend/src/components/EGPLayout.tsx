@@ -17,7 +17,7 @@ const NAV = [
   { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
 ]
 
-function ContractSelector() {
+export function ContractSelector() {
   const { isDark } = useTheme()
   const { portfolio, portfolios, setPortfolioId } = useEGPContract()
   const [open, setOpen] = useState(false)
@@ -99,7 +99,6 @@ export default function EGPLayout() {
         nav={NAV}
         moduleSubtitle="Escritório de Gestão de Projetos"
         bottomNavMaxItems={6}
-        headerExtra={<ContractSelector />}
       />
     </EGPContractProvider>
   )

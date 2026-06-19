@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ContractSelector } from '../../components/EGPLayout'
 import {
   ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign,
   AlertTriangle, Plus, Trash2, Save, Edit3, X, Check, Sparkles, FolderKanban, ChevronRight,
@@ -73,27 +74,13 @@ export default function EGPPlanejamento() {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      {/* Back */}
-      <button
-        onClick={() => nav('/egp/planejamento')}
-        className={`flex items-center gap-1 text-sm transition-colors ${
-          isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <ArrowLeft size={14} /> Voltar
-      </button>
-
-      {/* Header */}
-      <div>
+      {/* Header: título + seletor de contrato */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Compass size={20} className="text-blue-500" />
           Planejamento
         </h1>
-        {portfolio && (
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            {portfolio.nome_obra} - {portfolio.numero_osc}{projetoAtivo ? ` → ${projetoAtivo.nome}` : ''}
-          </p>
-        )}
+        <ContractSelector />
       </div>
 
       {/* Tab bar - SEMPRE VISÍVEL no topo */}

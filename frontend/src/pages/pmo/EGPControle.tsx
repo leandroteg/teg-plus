@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ContractSelector } from '../../components/EGPLayout'
 import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
@@ -76,27 +77,13 @@ export default function EGPControle() {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      {/* Back */}
-      <button
-        onClick={() => nav('/egp/controle')}
-        className={`flex items-center gap-1 text-sm transition-colors ${
-          isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <ArrowLeft size={14} /> Voltar
-      </button>
-
-      {/* Header */}
-      <div>
+      {/* Header: título + seletor de contrato */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <BarChart3 size={20} className="text-emerald-500" />
           Controle
         </h1>
-        {portfolio && (
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            {portfolio.nome_obra} - {portfolio.numero_osc}{projetoAtivo ? ` → ${projetoAtivo.nome}` : ''}
-          </p>
-        )}
+        <ContractSelector />
       </div>
 
       {/* Tab bar - SEMPRE VISÍVEL no topo */}
