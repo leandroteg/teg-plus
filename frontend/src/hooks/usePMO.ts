@@ -208,6 +208,65 @@ export function useObrasDoPortfolio(portfolioId?: string) {
   })
 }
 
+// ── OSCs por obra (pmo_fluxo_os) ──────────────────────────────────────────────
+export interface EGPOscRow {
+  id: string
+  obra_id: string | null
+  portfolio_id: string
+  numero_os: string
+  etapa_atual: string
+  tipo_servico: string | null
+  data_recebimento: string | null
+  observacoes: string | null
+}
+
+export function useOSCsDoPortfolio(portfolioId?: string) {
+  return useQuery<EGPOscRow[]>({
+    queryKey: ['egp-oscs-portfolio', portfolioId],
+    enabled: !!portfolioId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pmo_fluxo_os')
+        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes')
+        .eq('portfolio_id', portfolioId!)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as EGPOscRow[]
+    },
+  })
+}
+
+export function useAddOSC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { portfolio_id: string; obra_id: string; numero_os: string; tipo_servico?: string; observacoes?: string }) => {
+      const { data, error } = await supabase
+        .from('pmo_fluxo_os')
+        .insert({ ...payload, etapa_atual: 'recebida' })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-oscs-portfolio', vars.portfolio_id] })
+    },
+  })
+}
+
+export function useDeletarOSC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; portfolio_id: string }) => {
+      const { error } = await supabase.from('pmo_fluxo_os').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-oscs-portfolio', vars.portfolio_id] })
+    },
+  })
+}
+
 // ── TAP ──────────────────────────────────────────────────────────────────────
 
 export function useTAP(portfolioId: string | undefined) {

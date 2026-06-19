@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, Building2, Search,
+  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -10,7 +10,8 @@ import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
-  useObrasDoPortfolio,
+  useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC,
+  type EGPOscRow,
 } from '../../hooks/usePMO'
 import type { PMOTAP, PMOStakeholder, PMOComunicacao } from '../../types/pmo'
 
@@ -674,12 +675,36 @@ const STATUS_OBRA: Record<string, { label: string; light: string; dark: string }
 
 function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: obras, isLoading } = useObrasDoPortfolio(portfolioId)
+  const { data: oscs } = useOSCsDoPortfolio(portfolioId)
+  const addOSC = useAddOSC()
+  const delOSC = useDeletarOSC()
   const [q, setQ] = useState('')
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const [addingFor, setAddingFor] = useState<string | null>(null)
+  const [form, setForm] = useState<{ numero_os: string; tipo_servico: string }>({ numero_os: '', tipo_servico: '' })
+
+  // OSCs agrupadas por obra
+  const oscByObra = new Map<string, EGPOscRow[]>()
+  for (const osc of oscs ?? []) {
+    if (!osc.obra_id) continue
+    const arr = oscByObra.get(osc.obra_id) ?? []
+    arr.push(osc)
+    oscByObra.set(osc.obra_id, arr)
+  }
 
   const list = (obras ?? []).filter(o => {
     const s = q.trim().toLowerCase()
     return !s || o.nome.toLowerCase().includes(s) || (o.codigo ?? '').toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
   })
+
+  const toggle = (id: string) => setOpen(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const handleAdd = async (obraId: string) => {
+    if (!portfolioId || !form.numero_os.trim()) return
+    await addOSC.mutateAsync({ portfolio_id: portfolioId, obra_id: obraId, numero_os: form.numero_os.trim(), tipo_servico: form.tipo_servico.trim() || undefined })
+    setForm({ numero_os: '', tipo_servico: '' })
+    setAddingFor(null)
+  }
 
   if (isLoading) {
     return (
@@ -689,75 +714,84 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
     )
   }
 
-  const thCls = `text-[10px] uppercase tracking-wide font-semibold px-3 py-2 text-left ${isLight ? 'text-slate-400' : 'text-slate-500'}`
-  const tdCls = `px-3 py-2.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`
+  const inputCls = `rounded-lg border px-2 py-1.5 text-sm outline-none focus:ring-2 ${isLight ? 'bg-white border-slate-200 focus:ring-teal-500/20 focus:border-teal-400 text-slate-700' : 'bg-slate-800/60 border-slate-700 focus:ring-teal-500/20 text-white'}`
 
   return (
     <div className="space-y-4">
       {/* Header + busca */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className={`text-sm font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-          {list.length} obra{list.length !== 1 ? 's' : ''} / OS do contrato
+          {list.length} obra{list.length !== 1 ? 's' : ''} do contrato
         </p>
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
-          isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
-        }`}>
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
           <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="buscar obra, OSC, polo…"
-            className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`}
-          />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar obra, OSC, polo…"
+            className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
         </div>
       </div>
 
       {list.length === 0 ? (
-        <div className={`rounded-2xl border p-12 text-center ${
-          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-        }`}>
+        <div className={`rounded-2xl border p-12 text-center ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
           <Building2 size={32} className="mx-auto mb-3 opacity-40" />
-          <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Nenhuma obra vinculada a este contrato
-          </p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            As obras vêm dos polos do contrato (sys_obras).
-          </p>
+          <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma obra vinculada a este contrato</p>
         </div>
       ) : (
-        <div className={`rounded-2xl border overflow-hidden ${
-          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-        }`}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead>
-                <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-                  <th className={thCls}>OSC</th>
-                  <th className={thCls}>Obra</th>
-                  <th className={thCls}>Polo</th>
-                  <th className={thCls}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map(o => {
-                  const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
-                  return (
-                    <tr key={o.id} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
-                      <td className={`px-3 py-2.5 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.codigo ?? '—'}</td>
-                      <td className={`${tdCls} font-medium`}>{o.nome}</td>
-                      <td className={tdCls}>{o.polo_nome}</td>
-                      <td className={tdCls}><span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-2">
+          {list.map(o => {
+            const oscList = oscByObra.get(o.id) ?? []
+            const expanded = open.has(o.id)
+            const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
+            return (
+              <div key={o.id} className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                {/* linha da obra */}
+                <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
+                  <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
+                  <span className={`hidden md:inline text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{o.polo_nome}</span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
+                    {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
+                </button>
+
+                {/* OSCs (colapsável) */}
+                {expanded && (
+                  <div className={`px-3 pb-3 pt-1 border-t ${isLight ? 'border-slate-100 bg-slate-50/50' : 'border-white/[0.04] bg-white/[0.01]'}`}>
+                    {oscList.length === 0 && addingFor !== o.id && (
+                      <p className={`text-xs py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma OSC nesta obra ainda.</p>
+                    )}
+                    {oscList.map(osc => (
+                      <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                        <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
+                        {osc.tipo_servico && <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>· {osc.tipo_servico}</span>}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400'}`}>{osc.etapa_atual}</span>
+                        <button onClick={() => portfolioId && delOSC.mutate({ id: osc.id, portfolio_id: portfolioId })} className="ml-auto text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
+                      </div>
+                    ))}
+
+                    {/* form de adicionar */}
+                    {addingFor === o.id ? (
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <input autoFocus value={form.numero_os} onChange={e => setForm(f => ({ ...f, numero_os: e.target.value }))} placeholder="Número da OSC *" className={`${inputCls} w-44`} />
+                        <input value={form.tipo_servico} onChange={e => setForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Tipo de serviço (opcional)" className={`${inputCls} flex-1 min-w-[160px]`} />
+                        <button onClick={() => handleAdd(o.id)} disabled={addOSC.isPending || !form.numero_os.trim()} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-40"><Check size={16} /></button>
+                        <button onClick={() => { setAddingFor(null); setForm({ numero_os: '', tipo_servico: '' }) }} className={isLight ? 'text-slate-400' : 'text-slate-500'}><X size={16} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setAddingFor(o.id); setForm({ numero_os: '', tipo_servico: '' }) }} className={`inline-flex items-center gap-1 mt-1.5 text-xs font-semibold ${isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'}`}>
+                        <Plus size={13} /> Adicionar OSC
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
       <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-        Obras do contrato (via polos). A coluna <b>OSC</b> é o código da obra em <code>sys_obras</code> — é o vínculo obra ↔ OSC.
+        Cada obra pode ter várias OSCs (em <code>pmo_fluxo_os</code>, ligadas à obra). Adicione com o número real da OSC — nada é preenchido automaticamente.
       </p>
     </div>
   )
