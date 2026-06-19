@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Clock, CheckCircle2, Timer, FileText } from 'lucide-react'
-import { useLeadTimeCompras, type LeadTimeCategoria } from '../../hooks/useLeadTimeCompras'
+import { useLeadTimeCompras } from '../../hooks/useLeadTimeCompras'
 
 // Fases do pipeline (ordem cronologica) + cor
 const PHASES = [
@@ -17,9 +17,9 @@ const PHASES = [
 
 const fmtD = (v: number | null) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}d`)
 
-function StackedBar({ cat }: { cat: LeadTimeCategoria }) {
+function StackedBar({ vals }: { vals: Record<string, number | null> }) {
   const segs = PHASES
-    .map(p => ({ key: p.key, label: p.label, color: p.color, val: cat[p.key] ?? 0 }))
+    .map(p => ({ key: p.key, label: p.label, color: p.color, val: vals[p.key] ?? 0 }))
     .filter(s => s.val > 0)
   const soma = segs.reduce((s, x) => s + x.val, 0)
   if (!soma) {
@@ -138,20 +138,25 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
                   </td>
                 </tr>
               ) : (
-                categorias.map(cat => (
+                categorias.map(cat => {
+                  const fase = leadMode === 'entregues'
+                    ? { reqAprov: cat.reqAprov, aprovCotacao: cat.aprovCotacao, cotacaoPedido: cat.cotacaoPedido, pedidoEntrega: cat.pedidoEntrega }
+                    : { reqAprov: cat.reqAprovGeral, aprovCotacao: cat.aprovCotacaoGeral, cotacaoPedido: cat.cotacaoPedidoGeral, pedidoEntrega: cat.pedidoEntregaGeral }
+                  return (
                   <tr key={cat.categoria} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                     <td className={`px-3 py-2 font-semibold text-xs ${txtMain}`}>{cat.nome}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.total}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.comPedido}</td>
                     <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{cat.comEntrega}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.reqAprov)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.aprovCotacao)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.cotacaoPedido)}</td>
-                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(cat.pedidoEntrega)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.reqAprov)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.aprovCotacao)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.cotacaoPedido)}</td>
+                    <td className={`px-2 py-2 text-right text-xs ${txtMain}`}>{fmtD(fase.pedidoEntrega)}</td>
                     <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{fmtD(leadMode === 'entregues' ? cat.leadTotal : cat.leadGeral)}</td>
-                    <td className="px-3 py-2"><StackedBar cat={cat} /></td>
+                    <td className="px-3 py-2"><StackedBar vals={fase} /></td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

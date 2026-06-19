@@ -26,6 +26,11 @@ export interface LeadTimeCategoria {
   pedidoEntrega: number | null
   leadTotal: number | null
   leadGeral: number | null  // inclui RCs em aberto (hoje − criação)
+  // fases na variante "geral" (fase gargalo conta idade até hoje)
+  reqAprovGeral: number | null
+  aprovCotacaoGeral: number | null
+  cotacaoPedidoGeral: number | null
+  pedidoEntregaGeral: number | null
 }
 
 export interface LeadTimeCompras {
@@ -118,6 +123,10 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
         pedidoEntrega: number | null
         leadTotal: number | null
         geralLead: number | null
+        geralRA: number | null
+        geralAC: number | null
+        geralCP: number | null
+        geralPE: number | null
         temAprov: boolean
         temPedido: boolean
         temEntrega: boolean
@@ -132,19 +141,36 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
         const cotConcl = cotByReq.get(r.id) ?? null
         const ped = pedByReq.get(r.id) ?? null
         const temEnt = ped?.data_entrega_real != null
+        const temApr = r.data_aprovacao != null
+        const temCot = cotConcl != null
+        const temPed = ped != null
+        const ativo = !FECHADO.has(r.status)
+        const baseCP = cotConcl ?? r.data_aprovacao
+
+        // durações concluídas (fase fechada)
+        const cReqAprov = diffDays(r.data_aprovacao, r.created_at)
+        const cAprovCot = diffDays(cotConcl, r.data_aprovacao)
+        const cCotPed = diffDays(ped?.data_pedido, baseCP)
+        const cPedEnt = diffDays(fimDoDia(ped?.data_entrega_real), ped?.data_pedido)
         const leadTotal = diffDays(fimDoDia(ped?.data_entrega_real), r.created_at)
+
+        // "geral": fase concluída mantém a duração; a 1ª fase incompleta (gargalo) recebe a idade até hoje
+        let gReqAprov = cReqAprov, gAprovCot = cAprovCot, gCotPed = cCotPed, gPedEnt = cPedEnt
+        if (ativo && !temEnt) {
+          if (!temApr) gReqAprov = diffDays(agoraISO, r.created_at)
+          else if (!temCot) gAprovCot = diffDays(agoraISO, r.data_aprovacao)
+          else if (!temPed) gCotPed = diffDays(agoraISO, baseCP)
+          else gPedEnt = diffDays(agoraISO, ped?.data_pedido)
+        }
 
         return {
           categoria,
-          reqAprov: diffDays(r.data_aprovacao, r.created_at),
-          aprovCotacao: diffDays(cotConcl, r.data_aprovacao),
-          cotacaoPedido: diffDays(ped?.data_pedido, cotConcl ?? r.data_aprovacao),
-          pedidoEntrega: diffDays(fimDoDia(ped?.data_entrega_real), ped?.data_pedido),
+          reqAprov: cReqAprov, aprovCotacao: cAprovCot, cotacaoPedido: cCotPed, pedidoEntrega: cPedEnt,
           leadTotal,
-          // geral: entregue → lead real; em aberto (status ativo, sem entrega) → idade até hoje
-          geralLead: temEnt ? leadTotal : (FECHADO.has(r.status) ? null : diffDays(agoraISO, r.created_at)),
-          temAprov: r.data_aprovacao != null,
-          temPedido: ped != null,
+          geralLead: temEnt ? leadTotal : (ativo ? diffDays(agoraISO, r.created_at) : null),
+          geralRA: gReqAprov, geralAC: gAprovCot, geralCP: gCotPed, geralPE: gPedEnt,
+          temAprov: temApr,
+          temPedido: temPed,
           temEntrega: temEnt,
           noPrazo: ped?.data_entrega_real && ped?.data_prevista_entrega
             ? new Date(ped.data_entrega_real).getTime() <= new Date(ped.data_prevista_entrega).getTime()
@@ -172,6 +198,10 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
           pedidoEntrega: avg(list.map(c => c.pedidoEntrega)),
           leadTotal: avg(list.map(c => c.leadTotal)),
           leadGeral: avg(list.map(c => c.geralLead)),
+          reqAprovGeral: avg(list.map(c => c.geralRA)),
+          aprovCotacaoGeral: avg(list.map(c => c.geralAC)),
+          cotacaoPedidoGeral: avg(list.map(c => c.geralCP)),
+          pedidoEntregaGeral: avg(list.map(c => c.geralPE)),
         }))
         .sort((a, b) => b.total - a.total)
 
