@@ -125,6 +125,7 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
     .filter(x => x.value != null).sort((a, b) => (a.value ?? 0) - (b.value ?? 0)).slice(0, 5)
 
   return (
+    <div className="space-y-3">
     <section className={`${cardCls} overflow-hidden`}>
       {/* Header da secao */}
       <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
@@ -221,56 +222,57 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
           aprovação da cotação → emissão do pedido → entrega). No modo "+ Em aberto", cada fase também conta a idade do que
           está parado nela. Células com "—" ainda não têm amostra.
         </p>
-
-        {/* Linha 1: Fases por tempo + Lead time por comprador */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
-            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
-              <Timer size={13} className="text-teal-500" /> Fases por tempo
-            </h3>
-            <Bars items={fasesBars} isDark={isDark} cor="#14b8a6" />
-          </div>
-          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
-            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
-              <Users size={13} className="text-sky-500" /> Lead time por comprador
-            </h3>
-            <Bars items={compradoresBars} isDark={isDark} cor="#0ea5e9" />
-          </div>
-        </div>
-
-        {/* Linha 2: RCs paradas + Obras com menor lead time */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
-            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${txtMain}`}>
-              <AlertTriangle size={13} className="text-amber-500" /> Top 5 — paradas há mais tempo
-            </h3>
-            {paradas.length === 0 ? (
-              <div className={`text-[11px] py-3 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma requisição em aberto</div>
-            ) : (
-              <div className="divide-y divide-slate-100/60">
-                {paradas.map((p, i) => (
-                  <div key={p.numero + i} className="flex items-center justify-between gap-2 py-1.5">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <span className={`text-[10px] font-bold w-4 text-center shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
-                      <div className="min-w-0">
-                        <p className={`text-xs font-semibold truncate ${txtMain}`}>{p.numero}</p>
-                        <p className={`text-[10px] truncate ${txtMuted}`}>{p.obra}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs font-bold shrink-0 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{fmtD(p.dias)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-100'}`}>
-            <h3 className={`text-xs font-bold flex items-center gap-1.5 mb-3 ${txtMain}`}>
-              <CheckCircle2 size={13} className="text-emerald-500" /> Top 5 obras — menor lead time
-            </h3>
-            <Bars items={obrasMenor} isDark={isDark} cor="#10b981" />
-          </div>
-        </div>
       </div>
     </section>
+
+    {/* Linha 1: Fases por tempo + Lead time por comprador */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <section className={`${cardCls} p-4`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+          <Timer size={14} className="text-teal-500" /> Fases por tempo
+        </h3>
+        <Bars items={fasesBars} isDark={isDark} cor="#14b8a6" />
+      </section>
+      <section className={`${cardCls} p-4`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+          <Users size={14} className="text-sky-500" /> Lead time por comprador
+        </h3>
+        <Bars items={compradoresBars} isDark={isDark} cor="#0ea5e9" />
+      </section>
+    </div>
+
+    {/* Linha 2: RCs paradas + Obras com menor lead time */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <section className={`${cardCls} p-4`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-1.5 mb-2 ${txtMain}`}>
+          <AlertTriangle size={14} className="text-amber-500" /> Top 5 — paradas há mais tempo
+        </h3>
+        {paradas.length === 0 ? (
+          <div className={`text-[11px] py-3 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma requisição em aberto</div>
+        ) : (
+          <div className={`divide-y ${isDark ? 'divide-white/[0.06]' : 'divide-slate-100'}`}>
+            {paradas.map((p, i) => (
+              <div key={p.numero + i} className="flex items-center justify-between gap-2 py-1.5">
+                <div className="min-w-0 flex items-center gap-2">
+                  <span className={`text-[10px] font-bold w-4 text-center shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold truncate ${txtMain}`}>{p.numero}</p>
+                    <p className={`text-[10px] truncate ${txtMuted}`}>{p.obra}</p>
+                  </div>
+                </div>
+                <span className={`text-xs font-bold shrink-0 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{fmtD(p.dias)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      <section className={`${cardCls} p-4`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txtMain}`}>
+          <CheckCircle2 size={14} className="text-emerald-500" /> Top 5 obras — menor lead time
+        </h3>
+        <Bars items={obrasMenor} isDark={isDark} cor="#10b981" />
+      </section>
+    </div>
+    </div>
   )
 }
