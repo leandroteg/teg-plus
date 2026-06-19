@@ -36,6 +36,14 @@ export interface LeadTimeCategoria {
   entregaGeral: number | null
 }
 
+export interface FasesAvg {
+  validacaoTecnica: number | null
+  cotacao: number | null
+  aprovacao: number | null
+  pedido: number | null
+  entrega: number | null
+}
+
 export interface LeadTimeCompras {
   categorias: LeadTimeCategoria[]
   geral: {
@@ -44,6 +52,9 @@ export interface LeadTimeCompras {
     leadMedio: number | null       // entregues: entrega − criação
     leadMedioGeral: number | null  // inclui RCs em aberto: hoje − criação
     noPrazoPct: number | null
+    fases: FasesAvg                 // média por fase (entregues) — p/ achar o gargalo
+    fasesGeral: FasesAvg            // média por fase (inclui em aberto)
+    maisAntigaAberto: number | null // idade (dias) da RC em aberto mais antiga
   }
 }
 
@@ -218,6 +229,7 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
         .sort((a, b) => b.total - a.total)
 
       const noPrazoVals = calcs.map(c => c.noPrazo).filter((v): v is boolean => v != null)
+      const abertas = calcs.filter(c => !c.temEntrega && c.geralLead != null).map(c => c.geralLead as number)
 
       return {
         categorias,
@@ -229,6 +241,21 @@ export function useLeadTimeCompras(opts?: { de?: string; ate?: string; obraId?: 
           noPrazoPct: noPrazoVals.length
             ? Math.round((noPrazoVals.filter(Boolean).length / noPrazoVals.length) * 100)
             : null,
+          fases: {
+            validacaoTecnica: avg(calcs.map(c => c.vtec)),
+            cotacao: avg(calcs.map(c => c.cot)),
+            aprovacao: avg(calcs.map(c => c.apr)),
+            pedido: avg(calcs.map(c => c.ped)),
+            entrega: avg(calcs.map(c => c.ent)),
+          },
+          fasesGeral: {
+            validacaoTecnica: avg(calcs.map(c => c.gVtec)),
+            cotacao: avg(calcs.map(c => c.gCot)),
+            aprovacao: avg(calcs.map(c => c.gApr)),
+            pedido: avg(calcs.map(c => c.gPed)),
+            entrega: avg(calcs.map(c => c.gEnt)),
+          },
+          maisAntigaAberto: abertas.length ? Math.max(...abertas) : null,
         },
       }
     },

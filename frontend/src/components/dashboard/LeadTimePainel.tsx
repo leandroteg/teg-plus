@@ -4,7 +4,7 @@
 // de visao agregada (o Painel ja era a porta de entrada natural).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Clock, CheckCircle2, Timer, FileText } from 'lucide-react'
+import { Clock, CheckCircle2, Timer, AlertTriangle } from 'lucide-react'
 import { useLeadTimeCompras } from '../../hooks/useLeadTimeCompras'
 
 // Fases do pipeline (ordem cronologica) + cor
@@ -71,12 +71,20 @@ export default function LeadTimePainel({ isDark, leadMode = 'geral', de, ate, ob
   const geral = data?.geral
   const categorias = data?.categorias ?? []
 
-  const leadMedioVal = leadMode === 'entregues' ? (geral?.leadMedio ?? null) : (geral?.leadMedioGeral ?? null)
+  // Maior gargalo: a fase com a maior média (no modo selecionado)
+  const FASE_LABEL: Record<string, string> = { validacaoTecnica: 'Validação Técnica', cotacao: 'Cotação', aprovacao: 'Aprovação', pedido: 'Pedido', entrega: 'Entrega' }
+  const fasesAtual = leadMode === 'entregues' ? geral?.fases : geral?.fasesGeral
+  let gargalo: { fase: string; dias: number } | null = null
+  if (fasesAtual) {
+    for (const [k, v] of Object.entries(fasesAtual)) {
+      if (v != null && (!gargalo || v > gargalo.dias)) gargalo = { fase: FASE_LABEL[k] ?? k, dias: v }
+    }
+  }
   const kpis = [
-    { label: 'Lead time médio', value: fmtD(leadMedioVal), icon: Timer, hint: leadMode === 'entregues' ? 'entregues · entrega − RC' : 'inclui abertos · hoje − RC' },
+    { label: 'Maior gargalo', value: gargalo ? fmtD(gargalo.dias) : '—', icon: Timer, hint: gargalo ? gargalo.fase : 'sem dados' },
     { label: 'Compras concluídas', value: String(geral?.concluidas ?? 0), icon: CheckCircle2, hint: 'com entrega registrada' },
     { label: 'Entregas no prazo', value: geral?.noPrazoPct == null ? '—' : `${geral.noPrazoPct}%`, icon: Clock, hint: 'vs. data prevista' },
-    { label: 'Requisições', value: String(geral?.totalReq ?? 0), icon: FileText, hint: 'total no período' },
+    { label: 'Parada há mais tempo', value: geral?.maisAntigaAberto == null ? '—' : fmtD(geral.maisAntigaAberto), icon: AlertTriangle, hint: 'RC em aberto mais antiga' },
   ]
 
   return (
