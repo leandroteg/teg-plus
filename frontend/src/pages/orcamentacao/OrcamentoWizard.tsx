@@ -495,8 +495,8 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
 function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hint: string }) {
   const { data: arquivos = [] } = useArquivos(orcId)
   const adicionar = useAdicionarArquivos()
-  const [novos, setNovos] = useState<NovoArquivo[]>([])
-  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const [erro, setErro] = useState('')
+  const [prog, setProg] = useState<{ done: number; total: number } | null>(null)
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const inputId = `wiz-docs-${orcId}`
   const det = (n: string): OrcArquivoTipo => {
@@ -506,6 +506,21 @@ function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hi
     return 'outro'
   }
   const docs = arquivos.filter(a => a.tipo !== 'kmz')
+  // sobe na hora ao anexar (sem passo "salvar" separado), com erro e progresso visíveis
+  const enviar = async (files: File[]) => {
+    setErro(''); setProg({ done: 0, total: files.length })
+    try {
+      await adicionar.mutateAsync({
+        orcamentoId: orcId,
+        arquivos: files.map(f => ({ file: f, tipo: det(f.name) }) as NovoArquivo),
+        onProgress: (done, total) => setProg({ done, total }),
+      })
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao enviar os documentos.')
+    } finally {
+      setProg(null)
+    }
+  }
   return (
     <div className="mt-3">
       <p className={`text-[11px] mb-1.5 ${txtMuted}`}>Documentos ({hint}):</p>
@@ -515,25 +530,24 @@ function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hi
         </div>
       )}
       <div className="flex items-center gap-2 flex-wrap">
-        <label htmlFor={inputId} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+        <label htmlFor={inputId} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${adicionar.isPending ? 'opacity-60 pointer-events-none' : ''} ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
           <UploadCloud size={13} /> Anexar
         </label>
-        <input id={inputId} type="file" multiple className="hidden" accept=".kmz,.kml,.pdf,.doc,.docx,.xlsx,.xls,image/*"
-          onChange={e => { const fs = e.target.files; if (fs) setNovos(p => [...p, ...Array.from(fs).map(f => ({ file: f, tipo: det(f.name) }))]); e.currentTarget.value = '' }} />
-        {novos.map((a, i) => (
-          <span key={i} className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
-            <FileText size={11} /> {a.file.name}
-            <button onClick={() => setNovos(p => p.filter((_, j) => j !== i))}><Trash2 size={11} /></button>
+        <input id={inputId} type="file" multiple disabled={adicionar.isPending} className="hidden" accept=".kmz,.kml,.pdf,.doc,.docx,.xlsx,.xls,image/*"
+          onChange={e => { const fs = e.target.files; if (fs && fs.length) enviar(Array.from(fs)); e.currentTarget.value = '' }} />
+        {adicionar.isPending && prog && (
+          <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
+            <RefreshCw size={12} className="animate-spin" /> Enviando {prog.done}/{prog.total}…
           </span>
-        ))}
-        {novos.length > 0 && (
-          <button onClick={async () => { await adicionar.mutateAsync({ orcamentoId: orcId, arquivos: novos }); setNovos([]) }} disabled={adicionar.isPending}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60">
-            {adicionar.isPending ? 'Enviando…' : 'Salvar docs'}
-          </button>
+        )}
+        {!adicionar.isPending && docs.length > 0 && !erro && (
+          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>
+            <Check size={12} /> {docs.length} anexado(s)
+          </span>
         )}
       </div>
-      <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Anexe os documentos e use <span className="font-semibold">Regerar</span> para o SuperTEG consolidar com eles. <span className="font-semibold">{txt && ''}</span></p>
+      {erro && <p className={`mt-1.5 text-[11px] whitespace-pre-line ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>⚠ {erro}</p>}
+      <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Os arquivos sobem <span className="font-semibold">na hora</span> que você anexa. Depois use <span className="font-semibold">Regerar</span> para o SuperTEG consolidar com eles.</p>
     </div>
   )
 }

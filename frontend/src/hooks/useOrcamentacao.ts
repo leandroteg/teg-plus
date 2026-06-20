@@ -155,28 +155,36 @@ export function useArquivos(orcamentoId?: string) {
 export function useAdicionarArquivos() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { orcamentoId: string; arquivos: NovoArquivo[]; premissas?: Partial<OrcPremissas> }) => {
+    mutationFn: async (input: { orcamentoId: string; arquivos: NovoArquivo[]; premissas?: Partial<OrcPremissas>; onProgress?: (done: number, total: number) => void }) => {
+      const falhas: string[] = []
+      let done = 0
       for (const a of input.arquivos) {
-        const path = `${input.orcamentoId}/${Date.now()}_${safeName(a.file.name)}`
-        const { error: upErr } = await supabase.storage
-          .from(BUCKET).upload(path, a.file, { upsert: true, contentType: a.file.type || 'application/octet-stream' })
-        if (upErr) throw new Error('Falha no upload de ' + a.file.name + ': ' + upErr.message)
-        const { error: arqErr } = await supabase.from('orc_arquivos').insert({
-          orcamento_id: input.orcamentoId, nome: a.file.name, tipo: a.tipo,
-          storage_path: path, mime: a.file.type || null, tamanho: a.file.size,
-        })
-        if (arqErr) throw new Error('Falha ao registrar ' + a.file.name)
+        try {
+          const path = `${input.orcamentoId}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${safeName(a.file.name)}`
+          const { error: upErr } = await supabase.storage
+            .from(BUCKET).upload(path, a.file, { upsert: true, contentType: a.file.type || 'application/octet-stream' })
+          if (upErr) throw new Error(upErr.message)
+          const { error: arqErr } = await supabase.from('orc_arquivos').insert({
+            orcamento_id: input.orcamentoId, nome: a.file.name, tipo: a.tipo,
+            storage_path: path, mime: a.file.type || null, tamanho: a.file.size,
+          })
+          if (arqErr) throw new Error(arqErr.message)
+        } catch (e) {
+          falhas.push(`${a.file.name}: ${e instanceof Error ? e.message : 'erro'}`)
+        }
+        done++; input.onProgress?.(done, input.arquivos.length)
       }
       if (input.premissas) {
         const { data: cur } = await supabase.from('orc_orcamentos').select('premissas').eq('id', input.orcamentoId).maybeSingle()
         const merged = { ...((cur?.premissas as object) ?? {}), ...input.premissas }
         await supabase.from('orc_orcamentos').update({ premissas: merged }).eq('id', input.orcamentoId)
       }
+      if (falhas.length) throw new Error(`${falhas.length} de ${input.arquivos.length} arquivo(s) falharam:\n` + falhas.slice(0, 6).join('\n'))
       return input.orcamentoId
     },
-    onSuccess: (id) => {
-      qc.invalidateQueries({ queryKey: ['orc_arquivos', id] })
-      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+    onSettled: (_data, _err, input) => {
+      qc.invalidateQueries({ queryKey: ['orc_arquivos', input.orcamentoId] })
+      qc.invalidateQueries({ queryKey: ['orcamento', input.orcamentoId] })
     },
   })
 }
