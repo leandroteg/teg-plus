@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
   UploadCloud, FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
+  Route, RadioTower,
 } from 'lucide-react'
 import {
   useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, type NovoArquivo,
@@ -17,6 +18,29 @@ const ESTAGIOS = [
   { n: 4, label: 'Custos', icon: Wallet },
   { n: 5, label: 'Orçamentação', icon: TrendingUp },
 ]
+
+// ── Escala de dificuldade do relevo (pelo fator de terreno) ────────────────────
+type RelevoTone = 'slate' | 'emerald' | 'amber' | 'orange' | 'rose'
+const RELEVO_TONE: Record<RelevoTone, { barHex: string; pillL: string; pillD: string; dot: string }> = {
+  slate:   { barHex: '#94a3b8', pillL: 'bg-slate-100 text-slate-600 border-slate-200',     pillD: 'bg-white/[0.06] text-slate-300 border-white/10',       dot: 'bg-slate-400' },
+  emerald: { barHex: '#10b981', pillL: 'bg-emerald-50 text-emerald-700 border-emerald-200', pillD: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-500' },
+  amber:   { barHex: '#f59e0b', pillL: 'bg-amber-50 text-amber-700 border-amber-200',       pillD: 'bg-amber-500/15 text-amber-300 border-amber-500/30',     dot: 'bg-amber-500' },
+  orange:  { barHex: '#f97316', pillL: 'bg-orange-50 text-orange-700 border-orange-200',     pillD: 'bg-orange-500/15 text-orange-300 border-orange-500/30',   dot: 'bg-orange-500' },
+  rose:    { barHex: '#f43f5e', pillL: 'bg-rose-50 text-rose-700 border-rose-200',           pillD: 'bg-rose-500/15 text-rose-300 border-rose-500/30',       dot: 'bg-rose-500' },
+}
+const RELEVO_ESCALA: { tone: RelevoTone; label: string }[] = [
+  { tone: 'emerald', label: 'Plano' },
+  { tone: 'amber', label: 'Ondulado' },
+  { tone: 'orange', label: 'Acidentado' },
+  { tone: 'rose', label: 'Serrano' },
+]
+function relevoNivel(f: number): { label: string; tone: RelevoTone } {
+  if (!f || f <= 0) return { label: 'Sem dado', tone: 'slate' }
+  if (f < 1.08) return { label: 'Plano', tone: 'emerald' }
+  if (f < 1.17) return { label: 'Ondulado', tone: 'amber' }
+  if (f < 1.27) return { label: 'Acidentado', tone: 'orange' }
+  return { label: 'Serrano', tone: 'rose' }
+}
 
 export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDark: boolean }) {
   const atual = orc.estagio_atual ?? 1
@@ -214,22 +238,60 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
       )}
       {obras.length > 0 && (
         <div className={`mt-3 pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Obras do lote ({obras.length}) · clique p/ ver o terreno</p>
-          <div className="space-y-1">
+          <div className="flex items-center justify-between flex-wrap gap-x-4 gap-y-1.5 mb-2">
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Obras do lote ({obras.length}) · clique p/ ver o terreno</p>
+            <div className="flex items-center gap-3">
+              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Extensão da linha"><Route size={12} className="text-slate-400" /> km</span>
+              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Número de torres"><RadioTower size={12} className="text-slate-400" /> torres</span>
+              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Fator de relevo (dificuldade do terreno)"><Mountain size={12} className="text-slate-400" /> relevo</span>
+            </div>
+          </div>
+          {/* Escala de cores do relevo */}
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            {RELEVO_ESCALA.map(r => (
+              <span key={r.tone} className={`flex items-center gap-1.5 text-[10px] ${txtMuted}`}>
+                <span className={`w-2.5 h-2.5 rounded-full ${RELEVO_TONE[r.tone].dot}`} /> {r.label}
+              </span>
+            ))}
+          </div>
+          <div className="space-y-0.5">
             {[...obras].sort((a, b) => Number(b.km) - Number(a.km)).slice(0, 60).map((o, i) => {
               const aberto = open === i
               const terreno = String(o.terreno ?? '')
+              const f = Number(o.f_terreno)
+              const niv = relevoNivel(f)
+              const tn = RELEVO_TONE[niv.tone]
               return (
-                <div key={i}>
-                  <div className="flex items-center gap-2 text-xs py-1">
-                    <button onClick={() => terreno && setOpen(aberto ? null : i)} className={`flex items-center gap-2 min-w-0 flex-1 text-left ${terreno ? 'cursor-pointer' : ''}`}>
+                <div key={i} className={`rounded-lg ${aberto ? (isDark ? 'bg-white/[0.03]' : 'bg-slate-50') : ''}`}>
+                  <div className="flex items-center gap-2 text-xs py-1.5">
+                    {/* barra de dificuldade do relevo */}
+                    <span className="w-1 h-6 rounded-full shrink-0" style={{ background: tn.barHex }} title={`Relevo: ${niv.label}`} />
+                    <button onClick={() => terreno && setOpen(aberto ? null : i)} className={`flex items-center gap-1.5 min-w-0 flex-1 text-left ${terreno ? 'cursor-pointer' : ''}`}>
                       {terreno ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
-                      <span className={`flex-1 truncate ${txt}`}>{String(o.nome)}</span>
+                      <span className={`flex-1 truncate font-semibold ${txt}`}>{String(o.nome)}</span>
                     </button>
-                    <span className={`${txtMuted} shrink-0 hidden sm:inline`}>{fmtNum(Number(o.km), 1)} km · {fmtNum(Number(o.torres))} t · ×{fmtNum(Number(o.f_terreno), 2)}</span>
+                    {/* métricas destacadas */}
+                    <div className="hidden sm:flex items-center gap-2.5 shrink-0">
+                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Extensão">
+                        <Route size={12} className="text-slate-400" />{fmtNum(Number(o.km), 1)}<span className={`font-medium ${txtMuted}`}>km</span>
+                      </span>
+                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres">
+                        <RadioTower size={12} className="text-slate-400" />{fmtNum(Number(o.torres))}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`} title={`Relevo ${niv.label} (fator ×${fmtNum(f, 2)})`}>
+                        <Mountain size={11} />×{fmtNum(f, 2)}
+                      </span>
+                    </div>
                     <button onClick={() => setMapaObra(String(o.nome))} title="Ver no mapa" className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.08] text-slate-400 hover:text-amber-300' : 'hover:bg-slate-100 text-slate-400 hover:text-amber-600'}`}><MapPin size={13} /></button>
                   </div>
-                  {aberto && terreno && <p className={`text-[11px] leading-relaxed pl-5 pb-1.5 ${txtMuted}`}>{terreno}</p>}
+                  {aberto && terreno && (
+                    <div className={`pl-5 pr-2 pb-2 ${terreno ? '' : 'hidden'}`}>
+                      <span className={`inline-flex items-center gap-1 mb-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>
+                        <Mountain size={10} /> {niv.label} · ×{fmtNum(f, 2)}
+                      </span>
+                      <p className={`text-[11px] leading-relaxed ${txtMuted}`}>{terreno}</p>
+                    </div>
+                  )}
                 </div>
               )
             })}
