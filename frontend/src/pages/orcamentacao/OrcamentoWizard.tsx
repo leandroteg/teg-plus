@@ -31,31 +31,28 @@ export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDar
 
   return (
     <div className="space-y-4">
-      {/* Stepper */}
-      <div className={`${CARD(isDark)} p-2 flex items-center gap-1 overflow-x-auto`}>
-        {ESTAGIOS.map((e, i) => {
+      {/* Stepper — padrão de abas dos demais módulos */}
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {ESTAGIOS.map(e => {
           const feito = atual > e.n || (atual === e.n && !!dados[String(e.n)])
           const liberado = e.n <= atual + 1
           const ativo = aba === e.n
           return (
-            <div key={e.n} className="flex items-center">
-              <button
-                disabled={!liberado}
-                onClick={() => liberado && setAba(e.n)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
-                  ativo ? 'bg-amber-500 text-white shadow-sm'
-                    : feito ? (isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700')
-                    : liberado ? (isDark ? 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')
-                    : (isDark ? 'text-slate-600' : 'text-slate-300')
-                }`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${ativo ? 'bg-white/20' : feito ? 'bg-emerald-500/20' : isDark ? 'bg-white/[0.06]' : 'bg-white'}`}>
-                  {feito && !ativo ? <Check size={11} /> : !liberado ? <Lock size={10} /> : e.n}
-                </span>
-                <e.icon size={13} /> {e.label}
-              </button>
-              {i < ESTAGIOS.length - 1 && <ChevronRight size={14} className={`mx-0.5 shrink-0 ${txtMuted}`} />}
-            </div>
+            <button key={e.n} disabled={!liberado} onClick={() => liberado && setAba(e.n)}
+              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                ativo
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                  : feito
+                    ? (isDark ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                    : liberado
+                      ? (isDark ? 'text-slate-300 border-transparent hover:bg-white/[0.05]' : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm')
+                      : (isDark ? 'text-slate-600 border-transparent cursor-not-allowed' : 'text-slate-300 border-transparent cursor-not-allowed')
+              }`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${ativo ? 'bg-white/20' : feito ? (isDark ? 'bg-emerald-500/20' : 'bg-emerald-100') : isDark ? 'bg-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+                {feito && !ativo ? <Check size={11} /> : !liberado ? <Lock size={10} /> : e.n}
+              </span>
+              <e.icon size={14} /> {e.label}
+            </button>
           )
         })}
       </div>

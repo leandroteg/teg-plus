@@ -236,13 +236,13 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, geo])
 
-  const pill = (active: boolean) =>
-    `inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all border ${
+  const iconBtn = (active: boolean) =>
+    `h-8 w-8 inline-flex items-center justify-center rounded-lg transition-all ${
       active
-        ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+        ? 'bg-amber-500 text-white shadow-sm'
         : isDark
-          ? 'bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]'
-          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:shadow-sm'
+          ? 'text-slate-300 hover:bg-white/[0.08]'
+          : 'text-slate-500 hover:bg-slate-100'
     }`
 
   return (
@@ -265,18 +265,19 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
                 : 'Traçado do KMZ'}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={() => setMostrarNomes(v => !v)} className={pill(mostrarNomes)} title="Mostrar/ocultar nomes das obras">
-              {mostrarNomes ? <Eye size={13} /> : <EyeOff size={13} />} Nomes
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button onClick={() => setMostrarNomes(v => !v)} className={iconBtn(mostrarNomes)} title={mostrarNomes ? 'Ocultar nomes das obras' : 'Mostrar nomes das obras'}>
+              {mostrarNomes ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
-            <button onClick={centralizar} className={pill(false)} title="Centralizar na obra">
-              <Crosshair size={13} /> Centralizar
+            <button onClick={centralizar} className={iconBtn(false)} title="Centralizar na obra">
+              <Crosshair size={16} />
             </button>
             <a href={kmzUrl ? `https://www.google.com/maps?q=${encodeURIComponent(kmzUrl)}` : undefined} target="_blank" rel="noopener noreferrer"
-              className={`${pill(false)} ${kmzUrl ? '' : 'opacity-50 pointer-events-none'}`} title="Abrir no Google Maps">
-              <ExternalLink size={13} /> Google Maps
+              className={`${iconBtn(false)} ${kmzUrl ? '' : 'opacity-40 pointer-events-none'}`} title="Abrir no Google Maps">
+              <ExternalLink size={16} />
             </a>
-            <button onClick={onClose} className={`ml-0.5 h-8 w-8 inline-flex items-center justify-center rounded-lg ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={17} /></button>
+            <span className={`mx-1 h-5 w-px ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
+            <button onClick={onClose} className={iconBtn(false)} title="Fechar"><X size={17} /></button>
           </div>
         </div>
 
