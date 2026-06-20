@@ -52,7 +52,7 @@ interface GeoData {
   canteiro_cidades?: { nome: string; tipo: string; dist_km: number }[]
   piores_trechos?: { km_ini: number; km_fim: number; rampa_pct: number; elev: number[] }[]
   amplitude_m?: number | null
-  perfil?: { dist_km: number[]; elev_m: number[]; rampa_media_pct: number; rampa_max_pct: number; subida_m: number; descida_m: number; n_pontos: number } | null
+  perfil?: { dist_km: number[]; elev_m: number[]; lat?: number[]; lon?: number[]; rampa_media_pct: number; rampa_max_pct: number; subida_m: number; descida_m: number; n_pontos: number } | null
   extensao_km?: number
 }
 
@@ -120,36 +120,54 @@ function PerfilChart({ perfil, isDark, cor, torres }: { perfil: NonNullable<GeoD
   const line = e.map((m, i) => `${i ? 'L' : 'M'}${X(d[i]).toFixed(1)} ${Y(m).toFixed(1)}`).join(' ')
   const area = `${line} L${X(maxD).toFixed(1)} ${(H - pB).toFixed(1)} L${X(0).toFixed(1)} ${(H - pB).toFixed(1)} Z`
 
-  let tip: React.ReactNode = null
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const val = isDark ? 'text-slate-100' : 'text-slate-800'
+  let guide: React.ReactNode = null
+  let card: React.ReactNode = null
   if (hov != null) {
     const tx = X(d[hov]), ty = Y(e[hov])
-    const txt = `${d[hov].toFixed(1)} km · ${e[hov]} m`
-    const w = txt.length * 4.3 + 8
-    const bx = Math.min(Math.max(tx - w / 2, pL), W - pR - w)
-    const by = ty - 16 < pT ? ty + 7 : ty - 16
-    tip = (
+    const xFrac = tx / W, yFrac = ty / H
+    const tipX = xFrac < 0.25 ? '0%' : xFrac > 0.75 ? '-100%' : '-50%'
+    const below = yFrac < 0.45
+    const lat = perfil.lat?.[hov], lon = perfil.lon?.[hov]
+    guide = (
       <g pointerEvents="none">
         <line x1={tx} y1={pT} x2={tx} y2={H - pB} stroke={cor} strokeWidth={0.5} opacity={0.45} />
-        <Cross x={tx} y={ty} cor={cor} size={3.2} bold />
-        <rect x={bx} y={by} width={w} height={12} rx={2.5} fill={isDark ? '#0f172a' : '#ffffff'} stroke={cor} strokeWidth={0.6} />
-        <text x={bx + w / 2} y={by + 8.6} fontSize={7.5} textAnchor="middle" fontWeight="bold" fill={isDark ? '#e2e8f0' : '#0f172a'}>{txt}</text>
+        <Cross x={tx} y={ty} cor={cor} size={3.4} bold />
       </g>
+    )
+    card = (
+      <div className="absolute z-20 pointer-events-none" style={{ left: `${xFrac * 100}%`, top: `${yFrac * 100}%`, transform: `translate(${tipX}, ${below ? '10px' : 'calc(-100% - 10px)'})` }}>
+        <div className={`rounded-xl border shadow-xl px-3 py-2 text-[11px] leading-tight whitespace-nowrap ${isDark ? 'bg-[#0f172a] border-white/15' : 'bg-white border-slate-200'}`}>
+          <div className="flex items-center gap-1.5 font-extrabold mb-1.5" style={{ color: cor }}>
+            <span className="inline-block w-2 h-2 rounded-sm" style={{ background: cor }} /> Torre {hov + 1}<span className={`font-medium ${muted}`}>/{d.length}</span>
+          </div>
+          <div className={`flex justify-between gap-5 ${val}`}><span className={muted}>Altura</span><b>{e[hov]} m</b></div>
+          <div className={`flex justify-between gap-5 ${val}`}><span className={muted}>Distância</span><b>{d[hov].toFixed(1)} km</b></div>
+          {lat != null && lon != null && (
+            <div className={`flex justify-between gap-5 ${val}`}><span className={muted}>Coordenada</span><b className="tabular-nums">{lat.toFixed(5)}, {lon.toFixed(5)}</b></div>
+          )}
+        </div>
+      </div>
     )
   }
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }} onMouseLeave={() => setHov(null)}>
-      <line x1={pL} y1={H - pB} x2={W - pR} y2={H - pB} stroke={grid} strokeWidth={0.5} />
-      <line x1={pL} y1={pT} x2={pL} y2={H - pB} stroke={grid} strokeWidth={0.5} />
-      <path d={area} fill={cor} opacity={0.15} />
-      <path d={line} fill="none" stroke={cor} strokeWidth={1.4} />
-      {e.map((m, i) => <Cross key={i} x={X(d[i])} y={Y(m)} cor={cor} size={2} onHover={() => setHov(i)} />)}
-      <text x={pL - 3} y={pT + 4} fontSize={7} textAnchor="end" fill={lbl}>{maxE}</text>
-      <text x={pL - 3} y={H - pB} fontSize={7} textAnchor="end" fill={lbl}>{minE}</text>
-      <text x={pL} y={H - 3} fontSize={7} fill={lbl}>0</text>
-      <text x={W - pR} y={H - 3} fontSize={7} textAnchor="end" fill={lbl}>{maxD.toFixed(0)} km</text>
-      {tip}
-    </svg>
+    <div className="relative" onMouseLeave={() => setHov(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto', display: 'block' }}>
+        <line x1={pL} y1={H - pB} x2={W - pR} y2={H - pB} stroke={grid} strokeWidth={0.5} />
+        <line x1={pL} y1={pT} x2={pL} y2={H - pB} stroke={grid} strokeWidth={0.5} />
+        <path d={area} fill={cor} opacity={0.15} />
+        <path d={line} fill="none" stroke={cor} strokeWidth={1.4} />
+        {e.map((m, i) => <Cross key={i} x={X(d[i])} y={Y(m)} cor={cor} size={2} onHover={() => setHov(i)} />)}
+        <text x={pL - 3} y={pT + 4} fontSize={7} textAnchor="end" fill={lbl}>{maxE}</text>
+        <text x={pL - 3} y={H - pB} fontSize={7} textAnchor="end" fill={lbl}>{minE}</text>
+        <text x={pL} y={H - 3} fontSize={7} fill={lbl}>0</text>
+        <text x={W - pR} y={H - 3} fontSize={7} textAnchor="end" fill={lbl}>{maxD.toFixed(0)} km</text>
+        {guide}
+      </svg>
+      {card}
+    </div>
   )
 }
 
