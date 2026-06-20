@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Map as MapIcon, ChevronLeft, Banknote, Wallet, TrendingUp, Percent, Ruler, Factory,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOrcamento, useReprocessarOrcamento } from '../../hooks/useOrcamentacao'
+import type { OrcRegiao } from '../../types/orcamentacao'
 import { fmtBRL, fmtMM, fmtNum, StatusBadge, Kpi, BarRow, MiniMarkdown, CARD } from './_ui'
 
 const SECAO_COR = ['#f59e0b', '#3b82f6', '#14b8a6', '#8b5cf6', '#ec4899', '#10b981', '#64748b', '#f43f5e']
@@ -17,6 +19,7 @@ export default function OrcamentoDetalhe() {
   const isDark = !isLight
   const { data: orc, isLoading } = useOrcamento(id)
   const reprocessar = useReprocessarOrcamento()
+  const [scopeKey, setScopeKey] = useState<string>('total')
 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -33,8 +36,14 @@ export default function OrcamentoDetalhe() {
     )
   }
 
-  const r = orc.resultado
+  const rTot = orc.resultado
+  const regioes: OrcRegiao[] = rTot?.regioes ?? []
+  // escopo: total OU uma região selecionada (mesma forma de dados)
+  const scope = (scopeKey !== 'total' ? regioes.find(x => x.regiao === scopeKey) : null) ?? rTot
+  const r = scope
   const resumo = r?.resumo
+  const isRegiao = scopeKey !== 'total' && !!regioes.find(x => x.regiao === scopeKey)
+  const analiseTxt = isRegiao ? ((scope as OrcRegiao)?.analise_md || orc.analise_md || '') : (orc.analise_md || '')
 
   return (
     <div className="space-y-4 p-4">
@@ -59,7 +68,7 @@ export default function OrcamentoDetalhe() {
         <section className={`${CARD(isDark)} p-8 flex flex-col items-center text-center`}>
           <div className="w-12 h-12 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
           <p className={`text-sm font-bold ${txt}`}>O SuperTEG está estimando…</p>
-          <p className={`text-xs mt-1 max-w-md ${txtMuted}`}>Lendo o traçado (KMZ), as especificações e aplicando o motor paramétrico v3. Isso costuma levar de 1 a 3 minutos — esta tela atualiza sozinha.</p>
+          <p className={`text-xs mt-1 max-w-md ${txtMuted}`}>Lendo o traçado (KMZ) por região e obra, e analisando cada região com o motor paramétrico. Isso costuma levar de 1 a 3 minutos — esta tela atualiza sozinha.</p>
         </section>
       )}
 
@@ -86,6 +95,28 @@ export default function OrcamentoDetalhe() {
       {/* Estado: concluído */}
       {orc.status === 'concluido' && resumo && r && (
         <>
+          {/* Seletor de região */}
+          {regioes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider mr-1 ${txtMuted}`}>Região:</span>
+              {[{ k: 'total', label: `Total · ${fmtNum(rTot?.lts?.length ?? 0)} obras` }, ...regioes.map(rg => ({ k: rg.regiao, label: `${rg.regiao} · ${rg.lts.length}` }))].map(opt => (
+                <button
+                  key={opt.k}
+                  onClick={() => setScopeKey(opt.k)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    scopeKey === opt.k ? 'bg-amber-500 text-white shadow-sm'
+                      : isDark ? 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {isRegiao && (scope as OrcRegiao).f_terreno != null && (
+            <p className={`text-[11px] ${txtMuted}`}>Escopo: <span className="font-bold">{scopeKey}</span> · terreno aplicado ×{fmtNum((scope as OrcRegiao).f_terreno!, 2)}</p>
+          )}
+
           {/* KPIs financeiros */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi label="Faturamento" value={fmtMM(resumo.faturamento_total)} hint="preços contratados CEMIG" tone="emerald" isDark={isDark} />
@@ -134,43 +165,45 @@ export default function OrcamentoDetalhe() {
             )}
           </section>
 
-          {/* Análise do SuperTEG */}
-          {orc.analise_md && (
+          {/* Análise do SuperTEG (do escopo selecionado) */}
+          {analiseTxt && (
             <section className={`${CARD(isDark)} p-4`}>
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-2 ${txt}`}>
-                <Sparkles size={14} className="text-amber-500" /> Análise do SuperTEG
+                <Sparkles size={14} className="text-amber-500" /> Análise do SuperTEG{isRegiao ? ` — ${scopeKey}` : ''}
                 {orc.nivel_confianca && <span className={`ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>confiança: {orc.nivel_confianca}</span>}
               </h2>
-              <MiniMarkdown text={orc.analise_md} isDark={isDark} />
+              <MiniMarkdown text={analiseTxt} isDark={isDark} />
             </section>
           )}
 
-          {/* Linhas (se mais de uma) */}
-          {r.lts.length > 1 && (
+          {/* Obras (LDs) do escopo */}
+          {r.lts.length > 0 && (() => {
+            const obras = [...r.lts].sort((a, b) => b.faturamento - a.faturamento)
+            const vis = obras.slice(0, 50)
+            return (
             <section className={`${CARD(isDark)} overflow-hidden`}>
-              <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-                <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><Layers size={14} className="text-amber-500" /> Linhas de Transmissão</h2>
+              <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+                <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><Layers size={14} className="text-amber-500" /> Obras{isRegiao ? ` — ${scopeKey}` : ''}</h2>
+                <span className={`text-[11px] ${txtMuted}`}>{obras.length} LD(s)</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className={`text-[10px] uppercase tracking-wider ${txtMuted} ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}`}>
-                      <th className="text-left font-semibold px-3 py-2">Linha</th>
+                      <th className="text-left font-semibold px-3 py-2">Obra (LD)</th>
                       <th className="text-right font-semibold px-2 py-2">km</th>
                       <th className="text-right font-semibold px-2 py-2">Torres</th>
-                      <th className="text-right font-semibold px-2 py-2">Terreno</th>
                       <th className="text-right font-semibold px-2 py-2">Faturamento</th>
                       <th className="text-right font-semibold px-2 py-2">Custo</th>
                       <th className="text-right font-semibold px-3 py-2">Prazo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {r.lts.map((l, i) => (
+                    {vis.map((l, i) => (
                       <tr key={i} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                        <td className={`px-3 py-2 font-semibold text-xs ${txt}`}>{l.nome}</td>
+                        <td className={`px-3 py-2 font-medium text-xs ${txt} max-w-[280px] truncate`} title={l.nome}>{l.nome}</td>
                         <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.extensao_km, 1)}</td>
                         <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.torres)}</td>
-                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>×{fmtNum(l.f_terreno, 2)}</td>
                         <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{fmtMM(l.faturamento)}</td>
                         <td className={`px-2 py-2 text-right text-xs ${txt}`}>{fmtMM(l.custo_total)}</td>
                         <td className={`px-3 py-2 text-right text-xs ${txtMuted}`}>~{fmtNum(l.prazo_meses, 1)}m</td>
@@ -179,8 +212,14 @@ export default function OrcamentoDetalhe() {
                   </tbody>
                 </table>
               </div>
+              {obras.length > vis.length && (
+                <div className={`px-4 py-2 text-[10px] ${txtMuted} ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                  Mostrando as 50 maiores de {obras.length} obras. Selecione uma região acima para ver o detalhe.
+                </div>
+              )}
             </section>
-          )}
+            )
+          })()}
 
           {/* Itens EAP */}
           <section className={`${CARD(isDark)} overflow-hidden`}>
@@ -329,25 +368,25 @@ export default function OrcamentoDetalhe() {
           <section className={`${CARD(isDark)} p-4`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Percent size={14} className="text-amber-500" /> Premissas e fontes</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div><p className={txtMuted}>Tensão</p><p className={`font-bold ${txt}`}>{String((r.premissas_usadas?.tensao_kv ?? orc.premissas.tensao_kv) ?? '—')} kV</p></div>
-              <div><p className={txtMuted}>Fundação</p><p className={`font-bold ${txt}`}>{String((r.premissas_usadas?.fundacao_tipo ?? orc.premissas.fundacao_tipo) ?? '—')}</p></div>
-              <div><p className={txtMuted}>Torres/km</p><p className={`font-bold ${txt}`}>{String(r.premissas_usadas?.torres_por_km ?? '1.53')}</p></div>
-              <div><p className={txtMuted}>Análise por</p><p className={`font-bold ${txt}`}>{String(r.premissas_usadas?.analise_por ?? '—')}</p></div>
+              <div><p className={txtMuted}>Tensão</p><p className={`font-bold ${txt}`}>{String((rTot?.premissas_usadas?.tensao_kv ?? orc.premissas.tensao_kv) ?? '—')} kV</p></div>
+              <div><p className={txtMuted}>Fundação</p><p className={`font-bold ${txt}`}>{String((rTot?.premissas_usadas?.fundacao_tipo ?? orc.premissas.fundacao_tipo) ?? '—')}</p></div>
+              <div><p className={txtMuted}>Torres/km</p><p className={`font-bold ${txt}`}>{String(rTot?.premissas_usadas?.torres_por_km ?? '1.53')}</p></div>
+              <div><p className={txtMuted}>Análise por</p><p className={`font-bold ${txt}`}>{String(rTot?.premissas_usadas?.analise_por ?? '—')}</p></div>
             </div>
-            {Array.isArray(r.geometria_kmz) && r.geometria_kmz.length > 0 && (
+            {Array.isArray(rTot?.geometria_kmz) && rTot!.geometria_kmz!.length > 0 && (
               <div className={`mt-3 pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Geometria lida dos KMZ</p>
-                {r.geometria_kmz.map((g, i) => (
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Resumo por região</p>
+                {rTot!.geometria_kmz!.map((g, i) => (
                   <p key={i} className={`text-[11px] ${txt}`}>
                     <span className="font-semibold">{String(g.nome)}</span>
-                    <span className={txtMuted}> — {fmtNum(Number(g.extensao_km), 2)} km · {String(g.n_deflexoes)} deflexões{Number(g.torres_kmz) > 0 ? ` · ${g.torres_kmz} torres no KMZ` : ''}</span>
+                    <span className={txtMuted}> — {fmtNum(Number(g.extensao_km), 2)} km{Number(g.torres_kmz) > 0 ? ` · ${g.torres_kmz} obras` : ''}</span>
                   </p>
                 ))}
               </div>
             )}
             <div className={`mt-3 flex items-start gap-2 text-[11px] rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
               <Activity size={13} className="text-amber-500 mt-0.5 shrink-0" />
-              <span>{r.classe_precisao || 'Estimativa paramétrica ~±30%'}. Não substitui orçamento executivo.</span>
+              <span>{rTot?.classe_precisao || 'Estimativa paramétrica ~±30%'}. Não substitui orçamento executivo.</span>
             </div>
           </section>
         </>

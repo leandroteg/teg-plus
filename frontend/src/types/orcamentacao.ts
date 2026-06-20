@@ -90,6 +90,22 @@ export interface OrcResumo {
   canteiro_dist_km?: number | null
 }
 
+// Uma região (Norte/Triângulo/Sul) — mesma forma do agregado, com obras (lts) próprias
+export interface OrcRegiao {
+  regiao: string
+  f_terreno?: number
+  analise_md?: string
+  resumo: OrcResumo
+  lts: OrcLT[]
+  itens_eap: OrcItemEAP[]
+  secoes_eap: OrcSecaoEAP[]
+  composicao_custo: OrcComposicao[]
+  curva_s: OrcCurvaS[]
+  tipos_torre?: OrcTipoTorre[]
+  plano_recursos?: OrcPlanoRecursos
+  comparacao?: OrcComparacao | null
+}
+
 export interface OrcResultado {
   resumo: OrcResumo
   lts: OrcLT[]
@@ -97,6 +113,7 @@ export interface OrcResultado {
   secoes_eap: OrcSecaoEAP[]
   composicao_custo: OrcComposicao[]
   curva_s: OrcCurvaS[]
+  regioes?: OrcRegiao[]
   tipos_torre?: OrcTipoTorre[]
   plano_recursos?: OrcPlanoRecursos
   comparacao?: OrcComparacao | null
