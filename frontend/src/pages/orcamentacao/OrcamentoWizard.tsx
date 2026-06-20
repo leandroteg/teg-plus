@@ -140,7 +140,7 @@ export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDar
   return (
     <div className="space-y-4">
       {/* Stepper — componente compartilhado ModuleTabs */}
-      <ModuleTabs isDark={isDark} value={String(aba)} onChange={v => { const n = Number(v); if (n <= atual + 1) setAba(n) }}
+      <ModuleTabs fill isDark={isDark} value={String(aba)} onChange={v => { const n = Number(v); if (n <= atual + 1) setAba(n) }}
         tabs={ESTAGIOS.map(e => {
           const feito = atual > e.n || (atual === e.n && !!dados[String(e.n)])
           const liberado = e.n <= atual + 1

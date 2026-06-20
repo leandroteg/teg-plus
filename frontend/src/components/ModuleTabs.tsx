@@ -32,12 +32,13 @@ const TONE: Record<TabTone, { activeL: string; activeD: string; badgeL: string; 
   indigo:  { activeL: 'bg-indigo-50 text-indigo-700 border-indigo-400',     activeD: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/40',   badgeL: 'bg-indigo-100 text-indigo-700',   badgeD: 'bg-indigo-500/20 text-indigo-300' },
 }
 
-export default function ModuleTabs({ tabs, value, onChange, isDark, className }: {
+export default function ModuleTabs({ tabs, value, onChange, isDark, className, fill }: {
   tabs: ModuleTab[]
   value?: string
   onChange?: (value: string) => void
   isDark: boolean
   className?: string
+  fill?: boolean   // distribui as abas p/ ocupar toda a largura (sem rolagem)
 }) {
   const railRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef({ active: false, startX: 0, startScrollLeft: 0, moved: false })
@@ -65,7 +66,7 @@ export default function ModuleTabs({ tabs, value, onChange, isDark, className }:
 
   return (
     <div className={`relative w-full min-w-0 ${className ?? ''}`}>
-      {canScrollLeft && (
+      {!fill && canScrollLeft && (
         <>
           <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-10 rounded-l-2xl bg-gradient-to-r ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
           <button type="button" onClick={() => scrollByAmount(-1)} aria-label="Rolar para a esquerda"
@@ -74,7 +75,7 @@ export default function ModuleTabs({ tabs, value, onChange, isDark, className }:
           </button>
         </>
       )}
-      {canScrollRight && (
+      {!fill && canScrollRight && (
         <>
           <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-10 rounded-r-2xl bg-gradient-to-l ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
           <button type="button" onClick={() => scrollByAmount(1)} aria-label="Rolar para a direita"
@@ -101,7 +102,7 @@ export default function ModuleTabs({ tabs, value, onChange, isDark, className }:
           if (!el) return
           if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY }
         }}
-        className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${canScrollRight ? 'pr-12' : ''} ${canScrollLeft ? 'pl-12' : ''} ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'} cursor-grab active:cursor-grabbing`}
+        className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${fill ? '' : `${canScrollRight ? 'pr-12' : ''} ${canScrollLeft ? 'pl-12' : ''} cursor-grab active:cursor-grabbing`} ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}
       >
         {tabs.map(t => {
           const tone = TONE[t.tone ?? 'slate']
@@ -126,7 +127,7 @@ export default function ModuleTabs({ tabs, value, onChange, isDark, className }:
 
           return (
             <button key={t.value} disabled={locked} onClick={() => !locked && onChange?.(t.value)}
-              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${cls}`}>
+              className={`${fill ? 'flex-1' : 'min-w-fit'} flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${cls}`}>
               {t.leading}
               {Icon && <Icon size={15} className="shrink-0" />}
               {t.label}
