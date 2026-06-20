@@ -36,6 +36,7 @@ import DPLayout from './components/DPLayout'
 import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
 import LocacaoLayout from './components/LocacaoLayout'
+import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -201,6 +202,11 @@ const MeusChamados = lazy(() => import('./pages/ti/MeusChamados'))
 const FilaChamados = lazy(() => import('./pages/ti/FilaChamados'))
 const ChamadoDetalhe = lazy(() => import('./pages/ti/ChamadoDetalhe'))
 const AdminAtendentes = lazy(() => import('./pages/ti/AdminAtendentes'))
+
+// Orçamentação (Expansão)
+const OrcamentacaoHome = lazy(() => import('./pages/orcamentacao/OrcamentacaoHome'))
+const NovoOrcamento = lazy(() => import('./pages/orcamentacao/NovoOrcamento'))
+const OrcamentoDetalhe = lazy(() => import('./pages/orcamentacao/OrcamentoDetalhe'))
 
 // SuperTEG AI Chat
 const SuperTEGChat = lazy(() => import('./components/SuperTEGChat'))
@@ -488,6 +494,15 @@ export default function App() {
               <Route path="/cadastros/categorias"         element={<Lazy><CategoriasFinanceiras /></Lazy>} />
               <Route path="/cadastros/categorias-compras" element={<Lazy><CategoriasCompras /></Lazy>} />
               <Route path="/cadastros/bases"              element={<Lazy><Bases /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo Orçamentação (Expansão) */}
+          <Route element={<ModuleRoute moduleKey="orcamentacao" />}>
+            <Route element={<OrcamentacaoLayout />}>
+              <Route path="/orcamentacao"      element={<LazyDash><OrcamentacaoHome /></LazyDash>} />
+              <Route path="/orcamentacao/novo" element={<Lazy><NovoOrcamento /></Lazy>} />
+              <Route path="/orcamentacao/:id"  element={<Lazy><OrcamentoDetalhe /></Lazy>} />
             </Route>
           </Route>
 

@@ -1,0 +1,266 @@
+import { useParams, useNavigate } from 'react-router-dom'
+import {
+  Map as MapIcon, ChevronLeft, Banknote, Wallet, TrendingUp, Percent, Ruler, Factory,
+  CalendarClock, Users, Layers, ListTree, BarChart3, Sparkles, AlertCircle, RefreshCw, Activity,
+} from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useOrcamento, useReprocessarOrcamento } from '../../hooks/useOrcamentacao'
+import { fmtBRL, fmtMM, fmtNum, StatusBadge, Kpi, BarRow, MiniMarkdown, CARD } from './_ui'
+
+const SECAO_COR = ['#f59e0b', '#3b82f6', '#14b8a6', '#8b5cf6', '#ec4899', '#10b981', '#64748b', '#f43f5e']
+
+export default function OrcamentoDetalhe() {
+  const { id } = useParams<{ id: string }>()
+  const nav = useNavigate()
+  const { isLightSidebar: isLight } = useTheme()
+  const isDark = !isLight
+  const { data: orc, isLoading } = useOrcamento(id)
+  const reprocessar = useReprocessarOrcamento()
+
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin" /></div>
+  }
+  if (!orc) {
+    return (
+      <div className="p-4">
+        <button onClick={() => nav('/orcamentacao')} className={`inline-flex items-center gap-1.5 text-sm ${txtMuted}`}><ChevronLeft size={16} /> Voltar</button>
+        <p className={`mt-6 text-center text-sm ${txtMuted}`}>Orçamento não encontrado.</p>
+      </div>
+    )
+  }
+
+  const r = orc.resultado
+  const resumo = r?.resumo
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => nav('/orcamentacao')} className={`p-2 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+          <ChevronLeft size={18} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-mono ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{orc.numero ?? '—'}</span>
+            <StatusBadge status={orc.status} isDark={isDark} />
+          </div>
+          <h1 className={`text-lg font-extrabold flex items-center gap-2 truncate ${txt}`}>
+            <MapIcon size={20} className="text-amber-500 shrink-0" /> {orc.nome}
+          </h1>
+        </div>
+      </div>
+
+      {/* Estado: processando */}
+      {orc.status === 'processando' && (
+        <section className={`${CARD(isDark)} p-8 flex flex-col items-center text-center`}>
+          <div className="w-12 h-12 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <p className={`text-sm font-bold ${txt}`}>O SuperTEG está estimando…</p>
+          <p className={`text-xs mt-1 max-w-md ${txtMuted}`}>Lendo o traçado (KMZ), as especificações e aplicando o motor paramétrico v3. Isso costuma levar de 1 a 3 minutos — esta tela atualiza sozinha.</p>
+        </section>
+      )}
+
+      {/* Estado: erro */}
+      {orc.status === 'erro' && (
+        <section className={`${CARD(isDark)} p-6`}>
+          <div className={`flex items-start gap-3 ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>
+            <AlertCircle size={20} className="shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold">Não foi possível gerar o orçamento</p>
+              <p className={`text-xs mt-1 ${txtMuted}`}>{orc.erro || 'Erro desconhecido.'}</p>
+              <button
+                onClick={() => reprocessar.mutate(orc.id)}
+                disabled={reprocessar.isPending}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw size={13} className={reprocessar.isPending ? 'animate-spin' : ''} /> Tentar novamente
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Estado: concluído */}
+      {orc.status === 'concluido' && resumo && r && (
+        <>
+          {/* KPIs financeiros */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Kpi label="Faturamento" value={fmtMM(resumo.faturamento_total)} hint="preços contratados CEMIG" tone="emerald" isDark={isDark} />
+            <Kpi label="Custo TEG" value={fmtMM(resumo.custo_total)} hint="60% do faturamento" tone="amber" isDark={isDark} />
+            <Kpi label="Lucro operacional" value={fmtMM(resumo.lucro_operacional)} hint="40% do faturamento" tone="teal" isDark={isDark} />
+            <Kpi label="Margem operacional" value={`${fmtNum(resumo.margem_operacional_pct, 0)}%`} hint="lucro / faturamento" tone="indigo" isDark={isDark} />
+          </div>
+
+          {/* Engenharia / prazo */}
+          <section className={`${CARD(isDark)} p-4`}>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { icon: Ruler, label: 'Extensão', value: `${fmtNum(resumo.extensao_km, 1)} km` },
+                { icon: Factory, label: 'Torres', value: fmtNum(resumo.torres) },
+                { icon: CalendarClock, label: 'Prazo', value: `~${fmtNum(resumo.prazo_meses, 1)} m` },
+                { icon: Users, label: 'Efetivo', value: `${fmtNum(resumo.efetivo_clt)} CLT` },
+                { icon: Banknote, label: 'Preço/torre', value: fmtMM(resumo.preco_por_torre) },
+              ].map(m => (
+                <div key={m.label} className={`rounded-xl p-3 flex flex-col items-center gap-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                  <m.icon size={15} className="text-amber-500" />
+                  <p className={`text-lg font-extrabold leading-none ${txt}`}>{m.value}</p>
+                  <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>{m.label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Análise do SuperTEG */}
+          {orc.analise_md && (
+            <section className={`${CARD(isDark)} p-4`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-2 ${txt}`}>
+                <Sparkles size={14} className="text-amber-500" /> Análise do SuperTEG
+                {orc.nivel_confianca && <span className={`ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>confiança: {orc.nivel_confianca}</span>}
+              </h2>
+              <MiniMarkdown text={orc.analise_md} isDark={isDark} />
+            </section>
+          )}
+
+          {/* Linhas (se mais de uma) */}
+          {r.lts.length > 1 && (
+            <section className={`${CARD(isDark)} overflow-hidden`}>
+              <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+                <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><Layers size={14} className="text-amber-500" /> Linhas de Transmissão</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`text-[10px] uppercase tracking-wider ${txtMuted} ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}`}>
+                      <th className="text-left font-semibold px-3 py-2">Linha</th>
+                      <th className="text-right font-semibold px-2 py-2">km</th>
+                      <th className="text-right font-semibold px-2 py-2">Torres</th>
+                      <th className="text-right font-semibold px-2 py-2">Terreno</th>
+                      <th className="text-right font-semibold px-2 py-2">Faturamento</th>
+                      <th className="text-right font-semibold px-2 py-2">Custo</th>
+                      <th className="text-right font-semibold px-3 py-2">Prazo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.lts.map((l, i) => (
+                      <tr key={i} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                        <td className={`px-3 py-2 font-semibold text-xs ${txt}`}>{l.nome}</td>
+                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.extensao_km, 1)}</td>
+                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.torres)}</td>
+                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>×{fmtNum(l.f_terreno, 2)}</td>
+                        <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{fmtMM(l.faturamento)}</td>
+                        <td className={`px-2 py-2 text-right text-xs ${txt}`}>{fmtMM(l.custo_total)}</td>
+                        <td className={`px-3 py-2 text-right text-xs ${txtMuted}`}>~{fmtNum(l.prazo_meses, 1)}m</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Itens EAP */}
+          <section className={`${CARD(isDark)} overflow-hidden`}>
+            <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><ListTree size={14} className="text-amber-500" /> Quantitativos e preços (EAP CEMIG)</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className={`text-[10px] uppercase tracking-wider ${txtMuted} ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}`}>
+                    <th className="text-left font-semibold px-3 py-2">Cód.</th>
+                    <th className="text-left font-semibold px-2 py-2">Item</th>
+                    <th className="text-right font-semibold px-2 py-2">Qtd.</th>
+                    <th className="text-right font-semibold px-2 py-2">Un.</th>
+                    <th className="text-right font-semibold px-2 py-2">Preço unit.</th>
+                    <th className="text-right font-semibold px-3 py-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.itens_eap.map((it, i) => (
+                    <tr key={i} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                      <td className={`px-3 py-2 text-xs font-mono ${txtMuted}`}>{it.cod}</td>
+                      <td className={`px-2 py-2 text-xs font-medium ${txt}`}>{it.nome}</td>
+                      <td className={`px-2 py-2 text-right text-xs ${txt}`}>{fmtNum(it.qtd, 1)}</td>
+                      <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{it.un}</td>
+                      <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtBRL(it.preco_unit)}</td>
+                      <td className={`px-3 py-2 text-right text-xs font-bold ${txt}`}>{fmtBRL(it.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={`px-4 py-2 text-[10px] ${txtMuted} ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+              Núcleo físico = fundações + montagem + lançamento (62,4% do contrato). O complemento cobre Administração Local, complementares e desmontagem.
+            </div>
+          </section>
+
+          {/* Seções EAP + Composição do custo */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <section className={`${CARD(isDark)} p-4`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><BarChart3 size={14} className="text-amber-500" /> Faturamento por seção da EAP</h2>
+              {(() => { const max = Math.max(...r.secoes_eap.map(s => s.valor), 1); return r.secoes_eap.map((s, i) => (
+                <BarRow key={s.secao} label={`${s.secao} (${fmtNum(s.pct, 1)}%)`} pct={s.valor} max={max} cor={SECAO_COR[i % SECAO_COR.length]} isDark={isDark} right={fmtMM(s.valor)} />
+              )) })()}
+            </section>
+            <section className={`${CARD(isDark)} p-4`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Wallet size={14} className="text-amber-500" /> Composição do custo direto</h2>
+              {(() => { const max = Math.max(...r.composicao_custo.map(c => c.valor), 1); return r.composicao_custo.map((c, i) => (
+                <BarRow key={c.natureza} label={`${c.natureza} (${fmtNum(c.pct, 1)}%)`} pct={c.valor} max={max} cor={SECAO_COR[i % SECAO_COR.length]} isDark={isDark} right={fmtMM(c.valor)} />
+              )) })()}
+            </section>
+          </div>
+
+          {/* Curva S */}
+          {r.curva_s.length > 0 && (
+            <section className={`${CARD(isDark)} p-4`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><TrendingUp size={14} className="text-amber-500" /> Curva S — desembolso mensal (custo)</h2>
+              {(() => {
+                const max = Math.max(...r.curva_s.map(c => c.valor), 1)
+                return (
+                  <div className="flex items-end gap-1.5 h-40">
+                    {r.curva_s.map(c => (
+                      <div key={c.mes} className="flex-1 flex flex-col items-center justify-end gap-1 group" title={`Mês ${c.mes}: ${fmtBRL(c.valor)} · acumulado ${fmtNum(c.pct_acumulado, 0)}%`}>
+                        <span className={`text-[9px] font-bold ${txtMuted} opacity-0 group-hover:opacity-100 transition-opacity`}>{fmtMM(c.valor)}</span>
+                        <div className="w-full rounded-t-md bg-amber-500/80 hover:bg-amber-500 transition-all" style={{ height: `${Math.max(4, (c.valor / max) * 100)}%` }} />
+                        <span className={`text-[9px] ${txtMuted}`}>M{c.mes}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+              <p className={`text-[10px] mt-2 ${txtMuted}`}>Distribuição do custo total no tempo por produtividade média (curva S). Acumulado no hover.</p>
+            </section>
+          )}
+
+          {/* Premissas + geometria */}
+          <section className={`${CARD(isDark)} p-4`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Percent size={14} className="text-amber-500" /> Premissas e fontes</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div><p className={txtMuted}>Tensão</p><p className={`font-bold ${txt}`}>{String((r.premissas_usadas?.tensao_kv ?? orc.premissas.tensao_kv) ?? '—')} kV</p></div>
+              <div><p className={txtMuted}>Fundação</p><p className={`font-bold ${txt}`}>{String((r.premissas_usadas?.fundacao_tipo ?? orc.premissas.fundacao_tipo) ?? '—')}</p></div>
+              <div><p className={txtMuted}>Torres/km</p><p className={`font-bold ${txt}`}>{String(r.premissas_usadas?.torres_por_km ?? '1.53')}</p></div>
+              <div><p className={txtMuted}>Análise por</p><p className={`font-bold ${txt}`}>{String(r.premissas_usadas?.analise_por ?? '—')}</p></div>
+            </div>
+            {Array.isArray(r.geometria_kmz) && r.geometria_kmz.length > 0 && (
+              <div className={`mt-3 pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Geometria lida dos KMZ</p>
+                {r.geometria_kmz.map((g, i) => (
+                  <p key={i} className={`text-[11px] ${txt}`}>
+                    <span className="font-semibold">{String(g.nome)}</span>
+                    <span className={txtMuted}> — {fmtNum(Number(g.extensao_km), 2)} km · {String(g.n_deflexoes)} deflexões{Number(g.torres_kmz) > 0 ? ` · ${g.torres_kmz} torres no KMZ` : ''}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className={`mt-3 flex items-start gap-2 text-[11px] rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+              <Activity size={13} className="text-amber-500 mt-0.5 shrink-0" />
+              <span>{r.classe_precisao || 'Estimativa paramétrica ~±30%'}. Não substitui orçamento executivo.</span>
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  )
+}

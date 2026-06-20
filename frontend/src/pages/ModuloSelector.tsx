@@ -141,6 +141,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(245,158,11,0.16)',
     accent: '#FBBF24',
     subs: [
+      { key: 'orcamentacao', label: 'Orçamentação', desc: 'Estimativa de LT por KMZ (custo, prazo, recursos)', Icon: Calculator, active: true, route: '/orcamentacao' },
       { key: 'estrategico', label: 'Estratégico', desc: 'Planejamento e metas corporativas', Icon: Target, active: false, route: '' },
       { key: 'comercial', label: 'Comercial', desc: 'Vendas e relacionamento', Icon: Store, active: false, route: '' },
     ],
