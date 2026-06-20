@@ -8,6 +8,7 @@ import {
   useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, type NovoArquivo,
 } from '../../hooks/useOrcamentacao'
 import type { Orcamento, OrcArquivoTipo } from '../../types/orcamentacao'
+import ModuleTabs, { type TabTone, type TabState } from '../../components/ModuleTabs'
 import { fmtMM, fmtNum, MiniMarkdown, CARD } from './_ui'
 import MapaObraModal from './MapaObraModal'
 
@@ -55,31 +56,22 @@ export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDar
 
   return (
     <div className="space-y-4">
-      {/* Stepper — padrão de abas dos demais módulos */}
-      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-        {ESTAGIOS.map(e => {
+      {/* Stepper — componente compartilhado ModuleTabs */}
+      <ModuleTabs isDark={isDark} value={String(aba)} onChange={v => { const n = Number(v); if (n <= atual + 1) setAba(n) }}
+        tabs={ESTAGIOS.map(e => {
           const feito = atual > e.n || (atual === e.n && !!dados[String(e.n)])
           const liberado = e.n <= atual + 1
           const ativo = aba === e.n
-          return (
-            <button key={e.n} disabled={!liberado} onClick={() => liberado && setAba(e.n)}
-              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
-                ativo
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                  : feito
-                    ? (isDark ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                    : liberado
-                      ? (isDark ? 'text-slate-300 border-transparent hover:bg-white/[0.05]' : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm')
-                      : (isDark ? 'text-slate-600 border-transparent cursor-not-allowed' : 'text-slate-300 border-transparent cursor-not-allowed')
-              }`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${ativo ? 'bg-white/20' : feito ? (isDark ? 'bg-emerald-500/20' : 'bg-emerald-100') : isDark ? 'bg-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          const state: TabState = !liberado ? 'locked' : ativo ? 'active' : feito ? 'done' : 'todo'
+          return {
+            value: String(e.n), label: e.label, icon: e.icon, tone: 'amber' as TabTone, state,
+            leading: (
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${ativo ? 'bg-amber-500/20' : feito ? (isDark ? 'bg-emerald-500/20' : 'bg-emerald-100') : isDark ? 'bg-white/[0.06]' : 'bg-white border border-slate-200'}`}>
                 {feito && !ativo ? <Check size={11} /> : !liberado ? <Lock size={10} /> : e.n}
               </span>
-              <e.icon size={14} /> {e.label}
-            </button>
-          )
-        })}
-      </div>
+            ),
+          }
+        })} />
 
       {/* Processando */}
       {processando && (
