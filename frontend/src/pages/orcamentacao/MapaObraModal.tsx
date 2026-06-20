@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, MapPin, Loader2, AlertCircle } from 'lucide-react'
+import { X, MapPin, Loader2, AlertCircle, ExternalLink, Download } from 'lucide-react'
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -51,6 +51,8 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
 }) {
   const [linhas, setLinhas] = useState<Linha[] | null>(null)
   const [erro, setErro] = useState('')
+  const [kmzUrl, setKmzUrl] = useState('')
+  const [kmzNome, setKmzNome] = useState('')
 
   useEffect(() => {
     let vivo = true
@@ -61,8 +63,9 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
         if (error) throw error
         const kmz = (arqs ?? []).find(a => a.tipo === 'kmz' || /\.(kmz|kml)$/i.test(a.nome))
         if (!kmz) throw new Error('KMZ não encontrado neste orçamento.')
-        const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(kmz.storage_path, 600)
+        const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(kmz.storage_path, 86400)
         if (!signed?.signedUrl) throw new Error('Não consegui gerar o link do KMZ.')
+        if (vivo) { setKmzUrl(signed.signedUrl); setKmzNome(kmz.nome) }
         const buf = await fetch(signed.signedUrl).then(r => r.arrayBuffer())
         let kmlText = ''
         if (/\.kmz$/i.test(kmz.nome) || kmz.tipo === 'kmz') {
@@ -97,7 +100,28 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
             </p>
             <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Traçado do KMZ {alvo ? '· obra destacada' : '· obra não localizada no KMZ — mostrando o lote'}</p>
           </div>
-          <button onClick={onClose} className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={kmzUrl ? `https://www.google.com/maps?q=${encodeURIComponent(kmzUrl)}` : undefined}
+              target="_blank" rel="noopener noreferrer"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                kmzUrl ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-slate-300 text-slate-500 pointer-events-none'
+              }`}
+              title="Abrir o KMZ original no Google Maps"
+            >
+              <ExternalLink size={13} /> Google Maps
+            </a>
+            <a
+              href={kmzUrl || undefined} download={kmzNome || 'tracado.kmz'}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                kmzUrl ? (isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200') : 'bg-slate-200 text-slate-400 pointer-events-none'
+              }`}
+              title="Baixar o KMZ (abrir no Google Earth)"
+            >
+              <Download size={13} /> KMZ
+            </a>
+            <button onClick={onClose} className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
+          </div>
         </div>
 
         <div className="h-[60vh] relative">
