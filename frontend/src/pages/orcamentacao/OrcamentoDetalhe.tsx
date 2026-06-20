@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Map as MapIcon, ChevronLeft, Banknote, Wallet, TrendingUp, Percent, Ruler, Factory,
-  CalendarClock, Users, Layers, ListTree, BarChart3, Sparkles, AlertCircle, RefreshCw, Activity,
+  Map as MapIcon, ChevronLeft, Wallet, TrendingUp, Percent, Ruler, Factory,
+  CalendarClock, Users, Layers, ListTree, Sparkles, AlertCircle, RefreshCw, Activity,
   Boxes, HardHat, Scale, MoveHorizontal, Tent,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -117,12 +117,12 @@ export default function OrcamentoDetalhe() {
             <p className={`text-[11px] ${txtMuted}`}>Escopo: <span className="font-bold">{scopeKey}</span> · terreno aplicado ×{fmtNum((scope as OrcRegiao).f_terreno!, 2)}</p>
           )}
 
-          {/* KPIs financeiros */}
+          {/* KPIs de CUSTO */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Kpi label="Faturamento" value={fmtMM(resumo.faturamento_total)} hint="preços contratados CEMIG" tone="emerald" isDark={isDark} />
-            <Kpi label="Custo TEG" value={fmtMM(resumo.custo_total)} hint="60% do faturamento" tone="amber" isDark={isDark} />
-            <Kpi label="Lucro operacional" value={fmtMM(resumo.lucro_operacional)} hint="40% do faturamento" tone="teal" isDark={isDark} />
-            <Kpi label="Margem operacional" value={`${fmtNum(resumo.margem_operacional_pct, 0)}%`} hint="lucro / faturamento" tone="indigo" isDark={isDark} />
+            <Kpi label="Custo estimado" value={fmtMM(resumo.custo_total)} hint="custo real Nibo+TOTVS" tone="amber" isDark={isDark} />
+            <Kpi label="Custo / US" value={`R$ ${fmtNum(resumo.custo_us)}`} hint="base executada (R$/US)" tone="teal" isDark={isDark} />
+            <Kpi label="Total de US" value={fmtNum(resumo.us)} hint="unidades de serviço CEMIG" tone="sky" isDark={isDark} />
+            <Kpi label="Custo / torre" value={fmtMM(resumo.custo_por_torre)} hint={`${fmtNum(resumo.custo_por_km)}/km`} tone="indigo" isDark={isDark} />
           </div>
 
           {/* Engenharia / características */}
@@ -178,7 +178,7 @@ export default function OrcamentoDetalhe() {
 
           {/* Obras (LDs) do escopo */}
           {r.lts.length > 0 && (() => {
-            const obras = [...r.lts].sort((a, b) => b.faturamento - a.faturamento)
+            const obras = [...r.lts].sort((a, b) => b.custo_total - a.custo_total)
             const vis = obras.slice(0, 50)
             return (
             <section className={`${CARD(isDark)} overflow-hidden`}>
@@ -193,7 +193,7 @@ export default function OrcamentoDetalhe() {
                       <th className="text-left font-semibold px-3 py-2">Obra (LD)</th>
                       <th className="text-right font-semibold px-2 py-2">km</th>
                       <th className="text-right font-semibold px-2 py-2">Torres</th>
-                      <th className="text-right font-semibold px-2 py-2">Faturamento</th>
+                      <th className="text-right font-semibold px-2 py-2">US</th>
                       <th className="text-right font-semibold px-2 py-2">Custo</th>
                       <th className="text-right font-semibold px-3 py-2">Prazo</th>
                     </tr>
@@ -204,8 +204,8 @@ export default function OrcamentoDetalhe() {
                         <td className={`px-3 py-2 font-medium text-xs ${txt} max-w-[280px] truncate`} title={l.nome}>{l.nome}</td>
                         <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.extensao_km, 1)}</td>
                         <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.torres)}</td>
-                        <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{fmtMM(l.faturamento)}</td>
-                        <td className={`px-2 py-2 text-right text-xs ${txt}`}>{fmtMM(l.custo_total)}</td>
+                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.us)}</td>
+                        <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{fmtMM(l.custo_total)}</td>
                         <td className={`px-3 py-2 text-right text-xs ${txtMuted}`}>~{fmtNum(l.prazo_meses, 1)}m</td>
                       </tr>
                     ))}
@@ -299,47 +299,66 @@ export default function OrcamentoDetalhe() {
                 }
                 return (
                   <section className={`${CARD(isDark)} p-4`}>
-                    <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Scale size={14} className="text-amber-500" /> Comparação com a carteira</h2>
+                    <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Scale size={14} className="text-amber-500" /> Comparação de custo com a carteira</h2>
                     <div className="space-y-2.5">
                       <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
                         <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Frente real mais parecida</p>
                         <p className={`text-sm font-extrabold ${txt}`}>{c.frente_mais_proxima}</p>
-                        <p className={`text-[11px] ${txtMuted}`}>preço/torre {fmtMM(c.frente_preco_por_torre)} · aço {fmtNum(c.frente_aco_por_torre ?? 0, 2)} t · fund {fmtNum(c.frente_vol_fund_por_torre ?? 0, 1)} m³</p>
+                        <p className={`text-[11px] ${txtMuted}`}>custo/torre {fmtMM(c.frente_custo_por_torre)} · aço {fmtNum(c.frente_aco_por_torre ?? 0, 2)} t · fund {fmtNum(c.frente_vol_fund_por_torre ?? 0, 1)} m³</p>
                       </div>
                       <div className="flex items-center justify-between text-xs">
-                        <span className={txtMuted}>Preço/torre vs essa frente</span>{dev(c.desvio_vs_frente_pct)}
+                        <span className={txtMuted}>Custo/torre vs essa frente</span>{dev(c.desvio_vs_frente_pct)}
                       </div>
                       <div className="flex items-center justify-between text-xs">
-                        <span className={txtMuted}>Preço/torre vs média da carteira ({fmtMM(c.media_carteira_preco_por_torre)})</span>{dev(c.desvio_vs_carteira_pct)}
+                        <span className={txtMuted}>Média de custo/torre da carteira</span>
+                        <span className={`font-bold ${txt}`}>{fmtMM(c.media_carteira_custo_por_torre)}</span>
                       </div>
-                      {c.aco_por_torre_carteira_faixa && (
+                      {c.custo_us_faixa_lote && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className={txtMuted}>Faixa de aço/torre da carteira</span>
-                          <span className={`font-bold ${txt}`}>{fmtNum(c.aco_por_torre_carteira_faixa[0], 2)}–{fmtNum(c.aco_por_torre_carteira_faixa[1], 2)} t</span>
+                          <span className={txtMuted}>Faixa de custo/US por lote (carteira)</span>
+                          <span className={`font-bold ${txt}`}>R$ {fmtNum(c.custo_us_faixa_lote[0])}–{fmtNum(c.custo_us_faixa_lote[1])}/US</span>
                         </div>
                       )}
                     </div>
-                    <p className={`text-[10px] mt-3 ${txtMuted}`}>Desvio ≤15% (verde) é coerente com a carteira; acima disso, vale revisar terreno/torres. Frentes pequenas têm preço/torre alto (custos fixos).</p>
+                    <p className={`text-[10px] mt-3 ${txtMuted}`}>Custo base de R$ {fmtNum(c.custo_us ?? 639)}/US (real Nibo+TOTVS). Desvio ≤15% (verde) é coerente; acima, revisar terreno/torres. O custo/US varia por lote/região.</p>
                   </section>
                 )
               })()}
             </div>
           )}
 
-          {/* Seções EAP + Composição do custo */}
+          {/* Composição do custo + Cenários de preço */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <section className={`${CARD(isDark)} p-4`}>
-              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><BarChart3 size={14} className="text-amber-500" /> Faturamento por seção da EAP</h2>
-              {(() => { const max = Math.max(...r.secoes_eap.map(s => s.valor), 1); return r.secoes_eap.map((s, i) => (
-                <BarRow key={s.secao} label={`${s.secao} (${fmtNum(s.pct, 1)}%)`} pct={s.valor} max={max} cor={SECAO_COR[i % SECAO_COR.length]} isDark={isDark} right={fmtMM(s.valor)} />
-              )) })()}
-            </section>
-            <section className={`${CARD(isDark)} p-4`}>
-              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Wallet size={14} className="text-amber-500" /> Composição do custo direto</h2>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Wallet size={14} className="text-amber-500" /> Composição do custo <span className={`text-[11px] font-normal ${txtMuted}`}>(real Nibo+TOTVS)</span></h2>
               {(() => { const max = Math.max(...r.composicao_custo.map(c => c.valor), 1); return r.composicao_custo.map((c, i) => (
                 <BarRow key={c.natureza} label={`${c.natureza} (${fmtNum(c.pct, 1)}%)`} pct={c.valor} max={max} cor={SECAO_COR[i % SECAO_COR.length]} isDark={isDark} right={fmtMM(c.valor)} />
               )) })()}
             </section>
+            {r.cenarios_preco && r.cenarios_preco.length > 0 && (
+              <section className={`${CARD(isDark)} p-4`}>
+                <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-1 ${txt}`}><TrendingUp size={14} className="text-amber-500" /> Cenários de preço (proposta)</h2>
+                <p className={`text-[10px] mb-3 ${txtMuted}`}>Estratégia de lance = US × preço/US (já inclui ativos, tributos e margem). O custo acima é a base.</p>
+                <div className="space-y-2">
+                  {r.cenarios_preco.map(c => {
+                    const tone: Record<string, string> = { 'Mínima': 'amber', 'Competitivo': 'sky', 'Seguro': 'violet', 'Ótima': 'emerald' }
+                    const t = tone[c.nome] ?? 'slate'
+                    const clr = isDark
+                      ? { amber: 'text-amber-300', sky: 'text-sky-300', violet: 'text-violet-300', emerald: 'text-emerald-300', slate: 'text-slate-300' }[t]
+                      : { amber: 'text-amber-600', sky: 'text-sky-600', violet: 'text-violet-600', emerald: 'text-emerald-600', slate: 'text-slate-600' }[t]
+                    return (
+                      <div key={c.nome} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                        <div>
+                          <p className={`text-xs font-bold ${clr}`}>{c.nome} <span className={`font-normal ${txtMuted}`}>· margem {fmtNum(c.margem_pct, c.margem_pct % 1 ? 1 : 0)}%</span></p>
+                          <p className={`text-[10px] ${txtMuted}`}>R$ {fmtNum(c.preco_us)} /US</p>
+                        </div>
+                        <span className={`text-sm font-extrabold ${txt}`}>{fmtMM(c.preco_total)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Curva S */}

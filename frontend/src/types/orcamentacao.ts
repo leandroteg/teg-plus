@@ -22,7 +22,7 @@ export interface OrcItemEAP {
 }
 
 export interface OrcSecaoEAP { secao: string; pct: number; valor: number }
-export interface OrcComposicao { natureza: string; pct: number; valor: number }
+export interface OrcComposicao { natureza: string; pct: number; valor: number; rs_us?: number }
 export interface OrcCurvaS { mes: number; valor: number; acumulado: number; pct_acumulado: number }
 export interface OrcTipoTorre { familia: string; classe: string; qtd: number }
 
@@ -36,12 +36,13 @@ export interface OrcPlanoRecursos {
 
 export interface OrcComparacao {
   frente_mais_proxima: string
-  frente_preco_por_torre: number
+  frente_custo_por_torre: number
   frente_aco_por_torre?: number
   frente_vol_fund_por_torre?: number
   desvio_vs_frente_pct: number
-  media_carteira_preco_por_torre: number
-  desvio_vs_carteira_pct: number
+  media_carteira_custo_por_torre: number
+  custo_us?: number
+  custo_us_faixa_lote?: number[]
   aco_por_torre_carteira_faixa?: number[]
 }
 
@@ -55,11 +56,12 @@ export interface OrcLT {
   fundacao_m3: number
   faixa_ha: number
   nucleo_fisico: number
-  faturamento: number
+  valor_servico?: number
+  us: number
   custo_total: number
-  custo_direto: number
-  lucro_operacional: number
-  preco_por_torre: number
+  custo_us?: number
+  custo_por_torre?: number
+  custo_por_km?: number
   prazo_meses: number
   montagem_dias: number
   lancamento_mes: number
@@ -75,19 +77,25 @@ export interface OrcLT {
 export interface OrcResumo {
   extensao_km: number
   torres: number
-  faturamento_total: number
+  us: number
   custo_total: number
-  custo_direto: number
-  lucro_operacional: number
-  margem_operacional_pct: number
-  preco_por_torre: number
-  preco_por_km: number
+  custo_us: number
+  custo_por_torre: number
+  custo_por_km: number
+  valor_servico?: number
   prazo_meses: number
   efetivo_clt: number
   aco_por_torre?: number
   vol_fund_por_torre?: number
   vao_medio_m?: number | null
   canteiro_dist_km?: number | null
+}
+
+export interface OrcCenario {
+  nome: string
+  margem_pct: number
+  preco_us: number
+  preco_total: number
 }
 
 // Uma região (Norte/Triângulo/Sul) — mesma forma do agregado, com obras (lts) próprias
@@ -98,8 +106,8 @@ export interface OrcRegiao {
   resumo: OrcResumo
   lts: OrcLT[]
   itens_eap: OrcItemEAP[]
-  secoes_eap: OrcSecaoEAP[]
   composicao_custo: OrcComposicao[]
+  cenarios_preco?: OrcCenario[]
   curva_s: OrcCurvaS[]
   tipos_torre?: OrcTipoTorre[]
   plano_recursos?: OrcPlanoRecursos
@@ -110,8 +118,8 @@ export interface OrcResultado {
   resumo: OrcResumo
   lts: OrcLT[]
   itens_eap: OrcItemEAP[]
-  secoes_eap: OrcSecaoEAP[]
   composicao_custo: OrcComposicao[]
+  cenarios_preco?: OrcCenario[]
   curva_s: OrcCurvaS[]
   regioes?: OrcRegiao[]
   tipos_torre?: OrcTipoTorre[]

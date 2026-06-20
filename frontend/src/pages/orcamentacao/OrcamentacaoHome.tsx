@@ -18,8 +18,9 @@ export default function OrcamentacaoHome() {
     const concl = orcamentos.filter(o => o.status === 'concluido')
     const proc = orcamentos.filter(o => o.status === 'processando').length
     const ext = concl.reduce((s, o) => s + (o.resultado?.resumo?.extensao_km ?? 0), 0)
-    const fat = concl.reduce((s, o) => s + (o.resultado?.resumo?.faturamento_total ?? 0), 0)
-    return { total: orcamentos.length, concl: concl.length, proc, ext, fat }
+    const custo = concl.reduce((s, o) => s + (o.resultado?.resumo?.custo_total ?? 0), 0)
+    const us = concl.reduce((s, o) => s + (o.resultado?.resumo?.us ?? 0), 0)
+    return { total: orcamentos.length, concl: concl.length, proc, ext, custo, us }
   }, [orcamentos])
 
   if (isLoading) {
@@ -57,8 +58,8 @@ export default function OrcamentacaoHome() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi label="Orçamentos" value={kpis.total} hint={`${kpis.concl} concluído(s) · ${kpis.proc} processando`} tone="indigo" isDark={isDark} />
         <Kpi label="Extensão estimada" value={`${fmtNum(kpis.ext, 0)} km`} hint="soma das LTs concluídas" tone="sky" isDark={isDark} />
-        <Kpi label="Faturamento estimado" value={fmtMM(kpis.fat)} hint="preços contratados CEMIG" tone="emerald" isDark={isDark} />
-        <Kpi label="Custo TEG estimado" value={fmtMM(kpis.fat * 0.6)} hint="60% do faturamento" tone="amber" isDark={isDark} />
+        <Kpi label="Total de US" value={fmtNum(kpis.us)} hint="unidades de serviço CEMIG" tone="teal" isDark={isDark} />
+        <Kpi label="Custo estimado" value={fmtMM(kpis.custo)} hint="custo real Nibo+TOTVS" tone="amber" isDark={isDark} />
       </div>
 
       {/* Lista */}
@@ -105,8 +106,8 @@ export default function OrcamentacaoHome() {
                   <div className="text-right shrink-0 hidden sm:block">
                     {r && (
                       <>
-                        <p className={`text-sm font-extrabold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{fmtMM(r.faturamento_total)}</p>
-                        <p className={`text-[10px] ${txtMuted}`}>faturamento · {fmtNum(r.margem_operacional_pct, 0)}% margem</p>
+                        <p className={`text-sm font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{fmtMM(r.custo_total)}</p>
+                        <p className={`text-[10px] ${txtMuted}`}>custo · {fmtNum(r.us)} US</p>
                       </>
                     )}
                   </div>
