@@ -8,12 +8,24 @@ import { supabase } from '../../services/supabase'
 
 const BUCKET = 'orcamentacao-arquivos'
 
-interface Linha { nome: string; coords: [number, number][] }
-interface Ponto { nome: string; pos: [number, number] }
+interface Estilo { color: string; opacity: number; width: number }
+interface Linha extends Estilo { nome: string; coords: [number, number][] }
+interface Ponto { nome: string; pos: [number, number]; color: string }
 interface Poligono { nome: string; coords: [number, number][] }
 interface Geo { linhas: Linha[]; pontos: Ponto[]; poligonos: Poligono[] }
 
 const norm = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+
+// KML usa cor no formato AABBGGRR (hex). Converte pra CSS #RRGGBB + opacidade.
+function kmlCor(kml: string | null | undefined): { color: string; opacity: number } | null {
+  if (!kml) return null
+  const h = kml.trim().replace(/^#/, '')
+  if (h.length !== 8) return null
+  const aa = parseInt(h.slice(0, 2), 16)
+  const bb = h.slice(2, 4), gg = h.slice(4, 6), rr = h.slice(6, 8)
+  if (isNaN(aa)) return null
+  return { color: `#${rr}${gg}${bb}`, opacity: Math.max(0.15, aa / 255) }
+}
 
 function coordsFrom(t: string | null | undefined): [number, number][] {
   const out: [number, number][] = []
@@ -30,19 +42,45 @@ function coordsFrom(t: string | null | undefined): [number, number][] {
 function parseKml(text: string): Geo {
   const doc = new DOMParser().parseFromString(text, 'text/xml')
   const g: Geo = { linhas: [], pontos: [], poligonos: [] }
+
+  // 1) coletar <Style> (cor/largura de linha)
+  const styles: Record<string, Estilo> = {}
+  for (const st of Array.from(doc.getElementsByTagName('Style'))) {
+    const id = st.getAttribute('id'); if (!id) continue
+    const lsEl = st.getElementsByTagName('LineStyle')[0]
+    const c = kmlCor(lsEl?.getElementsByTagName('color')[0]?.textContent)
+    const w = parseFloat(lsEl?.getElementsByTagName('width')[0]?.textContent || '')
+    styles[id] = { color: c?.color ?? '#2563eb', opacity: c?.opacity ?? 1, width: isNaN(w) ? 3 : Math.max(2, w) }
+  }
+  // 2) <StyleMap> → mapeia id para o estilo "normal"
+  const styleMaps: Record<string, string> = {}
+  for (const sm of Array.from(doc.getElementsByTagName('StyleMap'))) {
+    const id = sm.getAttribute('id'); if (!id) continue
+    for (const pair of Array.from(sm.getElementsByTagName('Pair'))) {
+      const key = pair.getElementsByTagName('key')[0]?.textContent?.trim()
+      const url = pair.getElementsByTagName('styleUrl')[0]?.textContent?.trim()
+      if (key === 'normal' && url) styleMaps[id] = url.replace(/^#/, '')
+    }
+  }
+  const resolver = (styleUrl: string | null | undefined): Estilo => {
+    let id = (styleUrl || '').replace(/^#/, '')
+    if (styleMaps[id]) id = styleMaps[id]
+    return styles[id] ?? { color: '#2563eb', opacity: 1, width: 3 }
+  }
+
   for (const pm of Array.from(doc.getElementsByTagName('Placemark'))) {
     const nome = (pm.getElementsByTagName('name')[0]?.textContent || '').trim()
+    const est = resolver(pm.getElementsByTagName('styleUrl')[0]?.textContent)
     for (const ls of Array.from(pm.getElementsByTagName('LineString'))) {
       const c = coordsFrom(ls.getElementsByTagName('coordinates')[0]?.textContent)
-      if (c.length >= 2) g.linhas.push({ nome, coords: c })
+      if (c.length >= 2) g.linhas.push({ nome, coords: c, ...est })
     }
     for (const pt of Array.from(pm.getElementsByTagName('Point'))) {
       const c = coordsFrom(pt.getElementsByTagName('coordinates')[0]?.textContent)
-      if (c.length) g.pontos.push({ nome, pos: c[0] })
+      if (c.length) g.pontos.push({ nome, pos: c[0], color: est.color })
     }
     for (const pg of Array.from(pm.getElementsByTagName('Polygon'))) {
-      const ring = pg.getElementsByTagName('coordinates')[0]?.textContent
-      const c = coordsFrom(ring)
+      const c = coordsFrom(pg.getElementsByTagName('coordinates')[0]?.textContent)
       if (c.length >= 3) g.poligonos.push({ nome, coords: c })
     }
   }
@@ -100,8 +138,9 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
     const a = norm(nome); const b = norm(obraNome)
     return a === b || a.includes(b) || b.includes(a)
   }
-  const alvoLinha = geo?.linhas.find(l => ehAlvo(l.nome))
-  const fitCoords = alvoLinha?.coords
+  const alvos = geo?.linhas.filter(l => ehAlvo(l.nome)) ?? []
+  const outras = geo?.linhas.filter(l => !ehAlvo(l.nome)) ?? []
+  const fitCoords = (alvos.length ? alvos.flatMap(l => l.coords) : null)
     || (geo && [...geo.linhas.flatMap(l => l.coords), ...geo.pontos.map(p => p.pos)]) || []
 
   return (
@@ -114,7 +153,9 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
               <MapPin size={15} className="text-amber-500 shrink-0" /> {obraNome}
             </p>
             <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {geo ? `${geo.linhas.length} traçado(s) · ${geo.pontos.length} ponto(s)${alvoLinha ? ' · obra destacada' : ' · obra não localizada — mostrando o lote'}` : 'Traçado do KMZ'}
+              {geo
+                ? `${geo.linhas.length} traçado(s) do KMZ${geo.pontos.length ? ` · ${geo.pontos.length} ponto(s)` : ''} · cores originais${alvos.length ? ' · obra destacada' : ' · obra não localizada no traçado'}`
+                : 'Traçado do KMZ'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -147,33 +188,35 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
                 </LayersControl.BaseLayer>
               </LayersControl>
 
-              {/* polígonos (faixa) */}
+              {/* polígonos (faixa) — se houver */}
               {geo.poligonos.map((pg, i) => (
                 <Polygon key={'pg' + i} positions={pg.coords} pathOptions={{ color: '#10b981', weight: 1, fillOpacity: 0.12 }} />
               ))}
 
-              {/* linhas (traçados) */}
-              {geo.linhas.map((l, i) => {
-                const destaque = ehAlvo(l.nome)
-                return (
-                  <Polyline key={'ln' + i} positions={l.coords}
-                    pathOptions={{ color: destaque ? '#f59e0b' : '#64748b', weight: destaque ? 5 : 2.5, opacity: destaque ? 1 : 0.55 }}>
-                    {l.nome && <Tooltip sticky>{l.nome}</Tooltip>}
-                  </Polyline>
-                )
-              })}
+              {/* demais linhas do lote — cores originais do KMZ */}
+              {outras.map((l, i) => (
+                <Polyline key={'ln' + i} positions={l.coords} pathOptions={{ color: l.color, weight: l.width, opacity: l.opacity }}>
+                  {l.nome && <Tooltip sticky>{l.nome}</Tooltip>}
+                </Polyline>
+              ))}
 
-              {/* pontos (torres / marcos) */}
-              {geo.pontos.map((p, i) => {
-                const destaque = ehAlvo(p.nome)
-                return (
-                  <CircleMarker key={'pt' + i} center={p.pos}
-                    radius={destaque ? 4 : 2.5}
-                    pathOptions={{ color: destaque ? '#b45309' : '#475569', fillColor: destaque ? '#f59e0b' : '#94a3b8', fillOpacity: 0.9, weight: 1 }}>
-                    {p.nome && <Tooltip>{p.nome}</Tooltip>}
-                  </CircleMarker>
-                )
-              })}
+              {/* obra destacada — halo branco + cor original por cima */}
+              {alvos.map((l, i) => (
+                <Polyline key={'halo' + i} positions={l.coords} pathOptions={{ color: '#ffffff', weight: l.width + 7, opacity: 0.9 }} />
+              ))}
+              {alvos.map((l, i) => (
+                <Polyline key={'alvo' + i} positions={l.coords} pathOptions={{ color: l.color, weight: l.width + 3, opacity: 1 }}>
+                  {l.nome && <Tooltip sticky>{l.nome}</Tooltip>}
+                </Polyline>
+              ))}
+
+              {/* pontos (torres/marcos) — se houver */}
+              {geo.pontos.map((p, i) => (
+                <CircleMarker key={'pt' + i} center={p.pos} radius={ehAlvo(p.nome) ? 4 : 2.5}
+                  pathOptions={{ color: p.color, fillColor: p.color, fillOpacity: 0.9, weight: 1 }}>
+                  {p.nome && <Tooltip>{p.nome}</Tooltip>}
+                </CircleMarker>
+              ))}
 
               <Fit coords={fitCoords} />
             </MapContainer>
