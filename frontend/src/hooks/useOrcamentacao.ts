@@ -136,6 +136,26 @@ export function useReprocessarOrcamento() {
   })
 }
 
+// ── Editar (nome / descrição / premissas) ───────────────────────────────────────
+export function useAtualizarOrcamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; nome?: string; descricao?: string; premissas?: Partial<OrcPremissas> }) => {
+      const patch: Record<string, unknown> = {}
+      if (input.nome !== undefined) patch.nome = input.nome.trim()
+      if (input.descricao !== undefined) patch.descricao = input.descricao.trim() || null
+      if (input.premissas !== undefined) patch.premissas = input.premissas
+      const { error } = await supabase.from('orc_orcamentos').update(patch).eq('id', input.id)
+      if (error) throw error
+      return input.id
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+    },
+  })
+}
+
 // ── Excluir ─────────────────────────────────────────────────────────────────────
 export function useExcluirOrcamento() {
   const qc = useQueryClient()

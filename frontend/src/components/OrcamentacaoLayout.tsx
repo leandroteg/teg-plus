@@ -1,4 +1,4 @@
-import { LayoutDashboard, Plus } from 'lucide-react'
+import { LayoutDashboard, Plus, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
@@ -8,6 +8,7 @@ export default function OrcamentacaoLayout() {
 
   const NAV: NavItem[] = [
     { to: '/orcamentacao', icon: LayoutDashboard, label: 'Painel', end: true },
+    { to: '/orcamentacao/orcamentos', icon: FileText, label: 'Orçamentos', end: false },
     {
       to: '/orcamentacao/novo',
       icon: Plus,

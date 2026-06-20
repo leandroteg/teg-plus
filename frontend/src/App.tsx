@@ -205,6 +205,7 @@ const AdminAtendentes = lazy(() => import('./pages/ti/AdminAtendentes'))
 
 // Orçamentação (Expansão)
 const OrcamentacaoHome = lazy(() => import('./pages/orcamentacao/OrcamentacaoHome'))
+const OrcamentosLista = lazy(() => import('./pages/orcamentacao/OrcamentosLista'))
 const NovoOrcamento = lazy(() => import('./pages/orcamentacao/NovoOrcamento'))
 const OrcamentoDetalhe = lazy(() => import('./pages/orcamentacao/OrcamentoDetalhe'))
 
@@ -500,9 +501,10 @@ export default function App() {
           {/* Módulo Orçamentação (Expansão) */}
           <Route element={<ModuleRoute moduleKey="orcamentacao" />}>
             <Route element={<OrcamentacaoLayout />}>
-              <Route path="/orcamentacao"      element={<LazyDash><OrcamentacaoHome /></LazyDash>} />
-              <Route path="/orcamentacao/novo" element={<Lazy><NovoOrcamento /></Lazy>} />
-              <Route path="/orcamentacao/:id"  element={<Lazy><OrcamentoDetalhe /></Lazy>} />
+              <Route path="/orcamentacao"           element={<LazyDash><OrcamentacaoHome /></LazyDash>} />
+              <Route path="/orcamentacao/orcamentos" element={<Lazy><OrcamentosLista /></Lazy>} />
+              <Route path="/orcamentacao/novo"       element={<Lazy><NovoOrcamento /></Lazy>} />
+              <Route path="/orcamentacao/:id"        element={<Lazy><OrcamentoDetalhe /></Lazy>} />
             </Route>
           </Route>
 
