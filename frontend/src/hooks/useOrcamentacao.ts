@@ -205,6 +205,40 @@ export function useConcluirOrcamento() {
   })
 }
 
+// ── Rodar um estágio do wizard (aciona o SuperTEG; sessão persistente) ───────────
+export function useRodarEstagio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; estagio: number; fiscais?: Record<string, unknown> }) => {
+      const { data: resp, error } = await supabase.functions.invoke('orcamentacao-estagio', {
+        body: { orcamento_id: input.id, estagio: input.estagio, fiscais: input.fiscais ?? {} },
+      })
+      if (error) throw new Error(error.message)
+      if (resp && (resp as { ok?: boolean }).ok === false) throw new Error((resp as { motivo?: string }).motivo || 'Falha ao rodar o estágio')
+      return input.id
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+    },
+  })
+}
+
+// ── Salvar edições dos dados de um estágio (direto no banco) ──────────────────────
+export function useSalvarDadosEstagio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; estagio: number; dados: Record<string, unknown> }) => {
+      const { data: cur } = await supabase.from('orc_orcamentos').select('dados_estagios').eq('id', input.id).maybeSingle()
+      const merged = { ...((cur?.dados_estagios as object) ?? {}), [String(input.estagio)]: input.dados }
+      const { error } = await supabase.from('orc_orcamentos').update({ dados_estagios: merged }).eq('id', input.id)
+      if (error) throw error
+      return input.id
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ['orcamento', id] }),
+  })
+}
+
 // ── Editar (nome / descrição / premissas) ───────────────────────────────────────
 export function useAtualizarOrcamento() {
   const qc = useQueryClient()
