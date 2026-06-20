@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
-  UploadCloud, FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle,
+  UploadCloud, FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
 } from 'lucide-react'
 import {
   useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, type NovoArquivo,
 } from '../../hooks/useOrcamentacao'
 import type { Orcamento, OrcArquivoTipo } from '../../types/orcamentacao'
 import { fmtMM, fmtNum, MiniMarkdown, CARD } from './_ui'
+import MapaObraModal from './MapaObraModal'
 
 const ESTAGIOS = [
   { n: 1, label: 'Pré-análise', icon: Mountain },
@@ -150,7 +151,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
       </section>
 
       {/* Dados gerados (por tipo de estágio) */}
-      {(estagio === 1 || estagio === 2) && <Caracteristicas d={d} isDark={isDark} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
+      {(estagio === 1 || estagio === 2) && <Caracteristicas d={d} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
       {estagio === 3 && <Recursos d={d} isDark={isDark} />}
       {estagio === 4 && <Custos d={d} isDark={isDark} />}
       {estagio === 5 && <Orcamentacao d={d} isDark={isDark} />}
@@ -167,9 +168,10 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
 }
 
 // ── Características (estágios 1 e 2) — editável ───────────────────────────────────
-function Caracteristicas({ d, isDark, onSave, saving }: { d: Record<string, unknown>; isDark: boolean; onSave: (d: Record<string, unknown>) => void; saving: boolean }) {
+function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record<string, unknown>; isDark: boolean; orcamentoId: string; onSave: (d: Record<string, unknown>) => void; saving: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const [mapaObra, setMapaObra] = useState<string | null>(null)
   const [edit, setEdit] = useState<Record<string, number>>({
     torres: Number(d.torres ?? 0), aco_por_torre: Number(d.aco_por_torre ?? 0), vol_fund_por_torre: Number(d.vol_fund_por_torre ?? 0),
   })
@@ -222,11 +224,14 @@ function Caracteristicas({ d, isDark, onSave, saving }: { d: Record<string, unkn
               const terreno = String(o.terreno ?? '')
               return (
                 <div key={i}>
-                  <button onClick={() => terreno && setOpen(aberto ? null : i)} className={`w-full flex items-center gap-2 text-left text-xs py-1 ${terreno ? 'cursor-pointer' : ''}`}>
-                    {terreno ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3" />}
-                    <span className={`flex-1 truncate ${txt}`}>{String(o.nome)}</span>
-                    <span className={txtMuted}>{fmtNum(Number(o.km), 1)} km · {fmtNum(Number(o.torres))} t · ×{fmtNum(Number(o.f_terreno), 2)}</span>
-                  </button>
+                  <div className="flex items-center gap-2 text-xs py-1">
+                    <button onClick={() => terreno && setOpen(aberto ? null : i)} className={`flex items-center gap-2 min-w-0 flex-1 text-left ${terreno ? 'cursor-pointer' : ''}`}>
+                      {terreno ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
+                      <span className={`flex-1 truncate ${txt}`}>{String(o.nome)}</span>
+                    </button>
+                    <span className={`${txtMuted} shrink-0 hidden sm:inline`}>{fmtNum(Number(o.km), 1)} km · {fmtNum(Number(o.torres))} t · ×{fmtNum(Number(o.f_terreno), 2)}</span>
+                    <button onClick={() => setMapaObra(String(o.nome))} title="Ver no mapa" className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.08] text-slate-400 hover:text-amber-300' : 'hover:bg-slate-100 text-slate-400 hover:text-amber-600'}`}><MapPin size={13} /></button>
+                  </div>
                   {aberto && terreno && <p className={`text-[11px] leading-relaxed pl-5 pb-1.5 ${txtMuted}`}>{terreno}</p>}
                 </div>
               )
@@ -234,6 +239,7 @@ function Caracteristicas({ d, isDark, onSave, saving }: { d: Record<string, unkn
           </div>
         </div>
       )}
+      {mapaObra && <MapaObraModal orcamentoId={orcamentoId} obraNome={mapaObra} isDark={isDark} onClose={() => setMapaObra(null)} />}
     </section>
   )
 }
