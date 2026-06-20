@@ -24,6 +24,26 @@ export interface OrcItemEAP {
 export interface OrcSecaoEAP { secao: string; pct: number; valor: number }
 export interface OrcComposicao { natureza: string; pct: number; valor: number }
 export interface OrcCurvaS { mes: number; valor: number; acumulado: number; pct_acumulado: number }
+export interface OrcTipoTorre { familia: string; classe: string; qtd: number }
+
+export interface OrcPlanoRecursos {
+  fundacao?: { equipe_meses: number; equipes: number; pessoas_por_equipe: number; meses: number }
+  montagem?: { dias: number; meses: number; pessoas: number; guindaste: boolean }
+  lancamento?: { meses: number; pessoas: number }
+  frota_necessaria?: Record<string, number>
+  efetivo_pico_clt?: number
+}
+
+export interface OrcComparacao {
+  frente_mais_proxima: string
+  frente_preco_por_torre: number
+  frente_aco_por_torre?: number
+  frente_vol_fund_por_torre?: number
+  desvio_vs_frente_pct: number
+  media_carteira_preco_por_torre: number
+  desvio_vs_carteira_pct: number
+  aco_por_torre_carteira_faixa?: number[]
+}
 
 export interface OrcLT {
   nome: string
@@ -45,6 +65,10 @@ export interface OrcLT {
   lancamento_mes: number
   efetivo_clt: number
   itens_eap: OrcItemEAP[]
+  vol_fund_por_torre?: number
+  vao_medio_m?: number | null
+  tipos_torre?: OrcTipoTorre[]
+  canteiro_dist_km?: number | null
   obs?: string
 }
 
@@ -60,6 +84,10 @@ export interface OrcResumo {
   preco_por_km: number
   prazo_meses: number
   efetivo_clt: number
+  aco_por_torre?: number
+  vol_fund_por_torre?: number
+  vao_medio_m?: number | null
+  canteiro_dist_km?: number | null
 }
 
 export interface OrcResultado {
@@ -69,6 +97,9 @@ export interface OrcResultado {
   secoes_eap: OrcSecaoEAP[]
   composicao_custo: OrcComposicao[]
   curva_s: OrcCurvaS[]
+  tipos_torre?: OrcTipoTorre[]
+  plano_recursos?: OrcPlanoRecursos
+  comparacao?: OrcComparacao | null
   premissas_usadas?: Record<string, unknown>
   geometria_kmz?: Array<Record<string, unknown>>
   classe_precisao?: string

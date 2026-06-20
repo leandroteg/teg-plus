@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Map as MapIcon, ChevronLeft, Banknote, Wallet, TrendingUp, Percent, Ruler, Factory,
   CalendarClock, Users, Layers, ListTree, BarChart3, Sparkles, AlertCircle, RefreshCw, Activity,
+  Boxes, HardHat, Scale, MoveHorizontal, Tent,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOrcamento, useReprocessarOrcamento } from '../../hooks/useOrcamentacao'
@@ -93,23 +94,44 @@ export default function OrcamentoDetalhe() {
             <Kpi label="Margem operacional" value={`${fmtNum(resumo.margem_operacional_pct, 0)}%`} hint="lucro / faturamento" tone="indigo" isDark={isDark} />
           </div>
 
-          {/* Engenharia / prazo */}
+          {/* Engenharia / características */}
           <section className={`${CARD(isDark)} p-4`}>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Factory size={14} className="text-amber-500" /> Características e engenharia</h2>
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
               {[
                 { icon: Ruler, label: 'Extensão', value: `${fmtNum(resumo.extensao_km, 1)} km` },
                 { icon: Factory, label: 'Torres', value: fmtNum(resumo.torres) },
+                { icon: Scale, label: 'Aço/torre', value: resumo.aco_por_torre ? `${fmtNum(resumo.aco_por_torre, 2)} t` : '—' },
+                { icon: MoveHorizontal, label: 'Vão médio', value: resumo.vao_medio_m ? `${fmtNum(resumo.vao_medio_m)} m` : '—' },
+                { icon: Boxes, label: 'Fund./torre', value: resumo.vol_fund_por_torre ? `${fmtNum(resumo.vol_fund_por_torre, 1)} m³` : '—' },
+                { icon: Tent, label: 'Canteiro', value: resumo.canteiro_dist_km != null ? `${fmtNum(resumo.canteiro_dist_km, 1)} km` : '—' },
                 { icon: CalendarClock, label: 'Prazo', value: `~${fmtNum(resumo.prazo_meses, 1)} m` },
                 { icon: Users, label: 'Efetivo', value: `${fmtNum(resumo.efetivo_clt)} CLT` },
-                { icon: Banknote, label: 'Preço/torre', value: fmtMM(resumo.preco_por_torre) },
               ].map(m => (
-                <div key={m.label} className={`rounded-xl p-3 flex flex-col items-center gap-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-                  <m.icon size={15} className="text-amber-500" />
-                  <p className={`text-lg font-extrabold leading-none ${txt}`}>{m.value}</p>
-                  <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>{m.label}</p>
+                <div key={m.label} className={`rounded-xl p-2.5 flex flex-col items-center gap-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                  <m.icon size={14} className="text-amber-500" />
+                  <p className={`text-base font-extrabold leading-none ${txt}`}>{m.value}</p>
+                  <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${txtMuted}`}>{m.label}</p>
                 </div>
               ))}
             </div>
+            {/* Tipos de torre */}
+            {r.tipos_torre && r.tipos_torre.length > 0 && (
+              <div className={`mt-3 pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Tipos de torre (famílias detectadas no KMZ)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {r.tipos_torre.map(t => (
+                    <span key={t.familia} className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                      t.classe === 'ancoragem'
+                        ? (isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-100 text-rose-700')
+                        : (isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-100 text-sky-700')
+                    }`} title={t.classe}>
+                      {t.familia} <span className="opacity-60 font-normal">{t.classe === 'ancoragem' ? 'anc.' : 'susp.'}</span> · {t.qtd}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Análise do SuperTEG */}
@@ -195,6 +217,75 @@ export default function OrcamentoDetalhe() {
               Núcleo físico = fundações + montagem + lançamento (62,4% do contrato). O complemento cobre Administração Local, complementares e desmontagem.
             </div>
           </section>
+
+          {/* Plano de recursos + Comparação */}
+          {(r.plano_recursos || r.comparacao) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {r.plano_recursos && (
+                <section className={`${CARD(isDark)} p-4`}>
+                  <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><HardHat size={14} className="text-amber-500" /> Plano de recursos</h2>
+                  <div className="space-y-2">
+                    {r.plano_recursos.fundacao && (
+                      <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                        <div><p className={`text-xs font-bold ${txt}`}>Fundação</p><p className={`text-[10px] ${txtMuted}`}>{r.plano_recursos.fundacao.equipes} equipe(s) × {r.plano_recursos.fundacao.pessoas_por_equipe} pessoas · perfuração</p></div>
+                        <span className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>~{fmtNum(r.plano_recursos.fundacao.meses, 1)} m</span>
+                      </div>
+                    )}
+                    {r.plano_recursos.montagem && (
+                      <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                        <div><p className={`text-xs font-bold ${txt}`}>Montagem</p><p className={`text-[10px] ${txtMuted}`}>{r.plano_recursos.montagem.pessoas} pessoas {r.plano_recursos.montagem.guindaste ? '+ guindaste' : ''} · {fmtNum(r.plano_recursos.montagem.dias)} dias</p></div>
+                        <span className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>~{fmtNum(r.plano_recursos.montagem.meses, 1)} m</span>
+                      </div>
+                    )}
+                    {r.plano_recursos.lancamento && (
+                      <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                        <div><p className={`text-xs font-bold ${txt}`}>Lançamento</p><p className={`text-[10px] ${txtMuted}`}>{r.plano_recursos.lancamento.pessoas} pessoas · puller + prensa</p></div>
+                        <span className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>~{fmtNum(r.plano_recursos.lancamento.meses, 1)} m</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className={`mt-3 pt-3 flex items-center justify-between ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                    <span className={`text-[11px] ${txtMuted}`}>Frota: {Object.entries(r.plano_recursos.frota_necessaria ?? {}).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(' · ')}</span>
+                    <span className={`text-xs font-extrabold ${txt}`}>pico {fmtNum(r.plano_recursos.efetivo_pico_clt ?? 0)} CLT</span>
+                  </div>
+                </section>
+              )}
+
+              {r.comparacao && (() => {
+                const c = r.comparacao!
+                const dev = (v: number) => {
+                  const a = Math.abs(v)
+                  const cls = a <= 15 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : a <= 35 ? (isDark ? 'text-amber-400' : 'text-amber-600') : (isDark ? 'text-rose-400' : 'text-rose-600')
+                  return <span className={`font-extrabold ${cls}`}>{v > 0 ? '+' : ''}{fmtNum(v, 0)}%</span>
+                }
+                return (
+                  <section className={`${CARD(isDark)} p-4`}>
+                    <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Scale size={14} className="text-amber-500" /> Comparação com a carteira</h2>
+                    <div className="space-y-2.5">
+                      <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Frente real mais parecida</p>
+                        <p className={`text-sm font-extrabold ${txt}`}>{c.frente_mais_proxima}</p>
+                        <p className={`text-[11px] ${txtMuted}`}>preço/torre {fmtMM(c.frente_preco_por_torre)} · aço {fmtNum(c.frente_aco_por_torre ?? 0, 2)} t · fund {fmtNum(c.frente_vol_fund_por_torre ?? 0, 1)} m³</p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={txtMuted}>Preço/torre vs essa frente</span>{dev(c.desvio_vs_frente_pct)}
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={txtMuted}>Preço/torre vs média da carteira ({fmtMM(c.media_carteira_preco_por_torre)})</span>{dev(c.desvio_vs_carteira_pct)}
+                      </div>
+                      {c.aco_por_torre_carteira_faixa && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className={txtMuted}>Faixa de aço/torre da carteira</span>
+                          <span className={`font-bold ${txt}`}>{fmtNum(c.aco_por_torre_carteira_faixa[0], 2)}–{fmtNum(c.aco_por_torre_carteira_faixa[1], 2)} t</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className={`text-[10px] mt-3 ${txtMuted}`}>Desvio ≤15% (verde) é coerente com a carteira; acima disso, vale revisar terreno/torres. Frentes pequenas têm preço/torre alto (custos fixos).</p>
+                  </section>
+                )
+              })()}
+            </div>
+          )}
 
           {/* Seções EAP + Composição do custo */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
