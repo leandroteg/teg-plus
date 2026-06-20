@@ -52,7 +52,62 @@ interface GeoData {
   canteiro_cidades?: { nome: string; tipo: string; dist_km: number }[]
   piores_trechos?: { km_ini: number; km_fim: number; rampa_pct: number; elev: number[] }[]
   amplitude_m?: number | null
+  perfil?: { dist_km: number[]; elev_m: number[]; rampa_media_pct: number; rampa_max_pct: number; subida_m: number; descida_m: number; n_pontos: number } | null
   extensao_km?: number
+}
+
+// classifica o relevo pela RAMPA REAL (SRTM, determinístico); cai no fator se não houver perfil
+function relevoReal(rampa: number | null | undefined, f: number): { label: string; tone: RelevoTone } {
+  if (rampa == null) return relevoNivel(f)
+  if (rampa < 1.5) return { label: 'Plano', tone: 'emerald' }
+  if (rampa < 3) return { label: 'Ondulado', tone: 'amber' }
+  if (rampa < 5) return { label: 'Acidentado', tone: 'orange' }
+  return { label: 'Serrano', tone: 'rose' }
+}
+
+// símbolo de terreno (no lugar do fator): linha plana → picos serranos
+function RelevoGlyph({ tone, size = 16 }: { tone: RelevoTone; size?: number }) {
+  const paths: Record<RelevoTone, string> = {
+    slate: 'M1 9 H15',
+    emerald: 'M1 9 H15',
+    amber: 'M1 9 Q4 6 7 9 T15 9',
+    orange: 'M1 10 L4 5 L7 8 L10 4 L13 8 L15 10',
+    rose: 'M1 10 L4 3 L7 7 L10 2 L13 6 L15 10',
+  }
+  return (
+    <svg width={size} height={Math.round(size * 0.72)} viewBox="0 0 16 12" fill="none" className="shrink-0">
+      <path d={paths[tone]} stroke={RELEVO_TONE[tone].barHex} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// gráfico 2D altura × distância (1 ponto ~por torre)
+function PerfilChart({ perfil, isDark, cor }: { perfil: NonNullable<GeoData['perfil']>; isDark: boolean; cor: string }) {
+  const d = perfil.dist_km, e = perfil.elev_m
+  if (!d?.length || d.length !== e.length || d.length < 2) return null
+  const W = 360, H = 80, pL = 24, pR = 6, pT = 8, pB = 14
+  const maxD = d[d.length - 1] || 1
+  const minE = Math.min(...e), maxE = Math.max(...e)
+  const rE = Math.max(1, maxE - minE)
+  const X = (km: number) => pL + (km / maxD) * (W - pL - pR)
+  const Y = (m: number) => pT + (1 - (m - minE) / rE) * (H - pT - pB)
+  const line = e.map((m, i) => `${i ? 'L' : 'M'}${X(d[i]).toFixed(1)} ${Y(m).toFixed(1)}`).join(' ')
+  const area = `${line} L${X(maxD).toFixed(1)} ${(H - pB).toFixed(1)} L${X(0).toFixed(1)} ${(H - pB).toFixed(1)} Z`
+  const lbl = isDark ? '#94a3b8' : '#64748b'
+  const grid = isDark ? '#334155' : '#e2e8f0'
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }}>
+      <line x1={pL} y1={H - pB} x2={W - pR} y2={H - pB} stroke={grid} strokeWidth={0.5} />
+      <line x1={pL} y1={pT} x2={pL} y2={H - pB} stroke={grid} strokeWidth={0.5} />
+      <path d={area} fill={cor} opacity={0.16} />
+      <path d={line} fill="none" stroke={cor} strokeWidth={1.4} />
+      {e.map((m, i) => <circle key={i} cx={X(d[i])} cy={Y(m)} r={1} fill={cor} opacity={0.5} />)}
+      <text x={pL - 3} y={pT + 4} fontSize={7} textAnchor="end" fill={lbl}>{maxE}</text>
+      <text x={pL - 3} y={H - pB} fontSize={7} textAnchor="end" fill={lbl}>{minE}</text>
+      <text x={pL} y={H - 3} fontSize={7} fill={lbl}>0</text>
+      <text x={W - pR} y={H - 3} fontSize={7} textAnchor="end" fill={lbl}>{maxD.toFixed(0)} km</text>
+    </svg>
+  )
 }
 
 function GeoChip({ icon: Icon, children, isDark, title, tone }: { icon: LucideIcon; children: React.ReactNode; isDark: boolean; title?: string; tone?: string }) {
@@ -339,9 +394,9 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
               const aberto = open === i
               const terreno = String(o.terreno ?? '')
               const f = Number(o.f_terreno)
-              const niv = relevoNivel(f)
-              const tn = RELEVO_TONE[niv.tone]
               const geo = o.geo as GeoData | undefined
+              const rel = relevoReal(geo?.perfil?.rampa_media_pct, f)
+              const tn = RELEVO_TONE[rel.tone]
               const tr = geo?.travessias
               const temTrav = !!tr && (tr.rios + tr.rodovias + tr.ferrovias + tr.lts) > 0
               const torresN = Number(o.torres) || 0
@@ -354,7 +409,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                 <div key={i} className={`rounded-lg ${aberto ? (isDark ? 'bg-white/[0.03]' : 'bg-slate-50') : ''}`}>
                   <div className="flex items-center gap-2 text-xs py-1.5">
                     {/* barra de dificuldade do relevo */}
-                    <span className="w-1 h-6 rounded-full shrink-0" style={{ background: tn.barHex }} title={`Relevo: ${niv.label}`} />
+                    <span className="w-1 h-6 rounded-full shrink-0" style={{ background: tn.barHex }} title={`Relevo: ${rel.label}`} />
                     <button onClick={() => temDetalhe && setOpen(aberto ? null : i)} className={`flex items-center gap-1.5 min-w-0 flex-1 text-left ${temDetalhe ? 'cursor-pointer' : ''}`}>
                       {temDetalhe ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
                       <span className={`flex-1 truncate font-semibold ${txt}`}>{String(o.nome)}</span>
@@ -376,17 +431,26 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                       <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres">
                         <RadioTower size={12} className="text-slate-400" />{fmtNum(Number(o.torres))}
                       </span>
-                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`} title={`Relevo ${niv.label} (fator ×${fmtNum(f, 2)})`}>
-                        <Mountain size={11} />×{fmtNum(f, 2)}
+                      <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`} title={geo?.perfil ? `Relevo ${rel.label} · rampa média ${geo.perfil.rampa_media_pct}% (SRTM real)` : `Relevo ${rel.label} (fator ×${fmtNum(f, 2)})`}>
+                        <RelevoGlyph tone={rel.tone} size={15} /> {rel.label}
                       </span>
                     </div>
                     <button onClick={() => setMapaObra(String(o.nome))} title="Ver no mapa" className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.08] text-slate-400 hover:text-amber-300' : 'hover:bg-slate-100 text-slate-400 hover:text-amber-600'}`}><MapPin size={13} /></button>
                   </div>
                   {aberto && temDetalhe && (
                     <div className="pl-5 pr-2 pb-2.5">
-                      <span className={`inline-flex items-center gap-1 mb-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>
-                        <Mountain size={10} /> {niv.label} · ×{fmtNum(f, 2)}
+                      <span className={`inline-flex items-center gap-1.5 mb-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>
+                        <RelevoGlyph tone={rel.tone} size={13} /> {rel.label}{geo?.perfil ? ` · rampa ${geo.perfil.rampa_media_pct}%` : ` · ×${fmtNum(f, 2)}`}
                       </span>
+                      {geo?.perfil && (
+                        <div className="mb-1.5">
+                          <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Perfil de elevação <span className="font-normal normal-case">(1 ponto ~por torre · SRTM)</span></p>
+                          <div className={`rounded-lg p-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+                            <PerfilChart perfil={geo.perfil} isDark={isDark} cor={tn.barHex} />
+                          </div>
+                          <p className={`text-[10px] mt-0.5 ${txtMuted}`}>amplitude {geo.amplitude_m} m · ↑{geo.perfil.subida_m} / ↓{geo.perfil.descida_m} m · rampa média {geo.perfil.rampa_media_pct}% · máx {geo.perfil.rampa_max_pct}%</p>
+                        </div>
+                      )}
                       {terreno && <p className={`text-[11px] leading-relaxed ${txtMuted}`}>{terreno}</p>}
                       {temEng && (
                         <div className="mt-2">
