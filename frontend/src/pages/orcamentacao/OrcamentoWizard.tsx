@@ -57,7 +57,10 @@ interface GeoData {
 }
 
 // classifica o relevo pela RAMPA REAL (SRTM, determinístico); cai no fator se não houver perfil
-function relevoReal(rampa: number | null | undefined, f: number): { label: string; tone: RelevoTone } {
+function relevoReal(rampa: number | null | undefined, f: number, torres: number, km: number): { label: string; tone: RelevoTone } {
+  // obra curta demais p/ classificar relevo (1 torre ou < 0,4 km ≈ ponto): a rampa do SRTM
+  // vira ruído nessa escala → NÃO cravamos dificuldade (seria erro).
+  if (torres <= 1 || km < 0.4) return { label: 'Pontual', tone: 'slate' }
   if (rampa == null) return relevoNivel(f)
   if (rampa < 1.5) return { label: 'Plano', tone: 'emerald' }
   if (rampa < 3) return { label: 'Ondulado', tone: 'amber' }
@@ -388,6 +391,17 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
     torres: Number(d.torres ?? 0), aco_por_torre: Number(d.aco_por_torre ?? 0), vol_fund_por_torre: Number(d.vol_fund_por_torre ?? 0),
   })
   const obras = (d.obras as Array<Record<string, unknown>>) ?? []
+  // diferencia obras com nome repetido no KMZ (ex.: "…138kV duplo" em 2 trechos) → "trecho 1/2"
+  const obrasSorted = [...obras].sort((a, b) => Number(b.km) - Number(a.km)).slice(0, 60)
+  const nomeCount = new Map<string, number>()
+  obrasSorted.forEach(o => { const n = String(o.nome); nomeCount.set(n, (nomeCount.get(n) || 0) + 1) })
+  const seenNome = new Map<string, number>()
+  const obrasDisp = obrasSorted.map(o => {
+    const n = String(o.nome)
+    if ((nomeCount.get(n) || 0) <= 1) return n
+    const k = (seenNome.get(n) || 0) + 1; seenNome.set(n, k)
+    return `${n} — trecho ${k}`
+  })
   const tipos = (d.tipos_torre as Array<Record<string, unknown>>) ?? []
   const [open, setOpen] = useState<number | null>(null)
   // aço/torre e fund./torre não vêm do KMZ → só a partir da etapa 2 (com os docs).
@@ -451,16 +465,16 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
             ))}
           </div>
           <div className="space-y-0.5">
-            {[...obras].sort((a, b) => Number(b.km) - Number(a.km)).slice(0, 60).map((o, i) => {
+            {obrasSorted.map((o, i) => {
               const aberto = open === i
               const terreno = String(o.terreno ?? '')
               const f = Number(o.f_terreno)
               const geo = o.geo as GeoData | undefined
-              const rel = relevoReal(geo?.perfil?.rampa_media_pct, f)
+              const torresN = Number(o.torres) || 0
+              const rel = relevoReal(geo?.perfil?.rampa_media_pct, f, torresN, Number(o.km))
               const tn = RELEVO_TONE[rel.tone]
               const tr = geo?.travessias
               const temTrav = !!tr && (tr.rios + tr.rodovias + tr.ferrovias + tr.lts) > 0
-              const torresN = Number(o.torres) || 0
               const acoTorre = torresN ? Number(o.aco_t) / torresN : 0
               const fundTorre = torresN ? Number(o.fundacao_m3) / torresN : 0
               const vaoMedio = o.vao_medio_m != null ? Number(o.vao_medio_m) : null
@@ -473,7 +487,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                     <span className="w-1 h-6 rounded-full shrink-0" style={{ background: tn.barHex }} title={`Relevo: ${rel.label}`} />
                     <button onClick={() => temDetalhe && setOpen(aberto ? null : i)} className={`flex items-center gap-1.5 min-w-0 flex-1 text-left ${temDetalhe ? 'cursor-pointer' : ''}`}>
                       {temDetalhe ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
-                      <span className={`flex-1 truncate font-semibold ${txt}`}>{String(o.nome)}</span>
+                      <span className={`flex-1 truncate font-semibold ${txt}`}>{obrasDisp[i]}</span>
                     </button>
                     {/* travessias — ícones na própria linha */}
                     {temTrav && (
