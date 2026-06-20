@@ -2,8 +2,9 @@ import { useState } from 'react'
 import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
   UploadCloud, FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
-  Route, RadioTower,
+  Route, RadioTower, Waves, Milestone, TrainTrack, Zap, Navigation, Tent,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import {
   useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, type NovoArquivo,
 } from '../../hooks/useOrcamentacao'
@@ -41,6 +42,88 @@ function relevoNivel(f: number): { label: string; tone: RelevoTone } {
   if (f < 1.17) return { label: 'Ondulado', tone: 'amber' }
   if (f < 1.27) return { label: 'Acidentado', tone: 'orange' }
   return { label: 'Serrano', tone: 'rose' }
+}
+
+// ── Geo-enriquecimento por obra (traçado KMZ × OpenStreetMap/SRTM) ──────────────
+interface GeoRod { ref?: string | null; dist_km: number; surface?: string | null }
+interface GeoData {
+  travessias?: { rios: number; rodovias: number; ferrovias: number; lts: number; rios_nomes?: string[]; rodovias_nomes?: string[] }
+  acesso?: { trecho_remoto_km: number; trecho_remoto_pos_km: number; rod_subestacao_ini?: GeoRod; rod_subestacao_fim?: GeoRod }
+  canteiro_cidades?: { nome: string; tipo: string; dist_km: number }[]
+  piores_trechos?: { km_ini: number; km_fim: number; rampa_pct: number; elev: number[] }[]
+  amplitude_m?: number | null
+  extensao_km?: number
+}
+
+function GeoChip({ icon: Icon, children, isDark, title, tone }: { icon: LucideIcon; children: React.ReactNode; isDark: boolean; title?: string; tone?: string }) {
+  return (
+    <span title={title} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+      <Icon size={12} className={tone ?? 'opacity-70'} />{children}
+    </span>
+  )
+}
+
+function GeoObra({ geo, isDark }: { geo: GeoData; isDark: boolean }) {
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const body = isDark ? 'text-slate-300' : 'text-slate-600'
+  const head = `text-[10px] font-bold uppercase tracking-wider ${muted}`
+  const t = geo.travessias
+  const a = geo.acesso
+  const temTrav = !!t && (t.rios + t.rodovias + t.ferrovias + t.lts) > 0
+  const surf = (s?: string | null) => s === 'paved' ? 'pavimentada' : s === 'unpaved' ? 'não pavimentada' : (s || '—')
+  const fmt1 = (n?: number) => (n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+  return (
+    <div className="mt-2 space-y-2.5">
+      {/* Travessias */}
+      <div>
+        <p className={head}>Travessias</p>
+        {temTrav ? (
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {t!.rios > 0 && <GeoChip icon={Waves} isDark={isDark} tone="text-sky-500" title={(t!.rios_nomes || []).filter(Boolean).join(', ')}>{t!.rios} rio{t!.rios > 1 ? 's' : ''}</GeoChip>}
+            {t!.rodovias > 0 && <GeoChip icon={Milestone} isDark={isDark} tone="text-slate-400" title={(t!.rodovias_nomes || []).join(', ')}>{t!.rodovias} rodovia{t!.rodovias > 1 ? 's' : ''}{t!.rodovias_nomes?.length ? ` (${t!.rodovias_nomes.slice(0, 3).join(', ')})` : ''}</GeoChip>}
+            {t!.ferrovias > 0 && <GeoChip icon={TrainTrack} isDark={isDark} tone="text-orange-500">{t!.ferrovias} ferrovia{t!.ferrovias > 1 ? 's' : ''}</GeoChip>}
+            {t!.lts > 0 && <GeoChip icon={Zap} isDark={isDark} tone="text-amber-500">{t!.lts} LT{t!.lts > 1 ? 's' : ''}</GeoChip>}
+          </div>
+        ) : <p className={`text-[11px] mt-0.5 ${muted}`}>Nenhuma travessia relevante no traçado.</p>}
+      </div>
+
+      {/* Acesso */}
+      {a && (
+        <div>
+          <p className={head}>Acesso rodoviário</p>
+          <div className={`text-[11px] mt-0.5 space-y-0.5 ${body}`}>
+            <div className="flex items-start gap-1.5"><Navigation size={12} className="text-slate-400 shrink-0 mt-0.5" /><span>Trecho mais afastado de rodovia: <b>{fmt1(a.trecho_remoto_km)} km</b>{a.trecho_remoto_pos_km ? ` (por volta do km ${fmt1(a.trecho_remoto_pos_km)})` : ''}</span></div>
+            <div className="flex items-start gap-1.5"><Milestone size={12} className="text-slate-400 shrink-0 mt-0.5" /><span>Subestações: {a.rod_subestacao_ini?.ref || '—'} a {fmt1(a.rod_subestacao_ini?.dist_km)} km · {a.rod_subestacao_fim?.ref || '—'} a {fmt1(a.rod_subestacao_fim?.dist_km)} km{a.rod_subestacao_fim?.surface ? ` (${surf(a.rod_subestacao_fim.surface)})` : ''}</span></div>
+          </div>
+        </div>
+      )}
+
+      {/* Canteiro */}
+      {geo.canteiro_cidades?.length ? (
+        <div>
+          <p className={head}>Canteiro — cidades de apoio próximas</p>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {geo.canteiro_cidades.map((c, i) => (
+              <GeoChip key={i} icon={Tent} isDark={isDark} tone="text-emerald-500">{c.nome} — {fmt1(c.dist_km)} km</GeoChip>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Piores trechos */}
+      {(geo.piores_trechos?.length || geo.amplitude_m != null) ? (
+        <div>
+          <p className={head}>Piores trechos (relevo)</p>
+          <div className={`text-[11px] mt-0.5 space-y-0.5 ${body}`}>
+            {geo.piores_trechos?.map((p, i) => (
+              <div key={i} className="flex items-start gap-1.5"><TrendingUp size={12} className="text-rose-500 shrink-0 mt-0.5" /><span>km {fmt1(p.km_ini)}–{fmt1(p.km_fim)}: rampa <b>{fmt1(p.rampa_pct)}%</b>{p.elev?.length === 2 ? ` (${p.elev[0]}→${p.elev[1]} m)` : ''}</span></div>
+            ))}
+            {geo.amplitude_m != null && <div className={muted}>Amplitude de elevação no traçado: {geo.amplitude_m} m</div>}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDark: boolean }) {
@@ -253,15 +336,28 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
               const f = Number(o.f_terreno)
               const niv = relevoNivel(f)
               const tn = RELEVO_TONE[niv.tone]
+              const geo = o.geo as GeoData | undefined
+              const tr = geo?.travessias
+              const temTrav = !!tr && (tr.rios + tr.rodovias + tr.ferrovias + tr.lts) > 0
+              const temDetalhe = !!(terreno || geo)
               return (
                 <div key={i} className={`rounded-lg ${aberto ? (isDark ? 'bg-white/[0.03]' : 'bg-slate-50') : ''}`}>
                   <div className="flex items-center gap-2 text-xs py-1.5">
                     {/* barra de dificuldade do relevo */}
                     <span className="w-1 h-6 rounded-full shrink-0" style={{ background: tn.barHex }} title={`Relevo: ${niv.label}`} />
-                    <button onClick={() => terreno && setOpen(aberto ? null : i)} className={`flex items-center gap-1.5 min-w-0 flex-1 text-left ${terreno ? 'cursor-pointer' : ''}`}>
-                      {terreno ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
+                    <button onClick={() => temDetalhe && setOpen(aberto ? null : i)} className={`flex items-center gap-1.5 min-w-0 flex-1 text-left ${temDetalhe ? 'cursor-pointer' : ''}`}>
+                      {temDetalhe ? (aberto ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />) : <span className="w-3 shrink-0" />}
                       <span className={`flex-1 truncate font-semibold ${txt}`}>{String(o.nome)}</span>
                     </button>
+                    {/* travessias — ícones na própria linha */}
+                    {temTrav && (
+                      <span className="hidden md:inline-flex items-center gap-2 shrink-0 mr-1" title="Travessias no traçado">
+                        {tr!.rios > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] font-bold tabular-nums text-sky-500"><Waves size={12} />{tr!.rios}</span>}
+                        {tr!.rodovias > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] font-bold tabular-nums text-slate-400"><Milestone size={12} />{tr!.rodovias}</span>}
+                        {tr!.ferrovias > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] font-bold tabular-nums text-orange-500"><TrainTrack size={12} />{tr!.ferrovias}</span>}
+                        {tr!.lts > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] font-bold tabular-nums text-amber-500"><Zap size={12} />{tr!.lts}</span>}
+                      </span>
+                    )}
                     {/* métricas destacadas */}
                     <div className="hidden sm:flex items-center gap-2.5 shrink-0">
                       <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Extensão">
@@ -276,12 +372,13 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
                     </div>
                     <button onClick={() => setMapaObra(String(o.nome))} title="Ver no mapa" className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.08] text-slate-400 hover:text-amber-300' : 'hover:bg-slate-100 text-slate-400 hover:text-amber-600'}`}><MapPin size={13} /></button>
                   </div>
-                  {aberto && terreno && (
-                    <div className={`pl-5 pr-2 pb-2 ${terreno ? '' : 'hidden'}`}>
+                  {aberto && temDetalhe && (
+                    <div className="pl-5 pr-2 pb-2.5">
                       <span className={`inline-flex items-center gap-1 mb-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>
                         <Mountain size={10} /> {niv.label} · ×{fmtNum(f, 2)}
                       </span>
-                      <p className={`text-[11px] leading-relaxed ${txtMuted}`}>{terreno}</p>
+                      {terreno && <p className={`text-[11px] leading-relaxed ${txtMuted}`}>{terreno}</p>}
+                      {geo && <GeoObra geo={geo} isDark={isDark} />}
                     </div>
                   )}
                 </div>
