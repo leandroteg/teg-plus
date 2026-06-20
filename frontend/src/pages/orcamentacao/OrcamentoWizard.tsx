@@ -247,7 +247,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
       </section>
 
       {/* Dados gerados (por tipo de estágio) */}
-      {(estagio === 1 || estagio === 2) && <Caracteristicas d={d} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
+      {(estagio === 1 || estagio === 2) && <Caracteristicas d={d} estagio={estagio} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
       {estagio === 3 && <Recursos d={d} isDark={isDark} />}
       {estagio === 4 && <Custos d={d} isDark={isDark} />}
       {estagio === 5 && <Orcamentacao d={d} isDark={isDark} />}
@@ -264,7 +264,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
 }
 
 // ── Características (estágios 1 e 2) — editável ───────────────────────────────────
-function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record<string, unknown>; isDark: boolean; orcamentoId: string; onSave: (d: Record<string, unknown>) => void; saving: boolean }) {
+function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { d: Record<string, unknown>; estagio: number; isDark: boolean; orcamentoId: string; onSave: (d: Record<string, unknown>) => void; saving: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const [mapaObra, setMapaObra] = useState<string | null>(null)
@@ -274,14 +274,19 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
   const obras = (d.obras as Array<Record<string, unknown>>) ?? []
   const tipos = (d.tipos_torre as Array<Record<string, unknown>>) ?? []
   const [open, setOpen] = useState<number | null>(null)
-  const campos = [
-    { k: 'torres', lbl: 'Torres', un: '' },
-    { k: 'km', lbl: 'Km de linha', un: 'km', ro: true },
-    { k: 'aco_por_torre', lbl: 'Aço/torre', un: 't' },
-    { k: 'vol_fund_por_torre', lbl: 'Fund./torre', un: 'm³' },
-    { k: 'vao_medio_m', lbl: 'Vão médio', un: 'm', ro: true },
-    { k: 'canteiro_dist_km', lbl: 'Dist. canteiro', un: 'km', ro: true },
-  ]
+  // aço/torre e fund./torre não vêm do KMZ → só a partir da etapa 2 (com os docs).
+  // vão médio e dist. canteiro saíram dos cards gerais → agora são por obra.
+  const campos = estagio >= 2
+    ? [
+        { k: 'torres', lbl: 'Torres', un: '' },
+        { k: 'km', lbl: 'Km de linha', un: 'km', ro: true },
+        { k: 'aco_por_torre', lbl: 'Aço/torre', un: 't' },
+        { k: 'vol_fund_por_torre', lbl: 'Fund./torre', un: 'm³' },
+      ]
+    : [
+        { k: 'torres', lbl: 'Torres', un: '' },
+        { k: 'km', lbl: 'Km de linha', un: 'km', ro: true },
+      ]
   return (
     <section className={`${CARD(isDark)} p-4`}>
       <div className="flex items-center justify-between mb-3">
@@ -291,9 +296,9 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
           <Save size={13} /> {saving ? 'Salvando…' : 'Salvar edições'}
         </button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <div className="flex flex-wrap gap-2.5">
         {campos.map(c => (
-          <div key={c.k} className={`rounded-xl p-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+          <div key={c.k} className={`flex-1 min-w-[130px] rounded-xl p-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
             <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>{c.lbl}</p>
             {c.ro || !(c.k in edit) ? (
               <p className={`text-base font-extrabold ${txt}`}>{d[c.k] != null ? `${fmtNum(Number(d[c.k]), c.un === 't' || c.un === 'm³' ? 2 : c.un === 'km' ? 1 : 0)} ${c.un}` : '—'}</p>
@@ -339,7 +344,12 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
               const geo = o.geo as GeoData | undefined
               const tr = geo?.travessias
               const temTrav = !!tr && (tr.rios + tr.rodovias + tr.ferrovias + tr.lts) > 0
-              const temDetalhe = !!(terreno || geo)
+              const torresN = Number(o.torres) || 0
+              const acoTorre = torresN ? Number(o.aco_t) / torresN : 0
+              const fundTorre = torresN ? Number(o.fundacao_m3) / torresN : 0
+              const vaoMedio = o.vao_medio_m != null ? Number(o.vao_medio_m) : null
+              const temEng = vaoMedio != null || (estagio >= 2 && (acoTorre > 0 || fundTorre > 0))
+              const temDetalhe = !!(terreno || geo || temEng)
               return (
                 <div key={i} className={`rounded-lg ${aberto ? (isDark ? 'bg-white/[0.03]' : 'bg-slate-50') : ''}`}>
                   <div className="flex items-center gap-2 text-xs py-1.5">
@@ -378,6 +388,18 @@ function Caracteristicas({ d, isDark, orcamentoId, onSave, saving }: { d: Record
                         <Mountain size={10} /> {niv.label} · ×{fmtNum(f, 2)}
                       </span>
                       {terreno && <p className={`text-[11px] leading-relaxed ${txtMuted}`}>{terreno}</p>}
+                      {temEng && (
+                        <div className="mt-2">
+                          <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Engenharia {estagio < 2 ? '' : '(estimativa — refina com os docs)'}</p>
+                          <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                            {[
+                              vaoMedio != null ? `Vão médio ${fmtNum(vaoMedio)} m` : null,
+                              estagio >= 2 && acoTorre > 0 ? `Aço/torre ${fmtNum(acoTorre, 2)} t` : null,
+                              estagio >= 2 && fundTorre > 0 ? `Fund./torre ${fmtNum(fundTorre, 1)} m³` : null,
+                            ].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                      )}
                       {geo && <GeoObra geo={geo} isDark={isDark} />}
                     </div>
                   )}
