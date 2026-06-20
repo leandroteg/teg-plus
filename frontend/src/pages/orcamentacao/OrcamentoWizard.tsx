@@ -81,31 +81,74 @@ function RelevoGlyph({ tone, size = 16 }: { tone: RelevoTone; size?: number }) {
   )
 }
 
-// gráfico 2D altura × distância (1 ponto ~por torre)
-function PerfilChart({ perfil, isDark, cor }: { perfil: NonNullable<GeoData['perfil']>; isDark: boolean; cor: string }) {
+// cruzinha (+) num ponto do gráfico, com alvo de hover maior
+function Cross({ x, y, cor, size = 2, bold, onHover }: { x: number; y: number; cor: string; size?: number; bold?: boolean; onHover?: () => void }) {
+  return (
+    <g onMouseEnter={onHover} style={onHover ? { cursor: 'pointer' } : undefined}>
+      {onHover && <circle cx={x} cy={y} r={size + 3.5} fill="transparent" />}
+      <path d={`M${x - size} ${y} H${x + size} M${x} ${y - size} V${y + size}`} stroke={cor} strokeWidth={bold ? 1.6 : 0.9} strokeLinecap="round" />
+    </g>
+  )
+}
+
+// gráfico 2D altura × distância (1 ponto ~por torre) — cruzinhas + tooltip; 1 torre = ponto único
+function PerfilChart({ perfil, isDark, cor, torres }: { perfil: NonNullable<GeoData['perfil']>; isDark: boolean; cor: string; torres: number }) {
+  const [hov, setHov] = useState<number | null>(null)
   const d = perfil.dist_km, e = perfil.elev_m
-  if (!d?.length || d.length !== e.length || d.length < 2) return null
-  const W = 360, H = 80, pL = 24, pR = 6, pT = 8, pB = 14
-  const maxD = d[d.length - 1] || 1
+  if (!d?.length || d.length !== e.length) return null
+  const W = 360, H = 84, pL = 26, pR = 8, pT = 10, pB = 16
+  const lbl = isDark ? '#94a3b8' : '#64748b'
+  const grid = isDark ? '#334155' : '#e2e8f0'
   const minE = Math.min(...e), maxE = Math.max(...e)
   const rE = Math.max(1, maxE - minE)
+  const maxD = d[d.length - 1] || 1
+
+  // 1 torre (ou traçado degenerado) → ponto único
+  if (torres <= 1 || d.length < 2 || maxD < 0.05) {
+    const cx = W / 2, cy = (pT + (H - pB)) / 2
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }}>
+        <Cross x={cx} y={cy} cor={cor} size={4} bold />
+        <text x={cx} y={cy - 8} fontSize={8} textAnchor="middle" fill={lbl} fontWeight="bold">{e[0]} m</text>
+        <text x={cx} y={cy + 17} fontSize={7} textAnchor="middle" fill={lbl}>obra pontual (1 torre)</text>
+      </svg>
+    )
+  }
+
   const X = (km: number) => pL + (km / maxD) * (W - pL - pR)
   const Y = (m: number) => pT + (1 - (m - minE) / rE) * (H - pT - pB)
   const line = e.map((m, i) => `${i ? 'L' : 'M'}${X(d[i]).toFixed(1)} ${Y(m).toFixed(1)}`).join(' ')
   const area = `${line} L${X(maxD).toFixed(1)} ${(H - pB).toFixed(1)} L${X(0).toFixed(1)} ${(H - pB).toFixed(1)} Z`
-  const lbl = isDark ? '#94a3b8' : '#64748b'
-  const grid = isDark ? '#334155' : '#e2e8f0'
+
+  let tip: React.ReactNode = null
+  if (hov != null) {
+    const tx = X(d[hov]), ty = Y(e[hov])
+    const txt = `${d[hov].toFixed(1)} km · ${e[hov]} m`
+    const w = txt.length * 4.3 + 8
+    const bx = Math.min(Math.max(tx - w / 2, pL), W - pR - w)
+    const by = ty - 16 < pT ? ty + 7 : ty - 16
+    tip = (
+      <g pointerEvents="none">
+        <line x1={tx} y1={pT} x2={tx} y2={H - pB} stroke={cor} strokeWidth={0.5} opacity={0.45} />
+        <Cross x={tx} y={ty} cor={cor} size={3.2} bold />
+        <rect x={bx} y={by} width={w} height={12} rx={2.5} fill={isDark ? '#0f172a' : '#ffffff'} stroke={cor} strokeWidth={0.6} />
+        <text x={bx + w / 2} y={by + 8.6} fontSize={7.5} textAnchor="middle" fontWeight="bold" fill={isDark ? '#e2e8f0' : '#0f172a'}>{txt}</text>
+      </g>
+    )
+  }
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }} onMouseLeave={() => setHov(null)}>
       <line x1={pL} y1={H - pB} x2={W - pR} y2={H - pB} stroke={grid} strokeWidth={0.5} />
       <line x1={pL} y1={pT} x2={pL} y2={H - pB} stroke={grid} strokeWidth={0.5} />
-      <path d={area} fill={cor} opacity={0.16} />
+      <path d={area} fill={cor} opacity={0.15} />
       <path d={line} fill="none" stroke={cor} strokeWidth={1.4} />
-      {e.map((m, i) => <circle key={i} cx={X(d[i])} cy={Y(m)} r={1} fill={cor} opacity={0.5} />)}
+      {e.map((m, i) => <Cross key={i} x={X(d[i])} y={Y(m)} cor={cor} size={2} onHover={() => setHov(i)} />)}
       <text x={pL - 3} y={pT + 4} fontSize={7} textAnchor="end" fill={lbl}>{maxE}</text>
       <text x={pL - 3} y={H - pB} fontSize={7} textAnchor="end" fill={lbl}>{minE}</text>
       <text x={pL} y={H - 3} fontSize={7} fill={lbl}>0</text>
       <text x={W - pR} y={H - 3} fontSize={7} textAnchor="end" fill={lbl}>{maxD.toFixed(0)} km</text>
+      {tip}
     </svg>
   )
 }
@@ -446,7 +489,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                         <div className="mb-1.5">
                           <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Perfil de elevação <span className="font-normal normal-case">(1 ponto ~por torre · SRTM)</span></p>
                           <div className={`rounded-lg p-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-                            <PerfilChart perfil={geo.perfil} isDark={isDark} cor={tn.barHex} />
+                            <PerfilChart perfil={geo.perfil} isDark={isDark} cor={tn.barHex} torres={torresN} />
                           </div>
                           <p className={`text-[10px] mt-0.5 ${txtMuted}`}>amplitude {geo.amplitude_m} m · ↑{geo.perfil.subida_m} / ↓{geo.perfil.descida_m} m · rampa média {geo.perfil.rampa_media_pct}% · máx {geo.perfil.rampa_max_pct}%</p>
                         </div>
