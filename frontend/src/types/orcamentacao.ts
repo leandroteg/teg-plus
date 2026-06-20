@@ -9,6 +9,7 @@ export interface OrcPremissas {
   n_circuitos?: number
   fundacao_tipo?: string
   terreno?: 'facil' | 'medio' | 'dificil' | 'severo'
+  us_informado?: number
   observacoes?: string
 }
 

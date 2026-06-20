@@ -388,8 +388,8 @@ export default function OrcamentoDetalhe() {
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Percent size={14} className="text-amber-500" /> Premissas e fontes</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div><p className={txtMuted}>Tensão</p><p className={`font-bold ${txt}`}>{String((rTot?.premissas_usadas?.tensao_kv ?? orc.premissas.tensao_kv) ?? '—')} kV</p></div>
-              <div><p className={txtMuted}>Fundação</p><p className={`font-bold ${txt}`}>{String((rTot?.premissas_usadas?.fundacao_tipo ?? orc.premissas.fundacao_tipo) ?? '—')}</p></div>
-              <div><p className={txtMuted}>Torres/km</p><p className={`font-bold ${txt}`}>{String(rTot?.premissas_usadas?.torres_por_km ?? '1.53')}</p></div>
+              <div><p className={txtMuted}>Custo / US</p><p className={`font-bold ${txt}`}>R$ {String(rTot?.premissas_usadas?.custo_us ?? 639)}</p></div>
+              <div><p className={txtMuted}>Nº de US</p><p className={`font-bold ${rTot?.premissas_usadas?.us_exato ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : txt}`}>{rTot?.premissas_usadas?.us_exato ? 'do edital (exato)' : 'estimado'}</p></div>
               <div><p className={txtMuted}>Análise por</p><p className={`font-bold ${txt}`}>{String(rTot?.premissas_usadas?.analise_por ?? '—')}</p></div>
             </div>
             {Array.isArray(rTot?.geometria_kmz) && rTot!.geometria_kmz!.length > 0 && (

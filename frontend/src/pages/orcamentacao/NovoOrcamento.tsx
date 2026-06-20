@@ -110,21 +110,20 @@ export default function NovoOrcamento() {
             <input type="number" className={`${inputCls} mt-1`} value={premissas.n_circuitos ?? ''} onChange={e => setPremissas(p => ({ ...p, n_circuitos: Number(e.target.value) || undefined }))} />
           </div>
           <div>
-            <label className={labelCls}>Fundação</label>
-            <select className={`${inputCls} mt-1`} value={premissas.fundacao_tipo} onChange={e => setPremissas(p => ({ ...p, fundacao_tipo: e.target.value }))}>
-              <option value="tubulão">Tubulão</option>
-              <option value="sapata">Sapata</option>
-              <option value="estaca">Estaca</option>
-              <option value="grelha">Grelha</option>
-            </select>
-          </div>
-          <div>
             <label className={labelCls}>Terreno</label>
             <select className={`${inputCls} mt-1`} value={premissas.terreno} onChange={e => setPremissas(p => ({ ...p, terreno: e.target.value as OrcPremissas['terreno'] }))}>
               {TERRENO_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
+          <div>
+            <label className={labelCls}>Nº de US <span className="normal-case font-normal opacity-70">(opcional)</span></label>
+            <input type="number" className={`${inputCls} mt-1`} value={premissas.us_informado ?? ''} placeholder="do edital"
+              onChange={e => setPremissas(p => ({ ...p, us_informado: Number(e.target.value) || undefined }))} />
+          </div>
         </div>
+        <p className={`text-[11px] ${txtMuted}`}>
+          <span className="font-semibold">Nº de US</span>: se você informar a quantidade de US do edital, o custo fica <span className="font-semibold">exato</span> (US × R$ 639/US), distribuído por região/obra. Em branco, o sistema estima as US pela geometria (~±30%).
+        </p>
         <div>
           <label className={labelCls}>Observações para a análise</label>
           <textarea className={`${inputCls} mt-1 resize-none`} rows={2} value={premissas.observacoes} onChange={e => setPremissas(p => ({ ...p, observacoes: e.target.value }))} placeholder="Relevo, travessias, restrições ambientais, prazos do edital…" />
@@ -186,7 +185,7 @@ export default function NovoOrcamento() {
 
       {/* Ação */}
       <div className="flex items-center justify-between gap-3">
-        <p className={`text-[11px] ${txtMuted}`}>Estimativa paramétrica ~±30% · motor TEG v3 (preços CEMIG)</p>
+        <p className={`text-[11px] ${txtMuted}`}>Custo real por US (R$ 639/US · Nibo+TOTVS) · exato se informar as US do edital</p>
         <button
           onClick={handleEstimar}
           disabled={!podeEnviar}
