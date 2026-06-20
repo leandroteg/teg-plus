@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Map as MapIcon, ChevronLeft, Wallet, TrendingUp, Percent, Ruler, Factory,
-  CalendarClock, Users, Layers, ListTree, Sparkles, AlertCircle, RefreshCw, Activity,
+  Map as MapIcon, ChevronLeft, ChevronDown, ChevronRight, Wallet, TrendingUp, Percent, Ruler, Factory,
+  CalendarClock, Users, Layers, ListTree, Sparkles, AlertCircle, RefreshCw, Mountain,
   Boxes, HardHat, Scale, MoveHorizontal, Tent,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -20,6 +20,7 @@ export default function OrcamentoDetalhe() {
   const { data: orc, isLoading } = useOrcamento(id)
   const reprocessar = useReprocessarOrcamento()
   const [scopeKey, setScopeKey] = useState<string>('total')
+  const [openObra, setOpenObra] = useState<string | null>(null)
 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -184,7 +185,7 @@ export default function OrcamentoDetalhe() {
             <section className={`${CARD(isDark)} overflow-hidden`}>
               <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
                 <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><Layers size={14} className="text-amber-500" /> Obras{isRegiao ? ` — ${scopeKey}` : ''}</h2>
-                <span className={`text-[11px] ${txtMuted}`}>{obras.length} LD(s)</span>
+                <span className={`text-[11px] ${txtMuted}`}>{obras.length} LD(s) · clique p/ ver o terreno</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -199,16 +200,44 @@ export default function OrcamentoDetalhe() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vis.map((l, i) => (
-                      <tr key={i} className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                        <td className={`px-3 py-2 font-medium text-xs ${txt} max-w-[280px] truncate`} title={l.nome}>{l.nome}</td>
-                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.extensao_km, 1)}</td>
-                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.torres)}</td>
-                        <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.us)}</td>
-                        <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{fmtMM(l.custo_total)}</td>
-                        <td className={`px-3 py-2 text-right text-xs ${txtMuted}`}>~{fmtNum(l.prazo_meses, 1)}m</td>
-                      </tr>
-                    ))}
+                    {vis.map((l, i) => {
+                      const key = `${l.nome}_${i}`
+                      const open = openObra === key
+                      const temTerreno = !!(l.terreno && l.terreno.trim())
+                      return (
+                      <Fragment key={key}>
+                        <tr
+                          onClick={() => temTerreno && setOpenObra(open ? null : key)}
+                          className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'} ${temTerreno ? (isDark ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-pointer hover:bg-slate-50') : ''}`}
+                        >
+                          <td className={`px-3 py-2 font-medium text-xs ${txt} max-w-[280px]`} title={l.nome}>
+                            <span className="flex items-center gap-1.5">
+                              {temTerreno && (open ? <ChevronDown size={12} className="text-amber-500 shrink-0" /> : <ChevronRight size={12} className="text-amber-500 shrink-0" />)}
+                              <span className="truncate">{l.nome}</span>
+                            </span>
+                          </td>
+                          <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.extensao_km, 1)}</td>
+                          <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.torres)}</td>
+                          <td className={`px-2 py-2 text-right text-xs ${txtMuted}`}>{fmtNum(l.us)}</td>
+                          <td className={`px-2 py-2 text-right text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{fmtMM(l.custo_total)}</td>
+                          <td className={`px-3 py-2 text-right text-xs ${txtMuted}`}>~{fmtNum(l.prazo_meses, 1)}m</td>
+                        </tr>
+                        {open && temTerreno && (
+                          <tr className={isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}>
+                            <td colSpan={6} className="px-4 py-2.5">
+                              <div className="flex items-start gap-2">
+                                <Mountain size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                                <div>
+                                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${txtMuted}`}>Terreno · f ×{fmtNum(l.f_terreno, 2)}</p>
+                                  <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{l.terreno}</p>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -403,10 +432,6 @@ export default function OrcamentoDetalhe() {
                 ))}
               </div>
             )}
-            <div className={`mt-3 flex items-start gap-2 text-[11px] rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-              <Activity size={13} className="text-amber-500 mt-0.5 shrink-0" />
-              <span>{rTot?.classe_precisao || 'Estimativa paramétrica ~±30%'}. Não substitui orçamento executivo.</span>
-            </div>
           </section>
         </>
       )}

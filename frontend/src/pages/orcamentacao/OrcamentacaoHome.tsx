@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Map as MapIcon, Plus, RefreshCw, ArrowRight, FileText, Activity } from 'lucide-react'
+import { Map as MapIcon, Plus, RefreshCw, ArrowRight, FileText } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOrcamentos } from '../../hooks/useOrcamentacao'
 import { fmtMM, fmtNum, fmtData, Kpi, StatusBadge, CARD } from './_ui'
@@ -118,12 +118,6 @@ export default function OrcamentacaoHome() {
           </div>
         )}
       </section>
-
-      {/* Rodapé informativo */}
-      <div className={`flex items-start gap-2 text-[11px] rounded-xl px-3 py-2.5 ${isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-        <Activity size={13} className="text-amber-500 mt-0.5 shrink-0" />
-        <span>Classe de precisão ~±30% (AACE 4-5) — para viabilidade, comparação de traçados e proposta comercial. Não substitui orçamento executivo.</span>
-      </div>
     </div>
   )
 }

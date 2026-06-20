@@ -72,6 +72,7 @@ export interface OrcLT {
   vao_medio_m?: number | null
   tipos_torre?: OrcTipoTorre[]
   canteiro_dist_km?: number | null
+  terreno?: string
   obs?: string
 }
 
