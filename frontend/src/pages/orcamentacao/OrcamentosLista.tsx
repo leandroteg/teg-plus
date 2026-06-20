@@ -1,10 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Map as MapIcon, Plus, RefreshCw, ArrowRight, Pencil, Trash2, X, Check, RotateCw, AlertTriangle } from 'lucide-react'
+import { Map as MapIcon, Plus, RefreshCw, ArrowRight, Pencil, Trash2, X, Check, RotateCw, AlertTriangle, Layers, FileText, Loader2, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOrcamentos, useExcluirOrcamento, useReprocessarOrcamento, useAtualizarOrcamento } from '../../hooks/useOrcamentacao'
-import type { Orcamento } from '../../types/orcamentacao'
+import type { Orcamento, OrcStatus } from '../../types/orcamentacao'
 import { fmtMM, fmtNum, fmtData, StatusBadge, CARD } from './_ui'
+
+type FiltroStatus = '' | OrcStatus
+const FILTROS: { value: FiltroStatus; label: string; icon: typeof Layers; tone: 'slate' | 'amber' | 'emerald' | 'rose' }[] = [
+  { value: '',            label: 'Todos',       icon: Layers,        tone: 'slate' },
+  { value: 'rascunho',    label: 'Rascunho',    icon: FileText,      tone: 'slate' },
+  { value: 'processando', label: 'Processando', icon: Loader2,       tone: 'amber' },
+  { value: 'concluido',   label: 'Concluído',   icon: CheckCircle2,  tone: 'emerald' },
+  { value: 'erro',        label: 'Erro',        icon: AlertTriangle, tone: 'rose' },
+]
+const TONE: Record<string, { light: string; dark: string; badgeL: string; badgeD: string }> = {
+  slate:   { light: 'bg-slate-100 text-slate-700 border-slate-300',     dark: 'bg-white/[0.06] text-slate-200 border-white/[0.12]',  badgeL: 'bg-slate-200 text-slate-600',     badgeD: 'bg-white/[0.10] text-slate-300' },
+  amber:   { light: 'bg-amber-50 text-amber-700 border-amber-300',      dark: 'bg-amber-500/10 text-amber-300 border-amber-500/40',  badgeL: 'bg-amber-100 text-amber-700',     badgeD: 'bg-amber-500/20 text-amber-300' },
+  emerald: { light: 'bg-emerald-50 text-emerald-700 border-emerald-300', dark: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40', badgeL: 'bg-emerald-100 text-emerald-700', badgeD: 'bg-emerald-500/20 text-emerald-300' },
+  rose:    { light: 'bg-rose-50 text-rose-700 border-rose-300',         dark: 'bg-rose-500/10 text-rose-300 border-rose-500/40',     badgeL: 'bg-rose-100 text-rose-700',       badgeD: 'bg-rose-500/20 text-rose-300' },
+}
 
 export default function OrcamentosLista() {
   const nav = useNavigate()
@@ -19,9 +34,13 @@ export default function OrcamentosLista() {
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<FiltroStatus>('')
 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const contar = (v: FiltroStatus) => v === '' ? orcamentos.length : orcamentos.filter(o => o.status === v).length
+  const lista = filtro ? orcamentos.filter(o => o.status === filtro) : orcamentos
 
   function abrirEdicao(o: Orcamento) {
     setEditando(o); setNome(o.nome); setDescricao(o.descricao ?? '')
@@ -58,10 +77,33 @@ export default function OrcamentosLista() {
         </div>
       </div>
 
+      {/* Abas de status (padrão dos demais módulos) */}
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {FILTROS.map(f => {
+          const active = filtro === f.value
+          const t = TONE[f.tone]
+          const Icon = f.icon
+          return (
+            <button key={f.value} onClick={() => setFiltro(f.value)}
+              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                active
+                  ? `${isDark ? t.dark : t.light} shadow-sm`
+                  : isDark ? 'text-slate-400 border-transparent hover:bg-white/[0.04]' : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
+              }`}>
+              <Icon size={15} className={`shrink-0 ${f.value === 'processando' ? 'animate-spin' : ''}`} />
+              {f.label}
+              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+                active ? (isDark ? t.badgeD : t.badgeL) : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+              }`}>{contar(f.value)}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <section className={`${CARD(isDark)} overflow-hidden`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold ${txt}`}>Todos os orçamentos</h2>
-          <span className={`text-[11px] ${txtMuted}`}>{orcamentos.length} registro(s)</span>
+          <h2 className={`text-sm font-extrabold ${txt}`}>{filtro ? FILTROS.find(f => f.value === filtro)?.label : 'Todos os orçamentos'}</h2>
+          <span className={`text-[11px] ${txtMuted}`}>{lista.length} registro(s)</span>
         </div>
 
         {orcamentos.length === 0 ? (
@@ -74,9 +116,16 @@ export default function OrcamentosLista() {
               <Plus size={16} /> Criar primeiro orçamento
             </button>
           </div>
+        ) : lista.length === 0 ? (
+          <div className="px-4 py-16 text-center">
+            <p className={`text-sm font-bold ${txt}`}>Nenhum orçamento neste filtro</p>
+            <button onClick={() => setFiltro('')} className={`mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-600 hover:bg-slate-100'}`}>
+              Ver todos
+            </button>
+          </div>
         ) : (
           <div className={`divide-y ${isDark ? 'divide-white/[0.06]' : 'divide-slate-100'}`}>
-            {orcamentos.map(o => {
+            {lista.map(o => {
               const r = o.resultado?.resumo
               const delConfirm = confirmDel === o.id
               return (

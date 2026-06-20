@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { X, MapPin, Loader2, AlertCircle, ExternalLink, Tag, Eye, EyeOff } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, MapPin, Loader2, AlertCircle, ExternalLink, Tag, Eye, EyeOff, Crosshair } from 'lucide-react'
 import { MapContainer, TileLayer, Polyline, Polygon, CircleMarker, Tooltip, Popup, LayersControl, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -15,9 +15,8 @@ interface Poligono { nome: string; coords: [number, number][] }
 interface Geo { linhas: Linha[]; pontos: Ponto[]; poligonos: Poligono[] }
 
 const norm = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
-const ln = (el: Element) => el.localName || el.tagName
+const tag = (el: Element) => el.localName || el.tagName
 
-// rótulos dos campos do ExtendedData
 const ROTULO: Record<string, string> = {
   ID: 'ID', GEDEX: 'GEDEX', US: 'US', TENSAO_OPERACAO: 'Tensão (kV)', PLANO: 'Plano',
   CADASTRADOR: 'Cadastrador', DOCUMENTO: 'Documento', REVISAO: 'Revisão',
@@ -47,7 +46,7 @@ function coordsFrom(t: string | null | undefined): [number, number][] {
 }
 
 function nomeDireto(el: Element): string {
-  for (const c of Array.from(el.children)) if (ln(c) === 'name') return (c.textContent || '').trim()
+  for (const c of Array.from(el.children)) if (tag(c) === 'name') return (c.textContent || '').trim()
   return ''
 }
 
@@ -55,7 +54,6 @@ function parseKml(text: string): Geo {
   const doc = new DOMParser().parseFromString(text, 'text/xml')
   const g: Geo = { linhas: [], pontos: [], poligonos: [] }
 
-  // estilos (cor/largura de linha)
   const styles: Record<string, Estilo> = {}
   for (const st of Array.from(doc.getElementsByTagName('Style'))) {
     const id = st.getAttribute('id'); if (!id) continue
@@ -92,10 +90,9 @@ function parseKml(text: string): Geo {
     return d
   }
 
-  // percorre a árvore mantendo a pilha de pastas → define a região de cada obra
   const walk = (el: Element, pastas: string[]) => {
     for (const child of Array.from(el.children)) {
-      const t = ln(child)
+      const t = tag(child)
       if (t === 'Folder') {
         walk(child, [...pastas, nomeDireto(child)])
       } else if (t === 'Document') {
@@ -126,13 +123,10 @@ function parseKml(text: string): Geo {
   return g
 }
 
-function Fit({ coords }: { coords: [number, number][] }) {
+// captura a instância do mapa pro pai (fit inicial + botão centralizar)
+function CapturaMapa({ onReady }: { onReady: (m: L.Map) => void }) {
   const map = useMap()
-  useEffect(() => {
-    if (coords.length >= 2) { try { map.fitBounds(L.latLngBounds(coords as L.LatLngTuple[]), { padding: [40, 40] }) } catch { /* */ } }
-    else if (coords.length === 1) { map.setView(coords[0] as L.LatLngTuple, 13) }
-    setTimeout(() => map.invalidateSize(), 80)
-  }, [coords, map])
+  useEffect(() => { onReady(map) }, [map, onReady])
   return null
 }
 
@@ -166,6 +160,8 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
   const [kmzUrl, setKmzUrl] = useState('')
   const [regioesOff, setRegioesOff] = useState<Set<string>>(new Set())
   const [mostrarNomes, setMostrarNomes] = useState(true)
+  const [map, setMap] = useState<L.Map | null>(null)
+  const fitDone = useRef(false)
 
   useEffect(() => {
     let vivo = true
@@ -202,7 +198,6 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
     return a === b || a.includes(b) || b.includes(a)
   }
 
-  // regiões presentes (cor representativa + contagem)
   const regioes: { nome: string; color: string; count: number }[] = []
   if (geo) {
     const m = new Map<string, { color: string; count: number }>()
@@ -215,12 +210,40 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
   const visivel = (l: Linha) => !regioesOff.has(l.regiao || 'Outras')
   const linhas = (geo?.linhas ?? []).filter(visivel)
   const alvos = linhas.filter(l => ehAlvo(l.nome))
-  const fitCoords = (alvos.length ? alvos.flatMap(l => l.coords) : null)
-    || (geo && [...geo.linhas.flatMap(l => l.coords), ...geo.pontos.map(p => p.pos)]) || []
 
   const toggleRegiao = (r: string) => setRegioesOff(prev => {
     const n = new Set(prev); n.has(r) ? n.delete(r) : n.add(r); return n
   })
+
+  const enquadrar = (cs: [number, number][]) => {
+    if (!map) return
+    if (cs.length >= 2) map.fitBounds(L.latLngBounds(cs as L.LatLngTuple[]), { padding: [40, 40] })
+    else if (cs.length === 1) map.setView(cs[0] as L.LatLngTuple, 13)
+  }
+  const centralizar = () => enquadrar((alvos.length ? alvos : linhas).flatMap(l => l.coords))
+
+  // fit inicial uma única vez (não recentraliza ao alternar nomes/regiões)
+  useEffect(() => {
+    if (!map || !geo || fitDone.current) return
+    fitDone.current = true
+    const alv = geo.linhas.filter(l => ehAlvo(l.nome))
+    const cs = (alv.length ? alv : geo.linhas).flatMap(l => l.coords)
+    setTimeout(() => {
+      map.invalidateSize()
+      if (cs.length >= 2) map.fitBounds(L.latLngBounds(cs as L.LatLngTuple[]), { padding: [40, 40] })
+      else if (cs.length === 1) map.setView(cs[0] as L.LatLngTuple, 13)
+    }, 60)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, geo])
+
+  const pill = (active: boolean) =>
+    `inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all border ${
+      active
+        ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+        : isDark
+          ? 'bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]'
+          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:shadow-sm'
+    }`
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
@@ -231,7 +254,7 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
       `}</style>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div onClick={e => e.stopPropagation()} className={`relative w-full max-w-5xl rounded-2xl border overflow-hidden shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-        <div className={`flex items-center justify-between px-5 py-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className={`flex items-center justify-between gap-3 px-5 py-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <div className="min-w-0">
             <p className={`text-sm font-extrabold flex items-center gap-1.5 truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
               <MapPin size={15} className="text-amber-500 shrink-0" /> {obraNome}
@@ -242,18 +265,18 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
                 : 'Traçado do KMZ'}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setMostrarNomes(v => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${mostrarNomes ? 'bg-amber-500 text-white' : (isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')}`}
-              title="Mostrar/ocultar nomes das obras">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => setMostrarNomes(v => !v)} className={pill(mostrarNomes)} title="Mostrar/ocultar nomes das obras">
               {mostrarNomes ? <Eye size={13} /> : <EyeOff size={13} />} Nomes
             </button>
+            <button onClick={centralizar} className={pill(false)} title="Centralizar na obra">
+              <Crosshair size={13} /> Centralizar
+            </button>
             <a href={kmzUrl ? `https://www.google.com/maps?q=${encodeURIComponent(kmzUrl)}` : undefined} target="_blank" rel="noopener noreferrer"
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${kmzUrl ? (isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200') : 'bg-slate-200 text-slate-400 pointer-events-none'}`}
-              title="Abrir no Google Maps">
+              className={`${pill(false)} ${kmzUrl ? '' : 'opacity-50 pointer-events-none'}`} title="Abrir no Google Maps">
               <ExternalLink size={13} /> Google Maps
             </a>
-            <button onClick={onClose} className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
+            <button onClick={onClose} className={`ml-0.5 h-8 w-8 inline-flex items-center justify-center rounded-lg ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={17} /></button>
           </div>
         </div>
 
@@ -269,6 +292,7 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
           ) : (
             <>
               <MapContainer center={[-19, -47]} zoom={8} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
+                <CapturaMapa onReady={setMap} />
                 <LayersControl position="topright">
                   <LayersControl.BaseLayer checked name="Satélite">
                     <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="&copy; Esri" maxZoom={19} />
@@ -278,26 +302,22 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
                   </LayersControl.BaseLayer>
                 </LayersControl>
 
-                {/* polígonos (faixa) — se houver */}
                 {geo.poligonos.map((pg, i) => (
                   <Polygon key={'pg' + i} positions={pg.coords} pathOptions={{ color: '#10b981', weight: 1, fillOpacity: 0.12 }} />
                 ))}
 
-                {/* halo branco sob a obra destacada */}
                 {alvos.map((l, i) => (
                   <Polyline key={'halo' + i} positions={l.coords} pathOptions={{ color: '#ffffff', weight: l.width + 7, opacity: 0.9, interactive: false }} />
                 ))}
 
-                {/* todas as linhas visíveis — cor original + rótulo + balão */}
                 {linhas.map((l, i) => {
                   const alvo = ehAlvo(l.nome)
-                  const label = mostrarNomes || alvo
                   return (
                     <Polyline key={'ln' + i} positions={l.coords}
                       pathOptions={{ color: l.color, weight: alvo ? l.width + 3 : l.width, opacity: alvo ? 1 : l.opacity }}>
                       {l.nome && (
-                        <Tooltip permanent={label} sticky={!label} direction="center"
-                          className={`obra-rotulo ${alvo ? 'obra-rotulo-alvo' : ''}`}>
+                        <Tooltip key={mostrarNomes ? 'on' : 'off'} permanent={mostrarNomes} sticky={!mostrarNomes}
+                          direction="center" className={`obra-rotulo ${alvo ? 'obra-rotulo-alvo' : ''}`}>
                           {l.nome}
                         </Tooltip>
                       )}
@@ -306,18 +326,14 @@ export default function MapaObraModal({ orcamentoId, obraNome, onClose, isDark }
                   )
                 })}
 
-                {/* pontos (torres/marcos) — se houver */}
                 {geo.pontos.map((p, i) => (
                   <CircleMarker key={'pt' + i} center={p.pos} radius={ehAlvo(p.nome) ? 4 : 2.5}
                     pathOptions={{ color: p.color, fillColor: p.color, fillOpacity: 0.9, weight: 1 }}>
                     {p.nome && <Tooltip>{p.nome}</Tooltip>}
                   </CircleMarker>
                 ))}
-
-                <Fit coords={fitCoords} />
               </MapContainer>
 
-              {/* legenda / filtro por região */}
               {regioes.length > 0 && (
                 <div className={`absolute bottom-3 left-3 z-[1000] rounded-xl border shadow-lg overflow-hidden ${isDark ? 'bg-[#0f172a]/95 border-white/10' : 'bg-white/95 border-slate-200'}`}>
                   <div className={`px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-300 border-b border-white/10' : 'text-slate-500 border-b border-slate-100'}`}>
