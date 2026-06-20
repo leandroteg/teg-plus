@@ -3,11 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Map as MapIcon, ChevronLeft, ChevronDown, ChevronRight, Wallet, TrendingUp, Percent, Ruler, Factory,
   CalendarClock, Users, Layers, ListTree, Sparkles, AlertCircle, RefreshCw, Mountain,
-  Boxes, HardHat, Scale, MoveHorizontal, Tent,
+  Boxes, HardHat, Scale, MoveHorizontal, Tent, Paperclip, UploadCloud, FileText, Trash2, CheckCircle2, X, Sparkles as SparklesIcon,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useOrcamento, useReprocessarOrcamento } from '../../hooks/useOrcamentacao'
-import type { OrcRegiao } from '../../types/orcamentacao'
+import {
+  useOrcamento, useReprocessarOrcamento, useArquivos, useAdicionarArquivos, useConcluirOrcamento,
+  type NovoArquivo,
+} from '../../hooks/useOrcamentacao'
+import type { OrcRegiao, OrcArquivoTipo } from '../../types/orcamentacao'
 import { fmtBRL, fmtMM, fmtNum, StatusBadge, Kpi, BarRow, MiniMarkdown, CARD } from './_ui'
 
 const SECAO_COR = ['#f59e0b', '#3b82f6', '#14b8a6', '#8b5cf6', '#ec4899', '#10b981', '#64748b', '#f43f5e']
@@ -21,6 +24,7 @@ export default function OrcamentoDetalhe() {
   const reprocessar = useReprocessarOrcamento()
   const [scopeKey, setScopeKey] = useState<string>('total')
   const [openObra, setOpenObra] = useState<string | null>(null)
+  const [aba, setAba] = useState<'pre' | 'doc' | 'orc'>('pre')
 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -96,8 +100,23 @@ export default function OrcamentoDetalhe() {
       {/* Estado: concluído */}
       {orc.status === 'concluido' && resumo && r && (
         <>
+          {/* Abas / estágios */}
+          <div className={`flex items-center gap-1 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            {([{ k: 'pre', label: 'Pré-análise', icon: Mountain }, { k: 'doc', label: 'Documentos', icon: Paperclip }, { k: 'orc', label: 'Orçamento', icon: Wallet }] as const).map(t => (
+              <button
+                key={t.k}
+                onClick={() => setAba(t.k)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors ${
+                  aba === t.k ? 'border-amber-500 text-amber-500' : `border-transparent ${txtMuted} ${isDark ? 'hover:text-slate-200' : 'hover:text-slate-700'}`
+                }`}
+              >
+                <t.icon size={14} /> {t.label}
+              </button>
+            ))}
+          </div>
+
           {/* Seletor de região */}
-          {regioes.length > 0 && (
+          {aba !== 'doc' && regioes.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className={`text-[11px] font-bold uppercase tracking-wider mr-1 ${txtMuted}`}>Região:</span>
               {[{ k: 'total', label: `Total · ${fmtNum(rTot?.lts?.length ?? 0)} obras` }, ...regioes.map(rg => ({ k: rg.regiao, label: `${rg.regiao} · ${rg.lts.length}` }))].map(opt => (
@@ -114,19 +133,25 @@ export default function OrcamentoDetalhe() {
               ))}
             </div>
           )}
-          {isRegiao && (scope as OrcRegiao).f_terreno != null && (
+          {aba !== 'doc' && isRegiao && (scope as OrcRegiao).f_terreno != null && (
             <p className={`text-[11px] ${txtMuted}`}>Escopo: <span className="font-bold">{scopeKey}</span> · terreno aplicado ×{fmtNum((scope as OrcRegiao).f_terreno!, 2)}</p>
           )}
 
+          {/* Documentos */}
+          {aba === 'doc' && <DocumentosTab orc={orc} isDark={isDark} />}
+
           {/* KPIs de CUSTO */}
+          {aba === 'orc' && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi label="Custo estimado" value={fmtMM(resumo.custo_total)} hint="custo real Nibo+TOTVS" tone="amber" isDark={isDark} />
             <Kpi label="Custo / US" value={`R$ ${fmtNum(resumo.custo_us)}`} hint="base executada (R$/US)" tone="teal" isDark={isDark} />
             <Kpi label="Total de US" value={fmtNum(resumo.us)} hint="unidades de serviço CEMIG" tone="sky" isDark={isDark} />
             <Kpi label="Custo / torre" value={fmtMM(resumo.custo_por_torre)} hint={`${fmtNum(resumo.custo_por_km)}/km`} tone="indigo" isDark={isDark} />
           </div>
+          )}
 
           {/* Engenharia / características */}
+          {aba === 'pre' && (
           <section className={`${CARD(isDark)} p-4`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Factory size={14} className="text-amber-500" /> Características e engenharia</h2>
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
@@ -165,9 +190,10 @@ export default function OrcamentoDetalhe() {
               </div>
             )}
           </section>
+          )}
 
           {/* Análise do SuperTEG (do escopo selecionado) */}
-          {analiseTxt && (
+          {aba === 'pre' && analiseTxt && (
             <section className={`${CARD(isDark)} p-4`}>
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-2 ${txt}`}>
                 <Sparkles size={14} className="text-amber-500" /> Análise do SuperTEG{isRegiao ? ` — ${scopeKey}` : ''}
@@ -178,7 +204,7 @@ export default function OrcamentoDetalhe() {
           )}
 
           {/* Obras (LDs) do escopo */}
-          {r.lts.length > 0 && (() => {
+          {aba === 'pre' && r.lts.length > 0 && (() => {
             const obras = [...r.lts].sort((a, b) => b.custo_total - a.custo_total)
             const vis = obras.slice(0, 50)
             return (
@@ -251,6 +277,7 @@ export default function OrcamentoDetalhe() {
           })()}
 
           {/* Itens EAP */}
+          {aba === 'orc' && (
           <section className={`${CARD(isDark)} overflow-hidden`}>
             <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><ListTree size={14} className="text-amber-500" /> Quantitativos e preços (EAP CEMIG)</h2>
@@ -285,9 +312,10 @@ export default function OrcamentoDetalhe() {
               Núcleo físico = fundações + montagem + lançamento (62,4% do contrato). O complemento cobre Administração Local, complementares e desmontagem.
             </div>
           </section>
+          )}
 
           {/* Plano de recursos + Comparação */}
-          {(r.plano_recursos || r.comparacao) && (
+          {aba === 'orc' && (r.plano_recursos || r.comparacao) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {r.plano_recursos && (
                 <section className={`${CARD(isDark)} p-4`}>
@@ -357,6 +385,7 @@ export default function OrcamentoDetalhe() {
           )}
 
           {/* Composição do custo + Cenários de preço */}
+          {aba === 'orc' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <section className={`${CARD(isDark)} p-4`}>
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Wallet size={14} className="text-amber-500" /> Composição do custo <span className={`text-[11px] font-normal ${txtMuted}`}>(real Nibo+TOTVS)</span></h2>
@@ -389,9 +418,10 @@ export default function OrcamentoDetalhe() {
               </section>
             )}
           </div>
+          )}
 
           {/* Curva S */}
-          {r.curva_s.length > 0 && (
+          {aba === 'orc' && r.curva_s.length > 0 && (
             <section className={`${CARD(isDark)} p-4`}>
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><TrendingUp size={14} className="text-amber-500" /> Curva S — desembolso mensal (custo)</h2>
               {(() => {
@@ -413,6 +443,7 @@ export default function OrcamentoDetalhe() {
           )}
 
           {/* Premissas + geometria */}
+          {aba === 'orc' && (
           <section className={`${CARD(isDark)} p-4`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><Percent size={14} className="text-amber-500" /> Premissas e fontes</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -433,8 +464,117 @@ export default function OrcamentoDetalhe() {
               </div>
             )}
           </section>
+          )}
         </>
       )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ABA DOCUMENTOS — anexar docs adicionais + Nº de US + Concluir orçamento
+// ═══════════════════════════════════════════════════════════════════════════════
+function DocumentosTab({ orc, isDark }: { orc: import('../../types/orcamentacao').Orcamento; isDark: boolean }) {
+  const { data: arquivos = [] } = useArquivos(orc.id)
+  const adicionar = useAdicionarArquivos()
+  const concluir = useConcluirOrcamento()
+  const [novos, setNovos] = useState<NovoArquivo[]>([])
+  const [us, setUs] = useState<string>(orc.premissas?.us_informado ? String(orc.premissas.us_informado) : '')
+  const [erro, setErro] = useState('')
+
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  function detectarTipo(name: string): OrcArquivoTipo {
+    const n = name.toLowerCase()
+    if (n.endsWith('.kmz') || n.endsWith('.kml')) return 'kmz'
+    if (n.endsWith('.pdf') || n.endsWith('.doc') || n.endsWith('.docx') || n.endsWith('.xlsx') || n.endsWith('.xls')) return 'spec'
+    return 'outro'
+  }
+
+  async function salvarDocs() {
+    setErro('')
+    try {
+      if (novos.length) await adicionar.mutateAsync({ orcamentoId: orc.id, arquivos: novos })
+      setNovos([])
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao enviar') }
+  }
+  async function concluirOrc() {
+    setErro('')
+    try {
+      if (novos.length) await adicionar.mutateAsync({ orcamentoId: orc.id, arquivos: novos })
+      const usNum = Number(us) || undefined
+      await concluir.mutateAsync({ id: orc.id, premissas: usNum ? { us_informado: usNum } : undefined })
+      setNovos([])
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao concluir') }
+  }
+
+  const card = `rounded-2xl border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`
+  const inputId = `orc-doc-input-${orc.id}`
+
+  return (
+    <div className="space-y-3">
+      {/* Arquivos enviados */}
+      <section className={`${card} p-4`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 mb-3 ${txt}`}><FileText size={14} className="text-amber-500" /> Documentos enviados</h2>
+        {arquivos.length === 0 ? (
+          <p className={`text-xs ${txtMuted}`}>Nenhum documento ainda.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {arquivos.map(a => (
+              <div key={a.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+                <FileText size={14} className={a.tipo === 'kmz' ? 'text-amber-500 shrink-0' : 'text-slate-400 shrink-0'} />
+                <span className={`text-xs font-medium truncate flex-1 ${txt}`}>{a.nome}</span>
+                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{a.tipo}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Adicionar documentos */}
+      <section className={`${card} p-4 space-y-3`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><UploadCloud size={14} className="text-amber-500" /> Adicionar documentos</h2>
+        <p className={`text-[11px] ${txtMuted}`}>Especificações, planilha de serviços/US, projeto executivo… O SuperTEG usa na conclusão.</p>
+        <label htmlFor={inputId} className={`block w-full rounded-xl border-2 border-dashed py-5 text-center cursor-pointer transition-colors ${isDark ? 'border-white/[0.12] hover:border-amber-400/40' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/40'}`}>
+          <UploadCloud size={22} className="text-amber-500 mx-auto mb-1" />
+          <span className={`text-sm font-semibold ${txt}`}>Selecionar arquivos</span>
+        </label>
+        <input id={inputId} type="file" multiple className="hidden" accept=".kmz,.kml,.pdf,.doc,.docx,.xlsx,.xls,image/*"
+          onChange={e => { const fs = e.target.files; if (fs) setNovos(prev => [...prev, ...Array.from(fs).map(f => ({ file: f, tipo: detectarTipo(f.name) }))]); e.currentTarget.value = '' }} />
+        {novos.length > 0 && (
+          <div className="space-y-1.5">
+            {novos.map((a, i) => (
+              <div key={i} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+                <FileText size={14} className="text-amber-500 shrink-0" />
+                <span className={`text-xs font-medium truncate flex-1 ${txt}`}>{a.file.name}</span>
+                <button onClick={() => setNovos(prev => prev.filter((_, j) => j !== i))} className={isDark ? 'text-slate-500 hover:text-rose-300' : 'text-slate-400 hover:text-rose-600'}><Trash2 size={14} /></button>
+              </div>
+            ))}
+            <button onClick={salvarDocs} disabled={adicionar.isPending} className={`text-xs font-bold px-3 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} disabled:opacity-60`}>
+              {adicionar.isPending ? 'Enviando…' : 'Salvar documentos'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Concluir */}
+      <section className={`${card} p-4 space-y-3`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}><CheckCircle2 size={14} className="text-emerald-500" /> Concluir orçamento</h2>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className={`text-[11px] font-bold uppercase tracking-wider ${txtMuted}`}>Nº de US (do edital)</label>
+            <input type="number" value={us} placeholder="opcional — custo exato" onChange={e => setUs(e.target.value)}
+              className={`block mt-1 w-48 rounded-xl border px-3 py-2 text-sm outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+          </div>
+          <button onClick={concluirOrc} disabled={concluir.isPending || adicionar.isPending}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60 shadow-sm">
+            {concluir.isPending ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Concluindo…</> : <><SparklesIcon size={16} /> Concluir com SuperTEG</>}
+          </button>
+        </div>
+        <p className={`text-[11px] ${txtMuted}`}>Reprocessa com os documentos e o Nº de US informado. {orc.estagio === 'concluido' ? 'Este orçamento já foi concluído — você pode reprocessar de novo.' : ''}</p>
+        {erro && <div className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 ${isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-600'}`}><X size={14} /> {erro}</div>}
+      </section>
     </div>
   )
 }

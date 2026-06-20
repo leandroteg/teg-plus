@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import type { Orcamento, OrcPremissas, OrcArquivoTipo } from '../types/orcamentacao'
+import type { Orcamento, OrcPremissas, OrcArquivoTipo, OrcArquivo } from '../types/orcamentacao'
 
 const BUCKET = 'orcamentacao-arquivos'
 
@@ -128,6 +128,75 @@ export function useReprocessarOrcamento() {
         throw new Error((resp as { motivo?: string }).motivo || 'Falha ao reprocessar')
       }
       return id
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+    },
+  })
+}
+
+// ── Arquivos do orçamento ───────────────────────────────────────────────────────
+export function useArquivos(orcamentoId?: string) {
+  return useQuery<OrcArquivo[]>({
+    queryKey: ['orc_arquivos', orcamentoId],
+    enabled: !!orcamentoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orc_arquivos').select('*').eq('orcamento_id', orcamentoId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as OrcArquivo[]
+    },
+  })
+}
+
+// ── Adicionar documentos a um orçamento existente (+ premissas) ──────────────────
+export function useAdicionarArquivos() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { orcamentoId: string; arquivos: NovoArquivo[]; premissas?: Partial<OrcPremissas> }) => {
+      for (const a of input.arquivos) {
+        const path = `${input.orcamentoId}/${Date.now()}_${safeName(a.file.name)}`
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET).upload(path, a.file, { upsert: true, contentType: a.file.type || 'application/octet-stream' })
+        if (upErr) throw new Error('Falha no upload de ' + a.file.name + ': ' + upErr.message)
+        const { error: arqErr } = await supabase.from('orc_arquivos').insert({
+          orcamento_id: input.orcamentoId, nome: a.file.name, tipo: a.tipo,
+          storage_path: path, mime: a.file.type || null, tamanho: a.file.size,
+        })
+        if (arqErr) throw new Error('Falha ao registrar ' + a.file.name)
+      }
+      if (input.premissas) {
+        const { data: cur } = await supabase.from('orc_orcamentos').select('premissas').eq('id', input.orcamentoId).maybeSingle()
+        const merged = { ...((cur?.premissas as object) ?? {}), ...input.premissas }
+        await supabase.from('orc_orcamentos').update({ premissas: merged }).eq('id', input.orcamentoId)
+      }
+      return input.orcamentoId
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ['orc_arquivos', id] })
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+    },
+  })
+}
+
+// ── Concluir (marca estágio + reprocessa com os docs) ────────────────────────────
+export function useConcluirOrcamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; premissas?: Partial<OrcPremissas> }) => {
+      if (input.premissas) {
+        const { data: cur } = await supabase.from('orc_orcamentos').select('premissas').eq('id', input.id).maybeSingle()
+        const merged = { ...((cur?.premissas as object) ?? {}), ...input.premissas }
+        await supabase.from('orc_orcamentos').update({ premissas: merged, estagio: 'concluido' }).eq('id', input.id)
+      } else {
+        await supabase.from('orc_orcamentos').update({ estagio: 'concluido' }).eq('id', input.id)
+      }
+      const { data: resp, error } = await supabase.functions.invoke('orcamentacao-estimar', { body: { orcamento_id: input.id } })
+      if (error) throw new Error(error.message)
+      if (resp && (resp as { ok?: boolean }).ok === false) throw new Error((resp as { motivo?: string }).motivo || 'Falha ao concluir')
+      return input.id
     },
     onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ['orcamento', id] })

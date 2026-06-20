@@ -146,6 +146,8 @@ export interface OrcArquivo {
   created_at: string
 }
 
+export type OrcEstagio = 'pre_analise' | 'concluido'
+
 export interface Orcamento {
   id: string
   numero: string | null
@@ -153,6 +155,7 @@ export interface Orcamento {
   descricao: string | null
   premissas: OrcPremissas
   status: OrcStatus
+  estagio?: OrcEstagio
   resultado: OrcResultado | null
   analise_md: string | null
   nivel_confianca: string | null
