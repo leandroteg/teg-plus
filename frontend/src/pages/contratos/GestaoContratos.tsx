@@ -8,7 +8,7 @@ import {
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
   LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { Contrato, ContratoMedicao } from '../../types/contratos'
@@ -1252,7 +1252,7 @@ function NovaMedicaoModal({
         valor_medido: medido,
         valor_retencao: retencao,
         // valor_liquido é coluna gerada no banco (valor_medido - valor_retencao); não enviar
-        status: 'rascunho',
+        status: 'em_aprovacao',
         observacoes: observacoes.trim() || undefined,
       } as any,
       {
@@ -1395,6 +1395,7 @@ function NovaMedicaoModal({
 }
 
 function TabMedicoes() {
+  const { perfil } = useAuth()
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1403,6 +1404,7 @@ function TabMedicoes() {
   const { data: medicoes = [], isLoading } = useMedicoes()
   const { data: contratos = [] } = useContratos()
   const faturar = useFaturarMedicao()
+  const atualizar = useAtualizarMedicao()
 
   const contratoMap = new Map(contratos.map(c => [c.id, c]))
 
@@ -1441,6 +1443,34 @@ function TabMedicoes() {
         }
       },
       onError: () => showToast('error', 'Erro ao enviar medição'),
+    })
+  }
+
+  const handleSubmeter = (medicaoId: string) => {
+    atualizar.mutate({ id: medicaoId, status: 'em_aprovacao' }, {
+      onSuccess: () => showToast('success', 'Medição enviada para aprovação'),
+      onError: (err: any) => showToast('error', `Erro: ${err?.message ?? 'desconhecido'}`),
+    })
+  }
+
+  const handleAprovar = (medicaoId: string) => {
+    if (!confirm('Aprovar esta medição?\n\nApós aprovada o contrato será atualizado e ela ficará pronta para envio ao Financeiro.')) return
+    atualizar.mutate({
+      id: medicaoId,
+      status: 'aprovado',
+      aprovado_por: perfil?.nome ?? 'Sistema',
+      aprovado_em: new Date().toISOString(),
+    }, {
+      onSuccess: () => showToast('success', 'Medição aprovada'),
+      onError: (err: any) => showToast('error', `Erro: ${err?.message ?? 'desconhecido'}`),
+    })
+  }
+
+  const handleRejeitar = (medicaoId: string) => {
+    if (!confirm('Rejeitar esta medição?')) return
+    atualizar.mutate({ id: medicaoId, status: 'rejeitado' }, {
+      onSuccess: () => showToast('success', 'Medição rejeitada'),
+      onError: (err: any) => showToast('error', `Erro: ${err?.message ?? 'desconhecido'}`),
     })
   }
 
@@ -1582,27 +1612,67 @@ function TabMedicoes() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {podeEnviar && (
-                          <button
-                            onClick={() => handleEnviar(m.id)}
-                            disabled={faturar.isPending}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl
-                              bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
-                              hover:bg-fuchsia-100 transition-all disabled:opacity-50"
-                            title="Cria CP/CR previsto a partir desta medição"
-                          >
-                            {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
-                            Enviar ao Financeiro
-                          </button>
-                        )}
-                        {jaEnviada && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
-                            <CheckCircle2 size={11} /> Enviada
-                          </span>
-                        )}
-                        {!podeEnviar && !jaEnviada && (
-                          <span className="text-[10px] text-slate-400">—</span>
-                        )}
+                        <div className="inline-flex items-center gap-1.5">
+                          {m.status === 'rascunho' && (
+                            <button
+                              onClick={() => handleSubmeter(m.id)}
+                              disabled={atualizar.isPending}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                bg-amber-50 border border-amber-200 text-[10px] font-bold text-amber-700
+                                hover:bg-amber-100 transition-all disabled:opacity-50"
+                              title="Enviar para aprovação"
+                            >
+                              <Send size={11} /> Enviar p/ Aprovação
+                            </button>
+                          )}
+                          {m.status === 'em_aprovacao' && (
+                            <>
+                              <button
+                                onClick={() => handleAprovar(m.id)}
+                                disabled={atualizar.isPending}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                  bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700
+                                  hover:bg-emerald-100 transition-all disabled:opacity-50"
+                                title="Aprovar medição"
+                              >
+                                <CheckCircle2 size={11} /> Aprovar
+                              </button>
+                              <button
+                                onClick={() => handleRejeitar(m.id)}
+                                disabled={atualizar.isPending}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                  bg-red-50 border border-red-200 text-[10px] font-bold text-red-700
+                                  hover:bg-red-100 transition-all disabled:opacity-50"
+                                title="Rejeitar medição"
+                              >
+                                <XCircle size={11} /> Rejeitar
+                              </button>
+                            </>
+                          )}
+                          {podeEnviar && (
+                            <button
+                              onClick={() => handleEnviar(m.id)}
+                              disabled={faturar.isPending}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
+                                hover:bg-fuchsia-100 transition-all disabled:opacity-50"
+                              title="Cria CP/CR previsto a partir desta medição"
+                            >
+                              {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                              Enviar ao Financeiro
+                            </button>
+                          )}
+                          {jaEnviada && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
+                              <CheckCircle2 size={11} /> Enviada
+                            </span>
+                          )}
+                          {m.status === 'rejeitado' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500">
+                              <XCircle size={11} /> Rejeitada
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
