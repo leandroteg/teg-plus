@@ -294,14 +294,23 @@ export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDar
       {!processando && (
         <>
           {!d ? (
-            <section className={`${CARD(isDark)} p-8 text-center`}>
+            <section className={`${CARD(isDark)} p-6 text-center`}>
               <div className={`w-12 h-12 mx-auto rounded-2xl flex items-center justify-center mb-3 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 {(() => { const Ic = ESTAGIOS[aba - 1].icon; return <Ic size={24} className="text-amber-500" /> })()}
               </div>
               <p className={`text-sm font-bold ${txt}`}>Estágio {aba} — {ESTAGIOS[aba - 1].label}</p>
-              <p className={`text-xs mt-1 mb-4 ${txtMuted}`}>Ainda não gerado. O SuperTEG vai gerar com base em tudo o que já analisamos nesta orçamentação.</p>
+              <p className={`text-xs mt-1 ${txtMuted}`}>
+                {aba === 2 ? 'Anexe os documentos do edital (romaneio, projeto de fundação, cronograma, matriz de recursos) ANTES de gerar — o estágio 2 extrai os fatos APENAS deles.'
+                  : aba === 3 ? 'Anexe a matriz de recursos / tabela de salários do contrato, se houver, antes de gerar.'
+                  : 'Ainda não gerado. O SuperTEG vai gerar com base em tudo o que já analisamos nesta orçamentação.'}
+              </p>
+              {(aba === 1 || aba === 2 || aba === 3) && (
+                <div className="text-left max-w-xl mx-auto mt-3 mb-4">
+                  <DocsInput orcId={orc.id} isDark={isDark} hint={aba === 2 ? 'romaneio, projeto de fundação, cronograma, matriz de recursos' : aba === 3 ? 'matriz de recursos, tabela de salários' : 'documentos adicionais'} />
+                </div>
+              )}
               <button onClick={() => rodar.mutate({ id: orc.id, estagio: aba })} disabled={rodar.isPending}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60">
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60 mt-1">
                 <Sparkles size={16} /> Gerar este estágio
               </button>
             </section>
