@@ -441,6 +441,54 @@ export function useEnviarFaturasFinanceiro() {
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['loc-fatura-resumo'] })
+    },
+  })
+}
+
+// Gera faturas mensais (aluguel + iptu + condominio + energia + agua + internet)
+// para todos os imoveis ativos. Idempotente: nao re-cria se ja existe (imovel, tipo, mes).
+export function useGerarFaturasMes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ competencia }: { competencia: string }) => {
+      const { data, error } = await supabase.rpc('loc_gerar_faturas_mes', {
+        p_competencia: competencia,
+      })
+      if (error) throw error
+      return data as {
+        ok: boolean
+        competencia: string
+        imoveis_ativos: number
+        criadas: number
+        puladas_existentes: number
+        erro?: string
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+      qc.invalidateQueries({ queryKey: ['loc-fatura-resumo'] })
+    },
+  })
+}
+
+// Desfaz envio de fatura: volta status para 'lancado' e deleta CP previsto.
+// Bloqueia se CP ja tem pagamento.
+export function useCancelarEnvioFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ faturaId }: { faturaId: string }) => {
+      const { data, error } = await supabase.rpc('loc_cancelar_envio_fatura', {
+        p_fatura_id: faturaId,
+      })
+      if (error) throw error
+      return data as { ok: boolean; erro?: string; fatura_id?: string; cp_deletado?: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['loc-fatura-resumo'] })
     },
   })
 }

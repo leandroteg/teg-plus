@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
-  ChevronLeft, ChevronRight, Pencil, Plus, Download, Send,
+  ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura, useEnviarFaturasFinanceiro } from '../../hooks/useLocacao'
+import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura, useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura } from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
@@ -204,6 +204,7 @@ function ImovelFaturasModal({
   const [modalCompetencia, setModalCompetencia] = useState(currentYYYYMM)
   const [editingRow, setEditingRow] = useState<{ tipo: TipoFatura; fatura: LocFatura | null } | null>(null)
   const enviarFinanceiro = useEnviarFaturasFinanceiro()
+  const cancelarEnvio = useCancelarEnvioFatura()
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -317,6 +318,28 @@ function ImovelFaturasModal({
                               >
                                 <Pencil size={12} />
                               </button>
+                              {fat.status === 'enviado_pagamento' && (
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('Desfazer envio? A Conta a Pagar vinculada será deletada (só se ainda estiver "previsto" sem pagamento) e a fatura volta para "lançado".')) return
+                                    try {
+                                      const r = await cancelarEnvio.mutateAsync({ faturaId: fat.id })
+                                      if (!r.ok) {
+                                        alert(`Não foi possível desfazer: ${r.erro ?? 'erro desconhecido'}`)
+                                        return
+                                      }
+                                      alert('✓ Envio desfeito.')
+                                    } catch (err: any) {
+                                      alert(`Erro: ${err?.message ?? 'desconhecido'}`)
+                                    }
+                                  }}
+                                  disabled={cancelarEnvio.isPending}
+                                  className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-amber-500/10 text-amber-400' : 'hover:bg-amber-50 text-amber-600'}`}
+                                  title="Desfazer envio ao Financeiro"
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </>
@@ -408,7 +431,17 @@ function ImovelFaturasModal({
                 if (!confirm(`Enviar ${elegiveis.length} fatura(s) deste imóvel para o Financeiro? Cria uma Conta a Pagar para cada.`)) return
                 try {
                   const r = await enviarFinanceiro.mutateAsync({ faturaIds: elegiveis.map(f => f.id) })
-                  alert(`✓ ${r.enviadas} fatura(s) enviada(s) ao Financeiro${r.puladas > 0 ? ` (${r.puladas} pulada(s))` : ''}.`)
+                  const MOTIVO_LABEL: Record<string, string> = {
+                    ja_enviada: 'Já enviada anteriormente',
+                    status_invalido: 'Status fora de previsto/lançado',
+                    sem_valor: 'Sem valor',
+                    imovel_inativo: 'Imóvel inativo ou em saída',
+                  }
+                  const detalhe = r.puladas > 0 && r.motivos?.length
+                    ? '\n\nMotivos das puladas:\n' + r.motivos
+                        .map(m => `• ${MOTIVO_LABEL[m.motivo] ?? m.motivo}`).join('\n')
+                    : ''
+                  alert(`✓ ${r.enviadas} fatura(s) enviada(s) ao Financeiro${r.puladas > 0 ? ` (${r.puladas} pulada(s))` : ''}.${detalhe}`)
                 } catch (err: any) {
                   alert(`Erro ao enviar: ${err?.message ?? 'desconhecido'}`)
                 }
@@ -433,6 +466,7 @@ export default function Faturas() {
 
   const { data: imoveis = [], isLoading: loadingImoveis } = useImoveis()
   const { data: faturas = [], isLoading: loadingFaturas } = useFaturas()
+  const gerarMes = useGerarFaturasMes()
 
   const [busca, setBusca] = useState('')
   const [competencia, setCompetencia] = useState(currentYYYYMM)
@@ -564,9 +598,34 @@ export default function Faturas() {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div>
-        <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Faturas</h1>
-        <p className={`text-xs ${txtMuted}`}>Visao consolidada de contas por imovel</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Faturas</h1>
+          <p className={`text-xs ${txtMuted}`}>Visao consolidada de contas por imovel</p>
+        </div>
+        <button
+          onClick={async () => {
+            const competenciaDate = `${competencia}-01`
+            const label = competenciaLabel(competencia)
+            if (!confirm(`Gerar faturas (aluguel + IPTU + condomínio + energia + água + internet) para todos os imóveis ativos da competência ${label}?\n\nFaturas já existentes do mesmo trio (imóvel + tipo + mês) não são duplicadas.`)) return
+            try {
+              const r = await gerarMes.mutateAsync({ competencia: competenciaDate })
+              if (!r.ok) {
+                alert(`Erro: ${r.erro ?? 'desconhecido'}`)
+                return
+              }
+              alert(`✓ ${r.criadas} fatura(s) criada(s) para ${r.imoveis_ativos} imóvel(is) ativo(s).${r.puladas_existentes > 0 ? `\n${r.puladas_existentes} já existiam (pulada(s)).` : ''}`)
+            } catch (err: any) {
+              alert(`Erro ao gerar: ${err?.message ?? 'desconhecido'}`)
+            }
+          }}
+          disabled={gerarMes.isPending}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-60"
+          title="Cria as faturas mensais (aluguel + 5 tipos extras) para todos os imóveis ativos na competência selecionada"
+        >
+          {gerarMes.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Gerar faturas do mês
+        </button>
       </div>
 
       {/* Toolbar */}
