@@ -1395,7 +1395,8 @@ function NovaMedicaoModal({
 }
 
 function TabMedicoes() {
-  const { perfil } = useAuth()
+  const { perfil, isAdmin, hasSetorPapel } = useAuth()
+  const podeAprovar = isAdmin || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1454,15 +1455,28 @@ function TabMedicoes() {
   }
 
   const handleAprovar = (medicaoId: string) => {
-    if (!confirm('Aprovar esta medição?\n\nApós aprovada o contrato será atualizado e ela ficará pronta para envio ao Financeiro.')) return
+    if (!confirm('Aprovar esta medição?\n\nApós aprovada, o contrato será atualizado e a medição será automaticamente enviada ao Financeiro (cria CP/CR previsto).')) return
     atualizar.mutate({
       id: medicaoId,
       status: 'aprovado',
       aprovado_por: perfil?.nome ?? 'Sistema',
       aprovado_em: new Date().toISOString(),
     }, {
-      onSuccess: () => showToast('success', 'Medição aprovada'),
-      onError: (err: any) => showToast('error', `Erro: ${err?.message ?? 'desconhecido'}`),
+      onSuccess: () => {
+        // Encadeia o envio ao Financeiro logo após a aprovação.
+        faturar.mutate(medicaoId, {
+          onSuccess: (res) => {
+            if (res.ok) {
+              const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+              showToast('success', `Aprovada e enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
+            } else {
+              showToast('error', `Aprovada, mas não enviada: ${res.motivo ?? 'desconhecido'}`)
+            }
+          },
+          onError: () => showToast('error', 'Aprovada, mas falhou ao enviar ao Financeiro'),
+        })
+      },
+      onError: (err: any) => showToast('error', `Erro ao aprovar: ${err?.message ?? 'desconhecido'}`),
     })
   }
 
@@ -1626,28 +1640,38 @@ function TabMedicoes() {
                             </button>
                           )}
                           {m.status === 'em_aprovacao' && (
-                            <>
-                              <button
-                                onClick={() => handleAprovar(m.id)}
-                                disabled={atualizar.isPending}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
-                                  bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700
-                                  hover:bg-emerald-100 transition-all disabled:opacity-50"
-                                title="Aprovar medição"
-                              >
-                                <CheckCircle2 size={11} /> Aprovar
-                              </button>
-                              <button
-                                onClick={() => handleRejeitar(m.id)}
-                                disabled={atualizar.isPending}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
-                                  bg-red-50 border border-red-200 text-[10px] font-bold text-red-700
-                                  hover:bg-red-100 transition-all disabled:opacity-50"
-                                title="Rejeitar medição"
-                              >
-                                <XCircle size={11} /> Rejeitar
-                              </button>
-                            </>
+                            podeAprovar ? (
+                              <>
+                                <button
+                                  onClick={() => handleAprovar(m.id)}
+                                  disabled={atualizar.isPending || faturar.isPending}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                    bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700
+                                    hover:bg-emerald-100 transition-all disabled:opacity-50"
+                                  title="Aprovar medição (envia ao Financeiro automaticamente)"
+                                >
+                                  {atualizar.isPending || faturar.isPending
+                                    ? <Loader2 size={11} className="animate-spin" />
+                                    : <CheckCircle2 size={11} />}
+                                  Aprovar
+                                </button>
+                                <button
+                                  onClick={() => handleRejeitar(m.id)}
+                                  disabled={atualizar.isPending || faturar.isPending}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
+                                    bg-red-50 border border-red-200 text-[10px] font-bold text-red-700
+                                    hover:bg-red-100 transition-all disabled:opacity-50"
+                                  title="Rejeitar medição"
+                                >
+                                  <XCircle size={11} /> Rejeitar
+                                </button>
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 italic"
+                                title="Apenas Supervisor/Diretor/CEO de Contratos podem aprovar">
+                                <Lock size={11} /> Aguardando aprovação
+                              </span>
+                            )
                           )}
                           {podeEnviar && (
                             <button
@@ -1656,7 +1680,7 @@ function TabMedicoes() {
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
                                 bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
                                 hover:bg-fuchsia-100 transition-all disabled:opacity-50"
-                              title="Cria CP/CR previsto a partir desta medição"
+                              title="Reenviar ao Financeiro"
                             >
                               {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
                               Enviar ao Financeiro
@@ -1664,7 +1688,7 @@ function TabMedicoes() {
                           )}
                           {jaEnviada && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
-                              <CheckCircle2 size={11} /> Enviada
+                              <CheckCircle2 size={11} /> No Financeiro
                             </span>
                           )}
                           {m.status === 'rejeitado' && (
