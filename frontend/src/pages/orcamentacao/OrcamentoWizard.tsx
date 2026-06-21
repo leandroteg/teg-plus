@@ -574,6 +574,15 @@ function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: strin
   )
 }
 
+function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: boolean }) {
+  return (
+    <div className={`rounded-lg px-2 py-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+      <p className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
+      <p className={`text-[11px] font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{val}</p>
+    </div>
+  )
+}
+
 // ── Consolidação (estágio 2): resumo (medido) + SÓ fatos extraídos dos documentos ──
 function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, unknown>; isDark: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -596,7 +605,19 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
     rios += g?.travessias?.rios ?? 0; rod += g?.travessias?.rodovias ?? 0
   })
   const relevoTxt = ['Plano', 'Ondulado', 'Acidentado', 'Serrano', 'Curto'].filter(c => relevoCount[c]).map(c => `${relevoCount[c]} ${c}`).join(' · ')
-  const fatosDaObra = (nome: string) => { const nn = normN(nome); return quant.filter(q => { const on = normN(String(q.obra || '')); return on && (on === nn || on.includes(nn) || nn.includes(on)) }) }
+  // casa fato↔obra por sobreposição de tokens (Jaccard) — robusto a sufixos/variações de nome
+  const STOP = new Set(['ld', 'kv', 'de', 'da', 'do', 'dos', 'das'])
+  const toks = (s: string) => new Set(normN(s).split(' ').filter(t => t.length > 2 && !/^\d/.test(t) && !STOP.has(t)))
+  const fatosDaObra = (nome: string) => {
+    const nt = toks(nome); if (!nt.size) return []
+    return quant.filter(q => {
+      const qo = String(q.obra || ''); if (!qo || normN(qo) === 'geral') return false
+      const qt = toks(qo); if (!qt.size) return false
+      let shared = 0; nt.forEach(t => { if (qt.has(t)) shared++ })
+      const uni = new Set([...nt, ...qt]).size
+      return uni > 0 && shared / uni >= 0.5
+    })
+  }
 
   const Secao = ({ titulo, icon: Icon, itens, cols }: { titulo: string; icon: LucideIcon; itens: Array<Record<string, unknown>>; cols: { k: string; w?: string; bold?: boolean }[] }) =>
     itens.length === 0 ? null : (
@@ -638,36 +659,46 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
         </div>
       </div>
 
-      {/* RESUMO POR OBRA (medido + fatos dos docs) */}
+      {/* RESUMO POR OBRA — cards (medido + fatos dos docs) */}
       {obras1.length > 0 && (
-        <div className="space-y-1.5">
-          <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Resumo por obra <span className="font-normal normal-case opacity-70">(medido + fatos dos documentos)</span></p>
-          {[...obras1].sort((a, b) => Number(b.km) - Number(a.km)).map((o, i) => {
-            const g = o.geo as GeoData | undefined
-            const rel = relevoReal(g?.perfil?.rampa_media_pct, Number(o.f_terreno), Number(o.km))
-            const tn = RELEVO_TONE[rel.tone]
-            const tv = g?.travessias
-            const fatos = fatosDaObra(String(o.nome))
-            const destaque = fatos.filter(f => /torre|estrutura|fundac|fundaç|aço|aco |comprimento|cabo|condutor/i.test(String(f.item))).slice(0, 3)
-            return (
-              <div key={i} className={`flex gap-2.5 rounded-lg border p-2.5 ${isDark ? 'border-white/[0.06] bg-white/[0.015]' : 'border-slate-200 bg-white'}`}>
-                <span className="w-1 rounded-full shrink-0 self-stretch" style={{ background: tn.barHex }} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-xs font-bold flex items-center gap-1.5 ${txt}`}><RelevoGlyph tone={rel.tone} size={13} /> <span className="truncate">{String(o.nome)}</span></p>
-                  <p className={`text-[11px] mt-0.5 ${txtMuted}`}>
-                    {fmtNum(Number(o.km), 1)} km · {rel.label}{g?.amplitude_m != null ? ` · amplitude ${g.amplitude_m} m` : ''}{tv ? ` · ${tv.rios} rios · ${tv.rodovias} rod${tv.lts ? ` · ${tv.lts} LT` : ''}` : ''}
-                  </p>
-                  {destaque.length > 0 ? (
-                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>📄 {destaque.map(f => `${String(f.item)}: ${String(f.valor)}`).join(' · ')}{fatos.length > destaque.length ? ` · +${fatos.length - destaque.length} fato(s)` : ''}</p>
-                  ) : fatos.length > 0 ? (
-                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>📄 {fatos.length} fato(s) nos documentos</p>
-                  ) : (
-                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-300/80' : 'text-amber-600'}`}>⚠ sem fato de documento para esta obra (vide pendências)</p>
-                  )}
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo por obra <span className="font-normal normal-case opacity-70">({obras1.length} no KMZ — medido + fatos dos documentos)</span></p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+            {[...obras1].sort((a, b) => Number(b.km) - Number(a.km)).map((o, i) => {
+              const g = o.geo as GeoData | undefined
+              const rel = relevoReal(g?.perfil?.rampa_media_pct, Number(o.f_terreno), Number(o.km))
+              const tn = RELEVO_TONE[rel.tone]
+              const tv = g?.travessias
+              const fatos = fatosDaObra(String(o.nome))
+              const destaque = fatos.filter(f => /torre|estrutura|fundac|fundaç|aço|aco |comprimento|cabo|condutor|tens/i.test(String(f.item))).slice(0, 4)
+              return (
+                <div key={i} className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.07] bg-white/[0.015]' : 'border-slate-200 bg-white'}`}>
+                  <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b ${isDark ? 'border-white/[0.05]' : 'border-slate-100'}`} style={{ borderLeft: `3px solid ${tn.barHex}` }}>
+                    <p className={`text-xs font-bold truncate ${txt}`}>{String(o.nome)}</p>
+                    <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={12} /> {rel.label}</span>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <CardMetric lbl="Extensão" val={`${fmtNum(Number(o.km), 1)} km`} isDark={isDark} />
+                      <CardMetric lbl="Amplitude" val={g?.amplitude_m != null ? `${g.amplitude_m} m` : '—'} isDark={isDark} />
+                      <CardMetric lbl="Travessias" val={tv ? `${tv.rios} rio · ${tv.rodovias} rod` : '—'} isDark={isDark} />
+                    </div>
+                    {destaque.length > 0 ? (
+                      <div className={`rounded-lg p-2 ${isDark ? 'bg-emerald-500/[0.08]' : 'bg-emerald-50'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>📄 Fatos dos documentos</p>
+                        <div className="space-y-0.5">
+                          {destaque.map((f, k) => <p key={k} className={`text-[11px] truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}><span className={txtMuted}>{String(f.item)}:</span> <b>{String(f.valor)}</b></p>)}
+                        </div>
+                        {fatos.length > destaque.length && <p className={`text-[10px] mt-1 ${txtMuted}`}>+{fatos.length - destaque.length} fato(s) — vide tabela abaixo</p>}
+                      </div>
+                    ) : (
+                      <p className={`text-[11px] rounded-lg p-2 ${isDark ? 'bg-amber-500/[0.08] text-amber-300/90' : 'bg-amber-50 text-amber-700'}`}>⚠ Sem fato de documento vinculado a esta obra (vide pendências)</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 
