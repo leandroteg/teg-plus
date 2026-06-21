@@ -125,11 +125,22 @@ export function MiniMarkdown({ text, isDark }: { text: string; isDark: boolean }
       continue
     }
     if (!l.trim()) { out.push(<div key={i} className="h-2" />); i++; continue }
-    if (l.startsWith('### ')) out.push(<h4 key={i} className={`text-xs font-bold mt-2 mb-1 ${head}`}>{inline(l.slice(4))}</h4>)
-    else if (l.startsWith('## ')) out.push(<h3 key={i} className={`text-sm font-extrabold mt-3 mb-1 ${head}`}>{inline(l.slice(3))}</h3>)
-    else if (l.startsWith('# ')) out.push(<h2 key={i} className={`text-base font-extrabold mt-2 mb-1.5 ${head}`}>{inline(l.slice(2))}</h2>)
-    else if (/^[-*]\s/.test(l)) out.push(<div key={i} className={`flex gap-2 text-xs leading-relaxed ${txt}`}><span className="text-amber-500">•</span><span>{inline(l.replace(/^[-*]\s/, ''))}</span></div>)
-    else out.push(<p key={i} className={`text-xs leading-relaxed ${txt}`}>{inline(l)}</p>)
+    const hMatch = l.match(/^(#{1,6})\s+(.*)/)
+    if (hMatch) {
+      const nivel = hMatch[1].length
+      const cls = nivel <= 1 ? `text-base font-extrabold mt-2 mb-1.5 ${head}`
+        : nivel === 2 ? `text-sm font-extrabold mt-3 mb-1 ${head}`
+        : nivel === 3 ? `text-xs font-bold mt-2 mb-1 ${head}`
+        : `text-[11px] font-bold uppercase tracking-wide mt-2 mb-0.5 ${head}`
+      out.push(<p key={i} className={cls}>{inline(hMatch[2])}</p>)
+    } else if (/^\d+\.\s/.test(l)) {
+      const m = l.match(/^(\d+)\.\s(.*)/)!
+      out.push(<div key={i} className={`flex gap-2 text-xs leading-relaxed ${txt}`}><span className="text-amber-500 font-bold tabular-nums shrink-0">{m[1]}.</span><span>{inline(m[2])}</span></div>)
+    } else if (/^[-*]\s/.test(l)) {
+      out.push(<div key={i} className={`flex gap-2 text-xs leading-relaxed ${txt}`}><span className="text-amber-500">•</span><span>{inline(l.replace(/^[-*]\s/, ''))}</span></div>)
+    } else {
+      out.push(<p key={i} className={`text-xs leading-relaxed ${txt}`}>{inline(l)}</p>)
+    }
     i++
   }
   return <div className="space-y-0.5">{out}</div>
