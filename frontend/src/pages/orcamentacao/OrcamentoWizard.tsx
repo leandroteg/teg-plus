@@ -780,24 +780,42 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const cenarios = (d.cenarios as Array<Record<string, unknown>>) ?? []
   const rec = String(d.cenario_recomendado ?? '')
+  const us = Number(d.us || 0)
+  const custoTotal = Number(d.custo_total || 0)
+  const custoUs = Number(d.custo_us || 0)
+  const refUs = d.preco_contratado_us_ref != null ? Number(d.preco_contratado_us_ref) : null
   return (
     <section className={`${CARD(isDark)} p-4`}>
-      <h3 className={`text-sm font-extrabold mb-3 ${txt}`}>Cenários de orçamentação</h3>
+      <h3 className={`text-sm font-extrabold mb-3 ${txt}`}>Orçamentação por US</h3>
+      {/* base de custo herdada do estágio 4 */}
+      {custoTotal > 0 && (
+        <div className={`rounded-xl border p-3 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
+          <ResumoStat lbl="Custo total (estágio 4)" val={fmtMM(custoTotal)} isDark={isDark} small />
+          <ResumoStat lbl="Unidades de Serviço" val={fmtNum(us)} isDark={isDark} small />
+          <ResumoStat lbl="Custo / US" val={`R$ ${fmtNum(custoUs)}`} isDark={isDark} small />
+          {refUs != null && <ResumoStat lbl="Ref. edital / US" val={`R$ ${fmtNum(refUs)}`} isDark={isDark} small />}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {cenarios.map((c, i) => {
           const isRec = rec && String(c.nome) === rec
+          const ref = c.preco_us_ref != null ? Number(c.preco_us_ref) : null
           return (
             <div key={i} className={`rounded-xl px-3 py-2.5 border ${isRec ? 'border-amber-500' : isDark ? 'border-white/[0.06]' : 'border-slate-200'} ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
               <div className="flex items-center justify-between">
                 <p className={`text-xs font-bold ${txt}`}>{String(c.nome)} {isRec && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white ml-1">recomendado</span>}</p>
-                <span className={`text-[10px] ${txtMuted}`}>margem {fmtNum(Number(c.margem_pct), 0)}%</span>
+                <span className={`text-[10px] font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>+{fmtNum(Number(c.margem_pct), 1)}% s/ custo</span>
               </div>
               <p className={`text-base font-extrabold mt-0.5 ${txt}`}>{fmtMM(Number(c.preco_total))}</p>
-              <p className={`text-[10px] ${txtMuted}`}>R$ {fmtNum(Number(c.preco_us))}/US</p>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className={`text-[10px] ${txtMuted}`}>R$ {fmtNum(Number(c.preco_us))}/US{c.lucro != null ? ` · lucro ${fmtMM(Number(c.lucro))}` : ''}</p>
+                {ref != null && <span className={`text-[9px] shrink-0 ${txtMuted}`} title="Preço/US de referência do edital">ref R$ {fmtNum(ref)}</span>}
+              </div>
             </div>
           )
         })}
       </div>
+      <p className={`text-[10px] mt-2 ${txtMuted}`}>Preço/US = (custo/US do estágio 4) × (1 + margem). Total = US × preço/US. "ref" = preço/US de referência do edital, para comparar competitividade.</p>
     </section>
   )
 }
