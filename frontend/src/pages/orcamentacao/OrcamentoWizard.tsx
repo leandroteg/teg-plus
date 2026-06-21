@@ -365,7 +365,8 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
       </section>
 
       {/* Dados gerados (por tipo de estágio) */}
-      {(estagio === 1 || estagio === 2) && <Caracteristicas d={d} estagio={estagio} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
+      {estagio === 1 && <Caracteristicas d={d} estagio={estagio} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
+      {estagio === 2 && <Consolidacao d={d} isDark={isDark} />}
       {estagio === 3 && <Recursos d={d} isDark={isDark} />}
       {estagio === 4 && <Custos d={d} isDark={isDark} />}
       {estagio === 5 && <Orcamentacao d={d} isDark={isDark} />}
@@ -550,6 +551,66 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
         </div>
       )}
       {mapaObra && <MapaObraModal orcamentoId={orcamentoId} obraNome={mapaObra} isDark={isDark} onClose={() => setMapaObra(null)} />}
+    </section>
+  )
+}
+
+// ── Consolidação (estágio 2): SÓ fatos extraídos dos documentos (sem estimativa) ──
+function Consolidacao({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) {
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const docs = (d.docs_analisados as string[]) ?? []
+  const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
+  const quant = arr('quantitativos'), crono = arr('cronograma'), recursos = arr('recursos_contrato'), restr = arr('restricoes'), geot = arr('geotecnia')
+  const pend = (d.pendencias as string[]) ?? []
+  const total = quant.length + crono.length + recursos.length + restr.length + geot.length
+
+  const Secao = ({ titulo, icon: Icon, itens, cols }: { titulo: string; icon: LucideIcon; itens: Array<Record<string, unknown>>; cols: { k: string; w?: string; bold?: boolean }[] }) =>
+    itens.length === 0 ? null : (
+      <div>
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 ${txtMuted}`}><Icon size={12} /> {titulo} <span className="opacity-60">({itens.length})</span></p>
+        <div className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          {itens.map((it, i) => (
+            <div key={i} className={`flex items-start gap-3 px-3 py-1.5 text-[11px] ${i ? (isDark ? 'border-t border-white/[0.05]' : 'border-t border-slate-100') : ''}`}>
+              {cols.map(c => (
+                <span key={c.k} className={`${c.w ?? 'flex-1'} min-w-0 ${c.k === 'fonte' ? `text-[10px] ${txtMuted} truncate` : c.bold ? `font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}` : (isDark ? 'text-slate-300' : 'text-slate-600')}`}>
+                  {c.k === 'fonte' ? (it[c.k] ? `📄 ${String(it[c.k])}` : '—') : String(it[c.k] ?? '—')}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+
+  return (
+    <section className={`${CARD(isDark)} p-4 space-y-3`}>
+      <div className="flex items-center justify-between">
+        <h3 className={`text-sm font-extrabold ${txt}`}>Fatos dos documentos <span className={`text-[11px] font-normal ${txtMuted}`}>(extraídos, sem estimativa)</span></h3>
+        <span className={`text-[11px] ${txtMuted}`}>{total} fato(s) · {docs.length} doc(s)</span>
+      </div>
+      {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
+      {docs.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {docs.map((n, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><FileText size={10} /> {n}</span>)}
+        </div>
+      )}
+      <Secao titulo="Quantitativos (romaneio/projeto)" icon={Layers} itens={quant} cols={[{ k: 'item' }, { k: 'obra', w: 'w-28' }, { k: 'valor', w: 'w-24', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      <Secao titulo="Cronograma / prazo" icon={Wallet} itens={crono} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      <Secao titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      <Secao titulo="Restrições / licenças" icon={AlertCircle} itens={restr} cols={[{ k: 'tipo', w: 'w-28' }, { k: 'descricao' }, { k: 'fonte', w: 'w-28' }]} />
+      <Secao titulo="Geotecnia" icon={Mountain} itens={geot} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      {pend.length > 0 && (
+        <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+          <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
+          <ul className="space-y-0.5">
+            {pend.map((p, i) => <li key={i} className={`text-[11px] flex gap-1.5 ${isDark ? 'text-amber-200' : 'text-amber-800'}`}><span>•</span><span>{p}</span></li>)}
+          </ul>
+        </div>
+      )}
+      {total === 0 && docs.length > 0 && (
+        <p className={`text-[11px] ${txtMuted}`}>Documentos lidos, mas nenhum fato útil foi extraído. Confira se os anexos têm romaneio, projeto de fundação, cronograma ou matriz de recursos.</p>
+      )}
     </section>
   )
 }
