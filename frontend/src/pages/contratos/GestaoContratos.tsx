@@ -1251,7 +1251,7 @@ function NovaMedicaoModal({
         periodo_fim: periodoFim,
         valor_medido: medido,
         valor_retencao: retencao,
-        valor_liquido: liquido,
+        // valor_liquido é coluna gerada no banco (valor_medido - valor_retencao); não enviar
         status: 'rascunho',
         observacoes: observacoes.trim() || undefined,
       } as any,
