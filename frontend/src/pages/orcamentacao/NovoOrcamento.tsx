@@ -13,13 +13,6 @@ const TIPO_OPTS: { value: OrcArquivoTipo; label: string }[] = [
   { value: 'outro', label: 'Outro' },
 ]
 
-const TERRENO_OPTS = [
-  { value: 'facil', label: 'Fácil (plano)' },
-  { value: 'medio', label: 'Médio (referência)' },
-  { value: 'dificil', label: 'Difícil (ondulado)' },
-  { value: 'severo', label: 'Severo (montanhoso/mata)' },
-]
-
 function detectarTipo(name: string): OrcArquivoTipo {
   const n = name.toLowerCase()
   if (n.endsWith('.kmz') || n.endsWith('.kml')) return 'kmz'
@@ -100,33 +93,10 @@ export default function NovoOrcamento() {
       {/* Premissas */}
       <section className={`${CARD(isDark)} p-4 space-y-3`}>
         <p className={`text-sm font-bold flex items-center gap-1.5 ${txt}`}><MountainSnow size={14} className="text-amber-500" /> Premissas</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div>
-            <label className={labelCls}>Tensão (kV)</label>
-            <input type="number" className={`${inputCls} mt-1`} value={premissas.tensao_kv ?? ''} onChange={e => setPremissas(p => ({ ...p, tensao_kv: Number(e.target.value) || undefined }))} />
-          </div>
-          <div>
-            <label className={labelCls}>Nº circuitos</label>
-            <input type="number" className={`${inputCls} mt-1`} value={premissas.n_circuitos ?? ''} onChange={e => setPremissas(p => ({ ...p, n_circuitos: Number(e.target.value) || undefined }))} />
-          </div>
-          <div>
-            <label className={labelCls}>Terreno</label>
-            <select className={`${inputCls} mt-1`} value={premissas.terreno} onChange={e => setPremissas(p => ({ ...p, terreno: e.target.value as OrcPremissas['terreno'] }))}>
-              {TERRENO_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Nº de US <span className="normal-case font-normal opacity-70">(opcional)</span></label>
-            <input type="number" className={`${inputCls} mt-1`} value={premissas.us_informado ?? ''} placeholder="do edital"
-              onChange={e => setPremissas(p => ({ ...p, us_informado: Number(e.target.value) || undefined }))} />
-          </div>
-        </div>
-        <p className={`text-[11px] ${txtMuted}`}>
-          <span className="font-semibold">Nº de US</span>: se você informar a quantidade de US do edital, o custo fica <span className="font-semibold">exato</span> (US × R$ 639/US), distribuído por região/obra. Em branco, o sistema estima as US pela geometria (~±30%).
-        </p>
         <div>
           <label className={labelCls}>Observações para a análise</label>
-          <textarea className={`${inputCls} mt-1 resize-none`} rows={2} value={premissas.observacoes} onChange={e => setPremissas(p => ({ ...p, observacoes: e.target.value }))} placeholder="Relevo, travessias, restrições ambientais, prazos do edital…" />
+          <textarea className={`${inputCls} mt-1 resize-none`} rows={3} value={premissas.observacoes} onChange={e => setPremissas(p => ({ ...p, observacoes: e.target.value }))}
+            placeholder="Qual lote regional pegar (ex.: Triângulo) e observações do edital. O relevo, travessias, acesso e canteiro saem automáticos do KMZ × mapas (SRTM/OSM)." />
         </div>
       </section>
 
