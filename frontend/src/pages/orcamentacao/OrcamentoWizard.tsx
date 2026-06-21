@@ -754,20 +754,23 @@ function Custos({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const comp = (d.composicao as Array<Record<string, unknown>>) ?? []
   const max = Math.max(...comp.map(c => Number(c.valor)), 1)
+  const custoUs = Number(d.custo_us ?? 679)
+  const ref36 = d.custo_us_ref_36m != null ? Number(d.custo_us_ref_36m) : null
   return (
     <section className={`${CARD(isDark)} p-4`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className={`text-sm font-extrabold ${txt}`}>Custo do projeto</h3>
         <span className={`text-lg font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{fmtMM(Number(d.custo_total ?? 0))}</span>
       </div>
-      <p className={`text-[11px] mb-2 ${txtMuted}`}>R$ {fmtNum(Number(d.custo_us ?? 639))}/US · {fmtNum(Number(d.us ?? 0))} US · contingência {fmtNum(Number(d.contingencia_pct ?? 0), 0)}%</p>
+      <p className={`text-[11px] mb-3 ${txtMuted}`}>Base de Preços · <b className={txt}>R$ {fmtNum(custoUs)}/US</b> operacional 2026{ref36 != null && custoUs !== ref36 ? ` · ref. 36m R$ ${fmtNum(ref36)}` : ''} · {fmtNum(Number(d.us ?? 0))} US · contingência {fmtNum(Number(d.contingencia_pct ?? 0), 0)}%</p>
       {comp.map((c, i) => (
         <div key={i} className="flex items-center gap-2 py-1">
-          <span className={`text-[11px] w-44 shrink-0 truncate ${txtMuted}`}>{String(c.natureza)} ({fmtNum(Number(c.pct), 1)}%)</span>
+          <span className={`text-[11px] w-40 shrink-0 truncate ${txtMuted}`}>{String(c.natureza)} ({fmtNum(Number(c.pct), 1)}%)</span>
           <div className={`flex-1 h-3 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
             <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.max(2, (Number(c.valor) / max) * 100)}%` }} />
           </div>
-          <span className={`text-[11px] font-bold w-20 text-right ${txt}`}>{fmtMM(Number(c.valor))}</span>
+          {c.rs_us != null && <span className={`text-[10px] w-16 text-right shrink-0 ${txtMuted}`}>R$ {fmtNum(Number(c.rs_us))}/US</span>}
+          <span className={`text-[11px] font-bold w-20 text-right shrink-0 ${txt}`}>{fmtMM(Number(c.valor))}</span>
         </div>
       ))}
     </section>
