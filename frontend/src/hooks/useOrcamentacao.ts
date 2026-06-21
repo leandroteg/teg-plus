@@ -189,6 +189,24 @@ export function useAdicionarArquivos() {
   })
 }
 
+// ── Remover um arquivo do orçamento (storage + registro) ─────────────────────────
+export function useRemoverArquivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; orcamentoId: string; storage_path: string }) => {
+      // remove do storage primeiro (best-effort — não bloqueia a exclusão do registro)
+      await supabase.storage.from(BUCKET).remove([input.storage_path])
+      const { error } = await supabase.from('orc_arquivos').delete().eq('id', input.id)
+      if (error) throw error
+      return input.id
+    },
+    onSettled: (_data, _err, input) => {
+      qc.invalidateQueries({ queryKey: ['orc_arquivos', input.orcamentoId] })
+      qc.invalidateQueries({ queryKey: ['orcamento', input.orcamentoId] })
+    },
+  })
+}
+
 // ── Concluir (marca estágio + reprocessa com os docs) ────────────────────────────
 export function useConcluirOrcamento() {
   const qc = useQueryClient()

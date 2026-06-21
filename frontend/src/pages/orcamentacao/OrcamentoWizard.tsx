@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
-  UploadCloud, FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
+  FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
   Route, RadioTower, Waves, Milestone, TrainTrack, Zap, Navigation, Tent,
+  Paperclip, Plus, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
-  useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, type NovoArquivo,
+  useRodarEstagio, useSalvarDadosEstagio, useArquivos, useAdicionarArquivos, useRemoverArquivo, type NovoArquivo,
 } from '../../hooks/useOrcamentacao'
-import type { Orcamento, OrcArquivoTipo } from '../../types/orcamentacao'
+import type { Orcamento, OrcArquivoTipo, OrcArquivo } from '../../types/orcamentacao'
 import ModuleTabs, { type TabTone, type TabState } from '../../components/ModuleTabs'
 import { fmtMM, fmtNum, MiniMarkdown, CARD } from './_ui'
 import MapaObraModal from './MapaObraModal'
@@ -703,11 +705,6 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       )}
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
-      {docs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {docs.map((n, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><FileText size={10} /> {n}</span>)}
-        </div>
-      )}
       <Secao titulo="Quantitativos (romaneio/projeto)" icon={Layers} itens={quant} cols={[{ k: 'item' }, { k: 'obra', w: 'w-28' }, { k: 'valor', w: 'w-24', bold: true }, { k: 'fonte', w: 'w-28' }]} />
       <Secao titulo="Cronograma / prazo" icon={Wallet} itens={crono} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
       <Secao titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
@@ -806,21 +803,21 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
 }
 
 // ── Upload de documentos (inputs dos estágios) ───────────────────────────────────
-function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hint: string }) {
-  const { data: arquivos = [] } = useArquivos(orcId)
+// ── Modal de anexos: lista + adicionar + remover ────────────────────────────────
+function AnexosModal({ orcId, isDark, onClose }: { orcId: string; isDark: boolean; onClose: () => void }) {
+  const { data: arquivos = [], isLoading } = useArquivos(orcId)
   const adicionar = useAdicionarArquivos()
+  const remover = useRemoverArquivo()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState('')
   const [prog, setProg] = useState<{ done: number; total: number } | null>(null)
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const inputId = `wiz-docs-${orcId}`
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const det = (n: string): OrcArquivoTipo => {
     const x = n.toLowerCase()
     if (x.endsWith('.kmz') || x.endsWith('.kml')) return 'kmz'
     if (x.endsWith('.pdf') || x.endsWith('.doc') || x.endsWith('.docx') || x.endsWith('.xlsx') || x.endsWith('.xls')) return 'spec'
     return 'outro'
   }
-  const docs = arquivos.filter(a => a.tipo !== 'kmz')
-  // sobe na hora ao anexar (sem passo "salvar" separado), com erro e progresso visíveis
   const enviar = async (files: File[]) => {
     setErro(''); setProg({ done: 0, total: files.length })
     try {
@@ -829,39 +826,88 @@ function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hi
         arquivos: files.map(f => ({ file: f, tipo: det(f.name) }) as NovoArquivo),
         onProgress: (done, total) => setProg({ done, total }),
       })
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Falha ao enviar os documentos.')
-    } finally {
-      setProg(null)
-    }
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao enviar os documentos.') }
+    finally { setProg(null) }
   }
-  return (
-    <div className="mt-3">
-      <p className={`text-[11px] mb-1.5 ${txtMuted}`}>Documentos ({hint}):</p>
-      {docs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {docs.map(a => <span key={a.id} className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><FileText size={11} /> {a.nome}</span>)}
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const kmz = arquivos.filter(a => a.tipo === 'kmz')
+  const docs = arquivos.filter(a => a.tipo !== 'kmz')
+  const linha = (a: OrcArquivo, destaque: boolean) => {
+    const removing = remover.isPending && remover.variables?.id === a.id
+    return (
+      <div key={a.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+        <FileText size={14} className={`shrink-0 ${destaque ? 'text-amber-500' : 'text-slate-400'}`} />
+        <div className="min-w-0 flex-1">
+          <p className={`text-[11px] font-medium truncate ${txt}`}>{a.nome}</p>
+          <p className={`text-[9px] ${txtMuted}`}>{a.tipo}{a.tamanho ? ` · ${(a.tamanho / 1024).toFixed(0)} KB` : ''}</p>
         </div>
-      )}
-      <div className="flex items-center gap-2 flex-wrap">
-        <label htmlFor={inputId} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${adicionar.isPending ? 'opacity-60 pointer-events-none' : ''} ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-          <UploadCloud size={13} /> Anexar
-        </label>
-        <input id={inputId} type="file" multiple disabled={adicionar.isPending} className="hidden" accept=".kmz,.kml,.pdf,.doc,.docx,.xlsx,.xls,image/*"
-          onChange={e => { const fs = e.target.files; if (fs && fs.length) enviar(Array.from(fs)); e.currentTarget.value = '' }} />
-        {adicionar.isPending && prog && (
-          <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
-            <RefreshCw size={12} className="animate-spin" /> Enviando {prog.done}/{prog.total}…
+        {confirmId === a.id ? (
+          <span className="flex items-center gap-1 shrink-0">
+            <button onClick={() => { setConfirmId(null); remover.mutate({ id: a.id, orcamentoId: orcId, storage_path: a.storage_path }) }} className="text-[10px] font-bold px-2 py-1 rounded-md bg-rose-500 text-white hover:bg-rose-600">Remover</button>
+            <button onClick={() => setConfirmId(null)} className={`text-[10px] px-1.5 py-1 rounded-md ${isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}>cancelar</button>
           </span>
-        )}
-        {!adicionar.isPending && docs.length > 0 && !erro && (
-          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>
-            <Check size={12} /> {docs.length} anexado(s)
-          </span>
+        ) : (
+          <button disabled={removing} onClick={() => setConfirmId(a.id)} title="Remover" className={`p-1.5 rounded-lg shrink-0 ${removing ? 'opacity-50' : ''} ${isDark ? 'hover:bg-rose-500/15 text-slate-500 hover:text-rose-300' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-500'}`}>
+            {removing ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
+          </button>
         )}
       </div>
-      {erro && <p className={`mt-1.5 text-[11px] whitespace-pre-line ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>⚠ {erro}</p>}
-      <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Os arquivos sobem <span className="font-semibold">na hora</span> que você anexa. Depois use <span className="font-semibold">Regerar</span> para o SuperTEG consolidar com eles.</p>
+    )
+  }
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className={`w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border shadow-2xl ${isDark ? 'bg-[#1e293b] border-white/[0.08]' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-white/[0.07]' : 'border-slate-100'}`}>
+          <p className={`text-sm font-extrabold flex items-center gap-2 ${txt}`}><Paperclip size={16} className="text-amber-500" /> Anexos do orçamento <span className={`text-[11px] font-normal ${txtMuted}`}>({arquivos.length})</span></p>
+          <button onClick={onClose} className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={16} /></button>
+        </div>
+        <div className="px-4 pt-3">
+          <button onClick={() => inputRef.current?.click()} disabled={adicionar.isPending}
+            className={`w-full rounded-xl border-2 border-dashed py-3 flex items-center justify-center gap-2 text-xs font-bold transition-colors ${adicionar.isPending ? 'opacity-60 pointer-events-none' : ''} ${isDark ? 'border-white/[0.12] text-slate-300 hover:border-amber-400/40 hover:bg-white/[0.02]' : 'border-slate-200 text-slate-600 hover:border-amber-300 hover:bg-amber-50/40'}`}>
+            {adicionar.isPending && prog ? <><RefreshCw size={14} className="animate-spin" /> Enviando {prog.done}/{prog.total}…</> : <><Plus size={14} /> Adicionar arquivos</>}
+          </button>
+          <input ref={inputRef} type="file" multiple disabled={adicionar.isPending} className="hidden" accept=".kmz,.kml,.pdf,.doc,.docx,.xlsx,.xls,image/*"
+            onChange={e => { const fs = e.target.files; if (fs && fs.length) enviar(Array.from(fs)); e.currentTarget.value = '' }} />
+          {erro && <p className={`mt-1.5 text-[11px] whitespace-pre-line ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>⚠ {erro}</p>}
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+          {isLoading ? (
+            <p className={`text-xs ${txtMuted}`}>Carregando…</p>
+          ) : arquivos.length === 0 ? (
+            <p className={`text-xs text-center py-8 ${txtMuted}`}>Nenhum anexo ainda. Use “Adicionar arquivos”.</p>
+          ) : (
+            <>
+              {kmz.length > 0 && <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Traçado (KMZ)</p>}
+              {kmz.map(a => linha(a, true))}
+              {docs.length > 0 && <p className={`text-[10px] font-bold uppercase tracking-wider ${kmz.length ? 'pt-1.5' : ''} ${txtMuted}`}>Documentos ({docs.length})</p>}
+              {docs.map(a => linha(a, false))}
+            </>
+          )}
+        </div>
+        <div className={`px-4 py-2.5 border-t text-[10px] ${isDark ? 'border-white/[0.07] text-slate-500' : 'border-slate-100 text-slate-400'}`}>
+          Após adicionar/remover, use <span className="font-semibold">Regerar</span> para o SuperTEG reconsolidar com os anexos atuais.
+        </div>
+      </div>
+    </div>, document.body)
+}
+
+// ── Gatilho compacto: ícone + contagem que abre o modal de anexos ───────────────
+function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hint: string }) {
+  const { data: arquivos = [] } = useArquivos(orcId)
+  const [open, setOpen] = useState(false)
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const docs = arquivos.filter(a => a.tipo !== 'kmz')
+  return (
+    <div className="mt-3">
+      <button onClick={() => setOpen(true)}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+        <Paperclip size={13} className="text-amber-500" />
+        {docs.length > 0 ? `${docs.length} documento(s)` : 'Anexar documentos'}
+        <ChevronRight size={12} className="opacity-60" />
+      </button>
+      <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Gerencie os documentos ({hint}) — adicionar/remover. Depois <span className="font-semibold">Regerar</span> para consolidar.</p>
+      {open && <AnexosModal orcId={orcId} isDark={isDark} onClose={() => setOpen(false)} />}
     </div>
   )
 }
