@@ -11,7 +11,7 @@ import {
 import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { Contrato } from '../../types/contratos'
+import type { Contrato, ContratoMedicao } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
@@ -1189,17 +1189,19 @@ const STATUS_MEDICAO: Record<string, { label: string; dot: string; bg: string; t
 
 // ── Nova Medição modal ──────────────────────────────────────────────────────
 function NovaMedicaoModal({
-  open, onClose, contratos, onToast,
+  open, onClose, contratos, medicoes, onToast,
 }: {
   open: boolean
   onClose: () => void
   contratos: Contrato[]
+  medicoes: ContratoMedicao[]
   onToast: (type: 'success' | 'error', msg: string) => void
 }) {
   const criar = useCriarMedicao()
   const today = new Date().toISOString().slice(0, 10)
   const [contratoId, setContratoId] = useState('')
   const [numeroBm, setNumeroBm] = useState('')
+  const [bmTouched, setBmTouched] = useState(false)
   const [periodoInicio, setPeriodoInicio] = useState(today)
   const [periodoFim, setPeriodoFim] = useState(today)
   const [valorMedido, setValorMedido] = useState('')
@@ -1211,20 +1213,36 @@ function NovaMedicaoModal({
     [contratos]
   )
 
+  // Sugere próximo BM (BM-00X) quando o contrato é escolhido e o usuário ainda não digitou.
+  const sugerirProximoBm = (cid: string) => {
+    if (!cid) return ''
+    const n = medicoes.filter(m => m.contrato_id === cid).length + 1
+    return `BM-${String(n).padStart(3, '0')}`
+  }
+
+  const handleContratoChange = (cid: string) => {
+    setContratoId(cid)
+    if (!bmTouched) setNumeroBm(sugerirProximoBm(cid))
+  }
+
   const medido = parseFloat(valorMedido.replace(',', '.')) || 0
   const retencao = parseFloat(valorRetencao.replace(',', '.')) || 0
   const liquido = Math.max(medido - retencao, 0)
 
   const reset = () => {
-    setContratoId(''); setNumeroBm(''); setPeriodoInicio(today); setPeriodoFim(today)
+    setContratoId(''); setNumeroBm(''); setBmTouched(false)
+    setPeriodoInicio(today); setPeriodoFim(today)
     setValorMedido(''); setValorRetencao(''); setObservacoes('')
   }
 
   const handleSave = () => {
-    if (!contratoId || !numeroBm.trim() || !periodoInicio || !periodoFim || medido <= 0) {
-      onToast('error', 'Preencha contrato, BM, período e valor medido')
-      return
-    }
+    if (!contratoId) { onToast('error', 'Selecione o contrato'); return }
+    if (!numeroBm.trim()) { onToast('error', 'Informe o número do BM'); return }
+    if (!periodoInicio || !periodoFim) { onToast('error', 'Informe o período (início e fim)'); return }
+    if (periodoFim < periodoInicio) { onToast('error', 'O fim do período não pode ser antes do início'); return }
+    if (medido <= 0) { onToast('error', 'Valor medido deve ser maior que zero'); return }
+    if (retencao > medido) { onToast('error', 'Retenção não pode ser maior que o valor medido'); return }
+
     criar.mutate(
       {
         contrato_id: contratoId,
@@ -1242,7 +1260,7 @@ function NovaMedicaoModal({
           onToast('success', 'Medição criada com sucesso')
           reset(); onClose()
         },
-        onError: () => onToast('error', 'Erro ao criar medição'),
+        onError: (err: any) => onToast('error', `Erro ao criar medição: ${err?.message ?? 'desconhecido'}`),
       }
     )
   }
@@ -1268,7 +1286,7 @@ function NovaMedicaoModal({
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contrato</label>
             <select
               value={contratoId}
-              onChange={e => setContratoId(e.target.value)}
+              onChange={e => handleContratoChange(e.target.value)}
               className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
             >
               <option value="">Selecione um contrato vigente</option>
@@ -1286,7 +1304,7 @@ function NovaMedicaoModal({
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número BM</label>
               <UpperInput
                 value={numeroBm}
-                onChange={e => setNumeroBm(e.target.value)}
+                onChange={e => { setNumeroBm(e.target.value); setBmTouched(true) }}
                 placeholder="BM-001"
                 className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
               />
@@ -1499,6 +1517,7 @@ function TabMedicoes() {
         open={novaMedicaoOpen}
         onClose={() => setNovaMedicaoOpen(false)}
         contratos={contratos}
+        medicoes={medicoes}
         onToast={showToast}
       />
 
