@@ -396,7 +396,17 @@ function calcUnitariosEfetivos<T extends { quantidade: number; valor_unitario_es
 function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
   const numero = esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())
-  const itens = pedido.requisicao?.itens ?? []
+  const rcItens = pedido.requisicao?.itens ?? []
+  // Pedido Direto (sem RC) guarda itens em cmp_pedidos.itens_direto. Mapeia
+  // para o mesmo shape de RequisicaoItem para reaproveitar o render abaixo.
+  const itens = rcItens.length > 0
+    ? rcItens
+    : (pedido.itens_direto ?? []).map(it => ({
+        descricao: it.descricao,
+        quantidade: it.quantidade,
+        unidade: it.unidade,
+        valor_unitario_estimado: it.valor_unitario,
+      }))
   const parcelas = pedido.parcelas_preview ?? []
 
   const unitariosHtml = calcUnitariosEfetivos(itens, pedido.valor_total)
@@ -427,6 +437,13 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
     </div>
   ` : ''
 
+  const labelParcela = (p: typeof parcelas[number]) => {
+    const desc = (p.descricao || '').trim()
+    if (!desc || desc.toLowerCase() === 'revisar manualmente') {
+      return parcelas.length === 1 ? 'Parcela única' : `Parcela ${p.numero}/${parcelas.length}`
+    }
+    return desc
+  }
   const parcelasHtml = parcelas.length > 0 ? `
     <div class="section">
       <div class="section-title">Condicao de Pagamento${pedido.condicao_pagamento ? `: ${esc(pedido.condicao_pagamento)}` : ''}</div>
@@ -438,7 +455,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
           ${parcelas.map(p => `
             <tr>
               <td style="text-align:center">${p.numero}</td>
-              <td>${esc(p.descricao || `Parcela ${p.numero}/${parcelas.length}`)}</td>
+              <td>${esc(labelParcela(p))}</td>
               <td style="text-align:center">${fmtDate(p.data_vencimento)}</td>
               <td style="text-align:right;font-weight:600">${fmtBRL(p.valor)}</td>
             </tr>
@@ -658,7 +675,15 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   y += 4
 
   // ── Section: Itens ──────────────────────────────────────────────────────────
-  const itens = pedido.requisicao?.itens ?? []
+  const rcItensJs = pedido.requisicao?.itens ?? []
+  const itens = rcItensJs.length > 0
+    ? rcItensJs
+    : (pedido.itens_direto ?? []).map(it => ({
+        descricao: it.descricao,
+        quantidade: it.quantidade,
+        unidade: it.unidade,
+        valor_unitario_estimado: it.valor_unitario,
+      }))
   if (itens.length > 0) {
     sectionTitle('ITENS DO PEDIDO')
     const cols = [M, M + 8, M + 90, M + 105, M + 120, M + 145]
@@ -743,8 +768,12 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
     doc.setTextColor(...DARK)
     parcelas.forEach(p => {
       if (y > 270) { doc.addPage(); y = M }
+      const desc = (p.descricao || '').trim()
+      const descSafe = (!desc || desc.toLowerCase() === 'revisar manualmente')
+        ? (parcelas.length === 1 ? 'Parcela única' : `Parcela ${p.numero}/${parcelas.length}`)
+        : desc
       doc.text(String(p.numero), pCols[0] + 6, y)
-      doc.text(p.descricao || `Parcela ${p.numero}/${parcelas.length}`, pCols[1], y)
+      doc.text(descSafe, pCols[1], y)
       doc.text(fmtDate(p.data_vencimento), pCols[2], y)
       doc.setFont('helvetica', 'bold')
       doc.text(fmtBRL(p.valor), pCols[3], y)
@@ -2113,9 +2142,20 @@ function DetailModal({
             </div>
           )}
 
-          {/* Itens da requisição — agrupados por natureza (produto/servico) */}
-          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
-            const todos = pedido.requisicao!.itens!
+          {/* Itens da requisição — agrupados por natureza (produto/servico).
+              Pedido Direto (sem RC) tem itens em pedido.itens_direto. */}
+          {!pending && (() => {
+            const rcItensList = pedido.requisicao?.itens ?? []
+            const todos: any[] = rcItensList.length > 0
+              ? rcItensList
+              : (pedido.itens_direto ?? []).map(it => ({
+                  descricao: it.descricao,
+                  quantidade: it.quantidade,
+                  unidade: it.unidade,
+                  valor_unitario_estimado: it.valor_unitario,
+                  natureza: 'produto',
+                }))
+            if (todos.length === 0) return null
             const unitariosEf = calcUnitariosEfetivos(todos, pedido.valor_total)
             const todosEf = todos.map((it, i) => ({ ...it, valor_unitario_efetivo: unitariosEf[i] }))
             const produtos = todosEf.filter(i => (i.natureza ?? 'produto') === 'produto')

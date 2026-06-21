@@ -8,7 +8,7 @@ import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
-import { gerarPreviaParcelas } from '../utils/pagamentos'
+import { gerarPreviaParcelas, parcelaPrecisaRevisao } from '../utils/pagamentos'
 import NumericInput from './NumericInput'
 import { UpperInput, UpperTextarea } from './UpperInput'
 
@@ -363,6 +363,8 @@ export default function EmitirPedidoModal({
     Number(parcela.valor) > 0 &&
     Boolean(parcela.data_vencimento),
   )
+
+  const temParcelaRevisaoManual = parcelasEditaveis.some(parcelaPrecisaRevisao)
 
   const updateParcela = (numero: number, changes: Partial<ParcelaEditavel>) => {
     setParcelasEditadasManualmente(true)
@@ -917,8 +919,19 @@ export default function EmitirPedidoModal({
                         </div>
                       </div>
 
+                      {temParcelaRevisaoManual && (
+                        <div className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2.5">
+                          <Ban size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-bold text-red-700">Parcela precisa de revisão manual</p>
+                            <p className="text-[11px] text-red-600 mt-0.5">
+                              A condição de pagamento "{condicaoPagamento || cotacaoResolvida?.condicaoPagamento || '—'}" não foi interpretada. Edite a descrição da parcela (ex.: "À vista", "30 dias", "30/60/90", "3x") ou ajuste o número de parcelas antes de emitir o pedido.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       {parcelasEditaveis.map((parcela) => (
-                        <div key={`parcela-${parcela.numero}`} className="rounded-xl border border-slate-200 p-3 space-y-3">
+                        <div key={`parcela-${parcela.numero}`} className={`rounded-xl border p-3 space-y-3 ${parcelaPrecisaRevisao(parcela) ? 'border-red-300 bg-red-50/50' : 'border-slate-200'}`}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="flex items-center gap-2">
@@ -1049,7 +1062,8 @@ export default function EmitirPedidoModal({
                 !centroId ||
                 adiantamentoInvalido ||
                 !parcelasValidas ||
-                diferencaParcelas !== 0
+                diferencaParcelas !== 0 ||
+                temParcelaRevisaoManual
               ))
             }
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${

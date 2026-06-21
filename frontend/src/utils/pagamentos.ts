@@ -5,6 +5,24 @@ export interface ParcelaPreview {
   descricao: string
 }
 
+export const PARCELA_REVISAO_MANUAL = 'Revisar manualmente'
+
+export function condicaoPagamentoInterpretavel(condicao: string | null | undefined): boolean {
+  const termo = (condicao ?? '').trim().toLowerCase()
+  if (!termo) return false
+  if (['a vista', 'avista', 'a_vista'].includes(termo)) return true
+  if (/^\d+\s*dias?$/.test(termo)) return true
+  if (termo.includes('entrada') && termo.includes('+')) return true
+  if (/^\d+x$/.test(termo)) return true
+  const partes = termo.split('/').map(p => p.trim()).filter(Boolean)
+  if (partes.length >= 2 && partes.every(p => /^\d+$/.test(p.replace(/[^\d]/g, '')) && Number(p.replace(/[^\d]/g, '')) >= 0)) return true
+  return false
+}
+
+export function parcelaPrecisaRevisao(parcela: { descricao?: string | null }): boolean {
+  return (parcela.descricao ?? '').trim().toLowerCase() === PARCELA_REVISAO_MANUAL.toLowerCase()
+}
+
 function addDays(base: Date, days: number) {
   const next = new Date(base)
   next.setDate(next.getDate() + days)

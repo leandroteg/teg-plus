@@ -6,6 +6,7 @@ import {
   ScrollText, Undo2, Printer,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao, useDevolverRequisicaoCotacao } from '../hooks/useCotacoes'
+import { condicaoPagamentoInterpretavel } from '../utils/pagamentos'
 import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
@@ -1296,12 +1297,17 @@ export default function CotacaoForm() {
   const itensPendentes = itensParaEscolher.size - itensEscolhidos
   const precisaEscolherFornecedores = validos.length >= 2 && itensParaEscolher.size > 0 && itensPendentes > 0
 
+  const fornecedoresComCondicaoInvalida = validos
+    .map((f, i) => ({ idx: i + 1, nome: f.fornecedor_nome, cond: f.condicao_pagamento }))
+    .filter(f => f.cond.trim() && !condicaoPagamentoInterpretavel(f.cond))
+
   // Validação + feedback claro em cada etapa
   const canSubmit = validos.length > 0
     && (semCotacoesMinimas || validos.length >= minCot)
     && (!semCotacoesMinimas || justificativa.trim().length > 0)
     && !temNaoCadastrados
     && !precisaEscolherFornecedores
+    && fornecedoresComCondicaoInvalida.length === 0
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1340,6 +1346,14 @@ export default function CotacaoForm() {
     }
     if (precisaEscolherFornecedores) {
       setToast({ type: 'error', msg: `Escolha o fornecedor de cada item no mapa de cotação (${itensPendentes} pendente${itensPendentes > 1 ? 's' : ''}).` })
+      return
+    }
+    if (fornecedoresComCondicaoInvalida.length > 0) {
+      const nomes = fornecedoresComCondicaoInvalida.map(f => f.nome || `Fornecedor ${f.idx}`).join(', ')
+      setToast({
+        type: 'error',
+        msg: `Condição de pagamento não interpretada em: ${nomes}. Use "à vista", "30 dias", "30/60/90", "Entrada+30" ou "Nx" — senão a parcela do pedido fica "Revisar manualmente".`,
+      })
       return
     }
     if (!semCotacoesMinimas && validos.length < minCot) {
@@ -1714,13 +1728,24 @@ export default function CotacaoForm() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                placeholder="Condição de pgto (30 dias, à vista...)"
-                maxLength={255}
-                value={forn.condicao_pagamento}
-                onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
-              />
+              <div>
+                <input
+                  className={`w-full border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
+                    forn.condicao_pagamento.trim() && !condicaoPagamentoInterpretavel(forn.condicao_pagamento)
+                      ? 'border-red-300 bg-red-50/40'
+                      : 'border-slate-200'
+                  }`}
+                  placeholder="Condição de pgto (30 dias, à vista, 30/60/90, 3x...)"
+                  maxLength={255}
+                  value={forn.condicao_pagamento}
+                  onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
+                />
+                {forn.condicao_pagamento.trim() && !condicaoPagamentoInterpretavel(forn.condicao_pagamento) && (
+                  <p className="mt-1 text-[10px] text-red-600 leading-snug">
+                    Não interpretado. Use: "à vista", "30 dias", "30/60/90", "Entrada+30" ou "Nx".
+                  </p>
+                )}
+              </div>
               <div className="relative">
                 <input
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"

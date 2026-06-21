@@ -227,7 +227,10 @@ function buildDescricaoParcela(
     return ref ? `${ref} — ${base} (${valorParcela})` : base
   }
 
-  const parcelaLabel = parcela.descricao?.trim() || `Parcela ${parcela.numero}/${totalParcelas}`
+  const descTrim = parcela.descricao?.trim() || ''
+  const parcelaLabel = (!descTrim || descTrim.toLowerCase() === 'revisar manualmente')
+    ? `Parcela ${parcela.numero}/${totalParcelas}`
+    : descTrim
   const head = ref ? `${ref} — ${parcelaLabel}` : `${base} - ${parcelaLabel}`
   return `${head} (${valorParcela}${valorTotal})`
 }
