@@ -267,9 +267,9 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   minutaUrl: string | null
   onSuccess: () => void | Promise<void>
 }) {
-  const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string }[]>([
-    { nome: '', email: '', cpf: '', papel: 'Contratante' },
-    { nome: '', email: '', cpf: '', papel: 'Contratada' },
+  const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string; telefone: string; endereco: string }[]>([
+    { nome: '', email: '', cpf: '', papel: 'Contratante', telefone: '', endereco: '' },
+    { nome: '', email: '', cpf: '', papel: 'Contratada', telefone: '', endereco: '' },
   ])
   const [tipoAssinatura, setTipoAssinatura] = useState<TipoAssinatura>('eletronica')
   const [erro, setErro] = useState<string | null>(null)
@@ -278,7 +278,7 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   if (!open) return null
 
   const addSignatario = () =>
-    setSignatarios(prev => [...prev, { nome: '', email: '', cpf: '', papel: '' }])
+    setSignatarios(prev => [...prev, { nome: '', email: '', cpf: '', papel: '', telefone: '', endereco: '' }])
 
   const removeSignatario = (idx: number) =>
     setSignatarios(prev => prev.filter((_, i) => i !== idx))
@@ -291,12 +291,24 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
     if (!minutaUrl) { setErro('Nenhuma minuta disponível para envio.'); return }
     const invalidos = signatarios.filter(s => !s.nome || !s.email || !s.cpf)
     if (invalidos.length) { setErro('Preencha nome, e-mail e CPF de todos os signatários.'); return }
+    // ICP-Brasil: telefone obrigatório para SMS OTP; endereço recomendado
+    if (tipoAssinatura === 'digital_icp') {
+      const semTelefone = signatarios.filter(s => !s.telefone.trim())
+      if (semTelefone.length) {
+        setErro('Para assinatura ICP-Brasil, informe o telefone de todos os signatários (necessário para OTP/SMS).')
+        return
+      }
+    }
     try {
       await enviar.mutateAsync({
         solicitacao_id: solicitacao.id,
         minuta_url: minutaUrl,
         tipo_assinatura: tipoAssinatura,
-        signatarios: signatarios.map(s => ({ nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel })),
+        signatarios: signatarios.map(s => ({
+          nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel,
+          telefone: s.telefone || undefined,
+          endereco: s.endereco || undefined,
+        })),
       })
       // Avançar etapa ANTES de fechar o modal — await garante que erros sejam capturados
       await onSuccess()
@@ -404,6 +416,22 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
                     onChange={e => updateSignatario(idx, 'papel', e.target.value)}
                     placeholder="Papel (ex: Contratante)"
                     className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.telefone}
+                    onChange={e => updateSignatario(idx, 'telefone', e.target.value)}
+                    placeholder={tipoAssinatura === 'digital_icp' ? 'Telefone (obrigatório p/ ICP)' : 'Telefone'}
+                    className={`rounded-lg border px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white ${
+                      tipoAssinatura === 'digital_icp' && !s.telefone.trim()
+                        ? 'border-amber-300 bg-amber-50/40'
+                        : 'border-slate-200'
+                    }`}
+                  />
+                  <input
+                    value={s.endereco}
+                    onChange={e => updateSignatario(idx, 'endereco', e.target.value)}
+                    placeholder="Endereço (recomendado p/ ICP)"
+                    className="col-span-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
                   />
                 </div>
               </div>

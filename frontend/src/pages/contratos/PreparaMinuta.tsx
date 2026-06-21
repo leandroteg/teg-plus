@@ -1443,6 +1443,7 @@ export default function PreparaMinuta() {
   const [gerandoMinutaId, setGerandoMinutaId] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
   const [editedMelhoriasMap, setEditedMelhoriasMap] = useState<Record<string, MelhoriaMinuta>>({})
+  const [melhoriasConflitoId, setMelhoriasConflitoId] = useState<string | null>(null)
   const [pdfUrlMap, setPdfUrlMap] = useState<Record<string, string>>({})
 
   const isLoading = loadingSol || loadingMinutas
@@ -1622,14 +1623,28 @@ export default function PreparaMinuta() {
     setEditedMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
     // Also persist to melhoriasMap so it's available for PDF generation
     setMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
-    // Persist edited melhorias to Supabase
-    const { error } = await supabase
-      .from('con_minutas')
-      .update({ ai_melhorias: edited as unknown as Record<string, unknown>, ai_melhorado_em: new Date().toISOString() })
-      .eq('id', minutaId)
+
+    // RPC com lock otimista: compara ai_melhorado_em atual com o que vimos
+    const minutaAtual = minutas.find(m => m.id === minutaId)
+    const expected = minutaAtual?.ai_melhorado_em ?? null
+
+    const { data, error } = await supabase.rpc('con_atualizar_ai_melhorias', {
+      p_minuta_id: minutaId,
+      p_melhorias: edited as unknown as Record<string, unknown>,
+      p_expected_atualiz: expected,
+    })
     if (error) {
       console.error('Erro ao salvar melhorias:', error)
+      return
     }
+    const result = data as { ok?: boolean; conflito?: boolean } | null
+    if (result?.conflito) {
+      qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao?.id] })
+      setMelhoriasConflitoId(minutaId)
+      return
+    }
+    setMelhoriasConflitoId(prev => (prev === minutaId ? null : prev))
+    qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao?.id] })
   }
 
   const handleUpdateConfig = (ruleId: string, valor: string, ativo?: boolean) => {
@@ -2433,6 +2448,20 @@ export default function PreparaMinuta() {
             </div>
           ) : (
             <div className="space-y-3">
+              {melhoriasConflitoId && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2.5">
+                  <AlertTriangle size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-red-700">Conflito de edição nas melhorias</p>
+                    <p className="text-[11px] text-red-600 mt-0.5">
+                      Outro usuário editou as melhorias desta minuta em paralelo. A página foi recarregada — revise as alterações antes de salvar novamente.
+                    </p>
+                  </div>
+                  <button onClick={() => setMelhoriasConflitoId(null)} className="text-red-400 hover:text-red-600">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {minutas.map(m => (
                 <MinutaCard
                   key={m.id}

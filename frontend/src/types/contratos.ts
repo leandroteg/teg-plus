@@ -571,6 +571,8 @@ export interface Signatario {
   status: 'pendente' | 'assinado' | 'recusado'
   assinado_em: string | null
   link_assinatura: string | null
+  telefone?: string
+  endereco?: string
 }
 
 export interface Assinatura {
@@ -598,7 +600,7 @@ export interface EnviarAssinaturaPayload {
   solicitacao_id: string
   minuta_url: string
   tipo_assinatura: TipoAssinatura
-  signatarios: Pick<Signatario, 'nome' | 'email' | 'cpf' | 'papel'>[]
+  signatarios: Pick<Signatario, 'nome' | 'email' | 'cpf' | 'papel' | 'telefone' | 'endereco'>[]
 }
 
 export interface EnviarAssinaturaResponse {

@@ -559,17 +559,17 @@ export function useCriarMinuta() {
       descricao?: string
       arquivo_url: string
       arquivo_nome: string
+      // versao ignorado: calculado server-side via RPC para evitar race condition
       versao?: number
     }) => {
-      const { data, error } = await supabase
-        .from('con_minutas')
-        .insert({
-          ...payload,
-          status: 'rascunho',
-          versao: payload.versao ?? 1,
-        })
-        .select('*')
-        .single()
+      const { data, error } = await supabase.rpc('con_criar_minuta_atomic', {
+        p_solicitacao_id: payload.solicitacao_id,
+        p_titulo:         payload.titulo,
+        p_tipo:           payload.tipo,
+        p_descricao:      payload.descricao ?? '',
+        p_arquivo_url:    payload.arquivo_url,
+        p_arquivo_nome:   payload.arquivo_nome,
+      })
       if (error) throw error
       return data as Minuta
     },
@@ -1215,57 +1215,76 @@ export function useEnviarAssinatura() {
   const qc = useQueryClient()
   return useMutation<EnviarAssinaturaResponse, Error, EnviarAssinaturaPayload>({
     mutationFn: async (payload) => {
-      // 1) Enviar via n8n/Certisign — o workflow já cria registro em con_assinaturas
-      try {
-        const res = await fetch(`${N8N_BASE}/certisign-enviar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...payload,
-            callback_url: `${N8N_BASE}/certisign-callback`,
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
+      // Retry com backoff p/ falhas transientes (network/5xx). Erros de
+      // negocio do Certisign (4xx, status='erro' no body) NAO sao retentados.
+      const MAX_RETRIES = 2
+      const BACKOFFS_MS = [1000, 3000]
 
-        if (res.ok && data.status === 'enviado') {
-          // n8n criou o registro — não duplicar
-          return {
-            assinatura_id: data.assinatura_id ?? '',
-            envelope_id: data.envelope_id ?? '',
-            status: 'enviado' as const,
+      const tentarEnviar = async (tentativa: number): Promise<EnviarAssinaturaResponse> => {
+        try {
+          const res = await fetch(`${N8N_BASE}/certisign-enviar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...payload,
+              callback_url: `${N8N_BASE}/certisign-callback`,
+            }),
+          })
+          const data = await res.json().catch(() => ({}))
+
+          if (res.ok && data.status === 'enviado') {
+            return {
+              assinatura_id: data.assinatura_id ?? '',
+              envelope_id: data.envelope_id ?? '',
+              status: 'enviado' as const,
+            }
           }
-        }
 
-        // n8n retornou erro — ele já criou registro com status 'erro'
-        throw new Error(data.message || 'Falha ao enviar para Certisign')
-      } catch (err) {
-        if (err instanceof TypeError) {
-          // Fetch falhou (n8n offline) — criar registro local como fallback
-          console.warn('[Certisign] Webhook indisponível, criando registro local:', err)
-          const { data: assinatura, error: insErr } = await supabase
-            .from('con_assinaturas')
-            .insert({
-              solicitacao_id: payload.solicitacao_id,
-              tipo_assinatura: payload.tipo_assinatura,
-              status: 'pendente',
-              envelope_id: null,
-              signatarios: payload.signatarios,
-              enviado_em: new Date().toISOString(),
-            })
-            .select('id')
-            .single()
-
-          if (insErr) throw new Error(`Erro ao registrar assinatura: ${insErr.message}`)
-
-          return {
-            assinatura_id: assinatura?.id ?? '',
-            envelope_id: '',
-            status: 'enviado' as const,
+          // 5xx = transitorio: retenta
+          if (res.status >= 500 && tentativa < MAX_RETRIES) {
+            console.warn(`[Certisign] HTTP ${res.status} (tentativa ${tentativa + 1}/${MAX_RETRIES + 1}) — aguardando ${BACKOFFS_MS[tentativa]}ms`)
+            await new Promise(r => setTimeout(r, BACKOFFS_MS[tentativa]))
+            return tentarEnviar(tentativa + 1)
           }
+
+          throw new Error(data.message || `Falha ao enviar para Certisign (HTTP ${res.status})`)
+        } catch (err) {
+          // TypeError = fetch falhou (rede caiu / n8n offline). Retenta antes do fallback.
+          if (err instanceof TypeError && tentativa < MAX_RETRIES) {
+            console.warn(`[Certisign] Rede falhou (tentativa ${tentativa + 1}/${MAX_RETRIES + 1}) — aguardando ${BACKOFFS_MS[tentativa]}ms`)
+            await new Promise(r => setTimeout(r, BACKOFFS_MS[tentativa]))
+            return tentarEnviar(tentativa + 1)
+          }
+
+          if (err instanceof TypeError) {
+            // Esgotou retries de rede — fallback local
+            console.warn('[Certisign] Webhook indisponivel apos retries, criando registro local:', err)
+            const { data: assinatura, error: insErr } = await supabase
+              .from('con_assinaturas')
+              .insert({
+                solicitacao_id: payload.solicitacao_id,
+                tipo_assinatura: payload.tipo_assinatura,
+                status: 'pendente',
+                envelope_id: null,
+                signatarios: payload.signatarios,
+                enviado_em: new Date().toISOString(),
+              })
+              .select('id')
+              .single()
+
+            if (insErr) throw new Error(`Erro ao registrar assinatura: ${insErr.message}`)
+
+            return {
+              assinatura_id: assinatura?.id ?? '',
+              envelope_id: '',
+              status: 'enviado' as const,
+            }
+          }
+          throw err
         }
-        // Erro do n8n — propagar para o usuário
-        throw err
       }
+
+      return tentarEnviar(0)
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-assinaturas', vars.solicitacao_id] })
