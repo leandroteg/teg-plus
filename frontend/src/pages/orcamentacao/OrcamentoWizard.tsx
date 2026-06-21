@@ -781,19 +781,40 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
   const cenarios = (d.cenarios as Array<Record<string, unknown>>) ?? []
   const rec = String(d.cenario_recomendado ?? '')
   const us = Number(d.us || 0)
-  const custoTotal = Number(d.custo_total || 0)
-  const custoUs = Number(d.custo_us || 0)
-  const refUs = d.preco_contratado_us_ref != null ? Number(d.preco_contratado_us_ref) : null
+  const op = Number(d.custo_operacional_us || 0)
+  const aloc = Number(d.alocacao_ativos_us || 0)
+  const capital = Number(d.custo_capital_us || 0)
+  const adic = Number(d.adicional_6x1_us || 0)
+  const cheio = Number(d.custo_cheio_us || 0)
+  const contPct = Number(d.contingencia_pct || 0)
+  const cheioCont = Number(d.custo_com_contingencia_us || 0)
+  const tribPct = Number(d.tributos_pct || 0)
+  const refPct = Number(d.reforma_pct || 0)
+  const custoE4 = Number(d.custo_total_estagio4 || 0)
+  const passo = (lbl: string, v: number, k: string) => (
+    <span key={k} className="inline-flex flex-col items-center px-1.5">
+      <span className={`text-[9px] uppercase tracking-wide ${txtMuted}`}>{lbl}</span>
+      <span className={`text-xs font-bold ${txt}`}>{fmtNum(v)}</span>
+    </span>
+  )
+  const sep = (s: string, k: string) => <span key={k} className={`text-[11px] px-0.5 ${txtMuted}`}>{s}</span>
   return (
     <section className={`${CARD(isDark)} p-4`}>
-      <h3 className={`text-sm font-extrabold mb-3 ${txt}`}>Orçamentação por US</h3>
-      {/* base de custo herdada do estágio 4 */}
-      {custoTotal > 0 && (
-        <div className={`rounded-xl border p-3 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
-          <ResumoStat lbl="Custo total (estágio 4)" val={fmtMM(custoTotal)} isDark={isDark} small />
-          <ResumoStat lbl="Unidades de Serviço" val={fmtNum(us)} isDark={isDark} small />
-          <ResumoStat lbl="Custo / US" val={`R$ ${fmtNum(custoUs)}`} isDark={isDark} small />
-          {refUs != null && <ResumoStat lbl="Ref. edital / US" val={`R$ ${fmtNum(refUs)}`} isDark={isDark} small />}
+      <h3 className={`text-sm font-extrabold mb-1 ${txt}`}>Orçamentação por US</h3>
+      <p className={`text-[10px] mb-3 ${txtMuted}`}>Buildup da Base de Preços: custo cheio → contingência → tributos/reforma/margem sobre o preço.</p>
+      {cheio > 0 && (
+        <div className={`rounded-xl border p-3 mb-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
+          <div className="flex flex-wrap items-center justify-center gap-y-1">
+            {passo('Operac.', op, 'op')}{sep('+', 's1')}
+            {passo('Ativos', aloc, 'al')}{sep('+', 's2')}
+            {passo('Capital', capital, 'ca')}{sep('+', 's3')}
+            {passo('Fim 6x1', adic, 'ad')}{sep('=', 's4')}
+            {passo('Custo cheio', cheio, 'ch')}{sep(`× ${fmtNum(contPct, 0)}% →`, 's5')}
+            {passo('c/ conting.', cheioCont, 'cc')}
+          </div>
+          <p className={`text-[10px] mt-2 pt-2 border-t ${isDark ? 'border-white/[0.06] text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+            Preço/US = {fmtNum(cheioCont)} ÷ (1 − tributos {fmtNum(tribPct, 0)}% − reforma {fmtNum(refPct, 0)}% − margem). US (estágio 4): <b className={txt}>{fmtNum(us)}</b> · custo total estágio 4: <b className={txt}>{fmtMM(custoE4)}</b>
+          </p>
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -804,18 +825,18 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
             <div key={i} className={`rounded-xl px-3 py-2.5 border ${isRec ? 'border-amber-500' : isDark ? 'border-white/[0.06]' : 'border-slate-200'} ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
               <div className="flex items-center justify-between">
                 <p className={`text-xs font-bold ${txt}`}>{String(c.nome)} {isRec && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white ml-1">recomendado</span>}</p>
-                <span className={`text-[10px] font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>+{fmtNum(Number(c.margem_pct), 1)}% s/ custo</span>
+                <span className={`text-[10px] font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>margem {fmtNum(Number(c.margem_pct), 1)}%</span>
               </div>
-              <p className={`text-base font-extrabold mt-0.5 ${txt}`}>{fmtMM(Number(c.preco_total))}</p>
+              <p className={`text-base font-extrabold mt-0.5 ${txt}`}>R$ {fmtNum(Number(c.preco_us), 2)}<span className={`text-[11px] font-normal ${txtMuted}`}>/US</span></p>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className={`text-[10px] ${txtMuted}`}>R$ {fmtNum(Number(c.preco_us))}/US{c.lucro != null ? ` · lucro ${fmtMM(Number(c.lucro))}` : ''}</p>
-                {ref != null && <span className={`text-[9px] shrink-0 ${txtMuted}`} title="Preço/US de referência do edital">ref R$ {fmtNum(ref)}</span>}
+                <p className={`text-[11px] font-semibold ${txt}`}>{fmtMM(Number(c.preco_total))}</p>
+                {ref != null && <span className={`text-[9px] shrink-0 ${txtMuted}`} title="Preço/US de referência (Base de Preços histórica)">ref {fmtNum(ref)}</span>}
               </div>
+              <p className={`text-[10px] mt-0.5 ${txtMuted}`}>lucro {fmtMM(Number(c.lucro))} · tributos R$ {fmtNum(Number(c.tributos_us))}/US</p>
             </div>
           )
         })}
       </div>
-      <p className={`text-[10px] mt-2 ${txtMuted}`}>Preço/US = (custo/US do estágio 4) × (1 + margem). Total = US × preço/US. "ref" = preço/US de referência do edital, para comparar competitividade.</p>
     </section>
   )
 }
