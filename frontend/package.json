@@ -26,7 +26,8 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.28.0",
     "recharts": "^3.8.0",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

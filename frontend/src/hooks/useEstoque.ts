@@ -819,6 +819,45 @@ export function useImportarInventarioCSV() {
   })
 }
 
+// Importa inventario via planilha (XLSX). Diferente do CSV, casa por DESCRICAO
+// (normalizada) e auto-cria item em est_itens quando nao encontra. Use case:
+// planilha "Inventario_Geral_PERDIZES" que nao tem codigo real (so seq).
+export function useImportarInventarioPorDescricao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      inventarioId,
+      itens,
+      contadoPor,
+    }: {
+      inventarioId: string
+      itens: Array<{ descricao: string; unidade?: string; marca?: string; quantidade: number | string }>
+      contadoPor?: string
+    }) => {
+      const { data, error } = await supabase.rpc('est_importar_inventario_por_descricao', {
+        p_inventario_id: inventarioId,
+        p_itens: itens as any,
+        p_contado_por: contadoPor ?? null,
+      })
+      if (error) throw error
+      return data as {
+        ok: boolean
+        importados?: number
+        criados?: number
+        erros_count?: number
+        erros?: Array<{ linha: any; motivo: string }>
+        erro?: string
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-inventario'] })
+      qc.invalidateQueries({ queryKey: ['est-inventarios'] })
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      qc.invalidateQueries({ queryKey: ['lookups'] })
+    },
+  })
+}
+
 export function useAdicionarItemInventario() {
   const qc = useQueryClient()
   return useMutation({

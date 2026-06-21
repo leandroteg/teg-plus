@@ -8,8 +8,9 @@ import {
   useInventarios, useInventario,
   useAbrirInventario, useSalvarContagem, useConcluirInventario,
   useBases, useAdicionarItemInventario, useInventarioItemSearch,
-  useImportarInventarioCSV,
+  useImportarInventarioCSV, useImportarInventarioPorDescricao,
 } from '../../hooks/useEstoque'
+import * as XLSX from 'xlsx'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import type { EstInventario, EstItem, TipoInventario } from '../../types/estoque'
@@ -100,9 +101,9 @@ export default function Inventario() {
             onClick={handleImportClick}
             className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white
               text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-            title="Importar contagem em lote (CSV)"
+            title="Importar contagem em lote (CSV ou XLSX)"
           >
-            <Upload size={15} /> Importar CSV
+            <Upload size={15} /> Importar CSV/XLSX
           </button>
           <button
             onClick={() => setShowForm(true)}
@@ -442,9 +443,26 @@ function InventarioCard({
   )
 }
 
-// ── Modal: Importar Contagem via CSV ────────────────────────────────────────
-// Aceita 2-3 colunas: codigo, quantidade, observacao (opcional).
-// Cabecalho na 1a linha e detectado e ignorado. Separador: ; ou ,
+// ── Modal: Importar Contagem (CSV ou XLSX) ───────────────────────────────────
+// CSV (legado, codigo;quantidade): casa por codigo via est_importar_inventario.
+// XLSX (template Inventario Geral): casa por DESCRICAO + auto-cria item se
+//   necessario via est_importar_inventario_por_descricao.
+
+// Mapeia unidades comuns da planilha para o enum est_unidade.
+const UNIDADE_MAP: Record<string, string> = {
+  PACOTE: 'PCT', PCT: 'PCT', CAIXA: 'CX', CX: 'CX',
+  MT: 'M', METRO: 'M', M: 'M', M2: 'M2', M3: 'M3',
+  'GALÃO': 'GALAO', GALAO: 'GALAO', RM: 'UN', RESMA: 'UN',
+  KT: 'UN', KIT: 'UN', JG: 'JG', JOGO: 'JG',
+  KG: 'KG', TON: 'TON', L: 'L', LT: 'L', LITRO: 'L',
+  PC: 'PC', PEÇA: 'PC', PR: 'PR', PAR: 'PR',
+  UN: 'UN', UND: 'UN', UNIDADE: 'UN',
+  RL: 'RL', ROLO: 'RL', FARDO: 'FARDO', BARRA: 'BARRA',
+}
+
+type LinhaCsv = { codigo: string; quantidade: string; observacao?: string }
+type LinhaXlsx = { descricao: string; unidade?: string; marca?: string; quantidade: string }
+
 function ImportarCSVModal({
   inventarioId, isLight, onClose,
 }: {
@@ -453,9 +471,14 @@ function ImportarCSVModal({
   onClose: () => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const importar = useImportarInventarioCSV()
+  const importarCsv = useImportarInventarioCSV()
+  const importarXlsx = useImportarInventarioPorDescricao()
   const [csvText, setCsvText] = useState('')
-  const [result, setResult] = useState<Awaited<ReturnType<typeof importar.mutateAsync>> | null>(null)
+  const [xlsxRows, setXlsxRows] = useState<LinhaXlsx[]>([])
+  const [xlsxFileName, setXlsxFileName] = useState('')
+  const [mode, setMode] = useState<'csv' | 'xlsx'>('csv')
+  const [result, setResult] = useState<any | null>(null)
+  const [parseWarn, setParseWarn] = useState<string | null>(null)
 
   const bg = isLight ? 'bg-white' : 'bg-[#0f172a]'
   const border = isLight ? 'border-slate-200' : 'border-white/[0.06]'
@@ -467,13 +490,102 @@ function ImportarCSVModal({
 
   function handleFile(file: File | null) {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setCsvText(String(reader.result ?? ''))
-    reader.readAsText(file, 'utf-8')
+    const lower = file.name.toLowerCase()
+    if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+      handleXlsx(file)
+    } else {
+      const reader = new FileReader()
+      reader.onload = () => { setCsvText(String(reader.result ?? '')); setMode('csv') }
+      reader.readAsText(file, 'utf-8')
+    }
   }
 
-  function parseCsv(text: string): Array<{ codigo: string; quantidade: string; observacao?: string }> {
-    const out: Array<{ codigo: string; quantidade: string; observacao?: string }> = []
+  // Parse XLSX usando o template "Inventario Geral":
+  //   Colunas esperadas (apos cabecalho): QTD, DESCRICAO, CODIGO, MARCA, C.A, UNID, OBRA
+  //   Linhas iniciais (titulo/subtitulo) sao puladas automaticamente buscando
+  //   a linha que contem "DESCR" + "QTD".
+  function handleXlsx(file: File) {
+    setParseWarn(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = new Uint8Array(reader.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' })
+
+        // Localiza linha do cabecalho (contem "QTD" e "DESCR")
+        const headerIdx = rows.findIndex(r => {
+          const joined = r.map(c => String(c ?? '').toUpperCase()).join('|')
+          return joined.includes('QTD') && joined.includes('DESCR')
+        })
+        if (headerIdx < 0) {
+          setParseWarn('Nao encontrei cabecalho com colunas QTD e DESCRICAO. Verifique o arquivo.')
+          return
+        }
+        const headers = rows[headerIdx].map((c: any) => String(c ?? '').toUpperCase().replace(/\s+/g, ' ').trim())
+        const idxQtd  = headers.findIndex(h => h.startsWith('QTD'))
+        const idxDesc = headers.findIndex(h => h.includes('DESCR'))
+        const idxMarca = headers.findIndex(h => h.startsWith('MARCA') || h.includes('FABRIC'))
+        const idxUnid = headers.findIndex(h => h.startsWith('UNID') || h === 'UN')
+        if (idxQtd < 0 || idxDesc < 0) {
+          setParseWarn('Cabecalho sem colunas QTD/DESCRICAO suficientes.')
+          return
+        }
+
+        const out: LinhaXlsx[] = []
+        const ignoradas: string[] = []
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const row = rows[i]
+          const descRaw = String(row[idxDesc] ?? '').trim()
+          if (!descRaw) continue
+          // Pula linhas de totalizacao/observacao
+          if (/^TOTAL\s/i.test(descRaw) || /^OBS/i.test(descRaw)) continue
+
+          let qtdRaw = row[idxQtd]
+          let qtd: number
+          if (typeof qtdRaw === 'number') {
+            qtd = qtdRaw
+          } else {
+            // String tipo "10FD", "5CX": extrai apenas o numero inicial
+            const m = String(qtdRaw ?? '').replace(',', '.').match(/^\s*([\d.]+)/)
+            qtd = m ? Number(m[1]) : NaN
+          }
+          if (!Number.isFinite(qtd)) {
+            ignoradas.push(`${descRaw} (qtd invalida: "${qtdRaw}")`)
+            continue
+          }
+
+          const unidRaw = idxUnid >= 0 ? String(row[idxUnid] ?? '').toUpperCase().trim() : ''
+          const unid = UNIDADE_MAP[unidRaw] ?? unidRaw ?? 'UN'
+          const marca = idxMarca >= 0 ? String(row[idxMarca] ?? '').trim() : ''
+
+          out.push({
+            descricao: descRaw,
+            unidade: unid || 'UN',
+            marca: marca || undefined,
+            quantidade: String(qtd),
+          })
+        }
+        if (out.length === 0) {
+          setParseWarn('Nenhuma linha valida encontrada apos o cabecalho.')
+          return
+        }
+        if (ignoradas.length > 0) {
+          setParseWarn(`${ignoradas.length} linha(s) com qtd invalida foram puladas: ${ignoradas.slice(0, 3).join('; ')}${ignoradas.length > 3 ? ` (+${ignoradas.length - 3} mais)` : ''}`)
+        }
+        setXlsxRows(out)
+        setXlsxFileName(file.name)
+        setMode('xlsx')
+      } catch (e: any) {
+        setParseWarn(`Erro ao ler XLSX: ${e?.message ?? 'desconhecido'}`)
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  function parseCsv(text: string): LinhaCsv[] {
+    const out: LinhaCsv[] = []
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
     if (lines.length === 0) return out
 
@@ -494,24 +606,35 @@ function ImportarCSVModal({
 
   async function handleImport() {
     setResult(null)
-    const linhas = parseCsv(csvText)
-    if (linhas.length === 0) {
-      alert('CSV vazio ou invalido. Use: codigo;quantidade;observacao (uma linha por item)')
-      return
-    }
     try {
-      const r = await importar.mutateAsync({ inventarioId, linhas })
-      setResult(r)
+      if (mode === 'xlsx') {
+        if (xlsxRows.length === 0) {
+          alert('Nenhuma linha XLSX carregada.')
+          return
+        }
+        const r = await importarXlsx.mutateAsync({ inventarioId, itens: xlsxRows })
+        setResult(r)
+      } else {
+        const linhas = parseCsv(csvText)
+        if (linhas.length === 0) {
+          alert('CSV vazio ou invalido. Use: codigo;quantidade;observacao (uma linha por item)')
+          return
+        }
+        const r = await importarCsv.mutateAsync({ inventarioId, linhas })
+        setResult(r)
+      }
     } catch (e: any) {
       alert(`Erro: ${e?.message ?? 'desconhecido'}`)
     }
   }
 
+  const isPending = importarCsv.isPending || importarXlsx.isPending
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div className={`${bg} rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-5 py-4 border-b ${border}`}>
-          <h3 className={`text-sm font-bold ${txtMain}`}>Importar contagem (CSV)</h3>
+          <h3 className={`text-sm font-bold ${txtMain}`}>Importar contagem (CSV ou XLSX)</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
@@ -520,15 +643,15 @@ function ImportarCSVModal({
             <>
               <div className={`rounded-xl p-3 ${isLight ? 'bg-indigo-50 border border-indigo-200' : 'bg-indigo-500/10 border border-indigo-500/20'}`}>
                 <p className={`text-[11px] ${isLight ? 'text-indigo-700' : 'text-indigo-300'}`}>
-                  <strong>Formato:</strong> 1 item por linha, separado por <code>;</code> ou <code>,</code>.{' '}
-                  <code>codigo;quantidade;observacao</code> (observacao opcional). Cabecalho na 1a linha e ignorado se a quantidade nao for numero.
+                  <strong>XLSX</strong>: template "Inventário Geral" (colunas QTD, DESCRIÇÃO, CÓDIGO, MARCA, C.A, UNID., OBRA). Itens não cadastrados são criados automaticamente em est_itens (categoria "Almoxarifado Geral", valor 0).<br />
+                  <strong>CSV</strong>: <code>codigo;quantidade;observacao</code> (1 item por linha, casa por código existente).
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
                 <input
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".csv,.txt,.xlsx,.xls"
                   ref={fileRef}
                   onChange={e => handleFile(e.target.files?.[0] ?? null)}
                   className="hidden"
@@ -539,18 +662,39 @@ function ImportarCSVModal({
                     isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.10]'
                   }`}
                 >
-                  <Upload size={12} /> Selecionar arquivo .csv
+                  <Upload size={12} /> Selecionar arquivo (.csv ou .xlsx)
                 </button>
-                <span className={`text-[11px] ${txtMuted}`}>ou cole o conteudo abaixo:</span>
+                <span className={`text-[11px] ${txtMuted}`}>ou cole CSV abaixo</span>
               </div>
 
-              <textarea
-                rows={10}
-                placeholder={'codigo;quantidade;observacao\nIT-001;15;contagem ok\nIT-002;3,5'}
-                value={csvText}
-                onChange={e => setCsvText(e.target.value)}
-                className={inputCls}
-              />
+              {mode === 'xlsx' && xlsxRows.length > 0 && (
+                <div className={`rounded-xl p-3 ${isLight ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
+                  <p className={`text-sm font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>
+                    {xlsxFileName}
+                  </p>
+                  <p className={`text-[11px] ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                    {xlsxRows.length} item(ns) prontos para importar
+                    {' · '}
+                    {xlsxRows.filter(r => Number(r.quantidade) > 0).length} com qtd &gt; 0
+                  </p>
+                </div>
+              )}
+
+              {parseWarn && (
+                <div className={`rounded-xl p-3 ${isLight ? 'bg-amber-50 border border-amber-200' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+                  <p className={`text-[11px] ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>{parseWarn}</p>
+                </div>
+              )}
+
+              {mode === 'csv' && (
+                <textarea
+                  rows={6}
+                  placeholder={'codigo;quantidade;observacao\nIT-001;15;contagem ok\nIT-002;3,5'}
+                  value={csvText}
+                  onChange={e => setCsvText(e.target.value)}
+                  className={inputCls}
+                />
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -563,11 +707,11 @@ function ImportarCSVModal({
                 </button>
                 <button
                   onClick={handleImport}
-                  disabled={importar.isPending || !csvText.trim()}
+                  disabled={isPending || (mode === 'csv' ? !csvText.trim() : xlsxRows.length === 0)}
                   className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {importar.isPending ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                  {importar.isPending ? 'Importando...' : 'Importar'}
+                  {isPending ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  {isPending ? 'Importando...' : `Importar ${mode === 'xlsx' ? 'XLSX' : 'CSV'}`}
                 </button>
               </div>
             </>
@@ -579,12 +723,16 @@ function ImportarCSVModal({
                 <div className={`rounded-xl p-4 ${isLight ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
                   <p className={`text-sm font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>
                     {result.importados ?? 0} linha(s) importada(s)
+                    {result.criados ? ` · ${result.criados} item(ns) auto-criado(s) no catálogo` : ''}
                   </p>
                   {result.erros_count ? (
                     <p className={`text-xs mt-1 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
                       {result.erros_count} linha(s) ignorada(s)
                     </p>
                   ) : null}
+                  <p className={`text-[11px] mt-2 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                    Próximo passo: conclua o inventário na lista para gerar movimentações de ajuste e atualizar o saldo "Em Estoque" da base.
+                  </p>
                 </div>
               ) : (
                 <div className={`rounded-xl p-4 ${isLight ? 'bg-red-50 border border-red-200' : 'bg-red-500/10 border border-red-500/20'}`}>
