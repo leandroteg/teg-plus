@@ -179,7 +179,12 @@ function ModeloForm({
 
       {/* Cláusulas */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-        <h2 className="text-sm font-extrabold text-slate-800">Cláusulas Padrão</h2>
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-800">Cláusulas Padrão</h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Campo de referência (apenas leitura). Não interpola variáveis tipo <code className="bg-slate-100 px-1 rounded">{'{{nome}}'}</code> — a minuta real é o arquivo anexo abaixo.
+          </p>
+        </div>
         <textarea value={clausulas} onChange={e => setClausulas(e.target.value)}
           placeholder="Cláusulas padrão do contrato. Cada cláusula em uma linha ou use formatação livre..."
           rows={8} className={`${inputClass} resize-none font-mono text-xs leading-relaxed`} />

@@ -89,7 +89,17 @@ function SolicitarContratoForm({ valorMensal, pedido, onSuccess }: {
       })
       if (solErr) throw solErr
       if (!(result as any)?.ok) throw new Error((result as any)?.erro || 'falha ao criar solicitação')
-      await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', pedido.requisicao_id)
+      // Captura erro de RLS / outro — se a RC nao for atualizada, o usuario
+      // precisa saber para corrigir manualmente (antes ficava silencioso)
+      const { error: updErr, data: updData } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: 'aguardando_contrato' })
+        .eq('id', pedido.requisicao_id)
+        .select('id')
+      if (updErr) throw new Error(`Solicitacao criada, mas falhou ao atualizar a RC: ${updErr.message}`)
+      if (!updData || updData.length === 0) {
+        throw new Error('Solicitacao criada, mas a RC nao foi atualizada (sem permissao ou RC nao encontrada). Avise o administrador.')
+      }
       onSuccess()
     } catch (err: any) {
       alert(`Erro: ${err?.message || 'falha ao criar solicitação'}`)

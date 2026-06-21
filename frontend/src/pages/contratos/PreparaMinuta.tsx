@@ -2221,15 +2221,16 @@ export default function PreparaMinuta() {
                               solicitacaoId: solicitacao!.id,
                               file,
                             })
-                            await supabase.from('con_minutas').insert({
-                              solicitacao_id: solicitacao!.id,
-                              versao: (minutas?.length ?? 0) + 1,
-                              tipo: 'modelo',
-                              titulo: modelo.nome,
-                              arquivo_url: uploaded.arquivo_url,
-                              arquivo_nome: fileName,
-                              status: 'em_revisao',
+                            // RPC atomico (versao calculada server-side, sem race)
+                            const { error: insErr } = await supabase.rpc('con_criar_minuta_atomic', {
+                              p_solicitacao_id: solicitacao!.id,
+                              p_titulo:         modelo.nome,
+                              p_tipo:           'modelo',
+                              p_descricao:      '',
+                              p_arquivo_url:    uploaded.arquivo_url,
+                              p_arquivo_nome:   fileName,
                             })
+                            if (insErr) throw insErr
                             qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao!.id] })
                             btn.textContent = '✓ Carregado!'
                             btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white'

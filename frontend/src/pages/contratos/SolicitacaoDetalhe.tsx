@@ -715,7 +715,7 @@ function PlanejamentoParcelasCard({
   )
 }
 
-function EtapaActions({ etapa, status, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav, jaEnviado }: {
+function EtapaActions({ etapa, status, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav, jaEnviado, assinaturaPendenteId, onCancelarAssinaturaPendente, cancelandoPendencia }: {
   etapa: EtapaSolicitacao
   status: string
   solicitacaoId: string
@@ -726,6 +726,9 @@ function EtapaActions({ etapa, status, solicitacaoId, onAvancar, onCancel, onEnv
   isPending: boolean
   nav: ReturnType<typeof useNavigate>
   jaEnviado?: boolean
+  assinaturaPendenteId?: string | null
+  onCancelarAssinaturaPendente?: () => void
+  cancelandoPendencia?: boolean
 }) {
   const { role, hasSetorPapel } = useAuth()
   const canReleaseExecution = role === 'administrador'
@@ -864,10 +867,37 @@ function EtapaActions({ etapa, status, solicitacaoId, onAvancar, onCancel, onEnv
       return (
         <>
           {jaEnviado ? (
-            <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700">
-              <CheckCircle2 size={14} />
-              <span className="text-xs font-semibold">Enviado para assinatura via Certisign</span>
-            </div>
+            <>
+              <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700">
+                <CheckCircle2 size={14} />
+                <span className="text-xs font-semibold">Enviado para assinatura via Certisign</span>
+              </div>
+              {assinaturaPendenteId && onCancelarAssinaturaPendente && (
+                <>
+                  <button
+                    onClick={onCancelarAssinaturaPendente}
+                    disabled={cancelandoPendencia}
+                    className={`${btnSecondary} border-amber-200 text-amber-700 hover:bg-amber-50`}
+                    title="Marca a pendência atual como cancelada e libera para novo envio"
+                  >
+                    {cancelandoPendencia ? spinnerDark : <Ban size={12} />}
+                    Cancelar pendência
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await onCancelarAssinaturaPendente()
+                      onEnviarAssinatura()
+                    }}
+                    disabled={cancelandoPendencia}
+                    className={`${btnPrimary} bg-amber-500 text-white hover:bg-amber-600 shadow-sm`}
+                    title="Cancela a pendência e abre o modal para novo envio"
+                  >
+                    {cancelandoPendencia ? spinner : <PenTool size={13} />}
+                    Reenviar para Certisign
+                  </button>
+                </>
+              )}
+            </>
           ) : (
             <button
               onClick={onEnviarAssinatura}
@@ -954,6 +984,7 @@ export default function SolicitacaoDetalhe() {
   const [parcelasPlanejadas, setParcelasPlanejadas] = useState<ParcelaPlanejada[]>([])
   const [parcelasTouched, setParcelasTouched] = useState(false)
   const [execucaoErro, setExecucaoErro] = useState('')
+  const [cancelandoPendencia, setCancelandoPendencia] = useState(false)
 
   // Hook must be called unconditionally (before any early return)
   const etapaAtual = solicitacao?.etapa_atual
@@ -1033,6 +1064,26 @@ export default function SolicitacaoDetalhe() {
   const handleCancelar = async (motivo: string) => {
     await cancelarSolicitacao.mutateAsync({ id: s.id, motivo })
     setShowCancelModal(false)
+  }
+
+  const handleCancelarPendencia = async () => {
+    const pendente = assinaturas.find(a => a.status === 'enviado' || a.status === 'pendente' || a.status === 'erro')
+    if (!pendente) return
+    setCancelandoPendencia(true)
+    try {
+      const { error } = await supabase
+        .from('con_assinaturas')
+        .update({ status: 'cancelado' })
+        .eq('id', pendente.id)
+      if (error) {
+        alert(`Erro ao cancelar pendencia: ${error.message}`)
+        return
+      }
+      // Refetch assinaturas (useAssinaturas usa key ['con-assinaturas', solicitacaoId])
+      // sem qc disponivel aqui, mas useEnviarAssinatura ja invalida em re-envio.
+    } finally {
+      setCancelandoPendencia(false)
+    }
   }
 
   const vigencia =
@@ -1396,6 +1447,11 @@ export default function SolicitacaoDetalhe() {
                     isPending={avancarEtapa.isPending}
                     nav={nav}
                     jaEnviado={assinaturas.some(a => a.status === 'enviado' || a.status === 'assinado')}
+                    assinaturaPendenteId={
+                      assinaturas.find(a => a.status === 'enviado' || a.status === 'pendente' || a.status === 'erro')?.id ?? null
+                    }
+                    onCancelarAssinaturaPendente={handleCancelarPendencia}
+                    cancelandoPendencia={cancelandoPendencia}
                   />
                 )}
               </div>
