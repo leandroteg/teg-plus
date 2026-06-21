@@ -56,11 +56,10 @@ interface GeoData {
   extensao_km?: number
 }
 
-// classifica o relevo pela RAMPA REAL (SRTM, determinístico); cai no fator se não houver perfil
-function relevoReal(rampa: number | null | undefined, f: number, torres: number, km: number): { label: string; tone: RelevoTone } {
-  // obra curta demais p/ classificar relevo (1 torre ou < 0,4 km ≈ ponto): a rampa do SRTM
-  // vira ruído nessa escala → NÃO cravamos dificuldade (seria erro).
-  if (torres <= 1 || km < 0.4) return { label: 'Pontual', tone: 'slate' }
+// classifica o relevo pela RAMPA REAL (SRTM) ao longo da LINHA. Curta demais (<0,3 km) =
+// o SRTM não resolve o relevo → "Curto" (não cravamos). Determinístico.
+function relevoReal(rampa: number | null | undefined, f: number, km: number): { label: string; tone: RelevoTone } {
+  if (km < 0.3) return { label: 'Curto', tone: 'slate' }
   if (rampa == null) return relevoNivel(f)
   if (rampa < 1.5) return { label: 'Plano', tone: 'emerald' }
   if (rampa < 3) return { label: 'Ondulado', tone: 'amber' }
@@ -95,7 +94,7 @@ function Cross({ x, y, cor, size = 2, bold, onHover }: { x: number; y: number; c
 }
 
 // gráfico 2D altura × distância (1 ponto ~por torre) — cruzinhas + tooltip; 1 torre = ponto único
-function PerfilChart({ perfil, isDark, cor, torres }: { perfil: NonNullable<GeoData['perfil']>; isDark: boolean; cor: string; torres: number }) {
+function PerfilChart({ perfil, isDark, cor }: { perfil: NonNullable<GeoData['perfil']>; isDark: boolean; cor: string }) {
   const [hov, setHov] = useState<number | null>(null)
   const d = perfil.dist_km, e = perfil.elev_m
   if (!d?.length || d.length !== e.length) return null
@@ -106,14 +105,14 @@ function PerfilChart({ perfil, isDark, cor, torres }: { perfil: NonNullable<GeoD
   const rE = Math.max(1, maxE - minE)
   const maxD = d[d.length - 1] || 1
 
-  // 1 torre (ou traçado degenerado) → ponto único
-  if (torres <= 1 || d.length < 2 || maxD < 0.05) {
+  // traçado degenerado (1 ponto só) → ponto único
+  if (d.length < 2 || maxD < 0.02) {
     const cx = W / 2, cy = (pT + (H - pB)) / 2
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }}>
         <Cross x={cx} y={cy} cor={cor} size={4} bold />
         <text x={cx} y={cy - 8} fontSize={8} textAnchor="middle" fill={lbl} fontWeight="bold">{e[0]} m</text>
-        <text x={cx} y={cy + 17} fontSize={7} textAnchor="middle" fill={lbl}>obra pontual (1 torre)</text>
+        <text x={cx} y={cy + 17} fontSize={7} textAnchor="middle" fill={lbl}>trecho muito curto</text>
       </svg>
     )
   }
@@ -143,7 +142,7 @@ function PerfilChart({ perfil, isDark, cor, torres }: { perfil: NonNullable<GeoD
       <div className="absolute z-20 pointer-events-none" style={{ left: `${xFrac * 100}%`, top: `${yFrac * 100}%`, transform: `translate(${tipX}, ${below ? '10px' : 'calc(-100% - 10px)'})` }}>
         <div className={`rounded-xl border shadow-xl px-3 py-2 text-[11px] leading-tight whitespace-nowrap ${isDark ? 'bg-[#0f172a] border-white/15' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-1.5 font-extrabold mb-1.5" style={{ color: cor }}>
-            <span className="inline-block w-2 h-2 rounded-sm" style={{ background: cor }} /> Torre {hov + 1}<span className={`font-medium ${muted}`}>/{d.length}</span>
+            <span className="inline-block w-2 h-2 rounded-sm" style={{ background: cor }} /> Ponto {hov + 1}<span className={`font-medium ${muted}`}>/{d.length}</span>
           </div>
           <div className={`flex justify-between gap-5 ${val}`}><span className={muted}>Altura</span><b>{e[hov]} m</b></div>
           <div className={`flex justify-between gap-5 ${val}`}><span className={muted}>Distância</span><b>{d[hov].toFixed(1)} km</b></div>
@@ -452,7 +451,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
             <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Obras do lote ({obras.length}) · clique p/ ver o terreno</p>
             <div className="flex items-center gap-3">
               <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Extensão da linha"><Route size={12} className="text-slate-400" /> km</span>
-              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Número de torres"><RadioTower size={12} className="text-slate-400" /> torres</span>
+              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)"><RadioTower size={12} className="text-slate-400" /> torres (est.)</span>
               <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Fator de relevo (dificuldade do terreno)"><Mountain size={12} className="text-slate-400" /> relevo</span>
             </div>
           </div>
@@ -471,7 +470,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
               const f = Number(o.f_terreno)
               const geo = o.geo as GeoData | undefined
               const torresN = Number(o.torres) || 0
-              const rel = relevoReal(geo?.perfil?.rampa_media_pct, f, torresN, Number(o.km))
+              const rel = relevoReal(geo?.perfil?.rampa_media_pct, f, Number(o.km))
               const tn = RELEVO_TONE[rel.tone]
               const tr = geo?.travessias
               const temTrav = !!tr && (tr.rios + tr.rodovias + tr.ferrovias + tr.lts) > 0
@@ -503,8 +502,8 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                       <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Extensão">
                         <Route size={12} className="text-slate-400" />{fmtNum(Number(o.km), 1)}<span className={`font-medium ${txtMuted}`}>km</span>
                       </span>
-                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres">
-                        <RadioTower size={12} className="text-slate-400" />{fmtNum(Number(o.torres))}
+                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)">
+                        <RadioTower size={12} className="text-slate-400" />~{fmtNum(Number(o.torres))}
                       </span>
                       <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`} title={geo?.perfil ? `Relevo ${rel.label} · rampa média ${geo.perfil.rampa_media_pct}% (SRTM real)` : `Relevo ${rel.label} (fator ×${fmtNum(f, 2)})`}>
                         <RelevoGlyph tone={rel.tone} size={15} /> {rel.label}
@@ -521,7 +520,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                         <div className="mb-1.5">
                           <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Perfil de elevação <span className="font-normal normal-case">(1 ponto ~por torre · SRTM)</span></p>
                           <div className={`rounded-lg p-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-                            <PerfilChart perfil={geo.perfil} isDark={isDark} cor={tn.barHex} torres={torresN} />
+                            <PerfilChart perfil={geo.perfil} isDark={isDark} cor={tn.barHex} />
                           </div>
                           <p className={`text-[10px] mt-0.5 ${txtMuted}`}>amplitude {geo.amplitude_m} m · ↑{geo.perfil.subida_m} / ↓{geo.perfil.descida_m} m · rampa média {geo.perfil.rampa_media_pct}% · máx {geo.perfil.rampa_max_pct}%</p>
                         </div>
