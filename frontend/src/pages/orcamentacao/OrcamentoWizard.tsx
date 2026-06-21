@@ -375,7 +375,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
 
       {/* Dados gerados (por tipo de estágio) */}
       {estagio === 1 && <Caracteristicas d={d} estagio={estagio} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
-      {estagio === 2 && <Consolidacao d={d} isDark={isDark} />}
+      {estagio === 2 && <Consolidacao orc={orc} d={d} isDark={isDark} />}
       {estagio === 3 && <Recursos d={d} isDark={isDark} />}
       {estagio === 4 && <Custos d={d} isDark={isDark} />}
       {estagio === 5 && <Orcamentacao d={d} isDark={isDark} />}
@@ -564,8 +564,18 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
   )
 }
 
-// ── Consolidação (estágio 2): SÓ fatos extraídos dos documentos (sem estimativa) ──
-function Consolidacao({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) {
+function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: string; isDark: boolean; tone?: string; small?: boolean }) {
+  const valCls = tone === 'amber' ? (isDark ? 'text-amber-300' : 'text-amber-600') : (isDark ? 'text-white' : 'text-slate-900')
+  return (
+    <div className="min-w-0">
+      <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
+      <p className={`${small ? 'text-xs' : 'text-lg'} font-extrabold leading-tight truncate ${valCls}`}>{val}</p>
+    </div>
+  )
+}
+
+// ── Consolidação (estágio 2): resumo (medido) + SÓ fatos extraídos dos documentos ──
+function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, unknown>; isDark: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const docs = (d.docs_analisados as string[]) ?? []
@@ -573,6 +583,20 @@ function Consolidacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
   const quant = arr('quantitativos'), crono = arr('cronograma'), recursos = arr('recursos_contrato'), restr = arr('restricoes'), geot = arr('geotecnia')
   const pend = (d.pendencias as string[]) ?? []
   const total = quant.length + crono.length + recursos.length + restr.length + geot.length
+  // medido do estágio 1 (geo) — p/ os resumos
+  const obras1 = (((orc.dados_estagios as Record<string, Record<string, unknown>> | undefined)?.['1']?.obras) as Array<Record<string, unknown>>) ?? []
+  const normN = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+  const kmTotal = obras1.reduce((s, o) => s + Number(o.km || 0), 0)
+  const relevoCount: Record<string, number> = {}
+  let rios = 0, rod = 0
+  obras1.forEach(o => {
+    const g = o.geo as GeoData | undefined
+    const rel = relevoReal(g?.perfil?.rampa_media_pct, Number(o.f_terreno), Number(o.km))
+    relevoCount[rel.label] = (relevoCount[rel.label] || 0) + 1
+    rios += g?.travessias?.rios ?? 0; rod += g?.travessias?.rodovias ?? 0
+  })
+  const relevoTxt = ['Plano', 'Ondulado', 'Acidentado', 'Serrano', 'Curto'].filter(c => relevoCount[c]).map(c => `${relevoCount[c]} ${c}`).join(' · ')
+  const fatosDaObra = (nome: string) => { const nn = normN(nome); return quant.filter(q => { const on = normN(String(q.obra || '')); return on && (on === nn || on.includes(nn) || nn.includes(on)) }) }
 
   const Secao = ({ titulo, icon: Icon, itens, cols }: { titulo: string; icon: LucideIcon; itens: Array<Record<string, unknown>>; cols: { k: string; w?: string; bold?: boolean }[] }) =>
     itens.length === 0 ? null : (
@@ -598,6 +622,55 @@ function Consolidacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
         <h3 className={`text-sm font-extrabold ${txt}`}>Fatos dos documentos <span className={`text-[11px] font-normal ${txtMuted}`}>(extraídos, sem estimativa)</span></h3>
         <span className={`text-[11px] ${txtMuted}`}>{total} fato(s) · {docs.length} doc(s)</span>
       </div>
+
+      {/* RESUMO DO LOTE (medido) */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo do lote{d.lote ? ` — ${String(d.lote)}` : ''}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
+          <ResumoStat lbl="Obras" val={String(obras1.length)} isDark={isDark} />
+          <ResumoStat lbl="Extensão (medida)" val={`${fmtNum(kmTotal, 1)} km`} isDark={isDark} />
+          <ResumoStat lbl="Relevo (SRTM)" val={relevoTxt || '—'} isDark={isDark} small />
+          <ResumoStat lbl="Travessias (OSM)" val={`${rios} rios · ${rod} rod`} isDark={isDark} small />
+          <ResumoStat lbl="Documentos lidos" val={String(docs.length)} isDark={isDark} />
+          <ResumoStat lbl="Fatos extraídos" val={String(total)} isDark={isDark} />
+          <ResumoStat lbl="Cronograma/recursos" val={`${crono.length}/${recursos.length}`} isDark={isDark} />
+          <ResumoStat lbl="Pendências" val={String(pend.length)} isDark={isDark} tone="amber" />
+        </div>
+      </div>
+
+      {/* RESUMO POR OBRA (medido + fatos dos docs) */}
+      {obras1.length > 0 && (
+        <div className="space-y-1.5">
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Resumo por obra <span className="font-normal normal-case opacity-70">(medido + fatos dos documentos)</span></p>
+          {[...obras1].sort((a, b) => Number(b.km) - Number(a.km)).map((o, i) => {
+            const g = o.geo as GeoData | undefined
+            const rel = relevoReal(g?.perfil?.rampa_media_pct, Number(o.f_terreno), Number(o.km))
+            const tn = RELEVO_TONE[rel.tone]
+            const tv = g?.travessias
+            const fatos = fatosDaObra(String(o.nome))
+            const destaque = fatos.filter(f => /torre|estrutura|fundac|fundaç|aço|aco |comprimento|cabo|condutor/i.test(String(f.item))).slice(0, 3)
+            return (
+              <div key={i} className={`flex gap-2.5 rounded-lg border p-2.5 ${isDark ? 'border-white/[0.06] bg-white/[0.015]' : 'border-slate-200 bg-white'}`}>
+                <span className="w-1 rounded-full shrink-0 self-stretch" style={{ background: tn.barHex }} />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-xs font-bold flex items-center gap-1.5 ${txt}`}><RelevoGlyph tone={rel.tone} size={13} /> <span className="truncate">{String(o.nome)}</span></p>
+                  <p className={`text-[11px] mt-0.5 ${txtMuted}`}>
+                    {fmtNum(Number(o.km), 1)} km · {rel.label}{g?.amplitude_m != null ? ` · amplitude ${g.amplitude_m} m` : ''}{tv ? ` · ${tv.rios} rios · ${tv.rodovias} rod${tv.lts ? ` · ${tv.lts} LT` : ''}` : ''}
+                  </p>
+                  {destaque.length > 0 ? (
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>📄 {destaque.map(f => `${String(f.item)}: ${String(f.valor)}`).join(' · ')}{fatos.length > destaque.length ? ` · +${fatos.length - destaque.length} fato(s)` : ''}</p>
+                  ) : fatos.length > 0 ? (
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>📄 {fatos.length} fato(s) nos documentos</p>
+                  ) : (
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-300/80' : 'text-amber-600'}`}>⚠ sem fato de documento para esta obra (vide pendências)</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
       {docs.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
