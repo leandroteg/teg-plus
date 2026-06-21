@@ -84,15 +84,54 @@ export function MiniMarkdown({ text, isDark }: { text: string; isDark: boolean }
       p.startsWith('**') && p.endsWith('**')
         ? <strong key={i} className={head}>{p.slice(2, -2)}</strong>
         : <span key={i}>{p}</span>)
-  lines.forEach((raw, i) => {
-    const l = raw.trimEnd()
-    if (!l.trim()) { out.push(<div key={i} className="h-2" />); return }
+  const isRow = (l: string) => /^\s*\|.*\|\s*$/.test(l)
+  const splitCells = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())
+  const isSep = (l: string) => isRow(l) && splitCells(l).every(c => /^:?-+:?$/.test(c))
+  const isNum = (s: string) => /\d/.test(s) && /^[\s\d.,%+\-/xX]*(R\$|US)?[\s\d.,%+\-/xX]*$/.test(s)
+
+  let i = 0
+  while (i < lines.length) {
+    const l = (lines[i] || '').trimEnd()
+    // ── Tabela GFM: linha "| a | b |" seguida de separador "|---|---|" ──
+    if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {
+      const header = splitCells(l)
+      const rows: string[][] = []
+      let j = i + 2
+      while (j < lines.length && isRow(lines[j]) && !isSep(lines[j])) { rows.push(splitCells(lines[j])); j++ }
+      const alignRight = header.map((_, k) => isNum(rows[0]?.[k] ?? ''))
+      out.push(
+        <div key={i} className="overflow-x-auto my-2 -mx-1">
+          <table className={`w-full text-[11px] border-collapse rounded-lg overflow-hidden border ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <thead>
+              <tr className={isDark ? 'bg-white/[0.04]' : 'bg-slate-100/70'}>
+                {header.map((h, k) => (
+                  <th key={k} className={`px-2.5 py-1.5 font-bold whitespace-nowrap ${alignRight[k] ? 'text-right' : 'text-left'} ${head}`}>{inline(h)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri} className={`${ri ? (isDark ? 'border-t border-white/[0.05]' : 'border-t border-slate-100') : ''} ${ri % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}`}>
+                  {header.map((_, k) => (
+                    <td key={k} className={`px-2.5 py-1 whitespace-nowrap ${alignRight[k] ? 'text-right tabular-nums font-semibold' : 'text-left'} ${txt}`}>{inline(r[k] ?? '')}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+      i = j
+      continue
+    }
+    if (!l.trim()) { out.push(<div key={i} className="h-2" />); i++; continue }
     if (l.startsWith('### ')) out.push(<h4 key={i} className={`text-xs font-bold mt-2 mb-1 ${head}`}>{inline(l.slice(4))}</h4>)
     else if (l.startsWith('## ')) out.push(<h3 key={i} className={`text-sm font-extrabold mt-3 mb-1 ${head}`}>{inline(l.slice(3))}</h3>)
     else if (l.startsWith('# ')) out.push(<h2 key={i} className={`text-base font-extrabold mt-2 mb-1.5 ${head}`}>{inline(l.slice(2))}</h2>)
     else if (/^[-*]\s/.test(l)) out.push(<div key={i} className={`flex gap-2 text-xs leading-relaxed ${txt}`}><span className="text-amber-500">•</span><span>{inline(l.replace(/^[-*]\s/, ''))}</span></div>)
     else out.push(<p key={i} className={`text-xs leading-relaxed ${txt}`}>{inline(l)}</p>)
-  })
+    i++
+  }
   return <div className="space-y-0.5">{out}</div>
 }
 
