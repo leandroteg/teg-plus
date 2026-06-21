@@ -413,7 +413,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
         { k: 'vol_fund_por_torre', lbl: 'Fund./torre', un: 'm³' },
       ]
     : [
-        { k: 'torres', lbl: 'Torres', un: '' },
+        { k: 'n_obras', lbl: 'Obras', un: '', ro: true },
         { k: 'km', lbl: 'Km de linha', un: 'km', ro: true },
       ]
   return (
@@ -430,7 +430,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
           <div key={c.k} className={`flex-1 min-w-[130px] rounded-xl p-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
             <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>{c.lbl}</p>
             {c.ro || !(c.k in edit) ? (
-              <p className={`text-base font-extrabold ${txt}`}>{d[c.k] != null ? `${fmtNum(Number(d[c.k]), c.un === 't' || c.un === 'm³' ? 2 : c.un === 'km' ? 1 : 0)} ${c.un}` : '—'}</p>
+              <p className={`text-base font-extrabold ${txt}`}>{c.k === 'n_obras' ? fmtNum(Number(d.n_obras ?? obras.length)) : d[c.k] != null ? `${fmtNum(Number(d[c.k]), c.un === 't' || c.un === 'm³' ? 2 : c.un === 'km' ? 1 : 0)} ${c.un}` : '—'}</p>
             ) : (
               <input type="number" value={edit[c.k]} onChange={e => setEdit(s => ({ ...s, [c.k]: Number(e.target.value) }))}
                 className={`w-full bg-transparent text-base font-extrabold outline-none ${txt}`} />
@@ -451,7 +451,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
             <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Obras do lote ({obras.length}) · clique p/ ver o terreno</p>
             <div className="flex items-center gap-3">
               <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Extensão da linha"><Route size={12} className="text-slate-400" /> km</span>
-              <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)"><RadioTower size={12} className="text-slate-400" /> torres (est.)</span>
+              {estagio >= 2 && <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)"><RadioTower size={12} className="text-slate-400" /> torres (est.)</span>}
               <span className={`flex items-center gap-1 text-[10px] ${txtMuted}`} title="Fator de relevo (dificuldade do terreno)"><Mountain size={12} className="text-slate-400" /> relevo</span>
             </div>
           </div>
@@ -502,9 +502,11 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
                       <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Extensão">
                         <Route size={12} className="text-slate-400" />{fmtNum(Number(o.km), 1)}<span className={`font-medium ${txtMuted}`}>km</span>
                       </span>
-                      <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)">
-                        <RadioTower size={12} className="text-slate-400" />~{fmtNum(Number(o.torres))}
-                      </span>
+                      {estagio >= 2 && (
+                        <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title="Torres estimadas (~1,53/km — o KMZ não traz a posição das torres)">
+                          <RadioTower size={12} className="text-slate-400" />~{fmtNum(Number(o.torres))}
+                        </span>
+                      )}
                       <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`} title={geo?.perfil ? `Relevo ${rel.label} · rampa média ${geo.perfil.rampa_media_pct}% (SRTM real)` : `Relevo ${rel.label} (fator ×${fmtNum(f, 2)})`}>
                         <RelevoGlyph tone={rel.tone} size={15} /> {rel.label}
                       </span>
