@@ -114,8 +114,16 @@ function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
   return { sadm, rocha, agua, aguaSeco, tipos, classe, tone }
 }
 
-// cor de um tipo de solo pelo nome (casa com SOIL_TYPES) — p/ a barra de proporção
-const corDoTipo = (nome: string) => (SOIL_TYPES.find(t => t.re.test(nome)) || { color: '#94a3b8' }).color
+// DIFICULDADE (escala verde→vermelho) de UM tipo de fundação/solo pelo nome — p/ colorir a barra
+function toneDoTipo(nome: string): RelevoTone {
+  const s = String(nome).toLowerCase()
+  if (/rocha|impenetr|\bestacas?\b|bloco sobre estaca|\brefus/.test(s)) return 'rose'        // mais difícil
+  if (/submers|alagad|aflor|com alargamento|base alargada|\bmole\b|saturad|brejo/.test(s)) return 'orange'
+  if (/tubul[ãa]o|stub/.test(s)) return 'amber'                                               // padrão
+  if (/sapata|grelha|grilhag|residual|firme|solo comum|\bterra\b/.test(s)) return 'emerald'   // raso/fácil
+  return 'slate'
+}
+const corDificuldade = (nome: string) => RELEVO_TONE[toneDoTipo(nome)].barHex
 
 // tipo de FUNDAÇÃO predominante → glifo + dificuldade (escala verde→vermelho: emerald<amber<orange<rose)
 const FUND_TYPES: { re: RegExp; glyph: string; label: string; tone: RelevoTone }[] = [
@@ -143,9 +151,9 @@ function BarraSolo({ dist, isDark, compact }: { dist: Array<{ tipo: string; pct:
   return (
     <span className={`inline-flex flex-col ${compact ? 'w-16' : 'w-full'} gap-0.5`} title={dist.map(d => `${d.tipo}: ${Math.round(Number(d.pct))}%`).join(' · ')}>
       <span className={`flex h-2 w-full rounded-full overflow-hidden ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`}>
-        {dist.map((d, i) => <span key={i} style={{ width: `${(Number(d.pct) / tot) * 100}%`, background: corDoTipo(d.tipo) }} />)}
+        {dist.map((d, i) => <span key={i} style={{ width: `${(Number(d.pct) / tot) * 100}%`, background: corDificuldade(d.tipo) }} />)}
       </span>
-      {!compact && <span className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">{dist.map((d, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}><span className="w-2 h-2 rounded-sm" style={{ background: corDoTipo(d.tipo) }} /> {d.tipo} {Math.round(Number(d.pct))}%</span>)}</span>}
+      {!compact && <span className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">{dist.map((d, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}><span className="w-2 h-2 rounded-sm" style={{ background: corDificuldade(d.tipo) }} /> {d.tipo} {Math.round(Number(d.pct))}%</span>)}</span>}
     </span>
   )
 }
@@ -1069,10 +1077,14 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
           const f = classificarFundacao(its); const fn = f ? RELEVO_TONE[f.tone] : null
           const label = s.classe || s.tipos[0]?.label || ''
           if (!label && !dist.length && !f) return null
+          const distTip = dist.length ? dist.map(d => `${Math.round(Number(d.pct))}% ${d.tipo}`).join(' · ') : 'Tipo de fundação predominante'
           return <span className="inline-flex items-center gap-2 flex-wrap justify-end">
-            {dist.length > 0 && <BarraSolo dist={dist} isDark={isDark} compact />}
+            {(f || dist.length > 0) && <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? (fn || tn).pillD : (fn || tn).pillL}`} title={distTip}>
+              {f && fn && <FundGlyph tipo={f.glyph} color={fn.barHex} size={13} />}
+              {dist.length > 0 && <BarraSolo dist={dist} isDark={isDark} compact />}
+              {f?.label}
+            </span>}
             {label && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
-            {f && fn && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? fn.pillD : fn.pillL}`} title="Tipo de fundação predominante"><FundGlyph tipo={f.glyph} color={fn.barHex} size={12} /> {f.label}</span>}
           </span>
         }}
         obraResumo={(its) => {
@@ -1080,7 +1092,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
           const extra = [s.sadm != null ? `σadm ${s.sadm} kgf/cm²` : null, s.aguaSeco ? 'lençol não encontrado' : null, s.agua != null ? `lençol a ${s.agua} m` : null].filter(Boolean) as string[]
           if (!dist.length && !extra.length) return null
           return <div className="px-3 py-2 space-y-1.5">
-            {dist.length > 0 && <div><p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Proporção do solo (sondagem)</p><BarraSolo dist={dist} isDark={isDark} /></div>}
+            {dist.length > 0 && <div><p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Proporção por dificuldade · fundação/solo (verde→vermelho · sondagem)</p><BarraSolo dist={dist} isDark={isDark} /></div>}
             {extra.length > 0 && <div className="flex flex-wrap gap-1.5">{extra.map((t, i) => <span key={i} className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{t}</span>)}</div>}
           </div>
         }}
