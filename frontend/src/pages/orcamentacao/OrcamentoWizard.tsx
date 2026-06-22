@@ -706,7 +706,7 @@ function SecaoDoc({ titulo, icon: Icon, itens, cols, isDark, baixar, temArq, def
   )
 }
 
-// ── Quantitativos agrupados por obra → tipo de atividade (estágio 2) ─────────────
+// ── Lista de fatos agrupada por obra → categoria (quantitativos, geotecnia) ──────
 const QUANT_CATS: { key: string; re: RegExp }[] = [
   { key: 'Estruturas', re: /torre|estrutura|p[óo]rtico|poste|mastro|estai|autoport|trusspole|silhueta/i },
   { key: 'Fundações', re: /funda|concreto|tubul|sapata|estaca|escava|grauteamento/i },
@@ -715,32 +715,46 @@ const QUANT_CATS: { key: string; re: RegExp }[] = [
   { key: 'Aço', re: /\ba[çc]o\b|peso/i },
   { key: 'Dados gerais', re: /comprimento|tens[ãa]o|^nome|v[ãa]o|extens|defle|travessia|faixa|altitude|c[óo]digo|relev|coorden|servid/i },
 ]
-const categoriaQuant = (item: string) => QUANT_CATS.find(c => c.re.test(item))?.key || 'Outros'
+const GEOT_CATS: { key: string; re: RegExp }[] = [
+  { key: 'Sondagem', re: /sondagem|\bspt\b|trado|furo|perfura/i },
+  { key: 'Lençol freático', re: /len[çc]ol|fre[áa]tic|n[íi]vel d|[áa]gua/i },
+  { key: 'Parâmetros de solo', re: /solo|par[âa]metro|atrito|coes[ãa]o|sadm|capacidade|tubul[ãa]o|recalque|\badm\b/i },
+  { key: 'Resistividade / aterramento', re: /resistivid|aterr/i },
+]
+const obraDoItem = (it: Record<string, unknown>) => {
+  const o = String(it.obra || '').trim()
+  if (o && o.toLowerCase() !== 'geral') return o
+  const m = String(it.item ?? '').match(/LD\s+[A-Za-zÀ-ú0-9 .'\-–]+/i)
+  return m ? m[0].replace(/[)\]\s]+$/, '').trim() : ''
+}
 
-function QuantitativosAgrupado({ itens, isDark, baixar, temArq }: { itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
+function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObra }: {
+  itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean
+  titulo: string; Icon: LucideIcon; cats: { key: string; re: RegExp }[]; getObra: (it: Record<string, unknown>) => string
+}) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const [aberto, setAberto] = useState<Record<string, boolean>>({})
   if (!itens.length) return null
+  const categoriaDe = (item: string) => cats.find(c => c.re.test(item))?.key || 'Outros'
   const porObra = new Map<string, Array<Record<string, unknown>>>()
   itens.forEach(it => {
-    const o = String(it.obra || '').trim()
-    const k = (!o || o.toLowerCase() === 'geral') ? 'Geral / lote' : o
+    const k = getObra(it).trim() || 'Geral / lote'
     if (!porObra.has(k)) porObra.set(k, [])
     porObra.get(k)!.push(it)
   })
   const grupos = [...porObra.entries()].sort((a, b) =>
     a[0] === 'Geral / lote' ? 1 : b[0] === 'Geral / lote' ? -1 : b[1].length - a[1].length)
-  const ordemCat = [...QUANT_CATS.map(c => c.key), 'Outros']
+  const ordemCat = [...cats.map(c => c.key), 'Outros']
   return (
     <div>
-      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 ${txtMuted}`}><Layers size={12} /> Quantitativos por obra <span className="opacity-60">({itens.length})</span></p>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 ${txtMuted}`}><Icon size={12} /> {titulo} <span className="opacity-60">({itens.length})</span></p>
       <div className="space-y-1.5">
         {grupos.map(([obra, its]) => {
           const open = !!aberto[obra]
           const porCat = new Map<string, Array<Record<string, unknown>>>()
-          its.forEach(it => { const c = categoriaQuant(String(it.item ?? '')); if (!porCat.has(c)) porCat.set(c, []); porCat.get(c)!.push(it) })
-          const cats = ordemCat.filter(c => porCat.has(c)).map(c => [c, porCat.get(c)!] as const)
+          its.forEach(it => { const c = categoriaDe(String(it.item ?? '')); if (!porCat.has(c)) porCat.set(c, []); porCat.get(c)!.push(it) })
+          const catsArr = ordemCat.filter(c => porCat.has(c)).map(c => [c, porCat.get(c)!] as const)
           return (
             <div key={obra} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}>
               <button onClick={() => setAberto(a => ({ ...a, [obra]: !a[obra] }))}
@@ -753,7 +767,7 @@ function QuantitativosAgrupado({ itens, isDark, baixar, temArq }: { itens: Array
               </button>
               {open && (
                 <div className={isDark ? 'divide-y divide-white/[0.05]' : 'divide-y divide-slate-100'}>
-                  {cats.map(([cat, citems]) => (
+                  {catsArr.map(([cat, citems]) => (
                     <div key={cat} className="px-3 py-2">
                       <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600/90'}`}>{cat} <span className={`font-normal ${txtMuted}`}>({citems.length})</span></p>
                       <div className="space-y-1">
@@ -842,13 +856,11 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   }
   const docs = (d.docs_analisados as string[]) ?? []
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
-  const quant = arr('quantitativos'), crono = arr('cronograma'), recursos = arr('recursos_contrato'), restr = arr('restricoes'), geot = arr('geotecnia')
-  // separa marcos contratuais de execução das datas de elaboração/aprovação de documentos
-  const ehDocAprov = (c: Record<string, unknown>) => /aprova|elabora|revis|entrega.*(projeto|planilha|tabela|document)/i.test(String(c.marco ?? ''))
-  const cronoExec = crono.filter(c => !ehDocAprov(c))
-  const cronoDocs = crono.filter(ehDocAprov)
+  const quant = arr('quantitativos'), crono = arr('cronograma'), geot = arr('geotecnia')
+  // mantém só marcos contratuais de execução (descarta datas de aprovação de documentos)
+  const cronoExec = crono.filter(c => !/\bdata de aprova/i.test(String(c.marco ?? '')))
   const pend = (d.pendencias as string[]) ?? []
-  const total = quant.length + crono.length + recursos.length + restr.length + geot.length
+  const total = quant.length + crono.length + geot.length
   // medido do estágio 1 (geo) — p/ os resumos
   const obras1 = (((orc.dados_estagios as Record<string, Record<string, unknown>> | undefined)?.['1']?.obras) as Array<Record<string, unknown>>) ?? []
   const normN = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
@@ -893,7 +905,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
           <ResumoStat lbl="Travessias (OSM)" val={`${rios} rios · ${rod} rod`} isDark={isDark} small />
           <ResumoStat lbl="Documentos lidos" val={String(docs.length)} isDark={isDark} />
           <ResumoStat lbl="Fatos extraídos" val={String(total)} isDark={isDark} />
-          <ResumoStat lbl="Cronograma/recursos" val={`${crono.length}/${recursos.length}`} isDark={isDark} />
+          <ResumoStat lbl="Geotecnia" val={String(geot.length)} isDark={isDark} />
           <ResumoStat lbl="Pendências" val={String(pend.length)} isDark={isDark} tone="amber" />
         </div>
       </div>
@@ -942,12 +954,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       )}
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
-      <QuantitativosAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
       <SecaoDoc titulo="Cronograma / marcos de execução" icon={Wallet} itens={cronoExec} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} defaultOpen />
-      <SecaoDoc titulo="Prazos de elaboração de documentos" icon={FileText} itens={cronoDocs} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} nota="Datas de aprovação/revisão de projetos e planilhas — referência, não são marcos contratuais de execução." />
-      <SecaoDoc titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} />
-      <SecaoDoc titulo="Restrições / licenças" icon={AlertCircle} itens={restr} cols={[{ k: 'tipo', w: 'w-28' }, { k: 'descricao' }]} isDark={isDark} baixar={baixar} temArq={temArq} />
-      <SecaoDoc titulo="Geotecnia" icon={Mountain} itens={geot} cols={[{ k: 'item' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem} />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
