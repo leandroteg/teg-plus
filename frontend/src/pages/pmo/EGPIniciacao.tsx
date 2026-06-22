@@ -685,6 +685,12 @@ function aggOsc(oscs: EGPOscRow[]) {
   return { valor: hasV ? valor : null, minI, maxP }
 }
 
+const selCls = (isLight: boolean, active: boolean) =>
+  'text-sm rounded-xl border px-2.5 py-2 outline-none cursor-pointer shrink-0 ' +
+  (active
+    ? (isLight ? 'border-teal-300 text-teal-700 bg-teal-50 font-semibold' : 'border-teal-500/40 text-teal-300 bg-teal-500/10 font-semibold')
+    : (isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-300'))
+
 function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: obras, isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs } = useOSCsDoPortfolio(portfolioId)
@@ -696,6 +702,9 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const criarProjeto = useCriarProjeto()
   const criarObra = useCriarObraEGP()
   const [q, setQ] = useState('')
+  const [fTipo, setFTipo] = useState('')
+  const [fValor, setFValor] = useState('')
+  const [fData, setFData] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [form, setForm] = useState<{ numero_os: string; tipo_servico: string }>({ numero_os: '', tipo_servico: '' })
@@ -731,16 +740,32 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
     setEditOsc(null)
   }
 
-  // OSCs agrupadas por obra
+  // filtros de OSC
+  const fAtivo = !!(fTipo || fValor || fData)
+  const matchOsc = (o: EGPOscRow) => {
+    if (fTipo && o.tipo !== fTipo) return false
+    if (fValor) {
+      const v = o.valor ?? 0
+      if (fValor === 'gt1m' && v <= 1_000_000) return false
+      if (fValor === 'mid' && !(v >= 100_000 && v <= 1_000_000)) return false
+      if (fValor === 'lt100k' && v >= 100_000) return false
+    }
+    if (fData && (o.data_osc ?? '').slice(0, 4) !== fData) return false
+    return true
+  }
+
+  // OSCs agrupadas por obra (já filtradas)
   const oscByObra = new Map<string, EGPOscRow[]>()
   for (const osc of oscs ?? []) {
     if (!osc.obra_id) continue
+    if (fAtivo && !matchOsc(osc)) continue
     const arr = oscByObra.get(osc.obra_id) ?? []
     arr.push(osc)
     oscByObra.set(osc.obra_id, arr)
   }
 
   const list = (obras ?? []).filter(o => {
+    if (fAtivo && !(oscByObra.get(o.id)?.length)) return false
     const s = q.trim().toLowerCase()
     return !s || o.nome.toLowerCase().includes(s) || (o.codigo ?? '').toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
   })
@@ -790,17 +815,39 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
 
   return (
     <div className="space-y-4">
-      {/* Header + busca */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className={`text-sm font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-          {list.length} obra{list.length !== 1 ? 's' : ''} do contrato
+      {/* Header + busca + filtros (linha única) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          {list.length} obra{list.length !== 1 ? 's' : ''}
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-            <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar obra, OSC, polo…"
-              className={`text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
-          </div>
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shrink-0 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+          <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar…"
+            className={`w-28 text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+        </div>
+        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={selCls(isLight, !!fTipo)}>
+          <option value="">Tipo: todos</option>
+          <option value="construcao">Construção</option>
+          <option value="manutencao">O&amp;M</option>
+          <option value="deposito">Depósito</option>
+        </select>
+        <select value={fValor} onChange={e => setFValor(e.target.value)} className={selCls(isLight, !!fValor)}>
+          <option value="">Valor: todos</option>
+          <option value="gt1m">&gt; R$ 1 mi</option>
+          <option value="mid">R$ 100 mil – 1 mi</option>
+          <option value="lt100k">&lt; R$ 100 mil</option>
+        </select>
+        <select value={fData} onChange={e => setFData(e.target.value)} className={selCls(isLight, !!fData)}>
+          <option value="">Ano: todos</option>
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+        {fAtivo && (
+          <button onClick={() => { setFTipo(''); setFValor(''); setFData('') }} title="Limpar filtros"
+            className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><X size={15} /></button>
+        )}
+        <div className="ml-auto flex items-center gap-2 shrink-0 pl-2">
           <button onClick={() => { setPForm({ nome: '', codigo: '' }); setModal('projeto') }}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100' : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'}`}>
             <Plus size={14} /> Projeto
