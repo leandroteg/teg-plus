@@ -99,8 +99,24 @@ function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
     else if (sadm >= 2.5) { classe = 'Médio'; tone = 'amber' }
     else if (sadm >= 1.5) { classe = 'Mole'; tone = 'orange' }
     else { classe = 'Muito mole'; tone = 'rose' }
-  } else if (rocha) { classe = 'Rocha'; tone = 'sky' }
+  } else if (rocha) { classe = 'Rocha'; tone = 'orange' }   // escavação difícil → laranja (escala verde→vermelho)
   return { sadm, rocha, agua, aguaSeco, tipos, classe, tone }
+}
+
+// cor de um tipo de solo pelo nome (casa com SOIL_TYPES) — p/ a barra de proporção
+const corDoTipo = (nome: string) => (SOIL_TYPES.find(t => t.re.test(nome)) || { color: '#94a3b8' }).color
+// barra horizontal proporcional dos tipos de solo/furo (% por tipo, medido nas sondagens)
+function BarraSolo({ dist, isDark, compact }: { dist: Array<{ tipo: string; pct: number }>; isDark: boolean; compact?: boolean }) {
+  const tot = dist.reduce((s, d) => s + (Number(d.pct) || 0), 0)
+  if (!dist.length || tot <= 0) return null
+  return (
+    <span className={`inline-flex flex-col ${compact ? 'w-16' : 'w-full'} gap-0.5`} title={dist.map(d => `${d.tipo}: ${Math.round(Number(d.pct))}%`).join(' · ')}>
+      <span className={`flex h-2 w-full rounded-full overflow-hidden ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`}>
+        {dist.map((d, i) => <span key={i} style={{ width: `${(Number(d.pct) / tot) * 100}%`, background: corDoTipo(d.tipo) }} />)}
+      </span>
+      {!compact && <span className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">{dist.map((d, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}><span className="w-2 h-2 rounded-sm" style={{ background: corDoTipo(d.tipo) }} /> {d.tipo} {Math.round(Number(d.pct))}%</span>)}</span>}
+    </span>
+  )
 }
 
 // ── Geo-enriquecimento por obra (traçado KMZ × OpenStreetMap/SRTM) ──────────────
@@ -912,6 +928,14 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
   const quant = arr('quantitativos')
   const geot = arr('geotecnia').filter(g => !/tipo de sondagem/i.test(String(g.item ?? '')))
+  const geotDist = (d.geotecnia_dist as Array<{ obra?: string; dist?: Array<{ tipo: string; pct: number }> }>) ?? []
+  const distDaObra = (its: Array<Record<string, unknown>>): Array<{ tipo: string; pct: number }> => {
+    const obra = obraDoItem(its[0] || {}).toLowerCase()
+    const found = geotDist.find(x => { const o = String(x.obra || '').toLowerCase(); return o && obra && (o === obra || o.includes(obra) || obra.includes(o)) })
+    if (found?.dist?.length) return found.dist
+    const s = classificarSolo(its)   // fallback: 1 tipo só → 100% (sem inventar proporção de múltiplos)
+    return s.tipos.length === 1 ? [{ tipo: s.tipos[0].label, pct: 100 }] : []
+  }
   const pend = (d.pendencias as string[]) ?? []
   const total = quant.length + geot.length
   // medido do estágio 1 (geo) — p/ os resumos
@@ -1011,10 +1035,22 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem}
         obraBorda={(its) => RELEVO_TONE[classificarSolo(its).tone].barHex}
         obraBadge={(its) => {
-          const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]
+          const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]; const dist = distDaObra(its)
           const label = s.classe || s.tipos[0]?.label || ''
-          if (!label) return null
-          return <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>
+          if (!label && !dist.length) return null
+          return <span className="inline-flex items-center gap-2">
+            {dist.length > 0 && <BarraSolo dist={dist} isDark={isDark} compact />}
+            {label && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
+          </span>
+        }}
+        obraResumo={(its) => {
+          const s = classificarSolo(its); const dist = distDaObra(its)
+          const extra = [s.sadm != null ? `σadm ${s.sadm} kgf/cm²` : null, s.aguaSeco ? 'lençol não encontrado' : null, s.agua != null ? `lençol a ${s.agua} m` : null].filter(Boolean) as string[]
+          if (!dist.length && !extra.length) return null
+          return <div className="px-3 py-2 space-y-1.5">
+            {dist.length > 0 && <div><p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Proporção do solo (sondagem)</p><BarraSolo dist={dist} isDark={isDark} /></div>}
+            {extra.length > 0 && <div className="flex flex-wrap gap-1.5">{extra.map((t, i) => <span key={i} className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{t}</span>)}</div>}
+          </div>
         }}
       />
       {pend.length > 0 && (
