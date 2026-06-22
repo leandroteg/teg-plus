@@ -139,6 +139,7 @@ const PainelPagamentos = lazy(() => import('./pages/financeiro/PainelPagamentos'
 const ContasReceber = lazy(() => import('./pages/financeiro/ContasReceber'))
 const LoteDetalhe = lazy(() => import('./pages/financeiro/LoteDetalhe'))
 const Tesouraria = lazy(() => import('./pages/financeiro/Tesouraria'))
+const Conciliacao = lazy(() => import('./pages/financeiro/Conciliacao'))
 const Relatorios = lazy(() => import('./pages/financeiro/Relatorios'))
 const Configuracoes = lazy(() => import('./pages/financeiro/Configuracoes'))
 
@@ -279,7 +280,7 @@ export default function App() {
               <Route path="/financeiro/lotes"              element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes/:loteId"      element={<Lazy><LoteDetalhe /></Lazy>} />
               <Route path="/financeiro/painel-pagamentos"  element={<Lazy><PainelPagamentos /></Lazy>} />
-              <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/conciliacao"  element={<Lazy><Conciliacao /></Lazy>} />
               <Route path="/financeiro/tesouraria"    element={<Lazy><Tesouraria /></Lazy>} />
               <Route path="/financeiro/relatorios"   element={<Lazy><Relatorios /></Lazy>} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />

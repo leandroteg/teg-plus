@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw,
+  Plus, Save, Loader2, RefreshCw, Landmark,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -3866,14 +3866,27 @@ export default function CPPipeline() {
       )}
 
       {/* Header */}
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          <Receipt size={20} className="text-emerald-600" />
-          Contas a Pagar
-        </h1>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Receipt size={20} className="text-emerald-600" />
+            Contas a Pagar
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/financeiro/conciliacao')}
+          className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm ${
+            isDark
+              ? 'bg-green-500/15 text-green-300 border border-green-500/30 hover:bg-green-500/25'
+              : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+          }`}
+          title="Conciliação bancária — vínculo CP/CR com extrato"
+        >
+          <Landmark size={14} /> Conciliação
+        </button>
       </div>
 
       {/* ══ Horizontal Tabs ══ */}
