@@ -4,7 +4,7 @@ import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
   FileText, Trash2, Save, ChevronRight, ChevronDown, AlertCircle, MapPin,
   Route, RadioTower, Waves, Milestone, TrainTrack, Zap, Navigation, Tent,
-  Paperclip, Plus, X,
+  Paperclip, Plus, X, Download,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -14,6 +14,17 @@ import type { Orcamento, OrcArquivoTipo, OrcArquivo } from '../../types/orcament
 import ModuleTabs, { type TabTone, type TabState } from '../../components/ModuleTabs'
 import { fmtMM, fmtNum, MiniMarkdown, CARD } from './_ui'
 import MapaObraModal from './MapaObraModal'
+import { supabase } from '../../services/supabase'
+
+// ── Ícone da fonte: baixa o anexo se ele existir; senão mostra o nome (tooltip) ──
+function FonteIcon({ fonte, baixar, temArq, isDark }: { fonte?: unknown; baixar: (f: string) => void; temArq: (f: string) => boolean; isDark: boolean }) {
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  if (!fonte) return <span className="w-[16px] shrink-0" />
+  const f = String(fonte)
+  return temArq(f)
+    ? <button onClick={() => baixar(f)} title={`Baixar ${f}`} className={`shrink-0 p-0.5 rounded transition-colors ${isDark ? 'text-sky-300 hover:bg-sky-500/15' : 'text-sky-600 hover:bg-sky-50'}`}><Download size={13} /></button>
+    : <span title={`Fonte: ${f} (anexo não encontrado)`} className="shrink-0"><FileText size={12} className={txtMuted} /></span>
+}
 
 const ESTAGIOS = [
   { n: 1, label: 'Pré-análise', icon: Mountain },
@@ -659,6 +670,42 @@ function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: bo
   )
 }
 
+// ── Seção de fatos (colapsável) com download do anexo — cronograma/recursos/etc ──
+function SecaoDoc({ titulo, icon: Icon, itens, cols, isDark, baixar, temArq, defaultOpen, nota }: {
+  titulo: string; icon: LucideIcon; itens: Array<Record<string, unknown>>; cols: { k: string; w?: string; bold?: boolean }[]
+  isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; defaultOpen?: boolean; nota?: string
+}) {
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const [open, setOpen] = useState(!!defaultOpen)
+  if (!itens.length) return null
+  const dataCols = cols.filter(c => c.k !== 'fonte')
+  return (
+    <div className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}>
+      <button onClick={() => setOpen(o => !o)} className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.05]' : 'bg-slate-50 hover:bg-slate-100/70'}`}>
+        <span className={`flex items-center gap-1.5 min-w-0 text-xs font-bold ${txt}`}>
+          {open ? <ChevronDown size={14} className="shrink-0 text-amber-500" /> : <ChevronRight size={14} className="shrink-0 text-amber-500" />}
+          <Icon size={12} className="shrink-0" /> <span className="truncate">{titulo}</span>
+        </span>
+        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{itens.length}</span>
+      </button>
+      {open && (
+        <div className={isDark ? 'divide-y divide-white/[0.05]' : 'divide-y divide-slate-100'}>
+          {nota && <p className={`px-3 py-1.5 text-[10px] ${txtMuted}`}>{nota}</p>}
+          {itens.map((it, i) => (
+            <div key={i} className="flex items-start gap-3 px-3 py-1.5 text-[11px]">
+              {dataCols.map(c => (
+                <span key={c.k} className={`${c.w ?? 'flex-1'} min-w-0 ${c.bold ? `font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}` : (isDark ? 'text-slate-300' : 'text-slate-600')}`}>{String(it[c.k] ?? '—')}</span>
+              ))}
+              <FonteIcon fonte={it.fonte} baixar={baixar} temArq={temArq} isDark={isDark} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Quantitativos agrupados por obra → tipo de atividade (estágio 2) ─────────────
 const QUANT_CATS: { key: string; re: RegExp }[] = [
   { key: 'Estruturas', re: /torre|estrutura|p[óo]rtico|poste|mastro|estai|autoport|trusspole|silhueta/i },
@@ -670,7 +717,7 @@ const QUANT_CATS: { key: string; re: RegExp }[] = [
 ]
 const categoriaQuant = (item: string) => QUANT_CATS.find(c => c.re.test(item))?.key || 'Outros'
 
-function QuantitativosAgrupado({ itens, isDark }: { itens: Array<Record<string, unknown>>; isDark: boolean }) {
+function QuantitativosAgrupado({ itens, isDark, baixar, temArq }: { itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const [aberto, setAberto] = useState<Record<string, boolean>>({})
@@ -714,9 +761,7 @@ function QuantitativosAgrupado({ itens, isDark }: { itens: Array<Record<string, 
                           <div key={i} className="flex items-start gap-2 text-[11px]">
                             <span className={`flex-1 min-w-0 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{String(it.item ?? '—')}</span>
                             <span className={`shrink-0 max-w-[45%] text-right font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{String(it.valor ?? '—')}</span>
-                            {it.fonte
-                              ? <span title={`Fonte: ${String(it.fonte)}`} className="shrink-0 mt-0.5"><FileText size={11} className={txtMuted} /></span>
-                              : <span className="w-[11px] shrink-0" />}
+                            <span className="shrink-0 mt-px"><FonteIcon fonte={it.fonte} baixar={baixar} temArq={temArq} isDark={isDark} /></span>
                           </div>
                         ))}
                       </div>
@@ -780,9 +825,28 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const [releveObra, setReleveObra] = useState<Record<string, unknown> | null>(null)
   const [mapaObra, setMapaObra] = useState<string | null>(null)
+  const { data: arquivos = [] } = useArquivos(orc.id)
+  const arqDe = (fonte: string) => {
+    const full = fonte.toLowerCase().trim()
+    const base = full.match(/^[^\s(]+/)?.[0] || full   // nome do arquivo, antes do espaço/parêntese
+    const semExt = (s: string) => s.replace(/\.[^.]+$/, '')
+    return arquivos.find(a => a.nome.toLowerCase() === base)
+      || arquivos.find(a => semExt(a.nome.toLowerCase()) === semExt(base))
+      || arquivos.find(a => a.nome.toLowerCase() === full)
+  }
+  const temArq = (fonte: string) => !!arqDe(fonte)
+  const baixar = async (fonte: string) => {
+    const arq = arqDe(fonte); if (!arq) return
+    const { data } = await supabase.storage.from('orcamentacao-arquivos').createSignedUrl(arq.storage_path, 120, { download: true })
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
   const docs = (d.docs_analisados as string[]) ?? []
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
   const quant = arr('quantitativos'), crono = arr('cronograma'), recursos = arr('recursos_contrato'), restr = arr('restricoes'), geot = arr('geotecnia')
+  // separa marcos contratuais de execução das datas de elaboração/aprovação de documentos
+  const ehDocAprov = (c: Record<string, unknown>) => /aprova|elabora|revis|entrega.*(projeto|planilha|tabela|document)/i.test(String(c.marco ?? ''))
+  const cronoExec = crono.filter(c => !ehDocAprov(c))
+  const cronoDocs = crono.filter(ehDocAprov)
   const pend = (d.pendencias as string[]) ?? []
   const total = quant.length + crono.length + recursos.length + restr.length + geot.length
   // medido do estágio 1 (geo) — p/ os resumos
@@ -811,24 +875,6 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       return uni > 0 && shared / uni >= 0.5
     })
   }
-
-  const Secao = ({ titulo, icon: Icon, itens, cols }: { titulo: string; icon: LucideIcon; itens: Array<Record<string, unknown>>; cols: { k: string; w?: string; bold?: boolean }[] }) =>
-    itens.length === 0 ? null : (
-      <div>
-        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 ${txtMuted}`}><Icon size={12} /> {titulo} <span className="opacity-60">({itens.length})</span></p>
-        <div className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-          {itens.map((it, i) => (
-            <div key={i} className={`flex items-start gap-3 px-3 py-1.5 text-[11px] ${i ? (isDark ? 'border-t border-white/[0.05]' : 'border-t border-slate-100') : ''}`}>
-              {cols.map(c => (
-                <span key={c.k} className={`${c.w ?? 'flex-1'} min-w-0 ${c.k === 'fonte' ? `text-[10px] ${txtMuted} truncate` : c.bold ? `font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}` : (isDark ? 'text-slate-300' : 'text-slate-600')}`}>
-                  {c.k === 'fonte' ? (it[c.k] ? `📄 ${String(it[c.k])}` : '—') : String(it[c.k] ?? '—')}
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
 
   return (
     <section className={`${CARD(isDark)} p-4 space-y-3`}>
@@ -896,11 +942,12 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       )}
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
-      <QuantitativosAgrupado itens={quant} isDark={isDark} />
-      <Secao titulo="Cronograma / prazo" icon={Wallet} itens={crono} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
-      <Secao titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
-      <Secao titulo="Restrições / licenças" icon={AlertCircle} itens={restr} cols={[{ k: 'tipo', w: 'w-28' }, { k: 'descricao' }, { k: 'fonte', w: 'w-28' }]} />
-      <Secao titulo="Geotecnia" icon={Mountain} itens={geot} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      <QuantitativosAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <SecaoDoc titulo="Cronograma / marcos de execução" icon={Wallet} itens={cronoExec} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} defaultOpen />
+      <SecaoDoc titulo="Prazos de elaboração de documentos" icon={FileText} itens={cronoDocs} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} nota="Datas de aprovação/revisão de projetos e planilhas — referência, não são marcos contratuais de execução." />
+      <SecaoDoc titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <SecaoDoc titulo="Restrições / licenças" icon={AlertCircle} itens={restr} cols={[{ k: 'tipo', w: 'w-28' }, { k: 'descricao' }]} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <SecaoDoc titulo="Geotecnia" icon={Mountain} itens={geot} cols={[{ k: 'item' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
