@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Mountain, Layers, HardHat, Wallet, TrendingUp, Sparkles, RefreshCw, Check, Lock,
@@ -333,9 +333,44 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const salvar = useSalvarDadosEstagio()
-  const [fiscais, setFiscais] = useState({ impostos_pct: 11, contingencia_pct: 2, margem_pct: 13.5 })
+  const [fiscais, setFiscais] = useState<{ impostos_pct: number; contingencia_pct: number; margens: number[] }>({ impostos_pct: 11, contingencia_pct: 2, margens: [10, 13.5, 18, 23] })
+  // ao entrar no estágio 5, sincroniza os campos com o que já foi gerado
+  useEffect(() => {
+    if (estagio !== 5) return
+    const cen = (d.cenarios as Array<Record<string, unknown>>) || []
+    setFiscais({
+      impostos_pct: Number(d.tributos_pct ?? 11),
+      contingencia_pct: Number(d.contingencia_pct ?? 2),
+      margens: cen.length === 4 ? cen.map(c => Number(c.margem_pct)) : [10, 13.5, 18, 23],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estagio, orc.id])
 
   const analise = String(d.analise_md ?? '')
+  const inpFisc = `block mt-1 rounded-lg border px-2 py-1.5 text-sm outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`
+
+  // Recalcula os cenários do estágio 5 LOCALMENTE (mesmo buildup do worker), sem IA.
+  const recalcularStage5 = () => {
+    const cheio = Number(d.custo_cheio_us || 0); const us = Number(d.us || 0)
+    if (!cheio || !us) return
+    const reforma = Number(d.reforma_pct ?? 2) / 100
+    const cont = fiscais.contingencia_pct / 100, trib = fiscais.impostos_pct / 100
+    const custoCont = cheio * (1 + cont)
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const existentes = (d.cenarios as Array<Record<string, unknown>>) || []
+    const precoDe = (mPct: number) => { const m = mPct / 100; const den = 1 - trib - reforma - m; return den > 0 ? r2(custoCont / den) : 0 }
+    const linha = (nome: string, mPct: number, ref: unknown, manual: boolean) => {
+      const m = mPct / 100, preco_us = precoDe(mPct)
+      return { nome, margem_pct: mPct, preco_us, preco_total: Math.round(us * preco_us), tributos_us: r2(preco_us * trib), reforma_us: r2(preco_us * reforma), margem_us: r2(preco_us * m), lucro: Math.round(us * preco_us * m), preco_us_ref: ref, ...(manual ? { manual: true } : {}) }
+    }
+    const cenarios = ['Mínima', 'Competitivo', 'Seguro', 'Ótima'].map((nome, i) => linha(nome, fiscais.margens[i] || 0, existentes[i]?.preco_us_ref, false))
+    const manuais = existentes.filter(c => c.manual).map(c => linha(String(c.nome), Number(c.margem_pct || 0), c.preco_us_ref, true))
+    salvar.mutate({ id: orc.id, estagio: 5, dados: {
+      ...d, cenarios: [...cenarios, ...manuais],
+      tributos_pct: fiscais.impostos_pct, contingencia_pct: fiscais.contingencia_pct,
+      custo_com_contingencia_us: r2(custoCont),
+    } })
+  }
 
   return (
     <div className="space-y-3">
@@ -347,7 +382,13 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
             Estágio {estagio} — {ESTAGIOS[estagio - 1].label}{d.lote ? ` · ${String(d.lote)}` : ''}
           </h2>
           <div className="flex items-center gap-2">
-            <button onClick={() => onRegerar(estagio === 4 ? fiscais : undefined)} disabled={regerando}
+            {estagio === 5 && (
+              <button onClick={recalcularStage5} disabled={salvar.isPending} title="Recalcular os preços localmente, sem IA (aplica impostos/contingência/margens)"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'} disabled:opacity-60`}>
+                <RefreshCw size={13} className={salvar.isPending ? 'animate-spin' : ''} /> Recalcular
+              </button>
+            )}
+            <button onClick={() => onRegerar(estagio === 5 ? fiscais : undefined)} disabled={regerando} title="Regerar com a IA (refaz a análise e os cálculos)"
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} disabled:opacity-60`}>
               <RefreshCw size={13} className={regerando ? 'animate-spin' : ''} /> Regerar
             </button>
@@ -359,18 +400,28 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
           </div>
         </div>
 
-        {/* Inputs: docs (1,2,3) / fiscais (4) */}
+        {/* Inputs: docs (1,2,3) / fiscais do lance (5) */}
         {(estagio === 1 || estagio === 2 || estagio === 3) && <DocsInput orcId={orc.id} isDark={isDark} hint={estagio === 2 ? 'características, lista de materiais, planilha construtiva' : estagio === 3 ? 'matriz de recursos do contrato, tabela de salários' : 'documentos adicionais'} />}
-        {estagio === 4 && (
-          <div className="mt-3 flex items-end gap-3 flex-wrap">
-            {([['impostos_pct', 'Impostos %'], ['contingencia_pct', 'Contingência %'], ['margem_pct', 'Margem %']] as const).map(([k, lbl]) => (
-              <div key={k}>
-                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{lbl}</label>
-                <input type="number" value={(fiscais as Record<string, number>)[k]} onChange={e => setFiscais(f => ({ ...f, [k]: Number(e.target.value) }))}
-                  className={`block mt-1 w-24 rounded-lg border px-2 py-1.5 text-sm outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+        {estagio === 5 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Impostos %</label>
+                <input type="number" step="0.5" value={fiscais.impostos_pct} onChange={e => setFiscais(f => ({ ...f, impostos_pct: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
               </div>
-            ))}
-            <span className={`text-[11px] ${txtMuted}`}>aplicados ao regerar</span>
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Contingência %</label>
+                <input type="number" step="0.5" value={fiscais.contingencia_pct} onChange={e => setFiscais(f => ({ ...f, contingencia_pct: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
+              </div>
+              <div className={`hidden sm:block w-px self-stretch my-1 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
+              {['Mínima', 'Competitivo', 'Seguro', 'Ótima'].map((nm, i) => (
+                <div key={nm}>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{nm} %</label>
+                  <input type="number" step="0.5" value={fiscais.margens[i] ?? 0} onChange={e => setFiscais(f => { const m = [...f.margens]; m[i] = Number(e.target.value); return { ...f, margens: m } })} className={`${inpFisc} w-16`} />
+                </div>
+              ))}
+            </div>
+            <p className={`text-[11px] ${txtMuted}`}>Impostos, contingência e as 4 margens do lance — <span className="font-semibold">aplicados ao Regerar</span>. Margens (Mín/Comp/Seguro/Ótima) montam os 4 cenários; o <span className="font-semibold">Seguro</span> é o Preço Alvo.</p>
           </div>
         )}
       </section>
@@ -378,9 +429,9 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
       {/* Dados gerados (por tipo de estágio) */}
       {estagio === 1 && <Caracteristicas d={d} estagio={estagio} isDark={isDark} orcamentoId={orc.id} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
       {estagio === 2 && <Consolidacao orc={orc} d={d} isDark={isDark} />}
-      {estagio === 3 && <Recursos d={d} isDark={isDark} />}
+      {estagio === 3 && <Recursos d={d} isDark={isDark} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
       {estagio === 4 && <Custos d={d} isDark={isDark} />}
-      {estagio === 5 && <Orcamentacao d={d} isDark={isDark} />}
+      {estagio === 5 && <Orcamentacao d={d} isDark={isDark} onSave={(nd) => salvar.mutate({ id: orc.id, estagio, dados: nd })} saving={salvar.isPending} />}
 
       {/* Análise do SuperTEG */}
       {analise && (
@@ -773,23 +824,85 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
 }
 
 // ── Recursos (estágio 3) ─────────────────────────────────────────────────────────
-function Recursos({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) {
+function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; isDark: boolean; onSave: (nd: Record<string, unknown>) => void; saving: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const recursos = (d.recursos as Array<Record<string, unknown>>) ?? []
+  const [rec, setRec] = useState<Array<Record<string, unknown>>>(() => ((d.recursos as Array<Record<string, unknown>>) ?? []).map(r => ({ ...r })))
+  const [prazo, setPrazo] = useState<number>(Number(d.prazo_meses ?? 0))
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    setRec(((d.recursos as Array<Record<string, unknown>>) ?? []).map(r => ({ ...r }))); setPrazo(Number(d.prazo_meses ?? 0)); setDirty(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d.recursos, d.prazo_meses])
+  const porObra = (d.por_obra as Array<Record<string, unknown>>) ?? []
+  const setCampo = (i: number, k: string, v: number) => { setRec(p => p.map((r, j) => j === i ? { ...r, [k]: v } : r)); setDirty(true) }
+  // mesmo modelo de sobreposição do worker (montagem a 30% da fundação, lançamento a 33% da montagem)
+  const calcPrazo = (rs: Array<Record<string, unknown>>) => {
+    const get = (frag: string) => Number(rs.find(r => String(r.atividade ?? '').toLowerCase().includes(frag))?.meses ?? 0)
+    const f = get('fund'), mo = get('montag'), startMo = 0.30 * f, endMo = startMo + mo, endL = startMo + 0.33 * mo + get('lan')
+    const extras = rs.filter(r => !/fund|montag|lan/i.test(String(r.atividade ?? ''))).map(r => Number(r.meses ?? 0))
+    return Math.round(Math.max(f, endMo, endL, 0, ...extras) * 10) / 10
+  }
+  const recalcular = () => { const np = calcPrazo(rec); setPrazo(np); setDirty(false); onSave({ ...d, recursos: rec, prazo_meses: np }) }
+  const inp = `w-14 rounded-md border px-1.5 py-1 text-xs text-right outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`
+  const totPessoas = rec.reduce((s, r) => s + Number(r.pessoas ?? 0), 0)
   return (
-    <section className={`${CARD(isDark)} p-4`}>
-      <div className="flex items-center justify-between mb-3">
+    <section className={`${CARD(isDark)} p-4 space-y-3`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className={`text-sm font-extrabold ${txt}`}>Recursos e cronograma</h3>
-        <span className={`text-xs font-bold ${txt}`}>prazo ~{fmtNum(Number(d.prazo_meses ?? 0), 1)} m · pico {fmtNum(Number(d.efetivo_pico_clt ?? 0))} CLT</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold ${txt}`}>prazo ~{fmtNum(prazo, 1)} m · {fmtNum(totPessoas)} pessoas{d.efetivo_pico_clt ? ` · pico ${fmtNum(Number(d.efetivo_pico_clt))} CLT` : ''}</span>
+          <button onClick={recalcular} disabled={saving} title="Recalcula o prazo a partir das durações e salva (sem IA)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${dirty ? (isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200') : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')} disabled:opacity-60`}>
+            <RefreshCw size={12} className={saving ? 'animate-spin' : ''} /> Recalcular prazo
+          </button>
+        </div>
       </div>
-      <div className="space-y-2">
-        {recursos.map((r, i) => (
-          <div key={i} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-            <div><p className={`text-xs font-bold ${txt}`}>{String(r.atividade)}</p><p className={`text-[10px] ${txtMuted}`}>{fmtNum(Number(r.pessoas))} pessoas · {String(r.frota ?? '')}</p></div>
-            <span className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>~{fmtNum(Number(r.meses), 1)} m</span>
+
+      {porObra.length > 0 && (
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Por obra <span className="font-normal normal-case opacity-70">(1 equipe/atividade · produtividade-padrão)</span></p>
+          <div className="overflow-x-auto -mx-1">
+            <table className={`w-full text-[11px] border-collapse ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              <thead><tr className={isDark ? 'text-slate-500' : 'text-slate-400'}>
+                {['Obra', 'km', 'Torres', 'Fund.m³', 'Aço t', 'Fund.', 'Mont.', 'Lanç.', 'Prazo'].map((h, i) => <th key={h} className={`px-2 py-1 font-bold ${i === 0 ? 'text-left' : 'text-right'} whitespace-nowrap`}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {porObra.map((o, i) => (
+                  <tr key={i} className={isDark ? 'border-t border-white/[0.05]' : 'border-t border-slate-100'}>
+                    <td className={`px-2 py-1 font-medium truncate max-w-[160px] ${txt}`}>{String(o.nome)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.km), 1)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.torres))}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.fundacao_m3))}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.aco_t), 1)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.dur_fundacao_m), 1)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.dur_montagem_m), 1)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(Number(o.dur_lancamento_m), 1)}</td>
+                    <td className={`px-2 py-1 text-right font-bold tabular-nums ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{fmtNum(Number(o.prazo_obra_m), 1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div>
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Consolidado do lote <span className="font-normal normal-case opacity-70">(editável · equipes compartilhadas)</span></p>
+        <div className="space-y-1.5">
+          {rec.map((r, i) => (
+            <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-bold truncate ${txt}`}>{String(r.atividade)}</p>
+                <p className={`text-[10px] truncate ${txtMuted}`}>{String(r.frota ?? '')}</p>
+              </div>
+              <label className={`text-[9px] text-center ${txtMuted}`}>eq<input type="number" value={Number(r.equipes ?? 1)} onChange={e => setCampo(i, 'equipes', Number(e.target.value))} className={`block ${inp}`} /></label>
+              <label className={`text-[9px] text-center ${txtMuted}`}>pess<input type="number" value={Number(r.pessoas ?? 0)} onChange={e => setCampo(i, 'pessoas', Number(e.target.value))} className={`block ${inp}`} /></label>
+              <label className={`text-[9px] text-center ${txtMuted}`}>meses<input type="number" step="0.5" value={Number(r.meses ?? 0)} onChange={e => setCampo(i, 'meses', Number(e.target.value))} className={`block ${inp}`} /></label>
+            </div>
+          ))}
+        </div>
+        {dirty && <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>Editado — clique <b>Recalcular prazo</b> para atualizar o cronograma e salvar.</p>}
       </div>
     </section>
   )
@@ -809,7 +922,7 @@ function Custos({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) 
         <h3 className={`text-sm font-extrabold ${txt}`}>Custo do projeto</h3>
         <span className={`text-lg font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{fmtMM(Number(d.custo_total ?? 0))}</span>
       </div>
-      <p className={`text-[11px] mb-3 ${txtMuted}`}>Base de Preços · <b className={txt}>R$ {fmtNum(custoUs)}/US</b> operacional 2026{ref36 != null && custoUs !== ref36 ? ` · ref. 36m R$ ${fmtNum(ref36)}` : ''} · {fmtNum(Number(d.us ?? 0))} US · contingência {fmtNum(Number(d.contingencia_pct ?? 0), 0)}%</p>
+      <p className={`text-[11px] mb-3 ${txtMuted}`}>Base de Preços · <b className={txt}>R$ {fmtNum(custoUs)}/US</b> operacional 2026{ref36 != null && custoUs !== ref36 ? ` · ref. 36m R$ ${fmtNum(ref36)}` : ''} · {fmtNum(Number(d.us ?? 0))} US · <span className="opacity-80">custo direto — contingência/impostos/margem na etapa 5</span></p>
       {comp.map((c, i) => (
         <div key={i} className="flex items-center gap-2 py-1">
           <span className={`text-[11px] w-40 shrink-0 truncate ${txtMuted}`}>{String(c.natureza)} ({fmtNum(Number(c.pct), 1)}%)</span>
@@ -825,7 +938,7 @@ function Custos({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) 
 }
 
 // ── Orçamentação final (estágio 5) ───────────────────────────────────────────────
-function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boolean }) {
+function Orcamentacao({ d, isDark, onSave, saving }: { d: Record<string, unknown>; isDark: boolean; onSave: (nd: Record<string, unknown>) => void; saving: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const cenarios = (d.cenarios as Array<Record<string, unknown>>) ?? []
@@ -841,6 +954,20 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
   const tribPct = Number(d.tributos_pct || 0)
   const refPct = Number(d.reforma_pct || 0)
   const custoE4 = Number(d.custo_total_estagio4 || 0)
+  const [novo, setNovo] = useState<{ open: boolean; nome: string; margem: number }>({ open: false, nome: '', margem: 15 })
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const calcCen = (nome: string, margem_pct: number) => {
+    const trib = tribPct / 100, reforma = refPct / 100, m = margem_pct / 100
+    const denom = 1 - trib - reforma - m
+    const preco_us = denom > 0 ? r2(cheioCont / denom) : 0
+    return { nome, margem_pct, preco_us, preco_total: Math.round(us * preco_us), tributos_us: r2(preco_us * trib), reforma_us: r2(preco_us * reforma), margem_us: r2(preco_us * m), lucro: Math.round(us * preco_us * m), manual: true }
+  }
+  const addItem = () => {
+    const nome = novo.nome.trim() || `Item ${cenarios.filter(c => c.manual).length + 1}`
+    onSave({ ...d, cenarios: [...cenarios, calcCen(nome, Number(novo.margem) || 0)] })
+    setNovo({ open: false, nome: '', margem: 15 })
+  }
+  const removeItem = (idx: number) => onSave({ ...d, cenarios: cenarios.filter((_, i) => i !== idx) })
   const passo = (lbl: string, v: number, k: string) => (
     <span key={k} className="inline-flex flex-col items-center px-1.5">
       <span className={`text-[9px] uppercase tracking-wide ${txtMuted}`}>{lbl}</span>
@@ -848,10 +975,31 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
     </span>
   )
   const sep = (s: string, k: string) => <span key={k} className={`text-[11px] px-0.5 ${txtMuted}`}>{s}</span>
+  const inp2 = `rounded-md border px-2 py-1 text-xs outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`
   return (
     <section className={`${CARD(isDark)} p-4`}>
-      <h3 className={`text-sm font-extrabold mb-1 ${txt}`}>Orçamentação por US</h3>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <h3 className={`text-sm font-extrabold ${txt}`}>Orçamentação por US</h3>
+        <button onClick={() => setNovo(n => ({ ...n, open: !n.open }))} disabled={saving || !cheioCont}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} disabled:opacity-60`}>
+          <Plus size={13} /> Adicionar item
+        </button>
+      </div>
       <p className={`text-[10px] mb-3 ${txtMuted}`}>Buildup da Base de Preços: custo cheio → contingência → tributos/reforma/margem sobre o preço.</p>
+      {novo.open && (
+        <div className={`rounded-xl border p-2.5 mb-3 flex items-end gap-2 flex-wrap ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-slate-50/70 border-slate-200'}`}>
+          <div className="flex-1 min-w-[140px]">
+            <label className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Nome do cenário/item</label>
+            <input value={novo.nome} onChange={e => setNovo(n => ({ ...n, nome: e.target.value }))} placeholder="Ex.: Agressivo, Cliente X…" className={`${inp2} w-full mt-0.5`} />
+          </div>
+          <div>
+            <label className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Margem %</label>
+            <input type="number" step="0.5" value={novo.margem} onChange={e => setNovo(n => ({ ...n, margem: Number(e.target.value) }))} className={`${inp2} w-20 mt-0.5`} />
+          </div>
+          <button onClick={addItem} disabled={saving} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60"><Plus size={13} /> Adicionar</button>
+          <button onClick={() => setNovo({ open: false, nome: '', margem: 15 })} className={`px-2 py-1.5 rounded-lg text-xs font-semibold ${isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}>Cancelar</button>
+        </div>
+      )}
       {cheio > 0 && (
         <div className={`rounded-xl border p-3 mb-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
           <div className="flex flex-wrap items-center justify-center gap-y-1">
@@ -871,11 +1019,15 @@ function Orcamentacao({ d, isDark }: { d: Record<string, unknown>; isDark: boole
         {cenarios.map((c, i) => {
           const isRec = rec && String(c.nome) === rec
           const ref = c.preco_us_ref != null ? Number(c.preco_us_ref) : null
+          const manual = !!c.manual
           return (
             <div key={i} className={`rounded-xl px-3 py-2.5 border ${isRec ? 'border-amber-500' : isDark ? 'border-white/[0.06]' : 'border-slate-200'} ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-              <div className="flex items-center justify-between">
-                <p className={`text-xs font-bold ${txt}`}>{String(c.nome)} {isRec && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white ml-1">recomendado</span>}</p>
-                <span className={`text-[10px] font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>margem {fmtNum(Number(c.margem_pct), 1)}%</span>
+              <div className="flex items-center justify-between gap-1">
+                <p className={`text-xs font-bold truncate ${txt}`}>{String(c.nome)} {isRec && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white ml-1">recomendado</span>}{manual && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ml-1 ${isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'}`}>manual</span>}</p>
+                <span className="flex items-center gap-1 shrink-0">
+                  <span className={`text-[10px] font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>margem {fmtNum(Number(c.margem_pct), 1)}%</span>
+                  {manual && <button onClick={() => removeItem(i)} disabled={saving} title="Remover item manual" className={`p-0.5 rounded ${isDark ? 'hover:bg-rose-500/20 text-slate-500 hover:text-rose-300' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-500'}`}><X size={12} /></button>}
+                </span>
               </div>
               <p className={`text-base font-extrabold mt-0.5 ${txt}`}>R$ {fmtNum(Number(c.preco_us), 2)}<span className={`text-[11px] font-normal ${txtMuted}`}>/US</span></p>
               <div className="flex items-center justify-between gap-2 mt-0.5">
