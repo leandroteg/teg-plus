@@ -636,6 +636,79 @@ function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: bo
   )
 }
 
+// ── Quantitativos agrupados por obra → tipo de atividade (estágio 2) ─────────────
+const QUANT_CATS: { key: string; re: RegExp }[] = [
+  { key: 'Estruturas', re: /torre|estrutura|p[óo]rtico|poste|mastro|estai|autoport|trusspole|silhueta/i },
+  { key: 'Fundações', re: /funda|concreto|tubul|sapata|estaca|escava|grauteamento/i },
+  { key: 'Cabos e condutores', re: /cabo|condutor|p[áa]ra[- ]?raio|opgw|cordoalha|bitola|cpfe|aluma/i },
+  { key: 'Isoladores e ferragens', re: /isolador|cadeia|ferrag|grampo|emenda|espa[çc]ador|amortecedor|anel|ferro/i },
+  { key: 'Aço', re: /\ba[çc]o\b|peso/i },
+  { key: 'Dados gerais', re: /comprimento|tens[ãa]o|^nome|v[ãa]o|extens|defle|travessia|faixa|altitude|c[óo]digo|relev|coorden|servid/i },
+]
+const categoriaQuant = (item: string) => QUANT_CATS.find(c => c.re.test(item))?.key || 'Outros'
+
+function QuantitativosAgrupado({ itens, isDark }: { itens: Array<Record<string, unknown>>; isDark: boolean }) {
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const [aberto, setAberto] = useState<Record<string, boolean>>({})
+  if (!itens.length) return null
+  const porObra = new Map<string, Array<Record<string, unknown>>>()
+  itens.forEach(it => {
+    const o = String(it.obra || '').trim()
+    const k = (!o || o.toLowerCase() === 'geral') ? 'Geral / lote' : o
+    if (!porObra.has(k)) porObra.set(k, [])
+    porObra.get(k)!.push(it)
+  })
+  const grupos = [...porObra.entries()].sort((a, b) =>
+    a[0] === 'Geral / lote' ? 1 : b[0] === 'Geral / lote' ? -1 : b[1].length - a[1].length)
+  const ordemCat = [...QUANT_CATS.map(c => c.key), 'Outros']
+  return (
+    <div>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 ${txtMuted}`}><Layers size={12} /> Quantitativos por obra <span className="opacity-60">({itens.length})</span></p>
+      <div className="space-y-1.5">
+        {grupos.map(([obra, its]) => {
+          const open = !!aberto[obra]
+          const porCat = new Map<string, Array<Record<string, unknown>>>()
+          its.forEach(it => { const c = categoriaQuant(String(it.item ?? '')); if (!porCat.has(c)) porCat.set(c, []); porCat.get(c)!.push(it) })
+          const cats = ordemCat.filter(c => porCat.has(c)).map(c => [c, porCat.get(c)!] as const)
+          return (
+            <div key={obra} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}>
+              <button onClick={() => setAberto(a => ({ ...a, [obra]: !a[obra] }))}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.05]' : 'bg-slate-50 hover:bg-slate-100/70'}`}>
+                <span className={`flex items-center gap-1.5 min-w-0 text-xs font-bold ${txt}`}>
+                  {open ? <ChevronDown size={14} className="shrink-0 text-amber-500" /> : <ChevronRight size={14} className="shrink-0 text-amber-500" />}
+                  <span className="truncate">{obra}</span>
+                </span>
+                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{its.length} itens</span>
+              </button>
+              {open && (
+                <div className={isDark ? 'divide-y divide-white/[0.05]' : 'divide-y divide-slate-100'}>
+                  {cats.map(([cat, citems]) => (
+                    <div key={cat} className="px-3 py-2">
+                      <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600/90'}`}>{cat} <span className={`font-normal ${txtMuted}`}>({citems.length})</span></p>
+                      <div className="space-y-1">
+                        {citems.map((it, i) => (
+                          <div key={i} className="flex items-start gap-2 text-[11px]">
+                            <span className={`flex-1 min-w-0 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{String(it.item ?? '—')}</span>
+                            <span className={`shrink-0 max-w-[45%] text-right font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{String(it.valor ?? '—')}</span>
+                            {it.fonte
+                              ? <span title={`Fonte: ${String(it.fonte)}`} className="shrink-0 mt-0.5"><FileText size={11} className={txtMuted} /></span>
+                              : <span className="w-[11px] shrink-0" />}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de relevo: gráfico de elevação (estágio 1) + travessias + ver no mapa ───
 function ReleveModal({ obra, isDark, onClose, onVerMapa }: {
   obra: Record<string, unknown>; isDark: boolean; onClose: () => void; onVerMapa: () => void
@@ -800,7 +873,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       )}
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
-      <Secao titulo="Quantitativos (romaneio/projeto)" icon={Layers} itens={quant} cols={[{ k: 'item' }, { k: 'obra', w: 'w-28' }, { k: 'valor', w: 'w-24', bold: true }, { k: 'fonte', w: 'w-28' }]} />
+      <QuantitativosAgrupado itens={quant} isDark={isDark} />
       <Secao titulo="Cronograma / prazo" icon={Wallet} itens={crono} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
       <Secao titulo="Recursos do contrato" icon={HardHat} itens={recursos} cols={[{ k: 'item' }, { k: 'valor', w: 'w-28', bold: true }, { k: 'fonte', w: 'w-28' }]} />
       <Secao titulo="Restrições / licenças" icon={AlertCircle} itens={restr} cols={[{ k: 'tipo', w: 'w-28' }, { k: 'descricao' }, { k: 'fonte', w: 'w-28' }]} />
@@ -835,7 +908,7 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.recursos, d.prazo_meses])
   const porObra = (d.por_obra as Array<Record<string, unknown>>) ?? []
-  const setCampo = (i: number, k: string, v: number) => { setRec(p => p.map((r, j) => j === i ? { ...r, [k]: v } : r)); setDirty(true) }
+  const setCampo = (i: number, k: string, v: number | string) => { setRec(p => p.map((r, j) => j === i ? { ...r, [k]: v } : r)); setDirty(true) }
   // mesmo modelo de sobreposição do worker (montagem a 30% da fundação, lançamento a 33% da montagem)
   const calcPrazo = (rs: Array<Record<string, unknown>>) => {
     const get = (frag: string) => Number(rs.find(r => String(r.atividade ?? '').toLowerCase().includes(frag))?.meses ?? 0)
@@ -843,7 +916,8 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
     const extras = rs.filter(r => !/fund|montag|lan/i.test(String(r.atividade ?? ''))).map(r => Number(r.meses ?? 0))
     return Math.round(Math.max(f, endMo, endL, 0, ...extras) * 10) / 10
   }
-  const recalcular = () => { const np = calcPrazo(rec); setPrazo(np); setDirty(false); onSave({ ...d, recursos: rec, prazo_meses: np }) }
+  const recalcular = () => setPrazo(calcPrazo(rec))   // prévia do prazo (não salva)
+  const aplicar = () => { const np = calcPrazo(rec); setPrazo(np); setDirty(false); onSave({ ...d, recursos: rec, prazo_meses: np }) }
   const inp = `w-14 rounded-md border px-1.5 py-1 text-xs text-right outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`
   const totPessoas = rec.reduce((s, r) => s + Number(r.pessoas ?? 0), 0)
   return (
@@ -852,9 +926,13 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
         <h3 className={`text-sm font-extrabold ${txt}`}>Recursos e cronograma</h3>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-bold ${txt}`}>prazo ~{fmtNum(prazo, 1)} m · {fmtNum(totPessoas)} pessoas{d.efetivo_pico_clt ? ` · pico ${fmtNum(Number(d.efetivo_pico_clt))} CLT` : ''}</span>
-          <button onClick={recalcular} disabled={saving} title="Recalcula o prazo a partir das durações e salva (sem IA)"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${dirty ? (isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200') : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')} disabled:opacity-60`}>
-            <RefreshCw size={12} className={saving ? 'animate-spin' : ''} /> Recalcular prazo
+          <button onClick={recalcular} disabled={saving} title="Recalcula o prazo a partir das durações (prévia, não salva)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-60`}>
+            <RefreshCw size={12} /> Recalcular prazo
+          </button>
+          <button onClick={aplicar} disabled={saving} title="Salva os recursos editados e o cronograma (sem IA)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold disabled:opacity-60 ${dirty ? 'bg-amber-500 text-white hover:bg-amber-600' : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}`}>
+            <Save size={12} className={saving ? 'animate-pulse' : ''} /> Aplicar
           </button>
         </div>
       </div>
@@ -894,7 +972,8 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
             <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
               <div className="min-w-0 flex-1">
                 <p className={`text-xs font-bold truncate ${txt}`}>{String(r.atividade)}</p>
-                <p className={`text-[10px] truncate ${txtMuted}`}>{String(r.frota ?? '')}</p>
+                <input value={String(r.frota ?? '')} onChange={e => setCampo(i, 'frota', e.target.value)} placeholder="recursos / máquinas"
+                  className={`mt-0.5 w-full rounded-md border px-1.5 py-0.5 text-[10px] outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 placeholder:text-slate-600' : 'bg-white border-slate-200 text-slate-600 placeholder:text-slate-400'}`} />
               </div>
               <label title="Equipes / frentes simultâneas" className={`text-[9px] text-center ${txtMuted}`}>Equipe<input type="number" value={Number(r.equipes ?? 1)} onChange={e => setCampo(i, 'equipes', Number(e.target.value))} className={`block ${inp}`} /></label>
               <label title="Pessoas (efetivo total da atividade)" className={`text-[9px] text-center ${txtMuted}`}>Pessoas<input type="number" value={Number(r.pessoas ?? 0)} onChange={e => setCampo(i, 'pessoas', Number(e.target.value))} className={`block ${inp}`} /></label>
@@ -902,7 +981,6 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
             </div>
           ))}
         </div>
-        {dirty && <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>Editado — clique <b>Recalcular prazo</b> para atualizar o cronograma e salvar.</p>}
       </div>
     </section>
   )
