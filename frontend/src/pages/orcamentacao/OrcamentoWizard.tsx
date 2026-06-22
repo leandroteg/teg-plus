@@ -70,6 +70,17 @@ function SoloGlyph({ tipo, color, size = 13 }: { tipo: string; color: string; si
   return <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">{body}</svg>
 }
 
+// ── Fundação: glifo simbólico por tipo (tubulão/sapata/estaca/grelha) ─────────────
+function FundGlyph({ tipo, color, size = 13 }: { tipo: string; color: string; size?: number }) {
+  const p = { stroke: color, strokeWidth: 1.6, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  let body: React.ReactNode
+  if (tipo === 'sapata') body = <g {...p}><path d="M3 8h18" /><path d="M12 8V4M9.5 4h5" /><path d="M6.5 18l1.5-6h8l1.5 6Z" /></g>
+  else if (tipo === 'estaca') body = <g {...p}><path d="M3 8h18" /><rect x="6" y="7" width="12" height="2.6" rx="0.6" /><path d="M8.5 9.6v8.4M12 9.6v8.4M15.5 9.6v8.4" /></g>
+  else if (tipo === 'grelha') body = <g {...p}><path d="M3 8h18" /><path d="M7 8v10M12 8v10M17 8v10M5 12h14M5 16h14" /></g>
+  else body = <g {...p}><path d="M3 8h18" /><path d="M12 8V3.5M9.5 3.5h5" /><rect x="8.5" y="8" width="7" height="11" rx="1.4" /></g> // tubulão (padrão)
+  return <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">{body}</svg>
+}
+
 // tipos de solo/material detectáveis nos docs → glifo + cor própria (não é o mesmo tipo na linha toda)
 const SOIL_TYPES: { re: RegExp; glyph: string; label: string; color: string }[] = [
   { re: /tubul[ãa]o em rocha|\brocha\b|impenetr|\brefus/i, glyph: 'rocha', label: 'Rocha', color: '#64748b' },
@@ -105,6 +116,26 @@ function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
 
 // cor de um tipo de solo pelo nome (casa com SOIL_TYPES) — p/ a barra de proporção
 const corDoTipo = (nome: string) => (SOIL_TYPES.find(t => t.re.test(nome)) || { color: '#94a3b8' }).color
+
+// tipo de FUNDAÇÃO predominante → glifo + dificuldade (escala verde→vermelho: emerald<amber<orange<rose)
+const FUND_TYPES: { re: RegExp; glyph: string; label: string; tone: RelevoTone }[] = [
+  { re: /tubul[ãa]o em rocha|bloco sobre estaca|estaca raiz|estaqueament|\bestacas?\b/i, glyph: 'estaca', label: 'Estaca/rocha', tone: 'rose' },
+  { re: /sapata submersa|com alargamento|base alargada/i, glyph: 'tubulao', label: 'Tubulão c/ base', tone: 'orange' },
+  { re: /stub.?tubul[ãa]o|tubul[ãa]o/i, glyph: 'tubulao', label: 'Tubulão', tone: 'amber' },
+  { re: /\bsapata/i, glyph: 'sapata', label: 'Sapata', tone: 'emerald' },
+  { re: /grelha|grilhag/i, glyph: 'grelha', label: 'Grelha', tone: 'emerald' },
+]
+// pega o tipo PREDOMINANTE = o que aparece PRIMEIRO no item "tipo de fundação" (ignora os citados como exceção/0)
+function classificarFundacao(items: Array<Record<string, unknown>>): { glyph: string; label: string; tone: RelevoTone } | null {
+  const decl = items.find(it => /tipo de funda|funda[çc][ãa]o predominante/i.test(String(it.item ?? '')))
+  const scan = decl ? `${decl.item ?? ''} ${decl.valor ?? ''}` : items.map(it => `${it.item ?? ''} ${it.valor ?? ''}`).join('  ')
+  let best: typeof FUND_TYPES[number] | null = null, bestIdx = Infinity
+  for (const ft of FUND_TYPES) {
+    const m = ft.re.exec(scan)
+    if (m && m.index < bestIdx) { bestIdx = m.index; best = ft }
+  }
+  return best ? { glyph: best.glyph, label: best.label, tone: best.tone } : null
+}
 // barra horizontal proporcional dos tipos de solo/furo (% por tipo, medido nas sondagens)
 function BarraSolo({ dist, isDark, compact }: { dist: Array<{ tipo: string; pct: number }>; isDark: boolean; compact?: boolean }) {
   const tot = dist.reduce((s, d) => s + (Number(d.pct) || 0), 0)
@@ -1030,17 +1061,18 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
         </div>
       )}
 
-      {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
       <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
       <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem}
         obraBorda={(its) => RELEVO_TONE[classificarSolo(its).tone].barHex}
         obraBadge={(its) => {
           const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]; const dist = distDaObra(its)
+          const f = classificarFundacao(its); const fn = f ? RELEVO_TONE[f.tone] : null
           const label = s.classe || s.tipos[0]?.label || ''
-          if (!label && !dist.length) return null
-          return <span className="inline-flex items-center gap-2">
+          if (!label && !dist.length && !f) return null
+          return <span className="inline-flex items-center gap-2 flex-wrap justify-end">
             {dist.length > 0 && <BarraSolo dist={dist} isDark={isDark} compact />}
             {label && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
+            {f && fn && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? fn.pillD : fn.pillL}`} title="Tipo de fundação predominante"><FundGlyph tipo={f.glyph} color={fn.barHex} size={12} /> {f.label}</span>}
           </span>
         }}
         obraResumo={(its) => {
