@@ -673,6 +673,18 @@ const fmtBRLc = (n: number) =>
   : `R$ ${n.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
 const fmtData = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/')
 
+// soma valor, mínimo de início (data_osc), máximo de prazo (vencimento)
+function aggOsc(oscs: EGPOscRow[]) {
+  let valor = 0, hasV = false
+  let minI: string | null = null, maxP: string | null = null
+  for (const o of oscs) {
+    if (o.valor != null) { valor += o.valor; hasV = true }
+    const di = o.data_osc?.slice(0, 10); if (di && (!minI || di < minI)) minI = di
+    const dv = o.vencimento?.slice(0, 10); if (dv && (!maxP || dv > maxP)) maxP = dv
+  }
+  return { valor: hasV ? valor : null, minI, maxP }
+}
+
 function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: obras, isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs } = useOSCsDoPortfolio(portfolioId)
@@ -810,13 +822,16 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
           {grupos.map(g => {
             const obrasDoPolo = byProjeto.get(g.id) ?? []
             const poloOpen = !!q.trim() || !collapsedPolos.has(g.id)
+            const pa = aggOsc(obrasDoPolo.flatMap(o => oscByObra.get(o.id) ?? []))
             return (
               <div key={g.id}>
                 {/* cabeçalho do polo/projeto */}
                 <button onClick={() => togglePolo(g.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
                   <ChevronRight size={15} className={`shrink-0 transition-transform ${poloOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />
                   <span className={`font-bold text-sm ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{g.nome}</span>
-                  <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
+                  {pa.valor != null && <span className={`ml-auto text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRLc(pa.valor)}</span>}
+                  {(pa.minI || pa.maxP) && <span className={`text-[11px] tabular-nums ${pa.valor != null ? '' : 'ml-auto '}${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.minI ? fmtData(pa.minI) : '—'} → {pa.maxP ? fmtData(pa.maxP) : '—'}</span>}
+                  <span className={`${pa.valor == null && !pa.minI && !pa.maxP ? 'ml-auto ' : ''}text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
                 </button>
 
                 {/* obras do polo */}
@@ -826,16 +841,15 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                       const oscList = oscByObra.get(o.id) ?? []
                       const expanded = open.has(o.id)
                       const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
+                      const oa = aggOsc(oscList)
                       return (
                         <div key={o.id} className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
                           {/* linha da obra */}
                           <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
                             <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
                             <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
-                            {(() => {
-                              const tp = TIPO_OBRA[o.tipo ?? '']
-                              return tp ? <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span> : null
-                            })()}
+                            {oa.valor != null && <span className={`text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRLc(oa.valor)}</span>}
+                            {(oa.minI || oa.maxP) && <span className={`hidden sm:inline text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.minI ? fmtData(oa.minI) : '—'} → {oa.maxP ? fmtData(oa.maxP) : '—'}</span>}
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
                               {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
                             </span>
@@ -848,15 +862,28 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                               {oscList.length === 0 && addingFor !== o.id && (
                                 <p className={`text-xs py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma OSC nesta obra ainda.</p>
                               )}
+                              {oscList.length > 0 && (
+                                <div className={`flex items-center gap-3 pb-1 text-[10px] font-semibold uppercase tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  <span className="w-[92px] shrink-0">OSC</span>
+                                  <span className="flex-1 min-w-0" />
+                                  <span className="w-[74px] text-right shrink-0">Tipo</span>
+                                  <span className="w-[70px] text-right shrink-0">Valor</span>
+                                  <span className="w-[60px] text-right shrink-0">Início</span>
+                                  <span className="w-[60px] text-right shrink-0">Prazo</span>
+                                  <span className="w-4 shrink-0" />
+                                </div>
+                              )}
                               {oscList.map(osc => {
                                 const tp = TIPO_OBRA[osc.tipo ?? '']
                                 return (
-                                  <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                                    <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
-                                    {tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}
-                                    {osc.valor != null && <span className={`text-xs font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmtBRLc(osc.valor)}</span>}
-                                    {osc.data_osc && <span className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>· {fmtData(osc.data_osc)}</span>}
-                                    <button onClick={() => openEdit(osc)} className={`ml-auto ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
+                                  <div key={osc.id} className={`flex items-center gap-3 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                                    <span className={`w-[92px] shrink-0 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
+                                    <span className={`flex-1 min-w-0 truncate text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.tipo_servico ? `· ${osc.tipo_servico}` : ''}</span>
+                                    <span className="w-[74px] shrink-0 flex justify-end">{tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}</span>
+                                    <span className={`w-[70px] shrink-0 text-right font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{osc.valor != null ? fmtBRLc(osc.valor) : '—'}</span>
+                                    <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.data_osc ? fmtData(osc.data_osc) : '—'}</span>
+                                    <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.vencimento ? fmtData(osc.vencimento) : '—'}</span>
+                                    <button onClick={() => openEdit(osc)} className={`w-4 shrink-0 ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
                                   </div>
                                 )
                               })}
