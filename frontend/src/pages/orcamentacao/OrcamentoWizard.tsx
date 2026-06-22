@@ -134,6 +134,7 @@ function RelevoGlyph({ tone, size = 16 }: { tone: RelevoTone; size?: number }) {
     amber: 'M1 9 Q4 6 7 9 T15 9',
     orange: 'M1 10 L4 5 L7 8 L10 4 L13 8 L15 10',
     rose: 'M1 10 L4 3 L7 7 L10 2 L13 6 L15 10',
+    sky: 'M1 9 H15',
   }
   return (
     <svg width={size} height={Math.round(size * 0.72)} viewBox="0 0 16 12" fill="none" className="shrink-0">
@@ -774,7 +775,7 @@ const obraDoItem = (it: Record<string, unknown>) => {
   return m ? m[0].replace(/[)\]\s]+$/, '').trim() : ''
 }
 
-function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObra, obraBadge, obraResumo }: {
+function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObra, obraBadge, obraResumo, obraBorda }: {
   itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean
   titulo: string; Icon: LucideIcon; cats: { key: string; re: RegExp }[]; getObra: (it: Record<string, unknown>) => string
   obraBadge?: (its: Array<Record<string, unknown>>) => React.ReactNode; obraResumo?: (its: Array<Record<string, unknown>>) => React.ReactNode
@@ -1011,25 +1012,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
         obraBorda={(its) => RELEVO_TONE[classificarSolo(its).tone].barHex}
         obraBadge={(its) => {
           const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]
-          if (!s.classe && !s.tipos.length) return null
-          return <span className="inline-flex items-center gap-1.5">
-            {s.tipos.length > 0 && <span className="inline-flex items-center gap-0.5">{s.tipos.slice(0, 4).map((t, i) => <span key={i} title={t.label}><SoloGlyph tipo={t.glyph} color={t.color} size={14} /></span>)}</span>}
-            {s.classe && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>{s.classe}{s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
-          </span>
-        }}
-        obraResumo={(its) => {
-          const s = classificarSolo(its)
-          const extra = [
-            s.sadm != null ? `σadm ${s.sadm} kgf/cm²` : null,
-            s.aguaSeco ? 'lençol não encontrado' : null,
-            s.agua != null ? `lençol a ${s.agua} m` : null,
-          ].filter(Boolean) as string[]
-          if (!s.tipos.length && !extra.length) return null
-          return <div className="px-3 py-2 flex flex-wrap items-center gap-1.5">
-            <span className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solo</span>
-            {s.tipos.map((t, i) => <span key={i} title={t.label} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-200' : 'bg-slate-100 text-slate-700'}`} style={{ borderLeft: `2px solid ${t.color}` }}><SoloGlyph tipo={t.glyph} color={t.color} size={11} /> {t.label}</span>)}
-            {extra.map((t, i) => <span key={`e${i}`} className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{t}</span>)}
-          </div>
+          const label = s.classe || s.tipos[0]?.label || ''
+          if (!label) return null
+          return <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>
         }}
       />
       {pend.length > 0 && (
