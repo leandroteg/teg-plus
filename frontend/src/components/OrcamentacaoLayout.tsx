@@ -8,7 +8,6 @@ export default function OrcamentacaoLayout() {
 
   const NAV: NavItem[] = [
     { to: '/orcamentacao', icon: LayoutDashboard, label: 'Painel', end: true },
-    { to: '/orcamentacao/orcamentos', icon: FileText, label: 'Orçamentos', end: false },
     {
       to: '/orcamentacao/novo',
       icon: Plus,
@@ -16,6 +15,7 @@ export default function OrcamentacaoLayout() {
       action: () => navigate('/orcamentacao/novo'),
       accent: true,
     },
+    { to: '/orcamentacao/orcamentos', icon: FileText, label: 'Orçamentos', end: false },
   ]
 
   return (
