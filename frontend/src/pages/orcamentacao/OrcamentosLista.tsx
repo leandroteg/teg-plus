@@ -62,18 +62,13 @@ export default function OrcamentosLista() {
           </h1>
           <p className={`text-xs mt-0.5 ${txtMuted}`}>Criar, editar, reprocessar e excluir orçamentos de LT</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
-            <RefreshCw size={16} />
-          </button>
-          <button onClick={() => nav('/orcamentacao/novo')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm">
-            <Plus size={16} /> Novo Orçamento
-          </button>
-        </div>
+        <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+          <RefreshCw size={16} />
+        </button>
       </div>
 
       {/* Abas de status — componente compartilhado ModuleTabs */}
-      <ModuleTabs isDark={isDark} value={filtro} onChange={v => setFiltro(v as FiltroStatus)}
+      <ModuleTabs isDark={isDark} fill value={filtro} onChange={v => setFiltro(v as FiltroStatus)}
         tabs={FILTROS.map(f => ({ value: f.value, label: f.label, icon: f.icon, tone: f.tone, badge: contar(f.value) }))} />
 
       <section className={`${CARD(isDark)} overflow-hidden`}>
