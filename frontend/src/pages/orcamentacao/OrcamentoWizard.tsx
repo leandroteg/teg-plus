@@ -57,6 +57,44 @@ function relevoNivel(f: number): { label: string; tone: RelevoTone } {
   return { label: 'Serrano', tone: 'rose' }
 }
 
+// ── Solo: glifo simbólico por tipo + classe de dificuldade (σadm/água/rocha) ─────
+function SoloGlyph({ tipo, color, size = 13 }: { tipo: string; color: string; size?: number }) {
+  const p = { stroke: color, strokeWidth: 1.6, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  let body: React.ReactNode
+  if (tipo === 'rocha') body = <path d="M2 19 L7 8 L11 14 L15 6 L22 19 Z" {...p} />
+  else if (tipo === 'areia') body = <g fill={color} stroke="none">{[[6, 8], [12, 7], [18, 9], [8, 13], [14, 12], [19, 15], [6, 17], [12, 17], [17, 18]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1.4" />)}</g>
+  else if (tipo === 'silte') body = <g {...p}><path d="M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0" /><path d="M3 14c2-2 4-2 6 0s4 2 6 0 4-2 6 0" /></g>
+  else if (tipo === 'argila') body = <g {...p}><rect x="3" y="6" width="18" height="13" rx="1.5" /><path d="M3 11.5h18M3 16h18" /></g>
+  else body = <g {...p}><path d="M3 8h18M3 12.5h18M3 17h18" /></g>
+  return <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">{body}</svg>
+}
+
+interface SoloInfo { sadm: number | null; rocha: boolean; agua: number | null; aguaSeco: boolean; glyph: string; tipoLabel: string; classe: string; tone: RelevoTone }
+// dificuldade do SOLO a partir dos FATOS dos docs (σadm medida, lençol, rocha) — não estima
+function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
+  const txt = items.map(it => `${it.item ?? ''} ${it.valor ?? ''}`).join('  ').toLowerCase()
+  const m = txt.match(/(\d+[.,]?\d*)\s*kgf\s*\/?\s*cm/)
+  const sadm = m ? parseFloat(m[1].replace(',', '.')) : null
+  const rocha = /\brocha|impenetr|embargad|saprolit|\brefus/.test(txt)
+  const aguaSeco = /(n[ãa]o encontrad|ausente|seco)/.test(txt)
+  const am = txt.match(/(?:len[çc]ol|fre[áa]tic|n[íi]vel d['’]?\s*[áa]gua)[^.]{0,40}?(\d+[.,]?\d*)\s*m\b/)
+  const agua = am ? parseFloat(am[1].replace(',', '.')) : null
+  let glyph = 'residual', tipoLabel = ''
+  if (/argila|argilos/.test(txt)) { glyph = 'argila'; tipoLabel = 'Argiloso' }
+  else if (/areia|arenos/.test(txt)) { glyph = 'areia'; tipoLabel = 'Arenoso' }
+  else if (/silt/.test(txt)) { glyph = 'silte'; tipoLabel = 'Siltoso' }
+  else if (/residual|saprolit/.test(txt)) { glyph = 'residual'; tipoLabel = 'Solo residual' }
+  else if (rocha) { glyph = 'rocha'; tipoLabel = 'Rochoso' }
+  let classe = '', tone: RelevoTone = 'slate'
+  if (sadm != null) {
+    if (sadm >= 4) { classe = 'Firme'; tone = 'emerald' }
+    else if (sadm >= 2.5) { classe = 'Médio'; tone = 'amber' }
+    else if (sadm >= 1.5) { classe = 'Mole'; tone = 'orange' }
+    else { classe = 'Muito mole'; tone = 'rose' }
+  } else if (rocha) { classe = 'Rocha'; tone = 'slate' }
+  return { sadm, rocha, agua, aguaSeco, glyph, tipoLabel, classe, tone }
+}
+
 // ── Geo-enriquecimento por obra (traçado KMZ × OpenStreetMap/SRTM) ──────────────
 interface GeoRod { ref?: string | null; dist_km: number; surface?: string | null }
 interface GeoData {
@@ -728,9 +766,10 @@ const obraDoItem = (it: Record<string, unknown>) => {
   return m ? m[0].replace(/[)\]\s]+$/, '').trim() : ''
 }
 
-function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObra }: {
+function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObra, obraBadge, obraResumo }: {
   itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean
   titulo: string; Icon: LucideIcon; cats: { key: string; re: RegExp }[]; getObra: (it: Record<string, unknown>) => string
+  obraBadge?: (its: Array<Record<string, unknown>>) => React.ReactNode; obraResumo?: (its: Array<Record<string, unknown>>) => React.ReactNode
 }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -763,10 +802,14 @@ function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObr
                   {open ? <ChevronDown size={14} className="shrink-0 text-amber-500" /> : <ChevronRight size={14} className="shrink-0 text-amber-500" />}
                   <span className="truncate">{obra}</span>
                 </span>
-                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{its.length} itens</span>
+                <span className="flex items-center gap-2 shrink-0">
+                  {obraBadge?.(its)}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{its.length} itens</span>
+                </span>
               </button>
               {open && (
                 <div className={isDark ? 'divide-y divide-white/[0.05]' : 'divide-y divide-slate-100'}>
+                  {obraResumo?.(its)}
                   {catsArr.map(([cat, citems]) => (
                     <div key={cat} className="px-3 py-2">
                       <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600/90'}`}>{cat} <span className={`font-normal ${txtMuted}`}>({citems.length})</span></p>
@@ -953,7 +996,28 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
       <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
-      <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem} />
+      <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem}
+        obraBadge={(its) => {
+          const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]
+          if (!s.classe && !s.tipoLabel) return null
+          return <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.glyph} color={tn.barHex} size={12} /> {s.classe || s.tipoLabel}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>
+        }}
+        obraResumo={(its) => {
+          const s = classificarSolo(its)
+          const chips = [
+            s.tipoLabel ? { ic: true, t: s.tipoLabel } : null,
+            s.sadm != null ? { t: `σadm ${s.sadm} kgf/cm²` } : null,
+            s.aguaSeco ? { t: 'lençol não encontrado' } : null,
+            s.agua != null ? { t: `lençol a ${s.agua} m` } : null,
+            s.rocha ? { t: 'rocha / impenetrável' } : null,
+          ].filter(Boolean) as { ic?: boolean; t: string }[]
+          if (!chips.length) return null
+          return <div className="px-3 py-2 flex flex-wrap items-center gap-1.5">
+            <span className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solo</span>
+            {chips.map((c, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.ic && <SoloGlyph tipo={s.glyph} color={RELEVO_TONE[s.tone].barHex} size={11} />}{c.t}</span>)}
+          </div>
+        }}
+      />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
