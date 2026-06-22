@@ -585,10 +585,54 @@ function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: bo
   )
 }
 
+// ── Modal de relevo: gráfico de elevação (estágio 1) + travessias + ver no mapa ───
+function ReleveModal({ obra, isDark, onClose, onVerMapa }: {
+  obra: Record<string, unknown>; isDark: boolean; onClose: () => void; onVerMapa: () => void
+}) {
+  const g = obra.geo as GeoData | undefined
+  const rel = relevoReal(g?.perfil?.rampa_media_pct, Number(obra.f_terreno), Number(obra.km))
+  const tn = RELEVO_TONE[rel.tone]
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className={`w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border shadow-2xl ${isDark ? 'bg-[#1e293b] border-white/[0.08]' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between gap-2 px-4 py-3 border-b ${isDark ? 'border-white/[0.07]' : 'border-slate-100'}`} style={{ borderLeft: `4px solid ${tn.barHex}` }}>
+          <div className="min-w-0 flex items-center gap-2">
+            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={13} /> {rel.label}{g?.perfil ? ` · rampa ${g.perfil.rampa_media_pct}%` : ''}</span>
+            <p className={`text-sm font-extrabold truncate ${txt}`}>{String(obra.nome)}</p>
+          </div>
+          <button onClick={onClose} className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={16} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {g?.perfil ? (
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Perfil de elevação <span className="font-normal normal-case">(1 ponto ~por torre · SRTM)</span></p>
+              <div className={`rounded-lg p-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+                <PerfilChart perfil={g.perfil} isDark={isDark} cor={tn.barHex} />
+              </div>
+              <p className={`text-[10px] mt-0.5 ${txtMuted}`}>extensão {fmtNum(Number(obra.km), 1)} km · amplitude {g.amplitude_m} m · ↑{g.perfil.subida_m} / ↓{g.perfil.descida_m} m · rampa média {g.perfil.rampa_media_pct}% · máx {g.perfil.rampa_max_pct}%</p>
+            </div>
+          ) : (
+            <p className={`text-xs ${txtMuted}`}>Sem perfil de elevação para esta obra.</p>
+          )}
+          {g && <GeoObra geo={g} isDark={isDark} />}
+        </div>
+        <div className={`px-4 py-3 border-t ${isDark ? 'border-white/[0.07]' : 'border-slate-100'}`}>
+          <button onClick={onVerMapa} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm">
+            <MapPin size={15} /> Ver no mapa
+          </button>
+        </div>
+      </div>
+    </div>, document.body)
+}
+
 // ── Consolidação (estágio 2): resumo (medido) + SÓ fatos extraídos dos documentos ──
 function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, unknown>; isDark: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const [releveObra, setReleveObra] = useState<Record<string, unknown> | null>(null)
+  const [mapaObra, setMapaObra] = useState<string | null>(null)
   const docs = (d.docs_analisados as string[]) ?? []
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
   const quant = arr('quantitativos'), crono = arr('cronograma'), recursos = arr('recursos_contrato'), restr = arr('restricoes'), geot = arr('geotecnia')
@@ -677,7 +721,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
                 <div key={i} className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.07] bg-white/[0.015]' : 'border-slate-200 bg-white'}`}>
                   <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b ${isDark ? 'border-white/[0.05]' : 'border-slate-100'}`} style={{ borderLeft: `3px solid ${tn.barHex}` }}>
                     <p className={`text-xs font-bold truncate ${txt}`}>{String(o.nome)}</p>
-                    <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={12} /> {rel.label}</span>
+                    <button onClick={() => setReleveObra(o)} title="Ver perfil de elevação e travessias" className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-transform hover:scale-105 cursor-pointer" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={12} /> {rel.label}</button>
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="grid grid-cols-3 gap-2">
@@ -721,6 +765,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       {total === 0 && docs.length > 0 && (
         <p className={`text-[11px] ${txtMuted}`}>Documentos lidos, mas nenhum fato útil foi extraído. Confira se os anexos têm romaneio, projeto de fundação, cronograma ou matriz de recursos.</p>
       )}
+
+      {releveObra && <ReleveModal obra={releveObra} isDark={isDark} onClose={() => setReleveObra(null)} onVerMapa={() => { setMapaObra(String(releveObra.nome)); setReleveObra(null) }} />}
+      {mapaObra && <MapaObraModal orcamentoId={orc.id} obraNome={mapaObra} isDark={isDark} onClose={() => setMapaObra(null)} />}
     </section>
   )
 }
