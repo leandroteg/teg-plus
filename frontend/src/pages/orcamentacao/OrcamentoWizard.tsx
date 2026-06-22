@@ -896,9 +896,9 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
                 <p className={`text-xs font-bold truncate ${txt}`}>{String(r.atividade)}</p>
                 <p className={`text-[10px] truncate ${txtMuted}`}>{String(r.frota ?? '')}</p>
               </div>
-              <label className={`text-[9px] text-center ${txtMuted}`}>eq<input type="number" value={Number(r.equipes ?? 1)} onChange={e => setCampo(i, 'equipes', Number(e.target.value))} className={`block ${inp}`} /></label>
-              <label className={`text-[9px] text-center ${txtMuted}`}>pess<input type="number" value={Number(r.pessoas ?? 0)} onChange={e => setCampo(i, 'pessoas', Number(e.target.value))} className={`block ${inp}`} /></label>
-              <label className={`text-[9px] text-center ${txtMuted}`}>meses<input type="number" step="0.5" value={Number(r.meses ?? 0)} onChange={e => setCampo(i, 'meses', Number(e.target.value))} className={`block ${inp}`} /></label>
+              <label title="Equipes / frentes simultâneas" className={`text-[9px] text-center ${txtMuted}`}>Equipes<input type="number" value={Number(r.equipes ?? 1)} onChange={e => setCampo(i, 'equipes', Number(e.target.value))} className={`block ${inp}`} /></label>
+              <label title="Pessoas (efetivo total da atividade)" className={`text-[9px] text-center ${txtMuted}`}>Pessoas<input type="number" value={Number(r.pessoas ?? 0)} onChange={e => setCampo(i, 'pessoas', Number(e.target.value))} className={`block ${inp}`} /></label>
+              <label title="Duração em meses" className={`text-[9px] text-center ${txtMuted}`}>Meses<input type="number" step="0.5" value={Number(r.meses ?? 0)} onChange={e => setCampo(i, 'meses', Number(e.target.value))} className={`block ${inp}`} /></label>
             </div>
           ))}
         </div>
