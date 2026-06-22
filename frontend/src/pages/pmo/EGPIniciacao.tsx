@@ -826,12 +826,17 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
             return (
               <div key={g.id}>
                 {/* cabeçalho do polo/projeto */}
-                <button onClick={() => togglePolo(g.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
+                <button onClick={() => togglePolo(g.id)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
                   <ChevronRight size={15} className={`shrink-0 transition-transform ${poloOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />
-                  <span className={`font-bold text-sm ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{g.nome}</span>
-                  {pa.valor != null && <span className={`ml-auto text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRLc(pa.valor)}</span>}
-                  {(pa.minI || pa.maxP) && <span className={`text-[11px] tabular-nums ${pa.valor != null ? '' : 'ml-auto '}${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.minI ? fmtData(pa.minI) : '—'} → {pa.maxP ? fmtData(pa.maxP) : '—'}</span>}
-                  <span className={`${pa.valor == null && !pa.minI && !pa.maxP ? 'ml-auto ' : ''}text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`font-bold text-sm truncate ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{g.nome}</span>
+                    <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <span className="w-[74px] shrink-0" />
+                  <span className={`w-[70px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{pa.valor != null ? fmtBRLc(pa.valor) : ''}</span>
+                  <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.minI ? fmtData(pa.minI) : ''}</span>
+                  <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.maxP ? fmtData(pa.maxP) : ''}</span>
+                  <span className="w-4 shrink-0" />
                 </button>
 
                 {/* obras do polo */}
@@ -847,13 +852,18 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                           {/* linha da obra */}
                           <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
                             <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
-                            <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
-                            {oa.valor != null && <span className={`text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRLc(oa.valor)}</span>}
-                            {(oa.minI || oa.maxP) && <span className={`hidden sm:inline text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.minI ? fmtData(oa.minI) : '—'} → {oa.maxP ? fmtData(oa.maxP) : '—'}</span>}
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
-                              {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
-                            </span>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className={`font-medium text-sm truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
+                              <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
+                                {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
+                              </span>
+                              <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
+                            </div>
+                            <span className="w-[74px] shrink-0" />
+                            <span className={`w-[70px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{oa.valor != null ? fmtBRLc(oa.valor) : ''}</span>
+                            <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.minI ? fmtData(oa.minI) : ''}</span>
+                            <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.maxP ? fmtData(oa.maxP) : ''}</span>
+                            <span className="w-4 shrink-0" />
                           </button>
 
                           {/* OSCs (colapsável) */}
