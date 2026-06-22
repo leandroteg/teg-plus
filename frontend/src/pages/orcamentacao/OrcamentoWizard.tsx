@@ -1091,7 +1091,8 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
     const extras = rs.filter(r => !/fund|montag|lan/i.test(String(r.atividade ?? ''))).map(r => Number(r.meses ?? 0))
     return Math.round(Math.max(f, endMo, endL, 0, ...extras) * 10) / 10
   }
-  const recalcular = () => setPrazo(calcPrazo(rec))   // prévia do prazo (não salva)
+  const [recalcBusy, setRecalcBusy] = useState(false)
+  const recalcular = () => { setRecalcBusy(true); setPrazo(calcPrazo(rec)); setTimeout(() => setRecalcBusy(false), 500) }   // prévia (não salva)
   const aplicar = () => { const np = calcPrazo(rec); setPrazo(np); setDirty(false); onSave({ ...d, recursos: rec, prazo_meses: np }) }
   const inp = `w-14 rounded-md border px-1.5 py-1 text-xs text-right outline-none ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-white border-slate-200 text-slate-900'}`
   const totPessoas = rec.reduce((s, r) => s + Number(r.pessoas ?? 0), 0)
@@ -1099,17 +1100,7 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
     <section className={`${CARD(isDark)} p-4 space-y-3`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className={`text-sm font-extrabold ${txt}`}>Recursos e cronograma</h3>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-bold ${txt}`}>prazo ~{fmtNum(prazo, 1)} m · {fmtNum(totPessoas)} pessoas{d.efetivo_pico_clt ? ` · pico ${fmtNum(Number(d.efetivo_pico_clt))} CLT` : ''}</span>
-          <button onClick={recalcular} disabled={saving} title="Recalcula o prazo a partir das durações (prévia, não salva)"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-60`}>
-            <RefreshCw size={12} /> Recalcular prazo
-          </button>
-          <button onClick={aplicar} disabled={saving} title="Salva os recursos editados e o cronograma (sem IA)"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold disabled:opacity-60 ${dirty ? 'bg-amber-500 text-white hover:bg-amber-600' : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}`}>
-            <Save size={12} className={saving ? 'animate-pulse' : ''} /> Aplicar
-          </button>
-        </div>
+        <span className={`text-xs font-bold ${txt}`}>prazo ~{fmtNum(prazo, 1)} m · {fmtNum(totPessoas)} pessoas{d.efetivo_pico_clt ? ` · pico ${fmtNum(Number(d.efetivo_pico_clt))} CLT` : ''}</span>
       </div>
 
       {porObra.length > 0 && (
@@ -1155,6 +1146,17 @@ function Recursos({ d, isDark, onSave, saving }: { d: Record<string, unknown>; i
               <label title="Duração em meses" className={`text-[9px] text-center ${txtMuted}`}>Meses<input type="number" step="0.5" value={Number(r.meses ?? 0)} onChange={e => setCampo(i, 'meses', Number(e.target.value))} className={`block ${inp}`} /></label>
             </div>
           ))}
+        </div>
+        {/* ações logo abaixo dos campos editáveis */}
+        <div className="flex items-center justify-end gap-2 mt-2.5">
+          <button onClick={recalcular} disabled={recalcBusy || saving} title="Recalcula o prazo a partir das durações (prévia, não salva)"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-60`}>
+            <RefreshCw size={13} className={recalcBusy ? 'animate-spin' : ''} /> {recalcBusy ? 'Recalculando…' : 'Recalcular prazo'}
+          </button>
+          <button onClick={aplicar} disabled={saving || recalcBusy} title="Salva os recursos editados e o cronograma (sem IA)"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-60 ${dirty || saving ? 'bg-amber-500 text-white hover:bg-amber-600' : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}`}>
+            {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />} {saving ? 'Aplicando…' : 'Aplicar'}
+          </button>
         </div>
       </div>
     </section>
