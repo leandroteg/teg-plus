@@ -35,13 +35,14 @@ const ESTAGIOS = [
 ]
 
 // ── Escala de dificuldade do relevo (pelo fator de terreno) ────────────────────
-type RelevoTone = 'slate' | 'emerald' | 'amber' | 'orange' | 'rose'
+type RelevoTone = 'slate' | 'emerald' | 'amber' | 'orange' | 'rose' | 'sky'
 const RELEVO_TONE: Record<RelevoTone, { barHex: string; pillL: string; pillD: string; dot: string }> = {
   slate:   { barHex: '#94a3b8', pillL: 'bg-slate-100 text-slate-600 border-slate-200',     pillD: 'bg-white/[0.06] text-slate-300 border-white/10',       dot: 'bg-slate-400' },
   emerald: { barHex: '#10b981', pillL: 'bg-emerald-50 text-emerald-700 border-emerald-200', pillD: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-500' },
   amber:   { barHex: '#f59e0b', pillL: 'bg-amber-50 text-amber-700 border-amber-200',       pillD: 'bg-amber-500/15 text-amber-300 border-amber-500/30',     dot: 'bg-amber-500' },
   orange:  { barHex: '#f97316', pillL: 'bg-orange-50 text-orange-700 border-orange-200',     pillD: 'bg-orange-500/15 text-orange-300 border-orange-500/30',   dot: 'bg-orange-500' },
   rose:    { barHex: '#f43f5e', pillL: 'bg-rose-50 text-rose-700 border-rose-200',           pillD: 'bg-rose-500/15 text-rose-300 border-rose-500/30',       dot: 'bg-rose-500' },
+  sky:     { barHex: '#0ea5e9', pillL: 'bg-sky-50 text-sky-700 border-sky-200',             pillD: 'bg-sky-500/15 text-sky-300 border-sky-500/30',         dot: 'bg-sky-500' },
 }
 const RELEVO_ESCALA: { tone: RelevoTone; label: string }[] = [
   { tone: 'emerald', label: 'Plano' },
@@ -69,8 +70,20 @@ function SoloGlyph({ tipo, color, size = 13 }: { tipo: string; color: string; si
   return <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">{body}</svg>
 }
 
-interface SoloInfo { sadm: number | null; rocha: boolean; agua: number | null; aguaSeco: boolean; glyph: string; tipoLabel: string; classe: string; tone: RelevoTone }
-// dificuldade do SOLO a partir dos FATOS dos docs (σadm medida, lençol, rocha) — não estima
+// tipos de solo/material detectáveis nos docs → glifo + cor própria (não é o mesmo tipo na linha toda)
+const SOIL_TYPES: { re: RegExp; glyph: string; label: string; color: string }[] = [
+  { re: /tubul[ãa]o em rocha|\brocha\b|impenetr|\brefus/i, glyph: 'rocha', label: 'Rocha', color: '#64748b' },
+  { re: /pedra solta|pedra de m[ãa]o|matac[ãa]o/i, glyph: 'rocha', label: 'Pedra solta', color: '#a8a29e' },
+  { re: /moledo|saprolit|alterad/i, glyph: 'rocha', label: 'Moledo/saprólito', color: '#b45309' },
+  { re: /argila|argilos/i, glyph: 'argila', label: 'Argila', color: '#d97706' },
+  { re: /\bareia|arenos/i, glyph: 'areia', label: 'Areia', color: '#eab308' },
+  { re: /\bsilt/i, glyph: 'silte', label: 'Silte', color: '#a16207' },
+  { re: /brejo|alagad|submers|saturad/i, glyph: 'silte', label: 'Brejo/saturado', color: '#0891b2' },
+  { re: /solo comum|\bterra\b|residual/i, glyph: 'residual', label: 'Solo comum', color: '#92400e' },
+]
+interface SoloTipo { glyph: string; label: string; color: string }
+interface SoloInfo { sadm: number | null; rocha: boolean; agua: number | null; aguaSeco: boolean; tipos: SoloTipo[]; classe: string; tone: RelevoTone }
+// dificuldade + tipos do SOLO a partir dos FATOS dos docs (σadm medida, lençol, rocha) — não estima
 function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
   const txt = items.map(it => `${it.item ?? ''} ${it.valor ?? ''}`).join('  ').toLowerCase()
   const m = txt.match(/(\d+[.,]?\d*)\s*kgf\s*\/?\s*cm/)
@@ -79,20 +92,15 @@ function classificarSolo(items: Array<Record<string, unknown>>): SoloInfo {
   const aguaSeco = /(n[ãa]o encontrad|ausente|seco)/.test(txt)
   const am = txt.match(/(?:len[çc]ol|fre[áa]tic|n[íi]vel d['’]?\s*[áa]gua)[^.]{0,40}?(\d+[.,]?\d*)\s*m\b/)
   const agua = am ? parseFloat(am[1].replace(',', '.')) : null
-  let glyph = 'residual', tipoLabel = ''
-  if (/argila|argilos/.test(txt)) { glyph = 'argila'; tipoLabel = 'Argiloso' }
-  else if (/areia|arenos/.test(txt)) { glyph = 'areia'; tipoLabel = 'Arenoso' }
-  else if (/silt/.test(txt)) { glyph = 'silte'; tipoLabel = 'Siltoso' }
-  else if (/residual|saprolit/.test(txt)) { glyph = 'residual'; tipoLabel = 'Solo residual' }
-  else if (rocha) { glyph = 'rocha'; tipoLabel = 'Rochoso' }
+  const tipos = SOIL_TYPES.filter(t => t.re.test(txt)).map(({ glyph, label, color }) => ({ glyph, label, color }))
   let classe = '', tone: RelevoTone = 'slate'
   if (sadm != null) {
     if (sadm >= 4) { classe = 'Firme'; tone = 'emerald' }
     else if (sadm >= 2.5) { classe = 'Médio'; tone = 'amber' }
     else if (sadm >= 1.5) { classe = 'Mole'; tone = 'orange' }
     else { classe = 'Muito mole'; tone = 'rose' }
-  } else if (rocha) { classe = 'Rocha'; tone = 'slate' }
-  return { sadm, rocha, agua, aguaSeco, glyph, tipoLabel, classe, tone }
+  } else if (rocha) { classe = 'Rocha'; tone = 'sky' }
+  return { sadm, rocha, agua, aguaSeco, tipos, classe, tone }
 }
 
 // ── Geo-enriquecimento por obra (traçado KMZ × OpenStreetMap/SRTM) ──────────────
@@ -770,6 +778,7 @@ function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObr
   itens: Array<Record<string, unknown>>; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean
   titulo: string; Icon: LucideIcon; cats: { key: string; re: RegExp }[]; getObra: (it: Record<string, unknown>) => string
   obraBadge?: (its: Array<Record<string, unknown>>) => React.ReactNode; obraResumo?: (its: Array<Record<string, unknown>>) => React.ReactNode
+  obraBorda?: (its: Array<Record<string, unknown>>) => string | undefined
 }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -794,8 +803,9 @@ function DocAgrupado({ itens, isDark, baixar, temArq, titulo, Icon, cats, getObr
           const porCat = new Map<string, Array<Record<string, unknown>>>()
           its.forEach(it => { const c = categoriaDe(String(it.item ?? '')); if (!porCat.has(c)) porCat.set(c, []); porCat.get(c)!.push(it) })
           const catsArr = ordemCat.filter(c => porCat.has(c)).map(c => [c, porCat.get(c)!] as const)
+          const borda = obraBorda?.(its)
           return (
-            <div key={obra} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}>
+            <div key={obra} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`} style={borda ? { borderLeft: `3px solid ${borda}` } : undefined}>
               <button onClick={() => setAberto(a => ({ ...a, [obra]: !a[obra] }))}
                 className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.05]' : 'bg-slate-50 hover:bg-slate-100/70'}`}>
                 <span className={`flex items-center gap-1.5 min-w-0 text-xs font-bold ${txt}`}>
@@ -899,7 +909,8 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   }
   const docs = (d.docs_analisados as string[]) ?? []
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
-  const quant = arr('quantitativos'), geot = arr('geotecnia')
+  const quant = arr('quantitativos')
+  const geot = arr('geotecnia').filter(g => !/tipo de sondagem/i.test(String(g.item ?? '')))
   const pend = (d.pendencias as string[]) ?? []
   const total = quant.length + geot.length
   // medido do estágio 1 (geo) — p/ os resumos
@@ -997,24 +1008,27 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
       <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
       <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem}
+        obraBorda={(its) => RELEVO_TONE[classificarSolo(its).tone].barHex}
         obraBadge={(its) => {
           const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]
-          if (!s.classe && !s.tipoLabel) return null
-          return <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.glyph} color={tn.barHex} size={12} /> {s.classe || s.tipoLabel}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>
+          if (!s.classe && !s.tipos.length) return null
+          return <span className="inline-flex items-center gap-1.5">
+            {s.tipos.length > 0 && <span className="inline-flex items-center gap-0.5">{s.tipos.slice(0, 4).map((t, i) => <span key={i} title={t.label}><SoloGlyph tipo={t.glyph} color={t.color} size={14} /></span>)}</span>}
+            {s.classe && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}>{s.classe}{s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
+          </span>
         }}
         obraResumo={(its) => {
           const s = classificarSolo(its)
-          const chips = [
-            s.tipoLabel ? { ic: true, t: s.tipoLabel } : null,
-            s.sadm != null ? { t: `σadm ${s.sadm} kgf/cm²` } : null,
-            s.aguaSeco ? { t: 'lençol não encontrado' } : null,
-            s.agua != null ? { t: `lençol a ${s.agua} m` } : null,
-            s.rocha ? { t: 'rocha / impenetrável' } : null,
-          ].filter(Boolean) as { ic?: boolean; t: string }[]
-          if (!chips.length) return null
+          const extra = [
+            s.sadm != null ? `σadm ${s.sadm} kgf/cm²` : null,
+            s.aguaSeco ? 'lençol não encontrado' : null,
+            s.agua != null ? `lençol a ${s.agua} m` : null,
+          ].filter(Boolean) as string[]
+          if (!s.tipos.length && !extra.length) return null
           return <div className="px-3 py-2 flex flex-wrap items-center gap-1.5">
             <span className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solo</span>
-            {chips.map((c, i) => <span key={i} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.ic && <SoloGlyph tipo={s.glyph} color={RELEVO_TONE[s.tone].barHex} size={11} />}{c.t}</span>)}
+            {s.tipos.map((t, i) => <span key={i} title={t.label} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-200' : 'bg-slate-100 text-slate-700'}`} style={{ borderLeft: `2px solid ${t.color}` }}><SoloGlyph tipo={t.glyph} color={t.color} size={11} /> {t.label}</span>)}
+            {extra.map((t, i) => <span key={`e${i}`} className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{t}</span>)}
           </div>
         }}
       />
