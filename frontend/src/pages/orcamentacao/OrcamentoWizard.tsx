@@ -333,7 +333,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const salvar = useSalvarDadosEstagio()
-  const [fiscais, setFiscais] = useState<{ impostos_pct: number; contingencia_pct: number; margens: number[] }>({ impostos_pct: 11, contingencia_pct: 2, margens: [10, 13.5, 18, 23] })
+  const [fiscais, setFiscais] = useState<{ impostos_pct: number; contingencia_pct: number; alocacao_ativos_us: number; custo_capital_us: number; adicional_6x1_us: number; margens: number[] }>({ impostos_pct: 11, contingencia_pct: 2, alocacao_ativos_us: 74, custo_capital_us: 22, adicional_6x1_us: 23, margens: [10, 13.5, 18, 23] })
   // ao entrar no estágio 5, sincroniza os campos com o que já foi gerado
   useEffect(() => {
     if (estagio !== 5) return
@@ -341,6 +341,9 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
     setFiscais({
       impostos_pct: Number(d.tributos_pct ?? 11),
       contingencia_pct: Number(d.contingencia_pct ?? 2),
+      alocacao_ativos_us: Number(d.alocacao_ativos_us ?? 74),
+      custo_capital_us: Number(d.custo_capital_us ?? 22),
+      adicional_6x1_us: Number(d.adicional_6x1_us ?? 23),
       margens: cen.length === 4 ? cen.map(c => Number(c.margem_pct)) : [10, 13.5, 18, 23],
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -351,7 +354,8 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
 
   // Recalcula os cenários do estágio 5 LOCALMENTE (mesmo buildup do worker), sem IA.
   const recalcularStage5 = () => {
-    const cheio = Number(d.custo_cheio_us || 0); const us = Number(d.us || 0)
+    const us = Number(d.us || 0); const op = Number(d.custo_operacional_us || 0)
+    const cheio = op + fiscais.alocacao_ativos_us + fiscais.custo_capital_us + fiscais.adicional_6x1_us
     if (!cheio || !us) return
     const reforma = Number(d.reforma_pct ?? 2) / 100
     const cont = fiscais.contingencia_pct / 100, trib = fiscais.impostos_pct / 100
@@ -368,7 +372,8 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
     salvar.mutate({ id: orc.id, estagio: 5, dados: {
       ...d, cenarios: [...cenarios, ...manuais],
       tributos_pct: fiscais.impostos_pct, contingencia_pct: fiscais.contingencia_pct,
-      custo_com_contingencia_us: r2(custoCont),
+      alocacao_ativos_us: fiscais.alocacao_ativos_us, custo_capital_us: fiscais.custo_capital_us, adicional_6x1_us: fiscais.adicional_6x1_us,
+      custo_cheio_us: r2(cheio), custo_com_contingencia_us: r2(custoCont),
     } })
   }
 
@@ -403,25 +408,43 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
         {/* Inputs: docs (1,2,3) / fiscais do lance (5) */}
         {(estagio === 1 || estagio === 2 || estagio === 3) && <DocsInput orcId={orc.id} isDark={isDark} hint={estagio === 2 ? 'características, lista de materiais, planilha construtiva' : estagio === 3 ? 'matriz de recursos do contrato, tabela de salários' : 'documentos adicionais'} />}
         {estagio === 5 && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2.5">
+            {/* custo cheio (R$/US) — somados ao operacional do estágio 4 */}
             <div className="flex items-end gap-3 flex-wrap">
+              <span className={`text-[10px] font-bold uppercase tracking-wider self-center ${txtMuted}`}>Custo cheio R$/US:</span>
               <div>
-                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Impostos %</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Uso ativos</label>
+                <input type="number" step="0.5" title="Custo de uso de ativos próprios (R$/US)" value={fiscais.alocacao_ativos_us} onChange={e => setFiscais(f => ({ ...f, alocacao_ativos_us: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
+              </div>
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Capital</label>
+                <input type="number" step="0.5" title="Custo de capital de novos ativos (R$/US)" value={fiscais.custo_capital_us} onChange={e => setFiscais(f => ({ ...f, custo_capital_us: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
+              </div>
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Fim 6x1</label>
+                <input type="number" step="0.5" title="Adicional do fim da escala 6x1 (R$/US)" value={fiscais.adicional_6x1_us} onChange={e => setFiscais(f => ({ ...f, adicional_6x1_us: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
+              </div>
+            </div>
+            {/* preço (%) */}
+            <div className="flex items-end gap-3 flex-wrap">
+              <span className={`text-[10px] font-bold uppercase tracking-wider self-center ${txtMuted}`}>Preço %:</span>
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Impostos</label>
                 <input type="number" step="0.5" value={fiscais.impostos_pct} onChange={e => setFiscais(f => ({ ...f, impostos_pct: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
               </div>
               <div>
-                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Contingência %</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Contingência</label>
                 <input type="number" step="0.5" value={fiscais.contingencia_pct} onChange={e => setFiscais(f => ({ ...f, contingencia_pct: Number(e.target.value) }))} className={`${inpFisc} w-20`} />
               </div>
               <div className={`hidden sm:block w-px self-stretch my-1 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
               {['Mínima', 'Competitivo', 'Seguro', 'Ótima'].map((nm, i) => (
                 <div key={nm}>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{nm} %</label>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{nm}</label>
                   <input type="number" step="0.5" value={fiscais.margens[i] ?? 0} onChange={e => setFiscais(f => { const m = [...f.margens]; m[i] = Number(e.target.value); return { ...f, margens: m } })} className={`${inpFisc} w-16`} />
                 </div>
               ))}
             </div>
-            <p className={`text-[11px] ${txtMuted}`}>Impostos, contingência e as 4 margens do lance — <span className="font-semibold">aplicados ao Regerar</span>. Margens (Mín/Comp/Seguro/Ótima) montam os 4 cenários; o <span className="font-semibold">Seguro</span> é o Preço Alvo.</p>
+            <p className={`text-[11px] ${txtMuted}`}>Custo cheio = operacional (estágio 4) + uso ativos + capital + fim 6x1 → contingência → impostos/reforma/margem. <span className="font-semibold">Recalcular</span> aplica na hora (sem IA); <span className="font-semibold">Regerar</span> refaz com IA. <span className="font-semibold">Seguro</span> é o Preço Alvo.</p>
           </div>
         )}
       </section>
