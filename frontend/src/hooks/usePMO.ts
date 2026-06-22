@@ -177,6 +177,7 @@ export interface EGPObraVinc {
   nome: string
   status: string | null
   pmo_projeto_id: string | null
+  tipo: string | null
   polo_nome: string
 }
 
@@ -195,7 +196,7 @@ export function useObrasDoPortfolio(portfolioId?: string) {
       if (!ids.length) return []
       const { data, error } = await supabase
         .from('sys_obras')
-        .select('id, codigo, nome, status, pmo_projeto_id')
+        .select('id, codigo, nome, status, pmo_projeto_id, tipo')
         .in('pmo_projeto_id', ids)
         .order('nome')
       if (error) throw error
@@ -218,6 +219,12 @@ export interface EGPOscRow {
   tipo_servico: string | null
   data_recebimento: string | null
   observacoes: string | null
+  tipo: string | null
+  valor: number | null
+  quantidade_us: number | null
+  saldo_reais: number | null
+  data_osc: string | null
+  vencimento: string | null
 }
 
 export function useOSCsDoPortfolio(portfolioId?: string) {
@@ -227,11 +234,25 @@ export function useOSCsDoPortfolio(portfolioId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pmo_fluxo_os')
-        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes')
+        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes, tipo, valor, quantidade_us, saldo_reais, data_osc, vencimento')
         .eq('portfolio_id', portfolioId!)
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as EGPOscRow[]
+    },
+  })
+}
+
+export function useUpdateOSC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string; portfolio_id: string } & Partial<EGPOscRow>) => {
+      const { portfolio_id: _pf, ...fields } = patch as Record<string, unknown>
+      const { error } = await supabase.from('pmo_fluxo_os').update(fields).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-oscs-portfolio', vars.portfolio_id] })
     },
   })
 }

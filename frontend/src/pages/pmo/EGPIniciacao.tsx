@@ -10,7 +10,7 @@ import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
-  useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC,
+  useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC, useUpdateOSC,
   useProjetos, useCriarProjeto, useCriarObraEGP,
   type EGPOscRow,
 } from '../../hooks/usePMO'
@@ -659,11 +659,26 @@ const STATUS_OBRA: Record<string, { label: string; light: string; dark: string }
   concluida:    { label: 'Concluída',    light: 'bg-blue-100 text-blue-700',       dark: 'bg-blue-500/15 text-blue-400' },
 }
 
+// tipo da obra → tag (operacao+manutencao = O&M)
+const TIPO_OBRA: Record<string, { label: string; light: string; dark: string }> = {
+  construcao: { label: 'Construção', light: 'bg-sky-100 text-sky-700',       dark: 'bg-sky-500/15 text-sky-300' },
+  manutencao: { label: 'O&M',        light: 'bg-amber-100 text-amber-700',   dark: 'bg-amber-500/15 text-amber-300' },
+  operacao:   { label: 'O&M',        light: 'bg-amber-100 text-amber-700',   dark: 'bg-amber-500/15 text-amber-300' },
+  deposito:   { label: 'Depósito',   light: 'bg-violet-100 text-violet-700', dark: 'bg-violet-500/15 text-violet-300' },
+}
+
+const fmtBRLc = (n: number) =>
+  n >= 1_000_000 ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
+  : n >= 1_000 ? `R$ ${Math.round(n / 1_000)} mil`
+  : `R$ ${n.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+const fmtData = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/')
+
 function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: obras, isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs } = useOSCsDoPortfolio(portfolioId)
   const addOSC = useAddOSC()
   const delOSC = useDeletarOSC()
+  const updOSC = useUpdateOSC()
   const { data: projetos } = useProjetos(portfolioId)
   const { data: portfolio } = usePortfolio(portfolioId)
   const criarProjeto = useCriarProjeto()
@@ -676,6 +691,33 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [modal, setModal] = useState<null | 'projeto' | 'obra'>(null)
   const [pForm, setPForm] = useState({ nome: '', codigo: '' })
   const [oForm, setOForm] = useState({ nome: '', codigo: '', pmo_projeto_id: '' })
+  const [editOsc, setEditOsc] = useState<EGPOscRow | null>(null)
+  const [eForm, setEForm] = useState({ tipo: '', valor: '', data_osc: '', vencimento: '', tipo_servico: '', observacoes: '' })
+
+  const openEdit = (osc: EGPOscRow) => {
+    setEditOsc(osc)
+    setEForm({
+      tipo: osc.tipo ?? '', valor: osc.valor != null ? String(osc.valor) : '',
+      data_osc: osc.data_osc ?? '', vencimento: osc.vencimento ?? '',
+      tipo_servico: osc.tipo_servico ?? '', observacoes: osc.observacoes ?? '',
+    })
+  }
+  const salvarEdit = async () => {
+    if (!editOsc || !portfolioId) return
+    await updOSC.mutateAsync({
+      id: editOsc.id, portfolio_id: portfolioId,
+      tipo: eForm.tipo || null,
+      valor: eForm.valor.trim() === '' ? null : Number(eForm.valor),
+      data_osc: eForm.data_osc || null, vencimento: eForm.vencimento || null,
+      tipo_servico: eForm.tipo_servico.trim() || null, observacoes: eForm.observacoes.trim() || null,
+    })
+    setEditOsc(null)
+  }
+  const apagarEdit = async () => {
+    if (!editOsc || !portfolioId) return
+    await delOSC.mutateAsync({ id: editOsc.id, portfolio_id: portfolioId })
+    setEditOsc(null)
+  }
 
   // OSCs agrupadas por obra
   const oscByObra = new Map<string, EGPOscRow[]>()
@@ -790,6 +832,10 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                           <button onClick={() => toggle(o.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
                             <ChevronRight size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
                             <span className={`font-medium text-sm flex-1 min-w-0 truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.nome}</span>
+                            {(() => {
+                              const tp = TIPO_OBRA[o.tipo ?? '']
+                              return tp ? <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span> : null
+                            })()}
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oscList.length ? (isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300') : (isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400')}`}>
                               {oscList.length} OSC{oscList.length !== 1 ? 's' : ''}
                             </span>
@@ -802,14 +848,18 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                               {oscList.length === 0 && addingFor !== o.id && (
                                 <p className={`text-xs py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma OSC nesta obra ainda.</p>
                               )}
-                              {oscList.map(osc => (
-                                <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                                  <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
-                                  {osc.tipo_servico && <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>· {osc.tipo_servico}</span>}
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-500/15 text-slate-400'}`}>{osc.etapa_atual}</span>
-                                  <button onClick={() => portfolioId && delOSC.mutate({ id: osc.id, portfolio_id: portfolioId })} className="ml-auto text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
-                                </div>
-                              ))}
+                              {oscList.map(osc => {
+                                const tp = TIPO_OBRA[osc.tipo ?? '']
+                                return (
+                                  <div key={osc.id} className={`flex items-center gap-2 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                                    <span className={`font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
+                                    {tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}
+                                    {osc.valor != null && <span className={`text-xs font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmtBRLc(osc.valor)}</span>}
+                                    {osc.data_osc && <span className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>· {fmtData(osc.data_osc)}</span>}
+                                    <button onClick={() => openEdit(osc)} className={`ml-auto ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
+                                  </div>
+                                )
+                              })}
 
                               {/* form de adicionar */}
                               {addingFor === o.id ? (
@@ -888,6 +938,58 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar OSC */}
+      {editOsc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditOsc(null)}>
+          <div onClick={e => e.stopPropagation()} className={`w-full max-w-md rounded-2xl border p-5 shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-bold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{editOsc.numero_os}</h3>
+              <button onClick={() => setEditOsc(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo</label>
+                  <select value={eForm.tipo} onChange={e => setEForm(f => ({ ...f, tipo: e.target.value }))} className={`${inputCls} w-full mt-1`}>
+                    <option value="">—</option>
+                    <option value="construcao">Construção</option>
+                    <option value="manutencao">O&amp;M</option>
+                    <option value="deposito">Depósito</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Valor (R$)</label>
+                  <input type="number" value={eForm.valor} onChange={e => setEForm(f => ({ ...f, valor: e.target.value }))} placeholder="0,00" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Data da OSC</label>
+                  <input type="date" value={eForm.data_osc} onChange={e => setEForm(f => ({ ...f, data_osc: e.target.value }))} className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Prazo / Vencimento</label>
+                  <input type="date" value={eForm.vencimento} onChange={e => setEForm(f => ({ ...f, vencimento: e.target.value }))} className={`${inputCls} w-full mt-1`} />
+                </div>
+              </div>
+              <div>
+                <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo de serviço</label>
+                <input value={eForm.tipo_servico} onChange={e => setEForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Opcional" className={`${inputCls} w-full mt-1`} />
+              </div>
+              <div>
+                <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Observações</label>
+                <textarea value={eForm.observacoes} onChange={e => setEForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} placeholder="Opcional" className={`${inputCls} w-full mt-1 resize-none`} />
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <button onClick={apagarEdit} disabled={delOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} disabled:opacity-40`}><Trash2 size={14} /> Apagar OSC</button>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditOsc(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Cancelar</button>
+                  <button onClick={salvarEdit} disabled={updOSC.isPending} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"><Save size={14} /> Salvar</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
