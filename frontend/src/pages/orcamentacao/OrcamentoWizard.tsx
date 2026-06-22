@@ -856,11 +856,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   }
   const docs = (d.docs_analisados as string[]) ?? []
   const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
-  const quant = arr('quantitativos'), crono = arr('cronograma'), geot = arr('geotecnia')
-  // mantém só marcos contratuais de execução (descarta datas de aprovação de documentos)
-  const cronoExec = crono.filter(c => !/\bdata de aprova/i.test(String(c.marco ?? '')))
+  const quant = arr('quantitativos'), geot = arr('geotecnia')
   const pend = (d.pendencias as string[]) ?? []
-  const total = quant.length + crono.length + geot.length
+  const total = quant.length + geot.length
   // medido do estágio 1 (geo) — p/ os resumos
   const obras1 = (((orc.dados_estagios as Record<string, Record<string, unknown>> | undefined)?.['1']?.obras) as Array<Record<string, unknown>>) ?? []
   const normN = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
@@ -955,7 +953,6 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
 
       {d.analise_md ? <MiniMarkdown text={String(d.analise_md)} isDark={isDark} /> : null}
       <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
-      <SecaoDoc titulo="Cronograma / marcos de execução" icon={Wallet} itens={cronoExec} cols={[{ k: 'marco' }, { k: 'valor', w: 'w-36', bold: true }]} isDark={isDark} baixar={baixar} temArq={temArq} defaultOpen />
       <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem} />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
