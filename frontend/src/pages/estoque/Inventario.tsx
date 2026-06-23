@@ -527,7 +527,14 @@ function ImportarCSVModal({
         const idxQtd  = headers.findIndex(h => h.startsWith('QTD'))
         const idxDesc = headers.findIndex(h => h.includes('DESCR'))
         const idxMarca = headers.findIndex(h => h.startsWith('MARCA') || h.includes('FABRIC'))
-        const idxUnid = headers.findIndex(h => h.startsWith('UNID') || h === 'UN')
+        // Coluna de unidade: aceita header explicito ("UNID.", "UN") ou heuristica
+        // (planilha do CD Araxa usa "PC" como header da coluna porque a maioria dos
+        // itens e em peca — o que importa eh o conteudo, nao o rotulo da coluna).
+        const KNOWN_UNIT_HEADERS = new Set(Object.keys(UNIDADE_MAP))
+        let idxUnid = headers.findIndex(h => h.startsWith('UNID') || h === 'UN')
+        if (idxUnid < 0) {
+          idxUnid = headers.findIndex(h => KNOWN_UNIT_HEADERS.has(h.replace(/\.$/, '')))
+        }
         if (idxQtd < 0 || idxDesc < 0) {
           setParseWarn('Cabecalho sem colunas QTD/DESCRICAO suficientes.')
           return
