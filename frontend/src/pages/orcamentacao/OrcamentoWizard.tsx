@@ -981,7 +981,7 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
   )}</div>
 }
 
-function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
+function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
   const itens: Array<{ chave: string; v: unknown }> = Array.isArray(dados)
     ? (dados as Array<Record<string, unknown>>).map((o, i) => { const { item, obra, nome, ...rest } = o; return { chave: String(item ?? obra ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
     : (dados && typeof dados === 'object' ? Object.entries(dados as Record<string, unknown>).map(([chave, v]) => ({ chave, v })) : [])
@@ -996,10 +996,21 @@ function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq }: { titulo: st
     <div className={`divide-y ${isDark ? 'divide-white/[0.05]' : 'divide-slate-100'}`}>
       {itens.map(({ chave, v }, i) => {
         const aberto = open[i] ?? (itens.length <= 2)
-        return <div key={i}>
-          <button type="button" onClick={() => setOpen(s => ({ ...s, [i]: !aberto }))} className={`w-full px-4 py-2 flex items-center gap-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'}`}>
+        // padrão visual: classifica solo/fundação a partir do conteúdo rico da obra (texto)
+        const its = modo === 'geo' ? [{ item: chave, valor: JSON.stringify(v) }] : []
+        const solo = modo === 'geo' ? classificarSolo(its) : null
+        const fund = modo === 'geo' ? classificarFundacao(its) : null
+        const tn = solo ? RELEVO_TONE[solo.tone] : null
+        const fn = fund ? RELEVO_TONE[fund.tone] : null
+        const soloLbl = solo ? (solo.classe || solo.tipos[0]?.label || '') : ''
+        return <div key={i} style={tn ? { borderLeft: `3px solid ${tn.barHex}` } : undefined}>
+          <button type="button" onClick={() => setOpen(prev => ({ ...prev, [i]: !aberto }))} className={`w-full px-4 py-2 flex items-center gap-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'}`}>
             <span className={`shrink-0 text-[11px] transition-transform ${aberto ? 'rotate-90' : ''} ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>▸</span>
-            <span className={`text-xs font-bold ${txt}`}>{String(chave).replace(/_/g, ' ')}</span>
+            <span className={`text-xs font-bold truncate ${txt}`}>{String(chave).replace(/_/g, ' ')}</span>
+            {(fund || soloLbl) && <span className="ml-auto inline-flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+              {fund && fn && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? fn.pillD : fn.pillL}`}><FundGlyph tipo={fund.glyph} color={fn.barHex} size={12} /> {fund.label}</span>}
+              {soloLbl && tn && solo && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={solo.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {soloLbl}{solo.classe && solo.sadm != null ? ` · ${solo.sadm} kgf/cm²` : ''}</span>}
+            </span>}
           </button>
           {aberto && <div className="px-4 pb-3 pl-9 min-w-0"><ValorRico v={v} isDark={isDark} baixar={baixar} temArq={temArq} /></div>}
         </div>
@@ -1136,7 +1147,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       )}
 
       <BlocoRico titulo="Quantitativos por obra" Icon={Layers} dados={d.quantitativos} isDark={isDark} baixar={baixar} temArq={temArq} />
-      <BlocoRico titulo="Geotecnia por obra" Icon={Mountain} dados={d.geotecnia} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <BlocoRico titulo="Geotecnia por obra" Icon={Mountain} dados={d.geotecnia} isDark={isDark} baixar={baixar} temArq={temArq} modo="geo" />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
