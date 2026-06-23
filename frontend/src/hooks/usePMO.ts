@@ -301,6 +301,52 @@ export function useAddOSC() {
   })
 }
 
+// parse do PDF de abertura da OSC via n8n (Gemini)
+export interface ParsedOSC {
+  numero_os: string
+  trecho?: string
+  valor?: number | null
+  data_inicio?: string | null
+  data_termino?: string | null
+  tipo?: string | null
+  itens?: { secao: string; item: string; unidade: string; quantidade: number; valor: number }[]
+}
+export async function parseOSCPdf(base64: string, mime: string): Promise<ParsedOSC> {
+  const base = (import.meta.env.VITE_N8N_WEBHOOK_URL as string) || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+  const resp = await fetch(`${base}/egp/parse-osc`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64, mime_type: mime }),
+  })
+  if (!resp.ok) throw new Error('Falha ao ler o PDF (parse)')
+  const r = await resp.json()
+  if (!r || !r.numero_os) throw new Error('Não consegui extrair a OSC do PDF')
+  return r as ParsedOSC
+}
+
+export function useAddOSCFromParse() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ portfolio_id, obra_id, parsed }: { portfolio_id: string; obra_id: string; parsed: ParsedOSC }) => {
+      const { data: osc, error } = await supabase.from('pmo_fluxo_os').insert({
+        portfolio_id, obra_id, numero_os: parsed.numero_os, etapa_atual: 'recebida',
+        valor: parsed.valor ?? null, data_osc: parsed.data_inicio ?? null, vencimento: parsed.data_termino ?? null,
+        tipo: parsed.tipo ?? null, tipo_servico: parsed.trecho ?? null,
+      }).select('id').single()
+      if (error) throw error
+      const itens = (parsed.itens ?? []).filter(it => it.item).map(it => ({
+        fluxo_os_id: osc.id, numero_os: parsed.numero_os, secao: it.secao || null, subsec_nome: it.item,
+        unidade: it.unidade || null, quantidade: it.quantidade ?? null, valor: it.valor ?? null,
+      }))
+      if (itens.length) { const { error: e2 } = await supabase.from('pmo_osc_itens').insert(itens); if (e2) throw e2 }
+      return osc
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-oscs-portfolio', vars.portfolio_id] })
+      qc.invalidateQueries({ queryKey: ['egp-obras-portfolio', vars.portfolio_id] })
+    },
+  })
+}
+
 export function useDeletarOSC() {
   const qc = useQueryClient()
   return useMutation({

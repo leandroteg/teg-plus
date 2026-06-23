@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight,
+  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -11,6 +11,7 @@ import {
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
   useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC, useUpdateOSC, useOSCItens,
+  useAddOSCFromParse, parseOSCPdf,
   useProjetos, useCriarProjeto, useCriarObraEGP,
   type EGPOscRow, type EGPOscItem,
 } from '../../hooks/usePMO'
@@ -697,6 +698,29 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const addOSC = useAddOSC()
   const delOSC = useDeletarOSC()
   const updOSC = useUpdateOSC()
+  const addOSCParse = useAddOSCFromParse()
+  const [parsing, setParsing] = useState<string | null>(null)
+  const [parseErr, setParseErr] = useState<string | null>(null)
+
+  const handlePdf = async (obraId: string, file: File) => {
+    if (!portfolioId) return
+    setParseErr(null); setParsing(obraId)
+    try {
+      const b64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader()
+        r.onload = () => res(String(r.result).split(',')[1] || '')
+        r.onerror = () => rej(new Error('Falha ao ler arquivo'))
+        r.readAsDataURL(file)
+      })
+      const parsed = await parseOSCPdf(b64, file.type || 'application/pdf')
+      await addOSCParse.mutateAsync({ portfolio_id: portfolioId, obra_id: obraId, parsed })
+      setAddingFor(null)
+    } catch (e) {
+      setParseErr(e instanceof Error ? e.message : 'Erro ao processar o PDF')
+    } finally {
+      setParsing(null)
+    }
+  }
   const { data: projetos } = useProjetos(portfolioId)
   const { data: portfolio } = usePortfolio(portfolioId)
   const criarProjeto = useCriarProjeto()
@@ -952,16 +976,29 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                                 )
                               })}
 
-                              {/* form de adicionar */}
+                              {/* adicionar OSC via PDF de abertura (parse Gemini) */}
                               {addingFor === o.id ? (
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <input autoFocus value={form.numero_os} onChange={e => setForm(f => ({ ...f, numero_os: e.target.value }))} placeholder="Número da OSC *" className={`${inputCls} w-44`} />
-                                  <input value={form.tipo_servico} onChange={e => setForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Tipo de serviço (opcional)" className={`${inputCls} flex-1 min-w-[160px]`} />
-                                  <button onClick={() => handleAdd(o.id)} disabled={addOSC.isPending || !form.numero_os.trim()} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-40"><Check size={16} /></button>
-                                  <button onClick={() => { setAddingFor(null); setForm({ numero_os: '', tipo_servico: '' }) }} className={isLight ? 'text-slate-400' : 'text-slate-500'}><X size={16} /></button>
+                                <div className="mt-2">
+                                  {parsing === o.id ? (
+                                    <div className="flex items-center gap-2 text-xs font-medium text-teal-600">
+                                      <Loader2 size={14} className="animate-spin" /> Lendo o PDF e extraindo número, valor, datas e itens…
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold cursor-pointer bg-teal-600 text-white hover:bg-teal-700">
+                                          <Upload size={14} /> Anexar PDF da OSC
+                                          <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePdf(o.id, f); e.target.value = '' }} />
+                                        </label>
+                                        <button onClick={() => { setAddingFor(null); setParseErr(null) }} className={`text-xs ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'}`}>cancelar</button>
+                                      </div>
+                                      <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>O Gemini lê o PDF de abertura e preenche número, valor, início, prazo, tipo e itens automaticamente.</p>
+                                      {parseErr && <p className="text-[11px] mt-1 text-red-500">{parseErr}</p>}
+                                    </>
+                                  )}
                                 </div>
                               ) : (
-                                <button onClick={() => { setAddingFor(o.id); setForm({ numero_os: '', tipo_servico: '' }) }} className={`inline-flex items-center gap-1 mt-1.5 text-xs font-semibold ${isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'}`}>
+                                <button onClick={() => { setAddingFor(o.id); setParseErr(null) }} className={`inline-flex items-center gap-1 mt-1.5 text-xs font-semibold ${isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'}`}>
                                   <Plus size={13} /> Adicionar OSC
                                 </button>
                               )}
