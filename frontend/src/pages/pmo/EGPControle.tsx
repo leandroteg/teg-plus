@@ -345,7 +345,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const labelCls = `text-xs font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
   const valueCls = `text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`
   const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'}`
-  const tdCls = `py-2.5 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+  const tdCls = `py-1.5 px-3 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`
   const sel = (active: boolean) => 'text-sm rounded-xl border px-2.5 py-2 outline-none cursor-pointer shrink-0 ' + (active ? (isLight ? 'border-teal-300 text-teal-700 bg-teal-50 font-semibold' : 'border-teal-500/40 text-teal-300 bg-teal-500/10 font-semibold') : (isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-300'))
 
   return (
