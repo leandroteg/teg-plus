@@ -4,7 +4,7 @@ import { ContractSelector } from '../../components/EGPLayout'
 import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
-  Plus, Check, FolderKanban, ChevronRight, Search, Upload, Loader2,
+  Plus, Check, FolderKanban, ChevronRight, ChevronDown, Search, Upload, Loader2, ArrowUpDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -114,23 +114,6 @@ export default function EGPControle() {
           )
         })}
       </div>
-
-      {/* Barra Projetos do Contrato (chips) */}
-      <ProjetosBarControle
-        projetos={projetos ?? []}
-        loadingProjetos={loadingProjetos}
-        projetoId={projetoId}
-        setProjetoId={setProjetoId}
-        criando={criando}
-        setCriando={setCriando}
-        novoProjeto={novoProjeto}
-        setNovoProjeto={setNovoProjeto}
-        handleCriarProjeto={handleCriarProjeto}
-        criarProjetoPending={criarProjeto.isPending}
-        lookupsCC={lookups?.centros_custo ?? []}
-        tabAccent={TAB_ACCENT[tab]}
-        isLight={isLight}
-      />
 
       {/* Tab content */}
       {tab === 'medicoes' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
@@ -294,7 +277,12 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [parsing, setParsing] = useState(false)
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [projOpen, setProjOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<'osc' | 'obra' | 'valor' | 'medido' | 'amedir' | 'pct'>('osc')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const toggle = (p: string) => setCollapsed(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+  const clickSort = (col: typeof sortBy) => { if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir(col === 'osc' || col === 'obra' ? 'asc' : 'desc') } }
 
   const handleEspelho = async (file: File) => {
     if (!portfolioId) return
@@ -320,10 +308,24 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
     if (fData && (r.data_osc ?? '').slice(0, 4) !== fData) return false
     return true
   }
-  const list = (rows ?? []).filter(match)
+  const baseList = (rows ?? []).filter(match)
+  const allPolos = [...new Set(baseList.map(r => r.polo_nome))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const list = baseList.filter(r => !excluded.has(r.polo_nome))
   const totValor = list.reduce((s, r) => s + r.valor, 0)
   const totMedido = list.reduce((s, r) => s + r.medido, 0)
   const totAMedir = totValor - totMedido
+
+  const sortFns: Record<typeof sortBy, (a: MedicaoOSCRow, b: MedicaoOSCRow) => number> = {
+    osc: (a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true }),
+    obra: (a, b) => a.obra_nome.localeCompare(b.obra_nome),
+    valor: (a, b) => a.valor - b.valor,
+    medido: (a, b) => a.medido - b.medido,
+    amedir: (a, b) => (a.valor - a.medido) - (b.valor - b.medido),
+    pct: (a, b) => (a.valor ? a.medido / a.valor : 0) - (b.valor ? b.medido / b.valor : 0),
+  }
+  const cmp = (a: MedicaoOSCRow, b: MedicaoOSCRow) => { const r = sortFns[sortBy](a, b); return sortDir === 'asc' ? r : -r }
+  const toggleAll = () => setExcluded(excluded.size === 0 ? new Set(allPolos) : new Set())
+  const togglePolo = (p: string) => setExcluded(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
 
   const porPolo = new Map<string, MedicaoOSCRow[]>()
   for (const r of list) { const a = porPolo.get(r.polo_nome) ?? []; a.push(r); porPolo.set(r.polo_nome, a) }
@@ -338,32 +340,39 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
 
   return (
     <div className="space-y-4">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={cardCls}><p className={labelCls}>Valor Contrato</p><p className={valueCls}>{fmtBRL(totValor)}</p></div>
-        <div className={cardCls}>
-          <p className={labelCls}>Total Medido</p>
-          <p className={valueCls}>{fmtBRL(totMedido)}</p>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{fmtPct(totValor ? totMedido / totValor : 0)}</p>
-        </div>
-        <div className={cardCls}>
-          <p className={labelCls}>A Medir</p>
-          <p className={valueCls}>{fmtBRL(totAMedir)}</p>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{fmtPct(totValor ? totAMedir / totValor : 0)}</p>
-        </div>
-        <div className={cardCls + ' flex items-center justify-center'}>
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20">
-            <Scale size={14} /> Solicitar Faturamento
-          </button>
-        </div>
-      </div>
-
       {/* Filtros + Adicionar Medição (linha única) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
         <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{list.length} OSC{list.length !== 1 ? 's' : ''}</p>
         <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shrink-0 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
           <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar…" className={`w-28 text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+        </div>
+        <div className="relative shrink-0">
+          <button onClick={() => setProjOpen(o => !o)} className={`inline-flex items-center gap-1.5 ${sel(excluded.size > 0)}`}>
+            Projetos: {allPolos.length - excluded.size}/{allPolos.length}
+            <ChevronDown size={13} className={`transition-transform ${projOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {projOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setProjOpen(false)} />
+              <div className={`absolute z-20 mt-1 left-0 w-60 rounded-xl border shadow-lg p-1.5 max-h-72 overflow-y-auto ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+                <button onClick={toggleAll} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${excluded.size === 0 ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{excluded.size === 0 && <Check size={11} />}</span>
+                  Selecionar todos
+                </button>
+                <div className={`my-1 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+                {allPolos.map(p => {
+                  const on = !excluded.has(p)
+                  return (
+                    <button key={p} onClick={() => togglePolo(p)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                      <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{on && <Check size={11} />}</span>
+                      <span className="truncate text-left">{p}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
         <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel(!!fTipo)}>
           <option value="">Tipo: todos</option><option value="construcao">Construção</option><option value="manutencao">O&amp;M</option><option value="deposito">Depósito</option>
@@ -391,12 +400,11 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                  <th className={thCls}>OSC</th>
-                  <th className={thCls}>Obra</th>
-                  <th className={thCls + ' text-right'}>Valor</th>
-                  <th className={thCls + ' text-right'}>Medido</th>
-                  <th className={thCls + ' text-right'}>A Medir</th>
-                  <th className={thCls + ' text-right'}>%</th>
+                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['medido', 'Medido', 'right'], ['amedir', 'A Medir', 'right'], ['pct', '%', 'right']] as const).map(([col, lbl, align]) => (
+                    <th key={col} onClick={() => clickSort(col)} className={`${thCls} cursor-pointer select-none ${align === 'right' ? 'text-right' : ''} ${sortBy === col ? (isLight ? '!text-teal-700' : '!text-teal-300') : ''}`}>
+                      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end w-full' : ''}`}>{lbl}{sortBy === col ? <span>{sortDir === 'asc' ? '▲' : '▼'}</span> : <ArrowUpDown size={11} className="opacity-30" />}</span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -404,7 +412,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                   const pv = oscs.reduce((s, o) => s + o.valor, 0)
                   const pm = oscs.reduce((s, o) => s + o.medido, 0)
                   const open = !collapsed.has(polo)
-                  const ordenadas = [...oscs].sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true }))
+                  const ordenadas = [...oscs].sort(cmp)
                   return (
                     <Fragment key={polo}>
                       <tr onClick={() => toggle(polo)} className={`cursor-pointer ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
@@ -437,6 +445,15 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                   )
                 })}
               </tbody>
+              <tfoot>
+                <tr className={`border-t-2 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/[0.03]'}`}>
+                  <td colSpan={2} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>Total · {list.length} OSCs</td>
+                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRL(totValor)}</td>
+                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(totMedido)}</td>
+                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>{fmtBRL(totAMedir)}</td>
+                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{totValor ? Math.round((totMedido / totValor) * 100) : 0}%</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
