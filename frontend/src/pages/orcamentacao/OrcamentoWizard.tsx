@@ -1043,7 +1043,8 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
     return s.tipos.length === 1 ? [{ tipo: s.tipos[0].label, pct: 100 }] : []
   }
   const pend = (d.pendencias as string[]) ?? []
-  const total = quant.length + geot.length
+  const nEntr = (x: unknown) => Array.isArray(x) ? x.length : (x && typeof x === 'object' ? Object.keys(x as Record<string, unknown>).length : 0)
+  const total = nEntr(d.quantitativos) + nEntr(d.geotecnia)
   // medido do estágio 1 (geo) — p/ os resumos
   const obras1 = (((orc.dados_estagios as Record<string, Record<string, unknown>> | undefined)?.['1']?.obras) as Array<Record<string, unknown>>) ?? []
   const normN = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
@@ -1117,7 +1118,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
                       <CardMetric lbl="Amplitude" val={g?.amplitude_m != null ? `${g.amplitude_m} m` : '—'} isDark={isDark} />
                       <CardMetric lbl="Travessias" val={tv ? `${tv.rios} rio · ${tv.rodovias} rod` : '—'} isDark={isDark} />
                     </div>
-                    {destaque.length > 0 ? (
+                    {destaque.length > 0 && (
                       <div className={`rounded-lg p-2 ${isDark ? 'bg-emerald-500/[0.08]' : 'bg-emerald-50'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>📄 Fatos dos documentos</p>
                         <div className="space-y-0.5">
@@ -1125,8 +1126,6 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
                         </div>
                         {fatos.length > destaque.length && <p className={`text-[10px] mt-1 ${txtMuted}`}>+{fatos.length - destaque.length} fato(s) — vide tabela abaixo</p>}
                       </div>
-                    ) : (
-                      <p className={`text-[11px] rounded-lg p-2 ${isDark ? 'bg-amber-500/[0.08] text-amber-300/90' : 'bg-amber-50 text-amber-700'}`}>⚠ Sem fato de documento vinculado a esta obra (vide pendências)</p>
                     )}
                   </div>
                 </div>
