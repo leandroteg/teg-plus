@@ -400,7 +400,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['medido', 'Medido', 'right'], ['amedir', 'A Medir', 'right'], ['pct', '%', 'right']] as const).map(([col, lbl, align]) => (
+                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['medido', 'Faturado', 'right'], ['amedir', 'Saldo', 'right'], ['pct', '% Faturado', 'right']] as const).map(([col, lbl, align]) => (
                     <th key={col} onClick={() => clickSort(col)} className={`${thCls} cursor-pointer select-none ${align === 'right' ? 'text-right' : ''} ${sortBy === col ? (isLight ? '!text-teal-700' : '!text-teal-300') : ''}`}>
                       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end w-full' : ''}`}>{lbl}{sortBy === col ? <span>{sortDir === 'asc' ? '▲' : '▼'}</span> : <ArrowUpDown size={11} className="opacity-30" />}</span>
                     </th>
