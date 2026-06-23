@@ -5,6 +5,7 @@ import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
   Plus, Check, FolderKanban, ChevronRight, ChevronDown, Search, Upload, Loader2, ArrowUpDown,
+  ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -384,7 +385,16 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
           <option value="">Ano: todos</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
         </select>
         {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData('') }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
-        <label className={`ml-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer ${parsing ? 'bg-teal-400 text-white' : 'bg-teal-600 text-white hover:bg-teal-700'}`}>
+        {(() => {
+          const allCollapsed = allPolos.length > 0 && allPolos.every(p => collapsed.has(p))
+          return (
+            <button onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allPolos))} title={allCollapsed ? 'Expandir todos' : 'Recolher todos'}
+              className={`ml-auto shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/[0.06]'}`}>
+              {allCollapsed ? <ChevronsUpDown size={16} /> : <ChevronsDownUp size={16} />}
+            </button>
+          )
+        })()}
+        <label className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer ${parsing ? 'bg-teal-400 text-white' : 'bg-teal-600 text-white hover:bg-teal-700'}`}>
           {parsing ? <><Loader2 size={14} className="animate-spin" /> Lendo espelho…</> : <><Upload size={14} /> Adicionar Medição</>}
           <input type="file" accept="application/pdf" className="hidden" disabled={parsing} onChange={e => { const f = e.target.files?.[0]; if (f) handleEspelho(f); e.target.value = '' }} />
         </label>
