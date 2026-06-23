@@ -419,7 +419,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['pct', '% Faturado', 'right'], ['medido', 'Faturado', 'right'], ['amedir', 'Saldo', 'right'], ['prazo', '% Prazo', 'right']] as const).map(([col, lbl, align]) => (
+                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['prazo', '% Prazo', 'right'], ['pct', '% Faturado', 'right'], ['medido', 'Faturado', 'right'], ['amedir', 'Saldo', 'right']] as const).map(([col, lbl, align]) => (
                     <th key={col} onClick={() => clickSort(col)} className={`${thCls} cursor-pointer select-none ${align === 'right' ? 'text-right' : ''} ${sortBy === col ? (isLight ? '!text-teal-700' : '!text-teal-300') : ''}`}>
                       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end w-full' : ''}`}>{lbl}{sortBy === col ? <span>{sortDir === 'asc' ? '▲' : '▼'}</span> : <ArrowUpDown size={11} className="opacity-30" />}</span>
                     </th>
@@ -442,24 +442,33 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                           </span>
                         </td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv)}</td>
+                        <td className="py-2 px-4" />
                         <td className="py-2 px-4 text-right text-xs font-bold tabular-nums">{pv ? Math.round((pm / pv) * 100) : 0}%</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pm)}</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv - pm)}</td>
-                        <td className="py-2 px-4" />
                       </tr>
                       {open && ordenadas.map(o => {
                         const am = o.valor - o.medido
                         const pct = o.valor ? Math.round((o.medido / o.valor) * 100) : 0
                         const pp = pctPrazo(o.data_osc, o.vencimento)
+                        // ritmo: faturado vs prazo decorrido (verde adiantado, vermelho atrasado)
+                        const diff = pp != null ? pct - pp : null
+                        const dot = diff == null ? (isLight ? 'bg-slate-300' : 'bg-slate-600')
+                          : diff >= 10 ? 'bg-emerald-500' : diff <= -10 ? 'bg-rose-500' : 'bg-amber-400'
+                        const dotTitle = diff == null ? 'sem prazo' : diff >= 10 ? `adiantado (+${diff}pp)` : diff <= -10 ? `atrasado (${diff}pp)` : `no ritmo (${diff > 0 ? '+' : ''}${diff}pp)`
                         return (
                           <tr key={o.id} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'}`}>
                             <td className={`${tdCls} font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.numero_os}</td>
                             <td className={`${tdCls} max-w-[280px] truncate ${isLight ? 'text-slate-800' : 'text-white'}`} title={o.obra_nome}>{o.obra_nome}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(o.valor)}</td>
-                            <td className={`${tdCls} text-right tabular-nums`}>{pct}%</td>
+                            <td className={`${tdCls} text-right tabular-nums ${pp != null && pp >= 100 ? (isLight ? 'text-rose-600 font-semibold' : 'text-rose-400 font-semibold') : ''}`}>{pp != null ? `${pp}%` : '—'}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>
+                              <span className="inline-flex items-center justify-end gap-1.5 w-full" title={dotTitle}>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />{pct}%
+                              </span>
+                            </td>
                             <td className={`${tdCls} text-right tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(o.medido)}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(am)}</td>
-                            <td className={`${tdCls} text-right tabular-nums ${pp != null && pp >= 100 ? (isLight ? 'text-rose-600 font-semibold' : 'text-rose-400 font-semibold') : ''}`}>{pp != null ? `${pp}%` : '—'}</td>
                           </tr>
                         )
                       })}
@@ -471,10 +480,10 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                 <tr className={`border-t-2 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/[0.03]'}`}>
                   <td colSpan={2} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>Total · {list.length} OSCs</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRL(totValor)}</td>
+                  <td className="py-2.5 px-4" />
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{totValor ? Math.round((totMedido / totValor) * 100) : 0}%</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(totMedido)}</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>{fmtBRL(totAMedir)}</td>
-                  <td className="py-2.5 px-4" />
                 </tr>
               </tfoot>
             </table>
