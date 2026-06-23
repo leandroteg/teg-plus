@@ -994,9 +994,19 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
 }
 
 function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
-  const itens: Array<{ chave: string; v: unknown }> = Array.isArray(dados)
-    ? (dados as Array<Record<string, unknown>>).map((o, i) => { const { item, obra, nome, ...rest } = o; return { chave: String(item ?? obra ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
-    : (dados && typeof dados === 'object' ? Object.entries(dados as Record<string, unknown>).map(([chave, v]) => ({ chave, v })) : [])
+  const lista = Array.isArray(dados) ? (dados as Array<Record<string, unknown>>) : null
+  const ehPlano = !!lista && lista.length > 0 && lista.every(o => o && typeof o === 'object' && 'obra' in o)
+  let itens: Array<{ chave: string; v: unknown }>
+  if (ehPlano && lista) {
+    // lista plana de fatos (têm 'obra') → agrupa por obra (ex.: 227 fatos → ~23 cards)
+    const grupos = new Map<string, Array<Record<string, unknown>>>()
+    for (const o of lista) { const k = String(o.obra ?? 'Geral'); const { obra, ...rest } = o; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(rest) }
+    itens = Array.from(grupos, ([chave, v]) => ({ chave, v }))
+  } else if (lista) {
+    itens = lista.map((o, i) => { const { item, obra, nome, ...rest } = o; return { chave: String(item ?? obra ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
+  } else {
+    itens = dados && typeof dados === 'object' ? Object.entries(dados as Record<string, unknown>).map(([chave, v]) => ({ chave, v })) : []
+  }
   const [open, setOpen] = useState<Record<number, boolean>>({})
   const txt = isDark ? 'text-white' : 'text-slate-900'
   if (!itens.length) return null
