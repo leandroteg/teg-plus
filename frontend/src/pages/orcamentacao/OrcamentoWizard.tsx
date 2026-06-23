@@ -963,11 +963,12 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
     const { data } = await supabase.storage.from('orcamentacao-arquivos').createSignedUrl(arq.storage_path, 120, { download: true })
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
-  const docs = (d.docs_analisados as string[]) ?? []
-  const arr = (k: string) => (d[k] as Array<Record<string, unknown>>) ?? []
+  const docs = Array.isArray(d.docs_analisados) ? (d.docs_analisados as string[]) : []
+  // robusto: SEMPRE retorna array (o `?? []` antigo não protegia contra valor não-array → crash .filter)
+  const arr = (k: string): Array<Record<string, unknown>> => { const v = d?.[k]; return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : [] }
   const quant = arr('quantitativos')
   const geot = arr('geotecnia').filter(g => !/tipo de sondagem/i.test(String(g.item ?? '')))
-  const geotDist = (d.geotecnia_dist as Array<{ obra?: string; dist?: Array<{ tipo: string; pct: number }> }>) ?? []
+  const geotDist = Array.isArray(d.geotecnia_dist) ? (d.geotecnia_dist as Array<{ obra?: string; dist?: Array<{ tipo: string; pct: number }> }>) : []
   const distDaObra = (its: Array<Record<string, unknown>>): Array<{ tipo: string; pct: number }> => {
     const obra = obraDoItem(its[0] || {}).toLowerCase()
     const found = geotDist.find(x => { const o = String(x.obra || '').toLowerCase(); return o && obra && (o === obra || o.includes(obra) || obra.includes(o)) })
