@@ -4,13 +4,13 @@ import { ContractSelector } from '../../components/EGPLayout'
 import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
-  Plus, Check, FolderKanban, ChevronRight,
+  Plus, Check, FolderKanban, ChevronRight, Search, Upload, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
-  useMedicaoPorOSC, type MedicaoOSCRow,
+  useMedicaoPorOSC, type MedicaoOSCRow, useAplicarMedicao, parseOSCPdf,
   useMudancas, useMultas, useStatusReports, useIndicadores,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
@@ -286,14 +286,45 @@ function ProjetosBarControle({
 
 function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: rows, isLoading } = useMedicaoPorOSC(portfolioId)
+  const aplicarMed = useAplicarMedicao()
+  const [q, setQ] = useState('')
+  const [fTipo, setFTipo] = useState('')
+  const [fValor, setFValor] = useState('')
+  const [fData, setFData] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [parsing, setParsing] = useState(false)
+  const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
+  const toggle = (p: string) => setCollapsed(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+
+  const handleEspelho = async (file: File) => {
+    if (!portfolioId) return
+    setMedMsg(null); setParsing(true)
+    try {
+      const b64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('falha ao ler')); r.readAsDataURL(file) })
+      const parsed = await parseOSCPdf(b64, file.type || 'application/pdf')
+      const r = await aplicarMed.mutateAsync({ portfolio_id: portfolioId, parsed })
+      setMedMsg({ ok: true, txt: `Medição da ${parsed.numero_os} aplicada: ${r.atualizados}/${r.total} itens medidos.` })
+    } catch (e) {
+      setMedMsg({ ok: false, txt: e instanceof Error ? e.message : 'Erro ao processar a medição' })
+    } finally { setParsing(false) }
+  }
+
   if (isLoading) return <Spinner />
 
-  const list = rows ?? []
+  const fAtivo = !!(q.trim() || fTipo || fValor || fData)
+  const match = (r: MedicaoOSCRow) => {
+    const s = q.trim().toLowerCase()
+    if (s && !(r.numero_os.toLowerCase().includes(s) || r.obra_nome.toLowerCase().includes(s) || r.polo_nome.toLowerCase().includes(s))) return false
+    if (fTipo && r.tipo !== fTipo) return false
+    if (fValor) { const v = r.valor; if (fValor === 'gt1m' && v <= 1e6) return false; if (fValor === 'mid' && !(v >= 1e5 && v <= 1e6)) return false; if (fValor === 'lt100k' && v >= 1e5) return false }
+    if (fData && (r.data_osc ?? '').slice(0, 4) !== fData) return false
+    return true
+  }
+  const list = (rows ?? []).filter(match)
   const totValor = list.reduce((s, r) => s + r.valor, 0)
   const totMedido = list.reduce((s, r) => s + r.medido, 0)
   const totAMedir = totValor - totMedido
 
-  // agrupa por polo
   const porPolo = new Map<string, MedicaoOSCRow[]>()
   for (const r of list) { const a = porPolo.get(r.polo_nome) ?? []; a.push(r); porPolo.set(r.polo_nome, a) }
   const polos = [...porPolo.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
@@ -303,24 +334,22 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const valueCls = `text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`
   const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'}`
   const tdCls = `py-2.5 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+  const sel = (active: boolean) => 'text-sm rounded-xl border px-2.5 py-2 outline-none cursor-pointer shrink-0 ' + (active ? (isLight ? 'border-teal-300 text-teal-700 bg-teal-50 font-semibold' : 'border-teal-500/40 text-teal-300 bg-teal-500/10 font-semibold') : (isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-300'))
 
   return (
     <div className="space-y-4">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={cardCls}>
-          <p className={labelCls}>Valor Contrato</p>
-          <p className={valueCls}>{fmtBRL(totValor)}</p>
-        </div>
+        <div className={cardCls}><p className={labelCls}>Valor Contrato</p><p className={valueCls}>{fmtBRL(totValor)}</p></div>
         <div className={cardCls}>
           <p className={labelCls}>Total Medido</p>
           <p className={valueCls}>{fmtBRL(totMedido)}</p>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{fmtPct(totValor ? (totMedido / totValor) * 100 : 0)}</p>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{fmtPct(totValor ? totMedido / totValor : 0)}</p>
         </div>
         <div className={cardCls}>
           <p className={labelCls}>A Medir</p>
           <p className={valueCls}>{fmtBRL(totAMedir)}</p>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{fmtPct(totValor ? (totAMedir / totValor) * 100 : 0)}</p>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{fmtPct(totValor ? totAMedir / totValor : 0)}</p>
         </div>
         <div className={cardCls + ' flex items-center justify-center'}>
           <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20">
@@ -329,11 +358,34 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
         </div>
       </div>
 
-      {/* Medições por OSC, agrupadas por polo */}
+      {/* Filtros + Adicionar Medição (linha única) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{list.length} OSC{list.length !== 1 ? 's' : ''}</p>
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shrink-0 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+          <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar…" className={`w-28 text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+        </div>
+        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel(!!fTipo)}>
+          <option value="">Tipo: todos</option><option value="construcao">Construção</option><option value="manutencao">O&amp;M</option><option value="deposito">Depósito</option>
+        </select>
+        <select value={fValor} onChange={e => setFValor(e.target.value)} className={sel(!!fValor)}>
+          <option value="">Valor: todos</option><option value="gt1m">&gt; R$ 1 mi</option><option value="mid">R$ 100 mil – 1 mi</option><option value="lt100k">&lt; R$ 100 mil</option>
+        </select>
+        <select value={fData} onChange={e => setFData(e.target.value)} className={sel(!!fData)}>
+          <option value="">Ano: todos</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+        </select>
+        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData('') }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
+        <label className={`ml-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer ${parsing ? 'bg-teal-400 text-white' : 'bg-teal-600 text-white hover:bg-teal-700'}`}>
+          {parsing ? <><Loader2 size={14} className="animate-spin" /> Lendo espelho…</> : <><Upload size={14} /> Adicionar Medição</>}
+          <input type="file" accept="application/pdf" className="hidden" disabled={parsing} onChange={e => { const f = e.target.files?.[0]; if (f) handleEspelho(f); e.target.value = '' }} />
+        </label>
+      </div>
+      {medMsg && <p className={`text-xs ${medMsg.ok ? (isLight ? 'text-emerald-600' : 'text-emerald-400') : 'text-red-500'}`}>{medMsg.txt}</p>}
+
+      {/* Tabela por polo (colapsável) */}
       <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-        <h3 className={`text-sm font-bold px-5 pt-5 pb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Medições por OSC</h3>
         {list.length === 0 ? (
-          <EmptyState isLight={isLight} message="Nenhuma OSC neste contrato" />
+          <EmptyState isLight={isLight} message="Nenhuma OSC encontrada" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -351,17 +403,23 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                 {polos.map(([polo, oscs]) => {
                   const pv = oscs.reduce((s, o) => s + o.valor, 0)
                   const pm = oscs.reduce((s, o) => s + o.medido, 0)
+                  const open = !collapsed.has(polo)
                   const ordenadas = [...oscs].sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true }))
                   return (
                     <Fragment key={polo}>
-                      <tr className={isLight ? 'bg-slate-100' : 'bg-white/[0.05]'}>
-                        <td colSpan={2} className={`py-2 px-4 text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{polo} <span className="opacity-60 font-semibold">· {oscs.length} OSC{oscs.length !== 1 ? 's' : ''}</span></td>
+                      <tr onClick={() => toggle(polo)} className={`cursor-pointer ${isLight ? 'bg-slate-100 hover:bg-slate-200/70' : 'bg-white/[0.05] hover:bg-white/[0.08]'}`}>
+                        <td colSpan={2} className={`py-2 px-4 text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <ChevronRight size={13} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+                            {polo} <span className="opacity-60 font-semibold">· {oscs.length} OSC{oscs.length !== 1 ? 's' : ''}</span>
+                          </span>
+                        </td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv)}</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pm)}</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv - pm)}</td>
                         <td className="py-2 px-4 text-right text-xs font-bold tabular-nums">{pv ? Math.round((pm / pv) * 100) : 0}%</td>
                       </tr>
-                      {ordenadas.map(o => {
+                      {open && ordenadas.map(o => {
                         const am = o.valor - o.medido
                         const pct = o.valor ? Math.round((o.medido / o.valor) * 100) : 0
                         return (

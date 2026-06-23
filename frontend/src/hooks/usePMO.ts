@@ -279,6 +279,8 @@ export interface MedicaoOSCRow {
   polo_nome: string
   valor: number
   medido: number
+  tipo: string | null
+  data_osc: string | null
 }
 export function useMedicaoPorOSC(portfolioId?: string) {
   return useQuery<MedicaoOSCRow[]>({
@@ -292,8 +294,8 @@ export function useMedicaoPorOSC(portfolioId?: string) {
       const poloNome = new Map(polosArr.map(p => [p.id, p.nome]))
       const { data: obras } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', ids)
       const obraMap = new Map((obras ?? []).map((o: Record<string, unknown>) => [o.id as string, o]))
-      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor').eq('portfolio_id', portfolioId!)
-      const oscArr = (oscs ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null }[]
+      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, tipo, data_osc').eq('portfolio_id', portfolioId!)
+      const oscArr = (oscs ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; tipo: string | null; data_osc: string | null }[]
       const oscIds = oscArr.map(o => o.id)
       const medido = new Map<string, number>()
       if (oscIds.length) {
@@ -309,8 +311,37 @@ export function useMedicaoPorOSC(portfolioId?: string) {
           id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: obra.nome as string,
           polo_id: poloId, polo_nome: poloNome.get(poloId) ?? '—',
           valor: Number(o.valor ?? 0), medido: medido.get(o.id) ?? 0,
+          tipo: o.tipo, data_osc: o.data_osc,
         }
       })
+    },
+  })
+}
+
+// aplica medição: parse do espelho da OSC → casa itens por nome → grava valor_acum (medido)
+export function useAplicarMedicao() {
+  const qc = useQueryClient()
+  const norm = (s: string) => (s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+  return useMutation({
+    mutationFn: async ({ portfolio_id, parsed }: { portfolio_id: string; parsed: ParsedOSC }) => {
+      const { data: itens, error } = await supabase.from('pmo_osc_itens')
+        .select('id, subsec_nome').eq('numero_os', parsed.numero_os)
+      if (error) throw error
+      if (!itens?.length) throw new Error(`OSC ${parsed.numero_os} não tem itens cadastrados — cadastre a OSC antes`)
+      const byNome = new Map((itens as { id: string; subsec_nome: string }[]).map(i => [norm(i.subsec_nome), i.id]))
+      let upd = 0
+      for (const pit of parsed.itens ?? []) {
+        const id = byNome.get(norm(pit.item))
+        if (id != null && pit.valor != null) {
+          const { error: e2 } = await supabase.from('pmo_osc_itens').update({ valor_acum: pit.valor }).eq('id', id)
+          if (!e2) upd++
+        }
+      }
+      return { numero_os: parsed.numero_os, atualizados: upd, total: itens.length }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['egp-medicao-osc', vars.portfolio_id] })
+      qc.invalidateQueries({ queryKey: ['egp-osc-itens'] })
     },
   })
 }
