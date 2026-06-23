@@ -40,6 +40,14 @@ const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
+// % do prazo decorrido (início → vencimento), travado em 100% se já passou
+const pctPrazo = (di: string | null, dv: string | null): number | null => {
+  if (!di || !dv) return null
+  const ini = new Date(di.slice(0, 10)).getTime()
+  const venc = new Date(dv.slice(0, 10)).getTime()
+  if (!Number.isFinite(ini) || !Number.isFinite(venc) || venc <= ini) return null
+  return Math.max(0, Math.min(100, Math.round(((Date.now() - ini) / (venc - ini)) * 100)))
+}
 
 const fmtNum = (v?: number | null) => (v != null ? v.toLocaleString('pt-BR') : '-')
 
@@ -280,7 +288,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [projOpen, setProjOpen] = useState(false)
-  const [sortBy, setSortBy] = useState<'osc' | 'obra' | 'valor' | 'medido' | 'amedir' | 'pct'>('osc')
+  const [sortBy, setSortBy] = useState<'osc' | 'obra' | 'valor' | 'pct' | 'medido' | 'amedir' | 'prazo'>('osc')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const toggle = (p: string) => setCollapsed(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
   const clickSort = (col: typeof sortBy) => { if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir(col === 'osc' || col === 'obra' ? 'asc' : 'desc') } }
@@ -323,6 +331,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
     medido: (a, b) => a.medido - b.medido,
     amedir: (a, b) => (a.valor - a.medido) - (b.valor - b.medido),
     pct: (a, b) => (a.valor ? a.medido / a.valor : 0) - (b.valor ? b.medido / b.valor : 0),
+    prazo: (a, b) => (pctPrazo(a.data_osc, a.vencimento) ?? -1) - (pctPrazo(b.data_osc, b.vencimento) ?? -1),
   }
   const cmp = (a: MedicaoOSCRow, b: MedicaoOSCRow) => { const r = sortFns[sortBy](a, b); return sortDir === 'asc' ? r : -r }
   const toggleAll = () => setExcluded(excluded.size === 0 ? new Set(allPolos) : new Set())
@@ -410,7 +419,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['medido', 'Faturado', 'right'], ['amedir', 'Saldo', 'right'], ['pct', '% Faturado', 'right']] as const).map(([col, lbl, align]) => (
+                  {([['osc', 'OSC', 'left'], ['obra', 'Obra', 'left'], ['valor', 'Valor', 'right'], ['pct', '% Faturado', 'right'], ['medido', 'Faturado', 'right'], ['amedir', 'Saldo', 'right'], ['prazo', '% Prazo', 'right']] as const).map(([col, lbl, align]) => (
                     <th key={col} onClick={() => clickSort(col)} className={`${thCls} cursor-pointer select-none ${align === 'right' ? 'text-right' : ''} ${sortBy === col ? (isLight ? '!text-teal-700' : '!text-teal-300') : ''}`}>
                       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end w-full' : ''}`}>{lbl}{sortBy === col ? <span>{sortDir === 'asc' ? '▲' : '▼'}</span> : <ArrowUpDown size={11} className="opacity-30" />}</span>
                     </th>
@@ -433,21 +442,24 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                           </span>
                         </td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv)}</td>
+                        <td className="py-2 px-4 text-right text-xs font-bold tabular-nums">{pv ? Math.round((pm / pv) * 100) : 0}%</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pm)}</td>
                         <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv - pm)}</td>
-                        <td className="py-2 px-4 text-right text-xs font-bold tabular-nums">{pv ? Math.round((pm / pv) * 100) : 0}%</td>
+                        <td className="py-2 px-4" />
                       </tr>
                       {open && ordenadas.map(o => {
                         const am = o.valor - o.medido
                         const pct = o.valor ? Math.round((o.medido / o.valor) * 100) : 0
+                        const pp = pctPrazo(o.data_osc, o.vencimento)
                         return (
                           <tr key={o.id} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'}`}>
                             <td className={`${tdCls} font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.numero_os}</td>
                             <td className={`${tdCls} max-w-[280px] truncate ${isLight ? 'text-slate-800' : 'text-white'}`} title={o.obra_nome}>{o.obra_nome}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(o.valor)}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{pct}%</td>
                             <td className={`${tdCls} text-right tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(o.medido)}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(am)}</td>
-                            <td className={`${tdCls} text-right tabular-nums`}>{pct}%</td>
+                            <td className={`${tdCls} text-right tabular-nums ${pp != null && pp >= 100 ? (isLight ? 'text-rose-600 font-semibold' : 'text-rose-400 font-semibold') : ''}`}>{pp != null ? `${pp}%` : '—'}</td>
                           </tr>
                         )
                       })}
@@ -459,9 +471,10 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                 <tr className={`border-t-2 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/[0.03]'}`}>
                   <td colSpan={2} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>Total · {list.length} OSCs</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRL(totValor)}</td>
+                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{totValor ? Math.round((totMedido / totValor) * 100) : 0}%</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(totMedido)}</td>
                   <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>{fmtBRL(totAMedir)}</td>
-                  <td className={`py-2.5 px-4 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{totValor ? Math.round((totMedido / totValor) * 100) : 0}%</td>
+                  <td className="py-2.5 px-4" />
                 </tr>
               </tfoot>
             </table>

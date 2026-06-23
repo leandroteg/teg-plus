@@ -281,6 +281,7 @@ export interface MedicaoOSCRow {
   medido: number
   tipo: string | null
   data_osc: string | null
+  vencimento: string | null
 }
 export function useMedicaoPorOSC(portfolioId?: string) {
   return useQuery<MedicaoOSCRow[]>({
@@ -294,8 +295,8 @@ export function useMedicaoPorOSC(portfolioId?: string) {
       const poloNome = new Map(polosArr.map(p => [p.id, p.nome]))
       const { data: obras } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', ids)
       const obraMap = new Map((obras ?? []).map((o: Record<string, unknown>) => [o.id as string, o]))
-      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, tipo, data_osc, saldo_reais').eq('portfolio_id', portfolioId!)
-      const oscArr = (oscs ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; tipo: string | null; data_osc: string | null; saldo_reais: number | null }[]
+      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, tipo, data_osc, vencimento, saldo_reais').eq('portfolio_id', portfolioId!)
+      const oscArr = (oscs ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; tipo: string | null; data_osc: string | null; vencimento: string | null; saldo_reais: number | null }[]
       const oscIds = oscArr.map(o => o.id)
       const medido = new Map<string, number>()
       if (oscIds.length) {
@@ -314,7 +315,7 @@ export function useMedicaoPorOSC(portfolioId?: string) {
           id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: obra.nome as string,
           polo_id: poloId, polo_nome: poloNome.get(poloId) ?? '—',
           valor, medido: fat,
-          tipo: o.tipo, data_osc: o.data_osc,
+          tipo: o.tipo, data_osc: o.data_osc, vencimento: o.vencimento,
         }
       })
     },
