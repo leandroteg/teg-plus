@@ -668,10 +668,7 @@ const TIPO_OBRA: Record<string, { label: string; light: string; dark: string }> 
   deposito:   { label: 'Depósito',   light: 'bg-violet-100 text-violet-700', dark: 'bg-violet-500/15 text-violet-300' },
 }
 
-const fmtBRLc = (n: number) =>
-  n >= 1_000_000 ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
-  : n >= 1_000 ? `R$ ${Math.round(n / 1_000)} mil`
-  : `R$ ${n.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+const fmtBRLc = (n: number) => `R$ ${Math.round(n).toLocaleString('pt-BR')}`
 const fmtData = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/')
 
 // soma valor, mínimo de início (data_osc), máximo de prazo (vencimento)
@@ -911,7 +908,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                     <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{obrasDoPolo.length} obra{obrasDoPolo.length !== 1 ? 's' : ''}</span>
                   </div>
                   <span className="w-[74px] shrink-0" />
-                  <span className={`w-[70px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{pa.valor != null ? fmtBRLc(pa.valor) : ''}</span>
+                  <span className={`w-[100px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{pa.valor != null ? fmtBRLc(pa.valor) : ''}</span>
                   <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.minI ? fmtData(pa.minI) : ''}</span>
                   <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pa.maxP ? fmtData(pa.maxP) : ''}</span>
                   <span className="w-4 shrink-0" />
@@ -938,7 +935,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                               <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? st.light : st.dark}`}>{st.label}</span>
                             </div>
                             <span className="w-[74px] shrink-0" />
-                            <span className={`w-[70px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{oa.valor != null ? fmtBRLc(oa.valor) : ''}</span>
+                            <span className={`w-[100px] shrink-0 text-right text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{oa.valor != null ? fmtBRLc(oa.valor) : ''}</span>
                             <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.minI ? fmtData(oa.minI) : ''}</span>
                             <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oa.maxP ? fmtData(oa.maxP) : ''}</span>
                             <span className="w-4 shrink-0" />
@@ -955,7 +952,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                                   <span className="w-[92px] shrink-0">OSC</span>
                                   <span className="flex-1 min-w-0" />
                                   <span className="w-[74px] text-right shrink-0">Tipo</span>
-                                  <span className="w-[70px] text-right shrink-0">Valor</span>
+                                  <span className="w-[100px] text-right shrink-0">Valor</span>
                                   <span className="w-[60px] text-right shrink-0">Início</span>
                                   <span className="w-[60px] text-right shrink-0">Prazo</span>
                                   <span className="w-4 shrink-0" />
@@ -968,7 +965,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                                     <span className={`w-[92px] shrink-0 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
                                     <span className={`flex-1 min-w-0 truncate text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.tipo_servico ? `· ${osc.tipo_servico}` : ''}</span>
                                     <span className="w-[74px] shrink-0 flex justify-end">{tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}</span>
-                                    <span className={`w-[70px] shrink-0 text-right font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{osc.valor != null ? fmtBRLc(osc.valor) : '—'}</span>
+                                    <span className={`w-[100px] shrink-0 text-right font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{osc.valor != null ? fmtBRLc(osc.valor) : '—'}</span>
                                     <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.data_osc ? fmtData(osc.data_osc) : '—'}</span>
                                     <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.vencimento ? fmtData(osc.vencimento) : '—'}</span>
                                     <button onClick={e => { e.stopPropagation(); openEdit(osc) }} className={`w-4 shrink-0 ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
@@ -1120,7 +1117,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                                 <div className="flex items-center gap-2 text-xs">
                                   <span className={`flex-1 min-w-0 truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{it.subsec_nome}</span>
                                   <span className={`w-20 text-right tabular-nums ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{it.quantidade != null ? it.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'} {it.unidade}</span>
-                                  <span className={`w-24 text-right tabular-nums font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
+                                  <span className={`w-28 text-right tabular-nums font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
                                   <span className={`w-9 text-right text-[10px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pct != null ? pct + '%' : ''}</span>
                                 </div>
                                 {pct != null && (
@@ -1208,7 +1205,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                           <div key={it.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs border-t ${isLight ? 'border-slate-100 text-slate-700' : 'border-white/[0.04] text-slate-200'}`}>
                             <span className="flex-1 min-w-0 truncate">{it.subsec_nome}</span>
                             <span className={`w-20 text-right tabular-nums ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{it.quantidade != null ? it.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'} {it.unidade}</span>
-                            <span className="w-24 text-right tabular-nums font-semibold">{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
+                            <span className="w-28 text-right tabular-nums font-semibold">{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
                           </div>
                         ))}
                       </div>
