@@ -918,7 +918,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                 {poloOpen && (
                   <div className="space-y-2 mt-2 md:pl-3">
                     {obrasDoPolo.map(o => {
-                      const oscList = oscByObra.get(o.id) ?? []
+                      const oscList = (oscByObra.get(o.id) ?? []).slice().sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true }))
                       const expanded = open.has(o.id)
                       const st = STATUS_OBRA[o.status ?? ''] ?? { label: o.status ?? '—', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
                       const oa = aggOsc(oscList)
