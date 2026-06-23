@@ -942,6 +942,72 @@ function ReleveModal({ obra, isDark, onClose, onVerMapa }: {
     </div>, document.body)
 }
 
+// ── Etapa 2: renderer recursivo de dados ricos (tabelas, key-value, fonte clicável) ──
+function FonteTag({ fonte, isDark, baixar, temArq }: { fonte: string; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
+  const partes = String(fonte).split(/[+,;]/).map(s => s.trim()).filter(Boolean)
+  return <span className="inline-flex flex-wrap gap-1">{partes.map((p, i) => {
+    const tem = temArq(p)
+    return <button key={i} type="button" onClick={() => tem && baixar(p)} disabled={!tem} title={tem ? 'Baixar ' + p : p}
+      className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded ${tem ? (isDark ? 'bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 cursor-pointer' : 'bg-teal-50 text-teal-700 hover:bg-teal-100 cursor-pointer') : (isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-400')}`}>
+      {tem && <Download size={9} />}{p}</button>
+  })}</span>
+}
+
+function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-slate-200' : 'text-slate-700'
+  if (v === null || v === undefined || v === '') return <span className={muted}>—</span>
+  if (typeof v !== 'object') return <span className={txt}>{String(v)}</span>
+  if (Array.isArray(v)) {
+    if (!v.length) return <span className={muted}>—</span>
+    const objs = v.filter(x => x && typeof x === 'object' && !Array.isArray(x)) as Array<Record<string, unknown>>
+    if (objs.length === v.length) {
+      const cols = Array.from(new Set(objs.flatMap(o => Object.keys(o))))
+      return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[10.5px]">
+        <thead className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}><tr>{cols.map(c => <th key={c} className={`text-left font-bold px-2 py-1 whitespace-nowrap ${muted}`}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
+        <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top"><ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} /></td>)}</tr>)}</tbody>
+      </table></div>
+    }
+    return <span className="inline-flex flex-wrap gap-1">{v.map((x, i) => <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><ValorRico v={x} isDark={isDark} baixar={baixar} temArq={temArq} /></span>)}</span>
+  }
+  const obj = v as Record<string, unknown>
+  const keys = Object.keys(obj)
+  if ('valor' in obj && keys.every(k => k === 'valor' || k === 'fonte')) {
+    return <span className={txt}>{String(obj.valor)} {obj.fonte ? <FonteTag fonte={String(obj.fonte)} isDark={isDark} baixar={baixar} temArq={temArq} /> : null}</span>
+  }
+  return <div className="space-y-1">{keys.map(k => k === 'fonte'
+    ? <div key={k}><FonteTag fonte={String(obj[k])} isDark={isDark} baixar={baixar} temArq={temArq} /></div>
+    : <div key={k} className="flex gap-1.5 text-[11px] items-baseline"><span className={`font-bold shrink-0 ${muted}`}>{k.replace(/_/g, ' ')}:</span><div className="min-w-0"><ValorRico v={obj[k]} isDark={isDark} baixar={baixar} temArq={temArq} /></div></div>
+  )}</div>
+}
+
+function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
+  const itens: Array<{ chave: string; v: unknown }> = Array.isArray(dados)
+    ? (dados as Array<Record<string, unknown>>).map((o, i) => { const { item, obra, nome, ...rest } = o; return { chave: String(item ?? obra ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
+    : (dados && typeof dados === 'object' ? Object.entries(dados as Record<string, unknown>).map(([chave, v]) => ({ chave, v })) : [])
+  const [open, setOpen] = useState<Record<number, boolean>>({})
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  if (!itens.length) return null
+  return <section className={`${CARD(isDark)} overflow-hidden`}>
+    <div className={`px-4 py-2.5 flex items-center gap-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+      <Icon size={15} className="text-teal-500" /><h3 className={`text-sm font-extrabold ${txt}`}>{titulo}</h3>
+      <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>({itens.length})</span>
+    </div>
+    <div className={`divide-y ${isDark ? 'divide-white/[0.05]' : 'divide-slate-100'}`}>
+      {itens.map(({ chave, v }, i) => {
+        const aberto = open[i] ?? (itens.length <= 2)
+        return <div key={i}>
+          <button type="button" onClick={() => setOpen(s => ({ ...s, [i]: !aberto }))} className={`w-full px-4 py-2 flex items-center gap-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'}`}>
+            <span className={`shrink-0 text-[11px] transition-transform ${aberto ? 'rotate-90' : ''} ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>▸</span>
+            <span className={`text-xs font-bold ${txt}`}>{String(chave).replace(/_/g, ' ')}</span>
+          </button>
+          {aberto && <div className="px-4 pb-3 pl-9 min-w-0"><ValorRico v={v} isDark={isDark} baixar={baixar} temArq={temArq} /></div>}
+        </div>
+      })}
+    </div>
+  </section>
+}
+
 // ── Consolidação (estágio 2): resumo (medido) + SÓ fatos extraídos dos documentos ──
 function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, unknown>; isDark: boolean }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -1070,34 +1136,8 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
         </div>
       )}
 
-      <DocAgrupado itens={quant} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Quantitativos por obra" Icon={Layers} cats={QUANT_CATS} getObra={obraDoItem} />
-      <DocAgrupado itens={geot} isDark={isDark} baixar={baixar} temArq={temArq} titulo="Geotecnia por obra" Icon={Mountain} cats={GEOT_CATS} getObra={obraDoItem}
-        obraBorda={(its) => RELEVO_TONE[classificarSolo(its).tone].barHex}
-        obraBadge={(its) => {
-          const s = classificarSolo(its); const tn = RELEVO_TONE[s.tone]; const dist = distDaObra(its)
-          const f = classificarFundacao(its); const fn = f ? RELEVO_TONE[f.tone] : null
-          const label = s.classe || s.tipos[0]?.label || ''
-          if (!label && !dist.length && !f) return null
-          const distTip = dist.length ? dist.map(d => `${Math.round(Number(d.pct))}% ${d.tipo}`).join(' · ') : 'Tipo de fundação predominante'
-          return <span className="inline-flex items-center gap-2 flex-wrap justify-end">
-            {(f || dist.length > 0) && <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? (fn || tn).pillD : (fn || tn).pillL}`} title={distTip}>
-              {f && fn && <FundGlyph tipo={f.glyph} color={fn.barHex} size={13} />}
-              {dist.length > 0 && <BarraSolo dist={dist} isDark={isDark} compact />}
-              {f?.label}
-            </span>}
-            {label && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={s.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {label}{s.classe && s.sadm != null ? ` · ${s.sadm} kgf/cm²` : ''}</span>}
-          </span>
-        }}
-        obraResumo={(its) => {
-          const s = classificarSolo(its); const dist = distDaObra(its)
-          const extra = [s.sadm != null ? `σadm ${s.sadm} kgf/cm²` : null, s.aguaSeco ? 'lençol não encontrado' : null, s.agua != null ? `lençol a ${s.agua} m` : null].filter(Boolean) as string[]
-          if (!dist.length && !extra.length) return null
-          return <div className="px-3 py-2 space-y-1.5">
-            {dist.length > 0 && <div><p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Proporção por dificuldade · fundação/solo (verde→vermelho · sondagem)</p><BarraSolo dist={dist} isDark={isDark} /></div>}
-            {extra.length > 0 && <div className="flex flex-wrap gap-1.5">{extra.map((t, i) => <span key={i} className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-md ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{t}</span>)}</div>}
-          </div>
-        }}
-      />
+      <BlocoRico titulo="Quantitativos por obra" Icon={Layers} dados={d.quantitativos} isDark={isDark} baixar={baixar} temArq={temArq} />
+      <BlocoRico titulo="Geotecnia por obra" Icon={Mountain} dados={d.geotecnia} isDark={isDark} baixar={baixar} temArq={temArq} />
       {pend.length > 0 && (
         <div className={`rounded-lg p-3 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
           <p className={`text-[11px] font-bold mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}><AlertCircle size={12} /> Pendências (falta nos documentos p/ recursos/prazo)</p>
