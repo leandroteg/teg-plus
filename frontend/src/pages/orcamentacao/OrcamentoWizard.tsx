@@ -965,7 +965,7 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
       const cols = Array.from(new Set(objs.flatMap(o => Object.keys(o))))
       return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[10.5px]">
         <thead className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}><tr>{cols.map(c => <th key={c} className={`text-left font-bold px-2 py-1 whitespace-nowrap ${muted}`}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
-        <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top"><ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} /></td>)}</tr>)}</tbody>
+        <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top">{c === 'fonte' && row[c] ? <FonteTag fonte={String(row[c])} isDark={isDark} baixar={baixar} temArq={temArq} /> : <ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} />}</td>)}</tr>)}</tbody>
       </table></div>
     }
     return <span className="inline-flex flex-wrap gap-1">{v.map((x, i) => <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><ValorRico v={x} isDark={isDark} baixar={baixar} temArq={temArq} /></span>)}</span>
