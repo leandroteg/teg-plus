@@ -975,10 +975,22 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
   if ('valor' in obj && keys.every(k => k === 'valor' || k === 'fonte')) {
     return <span className={txt}>{String(obj.valor)} {obj.fonte ? <FonteTag fonte={String(obj.fonte)} isDark={isDark} baixar={baixar} temArq={temArq} /> : null}</span>
   }
-  return <div className="space-y-1">{keys.map(k => k === 'fonte'
-    ? <div key={k}><FonteTag fonte={String(obj[k])} isDark={isDark} baixar={baixar} temArq={temArq} /></div>
-    : <div key={k} className="flex gap-1.5 text-[11px] items-baseline"><span className={`font-bold shrink-0 ${muted}`}>{k.replace(/_/g, ' ')}:</span><div className="min-w-0"><ValorRico v={obj[k]} isDark={isDark} baixar={baixar} temArq={temArq} /></div></div>
-  )}</div>
+  const folha = (val: unknown) => val === null || typeof val !== 'object'
+  const prims = keys.filter(k => k !== 'fonte' && folha(obj[k]))
+  const aninhados = keys.filter(k => k !== 'fonte' && !folha(obj[k]))
+  return <div className="space-y-2">
+    {prims.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+      {prims.map(k => <div key={k} className={`rounded-md px-2 py-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+        <p className={`text-[8.5px] uppercase tracking-wide leading-tight ${muted}`}>{k.replace(/_/g, ' ')}</p>
+        <p className={`text-[11px] font-semibold leading-snug ${txt}`}>{obj[k] === null || obj[k] === '' ? '—' : String(obj[k])}</p>
+      </div>)}
+    </div>}
+    {aninhados.map(k => <div key={k}>
+      <p className={`text-[9.5px] font-bold uppercase tracking-wide mb-1 ${isDark ? 'text-teal-400/80' : 'text-teal-600/90'}`}>{k.replace(/_/g, ' ')}</p>
+      <div className={`pl-2 border-l-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}><ValorRico v={obj[k]} isDark={isDark} baixar={baixar} temArq={temArq} /></div>
+    </div>)}
+    {obj.fonte != null && <FonteTag fonte={String(obj.fonte)} isDark={isDark} baixar={baixar} temArq={temArq} />}
+  </div>
 }
 
 function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
