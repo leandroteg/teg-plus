@@ -713,8 +713,10 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [pForm, setPForm] = useState({ nome: '', codigo: '' })
   const [oForm, setOForm] = useState({ nome: '', codigo: '', pmo_projeto_id: '' })
   const [editOsc, setEditOsc] = useState<EGPOscRow | null>(null)
+  const [det, setDet] = useState<EGPOscRow | null>(null)
   const [eForm, setEForm] = useState({ tipo: '', valor: '', data_osc: '', vencimento: '', tipo_servico: '', observacoes: '' })
-  const { data: oscItens } = useOSCItens(editOsc?.id)
+  const { data: oscItens } = useOSCItens(det?.id ?? editOsc?.id)
+  const detObraNome = det ? ((obras ?? []).find(o => o.id === det.obra_id)?.nome ?? '') : ''
   const itensTotal = (oscItens ?? []).reduce((s, it) => s + (it.valor ?? 0), 0)
   const itensPorSecao = (oscItens ?? []).reduce((acc, it) => {
     const k = it.secao ?? '—'; (acc[k] ??= []).push(it); return acc
@@ -938,14 +940,14 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                               {oscList.map(osc => {
                                 const tp = TIPO_OBRA[osc.tipo ?? '']
                                 return (
-                                  <div key={osc.id} className={`flex items-center gap-3 py-1.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                                  <div key={osc.id} onClick={() => setDet(osc)} className={`flex items-center gap-3 py-1.5 text-sm cursor-pointer rounded-lg -mx-1 px-1 ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.04]'}`}>
                                     <span className={`w-[92px] shrink-0 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
                                     <span className={`flex-1 min-w-0 truncate text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.tipo_servico ? `· ${osc.tipo_servico}` : ''}</span>
                                     <span className="w-[74px] shrink-0 flex justify-end">{tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}</span>
                                     <span className={`w-[70px] shrink-0 text-right font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{osc.valor != null ? fmtBRLc(osc.valor) : '—'}</span>
                                     <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.data_osc ? fmtData(osc.data_osc) : '—'}</span>
                                     <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.vencimento ? fmtData(osc.vencimento) : '—'}</span>
-                                    <button onClick={() => openEdit(osc)} className={`w-4 shrink-0 ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
+                                    <button onClick={e => { e.stopPropagation(); openEdit(osc) }} className={`w-4 shrink-0 ${isLight ? 'text-slate-400 hover:text-teal-600' : 'text-slate-500 hover:text-teal-400'}`} title="Editar OSC"><Edit3 size={13} /></button>
                                   </div>
                                 )
                               })}
@@ -1030,6 +1032,88 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
           </div>
         </div>
       )}
+
+      {/* Modal DETALHES da OSC */}
+      {det && (() => {
+        const tp = TIPO_OBRA[det.tipo ?? '']
+        const card = (label: string, val: string) => (
+          <div className={`rounded-xl border px-3 py-2 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+            <div className={`text-[10px] font-semibold uppercase tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+            <div className={`text-sm font-bold tabular-nums mt-0.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>{val}</div>
+          </div>
+        )
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDet(null)}>
+            <div onClick={e => e.stopPropagation()} className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+              {/* header */}
+              <div className={`flex items-start justify-between gap-3 p-5 pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className={`font-mono font-bold text-lg ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{det.numero_os}</h3>
+                    {tp && <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}
+                  </div>
+                  {detObraNome && <p className={`text-sm font-medium mt-1 truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{detObraNome}</p>}
+                  {det.tipo_servico && <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{det.tipo_servico}</p>}
+                </div>
+                <button onClick={() => setDet(null)} className="shrink-0 text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              </div>
+              {/* cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-5 pb-3">
+                {card('Valor', det.valor != null ? fmtBRL(det.valor) : '—')}
+                {card('Início', det.data_osc ? fmtData(det.data_osc) : '—')}
+                {card('Prazo', det.vencimento ? fmtData(det.vencimento) : '—')}
+                {card('Saldo', det.saldo_reais != null ? fmtBRL(det.saldo_reais) : '—')}
+              </div>
+              {/* itens */}
+              {(oscItens?.length ?? 0) > 0 ? (
+                <div className="px-5 pb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className={`text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Itens / Quantitativos</h4>
+                    <span className={`text-xs font-bold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>Σ {fmtBRLc(itensTotal)}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {Object.entries(itensPorSecao).map(([sec, itens]) => (
+                      <div key={sec}>
+                        <div className={`text-[10px] font-bold uppercase tracking-wide mb-1 ${isLight ? 'text-teal-700' : 'text-teal-400'}`}>{sec}</div>
+                        <div className="space-y-1.5">
+                          {itens.map(it => {
+                            const pct = it.valor && it.valor_acum != null ? Math.min(100, Math.round((it.valor_acum / it.valor) * 100)) : null
+                            return (
+                              <div key={it.id}>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className={`flex-1 min-w-0 truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{it.subsec_nome}</span>
+                                  <span className={`w-20 text-right tabular-nums ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{it.quantidade != null ? it.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'} {it.unidade}</span>
+                                  <span className={`w-24 text-right tabular-nums font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
+                                  <span className={`w-9 text-right text-[10px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pct != null ? pct + '%' : ''}</span>
+                                </div>
+                                {pct != null && (
+                                  <div className={`h-1 rounded-full mt-1 overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
+                                    <div className="h-full rounded-full bg-teal-500" style={{ width: pct + '%' }} />
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className={`px-5 py-3 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem itens/quantitativos cadastrados para esta OSC.</p>
+              )}
+              {/* footer */}
+              <div className={`flex items-center justify-between gap-2 p-5 pt-3 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                <span className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{oscItens?.length ?? 0} {oscItens?.length === 1 ? 'item' : 'itens'}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setDet(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Fechar</button>
+                  <button onClick={() => { const o = det; setDet(null); openEdit(o) }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700"><Edit3 size={14} /> Editar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Modal editar OSC */}
       {editOsc && (
