@@ -10,9 +10,9 @@ import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
-  useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC, useUpdateOSC,
+  useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC, useUpdateOSC, useOSCItens,
   useProjetos, useCriarProjeto, useCriarObraEGP,
-  type EGPOscRow,
+  type EGPOscRow, type EGPOscItem,
 } from '../../hooks/usePMO'
 import type { PMOTAP, PMOStakeholder, PMOComunicacao } from '../../types/pmo'
 
@@ -714,6 +714,11 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [oForm, setOForm] = useState({ nome: '', codigo: '', pmo_projeto_id: '' })
   const [editOsc, setEditOsc] = useState<EGPOscRow | null>(null)
   const [eForm, setEForm] = useState({ tipo: '', valor: '', data_osc: '', vencimento: '', tipo_servico: '', observacoes: '' })
+  const { data: oscItens } = useOSCItens(editOsc?.id)
+  const itensTotal = (oscItens ?? []).reduce((s, it) => s + (it.valor ?? 0), 0)
+  const itensPorSecao = (oscItens ?? []).reduce((acc, it) => {
+    const k = it.secao ?? '—'; (acc[k] ??= []).push(it); return acc
+  }, {} as Record<string, EGPOscItem[]>)
 
   const openEdit = (osc: EGPOscRow) => {
     setEditOsc(osc)
@@ -1029,7 +1034,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
       {/* Modal editar OSC */}
       {editOsc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditOsc(null)}>
-          <div onClick={e => e.stopPropagation()} className={`w-full max-w-md rounded-2xl border p-5 shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+          <div onClick={e => e.stopPropagation()} className={`w-full ${oscItens?.length ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-2xl border p-5 shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`font-bold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{editOsc.numero_os}</h3>
               <button onClick={() => setEditOsc(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
@@ -1066,6 +1071,31 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                 <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Observações</label>
                 <textarea value={eForm.observacoes} onChange={e => setEForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} placeholder="Opcional" className={`${inputCls} w-full mt-1 resize-none`} />
               </div>
+
+              {/* Itens / Quantitativos (normalizados pelo EAP) */}
+              {(oscItens?.length ?? 0) > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Itens / Quantitativos <span className="opacity-60">({oscItens!.length})</span></label>
+                    <span className={`text-[11px] font-bold tabular-nums ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Σ {fmtBRLc(itensTotal)}</span>
+                  </div>
+                  <div className={`rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                    {Object.entries(itensPorSecao).map(([sec, itens]) => (
+                      <div key={sec}>
+                        <div className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.05] text-slate-400'}`}>{sec}</div>
+                        {itens.map(it => (
+                          <div key={it.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs border-t ${isLight ? 'border-slate-100 text-slate-700' : 'border-white/[0.04] text-slate-200'}`}>
+                            <span className="flex-1 min-w-0 truncate">{it.subsec_nome}</span>
+                            <span className={`w-20 text-right tabular-nums ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{it.quantidade != null ? it.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'} {it.unidade}</span>
+                            <span className="w-24 text-right tabular-nums font-semibold">{it.valor != null ? fmtBRLc(it.valor) : '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-2">
                 <button onClick={apagarEdit} disabled={delOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} disabled:opacity-40`}><Trash2 size={14} /> Apagar OSC</button>
                 <div className="flex gap-2">

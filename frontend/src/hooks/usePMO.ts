@@ -243,6 +243,32 @@ export function useOSCsDoPortfolio(portfolioId?: string) {
   })
 }
 
+export interface EGPOscItem {
+  id: string
+  secao: string | null
+  subsec_codigo: string | null
+  subsec_nome: string | null
+  unidade: string | null
+  quantidade: number | null
+  valor: number | null
+  valor_acum: number | null
+}
+export function useOSCItens(fluxoOsId?: string) {
+  return useQuery<EGPOscItem[]>({
+    queryKey: ['egp-osc-itens', fluxoOsId],
+    enabled: !!fluxoOsId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pmo_osc_itens')
+        .select('id, secao, subsec_codigo, subsec_nome, unidade, quantidade, valor, valor_acum')
+        .eq('fluxo_os_id', fluxoOsId!)
+        .order('subsec_codigo', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as EGPOscItem[]
+    },
+  })
+}
+
 export function useUpdateOSC() {
   const qc = useQueryClient()
   return useMutation({
