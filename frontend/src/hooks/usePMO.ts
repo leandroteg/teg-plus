@@ -269,6 +269,52 @@ export function useOSCItens(fluxoOsId?: string) {
   })
 }
 
+// medição por OSC (agrupado por polo) — medido = Σ valor_acum dos itens
+export interface MedicaoOSCRow {
+  id: string
+  numero_os: string
+  obra_id: string | null
+  obra_nome: string
+  polo_id: string
+  polo_nome: string
+  valor: number
+  medido: number
+}
+export function useMedicaoPorOSC(portfolioId?: string) {
+  return useQuery<MedicaoOSCRow[]>({
+    queryKey: ['egp-medicao-osc', portfolioId],
+    enabled: !!portfolioId,
+    queryFn: async () => {
+      const { data: polos } = await supabase.from('pmo_projetos').select('id, nome').eq('portfolio_id', portfolioId!)
+      const polosArr = (polos ?? []) as { id: string; nome: string }[]
+      const ids = polosArr.map(p => p.id)
+      if (!ids.length) return []
+      const poloNome = new Map(polosArr.map(p => [p.id, p.nome]))
+      const { data: obras } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', ids)
+      const obraMap = new Map((obras ?? []).map((o: Record<string, unknown>) => [o.id as string, o]))
+      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor').eq('portfolio_id', portfolioId!)
+      const oscArr = (oscs ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null }[]
+      const oscIds = oscArr.map(o => o.id)
+      const medido = new Map<string, number>()
+      if (oscIds.length) {
+        const { data: itens } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, valor_acum').in('fluxo_os_id', oscIds)
+        for (const it of (itens ?? []) as { fluxo_os_id: string; valor_acum: number | null }[]) {
+          if (it.valor_acum != null) medido.set(it.fluxo_os_id, (medido.get(it.fluxo_os_id) ?? 0) + Number(it.valor_acum))
+        }
+      }
+      return oscArr.filter(o => o.obra_id && obraMap.has(o.obra_id)).map(o => {
+        const obra = obraMap.get(o.obra_id as string) as Record<string, unknown>
+        const poloId = obra.pmo_projeto_id as string
+        return {
+          id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: obra.nome as string,
+          polo_id: poloId, polo_nome: poloNome.get(poloId) ?? '—',
+          valor: Number(o.valor ?? 0), medido: medido.get(o.id) ?? 0,
+        }
+      })
+    },
+  })
+}
+
 export function useUpdateOSC() {
   const qc = useQueryClient()
   return useMutation({

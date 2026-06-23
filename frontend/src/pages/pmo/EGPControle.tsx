@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ContractSelector } from '../../components/EGPLayout'
 import {
@@ -10,7 +10,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
-  useMedicaoResumo, useMedicaoItens,
+  useMedicaoPorOSC, type MedicaoOSCRow,
   useMudancas, useMultas, useStatusReports, useIndicadores,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
@@ -285,20 +285,24 @@ function ProjetosBarControle({
 // ── Medicoes Panel ──────────────────────────────────────────────────────────
 
 function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
-  const { data: resumo, isLoading: loadResumo } = useMedicaoResumo(portfolioId)
-  const { data: itens, isLoading: loadItens } = useMedicaoItens(portfolioId)
+  const { data: rows, isLoading } = useMedicaoPorOSC(portfolioId)
+  if (isLoading) return <Spinner />
 
-  if (loadResumo || loadItens) return <Spinner />
+  const list = rows ?? []
+  const totValor = list.reduce((s, r) => s + r.valor, 0)
+  const totMedido = list.reduce((s, r) => s + r.medido, 0)
+  const totAMedir = totValor - totMedido
 
-  const cardCls = `rounded-2xl border p-5 ${
-    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-  }`
+  // agrupa por polo
+  const porPolo = new Map<string, MedicaoOSCRow[]>()
+  for (const r of list) { const a = porPolo.get(r.polo_nome) ?? []; a.push(r); porPolo.set(r.polo_nome, a) }
+  const polos = [...porPolo.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+
+  const cardCls = `rounded-2xl border p-5 ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`
   const labelCls = `text-xs font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
   const valueCls = `text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`
-  const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${
-    isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'
-  }`
-  const tdCls = `py-3 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+  const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'}`
+  const tdCls = `py-2.5 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
 
   return (
     <div className="space-y-4">
@@ -306,74 +310,74 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className={cardCls}>
           <p className={labelCls}>Valor Contrato</p>
-          <p className={valueCls}>{resumo ? fmtBRL(resumo.valor_contrato) : '-'}</p>
+          <p className={valueCls}>{fmtBRL(totValor)}</p>
         </div>
         <div className={cardCls}>
           <p className={labelCls}>Total Medido</p>
-          <p className={valueCls}>{resumo ? fmtBRL(resumo.total_medido_valor) : '-'}</p>
-          {resumo && (
-            <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
-              {fmtPct(resumo.total_medido_pct)}
-            </p>
-          )}
+          <p className={valueCls}>{fmtBRL(totMedido)}</p>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{fmtPct(totValor ? (totMedido / totValor) * 100 : 0)}</p>
         </div>
         <div className={cardCls}>
           <p className={labelCls}>A Medir</p>
-          <p className={valueCls}>{resumo ? fmtBRL(resumo.total_a_medir_valor) : '-'}</p>
-          {resumo && (
-            <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>
-              {fmtPct(resumo.total_a_medir_pct)}
-            </p>
-          )}
+          <p className={valueCls}>{fmtBRL(totAMedir)}</p>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{fmtPct(totValor ? (totAMedir / totValor) * 100 : 0)}</p>
         </div>
         <div className={cardCls + ' flex items-center justify-center'}>
-          <button
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20"
-          >
-            <Scale size={14} />
-            Solicitar Faturamento
+          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20">
+            <Scale size={14} /> Solicitar Faturamento
           </button>
         </div>
       </div>
 
-      {/* Items table */}
-      <div className={`rounded-2xl border overflow-hidden ${
-        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-      }`}>
-        <h3 className={`text-sm font-bold px-5 pt-5 pb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>
-          Itens de Medição
-        </h3>
-        {(!itens || itens.length === 0) ? (
-          <EmptyState isLight={isLight} message="Nenhum item de medição cadastrado" />
+      {/* Medições por OSC, agrupadas por polo */}
+      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+        <h3 className={`text-sm font-bold px-5 pt-5 pb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Medições por OSC</h3>
+        {list.length === 0 ? (
+          <EmptyState isLight={isLight} message="Nenhuma OSC neste contrato" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                  <th className={thCls}>#</th>
-                  <th className={thCls}>Descrição</th>
-                  <th className={thCls}>Unidade</th>
-                  <th className={thCls + ' text-right'}>Qtd Prevista</th>
-                  <th className={thCls + ' text-right'}>Preco Unit.</th>
-                  <th className={thCls + ' text-right'}>Valor Total</th>
+                  <th className={thCls}>OSC</th>
+                  <th className={thCls}>Obra</th>
+                  <th className={thCls + ' text-right'}>Valor</th>
+                  <th className={thCls + ' text-right'}>Medido</th>
+                  <th className={thCls + ' text-right'}>A Medir</th>
+                  <th className={thCls + ' text-right'}>%</th>
                 </tr>
               </thead>
               <tbody>
-                {itens.map(item => (
-                  <tr
-                    key={item.id}
-                    className={`border-b transition-colors ${
-                      isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'
-                    }`}
-                  >
-                    <td className={tdCls + ' font-mono text-xs'}>{item.numero_medicao}</td>
-                    <td className={`${tdCls} font-medium ${isLight ? 'text-slate-800' : 'text-white'}`}>{item.item_descricao}</td>
-                    <td className={tdCls}>{item.unidade ?? '-'}</td>
-                    <td className={tdCls + ' text-right font-mono'}>{fmtNum(item.quantidade_prevista)}</td>
-                    <td className={tdCls + ' text-right font-mono'}>{fmtBRL(item.preco_unitario)}</td>
-                    <td className={`${tdCls} text-right font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRL(item.valor_total)}</td>
-                  </tr>
-                ))}
+                {polos.map(([polo, oscs]) => {
+                  const pv = oscs.reduce((s, o) => s + o.valor, 0)
+                  const pm = oscs.reduce((s, o) => s + o.medido, 0)
+                  const ordenadas = [...oscs].sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true }))
+                  return (
+                    <Fragment key={polo}>
+                      <tr className={isLight ? 'bg-slate-100' : 'bg-white/[0.05]'}>
+                        <td colSpan={2} className={`py-2 px-4 text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{polo} <span className="opacity-60 font-semibold">· {oscs.length} OSC{oscs.length !== 1 ? 's' : ''}</span></td>
+                        <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv)}</td>
+                        <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pm)}</td>
+                        <td className={`py-2 px-4 text-xs font-bold text-right tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{fmtBRL(pv - pm)}</td>
+                        <td className="py-2 px-4 text-right text-xs font-bold tabular-nums">{pv ? Math.round((pm / pv) * 100) : 0}%</td>
+                      </tr>
+                      {ordenadas.map(o => {
+                        const am = o.valor - o.medido
+                        const pct = o.valor ? Math.round((o.medido / o.valor) * 100) : 0
+                        return (
+                          <tr key={o.id} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'}`}>
+                            <td className={`${tdCls} font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.numero_os}</td>
+                            <td className={`${tdCls} max-w-[280px] truncate ${isLight ? 'text-slate-800' : 'text-white'}`} title={o.obra_nome}>{o.obra_nome}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(o.valor)}</td>
+                            <td className={`${tdCls} text-right tabular-nums ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{fmtBRL(o.medido)}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(am)}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{pct}%</td>
+                          </tr>
+                        )
+                      })}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
