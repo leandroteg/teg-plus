@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { Activity, Ruler, Layers, Building2, Star } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, fmtQtd } from '../../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, filtrarRawPorPeriodo, fmtQtd } from '../../../hooks/usePMO'
 import { Kpi, PanelCard, HBarRow } from '../../rh/paineis/_ui'
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
@@ -35,11 +35,12 @@ const PAC_COR: Record<string, string> = {
 }
 const PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
 
-export default function ProducaoPainel() {
+export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string }) {
   const { isDark } = useTheme()
   const portfolioId = useEGPPortfolioId()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
-  const polos = useMemo(() => aggregatePolos(raw ?? [], new Set()), [raw])
+  const rawF = useMemo(() => filtrarRawPorPeriodo(raw ?? [], de, ate), [raw, de, ate])
+  const polos = useMemo(() => aggregatePolos(rawF, new Set()), [rawF])
 
   const ag = useMemo(() => {
     const pac = new Map<string, { valor: number; qC: number; qR: number; uni: string | null }>()
@@ -60,7 +61,7 @@ export default function ProducaoPainel() {
   const obras = useMemo(() => {
     type O = { nome: string; polo: string; valor: number; fat: number; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
     const m = new Map<string, O>()
-    for (const polo of (raw ?? [])) for (const o of polo.oscs) {
+    for (const polo of rawF) for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
       let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloCurto(polo.label), valor: 0, fat: 0, pac: new Map() }; m.set(o.obra_nome, a) }
       a.valor += o.valor; a.fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
@@ -76,7 +77,7 @@ export default function ProducaoPainel() {
       const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni)}/${fmtQtd(x.qC, x.uni)}` : '—' }
       return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, drv }
     }).sort((x, y) => y.valor - x.valor)
-  }, [raw])
+  }, [rawF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!polos.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados.</p>

@@ -17,6 +17,24 @@ const EGP_PAINEIS: Array<{ key: EGPPainelKey; label: string }> = [
   { key: 'medicao', label: 'Medição' },
   { key: 'custos', label: 'Custos' },
 ]
+
+function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []; for (let a = 2021; a <= anoAtual + 1; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">{MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">{anos.map(a => <option key={a} value={a}>{a}</option>)}</select>
+    </span>
+  )
+}
 import { useQuery } from '@tanstack/react-query'
 import { usePortfolios, useParseOSC, useConfirmarOSC } from '../../hooks/usePMO'
 import type { OSCParsed } from '../../hooks/usePMO'
@@ -588,6 +606,8 @@ export default function EGPPainel() {
   const nav = useNavigate()
   const { isDark } = useTheme()
   const [painel, setPainel] = useState<EGPPainelKey>('geral')
+  const [de, setDe] = useState('2025-01')
+  const [ate, setAte] = useState(ymHoje())
   const [obraFilter, setObraFilter] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   const obras = useLookupObras()
@@ -760,13 +780,20 @@ export default function EGPPainel() {
           </button>
         </div>
         )}
+        {painel !== 'geral' && (
+          <div className="flex items-center gap-1.5">
+            <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+            <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+          </div>
+        )}
       </div>
 
       {/* Painéis selecionáveis (Produção / Medição / Custos) */}
       {painel !== 'geral' && (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>}>
-          {painel === 'producao' && <ProducaoPainel />}
-          {painel === 'medicao' && <MedicaoPainel />}
+          {painel === 'producao' && <ProducaoPainel de={de} ate={ate} />}
+          {painel === 'medicao' && <MedicaoPainel de={de} ate={ate} />}
           {painel === 'custos' && <CustosPainel />}
         </Suspense>
       )}

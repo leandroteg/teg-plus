@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { DollarSign, TrendingUp, PieChart, Wallet } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos } from '../../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, filtrarRawPorPeriodo } from '../../../hooks/usePMO'
 import { Kpi, PanelCard, HBarRow, ProporcaoBar, Legenda } from '../../rh/paineis/_ui'
 
 const POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04']
@@ -14,11 +14,11 @@ const PAC_COR: Record<string, string> = {
 const PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 
-export default function MedicaoPainel() {
+export default function MedicaoPainel({ de, ate }: { de?: string; ate?: string }) {
   const { isDark } = useTheme()
   const portfolioId = useEGPPortfolioId()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
-  const polos = useMemo(() => aggregatePolos(raw ?? [], new Set()), [raw])
+  const polos = useMemo(() => aggregatePolos(filtrarRawPorPeriodo(raw ?? [], de, ate), new Set()), [raw, de, ate])
 
   const ag = useMemo(() => {
     const contr = polos.reduce((s, p) => s + p.contr, 0)
