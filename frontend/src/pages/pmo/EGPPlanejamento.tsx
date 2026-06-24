@@ -17,6 +17,7 @@ import {
   useRiscosEGP, useCriarRisco, useAtualizarRisco, useDeletarRisco,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
+import { ProjetosFilterBar } from './ProjetosFilterBar'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
 type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'riscos'
@@ -49,7 +50,7 @@ export default function EGPPlanejamento() {
   const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('eap')
-  const [projetoId, setProjetoId] = useState<string | null>(null)
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [criando, setCriando] = useState(false)
   const [novoProjeto, setNovoProjeto] = useState({ nome: '', centro_custo_id: '' })
 
@@ -58,16 +59,17 @@ export default function EGPPlanejamento() {
   const criarProjeto = useCriarProjeto()
   const { data: lookups } = useLookups()
 
-  const projetoAtivo = projetos?.find(p => p.id === projetoId) ?? null
+  // projeto único selecionado (pro EAP) derivado do multi-select; null = todos/vários
+  const selIds = (projetos ?? []).filter(p => p.status !== 'cancelado' && !excluded.has(p.id)).map(p => p.id)
+  const eapProjetoId = selIds.length === 1 ? selIds[0] : null
 
   const handleCriarProjeto = async () => {
     if (!portfolioId || !novoProjeto.nome.trim()) return
-    const p = await criarProjeto.mutateAsync({
+    await criarProjeto.mutateAsync({
       portfolio_id: portfolioId,
       nome: novoProjeto.nome.trim(),
       centro_custo_id: novoProjeto.centro_custo_id || undefined,
     })
-    setProjetoId(p.id)
     setCriando(false)
     setNovoProjeto({ nome: '', centro_custo_id: '' })
   }
@@ -112,12 +114,12 @@ export default function EGPPlanejamento() {
         })}
       </div>
 
-      {/* Barra Projetos do Contrato (chips) */}
-      <ProjetosBar
+      {/* Barra de filtro de Projetos (multi-select) */}
+      <ProjetosFilterBar
         projetos={projetos ?? []}
         loadingProjetos={loadingProjetos}
-        projetoId={projetoId}
-        setProjetoId={setProjetoId}
+        excluded={excluded}
+        setExcluded={setExcluded}
         criando={criando}
         setCriando={setCriando}
         novoProjeto={novoProjeto}
@@ -125,12 +127,13 @@ export default function EGPPlanejamento() {
         handleCriarProjeto={handleCriarProjeto}
         criarProjetoPending={criarProjeto.isPending}
         lookupsCC={lookups?.centros_custo ?? []}
-        tabAccent={TAB_ACCENT[tab]}
+        accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
+        accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
         isLight={isLight}
       />
 
       {/* Tab content */}
-      {tab === 'eap' && <EAPPanel portfolioId={portfolioId} projetoId={projetoId} isLight={isLight} />}
+      {tab === 'eap' && <EAPPanel portfolioId={portfolioId} projetoId={eapProjetoId} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}

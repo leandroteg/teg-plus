@@ -16,6 +16,7 @@ import {
   usePlanoAcao, useCriarAcao, useAtualizarAcao, useDeletarAcao,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
+import { ProjetosFilterBar } from './ProjetosFilterBar'
 import type { PMOTarefa, PMORisco, PMOPlanoAcao, PMOHistograma } from '../../types/pmo'
 
 type Tab = 'cronograma' | 'histograma' | 'custos' | 'riscos' | 'plano_acao'
@@ -53,7 +54,7 @@ export default function EGPExecucao() {
   const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('cronograma')
-  const [projetoId, setProjetoId] = useState<string | null>(null)
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [criando, setCriando] = useState(false)
   const [novoProjeto, setNovoProjeto] = useState({ nome: '', centro_custo_id: '' })
 
@@ -62,22 +63,18 @@ export default function EGPExecucao() {
   const criarProjeto = useCriarProjeto()
   const { data: lookups } = useLookups()
 
-  const projetoAtivo = projetos?.find(p => p.id === projetoId) ?? null
-
   const handleCriarProjeto = async () => {
     if (!portfolioId || !novoProjeto.nome.trim()) return
-    const p = await criarProjeto.mutateAsync({
+    await criarProjeto.mutateAsync({
       portfolio_id: portfolioId,
       nome: novoProjeto.nome.trim(),
       centro_custo_id: novoProjeto.centro_custo_id || undefined,
     })
-    setProjetoId(p.id)
     setCriando(false)
     setNovoProjeto({ nome: '', centro_custo_id: '' })
   }
 
   const tabAccent = TAB_ACCENT[tab]
-  const projetosAtivos = (projetos ?? []).filter(p => p.status !== 'cancelado')
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -119,123 +116,23 @@ export default function EGPExecucao() {
         })}
       </div>
 
-      {/* Barra de Projetos do Contrato - dentro de cada tab */}
-      <div className={`rounded-2xl border p-3 ${
-        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-      }`}>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className={`text-xs font-bold flex items-center gap-1.5 uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-            <FolderKanban size={14} className={tabAccent.text} />
-            Projetos do Contrato
-            <span className={`text-[10px] font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-              ({projetosAtivos.length})
-            </span>
-          </h2>
-          <button
-            onClick={() => setCriando(!criando)}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-              isLight ? `${tabAccent.bg} ${tabAccent.text}` : `${tabAccent.bgDark} ${tabAccent.textDark}`
-            }`}
-          >
-            <Plus size={12} /> Novo Projeto
-          </button>
-        </div>
-
-        {criando && (
-          <div className={`rounded-xl border p-3 mb-2 space-y-2 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'}`}>
-            <input
-              type="text"
-              value={novoProjeto.nome}
-              onChange={e => setNovoProjeto(p => ({ ...p, nome: e.target.value }))}
-              placeholder="Nome do projeto"
-              className={`w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 ${
-                isLight ? 'bg-white border-slate-200 focus:ring-violet-500/20 focus:border-violet-400' : 'bg-slate-800/60 border-slate-700 focus:ring-violet-500/20 focus:border-violet-500 text-white'
-              }`}
-            />
-            <select
-              value={novoProjeto.centro_custo_id}
-              onChange={e => setNovoProjeto(p => ({ ...p, centro_custo_id: e.target.value }))}
-              className={`w-full rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 ${
-                isLight ? 'bg-white border-slate-200 focus:ring-violet-500/20 focus:border-violet-400' : 'bg-slate-800/60 border-slate-700 focus:ring-violet-500/20 focus:border-violet-500 text-white'
-              }`}
-            >
-              <option value="">Centro de custo (opcional)</option>
-              {(lookups?.centros_custo ?? []).map(cc => (
-                <option key={cc.id} value={cc.id}>{cc.codigo} - {cc.descricao}</option>
-              ))}
-            </select>
-            <div className="flex gap-1.5">
-              <button onClick={handleCriarProjeto} disabled={!novoProjeto.nome.trim() || criarProjeto.isPending}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-violet-500 text-white hover:bg-violet-600 transition-all disabled:opacity-50">
-                <Check size={11} /> Criar
-              </button>
-              <button onClick={() => setCriando(false)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-700 text-slate-300'}`}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {loadingProjetos ? (
-          <div className="flex items-center justify-center py-3">
-            <div className="w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-          </div>
-        ) : projetosAtivos.length === 0 ? (
-          <p className={`text-xs italic px-2 py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Nenhum projeto cadastrado
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {/* "Todos" chip */}
-            <button
-              onClick={() => setProjetoId(null)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
-                projetoId === null
-                  ? isLight
-                    ? `${tabAccent.bgActive} ${tabAccent.textActive} ${tabAccent.border}`
-                    : `${tabAccent.bgActiveDark} ${tabAccent.textActiveDark} ${tabAccent.borderDark}`
-                  : isLight
-                    ? 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
-                    : 'bg-slate-800/40 text-slate-400 border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              Todos · {projetosAtivos.length}
-            </button>
-            {projetosAtivos.map(p => {
-              const active = projetoId === p.id
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setProjetoId(p.id)}
-                  title={p.nome}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
-                    active
-                      ? isLight
-                        ? `${tabAccent.bgActive} ${tabAccent.textActive} ${tabAccent.border}`
-                        : `${tabAccent.bgActiveDark} ${tabAccent.textActiveDark} ${tabAccent.borderDark}`
-                      : isLight
-                        ? 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                        : 'bg-slate-800/40 text-slate-300 border-slate-700 hover:border-slate-600'
-                  }`}
-                >
-                  {p.centro_custo?.codigo ? (
-                    <>
-                      <span className={`font-mono ${active ? '' : (isLight ? 'text-slate-400' : 'text-slate-500')}`}>
-                        {p.centro_custo.codigo}
-                      </span>
-                      <span>·</span>
-                    </>
-                  ) : null}
-                  <span className="truncate max-w-[180px]">
-                    {(p.centro_custo?.descricao || p.nome).replace(/^CEMIG\s*\|\s*/, '')}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      {/* Barra de filtro de Projetos (multi-select) */}
+      <ProjetosFilterBar
+        projetos={projetos ?? []}
+        loadingProjetos={loadingProjetos}
+        excluded={excluded}
+        setExcluded={setExcluded}
+        criando={criando}
+        setCriando={setCriando}
+        novoProjeto={novoProjeto}
+        setNovoProjeto={setNovoProjeto}
+        handleCriarProjeto={handleCriarProjeto}
+        criarProjetoPending={criarProjeto.isPending}
+        lookupsCC={lookups?.centros_custo ?? []}
+        accentText={isLight ? tabAccent.text : tabAccent.textDark}
+        accentBg={isLight ? tabAccent.bg : tabAccent.bgDark}
+        isLight={isLight}
+      />
 
       {/* Tab content */}
       {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} obraId={portfolio?.obra_id} isLight={isLight} />}
