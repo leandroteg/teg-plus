@@ -3,25 +3,21 @@ import { useMemo, useState } from 'react'
 import { TrendingUp, Building2, PieChart, Grid3x3, Users } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useMedicaoMensal, useMedicaoSecao, useEAPFinal } from '../../../hooks/usePMO'
+import { Kpi, PanelCard, HBarRow, Heatmap } from '../../rh/paineis/_ui'
 
 // As medições são sempre do contrato CEMIG — o mapeamento OSC→polo é deste portfólio,
 // independente do contrato selecionado no seletor (senão tudo cai em "Outros").
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
-import { Kpi, PanelCard, HBarRow, Heatmap } from '../../rh/paineis/_ui'
 
 const POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#64748b']
 const poloNome = (s: string) => s.replace(/^F[\d.\/]+\s*-\s*/, '')
-// O espelho mensal só quebra até a SEÇÃO CEMIG. Mapeamos para os pacotes da EAP que
-// têm correspondência exata (1:1). A seção 1 "Serviços Preliminares" engloba
-// Serv.Preliminares + Canteiro + Adm — sem dado mensal por subseção, fica em "Serv. Preliminares".
-const SECAO_TO_EAP: Record<string, string> = {
-  'Preliminares': 'Serv. Preliminares', 'Fundações': 'Fundações', 'Montagem': 'Montagem de Torres', 'Lançamento': 'Lançamento de Cabos',
-  'Transportes': 'Outros', 'Aterramento': 'Outros', 'Complementares': 'Outros', 'Desmontagem': 'Outros',
-  'Depósito': 'Outros', 'Serv. Especiais': 'Outros', 'Outros (sem detalhe)': 'Outros',
-}
-const PAC_ORD = ['Serv. Preliminares', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Outros']
+// Pacotes da EAP (mesma taxonomia do painel Produção). A tabela pmo_medicao_secao já grava
+// estes nomes: seções 2/4/6 = Fundações/Montagem/Lançamento; a seção 1 do espelho é dividida
+// em Serv.Preliminares/Canteiro/Adm pelos %s reais de cada subseção; o resto = Outros.
+const PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
 const PAC_COR: Record<string, string> = {
-  'Serv. Preliminares': '#0284c7', 'Fundações': '#92400e', 'Montagem de Torres': '#374151', 'Lançamento de Cabos': '#3730a3', 'Outros': '#64748b',
+  'Serv. Preliminares': '#0284c7', 'Canteiro e Mobiliz.': '#0369a1', 'Fundações': '#92400e', 'Montagem de Torres': '#374151',
+  'Lançamento de Cabos': '#3730a3', 'Administração Local': '#6d28d9', 'Outros': '#64748b',
 }
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
@@ -100,7 +96,7 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     for (const r of (secaoRows ?? [])) {
       const v = Number(r.realizado ?? 0); const c = r.competencia
       if (v <= 0 || c < de || c > ateF) continue
-      const pac = SECAO_TO_EAP[r.pacote] ?? 'Outros'
+      const pac = r.pacote
       porPac.set(pac, (porPac.get(pac) ?? 0) + v)
       let pm = pacMes.get(pac); if (!pm) { pm = new Map(); pacMes.set(pac, pm) }
       pm.set(c, (pm.get(c) ?? 0) + v); mset.add(c)
