@@ -568,8 +568,10 @@ function MedicaoDetalheModal({ osc, onClose, isLight }: { osc: MedicaoOSCRow; on
   const compFmt = (c: string | null) => {
     if (!c) return '—'
     const [y, m] = c.split('-')
-    return m ? `${m}/${y}` : c
+    return m ? `${y}/${m}` : c
   }
+  // espelhos em ordem decrescente de data (mais recente primeiro), nulos por último
+  const espelhosOrd = [...(espelhos ?? [])].sort((a, b) => (b.competencia ?? '').localeCompare(a.competencia ?? ''))
   const porSecao = (itens ?? []).reduce((acc, it) => { const k = it.secao ?? '—'; (acc[k] ??= []).push(it); return acc }, {} as Record<string, EGPOscItem[]>)
   const pct = osc.valor ? Math.round(osc.medido / osc.valor * 100) : 0
 
@@ -606,11 +608,14 @@ function MedicaoDetalheModal({ osc, onClose, isLight }: { osc: MedicaoOSCRow; on
               : !espelhos?.length ? <div className={`text-xs italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum espelho arquivado para esta OSC.</div>
                 : (
                   <div className="space-y-1.5">
-                    {espelhos.map(e => (
+                    {espelhosOrd.map(e => (
                       <div key={e.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                         <FileText size={15} className={isLight ? 'text-rose-500' : 'text-rose-400'} />
                         <div className="min-w-0 flex-1">
-                          <div className={`text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>Medição {compFmt(e.competencia)}</div>
+                          <div className={`text-sm font-semibold flex items-center gap-1.5 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                            Medição
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold tabular-nums px-1.5 py-0.5 rounded ${isLight ? 'bg-teal-50 text-teal-700' : 'bg-teal-500/15 text-teal-300'}`}><Calendar size={11} />{compFmt(e.competencia)}</span>
+                          </div>
                           <div className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{e.arquivo_nome}</div>
                         </div>
                         <button onClick={() => abrir(e.storage_path, false, e.id + 'v')} disabled={busy === e.id + 'v'}
