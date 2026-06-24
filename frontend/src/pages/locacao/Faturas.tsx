@@ -213,7 +213,9 @@ function ImovelFaturasModal({
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
   const cc = (imovel as any).centro_custo
-  const endereco = [imovel.endereco, imovel.numero].filter(Boolean).join(', ')
+  const endereco = imovel.numero && !(imovel.endereco ?? '').includes(String(imovel.numero))
+    ? [imovel.endereco, imovel.numero].filter(Boolean).join(', ')
+    : (imovel.endereco ?? '')
   const cidadeUf = [imovel.cidade, imovel.uf].filter(Boolean).join('/')
 
   // Faturas for the selected competencia

@@ -12,6 +12,12 @@ import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const fmtCur = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+// Monta "logradouro, número" — só concatena o número se ele ainda não estiver no logradouro
+// (evita duplicar enquanto o número estiver guardado nos dois lugares).
+const fmtEndereco = (i: { endereco?: string; descricao?: string; numero?: string }) => {
+  const base = i.endereco || i.descricao || 'Não informado'
+  return i.numero && !base.includes(String(i.numero)) ? `${base}, ${i.numero}` : base
+}
 
 const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   ativo:      { label: 'Ativo',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
@@ -112,7 +118,7 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
           <div className={`rounded-xl p-4 ${isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'}`}>
             <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Endereço</p>
             <div className="space-y-1">
-              <p className={`text-sm font-bold ${txtMain}`}>{imovel.endereco || imovel.descricao || 'Não informado'}{imovel.numero ? `, ${imovel.numero}` : ''}</p>
+              <p className={`text-sm font-bold ${txtMain}`}>{fmtEndereco(imovel)}</p>
               {imovel.complemento && <p className={`text-xs ${txtMuted}`}>{imovel.complemento}</p>}
               {imovel.bairro && <p className={`text-xs ${txtMuted}`}>{imovel.bairro}</p>}
               <p className={`text-xs ${txtMuted}`}>{[imovel.cidade, imovel.uf].filter(Boolean).join(' — ') || 'Cidade não informada'}{imovel.cep ? ` · CEP ${imovel.cep}` : ''}</p>
