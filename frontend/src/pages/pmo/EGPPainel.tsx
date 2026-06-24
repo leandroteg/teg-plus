@@ -1,11 +1,22 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   RefreshCw, AlertTriangle, Zap,
   TrendingUp, Clock, MapPin, Activity, DollarSign,
-  CalendarClock, BarChart3, ChevronRight,
+  CalendarClock, BarChart3, ChevronRight, ChevronDown,
   Upload, FileText, Loader2, CheckCircle, X, Sparkles,
 } from 'lucide-react'
+
+const ProducaoPainel = lazy(() => import('./paineis/ProducaoPainel'))
+const MedicaoPainel = lazy(() => import('./paineis/MedicaoPainel'))
+const CustosPainel = lazy(() => import('./paineis/CustosPainel'))
+type EGPPainelKey = 'geral' | 'producao' | 'medicao' | 'custos'
+const EGP_PAINEIS: Array<{ key: EGPPainelKey; label: string }> = [
+  { key: 'geral', label: 'Visão Geral' },
+  { key: 'producao', label: 'Produção' },
+  { key: 'medicao', label: 'Medição' },
+  { key: 'custos', label: 'Custos' },
+]
 import { useQuery } from '@tanstack/react-query'
 import { usePortfolios, useParseOSC, useConfirmarOSC } from '../../hooks/usePMO'
 import type { OSCParsed } from '../../hooks/usePMO'
@@ -576,6 +587,7 @@ function UploadOSCModal({ open, onClose, isDark }: { open: boolean; onClose: () 
 export default function EGPPainel() {
   const nav = useNavigate()
   const { isDark } = useTheme()
+  const [painel, setPainel] = useState<EGPPainelKey>('geral')
   const [obraFilter, setObraFilter] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   const obras = useLookupObras()
@@ -694,14 +706,26 @@ export default function EGPPainel() {
 
       {/* Header + Filtros */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Painel - EGP
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Portfólio de obras, indicadores e alertas críticos
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Painel - EGP
+            </h1>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Portfólio de obras, indicadores e alertas críticos
+            </p>
+          </div>
+          <div className="relative">
+            <select value={painel} onChange={e => setPainel(e.target.value as EGPPainelKey)}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}>
+              {EGP_PAINEIS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          </div>
         </div>
+        {painel === 'geral' && (
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex items-center">
             <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -735,8 +759,19 @@ export default function EGPPainel() {
             <RefreshCw size={12} /> Atualizar
           </button>
         </div>
+        )}
       </div>
 
+      {/* Painéis selecionáveis (Produção / Medição / Custos) */}
+      {painel !== 'geral' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          {painel === 'producao' && <ProducaoPainel />}
+          {painel === 'medicao' && <MedicaoPainel />}
+          {painel === 'custos' && <CustosPainel />}
+        </Suspense>
+      )}
+
+      {painel === 'geral' && (<>
       {/* Upload OSC Modal */}
       <UploadOSCModal open={uploadOpen} onClose={() => setUploadOpen(false)} isDark={isDark} />
 
@@ -1031,6 +1066,7 @@ export default function EGPPainel() {
         </div>
       </section>
       </div>
+      </>)}
 
     </div>
   )
