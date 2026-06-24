@@ -88,15 +88,17 @@ function MuralBanner() {
 
 // ── Home Component ──────────────────────────────────────────────────────────
 
-export default function PortalHome({ user }: { user: PortalUser }) {
+export default function PortalHome({ user, onAbrirMissoes }: { user: PortalUser; onAbrirMissoes?: () => void }) {
   const { logout } = usePortalAuth()
   const primeiroNome = user.nome.split(' ')[0]
 
   function handleClick(b: BotaoConfig) {
     if (b.external) {
       window.open(b.href, '_blank', 'noopener,noreferrer')
+    } else if (b.key === 'procedimentos' && onAbrirMissoes) {
+      onAbrirMissoes()
     } else {
-      // Por enquanto: alerta. Implementar páginas no futuro.
+      // Demais telas internas: em breve.
       alert(`${b.label} — em breve.`)
     }
   }
