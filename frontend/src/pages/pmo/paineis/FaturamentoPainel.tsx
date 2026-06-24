@@ -15,24 +15,33 @@ function listaMeses(de: string, ate: string): string[] {
   return out
 }
 const ymLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${MES_ABR[Number(m)]}/${y.slice(2)}` }
+function shiftMonth(ym: string, delta: number): string {
+  let [y, m] = ym.split('-').map(Number); m += delta
+  while (m < 1) { m += 12; y-- }; while (m > 12) { m -= 12; y++ }
+  return `${y}-${String(m).padStart(2, '0')}`
+}
 
 export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string; ate?: string }) {
   const { isDark } = useTheme()
   const { data: rows, isLoading } = useMedicaoMensal()
   const [hover, setHover] = useState<number | null>(null)
+  const [visao, setVisao] = useState<'faturamento' | 'producao'>('faturamento')
   const ateF = ate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
+  const isProd = visao === 'producao'
+  const noun = isProd ? 'Produção' : 'Faturamento'
 
   const serie = useMemo(() => {
     const byM = new Map<string, { fat: number; oscs: Set<string> }>()
     for (const r of (rows ?? [])) {
       const v = Number(r.realizado ?? 0); if (v <= 0) continue
-      const c = r.competencia
+      // produção = 1 mês antes do faturamento (mês de execução)
+      const c = isProd ? shiftMonth(r.competencia, -1) : r.competencia
       let a = byM.get(c); if (!a) { a = { fat: 0, oscs: new Set() }; byM.set(c, a) }
       a.fat += v; a.oscs.add(r.numero_os)
     }
     const meses = listaMeses(de, ateF)
     return meses.map(ym => ({ ym, fat: byM.get(ym)?.fat ?? 0, oscs: byM.get(ym)?.oscs.size ?? 0 }))
-  }, [rows, de, ateF])
+  }, [rows, de, ateF, isProd])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -44,14 +53,25 @@ export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+          {(['producao', 'faturamento'] as const).map(v => (
+            <button key={v} onClick={() => setVisao(v)} className={`px-3 py-1.5 text-xs font-semibold transition-colors ${visao === v ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>
+              {v === 'producao' ? 'Produção' : 'Faturamento'}
+            </button>
+          ))}
+        </div>
+        <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{isProd ? 'mês de execução (1 mês antes do faturamento)' : 'mês do faturamento / medição'}</span>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <Kpi label="Faturado no período" value={fmtM(total)} tone="emerald" isDark={isDark} note={`${ativos.length} mes(es)`} />
+        <Kpi label={`${noun} no período`} value={fmtM(total)} tone="emerald" isDark={isDark} note={`${ativos.length} mes(es)`} />
         <Kpi label="Média mensal" value={fmtM(media)} tone="violet" isDark={isDark} note="meses com medição" />
         <Kpi label="Melhor mês" value={fmtM(melhor.fat)} tone="sky" isDark={isDark} note={melhor.ym ? ymLabel(melhor.ym) : '—'} />
         <Kpi label="Run-rate anual" value={fmtM(media * 12)} tone="amber" isDark={isDark} note="média × 12" />
       </div>
 
-      <PanelCard title="Faturamento mensal (medições consolidadas)" icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}>
+      <PanelCard title={`${noun} mensal (medições consolidadas)`} icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}>
         <div className="flex items-end gap-1 pt-6" style={{ height: 230 }}>
           {serie.map((s, i) => (
             <div key={s.ym} className="flex-1 flex flex-col items-center justify-end h-full relative" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
@@ -70,13 +90,13 @@ export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string
         <div className="flex gap-1 mt-1">
           {serie.map(s => <span key={s.ym} className={`flex-1 text-center text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{Number(s.ym.split('-')[1]) === 1 ? `'${s.ym.slice(2, 4)}` : MES_ABR[Number(s.ym.split('-')[1])][0]}</span>)}
         </div>
-        <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valores em R$ milhões. Faturamento = soma das medições realizadas no mês.</p>
+        <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valores em R$ milhões. {isProd ? 'Produção = medição deslocada 1 mês (mês de execução).' : 'Faturamento = soma das medições realizadas no mês.'}</p>
       </PanelCard>
 
       <PanelCard title="Detalhamento mensal" icon={<Calendar size={14} className="text-teal-500" />} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className={`text-[11px] uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <th className="text-left px-4 py-2">Mês</th><th className="text-right px-4 py-2">Faturado</th><th className="text-right px-4 py-2">OSCs</th>
+            <th className="text-left px-4 py-2">Mês</th><th className="text-right px-4 py-2">{noun}</th><th className="text-right px-4 py-2">OSCs</th>
           </tr></thead>
           <tbody>
             {[...ativos].reverse().map(s => (
