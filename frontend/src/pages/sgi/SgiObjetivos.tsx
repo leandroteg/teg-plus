@@ -378,7 +378,7 @@ export default function SgiObjetivos() {
             <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
           </div>
         ) : tab === 'anuais' || tab === 'trimestrais' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="space-y-3">
             {objetivos.map(obj => (
               <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark}
                 onCheckin={m => setCheckin({ obj, meta: m })} txt={txt} muted={muted} card={card} />
@@ -392,7 +392,7 @@ export default function SgiObjetivos() {
               <p className="text-xs">Defina metas trimestrais na aba "Metas Trimestrais" para montar o plano de ação.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {metasTri.map(({ obj, meta }) => (
                 <PlanoAcaoMeta key={meta.id} obj={obj} meta={meta} acoes={acoes} isDark={isDark} txt={txt} muted={muted} card={card} />
               ))}

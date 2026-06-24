@@ -341,7 +341,7 @@ export default function SgiMelhoriaContinua() {
             <RefreshCcw size={40} className="mb-3" /><p className="text-sm font-medium">Nenhum registro nesta etapa</p>
           </div>
         ) : view === 'cards' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-4">
+          <div className="space-y-2 p-4">
             {filtrados.map(r => <RegistroCard key={r.id} r={r} isDark={isDark} onClick={() => setDetail(r)} />)}
           </div>
         ) : (
