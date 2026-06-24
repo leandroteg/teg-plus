@@ -302,16 +302,35 @@ export async function getEspelhoUrl(path: string, download = false): Promise<str
 }
 
 // medição mensal consolidada (realizado por OSC por mês) — base do painel de Faturamento
-export interface MedicaoMensalRow { numero_os: string; competencia: string; realizado: number | null; acumulado: number | null; n_medicoes: number | null }
+export interface MedicaoMensalRow { numero_os: string; competencia: string; realizado: number | null; acumulado: number | null; n_medicoes: number | null; subcontratada?: boolean }
 export function useMedicaoMensal() {
   return useQuery<MedicaoMensalRow[]>({
     queryKey: ['egp-medicao-mensal'],
     queryFn: async () => {
       let out: MedicaoMensalRow[] = []; let from = 0
       for (;;) {
-        const { data, error } = await supabase.from('pmo_medicao_mensal').select('numero_os, competencia, realizado, acumulado, n_medicoes').order('competencia').range(from, from + 999)
+        const { data, error } = await supabase.from('pmo_medicao_mensal').select('numero_os, competencia, realizado, acumulado, n_medicoes, subcontratada').order('competencia').range(from, from + 999)
         if (error) throw error
         out = out.concat((data ?? []) as MedicaoMensalRow[])
+        if (!data || data.length < 1000) break
+        from += 1000
+      }
+      return out
+    },
+  })
+}
+
+// medição por seção/pacote da EAP (realizado real por OSC×mês×pacote)
+export interface MedicaoSecaoRow { numero_os: string; competencia: string; pacote: string; realizado: number | null }
+export function useMedicaoSecao() {
+  return useQuery<MedicaoSecaoRow[]>({
+    queryKey: ['egp-medicao-secao'],
+    queryFn: async () => {
+      let out: MedicaoSecaoRow[] = []; let from = 0
+      for (;;) {
+        const { data, error } = await supabase.from('pmo_medicao_secao').select('numero_os, competencia, pacote, realizado').range(from, from + 999)
+        if (error) throw error
+        out = out.concat((data ?? []) as MedicaoSecaoRow[])
         if (!data || data.length < 1000) break
         from += 1000
       }
