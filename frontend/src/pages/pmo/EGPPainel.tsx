@@ -8,12 +8,14 @@ import {
 } from 'lucide-react'
 
 const ProducaoPainel = lazy(() => import('./paineis/ProducaoPainel'))
+const FaturamentoPainel = lazy(() => import('./paineis/FaturamentoPainel'))
 const MedicaoPainel = lazy(() => import('./paineis/MedicaoPainel'))
 const CustosPainel = lazy(() => import('./paineis/CustosPainel'))
-type EGPPainelKey = 'geral' | 'producao' | 'medicao' | 'custos'
+type EGPPainelKey = 'geral' | 'producao' | 'faturamento' | 'medicao' | 'custos'
 const EGP_PAINEIS: Array<{ key: EGPPainelKey; label: string }> = [
   { key: 'geral', label: 'Visão Geral' },
   { key: 'producao', label: 'Produção' },
+  { key: 'faturamento', label: 'Faturamento' },
   { key: 'medicao', label: 'Medição' },
   { key: 'custos', label: 'Custos' },
 ]
@@ -793,6 +795,7 @@ export default function EGPPainel() {
       {painel !== 'geral' && (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>}>
           {painel === 'producao' && <ProducaoPainel de={de} ate={ate} />}
+          {painel === 'faturamento' && <FaturamentoPainel de={de} ate={ate} />}
           {painel === 'medicao' && <MedicaoPainel de={de} ate={ate} />}
           {painel === 'custos' && <CustosPainel />}
         </Suspense>

@@ -301,6 +301,25 @@ export async function getEspelhoUrl(path: string, download = false): Promise<str
   return data?.signedUrl ?? null
 }
 
+// medição mensal consolidada (realizado por OSC por mês) — base do painel de Faturamento
+export interface MedicaoMensalRow { numero_os: string; competencia: string; realizado: number | null; acumulado: number | null; n_medicoes: number | null }
+export function useMedicaoMensal() {
+  return useQuery<MedicaoMensalRow[]>({
+    queryKey: ['egp-medicao-mensal'],
+    queryFn: async () => {
+      let out: MedicaoMensalRow[] = []; let from = 0
+      for (;;) {
+        const { data, error } = await supabase.from('pmo_medicao_mensal').select('numero_os, competencia, realizado, acumulado, n_medicoes').order('competencia').range(from, from + 999)
+        if (error) throw error
+        out = out.concat((data ?? []) as MedicaoMensalRow[])
+        if (!data || data.length < 1000) break
+        from += 1000
+      }
+      return out
+    },
+  })
+}
+
 // medição por OSC (agrupado por polo) — medido = Σ valor_acum dos itens
 export interface MedicaoOSCRow {
   id: string
