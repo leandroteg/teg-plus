@@ -185,7 +185,10 @@ function TableRow({ ad, isDark, onStatus, isBusy }: {
     <tr className={`border-b transition-colors cursor-pointer
       ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
       <td className={`px-4 py-3 text-sm font-medium ${txt}`}>
-        <span className="block truncate max-w-[160px]">{ad.imovel?.descricao ?? '—'}</span>
+        <span className="block truncate max-w-[220px]">{ad.imovel?.endereco ?? ad.imovel?.descricao ?? '—'}</span>
+      </td>
+      <td className={`px-4 py-3 text-sm ${txtMuted}`}>
+        {ad.imovel?.cidade ?? '—'}
       </td>
       <td className="px-4 py-3">
         <TipoBadge tipo={ad.tipo} />
@@ -235,7 +238,7 @@ function AditivoCard({ ad, isDark, onStatus, isBusy }: {
         <StatusBadge status={ad.status} />
       </div>
       {/* Linha 2 */}
-      <p className={`text-xs mb-2 ${txtMuted}`}>{ad.imovel?.descricao ?? '—'}</p>
+      <p className={`text-xs mb-2 ${txtMuted}`}>{ad.imovel?.endereco ?? ad.imovel?.descricao ?? '—'}{ad.imovel?.cidade ? ` · ${ad.imovel.cidade}` : ''}</p>
       {/* Linha 3 */}
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${txtMuted}`}>
         {(ad.data_inicio || ad.data_fim) && (
@@ -276,6 +279,8 @@ export default function AditivosRenovacoes() {
     if (!search) return true
     const q = search.toLowerCase()
     return (
+      ad.imovel?.endereco?.toLowerCase().includes(q) ||
+      ad.imovel?.cidade?.toLowerCase().includes(q) ||
       ad.imovel?.descricao?.toLowerCase().includes(q) ||
       ad.descricao?.toLowerCase().includes(q) ||
       ad.tipo?.toLowerCase().includes(q)
@@ -350,7 +355,7 @@ export default function AditivosRenovacoes() {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Imóvel', 'Tipo', 'Período', 'Valor Anterior → Novo', 'Status', 'Ações'].map(h => (
+                  {['Imóvel', 'Cidade', 'Tipo', 'Período', 'Valor Anterior → Novo', 'Status', 'Ações'].map(h => (
                     <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>
                       {h}
                     </th>

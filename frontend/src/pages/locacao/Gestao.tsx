@@ -10,9 +10,9 @@ import Acordos from './Acordos'
 
 const TABS = [
   { key: 'ativos',   label: 'Ativos',                  icon: Building2 },
+  { key: 'aditivos', label: 'Aditivos & Renovações',    icon: FileSignature },
   { key: 'faturas',  label: 'Faturas',                  icon: Receipt },
   { key: 'servicos', label: 'Manutenções e Serviços',   icon: Wrench },
-  { key: 'aditivos', label: 'Aditivos & Renovações',    icon: FileSignature },
   { key: 'acordos',  label: 'Acordos',                  icon: Handshake },
 ] as const
 

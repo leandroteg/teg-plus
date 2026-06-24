@@ -30,6 +30,7 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
   const centrosCusto = useLookupCentrosCusto()
   const [current, setCurrent] = useState<LocImovel>(imovelProp)
   const [editing, setEditing] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [form, setForm] = useState<Partial<LocImovel>>({})
 
   const imovel = current
@@ -76,6 +77,8 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
       const updated = await atualizar.mutateAsync({ id: current.id, ...form })
       setCurrent(prev => ({ ...prev, ...updated }))
       setEditing(false)
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 2500)
     } catch (err) {
       alert('Erro ao salvar: ' + (err as Error).message)
     }
@@ -95,8 +98,11 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
 
         <div className="p-5 space-y-4">
           {!editing && (<>
-          {/* Status */}
-          <div className="flex items-center justify-end">
+          {/* Status + confirmação de salvamento */}
+          <div className="flex items-center justify-between">
+            {justSaved
+              ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><CheckCircle2 size={14} /> Alterações salvas</span>
+              : <span />}
             <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${stCfg.bg} ${stCfg.text}`}>
               <span className={`w-2 h-2 rounded-full ${stCfg.dot}`} /> {stCfg.label}
             </span>
