@@ -197,6 +197,54 @@ export function useCriarMeta() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sgi_objetivos'] }),
   })
 }
+export function useAtualizarObjetivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<SgiObjetivo> & { id: string }) => {
+      const { data, error } = await supabase.from('sgi_objetivos').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+      if (error) throw error
+      return data as SgiObjetivo
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sgi_objetivos'] }),
+  })
+}
+export function useRemoverObjetivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    // Remove o objetivo e seus dependentes (metas + check-ins), sem depender de cascade no banco.
+    mutationFn: async (id: string) => {
+      const { data: metas } = await supabase.from('sgi_metas').select('id').eq('objetivo_id', id)
+      const metaIds = (metas ?? []).map(m => (m as { id: string }).id)
+      if (metaIds.length) await supabase.from('sgi_metas_checkin').delete().in('meta_id', metaIds)
+      await supabase.from('sgi_metas').delete().eq('objetivo_id', id)
+      const { error } = await supabase.from('sgi_objetivos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sgi_objetivos'] }),
+  })
+}
+export function useAtualizarMeta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<SgiMeta> & { id: string }) => {
+      const { data, error } = await supabase.from('sgi_metas').update(payload).eq('id', id).select().single()
+      if (error) throw error
+      return data as SgiMeta
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sgi_objetivos'] }),
+  })
+}
+export function useRemoverMeta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from('sgi_metas_checkin').delete().eq('meta_id', id)
+      const { error } = await supabase.from('sgi_metas').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sgi_objetivos'] }),
+  })
+}
 export function useCheckins(metaId?: string) {
   return useQuery({
     queryKey: ['sgi_checkins', metaId],

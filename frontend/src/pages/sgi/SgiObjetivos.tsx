@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react'
-import { Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2, Circle, Send } from 'lucide-react'
+import {
+  Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2, Circle, Send,
+  Pencil, Trash2, Search, LayoutList, LayoutGrid, AlertTriangle,
+} from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin,
+  useAtualizarObjetivo, useAtualizarMeta, useRemoverObjetivo, useRemoverMeta,
   useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro,
 } from '../../hooks/useSgi'
 import { FAROL_CFG, STATUS_ACAO_LABEL } from '../../types/sgi'
@@ -14,6 +18,8 @@ type ObjFull = SgiObjetivo & { metas: MetaFull[] }
 const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
 const ultimoCheckin = (m: MetaFull): SgiCheckin | null =>
   m.checkins?.length ? [...m.checkins].sort((a, b) => (b.competencia || '').localeCompare(a.competencia || ''))[0] : null
+const alvoLabel = (obj: { direcao: DirecaoMeta; unidade?: string | null }, alvo?: number | null) =>
+  `${obj.direcao === 'menor_melhor' ? '≤' : '≥'} ${alvo ?? '—'}${obj.unidade ? ` ${obj.unidade}` : ''}`
 
 // ── Abas (padrão Gestao/Padronizacao) ─────────────────────────────────────────
 type TabKey = 'anuais' | 'trimestrais' | 'plano' | 'checkin' | 'revisao'
@@ -40,17 +46,20 @@ const TAB_ACCENT_DARK: Record<TabKey, AccentSet> = {
   revisao:     { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   badge:'bg-amber-500/15 text-amber-300',     border:'border-amber-500/20' },
 }
 
-// ── Modal Novo Objetivo (+ meta anual) ────────────────────────────────────────
-function NovoObjetivoModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
+// ── Modal Novo / Editar Objetivo (+ meta anual) ───────────────────────────────
+function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () => void; isDark: boolean }) {
   const criarObj = useCriarObjetivo()
   const criarMeta = useCriarMeta()
-  const anoAtual = new Date().getFullYear()
-  const [titulo, setTitulo] = useState('')
-  const [area, setArea] = useState('')
-  const [indicador, setIndicador] = useState('')
-  const [unidade, setUnidade] = useState('')
-  const [direcao, setDirecao] = useState<DirecaoMeta>('maior_melhor')
-  const [alvo, setAlvo] = useState('')
+  const atualizarObj = useAtualizarObjetivo()
+  const atualizarMeta = useAtualizarMeta()
+  const anoAtual = edit?.ano ?? new Date().getFullYear()
+  const metaAnual = edit?.metas.find(m => m.periodo === 'anual')
+  const [titulo, setTitulo] = useState(edit?.titulo ?? '')
+  const [area, setArea] = useState(edit?.area_processo ?? '')
+  const [indicador, setIndicador] = useState(edit?.indicador ?? '')
+  const [unidade, setUnidade] = useState(edit?.unidade ?? '')
+  const [direcao, setDirecao] = useState<DirecaoMeta>(edit?.direcao ?? 'maior_melhor')
+  const [alvo, setAlvo] = useState(metaAnual?.alvo != null ? String(metaAnual.alvo) : '')
   const [salvando, setSalvando] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -63,8 +72,15 @@ function NovoObjetivoModal({ onClose, isDark }: { onClose: () => void; isDark: b
     if (!titulo.trim()) return
     setSalvando(true)
     try {
-      const obj = await criarObj.mutateAsync({ titulo: titulo.trim(), ano: anoAtual, area_processo: area || undefined, indicador: indicador || undefined, unidade: unidade || undefined, direcao, status: 'ativo' })
-      await criarMeta.mutateAsync({ objetivo_id: obj.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined })
+      const fields = { titulo: titulo.trim(), area_processo: area || undefined, indicador: indicador || undefined, unidade: unidade || undefined, direcao }
+      if (edit) {
+        await atualizarObj.mutateAsync({ id: edit.id, ...fields })
+        if (metaAnual) await atualizarMeta.mutateAsync({ id: metaAnual.id, alvo: alvo ? Number(alvo) : null })
+        else await criarMeta.mutateAsync({ objetivo_id: edit.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined })
+      } else {
+        const obj = await criarObj.mutateAsync({ ...fields, ano: anoAtual, status: 'ativo' })
+        await criarMeta.mutateAsync({ objetivo_id: obj.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined })
+      }
       onClose()
     } finally { setSalvando(false) }
   }
@@ -73,7 +89,7 @@ function NovoObjetivoModal({ onClose, isDark }: { onClose: () => void; isDark: b
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
-          <h3 className={`text-base font-bold ${txt}`}>Novo Objetivo {anoAtual}</h3>
+          <h3 className={`text-base font-bold ${txt}`}>{edit ? 'Editar Objetivo' : `Novo Objetivo ${anoAtual}`}</h3>
           <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
         </div>
         <form onSubmit={submit} className="p-5 space-y-4">
@@ -109,10 +125,30 @@ function NovoObjetivoModal({ onClose, isDark }: { onClose: () => void; isDark: b
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
             <button type="submit" disabled={salvando || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
-              {salvando && <Loader2 size={14} className="animate-spin" />} Criar Objetivo
+              {salvando && <Loader2 size={14} className="animate-spin" />} {edit ? 'Salvar' : 'Criar Objetivo'}
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal de confirmação de exclusão ──────────────────────────────────────────
+function ConfirmDelModal({ label, pending, onConfirm, onClose, isDark }: { label: string; pending: boolean; onConfirm: () => void; onClose: () => void; isDark: boolean }) {
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className={`w-full max-w-sm rounded-2xl p-5 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-2"><AlertTriangle size={20} className="text-red-500" /><p className={`text-base font-bold ${txt}`}>Remover?</p></div>
+        <p className={`text-sm mb-4 ${muted}`}>{label} Esta ação não pode ser desfeita.</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className={`px-3 py-2 rounded-lg text-sm font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Cancelar</button>
+          <button onClick={onConfirm} disabled={pending} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
+            {pending && <Loader2 size={14} className="animate-spin" />} Remover
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -147,7 +183,7 @@ function CheckinModal({ obj, meta, onClose, isDark }: { obj: ObjFull; meta: Meta
           <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <p className={`text-xs ${muted}`}>Alvo {obj.direcao === 'menor_melhor' ? '≤' : '≥'} <b className={txt}>{meta.alvo ?? '—'}</b> {obj.unidade || ''} · {obj.direcao === 'maior_melhor' ? 'maior é melhor' : 'menor é melhor'}</p>
+          <p className={`text-xs ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`} · alvo <b className={txt}>{alvoLabel(obj, meta.alvo)}</b> · {obj.direcao === 'maior_melhor' ? 'maior é melhor' : 'menor é melhor'}</p>
           <form onSubmit={submit} className="grid grid-cols-2 gap-3 items-end">
             <div>
               <label className={`block text-xs font-semibold mb-1 ${muted}`}>Competência</label>
@@ -190,42 +226,48 @@ function CheckinModal({ obj, meta, onClose, isDark }: { obj: ObjFull; meta: Meta
   )
 }
 
-// ── Card de objetivo (metas de um período) ────────────────────────────────────
-function ObjetivoCard({ obj, periodo, isDark, onCheckin, txt, muted, card }: {
-  obj: ObjFull; periodo: 'anual' | 'trimestral'; isDark: boolean
-  onCheckin: (m: MetaFull) => void; txt: string; muted: string; card: string
+// ── Card de objetivo (gestão de metas: criar / editar / remover) ──────────────
+function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDeleteObj, onDeleteMeta }: {
+  obj: ObjFull; periodo: 'anual' | 'trimestral'; isDark: boolean; txt: string; muted: string; card: string
+  onEdit: (o: ObjFull) => void; onDeleteObj: (o: ObjFull) => void; onDeleteMeta: (o: ObjFull, m: MetaFull) => void
 }) {
   const criarMeta = useCriarMeta()
   const metas = obj.metas.filter(m => m.periodo === periodo).sort((a, b) => (a.trimestre || 0) - (b.trimestre || 0))
   const [addTri, setAddTri] = useState('1')
   const [addAlvo, setAddAlvo] = useState('')
+  const iconBtn = `p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`
 
   return (
     <div className={`rounded-2xl border shadow-sm p-4 ${card}`}>
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <p className={`text-sm font-bold ${txt}`}>{obj.titulo}</p>
           <p className={`text-[11px] ${muted}`}>{obj.ano} · {obj.area_processo || '—'} · {obj.indicador || 'indicador'} {obj.unidade ? `(${obj.unidade})` : ''}</p>
         </div>
-        <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold ${muted}`}>
-          {obj.direcao === 'maior_melhor' ? <TrendingUp size={12} className="text-emerald-500" /> : <TrendingDown size={12} className="text-emerald-500" />}
-          {obj.direcao === 'maior_melhor' ? '↑ melhor' : '↓ melhor'}
-        </span>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold mr-1 ${muted}`}>
+            {obj.direcao === 'maior_melhor' ? <TrendingUp size={12} className="text-emerald-500" /> : <TrendingDown size={12} className="text-emerald-500" />}
+            {obj.direcao === 'maior_melhor' ? '↑ melhor' : '↓ melhor'}
+          </span>
+          <button onClick={() => onEdit(obj)} title="Editar objetivo" className={iconBtn}><Pencil size={14} /></button>
+          <button onClick={() => onDeleteObj(obj)} title="Remover objetivo" className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-red-500/15 text-red-400' : 'hover:bg-red-50 text-red-500'}`}><Trash2 size={14} /></button>
+        </div>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {metas.length === 0 && <p className={`text-xs ${muted}`}>Sem metas {periodo === 'anual' ? 'anuais' : 'trimestrais'}.</p>}
         {metas.map(m => {
           const u = ultimoCheckin(m)
           const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
           return (
-            <div key={m.id} className={`flex items-center justify-between gap-2 rounded-xl p-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+            <div key={m.id} className={`flex items-start justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
               <div className="min-w-0">
-                <p className={`text-xs font-semibold ${txt}`}>{m.periodo === 'anual' ? 'Meta anual' : `Trim. ${m.trimestre}`} · alvo {m.alvo ?? '—'}</p>
-                <p className={`text-[10px] ${muted}`}>{u ? `Último: ${u.competencia} → ${u.realizado ?? '—'}` : 'Sem check-in'}</p>
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>{m.periodo === 'anual' ? 'Meta anual' : `Meta · Trim. ${m.trimestre}`}</p>
+                <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>
+                <p className={`text-[10px] mt-0.5 ${muted}`}>{u ? `Último: ${u.competencia} → ${u.realizado ?? '—'}` : 'Sem check-in'}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                <button onClick={() => onCheckin(m)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"><CheckCircle2 size={12} /> Check-in</button>
+                <button onClick={() => onDeleteMeta(obj, m)} title="Remover meta" className={`p-1 rounded-lg ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
               </div>
             </div>
           )
@@ -263,7 +305,7 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
   return (
     <div className={`rounded-2xl border shadow-sm p-4 ${card}`}>
       <p className={`text-sm font-bold ${txt}`}>{obj.titulo}</p>
-      <p className={`text-[11px] mb-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`} · alvo {meta.alvo ?? '—'} {obj.unidade || ''}</p>
+      <p className={`text-[11px] mb-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`} · alvo {alvoLabel(obj, meta.alvo)}</p>
       <div className="space-y-1.5 mb-2">
         {mine.length === 0 && <p className={`text-xs ${muted}`}>Nenhuma ação planejada.</p>}
         {mine.map(a => {
@@ -302,10 +344,19 @@ export default function SgiObjetivos() {
   const { data: objetivos = [], isLoading } = useObjetivos()
   const { data: acoes = [] } = useAcoes()
   const criarRegistro = useCriarRegistro()
+  const removerObjetivo = useRemoverObjetivo()
+  const removerMeta = useRemoverMeta()
   const [tab, setTab] = useState<TabKey>('anuais')
   const [showNovo, setShowNovo] = useState(false)
+  const [editObj, setEditObj] = useState<ObjFull | null>(null)
+  const [delAlvo, setDelAlvo] = useState<{ tipo: 'objetivo' | 'meta'; id: string; label: string } | null>(null)
   const [checkin, setCheckin] = useState<{ obj: ObjFull; meta: MetaFull } | null>(null)
   const [enviados, setEnviados] = useState<Record<string, boolean>>({})
+
+  // Filtros / visão (padrão Padronização) — aplicáveis a todas as abas
+  const [busca, setBusca] = useState('')
+  const [farolFilter, setFarolFilter] = useState('')
+  const [view, setView] = useState<'table' | 'cards'>('table')
 
   const card = isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -322,6 +373,17 @@ export default function SgiObjetivos() {
     revisao: todasMetas.filter(({ meta }) => (meta.checkins?.length ?? 0) > 0).length,
   }), [objetivos, metasTri, todasMetas])
 
+  // Filtragem
+  const matchObj = (o: ObjFull) => { const q = busca.toLowerCase(); return [o.titulo, o.indicador, o.area_processo].some(v => v?.toLowerCase().includes(q)) }
+  const objetivosFiltrados = useMemo(() => busca ? objetivos.filter(matchObj) : objetivos, [objetivos, busca])
+  const metasTriFiltradas = useMemo(() => busca ? metasTri.filter(({ obj }) => matchObj(obj)) : metasTri, [metasTri, busca])
+  const metasFiltradas = useMemo(() => {
+    let items = todasMetas
+    if (busca) { const q = busca.toLowerCase(); items = items.filter(({ obj, meta }) => [obj.titulo, obj.indicador, obj.area_processo, meta.periodo === 'anual' ? 'anual' : `trim ${meta.trimestre}`].some(v => v?.toLowerCase().includes(q))) }
+    if (farolFilter) items = items.filter(({ meta }) => ((ultimoCheckin(meta)?.farol) || 'cinza') === farolFilter)
+    return items
+  }, [todasMetas, busca, farolFilter])
+
   const enviarMelhoria = async (obj: ObjFull, meta: MetaFull) => {
     const u = ultimoCheckin(meta)
     await criarRegistro.mutateAsync({
@@ -334,7 +396,18 @@ export default function SgiObjetivos() {
     setEnviados(p => ({ ...p, [meta.id]: true }))
   }
 
+  const confirmarRemocao = async () => {
+    if (!delAlvo) return
+    if (delAlvo.tipo === 'objetivo') await removerObjetivo.mutateAsync(delAlvo.id)
+    else await removerMeta.mutateAsync(delAlvo.id)
+    setDelAlvo(null)
+  }
+
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
+
+  const isCheckinView = tab === 'checkin' || tab === 'revisao'
+  const metaLabel = (m: MetaFull) => (m.periodo === 'anual' ? 'Anual' : `Trim. ${m.trimestre}`)
+  const inputBg = isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-600'
 
   return (
     <div className={`rounded-2xl border overflow-hidden flex flex-col h-full ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -370,7 +443,31 @@ export default function SgiObjetivos() {
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4 space-y-3">
+        {/* Toolbar: busca (todas as abas) + filtro de farol e toggle lista/cards (check-in e revisão) */}
+        {objetivos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[160px] max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar objetivo, indicador, área..."
+                className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${inputBg}`} />
+              {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"><X size={12} /></button>}
+            </div>
+            {isCheckinView && (
+              <select value={farolFilter} onChange={e => setFarolFilter(e.target.value)} className={`rounded-lg border px-2 py-1.5 text-[11px] ${inputBg}`}>
+                <option value="">Farol</option>
+                {(Object.keys(FAROL_CFG) as Farol[]).map(k => <option key={k} value={k}>{FAROL_CFG[k].label}</option>)}
+              </select>
+            )}
+            {isCheckinView && (
+              <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <button onClick={() => setView('table')} title="Lista" className={`p-1.5 ${view === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
+                <button onClick={() => setView('cards')} title="Cards" className={`p-1.5 ${view === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
+              </div>
+            )}
+          </div>
+        )}
+
         {objetivos.length === 0 ? (
           <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
             <Target size={40} className="mb-1 text-emerald-500/50" />
@@ -378,14 +475,20 @@ export default function SgiObjetivos() {
             <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
           </div>
         ) : tab === 'anuais' || tab === 'trimestrais' ? (
-          <div className="space-y-3">
-            {objetivos.map(obj => (
-              <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark}
-                onCheckin={m => setCheckin({ obj, meta: m })} txt={txt} muted={muted} card={card} />
-            ))}
-          </div>
+          objetivosFiltrados.length === 0 ? (
+            <p className={`text-xs ${muted}`}>Nenhum objetivo encontrado.</p>
+          ) : (
+            <div className="space-y-3">
+              {objetivosFiltrados.map(obj => (
+                <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark} txt={txt} muted={muted} card={card}
+                  onEdit={o => setEditObj(o)}
+                  onDeleteObj={o => setDelAlvo({ tipo: 'objetivo', id: o.id, label: `O objetivo "${o.titulo}" e todas as suas metas/check-ins serão removidos.` })}
+                  onDeleteMeta={(o, m) => setDelAlvo({ tipo: 'meta', id: m.id, label: `A meta ${m.periodo === 'anual' ? 'anual' : 'T' + m.trimestre} de "${o.titulo}" e seus check-ins serão removidos.` })} />
+              ))}
+            </div>
+          )
         ) : tab === 'plano' ? (
-          metasTri.length === 0 ? (
+          metasTriFiltradas.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
               <Target size={36} className="text-violet-500/50" />
               <p className={`text-sm font-medium ${txt}`}>Nenhuma meta trimestral</p>
@@ -393,84 +496,140 @@ export default function SgiObjetivos() {
             </div>
           ) : (
             <div className="space-y-3">
-              {metasTri.map(({ obj, meta }) => (
+              {metasTriFiltradas.map(({ obj, meta }) => (
                 <PlanoAcaoMeta key={meta.id} obj={obj} meta={meta} acoes={acoes} isDark={isDark} txt={txt} muted={muted} card={card} />
               ))}
             </div>
           )
         ) : tab === 'checkin' ? (
-          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                  <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
-                  <th className="text-left px-3 py-2 font-semibold">META</th>
-                  <th className="text-right px-3 py-2 font-semibold">ALVO</th>
-                  <th className="text-center px-3 py-2 font-semibold">FAROL</th>
-                  <th className="text-right px-3 py-2 font-semibold">AÇÃO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todasMetas.map(({ obj, meta }) => {
-                  const u = ultimoCheckin(meta)
-                  const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                  return (
-                    <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
-                      <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                      <td className={`px-3 py-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Anual' : `Trim. ${meta.trimestre}`}</td>
-                      <td className={`px-3 py-2.5 text-right ${muted}`}>{meta.alvo ?? '—'}{obj.unidade ? ` ${obj.unidade}` : ''}</td>
-                      <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
-                      <td className="px-3 py-2.5 text-right"><button onClick={() => setCheckin({ obj, meta })} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> Check-in</button></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          metasFiltradas.length === 0 ? (
+            <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
+          ) : view === 'cards' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {metasFiltradas.map(({ obj, meta }) => {
+                const u = ultimoCheckin(meta)
+                const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+                return (
+                  <div key={meta.id} className={`rounded-2xl border shadow-sm p-4 ${card}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${muted}`}>Meta · {metaLabel(meta)}</p>
+                        <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, meta.alvo)}</p>
+                        <p className={`text-[10px] mt-0.5 ${muted}`}>{u ? `Último: ${u.competencia} → ${u.realizado ?? '—'}` : 'Sem check-in'}</p>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                    </div>
+                    <button onClick={() => setCheckin({ obj, meta })} className="w-full mt-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"><CheckCircle2 size={13} /> Lançar Check-in</button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                    <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
+                    <th className="text-left px-3 py-2 font-semibold">META</th>
+                    <th className="text-right px-3 py-2 font-semibold">ALVO</th>
+                    <th className="text-center px-3 py-2 font-semibold">FAROL</th>
+                    <th className="text-right px-3 py-2 font-semibold">AÇÃO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metasFiltradas.map(({ obj, meta }) => {
+                    const u = ultimoCheckin(meta)
+                    const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+                    return (
+                      <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
+                        <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
+                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}</td>
+                        <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{alvoLabel(obj, meta.alvo)}</td>
+                        <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
+                        <td className="px-3 py-2.5 text-right"><button onClick={() => setCheckin({ obj, meta })} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> Check-in</button></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : (
           /* Revisão */
-          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                  <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
-                  <th className="text-left px-3 py-2 font-semibold">META</th>
-                  <th className="text-right px-3 py-2 font-semibold">REALIZADO/ALVO</th>
-                  <th className="text-center px-3 py-2 font-semibold">FAROL</th>
-                  <th className="text-right px-3 py-2 font-semibold">REVISÃO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todasMetas.map(({ obj, meta }) => {
-                  const u = ultimoCheckin(meta)
-                  const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                  const jaEnviado = enviados[meta.id]
-                  return (
-                    <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
-                      <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                      <td className={`px-3 py-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Anual' : `Trim. ${meta.trimestre}`}</td>
-                      <td className={`px-3 py-2.5 text-right ${muted}`}>{u?.realizado ?? '—'} / {meta.alvo ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
-                      <td className="px-3 py-2.5 text-right">
-                        {jaEnviado ? (
-                          <span className="text-[10px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Enviado</span>
-                        ) : (
-                          <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending}
-                            className="text-[11px] font-bold text-amber-600 hover:text-amber-700 inline-flex items-center gap-1 disabled:opacity-50">
-                            <Send size={12} /> Enviar p/ Melhoria
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          metasFiltradas.length === 0 ? (
+            <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
+          ) : view === 'cards' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {metasFiltradas.map(({ obj, meta }) => {
+                const u = ultimoCheckin(meta)
+                const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+                const jaEnviado = enviados[meta.id]
+                return (
+                  <div key={meta.id} className={`rounded-2xl border shadow-sm p-4 ${card}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${muted}`}>Meta · {metaLabel(meta)}</p>
+                        <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{u?.realizado ?? '—'} <span className={`text-sm font-semibold ${muted}`}>/ {alvoLabel(obj, meta.alvo)}</span></p>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                    </div>
+                    {jaEnviado ? (
+                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado p/ Melhoria</span>
+                    ) : (
+                      <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending} className="w-full mt-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5"><Send size={13} /> Enviar p/ Melhoria</button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                    <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
+                    <th className="text-left px-3 py-2 font-semibold">META</th>
+                    <th className="text-right px-3 py-2 font-semibold">REALIZADO/ALVO</th>
+                    <th className="text-center px-3 py-2 font-semibold">FAROL</th>
+                    <th className="text-right px-3 py-2 font-semibold">REVISÃO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metasFiltradas.map(({ obj, meta }) => {
+                    const u = ultimoCheckin(meta)
+                    const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+                    const jaEnviado = enviados[meta.id]
+                    return (
+                      <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
+                        <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
+                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}</td>
+                        <td className={`px-3 py-2.5 text-right ${muted}`}>{u?.realizado ?? '—'} / {meta.alvo ?? '—'}</td>
+                        <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
+                        <td className="px-3 py-2.5 text-right">
+                          {jaEnviado ? (
+                            <span className="text-[10px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Enviado</span>
+                          ) : (
+                            <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending}
+                              className="text-[11px] font-bold text-amber-600 hover:text-amber-700 inline-flex items-center gap-1 disabled:opacity-50">
+                              <Send size={12} /> Enviar p/ Melhoria
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
 
-      {showNovo && <NovoObjetivoModal onClose={() => setShowNovo(false)} isDark={isDark} />}
+      {showNovo && <ObjetivoModal onClose={() => setShowNovo(false)} isDark={isDark} />}
+      {editObj && <ObjetivoModal edit={editObj} onClose={() => setEditObj(null)} isDark={isDark} />}
+      {delAlvo && <ConfirmDelModal label={delAlvo.label} pending={removerObjetivo.isPending || removerMeta.isPending} onConfirm={confirmarRemocao} onClose={() => setDelAlvo(null)} isDark={isDark} />}
       {checkin && <CheckinModal obj={checkin.obj} meta={checkin.meta} onClose={() => setCheckin(null)} isDark={isDark} />}
     </div>
   )
