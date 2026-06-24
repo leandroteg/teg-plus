@@ -1,9 +1,13 @@
 // Painel Faturamento — consolidação das medições mensais (pmo_medicao_mensal)
 import { useMemo, useState } from 'react'
-import { DollarSign, TrendingUp, Calendar, Award } from 'lucide-react'
+import { TrendingUp, Building2, PieChart, Grid3x3, Users } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useMedicaoMensal } from '../../../hooks/usePMO'
-import { Kpi, PanelCard } from '../../rh/paineis/_ui'
+import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
+import { useMedicaoMensal, useEAPFinal } from '../../../hooks/usePMO'
+import { Kpi, PanelCard, HBarRow, ProporcaoBar, Legenda, Heatmap } from '../../rh/paineis/_ui'
+
+const POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#64748b']
+const poloNome = (s: string) => s.replace(/^F[\d.\/]+\s*-\s*/, '')
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 const fmtFull = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR')
@@ -23,7 +27,9 @@ function shiftMonth(ym: string, delta: number): string {
 
 export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'faturamento' }: { de?: string; ate?: string; visao?: 'faturamento' | 'producao' }) {
   const { isDark } = useTheme()
+  const portfolioId = useEGPPortfolioId()
   const { data: rows, isLoading } = useMedicaoMensal()
+  const { data: raw } = useEAPFinal(portfolioId)
   const [hover, setHover] = useState<number | null>(null)
   const ateF = ate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
   const isProd = visao === 'producao'
@@ -41,6 +47,37 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     const meses = listaMeses(de, ateF)
     return meses.map(ym => ({ ym, fat: byM.get(ym)?.fat ?? 0, oscs: byM.get(ym)?.oscs.size ?? 0 }))
   }, [rows, de, ateF, isProd])
+
+  // mapa OSC → obra/frente (do contrato vigente)
+  const oscMap = useMemo(() => {
+    const m = new Map<string, { obra: string; polo: string }>()
+    for (const p of (raw ?? [])) for (const o of p.oscs) m.set(o.numero_os, { obra: o.obra_nome, polo: poloNome(p.label) })
+    return m
+  }, [raw])
+
+  // agregações do período: top obras, por frente, frente×mês, TEG×Sub
+  const agg = useMemo(() => {
+    const porObra = new Map<string, number>(); const porPolo = new Map<string, number>()
+    const poloMes = new Map<string, Map<string, number>>(); const mesesSet = new Set<string>()
+    let teg = 0, sub = 0
+    for (const r of (rows ?? [])) {
+      const v = Number(r.realizado ?? 0); const c = r.competencia
+      if (v <= 0 || c < de || c > ateF) continue
+      const info = oscMap.get(r.numero_os)
+      const obra = info?.obra ?? '— Fora do contrato'; const polo = info?.polo ?? 'Outros'
+      porObra.set(obra, (porObra.get(obra) ?? 0) + v)
+      porPolo.set(polo, (porPolo.get(polo) ?? 0) + v)
+      let pm = poloMes.get(polo); if (!pm) { pm = new Map(); poloMes.set(polo, pm) }
+      pm.set(c, (pm.get(c) ?? 0) + v); mesesSet.add(c)
+      if (r.subcontratada) sub += v; else teg += v
+    }
+    const topObras = [...porObra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    const totalGeral = [...porObra.values()].reduce((s, x) => s + x, 0) || 1
+    const top5 = [...porObra.values()].sort((a, b) => b - a).slice(0, 5).reduce((s, x) => s + x, 0)
+    const polos = [...porPolo.entries()].sort((a, b) => b[1] - a[1])
+    const meses = [...mesesSet].sort()
+    return { topObras, totalObras: porObra.size, totalGeral, concentr5: Math.round(top5 / totalGeral * 100), polos, poloMes, meses, teg, sub }
+  }, [rows, oscMap, de, ateF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -100,22 +137,73 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
         <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valores em R$ milhões. {isProd ? 'Produção = medição deslocada 1 mês (mês de execução).' : 'Faturamento = soma das medições realizadas no mês.'}</p>
       </PanelCard>
 
-      <PanelCard title="Detalhamento mensal" icon={<Calendar size={14} className="text-teal-500" />} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className={`text-[11px] uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <th className="text-left px-4 py-2">Mês</th><th className="text-right px-4 py-2">{noun}</th><th className="text-right px-4 py-2">OSCs</th>
-          </tr></thead>
-          <tbody>
-            {[...ativos].reverse().map(s => (
-              <tr key={s.ym} className={`border-t ${isDark ? 'border-white/[0.05] text-slate-300' : 'border-slate-100 text-slate-600'}`}>
-                <td className="px-4 py-2 font-semibold">{ymLabel(s.ym)}</td>
-                <td className={`px-4 py-2 text-right tabular-nums font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{fmtFull(s.fat)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{s.oscs}</td>
-              </tr>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Top obras faturadas */}
+        <PanelCard title="Top obras faturadas" icon={<Building2 size={14} className="text-teal-500" />} isDark={isDark}
+          right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>top 5 = {agg.concentr5}% do total</span>}>
+          <div className="space-y-2.5">
+            {agg.topObras.length === 0 ? <p className={`text-xs italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados no período.</p>
+              : agg.topObras.map(([nome, val], i) => <HBarRow key={nome} label={nome} value={val} max={agg.topObras[0][1]} color={POLO_COR[i % POLO_COR.length]} suffix={fmtM(val)} isDark={isDark} />)}
+          </div>
+        </PanelCard>
+
+        {/* Composição por frente */}
+        <PanelCard title="Composição por frente" icon={<PieChart size={14} className="text-teal-500" />} isDark={isDark}
+          right={<Legenda items={agg.polos.map(([n], i) => ({ label: n, color: POLO_COR[i % POLO_COR.length] }))} isDark={isDark} />}>
+          <div className="flex h-9 rounded-lg overflow-hidden mb-3">
+            {agg.polos.map(([nome, val], i) => { const pct = val / agg.totalGeral * 100; if (pct <= 0) return null; return (
+              <div key={nome} style={{ width: `${pct}%`, background: POLO_COR[i % POLO_COR.length] }} className="flex items-center justify-center" title={`${nome}: ${fmtM(val)} (${pct.toFixed(0)}%)`}>
+                {pct >= 8 && <span className="text-[10px] font-bold text-white truncate px-1">{Math.round(pct)}%</span>}
+              </div>
+            ) })}
+          </div>
+          <div className="space-y-1.5">
+            {agg.polos.map(([nome, val], i) => (
+              <div key={nome} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: POLO_COR[i % POLO_COR.length] }} />
+                <span className={`flex-1 truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{nome}</span>
+                <span className={`tabular-nums font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtM(val)}</span>
+                <span className={`w-9 text-right tabular-nums ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{Math.round(val / agg.totalGeral * 100)}%</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </PanelCard>
+          </div>
+        </PanelCard>
+      </div>
+
+      {/* Heatmap frente × mês */}
+      {agg.meses.length > 0 && agg.polos.length > 0 && (
+        <PanelCard title="Faturamento por frente × mês" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
+          right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>R$ milhões</span>}>
+          <Heatmap
+            meses={agg.meses.map(ym => ({ mes: MES_ABR[Number(ym.split('-')[1])], ano: ym.split('-')[0].slice(2) }))}
+            linhas={agg.polos.map(([nome, val], i) => ({
+              label: nome, color: POLO_COR[i % POLO_COR.length],
+              valores: agg.meses.map(m => { const v = agg.poloMes.get(nome)?.get(m) ?? 0; return v ? Math.round(v / 1e5) / 10 : 0 }),
+              total: Math.round(val / 1e5) / 10,
+            }))}
+            totalMes={agg.meses.map(m => { let s = 0; for (const [nome] of agg.polos) s += agg.poloMes.get(nome)?.get(m) ?? 0; return Math.round(s / 1e5) / 10 })}
+            isDark={isDark}
+          />
+        </PanelCard>
+      )}
+
+      {/* TEG × Subcontratadas */}
+      {agg.sub > 0 && (() => {
+        const tot = agg.teg + agg.sub || 1
+        const pSub = Math.round(agg.sub / tot * 100)
+        return (
+          <PanelCard title="Execução: TEG × Subcontratadas" icon={<Users size={14} className="text-teal-500" />} isDark={isDark}>
+            <div className="flex h-9 rounded-lg overflow-hidden mb-2">
+              <div style={{ width: `${100 - pSub}%`, background: '#0d9488' }} className="flex items-center justify-center"><span className="text-[11px] font-bold text-white px-1">TEG {100 - pSub}%</span></div>
+              <div style={{ width: `${pSub}%`, background: '#e87b2a' }} className="flex items-center justify-center">{pSub >= 8 && <span className="text-[11px] font-bold text-white px-1">Sub {pSub}%</span>}</div>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-bold text-teal-500">TEG própria:</span> {fmtFull(agg.teg)}</span>
+              <span className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-bold text-orange-500">Subcontratadas:</span> {fmtFull(agg.sub)}</span>
+            </div>
+          </PanelCard>
+        )
+      })()}
     </div>
   )
 }
