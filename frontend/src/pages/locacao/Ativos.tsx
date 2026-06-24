@@ -190,9 +190,9 @@ function ImovelDetailModal({ imovel, aditivos, vistorias, onClose, isDark }: {
                       <p className={`text-xs font-semibold ${txtMain}`}>{ad.tipo === 'renovacao' ? 'Renovação' : ad.tipo === 'reajuste' ? 'Reajuste' : ad.tipo === 'alteracao_valor' ? 'Alteração de Valor' : 'Aditivo'}</p>
                       <p className={`text-[10px] ${txtMuted}`}>
                         {ad.data_inicio ? fmtDate(ad.data_inicio) : '—'} → {ad.data_fim ? fmtDate(ad.data_fim) : '—'}
-                        {ad.novo_valor != null && ` · ${fmtCur(ad.novo_valor)}`}
+                        {ad.valor_novo != null && ` · ${fmtCur(ad.valor_novo)}`}
                       </p>
-                      {ad.observacoes && <p className={`text-[10px] ${txtMuted} mt-0.5`}>{ad.observacoes}</p>}
+                      {ad.descricao && <p className={`text-[10px] ${txtMuted} mt-0.5`}>{ad.descricao}</p>}
                     </div>
                   </div>
                 ))}
@@ -346,10 +346,10 @@ export default function Ativos() {
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 {[
+                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
                   { key: 'locador', label: 'LOCADOR', align: 'text-left' },
                   { key: 'cc', label: 'C. CUSTO', align: 'text-left' },
-                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'valor', label: 'VALOR/MÊS', align: 'text-right' },
                   { key: 'vencimento', label: 'VENCIMENTO', align: 'text-right' },
                   { key: '', label: 'STATUS', align: 'text-center' },
@@ -375,12 +375,12 @@ export default function Ativos() {
                 return (
                   <tr key={imo.id} onClick={() => setDetail(imo)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
                     <td className="px-3 py-2.5">
                       <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.endereco || imo.descricao}</p>
                     </td>
                     <td className={`px-3 py-2.5 truncate max-w-[150px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo.locador_nome || '—'}</td>
                     <td className={`px-3 py-2.5 truncate max-w-[100px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc?.descricao || '—'}</td>
-                    <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo.cidade || '—'}</td>
                     <td className={`px-3 py-2.5 text-right font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{fmtCur(imo.valor_aluguel_mensal)}</td>
                     <td className={`px-3 py-2.5 text-right ${isExpired ? 'text-red-600 font-bold' : isExpiring ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {venc ? fmtDate(venc) : '—'}
