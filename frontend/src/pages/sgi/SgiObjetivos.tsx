@@ -242,36 +242,32 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <p className={`text-sm font-bold ${txt}`}>{obj.titulo}</p>
-          <p className={`text-[11px] ${muted}`}>{obj.ano} · {obj.area_processo || '—'} · {obj.indicador || 'indicador'} {obj.unidade ? `(${obj.unidade})` : ''}</p>
+          <p className={`text-[11px] flex flex-wrap items-center gap-x-1.5 ${muted}`}>
+            <span>{obj.ano} · {obj.area_processo || '—'} · {obj.indicador || 'indicador'}{obj.unidade ? ` (${obj.unidade})` : ''}</span>
+            <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-500">
+              {obj.direcao === 'maior_melhor' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              {obj.direcao === 'maior_melhor' ? 'maior é melhor' : 'menor é melhor'}
+            </span>
+          </p>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold mr-1 ${muted}`}>
-            {obj.direcao === 'maior_melhor' ? <TrendingUp size={12} className="text-emerald-500" /> : <TrendingDown size={12} className="text-emerald-500" />}
-            {obj.direcao === 'maior_melhor' ? '↑ melhor' : '↓ melhor'}
-          </span>
           <button onClick={() => onEdit(obj)} title="Editar objetivo" className={iconBtn}><Pencil size={14} /></button>
-          <button onClick={() => onDeleteObj(obj)} title="Remover objetivo" className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-red-500/15 text-red-400' : 'hover:bg-red-50 text-red-500'}`}><Trash2 size={14} /></button>
+          <button onClick={() => onDeleteObj(obj)} title="Remover objetivo" className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-red-500/15 text-slate-400 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="space-y-2">
         {metas.length === 0 && <p className={`text-xs ${muted}`}>Sem metas {periodo === 'anual' ? 'anuais' : 'trimestrais'}.</p>}
-        {metas.map(m => {
-          const u = ultimoCheckin(m)
-          const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-          return (
-            <div key={m.id} className={`flex items-start justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-              <div className="min-w-0">
-                <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>{m.periodo === 'anual' ? 'Meta anual' : `Meta · Trim. ${m.trimestre}`}</p>
-                <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>
-                <p className={`text-[10px] mt-0.5 ${muted}`}>{u ? `Último: ${u.competencia} → ${u.realizado ?? '—'}` : 'Sem check-in'}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                <button onClick={() => onDeleteMeta(obj, m)} title="Remover meta" className={`p-1 rounded-lg ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
-              </div>
+        {metas.map(m => (
+          <div key={m.id} className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+            <div className="min-w-0">
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>{m.periodo === 'anual' ? 'Meta anual' : `Trim. ${m.trimestre}`}</p>
+              <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>
             </div>
-          )
-        })}
+            {periodo === 'trimestral' && (
+              <button onClick={() => onDeleteMeta(obj, m)} title="Remover meta" className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
+            )}
+          </div>
+        ))}
       </div>
       {periodo === 'trimestral' && (
         <div className="flex gap-1.5 mt-2">
@@ -505,22 +501,18 @@ export default function SgiObjetivos() {
           metasFiltradas.length === 0 ? (
             <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
           ) : view === 'cards' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
               {metasFiltradas.map(({ obj, meta }) => {
                 const u = ultimoCheckin(meta)
                 const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
                 return (
-                  <div key={meta.id} className={`rounded-2xl border shadow-sm p-4 ${card}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                        <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${muted}`}>Meta · {metaLabel(meta)}</p>
-                        <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, meta.alvo)}</p>
-                        <p className={`text-[10px] mt-0.5 ${muted}`}>{u ? `Último: ${u.competencia} → ${u.realizado ?? '—'}` : 'Sem check-in'}</p>
-                      </div>
-                      <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                  <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
+                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>Meta {metaLabel(meta)} · alvo <b className={txt}>{alvoLabel(obj, meta.alvo)}</b>{u ? ` · último ${u.competencia} → ${u.realizado ?? '—'}` : ' · sem check-in'}</p>
                     </div>
-                    <button onClick={() => setCheckin({ obj, meta })} className="w-full mt-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"><CheckCircle2 size={13} /> Lançar Check-in</button>
+                    <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                    <button onClick={() => setCheckin({ obj, meta })} className="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
                   </div>
                 )
               })}
@@ -560,25 +552,22 @@ export default function SgiObjetivos() {
           metasFiltradas.length === 0 ? (
             <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
           ) : view === 'cards' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
               {metasFiltradas.map(({ obj, meta }) => {
                 const u = ultimoCheckin(meta)
                 const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
                 const jaEnviado = enviados[meta.id]
                 return (
-                  <div key={meta.id} className={`rounded-2xl border shadow-sm p-4 ${card}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                        <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${muted}`}>Meta · {metaLabel(meta)}</p>
-                        <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{u?.realizado ?? '—'} <span className={`text-sm font-semibold ${muted}`}>/ {alvoLabel(obj, meta.alvo)}</span></p>
-                      </div>
-                      <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                  <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
+                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>Meta {metaLabel(meta)} · realizado <b className={txt}>{u?.realizado ?? '—'}</b> / alvo {alvoLabel(obj, meta.alvo)}</p>
                     </div>
+                    <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     {jaEnviado ? (
-                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado p/ Melhoria</span>
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
                     ) : (
-                      <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending} className="w-full mt-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5"><Send size={13} /> Enviar p/ Melhoria</button>
+                      <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending} className="shrink-0 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5"><Send size={13} /> Enviar p/ Melhoria</button>
                     )}
                   </div>
                 )
