@@ -610,6 +610,7 @@ export default function EGPPainel() {
   const [painel, setPainel] = useState<EGPPainelKey>('geral')
   const [de, setDe] = useState('2025-01')
   const [ate, setAte] = useState(ymHoje())
+  const [visaoFat, setVisaoFat] = useState<'producao' | 'faturamento'>('faturamento')
   const [obraFilter, setObraFilter] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   const obras = useLookupObras()
@@ -783,10 +784,21 @@ export default function EGPPainel() {
         </div>
         )}
         {painel !== 'geral' && (
-          <div className="flex items-center gap-1.5">
-            <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
-            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
-            <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+          <div className="flex items-center gap-2 flex-wrap">
+            {painel === 'faturamento' && (
+              <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                {(['producao', 'faturamento'] as const).map(v => (
+                  <button key={v} onClick={() => setVisaoFat(v)} className={`px-3 py-1.5 text-xs font-semibold transition-colors ${visaoFat === v ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>
+                    {v === 'producao' ? 'Produção' : 'Faturamento'}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+              <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+              <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+            </div>
           </div>
         )}
       </div>
@@ -795,7 +807,7 @@ export default function EGPPainel() {
       {painel !== 'geral' && (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>}>
           {painel === 'producao' && <ProducaoPainel de={de} ate={ate} />}
-          {painel === 'faturamento' && <FaturamentoPainel de={de} ate={ate} />}
+          {painel === 'faturamento' && <FaturamentoPainel de={de} ate={ate} visao={visaoFat} />}
           {painel === 'medicao' && <MedicaoPainel de={de} ate={ate} />}
           {painel === 'custos' && <CustosPainel />}
         </Suspense>

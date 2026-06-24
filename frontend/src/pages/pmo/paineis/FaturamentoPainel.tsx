@@ -21,11 +21,10 @@ function shiftMonth(ym: string, delta: number): string {
   return `${y}-${String(m).padStart(2, '0')}`
 }
 
-export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string; ate?: string }) {
+export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'faturamento' }: { de?: string; ate?: string; visao?: 'faturamento' | 'producao' }) {
   const { isDark } = useTheme()
   const { data: rows, isLoading } = useMedicaoMensal()
   const [hover, setHover] = useState<number | null>(null)
-  const [visao, setVisao] = useState<'faturamento' | 'producao'>('faturamento')
   const ateF = ate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
   const isProd = visao === 'producao'
   const noun = isProd ? 'Produção' : 'Faturamento'
@@ -50,20 +49,18 @@ export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string
   const media = ativos.length ? total / ativos.length : 0
   const melhor = serie.reduce((b, x) => x.fat > b.fat ? x : b, { ym: '', fat: 0, oscs: 0 })
   const max = Math.max(...serie.map(s => s.fat), 1)
+  // escala de cor por desvio da média (acima = verde, abaixo = âmbar/laranja)
+  const barColor = (v: number) => {
+    if (v <= 0) return 'transparent'
+    const r = media ? v / media : 1
+    if (r >= 1.25) return '#047857'
+    if (r >= 1.0) return '#10b981'
+    if (r >= 0.75) return '#f59e0b'
+    return '#f97316'
+  }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-          {(['producao', 'faturamento'] as const).map(v => (
-            <button key={v} onClick={() => setVisao(v)} className={`px-3 py-1.5 text-xs font-semibold transition-colors ${visao === v ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>
-              {v === 'producao' ? 'Produção' : 'Faturamento'}
-            </button>
-          ))}
-        </div>
-        <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{isProd ? 'mês de execução (1 mês antes do faturamento)' : 'mês do faturamento / medição'}</span>
-      </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <Kpi label={`${noun} no período`} value={fmtM(total)} tone="emerald" isDark={isDark} note={`${ativos.length} mes(es)`} />
         <Kpi label="Média mensal" value={fmtM(media)} tone="violet" isDark={isDark} note="meses com medição" />
@@ -71,24 +68,34 @@ export default function FaturamentoPainel({ de = '2024-01', ate }: { de?: string
         <Kpi label="Run-rate anual" value={fmtM(media * 12)} tone="amber" isDark={isDark} note="média × 12" />
       </div>
 
-      <PanelCard title={`${noun} mensal (medições consolidadas)`} icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}>
-        <div className="flex items-end gap-1 pt-6" style={{ height: 230 }}>
+      <PanelCard title={`${noun} mensal (medições consolidadas)`} icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}
+        right={<div className="flex items-center gap-2.5">
+          <span className="flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#10b981' }} /><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>≥ média</span></span>
+          <span className="flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#f59e0b' }} /><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>&lt; média</span></span>
+        </div>}>
+        <div className="flex items-end gap-1.5 pt-7 relative" style={{ height: 250 }}>
+          {media > 0 && (
+            <div className="absolute left-0 right-0 pointer-events-none flex items-center" style={{ bottom: `${(media / max) * (250 - 28) + 4}px` }}>
+              <div className={`flex-1 border-t border-dashed ${isDark ? 'border-white/25' : 'border-slate-300'}`} />
+              <span className={`text-[9px] font-semibold pl-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>média {fmtM(media)}</span>
+            </div>
+          )}
           {serie.map((s, i) => (
             <div key={s.ym} className="flex-1 flex flex-col items-center justify-end h-full relative" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               {hover === i && s.fat > 0 && (
                 <div className={`absolute -top-1 z-30 rounded-xl px-3 py-2 shadow-xl whitespace-nowrap ${i <= 1 ? 'left-0' : i >= serie.length - 2 ? 'right-0' : 'left-1/2 -translate-x-1/2'} ${isDark ? 'bg-slate-800 border border-white/10' : 'bg-white border border-slate-200'}`}>
                   <p className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{ymLabel(s.ym)}</p>
-                  <p className={`text-[11px] ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{fmtFull(s.fat)}</p>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{s.oscs} OSCs</p>
+                  <p className={`text-[11px] font-bold`} style={{ color: barColor(s.fat) }}>{fmtFull(s.fat)}</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{s.oscs} OSCs · {media ? Math.round(s.fat / media * 100) : 0}% da média</p>
                 </div>
               )}
-              <span className={`text-[9px] font-bold mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{s.fat > 0 ? (s.fat / 1e6).toFixed(1) : ''}</span>
-              <div className={`w-full rounded-t transition-opacity ${hover !== null && hover !== i ? 'opacity-50' : ''}`} style={{ height: `${(s.fat / max) * 100}%`, minHeight: s.fat > 0 ? 2 : 0, background: '#10b981' }} />
+              <span className={`text-[13px] font-extrabold mb-1 tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.fat > 0 ? (s.fat / 1e6).toFixed(1) : ''}</span>
+              <div className={`w-full rounded-t transition-opacity ${hover !== null && hover !== i ? 'opacity-50' : ''}`} style={{ height: `${(s.fat / max) * 100}%`, minHeight: s.fat > 0 ? 2 : 0, background: barColor(s.fat) }} />
             </div>
           ))}
         </div>
-        <div className="flex gap-1 mt-1">
-          {serie.map(s => <span key={s.ym} className={`flex-1 text-center text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{Number(s.ym.split('-')[1]) === 1 ? `'${s.ym.slice(2, 4)}` : MES_ABR[Number(s.ym.split('-')[1])][0]}</span>)}
+        <div className="flex gap-1.5 mt-1.5">
+          {serie.map(s => <span key={s.ym} className={`flex-1 text-center text-[11px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{ymLabel(s.ym)}</span>)}
         </div>
         <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valores em R$ milhões. {isProd ? 'Produção = medição deslocada 1 mês (mês de execução).' : 'Faturamento = soma das medições realizadas no mês.'}</p>
       </PanelCard>
