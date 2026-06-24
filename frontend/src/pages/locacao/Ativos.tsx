@@ -2,9 +2,11 @@ import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
+  Pencil, Save, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useAditivos, useVistorias } from '../../hooks/useLocacao'
+import { useImoveis, useAditivos, useVistorias, useAtualizarImovel } from '../../hooks/useLocacao'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import { UpperInput } from '../../components/UpperInput'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
@@ -21,18 +23,63 @@ const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text:
 type ViewMode = 'table' | 'cards'
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
-function ImovelDetailModal({ imovel, aditivos, vistorias, onClose, isDark }: {
+function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, isDark }: {
   imovel: LocImovel; aditivos: LocAditivo[]; vistorias: LocVistoria[]; onClose: () => void; isDark: boolean
 }) {
+  const atualizar = useAtualizarImovel()
+  const centrosCusto = useLookupCentrosCusto()
+  const [current, setCurrent] = useState<LocImovel>(imovelProp)
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState<Partial<LocImovel>>({})
+
+  const imovel = current
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const inputCls = `w-full rounded-lg border px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-100' : 'border-slate-200 bg-white text-slate-800'}`
+  const labelCls = `block text-[10px] font-semibold uppercase tracking-wider mb-1 ${txtMuted}`
   const contrato = (imovel as any).contrato
-  const cc = (imovel as any).centro_custo
+  const ccJoin = (imovel as any).centro_custo
+  const ccLookup = centrosCusto.find(c => c.id === imovel.centro_custo_id)
+  const cc = ccLookup ?? ccJoin
   const stCfg = STATUS_CFG[imovel.status] || STATUS_CFG.ativo
   const imovelAditivos = aditivos.filter(a => a.imovel_id === imovel.id)
   const imovelVistorias = vistorias.filter(v => v.imovel_id === imovel.id)
+
+  const setF = (k: keyof LocImovel, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const txt = (label: string, k: keyof LocImovel, opts: { full?: boolean; type?: string } = {}) => (
+    <div className={opts.full ? 'col-span-2' : ''}>
+      <label className={labelCls}>{label}</label>
+      <input
+        type={opts.type || 'text'}
+        value={(form[k] ?? '') as string | number}
+        onChange={e => setF(k, opts.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)}
+        className={inputCls}
+      />
+    </div>
+  )
+  const startEdit = () => {
+    setForm({
+      descricao: current.descricao, endereco: current.endereco, numero: current.numero,
+      complemento: current.complemento, bairro: current.bairro, cep: current.cep,
+      cidade: current.cidade, uf: current.uf, area_m2: current.area_m2,
+      valor_aluguel_mensal: current.valor_aluguel_mensal, dia_vencimento: current.dia_vencimento,
+      locador_nome: current.locador_nome, locador_cpf_cnpj: current.locador_cpf_cnpj,
+      locador_contato: current.locador_contato, centro_custo_id: current.centro_custo_id,
+      status: current.status,
+    })
+    setEditing(true)
+  }
+  const handleSave = async () => {
+    try {
+      const updated = await atualizar.mutateAsync({ id: current.id, ...form })
+      setCurrent(prev => ({ ...prev, ...updated }))
+      setEditing(false)
+    } catch (err) {
+      alert('Erro ao salvar: ' + (err as Error).message)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -47,6 +94,7 @@ function ImovelDetailModal({ imovel, aditivos, vistorias, onClose, isDark }: {
         </div>
 
         <div className="p-5 space-y-4">
+          {!editing && (<>
           {/* Status */}
           <div className="flex items-center justify-end">
             <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${stCfg.bg} ${stCfg.text}`}>
@@ -200,9 +248,85 @@ function ImovelDetailModal({ imovel, aditivos, vistorias, onClose, isDark }: {
             )}
           </div>
 
-          {/* Fechar */}
+          </>)}
+
+          {editing && (<>
+            {/* Form de edição */}
+            <div className={`rounded-xl p-4 ${cardBg} grid grid-cols-2 gap-x-4 gap-y-3`}>
+              <div className="col-span-2">
+                <label className={labelCls}>Status</label>
+                <select value={form.status ?? 'ativo'} onChange={e => setF('status', e.target.value)} className={inputCls}>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="em_entrada">Em Entrada</option>
+                  <option value="em_saida">Em Saída</option>
+                </select>
+              </div>
+              {txt('Descrição', 'descricao', { full: true })}
+            </div>
+
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Endereço</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {txt('Logradouro', 'endereco', { full: true })}
+                {txt('Número', 'numero')}
+                {txt('Complemento', 'complemento')}
+                {txt('Bairro', 'bairro')}
+                {txt('CEP', 'cep')}
+                {txt('Cidade', 'cidade')}
+                {txt('UF', 'uf')}
+                {txt('Área (m²)', 'area_m2', { type: 'number' })}
+              </div>
+            </div>
+
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Proprietário / Imobiliária</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {txt('Locador / Proprietário', 'locador_nome', { full: true })}
+                {txt('CPF / CNPJ', 'locador_cpf_cnpj')}
+                {txt('Contato', 'locador_contato')}
+              </div>
+            </div>
+
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Financeiro</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {txt('Aluguel Mensal (R$)', 'valor_aluguel_mensal', { type: 'number' })}
+                {txt('Dia Vencimento', 'dia_vencimento', { type: 'number' })}
+                <div className="col-span-2">
+                  <label className={labelCls}>Centro de Custo</label>
+                  <select value={form.centro_custo_id ?? ''} onChange={e => setF('centro_custo_id', e.target.value || null)} className={inputCls}>
+                    <option value="">Não atribuído</option>
+                    {centrosCusto.map(c => <option key={c.id} value={c.id}>{c.codigo} — {c.descricao}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <p className={`text-[10px] ${txtMuted}`}>Contrato, vistorias e aditivos são geridos nas respectivas abas.</p>
+          </>)}
+
+          {/* Ações */}
           <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
+            {editing ? (
+              <>
+                <button onClick={() => setEditing(false)} disabled={atualizar.isPending}
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Cancelar</button>
+                <button onClick={handleSave} disabled={atualizar.isPending}
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                  {atualizar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={startEdit}
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                  <Pencil size={15} /> Editar
+                </button>
+                <button onClick={onClose}
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -428,7 +552,7 @@ export default function Ativos() {
       )}
 
       {/* Modal */}
-      {detail && <ImovelDetailModal imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
+      {detail && <ImovelDetailModal key={detail.id} imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
     </div>
   )
 }
