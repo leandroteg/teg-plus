@@ -343,6 +343,8 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [projOpen, setProjOpen] = useState(false)
+  const [excludedObras, setExcludedObras] = useState<Set<string>>(new Set())
+  const [obraOpen, setObraOpen] = useState(false)
   const [detOsc, setDetOsc] = useState<MedicaoOSCRow | null>(null)
   const [sortBy, setSortBy] = useState<'osc' | 'obra' | 'valor' | 'pct' | 'medido' | 'amedir' | 'prazo'>('osc')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -364,7 +366,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
 
   if (isLoading) return <Spinner />
 
-  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct.size || fPrazo.size)
+  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct.size || fPrazo.size || excludedObras.size)
   const match = (r: MedicaoOSCRow) => {
     const s = q.trim().toLowerCase()
     if (s && !(r.numero_os.toLowerCase().includes(s) || r.obra_nome.toLowerCase().includes(s) || r.polo_nome.toLowerCase().includes(s))) return false
@@ -377,7 +379,10 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   }
   const baseList = (rows ?? []).filter(match)
   const allPolos = [...new Set(baseList.map(r => r.polo_nome))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-  const list = baseList.filter(r => !excluded.has(r.polo_nome))
+  // obras dependem do filtro de polo: só as obras dos polos selecionados aparecem
+  const afterPolo = baseList.filter(r => !excluded.has(r.polo_nome))
+  const allObras = [...new Set(afterPolo.map(r => r.obra_nome))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const list = afterPolo.filter(r => !excludedObras.has(r.obra_nome))
   const totValor = list.reduce((s, r) => s + r.valor, 0)
   const totMedido = list.reduce((s, r) => s + r.medido, 0)
   const totAMedir = totValor - totMedido
@@ -394,6 +399,9 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const cmp = (a: MedicaoOSCRow, b: MedicaoOSCRow) => { const r = sortFns[sortBy](a, b); return sortDir === 'asc' ? r : -r }
   const toggleAll = () => setExcluded(excluded.size === 0 ? new Set(allPolos) : new Set())
   const togglePolo = (p: string) => setExcluded(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+  const obrasOcultas = allObras.filter(o => excludedObras.has(o)).length
+  const toggleAllObra = () => setExcludedObras(obrasOcultas === 0 ? new Set(allObras) : new Set())
+  const toggleObra = (o: string) => setExcludedObras(s => { const n = new Set(s); n.has(o) ? n.delete(o) : n.add(o); return n })
 
   const porPolo = new Map<string, MedicaoOSCRow[]>()
   for (const r of list) { const a = porPolo.get(r.polo_nome) ?? []; a.push(r); porPolo.set(r.polo_nome, a) }
@@ -442,6 +450,33 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             </>
           )}
         </div>
+        <div className="relative shrink-0">
+          <button onClick={() => setObraOpen(o => !o)} className={`inline-flex items-center gap-1.5 ${sel(excludedObras.size > 0)}`} disabled={!allObras.length}>
+            Obras: {allObras.length - obrasOcultas}/{allObras.length}
+            <ChevronDown size={13} className={`transition-transform ${obraOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {obraOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setObraOpen(false)} />
+              <div className={`absolute z-20 mt-1 left-0 w-72 rounded-xl border shadow-lg p-1.5 max-h-72 overflow-y-auto ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+                <button onClick={toggleAllObra} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${obrasOcultas === 0 ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{obrasOcultas === 0 && <Check size={11} />}</span>
+                  Selecionar todas
+                </button>
+                <div className={`my-1 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+                {allObras.map(o => {
+                  const on = !excludedObras.has(o)
+                  return (
+                    <button key={o} onClick={() => toggleObra(o)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                      <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{on && <Check size={11} />}</span>
+                      <span className="truncate text-left">{o}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
         <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel(!!fTipo)}>
           <option value="">Tipo: todos</option><option value="construcao">Construção</option><option value="manutencao">O&amp;M</option><option value="deposito">Depósito</option>
         </select>
@@ -453,7 +488,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
         </select>
         <BandFilter label="% Faturado" selected={fPct} setSelected={setFPct} open={pctOpen} setOpen={setPctOpen} selBtn={sel} isLight={isLight} />
         <BandFilter label="% Prazo" selected={fPrazo} setSelected={setFPrazo} open={prazoOpen} setOpen={setPrazoOpen} selBtn={sel} isLight={isLight} />
-        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(new Set()); setFPrazo(new Set()) }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
+        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(new Set()); setFPrazo(new Set()); setExcludedObras(new Set()) }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
         {(() => {
           const allCollapsed = allPolos.length > 0 && allPolos.every(p => collapsed.has(p))
           return (
