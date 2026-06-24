@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { RefreshCw, Search, List, LayoutGrid, Plus, X, Loader2, Send, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAditivos, useCriarAditivo, useImoveis, useAtualizarStatusAditivo } from '../../hooks/useLocacao'
-import { STATUS_ADITIVO_LABEL } from '../../types/locacao'
+import { STATUS_ADITIVO_LABEL, fmtEndereco } from '../../types/locacao'
 import type { StatusAditivo, TipoAditivo, LocAditivo } from '../../types/locacao'
 
 // ── Tipo label ────────────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ function TableRow({ ad, isDark, onStatus, isBusy }: {
     <tr className={`border-b transition-colors cursor-pointer
       ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
       <td className={`px-4 py-3 text-sm font-medium ${txt}`}>
-        <span className="block truncate max-w-[220px]">{ad.imovel?.endereco ?? ad.imovel?.descricao ?? '—'}</span>
+        <span className="block truncate max-w-[220px]">{fmtEndereco(ad.imovel)}</span>
       </td>
       <td className={`px-4 py-3 text-sm ${txtMuted}`}>
         {ad.imovel?.cidade ?? '—'}
@@ -238,7 +238,7 @@ function AditivoCard({ ad, isDark, onStatus, isBusy }: {
         <StatusBadge status={ad.status} />
       </div>
       {/* Linha 2 */}
-      <p className={`text-xs mb-2 ${txtMuted}`}>{ad.imovel?.endereco ?? ad.imovel?.descricao ?? '—'}{ad.imovel?.cidade ? ` · ${ad.imovel.cidade}` : ''}</p>
+      <p className={`text-xs mb-2 ${txtMuted}`}>{fmtEndereco(ad.imovel)}{ad.imovel?.cidade ? ` · ${ad.imovel.cidade}` : ''}</p>
       {/* Linha 3 */}
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${txtMuted}`}>
         {(ad.data_inicio || ad.data_fim) && (

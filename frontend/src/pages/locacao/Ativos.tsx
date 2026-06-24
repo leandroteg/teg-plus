@@ -8,16 +8,11 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useVistorias, useAtualizarImovel } from '../../hooks/useLocacao'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import { UpperInput } from '../../components/UpperInput'
+import { fmtEndereco } from '../../types/locacao'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const fmtCur = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
-// Monta "logradouro, número" — só concatena o número se ele ainda não estiver no logradouro
-// (evita duplicar enquanto o número estiver guardado nos dois lugares).
-const fmtEndereco = (i: { endereco?: string; descricao?: string; numero?: string }) => {
-  const base = i.endereco || i.descricao || 'Não informado'
-  return i.numero && !base.includes(String(i.numero)) ? `${base}, ${i.numero}` : base
-}
 
 const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   ativo:      { label: 'Ativo',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
@@ -97,7 +92,7 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
           <div className="flex items-center gap-2 min-w-0">
             <Building2 size={18} className="text-indigo-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${txtMain}`}>{imovel.endereco || imovel.descricao}</h3>
+            <h3 className={`text-base font-bold truncate ${txtMain}`}>{fmtEndereco(imovel)}</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
@@ -513,7 +508,7 @@ export default function Ativos() {
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
                     <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
                     <td className="px-3 py-2.5">
-                      <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.endereco || imo.descricao}</p>
+                      <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtEndereco(imo)}</p>
                     </td>
                     <td className={`px-3 py-2.5 truncate max-w-[150px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo.locador_nome || '—'}</td>
                     <td className={`px-3 py-2.5 truncate max-w-[100px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc?.descricao || '—'}</td>
@@ -545,7 +540,7 @@ export default function Ativos() {
               <button key={imo.id} type="button" onClick={() => setDetail(imo)}
                 className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}>
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.endereco || imo.descricao}</p>
+                  <p className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtEndereco(imo)}</p>
                   <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.bg} ${st.text}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                   </span>

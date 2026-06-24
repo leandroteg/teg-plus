@@ -416,3 +416,15 @@ export const STATUS_ADITIVO_LABEL: Record<StatusAditivo, { label: string; dot: s
   aguardando_assinatura: { label: 'Aguard. Assinatura',    dot: 'bg-amber-400',  bg: 'bg-amber-50',   text: 'text-amber-700' },
   assinado:              { label: 'Assinado',              dot: 'bg-green-500',  bg: 'bg-green-50',   text: 'text-green-700' },
 }
+
+// Monta "logradouro, número" para exibição. Só concatena o número se ele ainda
+// não estiver no texto do logradouro — assim funciona tanto no estado transitório
+// (número guardado nos dois lugares) quanto no estado final (logradouro limpo).
+export function fmtEndereco(
+  i?: { endereco?: string; descricao?: string; numero?: string | null } | null,
+): string {
+  if (!i) return '—'
+  const base = i.endereco || i.descricao || ''
+  if (!base) return '—'
+  return i.numero && !base.includes(String(i.numero)) ? `${base}, ${i.numero}` : base
+}

@@ -9,7 +9,7 @@ import {
   useLocacaoKPIs, useFaturas, useEntradas, useSaidas, useSolicitacoesLocacao, useImoveis,
 } from '../../hooks/useLocacao'
 import {
-  ENTRADA_PIPELINE_STAGES, SAIDA_PIPELINE_STAGES, TIPO_FATURA_LABEL, STATUS_FATURA_LABEL,
+  ENTRADA_PIPELINE_STAGES, SAIDA_PIPELINE_STAGES, TIPO_FATURA_LABEL, STATUS_FATURA_LABEL, fmtEndereco,
 } from '../../types/locacao'
 
 const fmtCurrency = (v: number) =>
@@ -304,7 +304,7 @@ export default function LocacaoHome() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle size={11} className="text-red-500 shrink-0" />
-                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-red-300' : 'text-red-700'}`}>{imo.endereco || imo.descricao}</span>
+                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-red-300' : 'text-red-700'}`}>{fmtEndereco(imo)}</span>
                     </div>
                     <p className={`text-[10px] ${txtMuted}`}>{imo.cidade || ''}{imo.cidade ? ' · ' : ''}Venceu {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
                   </div>
@@ -316,7 +316,7 @@ export default function LocacaoHome() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <Calendar size={11} className="text-amber-500 shrink-0" />
-                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{imo.endereco || imo.descricao}</span>
+                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{fmtEndereco(imo)}</span>
                     </div>
                     <p className={`text-[10px] ${txtMuted}`}>{imo.cidade || ''}{imo.cidade ? ' · ' : ''}Vence {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
                   </div>
