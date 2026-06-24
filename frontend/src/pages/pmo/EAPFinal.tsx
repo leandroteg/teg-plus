@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Printer, Pencil, Check, X, ChevronDown } from 'lucide-react'
-import { useEAPFinal, useUpdatePoloTorres, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useUpdatePoloTorres, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
 
 const SEC_COLOR: Record<string, string> = {
   'Serv. Preliminares': '#0284c7',
@@ -55,9 +55,9 @@ function buildGeral(polos: EAPPolo[]): EAPPolo {
   }
 }
 
-export default function EAPFinal({ portfolioId, excluded, isLight }: { portfolioId?: string; excluded?: Set<string>; isLight: boolean }) {
+export default function EAPFinal({ portfolioId, excluded, excludedOscs, setExcludedOscs, isLight }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; setExcludedOscs: React.Dispatch<React.SetStateAction<Set<string>>>; isLight: boolean }) {
   const { data, isLoading } = useEAPFinal(portfolioId)
-  const polos = (data ?? []).filter(p => !excluded?.has(p.id))
+  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded])
 
   if (isLoading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" /></div>
   if (!polos.length) return <div className={`rounded-2xl border p-12 text-center text-sm ${isLight ? 'bg-white border-slate-200 text-slate-400' : 'bg-white/[0.03] border-white/[0.06] text-slate-500'}`}>Nenhum projeto selecionado.</div>
@@ -66,16 +66,16 @@ export default function EAPFinal({ portfolioId, excluded, isLight }: { portfolio
     <div className="space-y-3 print:space-y-2">
       {/* Geral + colunas por polo (máx 3 por linha) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
-        {[buildGeral(polos), ...polos].map(p => <PoloCol key={p.id} polo={p} portfolioId={portfolioId} isLight={isLight} isGeral={p.id === '__geral__'} />)}
+        {[buildGeral(polos), ...polos].map(p => <PoloCol key={p.id} polo={p} portfolioId={portfolioId} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} isGeral={p.id === '__geral__'} />)}
       </div>
     </div>
   )
 }
 
 // KPIs compactos (Contratado · Faturado · OSCs·Polos · Imprimir) — entram na linha do filtro
-export function EAPKpis({ portfolioId, excluded, isLight }: { portfolioId?: string; excluded?: Set<string>; isLight: boolean }) {
+export function EAPKpis({ portfolioId, excluded, excludedOscs, isLight }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; isLight: boolean }) {
   const { data } = useEAPFinal(portfolioId)
-  const polos = (data ?? []).filter(p => !excluded?.has(p.id))
+  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded])
   if (!polos.length) return null
   const totContr = polos.reduce((s, p) => s + p.contr, 0)
   const totFat = polos.reduce((s, p) => s + p.fat, 0)
@@ -100,20 +100,20 @@ export function EAPKpis({ portfolioId, excluded, isLight }: { portfolioId?: stri
   )
 }
 
-function PoloCol({ polo, portfolioId, isLight, isGeral }: { polo: EAPPolo; portfolioId?: string; isLight: boolean; isGeral?: boolean }) {
+function PoloCol({ polo, portfolioId, excludedOscs, setExcludedOscs, isLight, isGeral }: { polo: EAPPolo; portfolioId?: string; excludedOscs: Set<string>; setExcludedOscs: React.Dispatch<React.SetStateAction<Set<string>>>; isLight: boolean; isGeral?: boolean }) {
   return (
     <div className={`w-full flex flex-col gap-2 ${isGeral ? 'ring-2 ring-[#e87b2a]/40 rounded-2xl p-2' : ''}`}>
       {/* head */}
       {isGeral ? (
         <div className="rounded-xl px-3 py-2.5 bg-[#e87b2a] border-l-4 border-[#0f2a4a] flex items-center gap-2">
           <span className="text-white font-bold text-base uppercase tracking-wide shrink-0">Geral</span>
-          <ObrasOscsBox polo={polo} isLight={isLight} />
+          <ObrasOscsBox polo={polo} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />
         </div>
       ) : (
         <div className="rounded-xl px-3 py-2.5 bg-[#0f2a4a] border-l-4 border-[#e87b2a] flex items-center gap-2">
           <span className="text-[#e87b2a] font-bold text-sm uppercase shrink-0">{poloId(polo.label)}</span>
           <span className="text-white font-semibold text-base leading-none truncate">{poloNome(polo.label)}</span>
-          <ObrasOscsBox polo={polo} isLight={isLight} />
+          <ObrasOscsBox polo={polo} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />
         </div>
       )}
 
@@ -129,26 +129,50 @@ function PoloCol({ polo, portfolioId, isLight, isGeral }: { polo: EAPPolo; portf
   )
 }
 
-function ObrasOscsBox({ polo, isLight }: { polo: EAPPolo; isLight: boolean }) {
+function ObrasOscsBox({ polo, excludedOscs, setExcludedOscs, isLight }: { polo: EAPPolo; excludedOscs: Set<string>; setExcludedOscs: React.Dispatch<React.SetStateAction<Set<string>>>; isLight: boolean }) {
   const [open, setOpen] = useState(false)
+  const allIds = polo.obras.flatMap(ob => ob.oscs.map(o => o.id))
+  const selCount = allIds.filter(id => !excludedOscs.has(id)).length
+  const toggleOsc = (id: string) => setExcludedOscs(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleObra = (ids: string[]) => setExcludedOscs(s => {
+    const n = new Set(s); const allOn = ids.every(id => !n.has(id))
+    ids.forEach(id => allOn ? n.add(id) : n.delete(id)); return n
+  })
+  const Chk = ({ on }: { on: boolean }) => (
+    <span className={`shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/25')}`}>{on && <Check size={9} />}</span>
+  )
   return (
     <div className="relative ml-auto shrink-0">
       <button onClick={() => setOpen(o => !o)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/90 bg-white/15 hover:bg-white/25 rounded-md px-1.5 py-1">
-        {polo.obras.length} obras · {polo.nOscs} OSCs
+        {polo.obras.length} obras · {selCount}/{allIds.length} OSCs
         <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className={`absolute z-20 right-0 mt-1 w-72 rounded-xl border shadow-lg p-2 max-h-80 overflow-y-auto text-left ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
-            {polo.obras.length === 0 ? (
-              <div className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem obras.</div>
-            ) : polo.obras.map((ob, i) => (
-              <div key={i} className={`mb-1.5 last:mb-0 pb-1.5 last:pb-0 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                <div className={`text-xs font-semibold leading-tight ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{ob.nome}</div>
-                <div className={`text-[10px] font-mono mt-0.5 ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{ob.oscs.join(' · ')}</div>
-              </div>
-            ))}
+          <div className={`absolute z-20 right-0 mt-1 w-72 rounded-xl border shadow-lg p-1.5 max-h-80 overflow-y-auto text-left ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+            {polo.obras.length === 0 ? <div className={`text-xs px-1 py-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem obras.</div> :
+              polo.obras.map((ob, i) => {
+                const ids = ob.oscs.map(o => o.id)
+                const obraOn = ids.every(id => !excludedOscs.has(id))
+                return (
+                  <div key={i} className={`mb-1 last:mb-0 pb-1 last:pb-0 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                    <button onClick={() => toggleObra(ids)} className={`w-full flex items-center gap-1.5 px-1 py-0.5 rounded-md text-xs font-semibold ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                      <Chk on={obraOn} /> <span className="truncate text-left">{ob.nome}</span>
+                    </button>
+                    <div className="pl-5 flex flex-wrap gap-x-2 gap-y-0.5 py-0.5">
+                      {ob.oscs.map(o => {
+                        const on = !excludedOscs.has(o.id)
+                        return (
+                          <button key={o.id} onClick={() => toggleOsc(o.id)} className={`inline-flex items-center gap-1 text-[10px] font-mono ${on ? (isLight ? 'text-teal-700' : 'text-teal-300') : (isLight ? 'text-slate-300 line-through' : 'text-slate-600 line-through')}`}>
+                            <Chk on={on} />{o.numero_os.replace('OSC-', '')}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         </>
       )}

@@ -52,6 +52,7 @@ export default function EGPPlanejamento() {
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('eap')
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [excludedOscs, setExcludedOscs] = useState<Set<string>>(new Set())
   const [criando, setCriando] = useState(false)
   const [novoProjeto, setNovoProjeto] = useState({ nome: '', centro_custo_id: '' })
 
@@ -127,11 +128,11 @@ export default function EGPPlanejamento() {
         accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
         accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
         isLight={isLight}
-        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} isLight={isLight} /> : undefined}
+        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : undefined}
       />
 
       {/* Tab content */}
-      {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} isLight={isLight} />}
+      {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}

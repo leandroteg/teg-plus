@@ -347,9 +347,21 @@ export interface EAPPolo {
   montTon: number
   nOscs: number
   oscs: string[]
-  obras: { nome: string; oscs: string[] }[]
+  obras: { nome: string; oscs: { id: string; numero_os: string }[] }[]
   pacotes: EAPPacote[]
 }
+type PacAcc = { valor: number; fat: number; qC: number; qR: number; uni: string | null }
+export interface EAPOscRaw {
+  id: string
+  numero_os: string
+  obra_id: string | null
+  obra_nome: string
+  valor: number
+  saldo_reais: number | null
+  etapa_atual: string
+  pacotes: Record<string, PacAcc>
+}
+export interface EAPPoloRaw { id: string; label: string; codigo: string | null; qtdTorres: number | null; oscs: EAPOscRaw[] }
 const PACOTES_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
 function pacoteDe(code: string | null, secao: string | null): string {
   const c = String(code ?? ''); const s = (secao ?? '').toLowerCase()
@@ -376,7 +388,7 @@ function isDriver(pac: string, code: string | null, nome: string | null, uni: st
 type ItemRow = { fluxo_os_id: string; subsec_codigo: string | null; subsec_nome: string | null; secao: string | null; unidade: string | null; quantidade: number | null; qty_acum: number | null; valor: number | null; valor_acum: number | null }
 
 export function useEAPFinal(portfolioId?: string) {
-  return useQuery<EAPPolo[]>({
+  return useQuery<EAPPoloRaw[]>({
     queryKey: ['egp-eap-final', portfolioId],
     enabled: !!portfolioId,
     queryFn: async () => {
@@ -389,8 +401,6 @@ export function useEAPFinal(portfolioId?: string) {
       const obraNome = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.nome as string]))
       const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual').eq('portfolio_id', portfolioId!)
       const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string }[]
-      const osc2polo = new Map<string, string>()
-      for (const o of oscs) { const pid = o.obra_id ? obra2polo.get(o.obra_id) : undefined; if (pid) osc2polo.set(o.id, pid) }
       const oscIds = oscs.map(o => o.id)
       let itens: ItemRow[] = []
       for (let i = 0; i < oscIds.length; i += 200) {
@@ -398,54 +408,59 @@ export function useEAPFinal(portfolioId?: string) {
         const { data } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, subsec_codigo, subsec_nome, secao, unidade, quantidade, qty_acum, valor, valor_acum').in('fluxo_os_id', slice)
         itens = itens.concat((data ?? []) as ItemRow[])
       }
-      // agrega por polo → pacote
-      type Acc = { valor: number; fat: number; qC: number; qR: number; uni: string | null }
-      const byPolo = new Map<string, Map<string, Acc>>()
+      // agrega itens por OSC → pacote (cru; agregação por polo é no cliente, respeitando a seleção)
+      const byOsc = new Map<string, Record<string, PacAcc>>()
       for (const it of itens) {
-        const pid = osc2polo.get(it.fluxo_os_id); if (!pid) continue
         const pac = pacoteDe(it.subsec_codigo, it.secao)
-        let m = byPolo.get(pid); if (!m) { m = new Map(); byPolo.set(pid, m) }
-        let a = m.get(pac); if (!a) { a = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, a) }
+        let m = byOsc.get(it.fluxo_os_id); if (!m) { m = {}; byOsc.set(it.fluxo_os_id, m) }
+        let a = m[pac]; if (!a) { a = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m[pac] = a }
         a.valor += Number(it.valor ?? 0); a.fat += Number(it.valor_acum ?? 0)
         if (isDriver(pac, it.subsec_codigo, it.subsec_nome, it.unidade)) {
           a.qC += Number(it.quantidade ?? 0); a.qR += Number(it.qty_acum ?? 0); a.uni = it.unidade ?? a.uni
         }
       }
-      return polos.map(p => {
-        const polOscs = oscs.filter(o => osc2polo.get(o.id) === p.id && o.etapa_atual !== 'cancelada')
-        const contr = polOscs.reduce((s, o) => s + Number(o.valor ?? 0), 0)
-        const fat = polOscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, Number(o.valor ?? 0) - Number(o.saldo_reais)) : 0), 0)
-        const m = byPolo.get(p.id) ?? new Map<string, Acc>()
-        let montTon = 0
-        const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
-          const a = m.get(n)!
-          const pctFis = a.qC > 0 ? Math.round((a.qR / a.qC) * 100) : null
-          if (n === 'Montagem de Torres') montTon = a.qC
-          return {
-            n, valor: a.valor, faturado: a.fat,
-            pctFin: a.valor ? Math.round((a.fat / a.valor) * 100) : 0,
-            pctFis, qtdContr: a.qC, qtdReal: a.qR, unidade: a.uni,
-            isOutros: n === 'Outros',
-          }
-        })
-        // físico geral = média ponderada (por valor) dos pacotes com físico
-        const wf = pacotes.filter(x => x.pctFis != null)
-        const wsum = wf.reduce((s, x) => s + x.valor, 0)
-        const pctFis = wsum ? Math.round(wf.reduce((s, x) => s + (x.pctFis as number) * x.valor, 0) / wsum) : 0
-        const obrasMap = new Map<string, string[]>()
-        for (const o of polOscs) { const oid = o.obra_id ?? '—'; const a = obrasMap.get(oid) ?? []; a.push(o.numero_os); obrasMap.set(oid, a) }
-        const obras = [...obrasMap.entries()].map(([oid, list]) => ({ nome: obraNome.get(oid) ?? '— Sem obra', oscs: list.sort() })).sort((a, b) => a.nome.localeCompare(b.nome))
-        return {
-          id: p.id, label: p.nome, codigo: p.codigo,
-          contr, fat, saldo: contr - fat,
-          pctFin: contr ? Math.round((fat / contr) * 100) : 0,
-          pctFis, qtdTorres: p.qtd_torres, montTon,
-          nOscs: polOscs.length, oscs: polOscs.map(o => o.numero_os).sort(), obras,
-          pacotes,
-        }
-      }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      return polos.map(p => ({
+        id: p.id, label: p.nome, codigo: p.codigo, qtdTorres: p.qtd_torres,
+        oscs: oscs.filter(o => (o.obra_id ? obra2polo.get(o.obra_id) : undefined) === p.id).map(o => ({
+          id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: o.obra_id ? (obraNome.get(o.obra_id) ?? '— Sem obra') : '— Sem obra',
+          valor: Number(o.valor ?? 0), saldo_reais: o.saldo_reais, etapa_atual: o.etapa_atual,
+          pacotes: byOsc.get(o.id) ?? {},
+        })),
+      }))
     },
   })
+}
+
+// agrega os polos crus respeitando a seleção de OSCs (excludedOscs = ids ocultados)
+export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>): EAPPolo[] {
+  return raws.map(r => {
+    const oscs = r.oscs.filter(o => o.etapa_atual !== 'cancelada' && !excludedOscs.has(o.id))
+    const contr = oscs.reduce((s, o) => s + o.valor, 0)
+    const fat = oscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0), 0)
+    const m = new Map<string, PacAcc>()
+    for (const o of oscs) for (const [pac, a] of Object.entries(o.pacotes)) {
+      let x = m.get(pac); if (!x) { x = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, x) }
+      x.valor += a.valor; x.fat += a.fat; x.qC += a.qC; x.qR += a.qR; if (a.uni) x.uni = a.uni
+    }
+    let montTon = 0
+    const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
+      const a = m.get(n)!
+      if (n === 'Montagem de Torres') montTon = a.qC
+      return { n, valor: a.valor, faturado: a.fat, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis: a.qC > 0 ? Math.round(a.qR / a.qC * 100) : null, qtdContr: a.qC, qtdReal: a.qR, unidade: a.uni, isOutros: n === 'Outros' }
+    })
+    const wf = pacotes.filter(x => x.pctFis != null)
+    const wsum = wf.reduce((s, x) => s + x.valor, 0)
+    const pctFis = wsum ? Math.round(wf.reduce((s, x) => s + (x.pctFis as number) * x.valor, 0) / wsum) : 0
+    const obrasMap = new Map<string, { id: string; numero_os: string }[]>()
+    for (const o of oscs) { const k = o.obra_nome || '— Sem obra'; const a = obrasMap.get(k) ?? []; a.push({ id: o.id, numero_os: o.numero_os }); obrasMap.set(k, a) }
+    const obras = [...obrasMap.entries()].map(([nome, list]) => ({ nome, oscs: list.sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true })) })).sort((a, b) => a.nome.localeCompare(b.nome))
+    return {
+      id: r.id, label: r.label, codigo: r.codigo,
+      contr, fat, saldo: contr - fat, pctFin: contr ? Math.round(fat / contr * 100) : 0,
+      pctFis, qtdTorres: r.qtdTorres, montTon,
+      nOscs: oscs.length, oscs: oscs.map(o => o.numero_os).sort(), obras, pacotes,
+    }
+  }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
 }
 // fmtQ helper exposto p/ componente
 export function fmtQtd(v: number, u: string | null): string | null {
