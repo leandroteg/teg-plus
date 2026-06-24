@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -63,6 +63,19 @@ const PILLARS: Pillar[] = [
       { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: true, route: '/egp' },
       { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: true, route: '/obras' },
       { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
+    ],
+  },
+  {
+    key: 'governanca',
+    label: 'Governança',
+    tagline: 'SGI, qualidade e melhoria contínua',
+    Icon: Scale,
+    grad: 'from-violet-500/20 to-fuchsia-600/20',
+    border: 'border-violet-500/30',
+    glow: 'rgba(167,139,250,0.18)',
+    accent: '#C4B5FD',
+    subs: [
+      { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
     ],
   },
   {

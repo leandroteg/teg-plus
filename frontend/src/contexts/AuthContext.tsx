@@ -207,6 +207,12 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
       { key: 'rh', label: 'RH', icon: '👥' },
     ],
   },
+  {
+    label: 'Governança',
+    modulos: [
+      { key: 'sgi', label: 'Gestão (SGI)', icon: '⚖️' },
+    ],
+  },
 ]
 
 export const MODULOS_ERP: ModuloERP[] = MODULOS_ERP_GROUPED.flatMap(g => g.modulos)

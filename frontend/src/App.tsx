@@ -36,6 +36,7 @@ import DPLayout from './components/DPLayout'
 import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
 import LocacaoLayout from './components/LocacaoLayout'
+import SgiLayout from './components/SgiLayout'
 import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
@@ -183,6 +184,13 @@ const LocacaoHome = lazy(() => import('./pages/locacao/LocacaoHome'))
 const EntradasPipeline = lazy(() => import('./pages/locacao/EntradasPipeline'))
 const SaidaPipeline = lazy(() => import('./pages/locacao/SaidaPipeline'))
 const LocGestao = lazy(() => import('./pages/locacao/Gestao'))
+
+// SGI (Governança › Gestão)
+const SgiPainel = lazy(() => import('./pages/sgi/SgiPainel'))
+const SgiNovoRegistro = lazy(() => import('./pages/sgi/SgiNovoRegistro'))
+const SgiObjetivos = lazy(() => import('./pages/sgi/SgiObjetivos'))
+const SgiMelhoriaContinua = lazy(() => import('./pages/sgi/SgiMelhoriaContinua'))
+const SgiPadronizacao = lazy(() => import('./pages/sgi/SgiPadronizacao'))
 
 // Patrimonial (módulo próprio)
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
@@ -353,6 +361,17 @@ export default function App() {
               <Route path="/locacoes/entradas" element={<Lazy><EntradasPipeline /></Lazy>} />
               <Route path="/locacoes/gestao"   element={<Lazy><LocGestao /></Lazy>} />
               <Route path="/locacoes/saida"    element={<Lazy><SaidaPipeline /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo SGI (Governança › Gestão) */}
+          <Route element={<ModuleRoute moduleKey="sgi" />}>
+            <Route element={<SgiLayout />}>
+              <Route path="/sgi"               element={<LazyDash><SgiPainel /></LazyDash>} />
+              <Route path="/sgi/novo"          element={<Lazy><SgiNovoRegistro /></Lazy>} />
+              <Route path="/sgi/objetivos"     element={<Lazy><SgiObjetivos /></Lazy>} />
+              <Route path="/sgi/melhoria"      element={<Lazy><SgiMelhoriaContinua /></Lazy>} />
+              <Route path="/sgi/padronizacao"  element={<Lazy><SgiPadronizacao /></Lazy>} />
             </Route>
           </Route>
 
