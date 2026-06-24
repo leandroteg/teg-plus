@@ -132,23 +132,6 @@ export default function RHColaboradores() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Users size={20} className="text-violet-400" />
-            Gestão de Colaboradores
-          </h1>
-          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{filtered.length} colaboradores</p>
-        </div>
-        <button onClick={exportCSV}
-          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-colors ${
-            isLight ? 'text-slate-500 hover:bg-slate-100 border border-slate-200' : 'text-slate-400 hover:bg-white/10 border border-white/10'
-          }`}>
-          <Download size={13} /> Exportar CSV
-        </button>
-      </div>
-
       {/* KPI Summary Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
@@ -179,18 +162,41 @@ export default function RHColaboradores() {
         })}
       </div>
 
-      {/* Search + Filter toggle + View mode */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      {/* Busca + status + filtros + exportar + view (tudo em 1 linha) */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Status: Ativos / Inativos */}
+        {[
+          { label: 'Ativos', value: true, count: todos.filter(c => c.ativo).length },
+          { label: 'Inativos', value: false, count: todos.filter(c => !c.ativo).length },
+        ].map(t => (
+          <button key={String(t.value)} onClick={() => setFiltros(f => ({ ...f, ativo: t.value }))}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+              filtros.ativo === t.value
+                ? isLight ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
+            }`}>
+            {t.label}
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              filtros.ativo === t.value
+                ? isLight ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-200'
+                : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
+            }`}>{t.count}</span>
+          </button>
+        ))}
+
+        {/* Busca (encolhe pra caber) */}
+        <div className="relative flex-1 min-w-[150px]">
           <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
           <input value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CPF, matrícula, cargo ou email..."
-            className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
+            placeholder="Buscar por nome, CPF, cargo..."
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
               isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'
             }`} />
         </div>
+
+        {/* Filtros */}
         <button onClick={() => setShowFiltros(!showFiltros)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors relative ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors relative shrink-0 ${
             showFiltros || activeFilterCount > 0
               ? isLight ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
               : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/10'
@@ -202,8 +208,17 @@ export default function RHColaboradores() {
             </span>
           )}
         </button>
+
+        {/* Exportar CSV */}
+        <button onClick={exportCSV}
+          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-colors shrink-0 ${
+            isLight ? 'text-slate-500 hover:bg-slate-100 border border-slate-200' : 'text-slate-400 hover:bg-white/10 border border-white/10'
+          }`}>
+          <Download size={13} /> Exportar CSV
+        </button>
+
         {/* View mode toggle */}
-        <div className={`flex rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+        <div className={`flex rounded-xl border overflow-hidden shrink-0 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
           <button onClick={() => setViewMode('table')}
             className={`flex items-center gap-1 px-2.5 py-2 text-xs font-semibold transition-colors ${
               viewMode === 'table'
@@ -221,28 +236,6 @@ export default function RHColaboradores() {
             <LayoutGrid size={13} />
           </button>
         </div>
-      </div>
-
-      {/* Status tabs */}
-      <div className="flex gap-1.5">
-        {[
-          { label: 'Ativos', value: true, count: todos.filter(c => c.ativo).length },
-          { label: 'Inativos', value: false, count: todos.filter(c => !c.ativo).length },
-        ].map(t => (
-          <button key={String(t.value)} onClick={() => setFiltros(f => ({ ...f, ativo: t.value }))}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              filtros.ativo === t.value
-                ? isLight ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-transparent'
-            }`}>
-            {t.label}
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              filtros.ativo === t.value
-                ? isLight ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-200'
-                : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
-            }`}>{t.count}</span>
-          </button>
-        ))}
       </div>
 
       {/* Filtros expandidos */}
