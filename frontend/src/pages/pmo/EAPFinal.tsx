@@ -17,12 +17,41 @@ const fmtM = (v: number) => {
   return 'R$ ' + Math.round(v)
 }
 
+const PACOTES_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
+
 function poloId(label: string) {
   const m = label.match(/^(F[\d.\/]+)/)
   return m ? m[1] : label
 }
 function poloNome(label: string) {
   return label.replace(/^F[\d.\/]+\s*-\s*/, '')
+}
+
+// agrega todos os polos num bloco "Geral"
+function buildGeral(polos: EAPPolo[]): EAPPolo {
+  const contr = polos.reduce((s, p) => s + p.contr, 0)
+  const fat = polos.reduce((s, p) => s + p.fat, 0)
+  type Acc = { valor: number; fat: number; qC: number; qR: number; uni: string | null }
+  const m = new Map<string, Acc>()
+  for (const p of polos) for (const pac of p.pacotes) {
+    let a = m.get(pac.n); if (!a) { a = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac.n, a) }
+    a.valor += pac.valor; a.fat += pac.faturado; a.qC += pac.qtdContr; a.qR += pac.qtdReal; a.uni = pac.unidade ?? a.uni
+  }
+  let montTon = 0
+  const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
+    const a = m.get(n)!
+    if (n === 'Montagem de Torres') montTon = a.qC
+    return { n, valor: a.valor, faturado: a.fat, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis: a.qC > 0 ? Math.round(a.qR / a.qC * 100) : null, qtdContr: a.qC, qtdReal: a.qR, unidade: a.uni, isOutros: n === 'Outros' }
+  })
+  const wf = pacotes.filter(x => x.pctFis != null)
+  const wsum = wf.reduce((s, x) => s + x.valor, 0)
+  const pctFis = wsum ? Math.round(wf.reduce((s, x) => s + (x.pctFis as number) * x.valor, 0) / wsum) : 0
+  return {
+    id: '__geral__', label: 'Geral', codigo: null,
+    contr, fat, saldo: contr - fat, pctFin: contr ? Math.round(fat / contr * 100) : 0, pctFis,
+    qtdTorres: polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0) || null,
+    montTon, nOscs: polos.reduce((s, p) => s + p.nOscs, 0), oscs: [], pacotes,
+  }
 }
 
 export default function EAPFinal({ portfolioId, excluded, isLight }: { portfolioId?: string; excluded?: Set<string>; isLight: boolean }) {
@@ -59,23 +88,30 @@ export default function EAPFinal({ portfolioId, excluded, isLight }: { portfolio
         </button>
       </div>
 
-      {/* colunas por polo */}
-      <div className="flex flex-wrap gap-3 items-start">
-        {polos.map(p => <PoloCol key={p.id} polo={p} portfolioId={portfolioId} isLight={isLight} />)}
+      {/* Geral + colunas por polo (máx 3 por linha) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+        {[buildGeral(polos), ...polos].map(p => <PoloCol key={p.id} polo={p} portfolioId={portfolioId} isLight={isLight} isGeral={p.id === '__geral__'} />)}
       </div>
     </div>
   )
 }
 
-function PoloCol({ polo, portfolioId, isLight }: { polo: EAPPolo; portfolioId?: string; isLight: boolean }) {
+function PoloCol({ polo, portfolioId, isLight, isGeral }: { polo: EAPPolo; portfolioId?: string; isLight: boolean; isGeral?: boolean }) {
   return (
-    <div className="flex-1 min-w-[300px] max-w-[420px] flex flex-col gap-2">
+    <div className={`w-full flex flex-col gap-2 ${isGeral ? 'ring-2 ring-[#e87b2a]/40 rounded-2xl p-2' : ''}`}>
       {/* head */}
-      <div className="rounded-xl px-3 py-2.5 bg-[#0f2a4a] border-l-4 border-[#e87b2a] flex items-baseline gap-2">
-        <span className="text-[#e87b2a] font-bold text-sm uppercase shrink-0">{poloId(polo.label)}</span>
-        <span className="text-white font-semibold text-base leading-none">{poloNome(polo.label)}</span>
-        <span className="ml-auto text-white/50 text-[10px] truncate">{polo.oscs.join(' · ')}</span>
-      </div>
+      {isGeral ? (
+        <div className="rounded-xl px-3 py-2.5 bg-[#e87b2a] border-l-4 border-[#0f2a4a] flex items-baseline gap-2">
+          <span className="text-white font-bold text-base uppercase tracking-wide shrink-0">Geral</span>
+          <span className="ml-auto text-white/85 text-[11px] font-semibold">{polo.nOscs} OSCs</span>
+        </div>
+      ) : (
+        <div className="rounded-xl px-3 py-2.5 bg-[#0f2a4a] border-l-4 border-[#e87b2a] flex items-baseline gap-2">
+          <span className="text-[#e87b2a] font-bold text-sm uppercase shrink-0">{poloId(polo.label)}</span>
+          <span className="text-white font-semibold text-base leading-none">{poloNome(polo.label)}</span>
+          <span className="ml-auto text-white/50 text-[10px] truncate">{polo.oscs.join(' · ')}</span>
+        </div>
+      )}
 
       {/* resumo: físico / financeiro */}
       <div className={`rounded-xl border-l-4 border-[#e87b2a] p-2.5 space-y-1.5 ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-white/[0.03] border border-white/[0.06]'}`}>
@@ -84,7 +120,7 @@ function PoloCol({ polo, portfolioId, isLight }: { polo: EAPPolo; portfolioId?: 
       </div>
 
       {/* pacotes */}
-      {polo.pacotes.map(pac => <PacoteCard key={pac.n} pac={pac} polo={polo} portfolioId={portfolioId} isLight={isLight} />)}
+      {polo.pacotes.map(pac => <PacoteCard key={pac.n} pac={pac} polo={polo} portfolioId={portfolioId} isLight={isLight} isGeral={isGeral} />)}
     </div>
   )
 }
@@ -103,7 +139,7 @@ function ResumoBar({ label, pct, valor, color, isLight }: { label: string; pct: 
   )
 }
 
-function PacoteCard({ pac, polo, portfolioId, isLight }: { pac: EAPPacote; polo: EAPPolo; portfolioId?: string; isLight: boolean }) {
+function PacoteCard({ pac, polo, portfolioId, isLight, isGeral }: { pac: EAPPacote; polo: EAPPolo; portfolioId?: string; isLight: boolean; isGeral?: boolean }) {
   const color = SEC_COLOR[pac.n] ?? '#374151'
   const isMont = pac.n === 'Montagem de Torres'
   const badge = isMont
@@ -125,7 +161,9 @@ function PacoteCard({ pac, polo, portfolioId, isLight }: { pac: EAPPacote; polo:
       <div className="flex items-center gap-2 mb-1">
         <span className="font-semibold text-sm leading-tight" style={{ color: isLight ? '#0f2a4a' : '#e2e8f0' }}>{pac.n}</span>
         {isMont
-          ? <TorresBadge polo={polo} pac={pac} portfolioId={portfolioId} color={color} isLight={isLight} />
+          ? (isGeral
+            ? <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }}>{badge || '—'}</span>
+            : <TorresBadge polo={polo} pac={pac} portfolioId={portfolioId} color={color} isLight={isLight} />)
           : (badge && <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }}>{badge}</span>)}
       </div>
       {/* barra */}
