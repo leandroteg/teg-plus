@@ -4,10 +4,15 @@ import { TrendingUp, Building2, PieChart, Grid3x3, Users } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
 import { useMedicaoMensal, useEAPFinal } from '../../../hooks/usePMO'
-import { Kpi, PanelCard, HBarRow, ProporcaoBar, Legenda, Heatmap } from '../../rh/paineis/_ui'
+import { Kpi, PanelCard, HBarRow, Heatmap } from '../../rh/paineis/_ui'
 
 const POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#64748b']
 const poloNome = (s: string) => s.replace(/^F[\d.\/]+\s*-\s*/, '')
+const PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
+const PAC_COR: Record<string, string> = {
+  'Serv. Preliminares': '#0284c7', 'Canteiro e Mobiliz.': '#0369a1', 'Fundações': '#92400e',
+  'Montagem de Torres': '#374151', 'Lançamento de Cabos': '#3730a3', 'Administração Local': '#6d28d9', 'Outros': '#4b5563',
+}
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 const fmtFull = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR')
@@ -48,17 +53,22 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     return meses.map(ym => ({ ym, fat: byM.get(ym)?.fat ?? 0, oscs: byM.get(ym)?.oscs.size ?? 0 }))
   }, [rows, de, ateF, isProd])
 
-  // mapa OSC → obra/frente (do contrato vigente)
+  // mapa OSC → obra/frente + proporção por pacote da EAP (do contrato vigente)
   const oscMap = useMemo(() => {
-    const m = new Map<string, { obra: string; polo: string }>()
-    for (const p of (raw ?? [])) for (const o of p.oscs) m.set(o.numero_os, { obra: o.obra_nome, polo: poloNome(p.label) })
+    const m = new Map<string, { obra: string; polo: string; pacProp: Array<[string, number]> }>()
+    for (const p of (raw ?? [])) for (const o of p.oscs) {
+      const tot = Object.values(o.pacotes).reduce((s, a) => s + a.valor, 0) || 1
+      const pacProp = Object.entries(o.pacotes).map(([n, a]) => [n, a.valor / tot] as [string, number])
+      m.set(o.numero_os, { obra: o.obra_nome, polo: poloNome(p.label), pacProp })
+    }
     return m
   }, [raw])
 
   // agregações do período: top obras, por frente, frente×mês, TEG×Sub
   const agg = useMemo(() => {
     const porObra = new Map<string, number>(); const porPolo = new Map<string, number>()
-    const poloMes = new Map<string, Map<string, number>>(); const mesesSet = new Set<string>()
+    const poloMes = new Map<string, Map<string, number>>(); const pacMes = new Map<string, Map<string, number>>()
+    const porPac = new Map<string, number>(); const mesesSet = new Set<string>()
     let teg = 0, sub = 0
     for (const r of (rows ?? [])) {
       const v = Number(r.realizado ?? 0); const c = r.competencia
@@ -69,14 +79,21 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
       porPolo.set(polo, (porPolo.get(polo) ?? 0) + v)
       let pm = poloMes.get(polo); if (!pm) { pm = new Map(); poloMes.set(polo, pm) }
       pm.set(c, (pm.get(c) ?? 0) + v); mesesSet.add(c)
+      // distribui o realizado pelos pacotes da EAP (proporção contratada da OSC)
+      for (const [pac, prop] of (info?.pacProp ?? [])) {
+        const pv = v * prop; porPac.set(pac, (porPac.get(pac) ?? 0) + pv)
+        let qm = pacMes.get(pac); if (!qm) { qm = new Map(); pacMes.set(pac, qm) }
+        qm.set(c, (qm.get(c) ?? 0) + pv)
+      }
       if (r.subcontratada) sub += v; else teg += v
     }
     const topObras = [...porObra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
     const totalGeral = [...porObra.values()].reduce((s, x) => s + x, 0) || 1
     const top5 = [...porObra.values()].sort((a, b) => b - a).slice(0, 5).reduce((s, x) => s + x, 0)
     const polos = [...porPolo.entries()].sort((a, b) => b[1] - a[1])
+    const pacotes = PAC_ORD.filter(n => porPac.has(n)).map(n => [n, porPac.get(n)!] as [string, number])
     const meses = [...mesesSet].sort()
-    return { topObras, totalObras: porObra.size, totalGeral, concentr5: Math.round(top5 / totalGeral * 100), polos, poloMes, meses, teg, sub }
+    return { topObras, totalObras: porObra.size, totalGeral, concentr5: Math.round(top5 / totalGeral * 100), polos, poloMes, pacotes, pacMes, meses, teg, sub }
   }, [rows, oscMap, de, ateF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -148,8 +165,7 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
         </PanelCard>
 
         {/* Composição por frente */}
-        <PanelCard title="Composição por frente" icon={<PieChart size={14} className="text-teal-500" />} isDark={isDark}
-          right={<Legenda items={agg.polos.map(([n], i) => ({ label: n, color: POLO_COR[i % POLO_COR.length] }))} isDark={isDark} />}>
+        <PanelCard title="Composição por frente" icon={<PieChart size={14} className="text-teal-500" />} isDark={isDark}>
           <div className="flex h-9 rounded-lg overflow-hidden mb-3">
             {agg.polos.map(([nome, val], i) => { const pct = val / agg.totalGeral * 100; if (pct <= 0) return null; return (
               <div key={nome} style={{ width: `${pct}%`, background: POLO_COR[i % POLO_COR.length] }} className="flex items-center justify-center" title={`${nome}: ${fmtM(val)} (${pct.toFixed(0)}%)`}>
@@ -170,21 +186,40 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
         </PanelCard>
       </div>
 
-      {/* Heatmap frente × mês */}
-      {agg.meses.length > 0 && agg.polos.length > 0 && (
-        <PanelCard title="Faturamento por frente × mês" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
-          right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>R$ milhões</span>}>
-          <Heatmap
-            meses={agg.meses.map(ym => ({ mes: MES_ABR[Number(ym.split('-')[1])], ano: ym.split('-')[0].slice(2) }))}
-            linhas={agg.polos.map(([nome, val], i) => ({
-              label: nome, color: POLO_COR[i % POLO_COR.length],
-              valores: agg.meses.map(m => { const v = agg.poloMes.get(nome)?.get(m) ?? 0; return v ? Math.round(v / 1e5) / 10 : 0 }),
-              total: Math.round(val / 1e5) / 10,
-            }))}
-            totalMes={agg.meses.map(m => { let s = 0; for (const [nome] of agg.polos) s += agg.poloMes.get(nome)?.get(m) ?? 0; return Math.round(s / 1e5) / 10 })}
-            isDark={isDark}
-          />
-        </PanelCard>
+      {/* Heatmaps lado a lado: por Polo + por frente (EAP) */}
+      {agg.meses.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+          {agg.polos.length > 0 && (
+            <PanelCard title="Faturamento por Polo" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
+              right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>R$ milhões</span>} pad={false} bodyClassName="p-4 overflow-x-auto">
+              <Heatmap
+                meses={agg.meses.map(ym => ({ mes: MES_ABR[Number(ym.split('-')[1])], ano: ym.split('-')[0].slice(2) }))}
+                linhas={agg.polos.map(([nome, val], i) => ({
+                  label: nome, color: POLO_COR[i % POLO_COR.length],
+                  valores: agg.meses.map(m => { const v = agg.poloMes.get(nome)?.get(m) ?? 0; return v ? Math.round(v / 1e5) / 10 : 0 }),
+                  total: Math.round(val / 1e5) / 10,
+                }))}
+                totalMes={agg.meses.map(m => { let s = 0; for (const [nome] of agg.polos) s += agg.poloMes.get(nome)?.get(m) ?? 0; return Math.round(s / 1e5) / 10 })}
+                isDark={isDark}
+              />
+            </PanelCard>
+          )}
+          {agg.pacotes.length > 0 && (
+            <PanelCard title="Faturamento por frente (EAP)" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
+              right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>R$ milhões</span>} pad={false} bodyClassName="p-4 overflow-x-auto">
+              <Heatmap
+                meses={agg.meses.map(ym => ({ mes: MES_ABR[Number(ym.split('-')[1])], ano: ym.split('-')[0].slice(2) }))}
+                linhas={agg.pacotes.map(([nome, val]) => ({
+                  label: nome, color: PAC_COR[nome] ?? '#475569',
+                  valores: agg.meses.map(m => { const v = agg.pacMes.get(nome)?.get(m) ?? 0; return v ? Math.round(v / 1e5) / 10 : 0 }),
+                  total: Math.round(val / 1e5) / 10,
+                }))}
+                totalMes={agg.meses.map(m => { let s = 0; for (const [nome] of agg.pacotes) s += agg.pacMes.get(nome)?.get(m) ?? 0; return Math.round(s / 1e5) / 10 })}
+                isDark={isDark}
+              />
+            </PanelCard>
+          )}
+        </div>
       )}
 
       {/* TEG × Subcontratadas */}
