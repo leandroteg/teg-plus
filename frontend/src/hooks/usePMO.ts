@@ -225,6 +225,12 @@ export interface EGPOscRow {
   saldo_reais: number | null
   data_osc: string | null
   vencimento: string | null
+  abertura_path: string | null
+}
+
+export async function getAberturaUrl(path: string, download = false): Promise<string | null> {
+  const { data } = await supabase.storage.from('egp-osc-abertura').createSignedUrl(path, 3600, download ? { download: true } : undefined)
+  return data?.signedUrl ?? null
 }
 
 export function useOSCsDoPortfolio(portfolioId?: string) {
@@ -234,7 +240,7 @@ export function useOSCsDoPortfolio(portfolioId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pmo_fluxo_os')
-        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes, tipo, valor, quantidade_us, saldo_reais, data_osc, vencimento')
+        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes, tipo, valor, quantidade_us, saldo_reais, data_osc, vencimento, abertura_path')
         .eq('portfolio_id', portfolioId!)
         .order('created_at', { ascending: false })
       if (error) throw error

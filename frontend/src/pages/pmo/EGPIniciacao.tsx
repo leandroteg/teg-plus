@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2, Ban, RotateCcw,
+  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2, Ban, RotateCcw, FileText, Eye, Download,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -11,7 +11,7 @@ import {
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
   useComunicacao, useCriarComunicacao, useAtualizarComunicacao, useDeletarComunicacao,
   useObrasDoPortfolio, useOSCsDoPortfolio, useAddOSC, useDeletarOSC, useUpdateOSC, useOSCItens,
-  useAddOSCFromParse, parseOSCPdf,
+  useAddOSCFromParse, parseOSCPdf, getAberturaUrl,
   useProjetos, useCriarProjeto, useCriarObraEGP,
   type EGPOscRow, type EGPOscItem,
 } from '../../hooks/usePMO'
@@ -1132,6 +1132,21 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                 {card('Início', det.data_osc ? fmtData(det.data_osc) : '—')}
                 {card('Prazo', det.vencimento ? fmtData(det.vencimento) : '—')}
                 {card('Saldo', det.saldo_reais != null ? fmtBRL(det.saldo_reais) : '—')}
+              </div>
+              {/* OSC de abertura (ver/baixar) */}
+              <div className="px-5 pb-3">
+                {det.abertura_path ? (
+                  <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                    <FileText size={15} className={isLight ? 'text-rose-500' : 'text-rose-400'} />
+                    <span className={`text-sm font-semibold flex-1 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>OSC de abertura</span>
+                    <button onClick={async () => { const u = await getAberturaUrl(det.abertura_path!, false); if (u) window.open(u, '_blank') }}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'}`}><Eye size={13} /> Ver</button>
+                    <button onClick={async () => { const u = await getAberturaUrl(det.abertura_path!, true); if (u) window.open(u, '_blank') }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700"><Download size={13} /> Baixar</button>
+                  </div>
+                ) : (
+                  <p className={`text-xs italic flex items-center gap-1.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}><FileText size={13} /> PDF de abertura não arquivado para esta OSC.</p>
+                )}
               </div>
               {/* itens */}
               {(oscItens?.length ?? 0) > 0 ? (
