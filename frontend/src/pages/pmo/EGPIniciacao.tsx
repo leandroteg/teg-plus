@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2,
+  Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2, Ban, RotateCcw,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -726,6 +726,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [fTipo, setFTipo] = useState('')
   const [fValor, setFValor] = useState('')
   const [fData, setFData] = useState('')
+  const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [form, setForm] = useState<{ numero_os: string; tipo_servico: string }>({ numero_os: '', tipo_servico: '' })
@@ -767,9 +768,15 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
     await delOSC.mutateAsync({ id: editOsc.id, portfolio_id: portfolioId })
     setEditOsc(null)
   }
+  const cancelarEdit = async () => {
+    if (!editOsc || !portfolioId) return
+    const cancelar = editOsc.etapa_atual !== 'cancelada'
+    await updOSC.mutateAsync({ id: editOsc.id, portfolio_id: portfolioId, etapa_atual: cancelar ? 'cancelada' : 'recebida' })
+    setEditOsc(null)
+  }
 
   // filtros de OSC
-  const fAtivo = !!(fTipo || fValor || fData)
+  const fAtivo = !!(fTipo || fValor || fData || fStatus !== 'ativas')
   const matchOsc = (o: EGPOscRow) => {
     if (fTipo && o.tipo !== fTipo) return false
     if (fValor) {
@@ -782,10 +789,13 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
     return true
   }
 
-  // OSCs agrupadas por obra (já filtradas)
+  // OSCs agrupadas por obra (já filtradas). Canceladas saem por padrão (status 'ativas').
   const oscByObra = new Map<string, EGPOscRow[]>()
   for (const osc of oscs ?? []) {
     if (!osc.obra_id) continue
+    const cancelada = osc.etapa_atual === 'cancelada'
+    if (fStatus === 'ativas' && cancelada) continue
+    if (fStatus === 'canceladas' && !cancelada) continue
     if (fAtivo && !matchOsc(osc)) continue
     const arr = oscByObra.get(osc.obra_id) ?? []
     arr.push(osc)
@@ -811,6 +821,10 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
     ...[...nomeProjeto.keys()].map(id => ({ id, nome: nomeProjeto.get(id) ?? '—' })),
     ...(byProjeto.has('__sem__') ? [{ id: '__sem__', nome: '— Sem polo' }] : []),
   ].filter(g => !q.trim() || (byProjeto.get(g.id)?.length ?? 0) > 0).sort((a, b) => a.nome.localeCompare(b.nome))
+
+  // total geral (todas as obras visíveis) — soma do valor das OSCs e contagem
+  const totGeralValor = list.reduce((s, o) => s + (aggOsc(oscByObra.get(o.id) ?? []).valor ?? 0), 0)
+  const totGeralOscs = list.reduce((s, o) => s + (oscByObra.get(o.id)?.length ?? 0), 0)
 
   const handleCriarProjeto = async () => {
     if (!pForm.nome.trim() || !portfolioId) return
@@ -844,7 +858,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   return (
     <div className="space-y-4">
       {/* Header + busca + filtros (linha única) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <div className="flex flex-wrap items-center gap-2">
         <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           {list.length} obra{list.length !== 1 ? 's' : ''}
         </p>
@@ -871,8 +885,13 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
           <option value="2025">2025</option>
           <option value="2026">2026</option>
         </select>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value as 'ativas' | 'canceladas' | 'todas')} className={selCls(isLight, fStatus !== 'ativas')}>
+          <option value="ativas">Ativas</option>
+          <option value="canceladas">Canceladas</option>
+          <option value="todas">Todas (c/ canceladas)</option>
+        </select>
         {fAtivo && (
-          <button onClick={() => { setFTipo(''); setFValor(''); setFData('') }} title="Limpar filtros"
+          <button onClick={() => { setFTipo(''); setFValor(''); setFData(''); setFStatus('ativas') }} title="Limpar filtros"
             className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><X size={15} /></button>
         )}
         <div className="ml-auto flex items-center gap-2 shrink-0 pl-2">
@@ -960,10 +979,11 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                               )}
                               {oscList.map(osc => {
                                 const tp = TIPO_OBRA[osc.tipo ?? '']
+                                const cancelada = osc.etapa_atual === 'cancelada'
                                 return (
-                                  <div key={osc.id} onClick={() => setDet(osc)} className={`flex items-center gap-3 py-1.5 text-sm cursor-pointer rounded-lg -mx-1 px-1 ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.04]'}`}>
-                                    <span className={`w-[92px] shrink-0 font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
-                                    <span className={`flex-1 min-w-0 truncate text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.tipo_servico ? `· ${osc.tipo_servico}` : ''}</span>
+                                  <div key={osc.id} onClick={() => setDet(osc)} className={`flex items-center gap-3 py-1.5 text-sm cursor-pointer rounded-lg -mx-1 px-1 ${cancelada ? 'opacity-60' : ''} ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.04]'}`}>
+                                    <span className={`w-[92px] shrink-0 font-mono text-xs font-semibold ${cancelada ? 'line-through' : ''} ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</span>
+                                    <span className={`flex-1 min-w-0 truncate text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{cancelada ? <span className="text-rose-500 font-semibold">cancelada</span> : (osc.tipo_servico ? `· ${osc.tipo_servico}` : '')}</span>
                                     <span className="w-[74px] shrink-0 flex justify-end">{tp && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isLight ? tp.light : tp.dark}`}>{tp.label}</span>}</span>
                                     <span className={`w-[100px] shrink-0 text-right font-semibold tabular-nums ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{osc.valor != null ? fmtBRLc(osc.valor) : '—'}</span>
                                     <span className={`w-[60px] shrink-0 text-right text-[11px] tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.data_osc ? fmtData(osc.data_osc) : '—'}</span>
@@ -1009,6 +1029,21 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
               </div>
             )
           })}
+        </div>
+      )}
+
+      {list.length > 0 && (
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.04] border-white/10'}`}>
+          <span className="w-[15px] shrink-0" />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className={`font-bold text-sm uppercase tracking-wide ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>Total</span>
+            <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${isLight ? 'bg-white text-slate-500' : 'bg-white/10 text-slate-400'}`}>{list.length} obra{list.length !== 1 ? 's' : ''} · {totGeralOscs} OSC{totGeralOscs !== 1 ? 's' : ''}</span>
+          </div>
+          <span className="w-[74px] shrink-0" />
+          <span className={`w-[100px] shrink-0 text-right text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRLc(totGeralValor)}</span>
+          <span className="w-[60px] shrink-0" />
+          <span className="w-[60px] shrink-0" />
+          <span className="w-4 shrink-0" />
         </div>
       )}
 
@@ -1214,10 +1249,17 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2">
-                <button onClick={apagarEdit} disabled={delOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} disabled:opacity-40`}><Trash2 size={14} /> Apagar OSC</button>
+              <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
                 <div className="flex gap-2">
-                  <button onClick={() => setEditOsc(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Cancelar</button>
+                  <button onClick={apagarEdit} disabled={delOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} disabled:opacity-40`}><Trash2 size={14} /> Apagar OSC</button>
+                  {editOsc.etapa_atual === 'cancelada' ? (
+                    <button onClick={cancelarEdit} disabled={updOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'} disabled:opacity-40`}><RotateCcw size={14} /> Reativar</button>
+                  ) : (
+                    <button onClick={cancelarEdit} disabled={updOSC.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'} disabled:opacity-40`}><Ban size={14} /> Cancelar OSC</button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditOsc(null)} className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Fechar</button>
                   <button onClick={salvarEdit} disabled={updOSC.isPending} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"><Save size={14} /> Salvar</button>
                 </div>
               </div>
