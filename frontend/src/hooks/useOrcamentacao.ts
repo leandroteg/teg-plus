@@ -95,6 +95,7 @@ export function useCriarOrcamento() {
           storage_path: path,
           mime: a.file.type || null,
           tamanho: a.file.size,
+          estagio: a.tipo === 'kmz' ? 1 : 2,
         })
         if (arqErr) throw new Error('Falha ao registrar ' + a.file.name + ': ' + arqErr.message)
       }
@@ -155,7 +156,7 @@ export function useArquivos(orcamentoId?: string) {
 export function useAdicionarArquivos() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { orcamentoId: string; arquivos: NovoArquivo[]; premissas?: Partial<OrcPremissas>; onProgress?: (done: number, total: number) => void }) => {
+    mutationFn: async (input: { orcamentoId: string; arquivos: NovoArquivo[]; estagio?: number; premissas?: Partial<OrcPremissas>; onProgress?: (done: number, total: number) => void }) => {
       const falhas: string[] = []
       let done = 0
       for (const a of input.arquivos) {
@@ -167,6 +168,7 @@ export function useAdicionarArquivos() {
           const { error: arqErr } = await supabase.from('orc_arquivos').insert({
             orcamento_id: input.orcamentoId, nome: a.file.name, tipo: a.tipo,
             storage_path: path, mime: a.file.type || null, tamanho: a.file.size,
+            estagio: a.tipo === 'kmz' ? 1 : (input.estagio ?? 2),
           })
           if (arqErr) throw new Error(arqErr.message)
         } catch (e) {

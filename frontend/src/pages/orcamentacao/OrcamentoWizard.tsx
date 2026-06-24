@@ -421,7 +421,7 @@ export default function OrcamentoWizard({ orc, isDark }: { orc: Orcamento; isDar
               </p>
               {(aba === 1 || aba === 2 || aba === 3) && (
                 <div className="text-left max-w-xl mx-auto mt-3 mb-4">
-                  <DocsInput orcId={orc.id} isDark={isDark} hint={aba === 2 ? 'romaneio, projeto de fundação, cronograma, matriz de recursos' : aba === 3 ? 'matriz de recursos, tabela de salários' : 'documentos adicionais'} />
+                  <DocsInput orcId={orc.id} isDark={isDark} estagio={aba} hint={aba === 2 ? 'romaneio, projeto de fundação, cronograma, matriz de recursos' : aba === 3 ? 'matriz de recursos, tabela de salários' : 'documentos adicionais'} />
                 </div>
               )}
               <button onClick={() => rodar.mutate({ id: orc.id, estagio: aba })} disabled={rodar.isPending}
@@ -519,7 +519,7 @@ function EstagioConteudo({ orc, estagio, d, isDark, onRegerar, regerando, onAvan
         </div>
 
         {/* Inputs: docs (1,2,3) / fiscais do lance (5) */}
-        {(estagio === 1 || estagio === 2 || estagio === 3) && <DocsInput orcId={orc.id} isDark={isDark} hint={estagio === 2 ? 'características, lista de materiais, planilha construtiva' : estagio === 3 ? 'matriz de recursos do contrato, tabela de salários' : 'documentos adicionais'} />}
+        {(estagio === 1 || estagio === 2 || estagio === 3) && <DocsInput orcId={orc.id} isDark={isDark} estagio={estagio} hint={estagio === 2 ? 'características, lista de materiais, planilha construtiva' : estagio === 3 ? 'matriz de recursos do contrato, tabela de salários' : 'documentos adicionais'} />}
         {estagio === 5 && (
           <div className="mt-3 space-y-2.5">
             {/* custo cheio (R$/US) — somados ao operacional do estágio 4 */}
@@ -1426,7 +1426,7 @@ function Orcamentacao({ d, isDark, onSave, saving }: { d: Record<string, unknown
 
 // ── Upload de documentos (inputs dos estágios) ───────────────────────────────────
 // ── Modal de anexos: lista + adicionar + remover ────────────────────────────────
-function AnexosModal({ orcId, isDark, onClose }: { orcId: string; isDark: boolean; onClose: () => void }) {
+function AnexosModal({ orcId, isDark, estagio, onClose }: { orcId: string; isDark: boolean; estagio: number; onClose: () => void }) {
   const { data: arquivos = [], isLoading } = useArquivos(orcId)
   const adicionar = useAdicionarArquivos()
   const remover = useRemoverArquivo()
@@ -1446,6 +1446,7 @@ function AnexosModal({ orcId, isDark, onClose }: { orcId: string; isDark: boolea
       await adicionar.mutateAsync({
         orcamentoId: orcId,
         arquivos: files.map(f => ({ file: f, tipo: det(f.name) }) as NovoArquivo),
+        estagio,
         onProgress: (done, total) => setProg({ done, total }),
       })
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao enviar os documentos.') }
@@ -1515,7 +1516,7 @@ function AnexosModal({ orcId, isDark, onClose }: { orcId: string; isDark: boolea
 }
 
 // ── Gatilho compacto: ícone + contagem que abre o modal de anexos ───────────────
-function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hint: string }) {
+function DocsInput({ orcId, isDark, hint, estagio }: { orcId: string; isDark: boolean; hint: string; estagio: number }) {
   const { data: arquivos = [] } = useArquivos(orcId)
   const [open, setOpen] = useState(false)
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -1529,7 +1530,7 @@ function DocsInput({ orcId, isDark, hint }: { orcId: string; isDark: boolean; hi
         <ChevronRight size={12} className="opacity-60" />
       </button>
       <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Gerencie os documentos ({hint}) — adicionar/remover. Depois <span className="font-semibold">Regerar</span> para consolidar.</p>
-      {open && <AnexosModal orcId={orcId} isDark={isDark} onClose={() => setOpen(false)} />}
+      {open && <AnexosModal orcId={orcId} isDark={isDark} estagio={estagio} onClose={() => setOpen(false)} />}
     </div>
   )
 }
