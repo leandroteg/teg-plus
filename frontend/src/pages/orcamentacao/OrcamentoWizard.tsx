@@ -943,13 +943,22 @@ function ReleveModal({ obra, isDark, onClose, onVerMapa }: {
 }
 
 // ── Etapa 2: renderer recursivo de dados ricos (tabelas, key-value, fonte clicável) ──
+// título legível da obra: usa nome real (descricao/nome) quando existe, senão capitaliza a chave
+function tituloObra(chave: string, v: unknown): string {
+  const o = (v && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, unknown>) : null
+  const real = o ? (o.descricao ?? o.nome ?? o.obra ?? o.identificacao) : null
+  if (typeof real === 'string' && real.trim().length > 4) return real.split(/\s[—–]\s|,\s|\n|\s\(/)[0].trim().slice(0, 72)
+  if (chave.includes('_')) return chave.split('_').filter(Boolean).map(w => (w.length <= 3 || /\d/.test(w)) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  if (/[A-ZÀ-Ú]/.test(chave)) return chave
+  return chave.charAt(0).toUpperCase() + chave.slice(1)
+}
 function FonteTag({ fonte, isDark, baixar, temArq }: { fonte: string; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean }) {
   const partes = String(fonte).split(/[+,;]/).map(s => s.trim()).filter(Boolean)
   return <span className="inline-flex flex-wrap gap-1">{partes.map((p, i) => {
     const tem = temArq(p)
     return <button key={i} type="button" onClick={() => tem && baixar(p)} disabled={!tem} title={tem ? 'Baixar ' + p : p}
-      className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded ${tem ? (isDark ? 'bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 cursor-pointer' : 'bg-teal-50 text-teal-700 hover:bg-teal-100 cursor-pointer') : (isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-400')}`}>
-      {tem && <Download size={9} />}{p}</button>
+      className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded ${tem ? (isDark ? 'bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 cursor-pointer' : 'bg-teal-50 text-teal-700 hover:bg-teal-100 cursor-pointer') : (isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-400')}`}>
+      {tem && <Download size={11} />}{p}</button>
   })}</span>
 }
 
@@ -963,12 +972,12 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
     const objs = v.filter(x => x && typeof x === 'object' && !Array.isArray(x)) as Array<Record<string, unknown>>
     if (objs.length === v.length) {
       const cols = Array.from(new Set(objs.flatMap(o => Object.keys(o))))
-      return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[10.5px]">
+      return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[12px]">
         <thead className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}><tr>{cols.map(c => <th key={c} className={`text-left font-bold px-2 py-1 whitespace-nowrap ${muted}`}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
         <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top">{c === 'fonte' && row[c] ? <FonteTag fonte={String(row[c])} isDark={isDark} baixar={baixar} temArq={temArq} /> : <ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} />}</td>)}</tr>)}</tbody>
       </table></div>
     }
-    return <span className="inline-flex flex-wrap gap-1">{v.map((x, i) => <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><ValorRico v={x} isDark={isDark} baixar={baixar} temArq={temArq} /></span>)}</span>
+    return <span className="inline-flex flex-wrap gap-1">{v.map((x, i) => <span key={i} className={`text-[11px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><ValorRico v={x} isDark={isDark} baixar={baixar} temArq={temArq} /></span>)}</span>
   }
   const obj = v as Record<string, unknown>
   const keys = Object.keys(obj)
@@ -981,19 +990,19 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
   return <div className="space-y-2">
     {prims.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
       {prims.map(k => <div key={k} className={`rounded-md px-2 py-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-        <p className={`text-[8.5px] uppercase tracking-wide leading-tight ${muted}`}>{k.replace(/_/g, ' ')}</p>
-        <p className={`text-[11px] font-semibold leading-snug ${txt}`}>{obj[k] === null || obj[k] === '' ? '—' : String(obj[k])}</p>
+        <p className={`text-[10px] uppercase tracking-wide leading-tight ${muted}`}>{k.replace(/_/g, ' ')}</p>
+        <p className={`text-[12.5px] font-semibold leading-snug ${txt}`}>{obj[k] === null || obj[k] === '' ? '—' : String(obj[k])}</p>
       </div>)}
     </div>}
     {aninhados.map(k => <div key={k}>
-      <p className={`text-[9.5px] font-bold uppercase tracking-wide mb-1 ${isDark ? 'text-teal-400/80' : 'text-teal-600/90'}`}>{k.replace(/_/g, ' ')}</p>
+      <p className={`text-[11px] font-bold uppercase tracking-wide mb-1 ${isDark ? 'text-teal-400/80' : 'text-teal-600/90'}`}>{k.replace(/_/g, ' ')}</p>
       <div className={`pl-2 border-l-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}><ValorRico v={obj[k]} isDark={isDark} baixar={baixar} temArq={temArq} /></div>
     </div>)}
     {obj.fonte != null && <FonteTag fonte={String(obj.fonte)} isDark={isDark} baixar={baixar} temArq={temArq} />}
   </div>
 }
 
-function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
+export function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
   const lista = Array.isArray(dados) ? (dados as Array<Record<string, unknown>>) : null
   const ehPlano = !!lista && lista.length > 0 && lista.every(o => o && typeof o === 'object' && 'obra' in o)
   let itens: Array<{ chave: string; v: unknown }>
@@ -1028,10 +1037,10 @@ function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titu
         return <div key={i} style={tn ? { borderLeft: `3px solid ${tn.barHex}` } : undefined}>
           <button type="button" onClick={() => setOpen(prev => ({ ...prev, [i]: !aberto }))} className={`w-full px-4 py-2 flex items-center gap-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'}`}>
             <span className={`shrink-0 text-[11px] transition-transform ${aberto ? 'rotate-90' : ''} ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>▸</span>
-            <span className={`text-xs font-bold truncate ${txt}`}>{String(chave).replace(/_/g, ' ')}</span>
+            <span className={`text-sm font-bold truncate ${txt}`}>{tituloObra(chave, v)}</span>
             {(fund || soloLbl) && <span className="ml-auto inline-flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-              {fund && fn && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? fn.pillD : fn.pillL}`}><FundGlyph tipo={fund.glyph} color={fn.barHex} size={12} /> {fund.label}</span>}
-              {soloLbl && tn && solo && <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={solo.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {soloLbl}{solo.classe && solo.sadm != null ? ` · ${solo.sadm} kgf/cm²` : ''}</span>}
+              {fund && fn && <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${isDark ? fn.pillD : fn.pillL}`}><FundGlyph tipo={fund.glyph} color={fn.barHex} size={12} /> {fund.label}</span>}
+              {soloLbl && tn && solo && <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${isDark ? tn.pillD : tn.pillL}`}><SoloGlyph tipo={solo.tipos[0]?.glyph || 'residual'} color={tn.barHex} size={12} /> {soloLbl}{solo.classe && solo.sadm != null ? ` · ${solo.sadm} kgf/cm²` : ''}</span>}
             </span>}
           </button>
           {aberto && <div className="px-4 pb-3 pl-9 min-w-0"><ValorRico v={v} isDark={isDark} baixar={baixar} temArq={temArq} /></div>}
