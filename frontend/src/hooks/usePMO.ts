@@ -269,6 +269,32 @@ export function useOSCItens(fluxoOsId?: string) {
   })
 }
 
+// espelhos de medição (PDFs) por OSC — bucket egp-medicoes / tabela pmo_medicoes
+export interface MedicaoEspelho {
+  id: string
+  numero_os: string
+  competencia: string | null
+  arquivo_nome: string | null
+  storage_path: string
+  tamanho: number | null
+  created_at: string
+}
+export function useEspelhosDaOSC(numeroOs?: string) {
+  return useQuery<MedicaoEspelho[]>({
+    queryKey: ['egp-espelhos', numeroOs],
+    enabled: !!numeroOs,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_medicoes').select('*').eq('numero_os', numeroOs!).order('competencia', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as MedicaoEspelho[]
+    },
+  })
+}
+export async function getEspelhoUrl(path: string, download = false): Promise<string | null> {
+  const { data } = await supabase.storage.from('egp-medicoes').createSignedUrl(path, 3600, download ? { download: true } : undefined)
+  return data?.signedUrl ?? null
+}
+
 // medição por OSC (agrupado por polo) — medido = Σ valor_acum dos itens
 export interface MedicaoOSCRow {
   id: string

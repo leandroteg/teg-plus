@@ -5,13 +5,14 @@ import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
   Plus, Check, FolderKanban, ChevronRight, ChevronDown, Search, Upload, Loader2, ArrowUpDown,
-  ChevronsDownUp, ChevronsUpDown,
+  ChevronsDownUp, ChevronsUpDown, Download, Eye, X,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
   useMedicaoPorOSC, type MedicaoOSCRow, useAplicarMedicao, parseOSCPdf,
+  useOSCItens, type EGPOscItem, useEspelhosDaOSC, getEspelhoUrl,
   useMudancas, useMultas, useStatusReports, useIndicadores,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
@@ -342,6 +343,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [projOpen, setProjOpen] = useState(false)
+  const [detOsc, setDetOsc] = useState<MedicaoOSCRow | null>(null)
   const [sortBy, setSortBy] = useState<'osc' | 'obra' | 'valor' | 'pct' | 'medido' | 'amedir' | 'prazo'>('osc')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const toggle = (p: string) => setCollapsed(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
@@ -515,7 +517,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
                           : diff >= 10 ? 'bg-emerald-500' : diff <= -10 ? 'bg-rose-500' : 'bg-amber-400'
                         const dotTitle = diff == null ? 'sem prazo' : diff >= 10 ? `adiantado (+${diff}pp)` : diff <= -10 ? `atrasado (${diff}pp)` : `no ritmo (${diff > 0 ? '+' : ''}${diff}pp)`
                         return (
-                          <tr key={o.id} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'}`}>
+                          <tr key={o.id} onClick={() => setDetOsc(o)} className={`border-b cursor-pointer ${isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'}`}>
                             <td className={`${tdCls} font-mono text-xs font-semibold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{o.numero_os}</td>
                             <td className={`${tdCls} max-w-[280px] truncate ${isLight ? 'text-slate-800' : 'text-white'}`} title={o.obra_nome}>{o.obra_nome}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtBRL(o.valor)}</td>
@@ -547,6 +549,109 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
             </table>
           </div>
         )}
+      </div>
+      {detOsc && <MedicaoDetalheModal osc={detOsc} onClose={() => setDetOsc(null)} isLight={isLight} />}
+    </div>
+  )
+}
+
+// ── Modal de detalhe da OSC: medições feitas + espelhos (ver/baixar) ──────────
+function MedicaoDetalheModal({ osc, onClose, isLight }: { osc: MedicaoOSCRow; onClose: () => void; isLight: boolean }) {
+  const { data: itens, isLoading: loadIt } = useOSCItens(osc.id)
+  const { data: espelhos, isLoading: loadEsp } = useEspelhosDaOSC(osc.numero_os)
+  const [busy, setBusy] = useState<string | null>(null)
+  const fmt = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR')
+  const abrir = async (path: string, download: boolean, key: string) => {
+    setBusy(key)
+    try { const url = await getEspelhoUrl(path, download); if (url) window.open(url, '_blank') } finally { setBusy(null) }
+  }
+  const compFmt = (c: string | null) => {
+    if (!c) return '—'
+    const [y, m] = c.split('-')
+    return m ? `${m}/${y}` : c
+  }
+  const porSecao = (itens ?? []).reduce((acc, it) => { const k = it.secao ?? '—'; (acc[k] ??= []).push(it); return acc }, {} as Record<string, EGPOscItem[]>)
+  const pct = osc.valor ? Math.round(osc.medido / osc.valor * 100) : 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className={`w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl border shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+        {/* header */}
+        <div className={`sticky top-0 px-5 py-4 border-b flex items-start justify-between gap-3 ${isLight ? 'bg-white border-slate-100' : 'bg-slate-900 border-white/[0.06]'}`}>
+          <div>
+            <div className={`font-mono text-sm font-bold ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{osc.numero_os}</div>
+            <div className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{osc.obra_nome}</div>
+            <div className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{osc.polo_nome}</div>
+          </div>
+          <button onClick={onClose} className={isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'}><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* resumo */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[['Valor', fmt(osc.valor)], ['Faturado', fmt(osc.medido)], ['Saldo', fmt(osc.valor - osc.medido)], ['% Faturado', `${pct}%`]].map(([k, v]) => (
+              <div key={k} className={`rounded-xl border p-2.5 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                <div className={`text-[10px] uppercase tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{k}</div>
+                <div className={`text-sm font-bold tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* espelhos */}
+          <div>
+            <h3 className={`text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              <FileText size={13} /> Espelhos de medição {espelhos?.length ? `(${espelhos.length})` : ''}
+            </h3>
+            {loadEsp ? <div className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>carregando…</div>
+              : !espelhos?.length ? <div className={`text-xs italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum espelho arquivado para esta OSC.</div>
+                : (
+                  <div className="space-y-1.5">
+                    {espelhos.map(e => (
+                      <div key={e.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                        <FileText size={15} className={isLight ? 'text-rose-500' : 'text-rose-400'} />
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>Medição {compFmt(e.competencia)}</div>
+                          <div className={`text-[10px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{e.arquivo_nome}</div>
+                        </div>
+                        <button onClick={() => abrir(e.storage_path, false, e.id + 'v')} disabled={busy === e.id + 'v'}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'}`}>
+                          {busy === e.id + 'v' ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Ver
+                        </button>
+                        <button onClick={() => abrir(e.storage_path, true, e.id + 'd')} disabled={busy === e.id + 'd'}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700">
+                          {busy === e.id + 'd' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Baixar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+          </div>
+
+          {/* itens medidos (acumulado) */}
+          <div>
+            <h3 className={`text-xs font-bold uppercase tracking-wide mb-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Itens medidos (acumulado)</h3>
+            {loadIt ? <div className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>carregando…</div>
+              : !itens?.length ? <div className={`text-xs italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem itens detalhados.</div>
+                : Object.entries(porSecao).map(([secao, list]) => (
+                  <div key={secao} className="mb-2.5">
+                    <div className={`text-[11px] font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{secao}</div>
+                    <div className="space-y-1">
+                      {list.map(it => {
+                        const p = it.valor ? Math.round((it.valor_acum ?? 0) / it.valor * 100) : 0
+                        return (
+                          <div key={it.id} className="flex items-center gap-2 text-xs">
+                            <span className={`flex-1 min-w-0 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{it.subsec_nome}</span>
+                            <span className={`w-20 text-right tabular-nums ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(it.valor ?? 0)}</span>
+                            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-white/10'}`}><div className="h-full bg-teal-500 rounded-full" style={{ width: `${Math.min(p, 100)}%` }} /></div>
+                            <span className={`w-9 text-right tabular-nums ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{p}%</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+          </div>
+        </div>
       </div>
     </div>
   )
