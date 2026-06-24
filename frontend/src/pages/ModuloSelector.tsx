@@ -66,19 +66,6 @@ const PILLARS: Pillar[] = [
     ],
   },
   {
-    key: 'governanca',
-    label: 'Governança',
-    tagline: 'SGI, qualidade e melhoria contínua',
-    Icon: Scale,
-    grad: 'from-violet-500/20 to-fuchsia-600/20',
-    border: 'border-violet-500/30',
-    glow: 'rgba(167,139,250,0.18)',
-    accent: '#C4B5FD',
-    subs: [
-      { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
-    ],
-  },
-  {
     key: 'suprimentos',
     label: 'Suprimentos',
     tagline: 'Cadeia completa de abastecimento',
@@ -111,6 +98,19 @@ const PILLARS: Pillar[] = [
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: true, route: '/controladoria' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
       { key: 'cadastros', label: 'Cadastros', desc: 'Cadastros gerais do sistema', Icon: Settings, active: true, route: '/cadastros' },
+    ],
+  },
+  {
+    key: 'governanca',
+    label: 'Governança',
+    tagline: 'SGI, qualidade e melhoria contínua',
+    Icon: Scale,
+    grad: 'from-violet-500/20 to-fuchsia-600/20',
+    border: 'border-violet-500/30',
+    glow: 'rgba(167,139,250,0.18)',
+    accent: '#C4B5FD',
+    subs: [
+      { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
     ],
   },
   {
