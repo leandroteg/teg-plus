@@ -2,17 +2,26 @@
 import { useMemo, useState } from 'react'
 import { TrendingUp, Building2, PieChart, Grid3x3, Users } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
 import { useMedicaoMensal, useMedicaoSecao, useEAPFinal } from '../../../hooks/usePMO'
+
+// As medições são sempre do contrato CEMIG — o mapeamento OSC→polo é deste portfólio,
+// independente do contrato selecionado no seletor (senão tudo cai em "Outros").
+const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 import { Kpi, PanelCard, HBarRow, Heatmap } from '../../rh/paineis/_ui'
 
 const POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#64748b']
 const poloNome = (s: string) => s.replace(/^F[\d.\/]+\s*-\s*/, '')
-const PAC_ORD = ['Preliminares', 'Fundações', 'Transportes', 'Montagem', 'Aterramento', 'Lançamento', 'Complementares', 'Desmontagem', 'Depósito', 'Serv. Especiais', 'Outros (sem detalhe)']
+// O espelho mensal só quebra até a SEÇÃO CEMIG. Mapeamos para os pacotes da EAP que
+// têm correspondência exata (1:1). A seção 1 "Serviços Preliminares" engloba
+// Serv.Preliminares + Canteiro + Adm — sem dado mensal por subseção, fica em "Serv. Preliminares".
+const SECAO_TO_EAP: Record<string, string> = {
+  'Preliminares': 'Serv. Preliminares', 'Fundações': 'Fundações', 'Montagem': 'Montagem de Torres', 'Lançamento': 'Lançamento de Cabos',
+  'Transportes': 'Outros', 'Aterramento': 'Outros', 'Complementares': 'Outros', 'Desmontagem': 'Outros',
+  'Depósito': 'Outros', 'Serv. Especiais': 'Outros', 'Outros (sem detalhe)': 'Outros',
+}
+const PAC_ORD = ['Serv. Preliminares', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Outros']
 const PAC_COR: Record<string, string> = {
-  'Preliminares': '#0284c7', 'Fundações': '#92400e', 'Transportes': '#0d9488', 'Montagem': '#374151',
-  'Aterramento': '#65a30d', 'Lançamento': '#3730a3', 'Complementares': '#6d28d9', 'Desmontagem': '#b45309',
-  'Depósito': '#0891b2', 'Serv. Especiais': '#db2777', 'Outros (sem detalhe)': '#94a3b8',
+  'Serv. Preliminares': '#0284c7', 'Fundações': '#92400e', 'Montagem de Torres': '#374151', 'Lançamento de Cabos': '#3730a3', 'Outros': '#64748b',
 }
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
@@ -33,10 +42,9 @@ function shiftMonth(ym: string, delta: number): string {
 
 export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'faturamento' }: { de?: string; ate?: string; visao?: 'faturamento' | 'producao' }) {
   const { isDark } = useTheme()
-  const portfolioId = useEGPPortfolioId()
   const { data: rows, isLoading } = useMedicaoMensal()
   const { data: secaoRows } = useMedicaoSecao()
-  const { data: raw } = useEAPFinal(portfolioId)
+  const { data: raw } = useEAPFinal(CONTRATO_CEMIG)
   const [hover, setHover] = useState<number | null>(null)
   const ateF = ate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
   const isProd = visao === 'producao'
@@ -92,8 +100,9 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     for (const r of (secaoRows ?? [])) {
       const v = Number(r.realizado ?? 0); const c = r.competencia
       if (v <= 0 || c < de || c > ateF) continue
-      porPac.set(r.pacote, (porPac.get(r.pacote) ?? 0) + v)
-      let pm = pacMes.get(r.pacote); if (!pm) { pm = new Map(); pacMes.set(r.pacote, pm) }
+      const pac = SECAO_TO_EAP[r.pacote] ?? 'Outros'
+      porPac.set(pac, (porPac.get(pac) ?? 0) + v)
+      let pm = pacMes.get(pac); if (!pm) { pm = new Map(); pacMes.set(pac, pm) }
       pm.set(c, (pm.get(c) ?? 0) + v); mset.add(c)
     }
     const ord = (n: string) => { const i = PAC_ORD.indexOf(n); return i < 0 ? 99 : i }
