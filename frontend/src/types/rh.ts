@@ -16,6 +16,10 @@ export interface RHColaborador {
   telefone?: string
   foto_url?: string
 
+  // Flag de processo trabalhista (fonte: planilha RH/Processos)
+  tem_processo_trabalhista?: boolean
+  processo_trabalhista_info?: string | null
+
   // Dados pessoais
   data_nascimento?: string
   naturalidade?: string

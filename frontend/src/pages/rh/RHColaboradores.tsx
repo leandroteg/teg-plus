@@ -6,7 +6,7 @@ import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
   ChevronRight, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
-  LayoutList, LayoutGrid, GraduationCap,
+  LayoutList, LayoutGrid, GraduationCap, Gavel,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaboradores } from '../../hooks/useRH'
@@ -35,6 +35,7 @@ export default function RHColaboradores() {
   const [filtros, setFiltros] = useState<FiltrosColaboradores>({ ativo: true })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [comProcesso, setComProcesso] = useState(false)
 
   const { data: todos = [], isLoading } = useRHColaboradores()
   const { data: bases = [] } = useBases()
@@ -48,6 +49,8 @@ export default function RHColaboradores() {
     return todos.filter(c => {
       // Status ativo/inativo
       if (filtros.ativo !== undefined && c.ativo !== filtros.ativo) return false
+      // Processo trabalhista
+      if (comProcesso && !c.tem_processo_trabalhista) return false
       // Tipo contrato
       if (filtros.tipo_contrato && (c.tipo_contrato || 'CLT') !== filtros.tipo_contrato) return false
       // Departamento
@@ -85,7 +88,7 @@ export default function RHColaboradores() {
       }
       return true
     })
-  }, [todos, filtros, busca])
+  }, [todos, filtros, busca, comProcesso])
 
   // KPI calculations
   const kpis = useMemo(() => {
@@ -183,6 +186,22 @@ export default function RHColaboradores() {
             }`}>{t.count}</span>
           </button>
         ))}
+
+        {/* Processo trabalhista */}
+        <button onClick={() => setComProcesso(v => !v)}
+          title="Filtrar colaboradores com processo trabalhista"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            comProcesso
+              ? isLight ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+              : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
+          }`}>
+          <Gavel size={13} /> Processo
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+            comProcesso
+              ? isLight ? 'bg-amber-200 text-amber-700' : 'bg-amber-500/30 text-amber-200'
+              : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
+          }`}>{todos.filter(c => c.tem_processo_trabalhista).length}</span>
+        </button>
 
         {/* Busca (encolhe pra caber) */}
         <div className="relative flex-1 min-w-[150px]">
@@ -350,7 +369,14 @@ export default function RHColaboradores() {
                               ) : getInitials(c.nome)}
                             </div>
                             <div className="min-w-0">
-                              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{c.nome}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{c.nome}</p>
+                                {c.tem_processo_trabalhista && (
+                                  <span title={c.processo_trabalhista_info || 'Processo trabalhista'} className="shrink-0">
+                                    <Gavel size={12} className={isLight ? 'text-amber-500' : 'text-amber-400'} />
+                                  </span>
+                                )}
+                              </div>
                               {c.matricula && (
                                 <p className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{c.matricula}</p>
                               )}
@@ -435,6 +461,11 @@ export default function RHColaboradores() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{c.nome}</p>
+                          {c.tem_processo_trabalhista && (
+                            <span title={c.processo_trabalhista_info || 'Processo trabalhista'} className="shrink-0">
+                              <Gavel size={12} className={isLight ? 'text-amber-500' : 'text-amber-400'} />
+                            </span>
+                          )}
                           {c.matricula && (
                             <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-500'}`}>
                               {c.matricula}
