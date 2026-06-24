@@ -49,6 +49,56 @@ const pctPrazo = (di: string | null, dv: string | null): number | null => {
   return Math.max(0, Math.min(100, Math.round(((Date.now() - ini) / (venc - ini)) * 100)))
 }
 
+// faixas de % (faturado / prazo) — multi-select por caixas
+const PCT_BANDS: { k: string; lbl: string; min: number; max: number }[] = [
+  { k: '0', lbl: '0%', min: 0, max: 0 },
+  { k: '1-25', lbl: '1–25%', min: 1, max: 25 },
+  { k: '26-50', lbl: '26–50%', min: 26, max: 50 },
+  { k: '51-75', lbl: '51–75%', min: 51, max: 75 },
+  { k: '76-90', lbl: '76–90%', min: 76, max: 90 },
+  { k: '91-99', lbl: '91–99%', min: 91, max: 99 },
+  { k: '100', lbl: '100%', min: 100, max: 100 },
+]
+const inBands = (v: number, set: Set<string>) =>
+  set.size === 0 || PCT_BANDS.some(b => set.has(b.k) && v >= b.min && v <= b.max)
+
+function BandFilter({ label, selected, setSelected, open, setOpen, selBtn, isLight }: {
+  label: string
+  selected: Set<string>
+  setSelected: React.Dispatch<React.SetStateAction<Set<string>>>
+  open: boolean
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>
+  selBtn: (active: boolean) => string
+  isLight: boolean
+}) {
+  const n = selected.size
+  const toggle = (k: string) => setSelected(s => { const x = new Set(s); x.has(k) ? x.delete(k) : x.add(k); return x })
+  return (
+    <div className="relative shrink-0">
+      <button onClick={() => setOpen(o => !o)} className={selBtn(n > 0) + ' inline-flex items-center gap-1.5'}>
+        {label}{n > 0 ? `: ${n}` : ''}
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className={`absolute z-20 mt-1 left-0 w-40 rounded-xl border shadow-lg p-1.5 ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+            {PCT_BANDS.map(b => {
+              const on = selected.has(b.k)
+              return (
+                <button key={b.k} onClick={() => toggle(b.k)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{on && <Check size={11} />}</span>
+                  {b.lbl}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 const fmtNum = (v?: number | null) => (v != null ? v.toLocaleString('pt-BR') : '-')
 
 const fmtData = (d?: string) =>
@@ -283,8 +333,10 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [fTipo, setFTipo] = useState('')
   const [fValor, setFValor] = useState('')
   const [fData, setFData] = useState('')
-  const [fPct, setFPct] = useState('')
-  const [fPrazo, setFPrazo] = useState('')
+  const [fPct, setFPct] = useState<Set<string>>(new Set())
+  const [fPrazo, setFPrazo] = useState<Set<string>>(new Set())
+  const [pctOpen, setPctOpen] = useState(false)
+  const [prazoOpen, setPrazoOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [parsing, setParsing] = useState(false)
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
@@ -310,15 +362,15 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
 
   if (isLoading) return <Spinner />
 
-  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct || fPrazo)
+  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct.size || fPrazo.size)
   const match = (r: MedicaoOSCRow) => {
     const s = q.trim().toLowerCase()
     if (s && !(r.numero_os.toLowerCase().includes(s) || r.obra_nome.toLowerCase().includes(s) || r.polo_nome.toLowerCase().includes(s))) return false
     if (fTipo && r.tipo !== fTipo) return false
     if (fValor) { const v = r.valor; if (fValor === 'gt1m' && v <= 1e6) return false; if (fValor === 'mid' && !(v >= 1e5 && v <= 1e6)) return false; if (fValor === 'lt100k' && v >= 1e5) return false }
     if (fData && (r.data_osc ?? '').slice(0, 4) !== fData) return false
-    if (fPct) { const p = r.valor ? Math.round(r.medido / r.valor * 100) : 0; if (fPct === '0' && p !== 0) return false; if (fPct === '1-50' && !(p >= 1 && p <= 50)) return false; if (fPct === '51-99' && !(p >= 51 && p <= 99)) return false; if (fPct === '100' && p < 100) return false }
-    if (fPrazo) { const pp = pctPrazo(r.data_osc, r.vencimento); if (pp == null) return false; if (fPrazo === 'lt50' && !(pp < 50)) return false; if (fPrazo === '50-99' && !(pp >= 50 && pp < 100)) return false; if (fPrazo === 'venc' && pp < 100) return false }
+    if (fPct.size) { const p = r.valor ? Math.round(r.medido / r.valor * 100) : 0; if (!inBands(p, fPct)) return false }
+    if (fPrazo.size) { const pp = pctPrazo(r.data_osc, r.vencimento); if (pp == null || !inBands(pp, fPrazo)) return false }
     return true
   }
   const baseList = (rows ?? []).filter(match)
@@ -397,13 +449,9 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
         <select value={fData} onChange={e => setFData(e.target.value)} className={sel(!!fData)}>
           <option value="">Ano: todos</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
         </select>
-        <select value={fPct} onChange={e => setFPct(e.target.value)} className={sel(!!fPct)}>
-          <option value="">% Fat: todos</option><option value="0">0% (não faturado)</option><option value="1-50">1–50%</option><option value="51-99">51–99%</option><option value="100">100%</option>
-        </select>
-        <select value={fPrazo} onChange={e => setFPrazo(e.target.value)} className={sel(!!fPrazo)}>
-          <option value="">% Prazo: todos</option><option value="lt50">&lt; 50%</option><option value="50-99">50–99%</option><option value="venc">Vencido (100%)</option>
-        </select>
-        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(''); setFPrazo('') }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
+        <BandFilter label="% Faturado" selected={fPct} setSelected={setFPct} open={pctOpen} setOpen={setPctOpen} selBtn={sel} isLight={isLight} />
+        <BandFilter label="% Prazo" selected={fPrazo} setSelected={setFPrazo} open={prazoOpen} setOpen={setPrazoOpen} selBtn={sel} isLight={isLight} />
+        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(new Set()); setFPrazo(new Set()) }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
         {(() => {
           const allCollapsed = allPolos.length > 0 && allPolos.every(p => collapsed.has(p))
           return (
