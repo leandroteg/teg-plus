@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  RefreshCcw, Plus, X, Loader2, AlertTriangle, Calendar, CheckCircle2, Circle, ChevronRight,
+  RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -14,27 +14,25 @@ import type {
   SgiRegistro, StatusPdca, TipoRegistro, OrigemRegistro, Gravidade,
 } from '../../types/sgi'
 
-const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
+const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—')
 
-// ── Card do registro ──────────────────────────────────────────────────────────
-function RegistroCard({ r, isDark, onClick }: { r: SgiRegistro; isDark: boolean; onClick: () => void }) {
-  const g = GRAVIDADE_CFG[r.gravidade]
-  const hoje = new Date().toISOString().split('T')[0]
-  const atrasado = r.prazo && r.prazo < hoje && r.status_pdca !== 'encerrado'
-  return (
-    <button onClick={onClick} className={`w-full text-left rounded-xl border p-2.5 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}>
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.codigo || '—'}</span>
-        {r.classificacao === 'nc' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500">NC</span>}
-      </div>
-      <p className={`text-xs font-semibold leading-tight mb-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.titulo}</p>
-      <div className="flex flex-wrap items-center gap-1">
-        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${g.bg} ${g.text}`}>{g.label}</span>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{TIPO_REGISTRO_LABEL[r.tipo]}</span>
-        {r.prazo && <span className={`text-[9px] flex items-center gap-0.5 ${atrasado ? 'text-red-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><Calendar size={9} />{fmtDate(r.prazo)}</span>}
-      </div>
-    </button>
-  )
+// ── Accent por etapa (padrão EntradasPipeline) ────────────────────────────────
+type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
+const TAB_ACCENT: Record<StatusPdca, AccentSet> = {
+  pendente:      { bg:'bg-slate-50',   bgActive:'bg-slate-100',   text:'text-slate-500',   textActive:'text-slate-800',   dot:'bg-slate-400',   badge:'bg-slate-200/80 text-slate-600',     border:'border-slate-200' },
+  analise_causa: { bg:'bg-blue-50',    bgActive:'bg-blue-100',    text:'text-blue-500',    textActive:'text-blue-800',    dot:'bg-blue-500',    badge:'bg-blue-200/80 text-blue-700',       border:'border-blue-200' },
+  plano_acao:    { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',   border:'border-violet-200' },
+  execucao:      { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',     border:'border-amber-200' },
+  verificacao:   { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',       border:'border-cyan-200' },
+  encerrado:     { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
+}
+const TAB_ACCENT_DARK: Record<StatusPdca, AccentSet> = {
+  pendente:      { bg:'bg-white/[0.02]', bgActive:'bg-white/[0.06]', text:'text-slate-500',   textActive:'text-slate-200',   dot:'bg-slate-500',   badge:'bg-white/[0.06] text-slate-400',  border:'border-white/[0.08]' },
+  analise_causa: { bg:'bg-blue-500/5',   bgActive:'bg-blue-500/15',  text:'text-blue-400',    textActive:'text-blue-200',    dot:'bg-blue-400',    badge:'bg-blue-500/15 text-blue-300',    border:'border-blue-500/20' },
+  plano_acao:    { bg:'bg-violet-500/5', bgActive:'bg-violet-500/15',text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',border:'border-violet-500/20' },
+  execucao:      { bg:'bg-amber-500/5',  bgActive:'bg-amber-500/15', text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',  border:'border-amber-500/20' },
+  verificacao:   { bg:'bg-cyan-500/5',   bgActive:'bg-cyan-500/15',  text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
+  encerrado:     { bg:'bg-emerald-500/5',bgActive:'bg-emerald-500/15',text:'text-emerald-400',textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300',border:'border-emerald-500/20' },
 }
 
 // ── Modal de detalhe (avança PDCA + ações) ────────────────────────────────────
@@ -74,7 +72,6 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Stepper PDCA */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Fluxo PDCA</p>
             <div className="flex flex-wrap gap-1.5">
@@ -89,7 +86,6 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
             </div>
           </div>
 
-          {/* Classificação */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Triagem / Classificação</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs mb-3">
@@ -117,7 +113,6 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
             </div>
           )}
 
-          {/* Ações (backbone sgi_acoes) */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Plano de Ação ({acoes.length})</p>
             <div className="space-y-2 mb-3">
@@ -233,52 +228,130 @@ function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: b
   )
 }
 
-// ── Main (kanban PDCA) ─────────────────────────────────────────────────────────
+// ── Card / Row ────────────────────────────────────────────────────────────────
+function RegistroCard({ r, isDark, onClick }: { r: SgiRegistro; isDark: boolean; onClick: () => void }) {
+  const g = GRAVIDADE_CFG[r.gravidade]
+  const hoje = new Date().toISOString().split('T')[0]
+  const atrasado = r.prazo && r.prazo < hoje && r.status_pdca !== 'encerrado'
+  return (
+    <button type="button" onClick={onClick} className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md hover:border-slate-300'}`}>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.codigo ? `${r.codigo} · ` : ''}{r.titulo}</p>
+        {r.classificacao === 'nc' && <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500">NC</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${g.bg} ${g.text}`}>{g.label}</span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{TIPO_REGISTRO_LABEL[r.tipo]}</span>
+        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{ORIGEM_REGISTRO_LABEL[r.origem]}</span>
+        {r.prazo && <span className={`text-[10px] flex items-center gap-0.5 ${atrasado ? 'text-red-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><Calendar size={10} />{fmtDate(r.prazo)}</span>}
+      </div>
+    </button>
+  )
+}
+
+function RegistroRow({ r, isDark, onClick }: { r: SgiRegistro; isDark: boolean; onClick: () => void }) {
+  const g = GRAVIDADE_CFG[r.gravidade]
+  return (
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2 text-left border-b transition-all ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
+      <span className={`w-[64px] text-xs font-semibold shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.codigo || '—'}</span>
+      <span className={`flex-1 text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.titulo}</span>
+      <span className={`w-[90px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{TIPO_REGISTRO_LABEL[r.tipo]}</span>
+      <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${g.bg} ${g.text}`}>{g.label}</span>
+      <span className={`w-[64px] text-xs text-right shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDate(r.prazo)}</span>
+    </button>
+  )
+}
+
+// ── Main (card + abas por etapa + toolbar, padrão da casa) ────────────────────
 export default function SgiMelhoriaContinua() {
   const { isDark } = useTheme()
   const { data: registros = [], isLoading } = useRegistros()
+  const [tab, setTab] = useState<StatusPdca>('pendente')
+  const [busca, setBusca] = useState('')
+  const [view, setView] = useState<'cards' | 'list'>('cards')
   const [detail, setDetail] = useState<SgiRegistro | null>(null)
   const [showNovo, setShowNovo] = useState(false)
 
-  const porStatus = useMemo(() => {
-    const m: Record<string, SgiRegistro[]> = {}
-    PDCA_STAGES.forEach(s => { m[s.key] = [] })
-    registros.forEach(r => { (m[r.status_pdca] ||= []).push(r) })
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {}
+    registros.forEach(r => { m[r.status_pdca] = (m[r.status_pdca] || 0) + 1 })
     return m
   }, [registros])
+
+  const filtrados = useMemo(() => {
+    let items = registros.filter(r => r.status_pdca === tab)
+    if (busca) { const q = busca.toLowerCase(); items = items.filter(r => [r.codigo, r.titulo, r.area_processo].some(v => v?.toLowerCase().includes(q))) }
+    return items
+  }, [registros, tab, busca])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className={`rounded-2xl border overflow-hidden flex flex-col h-full ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-3">
         <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <RefreshCcw size={22} className="text-amber-500" /> Melhoria Contínua
+          <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <RefreshCcw size={18} className="text-amber-500" /> Melhoria Contínua
           </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Anomalias, não conformidades e ações corretivas (PDCA)</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Anomalias, não conformidades e ações corretivas (PDCA)</p>
         </div>
         <button onClick={() => setShowNovo(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-colors shrink-0">
           <Plus size={14} /> Nova Anomalia
         </button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
-        {PDCA_STAGES.map(s => (
-          <div key={s.key} className={`shrink-0 w-[230px] rounded-2xl border ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-slate-50/60 border-slate-200'}`}>
-            <div className={`flex items-center justify-between gap-2 px-3 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-              <span className="flex items-center gap-1.5 text-xs font-bold">
-                <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>{s.label}</span>
-              </span>
-              <span className={`text-[10px] font-bold rounded-full min-w-[20px] text-center px-1.5 py-0.5 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-200/80 text-slate-500'}`}>{porStatus[s.key].length}</span>
-            </div>
-            <div className="p-2 space-y-2 min-h-[80px] max-h-[calc(100vh-260px)] overflow-y-auto">
-              {porStatus[s.key].map(r => <RegistroCard key={r.id} r={r} isDark={isDark} onClick={() => setDetail(r)} />)}
-              {porStatus[s.key].length === 0 && <p className={`text-[10px] text-center py-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</p>}
-            </div>
+      {/* Abas por etapa */}
+      <div className={`flex gap-1 p-1 pb-2 border-b overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {PDCA_STAGES.map(s => {
+          const count = counts[s.key] || 0
+          const isActive = tab === s.key
+          const a = isDark ? TAB_ACCENT_DARK[s.key] : TAB_ACCENT[s.key]
+          return (
+            <button key={s.key} onClick={() => setTab(s.key)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
+                isActive ? `${a.bgActive} ${a.textActive} ${a.border} font-bold shadow-sm` : `${a.bg} ${a.text} font-medium border-transparent ${isDark ? '' : 'hover:bg-white hover:shadow-sm'}`
+              }`}>
+              {s.label}
+              {count > 0 && <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 ${isActive ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'}`}>{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Toolbar */}
+      <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar registro..."
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
+          {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
+        </div>
+        <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <button onClick={() => setView('list')} className={`p-1.5 ${view === 'list' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
+          <button onClick={() => setView('cards')} className={`p-1.5 ${view === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
+        </div>
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtrados.length} {filtrados.length === 1 ? 'item' : 'itens'}</span>
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex-1 overflow-auto min-h-[200px]">
+        {filtrados.length === 0 ? (
+          <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <RefreshCcw size={40} className="mb-3" /><p className="text-sm font-medium">Nenhum registro nesta etapa</p>
           </div>
-        ))}
+        ) : view === 'cards' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-4">
+            {filtrados.map(r => <RegistroCard key={r.id} r={r} isDark={isDark} onClick={() => setDetail(r)} />)}
+          </div>
+        ) : (
+          <div>
+            <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+              <span className="w-[64px] shrink-0">Código</span><span className="flex-1">Título</span><span className="w-[90px] shrink-0">Tipo</span><span className="w-[58px] shrink-0">Grav.</span><span className="w-[64px] shrink-0 text-right">Prazo</span>
+            </div>
+            {filtrados.map(r => <RegistroRow key={r.id} r={r} isDark={isDark} onClick={() => setDetail(r)} />)}
+          </div>
+        )}
       </div>
 
       {detail && <RegistroModal registro={detail} onClose={() => setDetail(null)} isDark={isDark} />}

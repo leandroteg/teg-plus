@@ -177,24 +177,32 @@ export default function SgiObjetivos() {
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className={`rounded-2xl border overflow-hidden flex flex-col h-full ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-3">
         <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
-            <Target size={22} className="text-emerald-500" /> Objetivos e Metas
+          <h1 className={`text-lg font-extrabold flex items-center gap-2 ${txt}`}>
+            <Target size={18} className="text-emerald-500" /> Objetivos e Metas
           </h1>
-          <p className={`text-xs mt-0.5 ${muted}`}>Metas anuais e check-in mensal com farol</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Metas anuais e check-in mensal com farol</p>
         </div>
         <button onClick={() => setShowNovo(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shrink-0">
           <Plus size={14} /> Novo Objetivo
         </button>
       </div>
 
+      {/* Toolbar */}
+      <div className={`px-4 py-2.5 border-b flex items-center ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{objetivos.length} objetivo(s)</span>
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex-1 overflow-auto p-4">
       {objetivos.length === 0 ? (
-        <div className={`rounded-2xl border shadow-sm p-12 flex flex-col items-center justify-center text-center gap-2 ${card}`}>
-          <Target size={36} className="text-emerald-500/60" />
-          <p className={`text-sm font-semibold ${txt}`}>Nenhum objetivo cadastrado</p>
-          <p className={`text-xs ${muted}`}>Crie o primeiro objetivo e defina a meta anual.</p>
+        <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+          <Target size={40} className="mb-1 text-emerald-500/50" />
+          <p className={`text-sm font-medium ${txt}`}>Nenhum objetivo cadastrado</p>
+          <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -233,6 +241,7 @@ export default function SgiObjetivos() {
           ))}
         </div>
       )}
+      </div>
 
       {showNovo && <NovoObjetivoModal onClose={() => setShowNovo(false)} isDark={isDark} />}
       {checkin && <CheckinModal obj={checkin.obj} meta={checkin.meta} onClose={() => setCheckin(null)} isDark={isDark} />}
