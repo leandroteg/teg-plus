@@ -206,7 +206,7 @@ export function Heatmap({ meses, linhas, totalMes, isDark }: {
           <tr>
             <td className={`text-[13px] font-extrabold pr-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
             {totalMes.map((t, i) => <td key={i} className={`text-[13px] font-extrabold text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t || ''}</td>)}
-            <td className={`text-[13px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalMes.reduce((a, b) => a + b, 0)}</td>
+            <td className={`text-[13px] font-extrabold text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{Math.round(totalMes.reduce((a, b) => a + b, 0) * 10) / 10}</td>
           </tr>
         </tbody>
       </table>
