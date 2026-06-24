@@ -61,37 +61,40 @@ export default function EAPFinal({ portfolioId, excluded, isLight }: { portfolio
   if (isLoading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" /></div>
   if (!polos.length) return <div className={`rounded-2xl border p-12 text-center text-sm ${isLight ? 'bg-white border-slate-200 text-slate-400' : 'bg-white/[0.03] border-white/[0.06] text-slate-500'}`}>Nenhum projeto selecionado.</div>
 
-  const totContr = polos.reduce((s, p) => s + p.contr, 0)
-  const totFat = polos.reduce((s, p) => s + p.fat, 0)
-  const totTon = polos.reduce((s, p) => s + p.montTon, 0)
-  const totTorres = polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0)
-  const totOscs = polos.reduce((s, p) => s + p.nOscs, 0)
-
   return (
     <div className="space-y-3 print:space-y-2">
-      {/* KPIs */}
-      <div className="flex flex-wrap items-center gap-2 print:gap-1">
-        {[
-          ['Contratado', fmtM(totContr), false],
-          ['Faturado', fmtM(totFat) + ` · ${totContr ? Math.round(totFat / totContr * 100) : 0}%`, true],
-          ['OSCs · Polos', `${totOscs} · ${polos.length}`, false],
-          ['Montagem', (totTon >= 1000 ? (totTon / 1000).toFixed(1) + 'k' : Math.round(totTon)) + ' t', false],
-          ['Torres', totTorres ? String(totTorres) : '—', false],
-        ].map(([k, v, hi]) => (
-          <div key={k as string} className={`px-3 py-1.5 rounded-xl text-center ${hi ? 'bg-[#e87b2a] text-white' : (isLight ? 'bg-[#0f2a4a] text-white' : 'bg-white/[0.06] text-white')}`}>
-            <div className="text-[9px] uppercase tracking-wide opacity-70">{k as string}</div>
-            <div className="text-sm font-bold leading-tight">{v as string}</div>
-          </div>
-        ))}
-        <button onClick={() => window.print()} className={`ml-auto print:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold ${isLight ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50' : 'bg-white/[0.04] border border-white/10 text-slate-300 hover:bg-white/[0.08]'}`}>
-          <Printer size={14} /> Imprimir
-        </button>
-      </div>
-
       {/* Geral + colunas por polo (máx 3 por linha) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
         {[buildGeral(polos), ...polos].map(p => <PoloCol key={p.id} polo={p} portfolioId={portfolioId} isLight={isLight} isGeral={p.id === '__geral__'} />)}
       </div>
+    </div>
+  )
+}
+
+// KPIs compactos (Contratado · Faturado · OSCs·Polos · Imprimir) — entram na linha do filtro
+export function EAPKpis({ portfolioId, excluded, isLight }: { portfolioId?: string; excluded?: Set<string>; isLight: boolean }) {
+  const { data } = useEAPFinal(portfolioId)
+  const polos = (data ?? []).filter(p => !excluded?.has(p.id))
+  if (!polos.length) return null
+  const totContr = polos.reduce((s, p) => s + p.contr, 0)
+  const totFat = polos.reduce((s, p) => s + p.fat, 0)
+  const totOscs = polos.reduce((s, p) => s + p.nOscs, 0)
+  const kpis: [string, string, boolean][] = [
+    ['Contratado', fmtM(totContr), false],
+    ['Faturado', fmtM(totFat) + ` · ${totContr ? Math.round(totFat / totContr * 100) : 0}%`, true],
+    ['OSCs · Polos', `${totOscs} · ${polos.length}`, false],
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-2 ml-auto">
+      {kpis.map(([k, v, hi]) => (
+        <div key={k} className={`px-2.5 py-1 rounded-lg text-center leading-tight ${hi ? 'bg-[#e87b2a] text-white' : (isLight ? 'bg-[#0f2a4a] text-white' : 'bg-white/[0.06] text-white')}`}>
+          <div className="text-[8px] uppercase tracking-wide opacity-70">{k}</div>
+          <div className="text-[13px] font-bold">{v}</div>
+        </div>
+      ))}
+      <button onClick={() => window.print()} className={`print:hidden inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-semibold ${isLight ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50' : 'bg-white/[0.04] border border-white/10 text-slate-300 hover:bg-white/[0.08]'}`}>
+        <Printer size={14} /> Imprimir
+      </button>
     </div>
   )
 }

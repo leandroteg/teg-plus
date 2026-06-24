@@ -18,7 +18,7 @@ import {
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
 import { ProjetosFilterBar } from './ProjetosFilterBar'
-import EAPFinal from './EAPFinal'
+import EAPFinal, { EAPKpis } from './EAPFinal'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
 type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'riscos'
@@ -127,6 +127,7 @@ export default function EGPPlanejamento() {
         accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
         accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
         isLight={isLight}
+        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} isLight={isLight} /> : undefined}
       />
 
       {/* Tab content */}
