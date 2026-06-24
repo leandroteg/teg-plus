@@ -347,6 +347,7 @@ export interface EAPPolo {
   montTon: number
   nOscs: number
   oscs: string[]
+  obras: { nome: string; oscs: string[] }[]
   pacotes: EAPPacote[]
 }
 const PACOTES_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
@@ -383,8 +384,9 @@ export function useEAPFinal(portfolioId?: string) {
       const polos = (polosD ?? []) as { id: string; nome: string; codigo: string | null; qtd_torres: number | null }[]
       if (!polos.length) return []
       const polosIds = polos.map(p => p.id)
-      const { data: obrasD } = await supabase.from('sys_obras').select('id, pmo_projeto_id').in('pmo_projeto_id', polosIds)
+      const { data: obrasD } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', polosIds)
       const obra2polo = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.pmo_projeto_id as string]))
+      const obraNome = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.nome as string]))
       const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual').eq('portfolio_id', portfolioId!)
       const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string }[]
       const osc2polo = new Map<string, string>()
@@ -430,12 +432,15 @@ export function useEAPFinal(portfolioId?: string) {
         const wf = pacotes.filter(x => x.pctFis != null)
         const wsum = wf.reduce((s, x) => s + x.valor, 0)
         const pctFis = wsum ? Math.round(wf.reduce((s, x) => s + (x.pctFis as number) * x.valor, 0) / wsum) : 0
+        const obrasMap = new Map<string, string[]>()
+        for (const o of polOscs) { const oid = o.obra_id ?? '—'; const a = obrasMap.get(oid) ?? []; a.push(o.numero_os); obrasMap.set(oid, a) }
+        const obras = [...obrasMap.entries()].map(([oid, list]) => ({ nome: obraNome.get(oid) ?? '— Sem obra', oscs: list.sort() })).sort((a, b) => a.nome.localeCompare(b.nome))
         return {
           id: p.id, label: p.nome, codigo: p.codigo,
           contr, fat, saldo: contr - fat,
           pctFin: contr ? Math.round((fat / contr) * 100) : 0,
           pctFis, qtdTorres: p.qtd_torres, montTon,
-          nOscs: polOscs.length, oscs: polOscs.map(o => o.numero_os).sort(),
+          nOscs: polOscs.length, oscs: polOscs.map(o => o.numero_os).sort(), obras,
           pacotes,
         }
       }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))

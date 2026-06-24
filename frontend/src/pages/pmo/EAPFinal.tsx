@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Printer, Pencil, Check, X } from 'lucide-react'
+import { Printer, Pencil, Check, X, ChevronDown } from 'lucide-react'
 import { useEAPFinal, useUpdatePoloTorres, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
 
 const SEC_COLOR: Record<string, string> = {
@@ -50,7 +50,8 @@ function buildGeral(polos: EAPPolo[]): EAPPolo {
     id: '__geral__', label: 'Geral', codigo: null,
     contr, fat, saldo: contr - fat, pctFin: contr ? Math.round(fat / contr * 100) : 0, pctFis,
     qtdTorres: polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0) || null,
-    montTon, nOscs: polos.reduce((s, p) => s + p.nOscs, 0), oscs: [], pacotes,
+    montTon, nOscs: polos.reduce((s, p) => s + p.nOscs, 0), oscs: [],
+    obras: polos.flatMap(p => p.obras), pacotes,
   }
 }
 
@@ -104,15 +105,15 @@ function PoloCol({ polo, portfolioId, isLight, isGeral }: { polo: EAPPolo; portf
     <div className={`w-full flex flex-col gap-2 ${isGeral ? 'ring-2 ring-[#e87b2a]/40 rounded-2xl p-2' : ''}`}>
       {/* head */}
       {isGeral ? (
-        <div className="rounded-xl px-3 py-2.5 bg-[#e87b2a] border-l-4 border-[#0f2a4a] flex items-baseline gap-2">
+        <div className="rounded-xl px-3 py-2.5 bg-[#e87b2a] border-l-4 border-[#0f2a4a] flex items-center gap-2">
           <span className="text-white font-bold text-base uppercase tracking-wide shrink-0">Geral</span>
-          <span className="ml-auto text-white/85 text-[11px] font-semibold">{polo.nOscs} OSCs</span>
+          <ObrasOscsBox polo={polo} isLight={isLight} />
         </div>
       ) : (
-        <div className="rounded-xl px-3 py-2.5 bg-[#0f2a4a] border-l-4 border-[#e87b2a] flex items-baseline gap-2">
+        <div className="rounded-xl px-3 py-2.5 bg-[#0f2a4a] border-l-4 border-[#e87b2a] flex items-center gap-2">
           <span className="text-[#e87b2a] font-bold text-sm uppercase shrink-0">{poloId(polo.label)}</span>
-          <span className="text-white font-semibold text-base leading-none">{poloNome(polo.label)}</span>
-          <span className="ml-auto text-white/50 text-[10px] truncate">{polo.oscs.join(' · ')}</span>
+          <span className="text-white font-semibold text-base leading-none truncate">{poloNome(polo.label)}</span>
+          <ObrasOscsBox polo={polo} isLight={isLight} />
         </div>
       )}
 
@@ -124,6 +125,33 @@ function PoloCol({ polo, portfolioId, isLight, isGeral }: { polo: EAPPolo; portf
 
       {/* pacotes */}
       {polo.pacotes.map(pac => <PacoteCard key={pac.n} pac={pac} polo={polo} portfolioId={portfolioId} isLight={isLight} isGeral={isGeral} />)}
+    </div>
+  )
+}
+
+function ObrasOscsBox({ polo, isLight }: { polo: EAPPolo; isLight: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative ml-auto shrink-0">
+      <button onClick={() => setOpen(o => !o)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/90 bg-white/15 hover:bg-white/25 rounded-md px-1.5 py-1">
+        {polo.obras.length} obras · {polo.nOscs} OSCs
+        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className={`absolute z-20 right-0 mt-1 w-72 rounded-xl border shadow-lg p-2 max-h-80 overflow-y-auto text-left ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+            {polo.obras.length === 0 ? (
+              <div className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem obras.</div>
+            ) : polo.obras.map((ob, i) => (
+              <div key={i} className={`mb-1.5 last:mb-0 pb-1.5 last:pb-0 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                <div className={`text-xs font-semibold leading-tight ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{ob.nome}</div>
+                <div className={`text-[10px] font-mono mt-0.5 ${isLight ? 'text-teal-700' : 'text-teal-300'}`}>{ob.oscs.join(' · ')}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
