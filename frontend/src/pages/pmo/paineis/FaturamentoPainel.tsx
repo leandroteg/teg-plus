@@ -243,8 +243,8 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
         return (
           <PanelCard title="Execução: TEG × Subcontratadas" icon={<Users size={14} className="text-teal-500" />} isDark={isDark}>
             <div className="flex h-9 rounded-lg overflow-hidden mb-2">
-              <div style={{ width: `${100 - pSub}%`, background: '#0d9488' }} className="flex items-center justify-center"><span className="text-[11px] font-bold text-white px-1">TEG {100 - pSub}%</span></div>
-              <div style={{ width: `${pSub}%`, background: '#e87b2a' }} className="flex items-center justify-center">{pSub >= 8 && <span className="text-[11px] font-bold text-white px-1">Sub {pSub}%</span>}</div>
+              <div style={{ width: `${100 - pSub}%`, background: '#0d9488' }} className="flex items-center justify-center overflow-hidden"><span className="text-[11px] font-bold text-white px-1.5 truncate">{fmtFull(agg.teg)}</span></div>
+              <div style={{ width: `${pSub}%`, background: '#e87b2a' }} className="flex items-center justify-center overflow-hidden">{pSub >= 14 && <span className="text-[11px] font-bold text-white px-1.5 truncate">{fmtFull(agg.sub)}</span>}</div>
             </div>
             <div className="flex justify-between text-xs">
               <span className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-bold text-teal-500">TEG própria:</span> {fmtFull(agg.teg)}</span>
