@@ -757,8 +757,8 @@ function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: strin
   const valCls = tone === 'amber' ? (isDark ? 'text-amber-300' : 'text-amber-600') : (isDark ? 'text-white' : 'text-slate-900')
   return (
     <div className="min-w-0">
-      <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
-      <p className={`${small ? 'text-xs' : 'text-lg'} font-extrabold leading-tight truncate ${valCls}`}>{val}</p>
+      <p className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
+      <p className={`${small ? 'text-sm' : 'text-xl'} font-extrabold leading-tight truncate ${valCls}`}>{val}</p>
     </div>
   )
 }
@@ -766,8 +766,8 @@ function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: strin
 function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: boolean }) {
   return (
     <div className={`rounded-lg px-2 py-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-      <p className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
-      <p className={`text-[11px] font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{val}</p>
+      <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
+      <p className={`text-[12.5px] font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{val}</p>
     </div>
   )
 }
@@ -1075,7 +1075,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
   // robusto: SEMPRE retorna array (o `?? []` antigo não protegia contra valor não-array → crash .filter)
   const arr = (k: string): Array<Record<string, unknown>> => { const v = d?.[k]; return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : [] }
   const quant = arr('quantitativos')
-  const geot = arr('geotecnia').filter(g => !/tipo de sondagem/i.test(String(g.item ?? '')))
+  const geot = (Array.isArray(d.geotecnia) ? (d.geotecnia as Array<Record<string, unknown>>)
+    : (d.geotecnia && typeof d.geotecnia === 'object') ? Object.keys(d.geotecnia as Record<string, unknown>).map(item => ({ item }))
+    : []).filter(g => !/tipo de sondagem/i.test(String(g.item ?? '')))
   const geotDist = Array.isArray(d.geotecnia_dist) ? (d.geotecnia_dist as Array<{ obra?: string; dist?: Array<{ tipo: string; pct: number }> }>) : []
   const distDaObra = (its: Array<Record<string, unknown>>): Array<{ tipo: string; pct: number }> => {
     const obra = obraDoItem(its[0] || {}).toLowerCase()
@@ -1084,7 +1086,12 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
     const s = classificarSolo(its)   // fallback: 1 tipo só → 100% (sem inventar proporção de múltiplos)
     return s.tipos.length === 1 ? [{ tipo: s.tipos[0].label, pct: 100 }] : []
   }
-  const pend = (d.pendencias as string[]) ?? []
+  // pendencias pode vir como array de strings, array de objetos {descricao}, ou dict {alertas:[...], criticas:[...]}
+  const _pendItem = (x: unknown): string => typeof x === 'string' ? x : String((x as Record<string, unknown>)?.descricao ?? (x as Record<string, unknown>)?.acao ?? '').trim()
+  const _pendBase: unknown[] = Array.isArray(d.pendencias) ? d.pendencias
+    : (d.pendencias && typeof d.pendencias === 'object') ? Object.values(d.pendencias as Record<string, unknown>).flat()
+    : []
+  const pend: string[] = _pendBase.map(_pendItem).filter(Boolean)
   const nEntr = (x: unknown) => Array.isArray(x) ? x.length : (x && typeof x === 'object' ? Object.keys(x as Record<string, unknown>).length : 0)
   const total = nEntr(d.quantitativos) + nEntr(d.geotecnia)
   // medido do estágio 1 (geo) — p/ os resumos
@@ -1123,7 +1130,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
 
       {/* RESUMO DO LOTE (medido) */}
       <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/70 border-slate-200'}`}>
-        <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo do lote{d.lote ? ` — ${String(d.lote)}` : ''}</p>
+        <p className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo do lote{d.lote ? ` — ${String(d.lote)}` : ''}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
           <ResumoStat lbl="Obras" val={String(obras1.length)} isDark={isDark} />
           <ResumoStat lbl="Extensão (medida)" val={`${fmtNum(kmTotal, 1)} km`} isDark={isDark} />
@@ -1139,7 +1146,7 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
       {/* RESUMO POR OBRA — cards (medido + fatos dos docs) */}
       {obras1.length > 0 && (
         <div>
-          <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo por obra <span className="font-normal normal-case opacity-70">({obras1.length} no KMZ — medido + fatos dos documentos)</span></p>
+          <p className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Resumo por obra <span className="font-normal normal-case opacity-70">({obras1.length} no KMZ — medido + fatos dos documentos)</span></p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
             {[...obras1].sort((a, b) => Number(b.km) - Number(a.km)).map((o, i) => {
               const g = o.geo as GeoData | undefined
@@ -1151,8 +1158,8 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
               return (
                 <div key={i} className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.07] bg-white/[0.015]' : 'border-slate-200 bg-white'}`}>
                   <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b ${isDark ? 'border-white/[0.05]' : 'border-slate-100'}`} style={{ borderLeft: `3px solid ${tn.barHex}` }}>
-                    <p className={`text-xs font-bold truncate ${txt}`}>{String(o.nome)}</p>
-                    <button onClick={() => setReleveObra(o)} title="Ver perfil de elevação e travessias" className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-transform hover:scale-105 cursor-pointer" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={12} /> {rel.label}</button>
+                    <p className={`text-sm font-bold truncate ${txt}`}>{String(o.nome)}</p>
+                    <button onClick={() => setReleveObra(o)} title="Ver perfil de elevação e travessias" className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md transition-transform hover:scale-105 cursor-pointer" style={{ background: tn.barHex + '22', color: tn.barHex }}><RelevoGlyph tone={rel.tone} size={12} /> {rel.label}</button>
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="grid grid-cols-3 gap-2">
@@ -1162,9 +1169,9 @@ function Consolidacao({ orc, d, isDark }: { orc: Orcamento; d: Record<string, un
                     </div>
                     {destaque.length > 0 && (
                       <div className={`rounded-lg p-2 ${isDark ? 'bg-emerald-500/[0.08]' : 'bg-emerald-50'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>📄 Fatos dos documentos</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>📄 Fatos dos documentos</p>
                         <div className="space-y-0.5">
-                          {destaque.map((f, k) => <p key={k} className={`text-[11px] truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}><span className={txtMuted}>{String(f.item)}:</span> <b>{String(f.valor)}</b></p>)}
+                          {destaque.map((f, k) => <p key={k} className={`text-[12px] truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}><span className={txtMuted}>{String(f.item)}:</span> <b>{String(f.valor)}</b></p>)}
                         </div>
                         {fatos.length > destaque.length && <p className={`text-[10px] mt-1 ${txtMuted}`}>+{fatos.length - destaque.length} fato(s) — vide tabela abaixo</p>}
                       </div>
