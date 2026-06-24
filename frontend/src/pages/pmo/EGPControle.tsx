@@ -283,6 +283,8 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   const [fTipo, setFTipo] = useState('')
   const [fValor, setFValor] = useState('')
   const [fData, setFData] = useState('')
+  const [fPct, setFPct] = useState('')
+  const [fPrazo, setFPrazo] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [parsing, setParsing] = useState(false)
   const [medMsg, setMedMsg] = useState<{ ok: boolean; txt: string } | null>(null)
@@ -308,13 +310,15 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
 
   if (isLoading) return <Spinner />
 
-  const fAtivo = !!(q.trim() || fTipo || fValor || fData)
+  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct || fPrazo)
   const match = (r: MedicaoOSCRow) => {
     const s = q.trim().toLowerCase()
     if (s && !(r.numero_os.toLowerCase().includes(s) || r.obra_nome.toLowerCase().includes(s) || r.polo_nome.toLowerCase().includes(s))) return false
     if (fTipo && r.tipo !== fTipo) return false
     if (fValor) { const v = r.valor; if (fValor === 'gt1m' && v <= 1e6) return false; if (fValor === 'mid' && !(v >= 1e5 && v <= 1e6)) return false; if (fValor === 'lt100k' && v >= 1e5) return false }
     if (fData && (r.data_osc ?? '').slice(0, 4) !== fData) return false
+    if (fPct) { const p = r.valor ? Math.round(r.medido / r.valor * 100) : 0; if (fPct === '0' && p !== 0) return false; if (fPct === '1-50' && !(p >= 1 && p <= 50)) return false; if (fPct === '51-99' && !(p >= 51 && p <= 99)) return false; if (fPct === '100' && p < 100) return false }
+    if (fPrazo) { const pp = pctPrazo(r.data_osc, r.vencimento); if (pp == null) return false; if (fPrazo === 'lt50' && !(pp < 50)) return false; if (fPrazo === '50-99' && !(pp >= 50 && pp < 100)) return false; if (fPrazo === 'venc' && pp < 100) return false }
     return true
   }
   const baseList = (rows ?? []).filter(match)
@@ -351,7 +355,7 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
   return (
     <div className="space-y-4">
       {/* Filtros + Adicionar Medição (linha única) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <div className="flex flex-wrap items-center gap-2">
         <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{list.length} OSC{list.length !== 1 ? 's' : ''}</p>
         <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shrink-0 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
           <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
@@ -393,7 +397,13 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
         <select value={fData} onChange={e => setFData(e.target.value)} className={sel(!!fData)}>
           <option value="">Ano: todos</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
         </select>
-        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData('') }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
+        <select value={fPct} onChange={e => setFPct(e.target.value)} className={sel(!!fPct)}>
+          <option value="">% Fat: todos</option><option value="0">0% (não faturado)</option><option value="1-50">1–50%</option><option value="51-99">51–99%</option><option value="100">100%</option>
+        </select>
+        <select value={fPrazo} onChange={e => setFPrazo(e.target.value)} className={sel(!!fPrazo)}>
+          <option value="">% Prazo: todos</option><option value="lt50">&lt; 50%</option><option value="50-99">50–99%</option><option value="venc">Vencido (100%)</option>
+        </select>
+        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(''); setFPrazo('') }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
         {(() => {
           const allCollapsed = allPolos.length > 0 && allPolos.every(p => collapsed.has(p))
           return (
