@@ -1,33 +1,43 @@
 import { useState, useMemo } from 'react'
-import { Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react'
+import { Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2, Circle, Send } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin } from '../../hooks/useSgi'
-import { FAROL_CFG } from '../../types/sgi'
-import type { SgiObjetivo, SgiMeta, SgiCheckin, DirecaoMeta, Farol } from '../../types/sgi'
+import {
+  useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin,
+  useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro,
+} from '../../hooks/useSgi'
+import { FAROL_CFG, STATUS_ACAO_LABEL } from '../../types/sgi'
+import type { SgiObjetivo, SgiMeta, SgiCheckin, SgiAcao, DirecaoMeta, Farol } from '../../types/sgi'
 
 type MetaFull = SgiMeta & { checkins: SgiCheckin[] }
 type ObjFull = SgiObjetivo & { metas: MetaFull[] }
 
+const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
 const ultimoCheckin = (m: MetaFull): SgiCheckin | null =>
   m.checkins?.length ? [...m.checkins].sort((a, b) => (b.competencia || '').localeCompare(a.competencia || ''))[0] : null
 
 // ── Abas (padrão Gestao/Padronizacao) ─────────────────────────────────────────
-type TabKey = 'anuais' | 'trimestrais' | 'checkin'
+type TabKey = 'anuais' | 'trimestrais' | 'plano' | 'checkin' | 'revisao'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'anuais',      label: 'Metas Anuais' },
   { key: 'trimestrais', label: 'Metas Trimestrais' },
+  { key: 'plano',       label: 'Plano de Ação' },
   { key: 'checkin',     label: 'Check-in Mensal' },
+  { key: 'revisao',     label: 'Revisão' },
 ]
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }
 const TAB_ACCENT: Record<TabKey, AccentSet> = {
   anuais:      { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
   trimestrais: { bg:'bg-teal-50',    bgActive:'bg-teal-100',    text:'text-teal-500',    textActive:'text-teal-800',    badge:'bg-teal-200/80 text-teal-700',       border:'border-teal-200' },
+  plano:       { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  badge:'bg-violet-200/80 text-violet-700',   border:'border-violet-200' },
   checkin:     { bg:'bg-sky-50',     bgActive:'bg-sky-100',     text:'text-sky-500',     textActive:'text-sky-800',     badge:'bg-sky-200/80 text-sky-700',         border:'border-sky-200' },
+  revisao:     { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   badge:'bg-amber-200/80 text-amber-700',     border:'border-amber-200' },
 }
 const TAB_ACCENT_DARK: Record<TabKey, AccentSet> = {
   anuais:      { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   trimestrais: { bg:'bg-teal-500/5',    bgActive:'bg-teal-500/15',    text:'text-teal-400',    textActive:'text-teal-200',    badge:'bg-teal-500/15 text-teal-300',       border:'border-teal-500/20' },
+  plano:       { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  badge:'bg-violet-500/15 text-violet-300',   border:'border-violet-500/20' },
   checkin:     { bg:'bg-sky-500/5',     bgActive:'bg-sky-500/15',     text:'text-sky-400',     textActive:'text-sky-200',     badge:'bg-sky-500/15 text-sky-300',         border:'border-sky-500/20' },
+  revisao:     { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   badge:'bg-amber-500/15 text-amber-300',     border:'border-amber-500/20' },
 }
 
 // ── Modal Novo Objetivo (+ meta anual) ────────────────────────────────────────
@@ -151,14 +161,12 @@ function CheckinModal({ obj, meta, onClose, isDark }: { obj: ObjFull; meta: Meta
               {lancar.isPending && <Loader2 size={14} className="animate-spin" />} Lançar Check-in
             </button>
           </form>
-
           {resultado && (
             <div className={`rounded-xl p-3 text-xs ${FAROL_CFG[(resultado.farol as Farol) || 'cinza'].bg} ${FAROL_CFG[(resultado.farol as Farol) || 'cinza'].text}`}>
               Farol: <b>{FAROL_CFG[(resultado.farol as Farol) || 'cinza'].label}</b>
               {resultado.registro_criado && <span className="block mt-1">⚠ Meta no vermelho — abriu registro de melhoria automaticamente.</span>}
             </div>
           )}
-
           <div>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Histórico</p>
             {historico.length === 0 ? <p className={`text-xs ${muted}`}>Sem check-ins ainda.</p> : (
@@ -182,7 +190,7 @@ function CheckinModal({ obj, meta, onClose, isDark }: { obj: ObjFull; meta: Meta
   )
 }
 
-// ── Card de objetivo (mostra metas de um período) ─────────────────────────────
+// ── Card de objetivo (metas de um período) ────────────────────────────────────
 function ObjetivoCard({ obj, periodo, isDark, onCheckin, txt, muted, card }: {
   obj: ObjFull; periodo: 'anual' | 'trimestral'; isDark: boolean
   onCheckin: (m: MetaFull) => void; txt: string; muted: string; card: string
@@ -238,25 +246,93 @@ function ObjetivoCard({ obj, periodo, isDark, onCheckin, txt, muted, card }: {
   )
 }
 
+// ── Plano de Ação por meta trimestral ─────────────────────────────────────────
+function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
+  obj: ObjFull; meta: MetaFull; acoes: SgiAcao[]; isDark: boolean; txt: string; muted: string; card: string
+}) {
+  const criarAcao = useCriarAcao()
+  const atualizarAcao = useAtualizarAcao()
+  const [nova, setNova] = useState('')
+  const [prazo, setPrazo] = useState('')
+  const mine = acoes.filter(a => a.origem_tipo === 'meta' && a.origem_id === meta.id)
+  const add = async () => {
+    if (!nova.trim()) return
+    await criarAcao.mutateAsync({ origem_tipo: 'meta', origem_id: meta.id, titulo: nova.trim(), prazo: prazo || undefined, status: 'aberta' })
+    setNova(''); setPrazo('')
+  }
+  return (
+    <div className={`rounded-2xl border shadow-sm p-4 ${card}`}>
+      <p className={`text-sm font-bold ${txt}`}>{obj.titulo}</p>
+      <p className={`text-[11px] mb-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`} · alvo {meta.alvo ?? '—'} {obj.unidade || ''}</p>
+      <div className="space-y-1.5 mb-2">
+        {mine.length === 0 && <p className={`text-xs ${muted}`}>Nenhuma ação planejada.</p>}
+        {mine.map(a => {
+          const sa = STATUS_ACAO_LABEL[a.status]
+          const done = a.status === 'concluida'
+          return (
+            <div key={a.id} className={`flex items-center gap-2 rounded-lg p-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+              <button onClick={() => atualizarAcao.mutate({ id: a.id, status: done ? 'aberta' : 'concluida', concluida_em: done ? null : new Date().toISOString() })} className="shrink-0">
+                {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} className="text-slate-400" />}
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-medium truncate ${done ? 'line-through ' + muted : txt}`}>{a.titulo}</p>
+                {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmtDate(a.prazo)}</p>}
+              </div>
+              <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex gap-1.5">
+        <input value={nova} onChange={e => setNova(e.target.value)} placeholder="Ação para atingir a meta..."
+          className={`flex-1 text-xs rounded-lg px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+        <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)}
+          className={`w-32 text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200'}`} />
+        <button onClick={add} disabled={criarAcao.isPending || !nova.trim()} className="px-2.5 rounded-lg bg-violet-600 text-white disabled:opacity-50">
+          {criarAcao.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SgiObjetivos() {
   const { isDark } = useTheme()
   const { data: objetivos = [], isLoading } = useObjetivos()
+  const { data: acoes = [] } = useAcoes()
+  const criarRegistro = useCriarRegistro()
   const [tab, setTab] = useState<TabKey>('anuais')
   const [showNovo, setShowNovo] = useState(false)
   const [checkin, setCheckin] = useState<{ obj: ObjFull; meta: MetaFull } | null>(null)
+  const [enviados, setEnviados] = useState<Record<string, boolean>>({})
 
   const card = isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'
 
+  const todasMetas = useMemo(() => objetivos.flatMap(o => o.metas.map(m => ({ obj: o, meta: m }))), [objetivos])
+  const metasTri = useMemo(() => objetivos.flatMap(o => o.metas.filter(m => m.periodo === 'trimestral').map(m => ({ obj: o, meta: m }))), [objetivos])
+
   const counts = useMemo(() => ({
     anuais: objetivos.filter(o => o.metas.some(m => m.periodo === 'anual')).length,
     trimestrais: objetivos.filter(o => o.metas.some(m => m.periodo === 'trimestral')).length,
-    checkin: objetivos.reduce((s, o) => s + o.metas.length, 0),
-  }), [objetivos])
+    plano: metasTri.length,
+    checkin: todasMetas.length,
+    revisao: todasMetas.filter(({ meta }) => (meta.checkins?.length ?? 0) > 0).length,
+  }), [objetivos, metasTri, todasMetas])
 
-  const todasMetas = useMemo(() => objetivos.flatMap(o => o.metas.map(m => ({ obj: o, meta: m }))), [objetivos])
+  const enviarMelhoria = async (obj: ObjFull, meta: MetaFull) => {
+    const u = ultimoCheckin(meta)
+    await criarRegistro.mutateAsync({
+      tipo: 'oportunidade', origem: 'meta', gravidade: 'media',
+      area_processo: obj.area_processo || undefined,
+      titulo: `Revisão: ${obj.titulo} (${meta.periodo === 'anual' ? 'anual' : 'T' + meta.trimestre})`,
+      descricao: `Enviado da revisão de metas. Último check-in: ${u?.competencia ?? '—'} → ${u?.realizado ?? '—'} (alvo ${meta.alvo ?? '—'}, farol ${u?.farol ?? '—'}).`,
+      status_pdca: 'pendente', classificacao: 'pendente',
+    })
+    setEnviados(p => ({ ...p, [meta.id]: true }))
+  }
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -268,7 +344,7 @@ export default function SgiObjetivos() {
           <h1 className={`text-lg font-extrabold flex items-center gap-2 ${txt}`}>
             <Target size={18} className="text-emerald-500" /> Objetivos e Metas
           </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Metas anuais e check-in mensal com farol</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Metas, plano de ação, check-in mensal e revisão</p>
         </div>
         <button onClick={() => setShowNovo(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shrink-0">
           <Plus size={14} /> Novo Objetivo
@@ -301,6 +377,27 @@ export default function SgiObjetivos() {
             <p className={`text-sm font-medium ${txt}`}>Nenhum objetivo cadastrado</p>
             <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
           </div>
+        ) : tab === 'anuais' || tab === 'trimestrais' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {objetivos.map(obj => (
+              <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark}
+                onCheckin={m => setCheckin({ obj, meta: m })} txt={txt} muted={muted} card={card} />
+            ))}
+          </div>
+        ) : tab === 'plano' ? (
+          metasTri.length === 0 ? (
+            <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+              <Target size={36} className="text-violet-500/50" />
+              <p className={`text-sm font-medium ${txt}`}>Nenhuma meta trimestral</p>
+              <p className="text-xs">Defina metas trimestrais na aba "Metas Trimestrais" para montar o plano de ação.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {metasTri.map(({ obj, meta }) => (
+                <PlanoAcaoMeta key={meta.id} obj={obj} meta={meta} acoes={acoes} isDark={isDark} txt={txt} muted={muted} card={card} />
+              ))}
+            </div>
+          )
         ) : tab === 'checkin' ? (
           <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <table className="w-full text-xs">
@@ -331,11 +428,44 @@ export default function SgiObjetivos() {
             </table>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {objetivos.map(obj => (
-              <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark}
-                onCheckin={m => setCheckin({ obj, meta: m })} txt={txt} muted={muted} card={card} />
-            ))}
+          /* Revisão */
+          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                  <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
+                  <th className="text-left px-3 py-2 font-semibold">META</th>
+                  <th className="text-right px-3 py-2 font-semibold">REALIZADO/ALVO</th>
+                  <th className="text-center px-3 py-2 font-semibold">FAROL</th>
+                  <th className="text-right px-3 py-2 font-semibold">REVISÃO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todasMetas.map(({ obj, meta }) => {
+                  const u = ultimoCheckin(meta)
+                  const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+                  const jaEnviado = enviados[meta.id]
+                  return (
+                    <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
+                      <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
+                      <td className={`px-3 py-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Anual' : `Trim. ${meta.trimestre}`}</td>
+                      <td className={`px-3 py-2.5 text-right ${muted}`}>{u?.realizado ?? '—'} / {meta.alvo ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
+                      <td className="px-3 py-2.5 text-right">
+                        {jaEnviado ? (
+                          <span className="text-[10px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Enviado</span>
+                        ) : (
+                          <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending}
+                            className="text-[11px] font-bold text-amber-600 hover:text-amber-700 inline-flex items-center gap-1 disabled:opacity-50">
+                            <Send size={12} /> Enviar p/ Melhoria
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

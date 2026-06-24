@@ -7,8 +7,8 @@ export default function SgiLayout() {
     { to: '/sgi',              icon: LayoutDashboard, label: 'Painel',            end: true },
     { to: '/sgi/novo',         icon: Plus,            label: 'Novo Registro',     accent: true },
     { to: '/sgi/objetivos',    icon: Target,          label: 'Objetivos e Metas' },
-    { to: '/sgi/padronizacao', icon: ClipboardCheck,  label: 'Padronização' },
     { to: '/sgi/melhoria',     icon: RefreshCcw,      label: 'Melhoria Contínua' },
+    { to: '/sgi/padronizacao', icon: ClipboardCheck,  label: 'Padronização' },
   ]
   return (
     <ModuleLayout
