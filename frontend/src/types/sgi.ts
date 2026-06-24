@@ -55,3 +55,122 @@ export const TIPO_DOC_LABEL: Record<TipoDocumento, string> = {
   manual:       'Manual',
   outro:        'Outro',
 }
+
+// ════════════════ FASE 2 — Melhoria Contínua (PDCA) ════════════════
+export type StatusPdca = 'pendente' | 'analise_causa' | 'plano_acao' | 'execucao' | 'verificacao' | 'encerrado'
+export type TipoRegistro = 'anomalia' | 'falha' | 'desvio' | 'quase_acidente' | 'reclamacao' | 'oportunidade'
+export type OrigemRegistro = 'campo' | 'auditoria' | 'cliente' | 'meta' | 'inspecao' | 'outro'
+export type Gravidade = 'baixa' | 'media' | 'alta' | 'critica'
+export type ClassificacaoRegistro = 'pendente' | 'nc' | 'registro' | 'dispensado'
+export type StatusAcao = 'aberta' | 'em_execucao' | 'concluida' | 'cancelada'
+
+export interface SgiRegistro {
+  id: string
+  codigo?: string | null
+  tipo: TipoRegistro
+  origem: OrigemRegistro
+  gravidade: Gravidade
+  area_processo?: string | null
+  obra_id?: string | null
+  titulo: string
+  descricao?: string | null
+  evidencia_url?: string | null
+  status_pdca: StatusPdca
+  classificacao: ClassificacaoRegistro
+  responsavel_id?: string | null
+  prazo?: string | null
+  encerrado_em?: string | null
+  created_at: string
+  updated_at: string
+  criado_por_nome?: string | null
+}
+
+export interface SgiAcao {
+  id: string
+  origem_tipo: 'registro' | 'meta' | 'achado_auditoria' | 'inspecao' | 'avulsa'
+  origem_id?: string | null
+  titulo: string
+  descricao?: string | null
+  responsavel_id?: string | null
+  prazo?: string | null
+  sla_horas?: number | null
+  status: StatusAcao
+  escalonado: boolean
+  evidencia_url?: string | null
+  concluida_em?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export const PDCA_STAGES: { key: StatusPdca; label: string; dot: string; bar: string }[] = [
+  { key: 'pendente',      label: 'Pendente',              dot: 'bg-slate-400',   bar: 'bg-slate-400' },
+  { key: 'analise_causa', label: 'Análise de Causa',      dot: 'bg-blue-500',    bar: 'bg-blue-500' },
+  { key: 'plano_acao',    label: 'Plano de Ação',         dot: 'bg-violet-500',  bar: 'bg-violet-500' },
+  { key: 'execucao',      label: 'Execução',              dot: 'bg-amber-500',   bar: 'bg-amber-500' },
+  { key: 'verificacao',   label: 'Verificação e Revisão', dot: 'bg-cyan-500',    bar: 'bg-cyan-500' },
+  { key: 'encerrado',     label: 'Encerrado',             dot: 'bg-emerald-500', bar: 'bg-emerald-500' },
+]
+
+export const TIPO_REGISTRO_LABEL: Record<TipoRegistro, string> = {
+  anomalia: 'Anomalia', falha: 'Falha', desvio: 'Desvio',
+  quase_acidente: 'Quase-acidente', reclamacao: 'Reclamação', oportunidade: 'Oportunidade',
+}
+export const ORIGEM_REGISTRO_LABEL: Record<OrigemRegistro, string> = {
+  campo: 'Campo', auditoria: 'Auditoria', cliente: 'Cliente', meta: 'Meta', inspecao: 'Inspeção', outro: 'Outro',
+}
+export const GRAVIDADE_CFG: Record<Gravidade, { label: string; bg: string; text: string; dot: string }> = {
+  baixa:   { label: 'Baixa',   bg: 'bg-slate-50',  text: 'text-slate-600',  dot: 'bg-slate-400' },
+  media:   { label: 'Média',   bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-500' },
+  alta:    { label: 'Alta',    bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-500' },
+  critica: { label: 'Crítica', bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500' },
+}
+export const STATUS_ACAO_LABEL: Record<StatusAcao, { label: string; bg: string; text: string; dot: string }> = {
+  aberta:      { label: 'Aberta',       bg: 'bg-slate-50',   text: 'text-slate-600',  dot: 'bg-slate-400' },
+  em_execucao: { label: 'Em Execução',  bg: 'bg-amber-50',   text: 'text-amber-700',  dot: 'bg-amber-500' },
+  concluida:   { label: 'Concluída',    bg: 'bg-emerald-50', text: 'text-emerald-700',dot: 'bg-emerald-500' },
+  cancelada:   { label: 'Cancelada',    bg: 'bg-slate-100',  text: 'text-slate-500',  dot: 'bg-slate-400' },
+}
+
+// ════════════════ FASE 3 — Objetivos e Metas ════════════════
+export type DirecaoMeta = 'maior_melhor' | 'menor_melhor'
+export type Farol = 'verde' | 'amarelo' | 'vermelho' | 'cinza'
+
+export interface SgiObjetivo {
+  id: string
+  ano: number
+  titulo: string
+  descricao?: string | null
+  area_processo?: string | null
+  responsavel_id?: string | null
+  indicador?: string | null
+  unidade?: string | null
+  direcao: DirecaoMeta
+  status: 'ativo' | 'concluido' | 'cancelado'
+  created_at: string
+  updated_at: string
+}
+export interface SgiMeta {
+  id: string
+  objetivo_id: string
+  periodo: 'anual' | 'trimestral'
+  trimestre?: number | null
+  ano: number
+  alvo?: number | null
+  created_at: string
+}
+export interface SgiCheckin {
+  id: string
+  meta_id: string
+  competencia: string
+  realizado?: number | null
+  farol?: Farol | null
+  observacao?: string | null
+  created_at: string
+}
+
+export const FAROL_CFG: Record<Farol, { label: string; dot: string; bg: string; text: string }> = {
+  verde:    { label: 'No alvo',  dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  amarelo:  { label: 'Atenção',  dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
+  vermelho: { label: 'Crítico',  dot: 'bg-red-500',     bg: 'bg-red-50',     text: 'text-red-700' },
+  cinza:    { label: 'Sem dado', dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-500' },
+}

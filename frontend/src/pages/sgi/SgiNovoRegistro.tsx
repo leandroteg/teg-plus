@@ -13,8 +13,8 @@ interface Opcao {
 }
 
 const OPCOES: Opcao[] = [
-  { key: 'checkin', label: 'Check-in de Meta',  desc: 'Lançar realizado vs. alvo de uma meta', icon: Target,        tone: 'emerald', ativo: false },
-  { key: 'anomalia', label: 'Anomalia / Falha',  desc: 'Registrar desvio, falha ou ocorrência', icon: AlertTriangle, tone: 'amber',   ativo: false },
+  { key: 'checkin', label: 'Check-in de Meta',  desc: 'Lançar realizado vs. alvo de uma meta', icon: Target,        tone: 'emerald', rota: '/sgi/objetivos', ativo: true },
+  { key: 'anomalia', label: 'Anomalia / Falha',  desc: 'Registrar desvio, falha ou ocorrência', icon: AlertTriangle, tone: 'amber',   rota: '/sgi/melhoria',  ativo: true },
   { key: 'documento', label: 'Documento',         desc: 'Criar documento (política, procedimento, IT…)', icon: FileText, tone: 'indigo', rota: '/sgi/padronizacao', ativo: true },
 ]
 

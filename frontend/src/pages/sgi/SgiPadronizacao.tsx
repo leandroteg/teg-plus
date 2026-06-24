@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
-  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown,
+  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useDocumentos, useCriarDocumento } from '../../hooks/useSgi'
+import { useDocumentos, useCriarDocumento, usePublicarDocumento, useAdesaoDocumento } from '../../hooks/useSgi'
 import { STATUS_DOC_LABEL, TIPO_DOC_LABEL } from '../../types/sgi'
 import type { SgiDocumento, StatusDocumento, TipoDocumento } from '../../types/sgi'
 
@@ -43,6 +43,14 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   const st = STATUS_DOC_LABEL[doc.status]
   const today = new Date().toISOString().split('T')[0]
   const revVencida = doc.proxima_revisao && doc.proxima_revisao < today && doc.status === 'vigente'
+  const publicar = usePublicarDocumento()
+  const { data: adesao = [] } = useAdesaoDocumento(doc.requer_ciencia ? doc.id : undefined)
+  const concl = adesao.filter(a => a.status === 'concluida').length
+  const handlePublicar = async () => {
+    const r = await publicar.mutateAsync(doc.id)
+    if (r.ok) alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).')
+    else alert('Erro ao publicar: ' + (r.erro || ''))
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -102,7 +110,34 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
             </div>
           </div>
 
+          {doc.requer_ciencia && (
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Ciência (Missões do Portal)</p>
+                {adesao.length > 0 && <span className={`text-[10px] font-bold ${txtMain}`}>{concl}/{adesao.length} ciente(s)</span>}
+              </div>
+              {adesao.length === 0 ? (
+                <p className={`text-xs ${txtMuted}`}>Ainda não publicado para ciência.</p>
+              ) : (
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {adesao.slice(0, 8).map(a => (
+                    <div key={a.colaborador_id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className={`truncate ${txtMain}`}>{a.nome || '—'}</span>
+                      <span className={a.status === 'concluida' ? 'text-emerald-500 font-semibold' : txtMuted}>{a.status === 'concluida' ? `Ciente ${fmtDate(a.concluida_em ? a.concluida_em.split('T')[0] : null)}` : 'Pendente'}</span>
+                    </div>
+                  ))}
+                  {adesao.length > 8 && <p className={`text-[10px] ${txtMuted}`}>+{adesao.length - 8} colaborador(es)</p>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
+            {doc.status !== 'obsoleto' && (
+              <button onClick={handlePublicar} disabled={publicar.isPending} className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                {publicar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.status === 'vigente' ? 'Republicar ciência' : 'Publicar'}
+              </button>
+            )}
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
           </div>
         </div>
