@@ -18,6 +18,7 @@ import {
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
 import { ProjetosFilterBar } from './ProjetosFilterBar'
+import EAPFinal from './EAPFinal'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
 type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'riscos'
@@ -58,10 +59,6 @@ export default function EGPPlanejamento() {
   const { data: projetos, isLoading: loadingProjetos } = useProjetos(portfolioId)
   const criarProjeto = useCriarProjeto()
   const { data: lookups } = useLookups()
-
-  // projeto único selecionado (pro EAP) derivado do multi-select; null = todos/vários
-  const selIds = (projetos ?? []).filter(p => p.status !== 'cancelado' && !excluded.has(p.id)).map(p => p.id)
-  const eapProjetoId = selIds.length === 1 ? selIds[0] : null
 
   const handleCriarProjeto = async () => {
     if (!portfolioId || !novoProjeto.nome.trim()) return
@@ -133,7 +130,7 @@ export default function EGPPlanejamento() {
       />
 
       {/* Tab content */}
-      {tab === 'eap' && <EAPPanel portfolioId={portfolioId} projetoId={eapProjetoId} isLight={isLight} />}
+      {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}

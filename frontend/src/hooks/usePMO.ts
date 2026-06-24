@@ -322,6 +322,144 @@ export function useMedicaoPorOSC(portfolioId?: string) {
   })
 }
 
+// ── EAP Final (visão por polo, financeiro + físico ao vivo) ───────────────────
+export interface EAPPacote {
+  n: string
+  valor: number
+  faturado: number
+  pctFin: number
+  pctFis: number | null
+  qtdContr: number
+  qtdReal: number
+  unidade: string | null
+  isOutros: boolean
+}
+export interface EAPPolo {
+  id: string
+  label: string
+  codigo: string | null
+  contr: number
+  fat: number
+  saldo: number
+  pctFin: number
+  pctFis: number
+  qtdTorres: number | null
+  montTon: number
+  nOscs: number
+  oscs: string[]
+  pacotes: EAPPacote[]
+}
+const PACOTES_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
+function pacoteDe(code: string | null, secao: string | null): string {
+  const c = String(code ?? ''); const s = (secao ?? '').toLowerCase()
+  if (c.startsWith('1.6') || c.startsWith('1.5') || (s.includes('prelimin') && s.includes('topog'))) return 'Serv. Preliminares'
+  if (c.startsWith('1.1') || c.startsWith('1.2') || c.startsWith('1.3') || s.includes('mobiliz') || s.includes('canteiro')) return 'Canteiro e Mobiliz.'
+  if (c.startsWith('1.4') || s.includes('administ')) return 'Administração Local'
+  if (c.startsWith('1') || s.includes('prelimin')) return 'Serv. Preliminares'
+  if (c.startsWith('2') || s.includes('funda')) return 'Fundações'
+  if (c.startsWith('4') || s.includes('montagem') || s.includes('estrutura metál')) return 'Montagem de Torres'
+  if (c.startsWith('6') || s.includes('lanca') || s.includes('lança')) return 'Lançamento de Cabos'
+  return 'Outros'
+}
+// item "driver" de cada pacote (carrega o quantitativo físico)
+function isDriver(pac: string, code: string | null, nome: string | null, uni: string | null): boolean {
+  const c = String(code ?? ''); const n = (nome ?? '').toLowerCase(); const u = (uni ?? '').toLowerCase()
+  if (pac === 'Serv. Preliminares') return c.startsWith('1.6') || n.includes('topograf')
+  if (pac === 'Canteiro e Mobiliz.') return c.startsWith('1.1') || n.includes('canteiro')
+  if (pac === 'Fundações') return c.startsWith('2.11') || n.includes('tubul')
+  if (pac === 'Montagem de Torres') return c.startsWith('4.2') || (n.includes('montagem') && u === 'ton')
+  if (pac === 'Lançamento de Cabos') return c.startsWith('6.2') || ((n.includes('lanc') || n.includes('lança')) && u === 'km')
+  if (pac === 'Administração Local') return c.startsWith('1.4') || n.includes('administ')
+  return false
+}
+type ItemRow = { fluxo_os_id: string; subsec_codigo: string | null; subsec_nome: string | null; secao: string | null; unidade: string | null; quantidade: number | null; qty_acum: number | null; valor: number | null; valor_acum: number | null }
+
+export function useEAPFinal(portfolioId?: string) {
+  return useQuery<EAPPolo[]>({
+    queryKey: ['egp-eap-final', portfolioId],
+    enabled: !!portfolioId,
+    queryFn: async () => {
+      const { data: polosD } = await supabase.from('pmo_projetos').select('id, nome, codigo, qtd_torres').eq('portfolio_id', portfolioId!)
+      const polos = (polosD ?? []) as { id: string; nome: string; codigo: string | null; qtd_torres: number | null }[]
+      if (!polos.length) return []
+      const polosIds = polos.map(p => p.id)
+      const { data: obrasD } = await supabase.from('sys_obras').select('id, pmo_projeto_id').in('pmo_projeto_id', polosIds)
+      const obra2polo = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.pmo_projeto_id as string]))
+      const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual').eq('portfolio_id', portfolioId!)
+      const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string }[]
+      const osc2polo = new Map<string, string>()
+      for (const o of oscs) { const pid = o.obra_id ? obra2polo.get(o.obra_id) : undefined; if (pid) osc2polo.set(o.id, pid) }
+      const oscIds = oscs.map(o => o.id)
+      let itens: ItemRow[] = []
+      for (let i = 0; i < oscIds.length; i += 200) {
+        const slice = oscIds.slice(i, i + 200)
+        const { data } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, subsec_codigo, subsec_nome, secao, unidade, quantidade, qty_acum, valor, valor_acum').in('fluxo_os_id', slice)
+        itens = itens.concat((data ?? []) as ItemRow[])
+      }
+      // agrega por polo → pacote
+      type Acc = { valor: number; fat: number; qC: number; qR: number; uni: string | null }
+      const byPolo = new Map<string, Map<string, Acc>>()
+      for (const it of itens) {
+        const pid = osc2polo.get(it.fluxo_os_id); if (!pid) continue
+        const pac = pacoteDe(it.subsec_codigo, it.secao)
+        let m = byPolo.get(pid); if (!m) { m = new Map(); byPolo.set(pid, m) }
+        let a = m.get(pac); if (!a) { a = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, a) }
+        a.valor += Number(it.valor ?? 0); a.fat += Number(it.valor_acum ?? 0)
+        if (isDriver(pac, it.subsec_codigo, it.subsec_nome, it.unidade)) {
+          a.qC += Number(it.quantidade ?? 0); a.qR += Number(it.qty_acum ?? 0); a.uni = it.unidade ?? a.uni
+        }
+      }
+      return polos.map(p => {
+        const polOscs = oscs.filter(o => osc2polo.get(o.id) === p.id && o.etapa_atual !== 'cancelada')
+        const contr = polOscs.reduce((s, o) => s + Number(o.valor ?? 0), 0)
+        const fat = polOscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, Number(o.valor ?? 0) - Number(o.saldo_reais)) : 0), 0)
+        const m = byPolo.get(p.id) ?? new Map<string, Acc>()
+        let montTon = 0
+        const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
+          const a = m.get(n)!
+          const pctFis = a.qC > 0 ? Math.round((a.qR / a.qC) * 100) : null
+          if (n === 'Montagem de Torres') montTon = a.qC
+          return {
+            n, valor: a.valor, faturado: a.fat,
+            pctFin: a.valor ? Math.round((a.fat / a.valor) * 100) : 0,
+            pctFis, qtdContr: a.qC, qtdReal: a.qR, unidade: a.uni,
+            isOutros: n === 'Outros',
+          }
+        })
+        // físico geral = média ponderada (por valor) dos pacotes com físico
+        const wf = pacotes.filter(x => x.pctFis != null)
+        const wsum = wf.reduce((s, x) => s + x.valor, 0)
+        const pctFis = wsum ? Math.round(wf.reduce((s, x) => s + (x.pctFis as number) * x.valor, 0) / wsum) : 0
+        return {
+          id: p.id, label: p.nome, codigo: p.codigo,
+          contr, fat, saldo: contr - fat,
+          pctFin: contr ? Math.round((fat / contr) * 100) : 0,
+          pctFis, qtdTorres: p.qtd_torres, montTon,
+          nOscs: polOscs.length, oscs: polOscs.map(o => o.numero_os).sort(),
+          pacotes,
+        }
+      }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+    },
+  })
+}
+// fmtQ helper exposto p/ componente
+export function fmtQtd(v: number, u: string | null): string | null {
+  if (!u || !v) return null
+  const s = v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
+  return `${s} ${u}`
+}
+
+export function useUpdatePoloTorres(portfolioId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ poloId, torres }: { poloId: string; torres: number | null }) => {
+      const { error } = await supabase.from('pmo_projetos').update({ qtd_torres: torres }).eq('id', poloId)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['egp-eap-final', portfolioId] }) },
+  })
+}
+
 // aplica medição: parse do espelho da OSC → casa itens por nome → grava valor_acum (medido)
 export function useAplicarMedicao() {
   const qc = useQueryClient()
