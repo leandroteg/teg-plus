@@ -452,8 +452,16 @@ export function filtrarRawPorPeriodo(raws: EAPPoloRaw[], de?: string, ate?: stri
 }
 export interface EAPPoloRaw { id: string; label: string; codigo: string | null; qtdTorres: number | null; oscs: EAPOscRaw[] }
 const PACOTES_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
-function pacoteDe(code: string | null, secao: string | null): string {
+// conferência/carga/descarga de estruturas/materiais e desmontagem NÃO são montagem (lançados como Outros)
+function ehConferenciaOuDesmont(code: string | null, secao: string | null, nome?: string | null): boolean {
+  const c = String(code ?? ''); const s = (secao ?? '').toLowerCase(); const n = (nome ?? '').toLowerCase()
+  if (s.includes('desmont') || c.startsWith('8')) return true
+  if ((n.includes('conf') || n.includes('carga') || n.includes('descarga')) && (n.includes('estrut') || n.includes('material') || n.includes('acess'))) return true
+  return false
+}
+function pacoteDe(code: string | null, secao: string | null, nome?: string | null): string {
   const c = String(code ?? ''); const s = (secao ?? '').toLowerCase()
+  if (ehConferenciaOuDesmont(code, secao, nome)) return 'Outros'  // antes de montagem, p/ não inflar
   if (c.startsWith('1.6') || c.startsWith('1.5') || (s.includes('prelimin') && s.includes('topog'))) return 'Serv. Preliminares'
   if (c.startsWith('1.1') || c.startsWith('1.2') || c.startsWith('1.3') || s.includes('mobiliz') || s.includes('canteiro')) return 'Canteiro e Mobiliz.'
   if (c.startsWith('1.4') || s.includes('administ')) return 'Administração Local'
@@ -469,7 +477,7 @@ function isDriver(pac: string, code: string | null, nome: string | null, uni: st
   if (pac === 'Serv. Preliminares') return c.startsWith('1.6') || n.includes('topograf')
   if (pac === 'Canteiro e Mobiliz.') return c.startsWith('1.1') || n.includes('canteiro')
   if (pac === 'Fundações') return c.startsWith('2.11') || n.includes('tubul')
-  if (pac === 'Montagem de Torres') return c.startsWith('4.2') || (n.includes('montagem') && u === 'ton')
+  if (pac === 'Montagem de Torres') return (c.startsWith('4.2') || n.includes('mont')) && u === 'ton' && !n.includes('conf') && !n.includes('desmont') && !n.includes('carga')
   if (pac === 'Lançamento de Cabos') return c.startsWith('6.2') || ((n.includes('lanc') || n.includes('lança')) && u === 'km')
   if (pac === 'Administração Local') return c.startsWith('1.4') || n.includes('administ')
   return false
@@ -507,7 +515,7 @@ export function useEAPFinal(portfolioId?: string) {
       // agrega itens por OSC → pacote (cru; agregação por polo é no cliente, respeitando a seleção)
       const byOsc = new Map<string, Record<string, PacAcc>>()
       for (const it of itens) {
-        const pac = pacoteDe(it.subsec_codigo, it.secao)
+        const pac = pacoteDe(it.subsec_codigo, it.secao, it.subsec_nome)
         let m = byOsc.get(it.fluxo_os_id); if (!m) { m = {}; byOsc.set(it.fluxo_os_id, m) }
         let a = m[pac]; if (!a) { a = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m[pac] = a }
         a.valor += Number(it.valor ?? 0); a.fat += Number(it.valor_acum ?? 0)
