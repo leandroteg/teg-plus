@@ -102,7 +102,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     for (const polo of (raw ?? []) as EAPPoloRaw[]) {
       let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
       for (const o of polo.oscs) {
-        if (o.etapa_atual === 'cancelada') continue
+        if (o.etapa_atual === 'cancelada' || o.tipo !== 'construcao') continue // só obras de construção
         let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
         const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
         const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
@@ -207,17 +207,21 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg).maxMeses
   const mesesArr = (applied && view.maxMeses > 0) ? Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i)) : []
   const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
+  // larguras fixas p/ TODAS as tabelas alinharem as colunas
+  const W_LABEL = 190, W_MES = 72, W_TOT = 78
+  const colGroup = <colgroup><col style={{ width: W_LABEL }} />{mesesArr.map((_, i) => <col key={i} style={{ width: W_MES }} />)}<col style={{ width: W_TOT }} /></colgroup>
+  const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
   const TotalLinha = ({ label, obras, geral }: { label: string; obras: Obra[]; geral?: boolean }) => {
     const t = totMensal(obras); const tot = t.reduce((s, x) => s + x, 0)
     const td = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap`
-    const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
     const hcl = `px-2 py-1 text-right text-[9px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'} whitespace-nowrap`
     return (
-      <div className={`overflow-x-auto rounded-lg ${geral ? '' : (isDark ? 'bg-white/[0.02]' : 'bg-slate-50/70')}`}>
-        <table className="w-full border-collapse">
+      <div className="overflow-x-auto">
+        <table className="border-collapse table-fixed">
+          {colGroup}
           <thead><tr><th className={`${hcl} text-left ${stk}`}></th>{mesesArr.map(m => <th key={m} className={hcl}>{ymLabel(m)}</th>)}<th className={`${hcl} pr-3`}>Total</th></tr></thead>
           <tbody><tr className={geral ? 'font-bold' : 'font-semibold'}>
-            <td className={`px-2 py-1 text-left text-[11px] ${stk} ${geral ? (isDark ? 'text-white' : 'text-slate-900') : (isDark ? 'text-teal-300' : 'text-teal-700')}`}>{label}</td>
+            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk} ${geral ? (isDark ? 'text-white' : 'text-slate-900') : (isDark ? 'text-teal-300' : 'text-teal-700')}`}>{label}</td>
             {t.map((v, i) => <td key={i} className={`${td} ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
             <td className={`${td} pr-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtM(tot)}</td>
           </tr></tbody>
@@ -281,33 +285,37 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                               const pj = projObra(o, applied)
                               const thx = `px-2 py-1 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
                               const tdx = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
-                              const stick = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
                               return (
-                                <div className="pl-5 pr-1 pb-2 pt-1 overflow-x-auto">
+                                <div className="pr-1 pb-2 pt-1 overflow-x-auto">
                                   {pj.maxMeses === 0 ? <p className="text-[11px] text-slate-400 px-2 py-1">Defina a produtividade pra projetar.</p> : (
-                                    <table className="w-full border-collapse">
+                                    <table className="border-collapse table-fixed">
+                                      {colGroup}
                                       <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                                        <th className={`px-2 py-1 text-left text-[10px] font-semibold ${stick} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Serviço</th>
-                                        {pj.meses.map(m => <th key={m} className={thx}>{ymLabel(m)}</th>)}
+                                        <th className={`px-2 py-1 text-left text-[10px] font-semibold ${stk} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Serviço</th>
+                                        {mesesArr.map(m => <th key={m} className={thx}>{ymLabel(m)}</th>)}
+                                        <th className={`${thx} pr-3`}>Total</th>
                                       </tr></thead>
                                       <tbody>
-                                        {pj.rows.map(r => (
+                                        {pj.rows.map(r => { const rowTot = r.rMes.reduce((s, x) => s + x, 0); return (
                                           <tr key={r.d.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                                            <td className={`px-2 py-1 text-left text-[11px] ${stick}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.d.cor }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>{r.d.label}</b> <span className="text-slate-400">{fmtQ(r.d.saldoQ)} {r.d.uni} · {fmtM(r.d.saldoR)}</span></td>
-                                            {r.rMes.map((v, i) => { const q = r.qty[i]; return (
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.d.cor }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>{r.d.label}</b> <span className="text-slate-400">{fmtQ(r.d.saldoQ)} {r.d.uni} · {fmtM(r.d.saldoR)}</span></td>
+                                            {mesesArr.map((_, i) => { const q = r.qty[i] || 0; const v = r.rMes[i] || 0; return (
                                               <td key={i} className={`${tdx} leading-tight`}>{q > 0 ? <><div className="font-semibold" style={{ color: r.d.cor }}>{fmtQ(q)} {r.d.uni}</div><div className="text-[9px] text-slate-400">{fmtM(v)}</div></> : <span className="text-slate-400">·</span>}</td>
                                             ) })}
+                                            <td className={`${tdx} pr-3 font-semibold`} style={{ color: r.d.cor }}>{fmtM(rowTot)}</td>
                                           </tr>
-                                        ))}
+                                        ) })}
                                         {o.outrosR > 0 && (
                                           <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                                            <td className={`px-2 py-1 text-left text-[11px] ${stick}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>ADM + Outros</b> <span className="text-slate-400">{fmtM(o.outrosR)}</span></td>
-                                            {pj.outrosRmes.map((v, i) => <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>ADM + Outros</b> <span className="text-slate-400">{fmtM(o.outrosR)}</span></td>
+                                            {mesesArr.map((_, i) => { const v = pj.outrosRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                            <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.outrosR)}</td>
                                           </tr>
                                         )}
                                         <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
-                                          <td className={`px-2 py-1 text-left text-[11px] ${stick} ${isDark ? 'text-white' : 'text-slate-900'}`}>Total R$/mês</td>
-                                          {pj.totalRmes.map((v, i) => <td key={i} className={`${tdx} font-bold`}>{fmtM(v)}</td>)}
+                                          <td className={`px-2 py-1 text-left text-[11px] ${stk} ${isDark ? 'text-white' : 'text-slate-900'}`}>Total R$/mês</td>
+                                          {mesesArr.map((_, i) => { const v = pj.totalRmes[i] || 0; return <td key={i} className={`${tdx} font-bold`}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                          <td className={`${tdx} pr-3 font-bold`}>{fmtM(pj.totalRmes.reduce((s, x) => s + x, 0))}</td>
                                         </tr>
                                       </tbody>
                                     </table>
@@ -324,7 +332,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                 </div>
               )
             })}
-            {view.frentesF.length > 0 && <div className={`mt-1 pt-2 border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'}`}><TotalLinha label="Total geral" obras={view.frentesF.flatMap(f => f.obras)} geral /></div>}
+            {view.frentesF.length > 0 && <div className={`rounded-xl border px-2 py-2 mt-1 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}><TotalLinha label="Total geral" obras={view.frentesF.flatMap(f => f.obras)} geral /></div>}
           </div>
         )}
       </PanelCard>
