@@ -234,7 +234,8 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
   const criarMeta = useCriarMeta()
   const metas = obj.metas.filter(m => m.periodo === periodo).sort((a, b) => (a.trimestre || 0) - (b.trimestre || 0))
   const [addTri, setAddTri] = useState('1')
-  const [addAlvo, setAddAlvo] = useState('')
+  const [addDesc, setAddDesc] = useState('')
+  const [addPrazo, setAddPrazo] = useState('')
   const iconBtn = `p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`
 
   return (
@@ -249,6 +250,7 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
               {obj.direcao === 'maior_melhor' ? 'maior é melhor' : 'menor é melhor'}
             </span>
           </p>
+          {obj.descricao && <p className={`text-[11px] mt-1 leading-snug ${muted}`}>{obj.descricao}</p>}
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={() => onEdit(obj)} title="Editar objetivo" className={iconBtn}><Pencil size={14} /></button>
@@ -258,10 +260,12 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
       <div className="space-y-2">
         {metas.length === 0 && <p className={`text-xs ${muted}`}>Sem metas {periodo === 'anual' ? 'anuais' : 'trimestrais'}.</p>}
         {metas.map(m => (
-          <div key={m.id} className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+          <div key={m.id} className={`flex items-start justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
             <div className="min-w-0">
               <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>{m.periodo === 'anual' ? 'Meta anual' : `Trim. ${m.trimestre}`}</p>
-              <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>
+              {m.descricao
+                ? <p className={`text-xs font-medium leading-snug ${txt}`}>{m.descricao}</p>
+                : <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>}
             </div>
             {periodo === 'trimestral' && (
               <button onClick={() => onDeleteMeta(obj, m)} title="Remover meta" className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
@@ -270,14 +274,16 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
         ))}
       </div>
       {periodo === 'trimestral' && (
-        <div className="flex gap-1.5 mt-2">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           <select value={addTri} onChange={e => setAddTri(e.target.value)} className={`text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200'}`}>
             {[1, 2, 3, 4].map(t => <option key={t} value={t}>T{t}</option>)}
           </select>
-          <input type="number" step="any" value={addAlvo} onChange={e => setAddAlvo(e.target.value)} placeholder="alvo"
-            className={`flex-1 text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
-          <button onClick={() => { criarMeta.mutate({ objetivo_id: obj.id, periodo: 'trimestral', trimestre: Number(addTri), ano: obj.ano, alvo: addAlvo ? Number(addAlvo) : undefined }); setAddAlvo('') }}
-            disabled={criarMeta.isPending} className="px-2.5 rounded-lg bg-teal-600 text-white text-xs disabled:opacity-50"><Plus size={13} /></button>
+          <input value={addDesc} onChange={e => setAddDesc(e.target.value)} placeholder="Resultado-chave (KR)..."
+            className={`flex-1 min-w-[140px] text-xs rounded-lg px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+          <input type="date" value={addPrazo} onChange={e => setAddPrazo(e.target.value)}
+            className={`w-32 text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200'}`} />
+          <button onClick={() => { if (!addDesc.trim()) return; criarMeta.mutate({ objetivo_id: obj.id, periodo: 'trimestral', trimestre: Number(addTri), ano: obj.ano, descricao: addDesc.trim(), prazo: addPrazo || undefined }); setAddDesc(''); setAddPrazo('') }}
+            disabled={criarMeta.isPending || !addDesc.trim()} className="px-2.5 rounded-lg bg-teal-600 text-white text-xs disabled:opacity-50"><Plus size={13} /></button>
         </div>
       )}
     </div>
@@ -509,7 +515,7 @@ export default function SgiObjetivos() {
                   <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>Meta {metaLabel(meta)} · alvo <b className={txt}>{alvoLabel(obj, meta.alvo)}</b>{u ? ` · último ${u.competencia} → ${u.realizado ?? '—'}` : ' · sem check-in'}</p>
+                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ?? `alvo ${alvoLabel(obj, meta.alvo)}`}{u ? ` · ${u.competencia}→${u.realizado ?? '—'}` : ''}</p>
                     </div>
                     <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     <button onClick={() => setCheckin({ obj, meta })} className="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
@@ -536,7 +542,7 @@ export default function SgiObjetivos() {
                     return (
                       <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
                         <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}</td>
+                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}{meta.descricao ? ` · ${meta.descricao}` : ''}</td>
                         <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{alvoLabel(obj, meta.alvo)}</td>
                         <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
                         <td className="px-3 py-2.5 text-right"><button onClick={() => setCheckin({ obj, meta })} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> Check-in</button></td>
@@ -561,7 +567,7 @@ export default function SgiObjetivos() {
                   <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>Meta {metaLabel(meta)} · realizado <b className={txt}>{u?.realizado ?? '—'}</b> / alvo {alvoLabel(obj, meta.alvo)}</p>
+                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ?? `realizado ${u?.realizado ?? '—'} / alvo ${alvoLabel(obj, meta.alvo)}`}</p>
                     </div>
                     <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     {jaEnviado ? (
@@ -593,7 +599,7 @@ export default function SgiObjetivos() {
                     return (
                       <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
                         <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}</td>
+                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}{meta.descricao ? ` · ${meta.descricao}` : ''}</td>
                         <td className={`px-3 py-2.5 text-right ${muted}`}>{u?.realizado ?? '—'} / {meta.alvo ?? '—'}</td>
                         <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
                         <td className="px-3 py-2.5 text-right">

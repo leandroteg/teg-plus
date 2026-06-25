@@ -156,6 +156,10 @@ export interface SgiMeta {
   trimestre?: number | null
   ano: number
   alvo?: number | null
+  /** KR textual (OKR): quando preenchido, a meta é um Resultado-Chave descritivo. */
+  descricao?: string | null
+  /** Prazo do KR (data-limite). */
+  prazo?: string | null
   created_at: string
 }
 export interface SgiCheckin {
