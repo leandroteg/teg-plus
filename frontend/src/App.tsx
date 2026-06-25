@@ -196,6 +196,7 @@ const SgiPadronizacao = lazy(() => import('./pages/sgi/SgiPadronizacao'))
 
 // Painéis (hub que reúne os painéis de todos os módulos)
 const PaineisOverview = lazy(() => import('./pages/paineis/PaineisOverview'))
+const PaineisSlideShow = lazy(() => import('./pages/paineis/PaineisSlideShow'))
 const PainelEmbed = lazy(() => import('./pages/paineis/PainelEmbed'))
 
 // Versões MOBILE-native dos painéis (renderizadas <lg via ResponsivePainel; desktop intacto)
@@ -401,6 +402,7 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="paineis" />}>
             <Route element={<PaineisLayout />}>
               <Route path="/paineis"             element={<Lazy><PaineisOverview /></Lazy>} />
+              <Route path="/paineis/slideshow"   element={<Lazy><PaineisSlideShow /></Lazy>} />
               <Route path="/paineis/:moduleKey"  element={<Lazy><PainelEmbed /></Lazy>} />
             </Route>
           </Route>

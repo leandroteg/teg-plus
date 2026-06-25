@@ -1,4 +1,4 @@
-import { LayoutGrid, FolderKanban, Layers, Wallet, Scale, Rocket, Users } from 'lucide-react'
+import { LayoutGrid, FolderKanban, Layers, Wallet, Scale, Rocket, Users, Presentation } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem, NavGroup } from './ModuleLayout'
@@ -25,6 +25,7 @@ export default function PaineisLayout() {
 
   const NAV: NavItem[] = [
     { to: '/paineis', icon: LayoutGrid, label: 'Visão Geral', end: true },
+    { to: '/paineis/slideshow', icon: Presentation, label: 'Slide Show' },
   ]
 
   const navGroups: NavGroup[] = PILARES
