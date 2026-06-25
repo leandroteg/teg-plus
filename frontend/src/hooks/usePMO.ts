@@ -492,8 +492,15 @@ export function useEAPFinal(portfolioId?: string) {
       let itens: ItemRow[] = []
       for (let i = 0; i < oscIds.length; i += 200) {
         const slice = oscIds.slice(i, i + 200)
-        const { data } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, subsec_codigo, subsec_nome, secao, unidade, quantidade, qty_acum, valor, valor_acum').in('fluxo_os_id', slice)
-        itens = itens.concat((data ?? []) as ItemRow[])
+        // pagina: o PostgREST corta em 1000 linhas — sem isso, itens além de 1000 somem (EAP subnotificava)
+        let from = 0
+        for (;;) {
+          const { data, error } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, subsec_codigo, subsec_nome, secao, unidade, quantidade, qty_acum, valor, valor_acum').in('fluxo_os_id', slice).range(from, from + 999)
+          if (error) throw error
+          itens = itens.concat((data ?? []) as ItemRow[])
+          if (!data || data.length < 1000) break
+          from += 1000
+        }
       }
       // agrega itens por OSC → pacote (cru; agregação por polo é no cliente, respeitando a seleção)
       const byOsc = new Map<string, Record<string, PacAcc>>()
