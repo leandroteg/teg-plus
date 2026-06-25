@@ -369,11 +369,13 @@ function AddKR({ obj, trimestre, isDark }: { obj: ObjFull; trimestre: number; is
 }
 
 // ── Accordion: metas agrupadas por Trimestre → Área (tudo recolhido) ──────────
-function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMeta, areaFooter }: {
+function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMeta, areaFooter, metaHealth }: {
   itens: { obj: ObjFull; meta: MetaFull }[]
   isDark: boolean; txt: string; muted: string; card: string; accentText: string
   renderMeta: (obj: ObjFull, meta: MetaFull) => ReactNode
   areaFooter?: (obj: ObjFull, trimestre: number) => ReactNode
+  /** Saúde por meta (verde/amarelo/vermelho/cinza) → flag + barra no cabeçalho de área/trimestre. */
+  metaHealth?: (m: MetaFull) => 'verde' | 'amarelo' | 'vermelho' | 'cinza'
 }) {
   const [openTri, setOpenTri] = useState<Record<number, boolean>>({})
   const [openArea, setOpenArea] = useState<Record<string, boolean>>({})
@@ -393,6 +395,21 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
   if (grupos.length === 0) return <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
   const hov = isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
 
+  // Saúde (flag + barra) por grupo/área — só quando metaHealth é fornecido
+  const HEALTH_BG: Record<string, string> = { verde: 'bg-emerald-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: isDark ? 'bg-white/[0.15]' : 'bg-slate-300' }
+  const ORDER = ['verde', 'amarelo', 'vermelho', 'cinza'] as const
+  const pior = (ms: MetaFull[]) => { const s = new Set(ms.map(m => metaHealth!(m))); return s.has('vermelho') ? 'vermelho' : s.has('amarelo') ? 'amarelo' : s.has('verde') ? 'verde' : 'cinza' }
+  const Barra = ({ ms, w }: { ms: MetaFull[]; w: string }) => {
+    const counts: Record<string, number> = { verde: 0, amarelo: 0, vermelho: 0, cinza: 0 }
+    ms.forEach(m => { counts[metaHealth!(m)]++ })
+    const total = ms.length || 1
+    return (
+      <div className={`flex ${w} h-1.5 rounded-full overflow-hidden shrink-0 ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`} title="Saúde das metas">
+        {ORDER.map(c => counts[c] > 0 ? <div key={c} className={HEALTH_BG[c]} style={{ width: `${(counts[c] / total) * 100}%` }} /> : null)}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-2.5">
       {grupos.map(({ tri, areas }) => {
@@ -405,6 +422,7 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
               <ChevronRight size={18} className={`shrink-0 transition-transform ${triOpen ? 'rotate-90' : ''} ${accentText}`} />
               <span className={`text-lg font-extrabold ${txt}`}>{triLabel}</span>
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{areas.length} {areas.length === 1 ? 'área' : 'áreas'} · {tot} metas</span>
+              {metaHealth && <Barra ms={areas.flatMap(a => a.metas)} w="w-28 ml-auto" />}
             </button>
             {triOpen && (
               <div className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
@@ -415,11 +433,13 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
                     <div key={obj.id} className={`border-b last:border-b-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
                       <button onClick={() => setOpenArea(s => ({ ...s, [aKey]: !aOpen }))} className={`w-full flex items-start gap-2.5 px-4 py-3 text-left ${hov}`}>
                         <ChevronRight size={15} className={`shrink-0 mt-1 transition-transform ${aOpen ? 'rotate-90' : ''} ${muted}`} />
+                        {metaHealth && <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${HEALTH_BG[pior(metas)]}`} title="Saúde da área" />}
                         <div className="min-w-0 flex-1">
                           <span className={`text-base font-bold ${txt}`}>{obj.titulo}</span>
                           <span className={`ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{metas.length}</span>
                           {obj.descricao && <p className={`text-[11px] mt-0.5 leading-snug ${muted}`}>{obj.descricao}</p>}
                         </div>
+                        {metaHealth && <Barra ms={metas} w="w-20 mt-1.5" />}
                       </button>
                       {aOpen && (
                         <div className={`px-3 pb-3 pt-0.5 space-y-2 ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}`}>
@@ -637,6 +657,7 @@ export default function SgiObjetivos() {
           )
         ) : tab === 'checkin' ? (
           <MetasAgrupadas itens={metasFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-sky-500"
+            metaHealth={m => (ultimoCheckin(m)?.farol as Farol) ?? 'cinza'}
             renderMeta={(obj, m) => {
               const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
               return (
@@ -662,6 +683,7 @@ export default function SgiObjetivos() {
         ) : (
           /* Revisão */
           <MetasAgrupadas itens={metasFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-amber-500"
+            metaHealth={m => m.status_revisao === 'atingida' ? 'verde' : m.status_revisao === 'parcial' ? 'amarelo' : m.status_revisao === 'nao_atingida' ? 'vermelho' : 'cinza'}
             renderMeta={(obj, m) => {
               const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']; const jaEnviado = enviados[m.id]
               return (
