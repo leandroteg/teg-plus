@@ -224,6 +224,40 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         <Kpi label="Alocação" value={applied?.modo === 'manual' ? 'Manual' : 'Proporcional'} tone="teal" isDark={isDark} note="recursos por obra" />
       </div>
 
+      {applied && view.maxMeses > 0 && (() => {
+        const meses = Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i))
+        const totMensal = (obras: Obra[]) => { const a = new Array(view.maxMeses).fill(0); for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
+        const geral = totMensal(view.frentesF.flatMap(f => f.obras))
+        const thc = `px-2 py-1.5 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
+        const tdc = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+        const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
+        return (
+          <PanelCard title="Total mês a mês — por frente e geral (R$)" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <th className={`px-3 py-1.5 text-left text-[10px] font-semibold ${stk} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Frente</th>
+                {meses.map(m => <th key={m} className={thc}>{ymLabel(m)}</th>)}
+                <th className={`${thc} pr-3`}>Total</th>
+              </tr></thead>
+              <tbody>
+                {view.frentesF.map(fr => { const t = totMensal(fr.obras); const tot = t.reduce((s: number, x: number) => s + x, 0); return (
+                  <tr key={fr.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                    <td className={`px-3 py-1 text-left text-[11px] font-medium ${stk} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fr.label}</td>
+                    {t.map((v: number, i: number) => <td key={i} className={tdc}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+                    <td className={`${tdc} pr-3 font-semibold`}>{fmtM(tot)}</td>
+                  </tr>
+                ) })}
+                <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
+                  <td className={`px-3 py-1.5 text-left text-[11px] ${stk} ${isDark ? 'text-white' : 'text-slate-900'}`}>Total geral</td>
+                  {geral.map((v: number, i: number) => <td key={i} className={`${tdc} font-bold`}>{fmtM(v)}</td>)}
+                  <td className={`${tdc} pr-3 font-bold`}>{fmtM(geral.reduce((s: number, x: number) => s + x, 0))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </PanelCard>
+        )
+      })()}
+
       <PanelCard title="Cronograma por frente e obra" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark}
         right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>barra = duração até o término</span>}>
         {!applied ? <p className={`text-center py-8 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Use <b>Configurar / Gerar</b> pra montar o cronograma.</p> : (
