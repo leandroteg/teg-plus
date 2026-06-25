@@ -19,6 +19,7 @@ import {
 import { useLookups } from '../../hooks/useLookups'
 import { ProjetosFilterBar } from './ProjetosFilterBar'
 import EAPFinal, { EAPKpis } from './EAPFinal'
+import CronogramaPainel from './paineis/CronogramaPainel'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
 type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'riscos'
@@ -133,7 +134,7 @@ export default function EGPPlanejamento() {
 
       {/* Tab content */}
       {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
-      {tab === 'cronograma' && <CronogramaPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'cronograma' && <CronogramaPainel portfolioId={portfolioId} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}

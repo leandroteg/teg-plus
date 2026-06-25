@@ -42,9 +42,9 @@ function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark
   )
 }
 
-export default function CronogramaPainel() {
+export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { portfolioId?: string } = {}) {
   const { isDark } = useTheme()
-  const { data: raw, isLoading } = useEAPFinal(CONTRATO_CEMIG)
+  const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [prod, setProd] = useState<Record<string, number>>({})
   const [horizonte, setHorizonte] = useState(12) // meses-alvo p/ semear a produtividade
