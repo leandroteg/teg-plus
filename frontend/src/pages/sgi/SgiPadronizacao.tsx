@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
-  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send,
+  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDocumentos, useCriarDocumento, usePublicarDocumento, useAdesaoDocumento } from '../../hooks/useSgi'
@@ -133,6 +133,12 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
           )}
 
           <div className="flex gap-2 pt-1">
+            {doc.arquivo_url && (
+              <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
+                className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-violet-500/30 text-violet-300 hover:bg-violet-500/10' : 'border-violet-200 text-violet-700 hover:bg-violet-50'}`}>
+                <ExternalLink size={15} /> Abrir documento
+              </a>
+            )}
             {doc.status !== 'obsoleto' && (
               <button onClick={handlePublicar} disabled={publicar.isPending} className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60">
                 {publicar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.status === 'vigente' ? 'Republicar ciência' : 'Publicar'}
