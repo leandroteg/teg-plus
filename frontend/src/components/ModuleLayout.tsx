@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronDown, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -48,6 +48,15 @@ export interface NavSection {
   items: NavItem[]
 }
 
+/** Grupo de navegação colapsável (accordion). Opt-in via ModuleConfig.navGroups. */
+export interface NavGroup {
+  key: string
+  label: string
+  icon: LucideIcon
+  items: NavItem[]
+  defaultOpen?: boolean
+}
+
 export interface ModuleConfig {
   moduleKey: string
   moduleName: string
@@ -55,6 +64,9 @@ export interface ModuleConfig {
   accent: string
   nav: NavItem[]
   navSections?: NavSection[]
+  /** Grupos colapsáveis (accordion) no menu lateral. Quando definido, substitui
+   *  a renderização plana da `nav` (a `nav` vira o topo fixo acima dos grupos). */
+  navGroups?: NavGroup[]
   mobileNav?: NavItem[]
   variant?: 'full' | 'compact'
   showCadastrosLink?: boolean
@@ -300,6 +312,7 @@ export default function ModuleLayout({
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [avatarPos, setAvatarPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
   // Compute avatar dropdown position from the clicked button rect
   const computeAvatarPosFromRect = useCallback((r: DOMRect) => {
@@ -393,6 +406,13 @@ export default function ModuleLayout({
   }, [isRequisitante, visibleNav])
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
+
+  // Auto-expande o grupo (accordion) que contém a rota ativa
+  useEffect(() => {
+    if (!config.navGroups) return
+    const active = config.navGroups.find(g => g.items.some(it => location.pathname === it.to))
+    if (active) setOpenGroups(s => (s[active.key] ? s : { ...s, [active.key]: true }))
+  }, [location.pathname, config.navGroups])
 
   // Guarda o pathname que estava aberto quando ?nova= estava na URL.
   // Quando a página filho limpa o param (ex: CPPipeline), não redirecionamos
@@ -615,6 +635,48 @@ export default function ModuleLayout({
             ))}
           </div>
         ))}
+      </>
+    )
+  }
+
+  function renderNavGroups() {
+    return (
+      <>
+        {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
+          <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+        {config.navGroups!.map(group => {
+          const isOpen = openGroups[group.key] ?? group.defaultOpen ?? false
+          const GIcon = group.icon
+          return (
+            <div key={group.key} className="pt-1">
+              <button
+                type="button"
+                onClick={() => setOpenGroups(s => ({ ...s, [group.key]: !(s[group.key] ?? group.defaultOpen ?? false) }))}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border border-transparent
+                  ${ls ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50' : 'text-slate-400 hover:text-slate-100 hover:bg-white/6'}`}
+              >
+                <GIcon size={16} className="shrink-0" />
+                <span className="flex-1 text-left">{group.label}</span>
+                <span className={`text-[10px] font-bold tabular-nums ${ls ? 'text-slate-300' : 'text-slate-600'}`}>{group.items.length}</span>
+                <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${ls ? 'text-slate-400' : 'text-slate-500'}`} />
+              </button>
+              {isOpen && (
+                <div className={`ml-4 mt-0.5 pl-2 border-l space-y-0.5 ${ls ? 'border-slate-200' : 'border-white/[0.08]'}`}>
+                  {group.items.map(({ to, icon: Icon, label, end }) => (
+                    <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+                      <Icon size={15} className="shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </>
     )
   }
@@ -984,15 +1046,18 @@ export default function ModuleLayout({
   // ══════════════════════════════════════════════════════════════════════════════
 
   const mobileBottomNav = useMemo(() => {
+    const flatNav = config.navGroups
+      ? [...visibleNavForRole, ...config.navGroups.flatMap(g => g.items)]
+      : visibleNavForRole
     const baseNav = config.mobileNav
-      ?? (bottomNavMaxItems ? visibleNavForRole.slice(0, bottomNavMaxItems) : visibleNavForRole)
+      ?? (bottomNavMaxItems ? flatNav.slice(0, bottomNavMaxItems) : flatNav)
 
     if (!isRequisitante) return baseNav
 
     const filtered = baseNav.filter(isNovaSolicitacaoItem)
     if (filtered.length > 0) return filtered
     return visibleNavForRole.filter(isNovaSolicitacaoItem)
-  }, [config.mobileNav, bottomNavMaxItems, visibleNavForRole, isRequisitante])
+  }, [config.mobileNav, config.navGroups, bottomNavMaxItems, visibleNavForRole, isRequisitante])
 
   return (
     <RequisitanteCtx.Provider value={isRequisitante ? { homeRoute } : null}>
@@ -1050,8 +1115,8 @@ export default function ModuleLayout({
         </div>
 
         {/* ── Navigation ────────────────────────────────────── */}
-        <nav className={`flex-1 px-3 py-3 overflow-y-auto styled-scrollbar ${config.navSections ? 'space-y-1' : 'space-y-0.5'}`}>
-          {config.navSections ? renderSectionedNav() : renderNavItems()}
+        <nav className={`flex-1 px-3 py-3 overflow-y-auto styled-scrollbar ${config.navSections || config.navGroups ? 'space-y-1' : 'space-y-0.5'}`}>
+          {config.navGroups ? renderNavGroups() : config.navSections ? renderSectionedNav() : renderNavItems()}
           {renderCadastrosLink()}
 
         </nav>
