@@ -219,8 +219,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <Kpi label="Saldo a faturar" value={fmtM(view.saldoRtot)} tone="amber" isDark={isDark} note="R$ restante (filtro)" />
-        <Kpi label="Término previsto" value={view.terminoGeral ? ymLabel(view.terminoGeral) : '—'} tone="violet" isDark={isDark} note={`${view.maxMeses} mes(es)`} />
         <Kpi label="Início" value={ymLabel(start)} tone="sky" isDark={isDark} note="próximo mês" />
+        <Kpi label="Término previsto" value={view.terminoGeral ? ymLabel(view.terminoGeral) : '—'} tone="violet" isDark={isDark} note={`${view.maxMeses} mes(es)`} />
         <Kpi label="Alocação" value={applied?.modo === 'manual' ? 'Manual' : 'Proporcional'} tone="teal" isDark={isDark} note="recursos por obra" />
       </div>
 
