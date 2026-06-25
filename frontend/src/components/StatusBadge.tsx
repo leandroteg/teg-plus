@@ -4,7 +4,6 @@ import type { StatusRequisicao } from '../types'
 const config: Record<string, { dot: string; bg: string; text: string; label: string }> = {
   // ── Etapa 1: Requisição ────────────────────────────────────────────────────
   rascunho:          { dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-600',    label: 'Rascunho'          },
-  aguardando_catalogo: { dot: 'bg-orange-500', bg: 'bg-orange-50',  text: 'text-orange-700',  label: 'Falta vincular catálogo' },
   em_triagem_cd:     { dot: 'bg-sky-500',     bg: 'bg-sky-50',      text: 'text-sky-700',     label: 'Aguard. CD Araxá' },
   atendida_cd:       { dot: 'bg-teal-500',    bg: 'bg-teal-50',     text: 'text-teal-700',    label: 'Atendida pelo CD'  },
   pendente:          { dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',   label: 'Aguard. Aprovação' },

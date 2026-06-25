@@ -1,6 +1,6 @@
 // Painel Produção — avanço físico e quantitativos (vivo, via useEAPFinal)
-import { useMemo } from 'react'
-import { Activity, Ruler, Layers, Building2, Star } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Activity, Ruler, Layers, Building2, Star, Filter } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
 import { useEAPFinal, aggregatePolos, filtrarRawPorPeriodo, fmtQtd } from '../../../hooks/usePMO'
@@ -9,6 +9,13 @@ import { Kpi, PanelCard, HBarRow } from '../../rh/paineis/_ui'
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 const poloCurto = (s: string) => { const m = s.match(/^(F[\d.\/]+)/); return m ? m[1] : s }
 const LIMITE_PRIORITARIA = 1_000_000 // construção-escala (OSC/obra > R$ 1M)
+const FIS_BANDS: [string, string, (p: number) => boolean][] = [
+  ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50],
+  ['51-75', '51–75%', p => p >= 51 && p <= 75], ['76-100', '76–100%', p => p >= 76],
+]
+const VAL_BANDS: [string, string, (v: number) => boolean][] = [
+  ['<1', '< 1M', v => v < 1e6], ['1-5', '1–5M', v => v >= 1e6 && v < 5e6], ['5-10', '5–10M', v => v >= 5e6 && v < 10e6], ['>=10', '≥ 10M', v => v >= 10e6],
+]
 
 // cor de ritmo: compara % produzido (físico) com % prazo decorrido
 function ritmoCor(pctFis: number, pctPrazo: number | null): string {
@@ -101,6 +108,11 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
     }).filter(o => o.pctFin < 95).sort((x, y) => y.valor - x.valor)
   }, [rawF])
 
+  const [fFrente, setFFrente] = useState<Set<string>>(new Set())
+  const [fFis, setFFis] = useState<Set<string>>(new Set())
+  const [fVal, setFVal] = useState<Set<string>>(new Set())
+  const toggle = (s: Set<string>, set: (v: Set<string>) => void, k: string) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); set(n) }
+
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!polos.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados.</p>
 
@@ -119,25 +131,48 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
       </div>
 
       {obras.length > 0 && (() => {
-        const prioritarias = obras.filter(o => o.valor >= LIMITE_PRIORITARIA)
-        const demais = obras.filter(o => o.valor < LIMITE_PRIORITARIA)
+        const frentes = [...new Set(obras.map(o => o.polo))].sort()
+        const obrasF = obras.filter(o =>
+          (fFrente.size === 0 || fFrente.has(o.polo)) &&
+          (fFis.size === 0 || FIS_BANDS.some(b => fFis.has(b[0]) && b[2](o.pctFis))) &&
+          (fVal.size === 0 || VAL_BANDS.some(b => fVal.has(b[0]) && b[2](o.valor))))
+        const prioritarias = obrasF.filter(o => o.valor >= LIMITE_PRIORITARIA)
+        const demais = obrasF.filter(o => o.valor < LIMITE_PRIORITARIA)
+        const chip = (active: boolean) => `px-2 py-0.5 rounded-full text-[10px] font-semibold border transition ${active ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400 hover:border-white/30' : 'border-slate-300 text-slate-500 hover:border-slate-400')}`
+        const lbl = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+        const limpar = fFrente.size || fFis.size || fVal.size
         return (
           <PanelCard title="Produção por obra — construção em andamento" icon={<Building2 size={14} className="text-teal-500" />} isDark={isDark}
             right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>│ prazo decorrido · cor = ritmo (<span className="text-emerald-500">no prazo</span>/<span className="text-amber-500">atenção</span>/<span className="text-red-500">atrasado</span>) · ★ &gt; R$ 1M</span>}>
-            <div className="space-y-4">
-              {prioritarias.length > 0 && (
-                <div className="space-y-2">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Prioritárias · {prioritarias.length}</p>
-                  {prioritarias.map(o => <ObraRow key={o.nome} o={o} star isDark={isDark} />)}
-                </div>
-              )}
-              {demais.length > 0 && (
-                <div className="space-y-2">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Demais obras · {demais.length}</p>
-                  {demais.map(o => <ObraRow key={o.nome} o={o} isDark={isDark} />)}
-                </div>
-              )}
+            {/* filtros: frente · % físico · valor */}
+            <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 pb-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <div className="flex items-center gap-1.5"><Filter size={12} className={isDark ? 'text-slate-500' : 'text-slate-400'} /><span className={lbl}>Frente</span>
+                {frentes.map(fr => <button key={fr} onClick={() => toggle(fFrente, setFFrente, fr)} className={chip(fFrente.has(fr))}>{fr}</button>)}</div>
+              <div className="flex items-center gap-1.5"><span className={lbl}>% Físico</span>
+                {FIS_BANDS.map(b => <button key={b[0]} onClick={() => toggle(fFis, setFFis, b[0])} className={chip(fFis.has(b[0]))}>{b[1]}</button>)}</div>
+              <div className="flex items-center gap-1.5"><span className={lbl}>Valor</span>
+                {VAL_BANDS.map(b => <button key={b[0]} onClick={() => toggle(fVal, setFVal, b[0])} className={chip(fVal.has(b[0]))}>{b[1]}</button>)}</div>
+              {limpar ? <button onClick={() => { setFFrente(new Set()); setFFis(new Set()); setFVal(new Set()) }} className={`text-[10px] underline ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>limpar</button> : null}
+              <span className={`ml-auto text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasF.length} de {obras.length} obras</span>
             </div>
+            {obrasF.length === 0 ? (
+              <p className={`text-center py-8 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>
+            ) : (
+              <div className="space-y-4">
+                {prioritarias.length > 0 && (
+                  <div className="space-y-2">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Prioritárias · {prioritarias.length}</p>
+                    {prioritarias.map(o => <ObraRow key={o.nome} o={o} star isDark={isDark} />)}
+                  </div>
+                )}
+                {demais.length > 0 && (
+                  <div className="space-y-2">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Demais obras · {demais.length}</p>
+                    {demais.map(o => <ObraRow key={o.nome} o={o} isDark={isDark} />)}
+                  </div>
+                )}
+              </div>
+            )}
           </PanelCard>
         )
       })()}

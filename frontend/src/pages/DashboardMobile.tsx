@@ -30,7 +30,7 @@ const EMPTY_KPIS: DashboardData['kpis'] = {
 }
 
 const STATUS_ATIVO: StatusRequisicao[] = [
-  'rascunho', 'aguardando_catalogo', 'em_triagem_cd', 'pendente', 'em_aprovacao', 'aprovada', 'em_esclarecimento',
+  'rascunho', 'em_triagem_cd', 'pendente', 'em_aprovacao', 'aprovada', 'em_esclarecimento',
   'em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'pedido_emitido',
   'em_entrega', 'entregue', 'aguardando_pgto',
 ]

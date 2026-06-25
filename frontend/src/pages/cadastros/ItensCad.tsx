@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
@@ -43,20 +43,6 @@ export default function ItensCad() {
   const [sortCol, setSortCol] = useState<string>('descricao')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-
-  // Prefill via query param ?descricao=X — usado pelo fluxo "aguardando_catalogo"
-  // do RequisicaoDetalhe: abre o modal com a descricao livre da RC ja preenchida.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const desc = params.get('descricao')
-    if (desc && desc.trim()) {
-      setEditItem({ ...EMPTY, descricao: desc.trim() })
-      setClasseBusca('')
-      setClasseDropdownOpen(false)
-      setShowForm(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const { data: itens = [], isLoading } = useEstoqueItens(
     curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined,

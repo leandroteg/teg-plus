@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Play, Pause, ChevronLeft, ChevronRight, X, Maximize2, Minimize2,
   Plus, Presentation, Mail, Loader2, Trash2, Clock,
@@ -120,6 +121,7 @@ export default function PaineisSlideShow() {
   const [cfg, setCfg] = useState<Cfg>(loadCfg)
   const [playing, setPlaying] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [searchParams] = useSearchParams()
 
   useEffect(() => { localStorage.setItem(LS_KEY, JSON.stringify(cfg)) }, [cfg])
 
@@ -127,6 +129,15 @@ export default function PaineisSlideShow() {
   const byKey: Record<string, PainelDef> = Object.fromEntries(PAINEIS.map(p => [p.key, p]))
   const slides = cfg.paineis.map(k => byKey[k]).filter(Boolean).filter(p => can(p.key))
   const disponiveis = PAINEIS.filter(p => can(p.key) && !cfg.paineis.includes(p.key))
+
+  // Auto-inicia a apresentação quando aberto via link direto (?autoplay=1).
+  const autoIniciou = useRef(false)
+  useEffect(() => {
+    if (!autoIniciou.current && searchParams.get('autoplay') === '1' && slides.length > 0) {
+      autoIniciou.current = true
+      setPlaying(true)
+    }
+  }, [searchParams, slides.length])
 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'

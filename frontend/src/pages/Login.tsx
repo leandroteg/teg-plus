@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download, X, Share2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -65,6 +65,10 @@ export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
   const { theme, isDark, isLightSidebar: isLight } = useTheme()
   const nav = useNavigate()
+  const location = useLocation()
+  // Rota pretendida (deep-link) — cai direto nela após logar; senão, vai pra Home.
+  const fromLoc = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from
+  const from = fromLoc?.pathname ? `${fromLoc.pathname}${fromLoc.search ?? ''}` : '/'
   const { isInstalled, promptInstall, isIOS } = usePWAInstall()
 
   const [showInstallGuide, setShowInstallGuide] = useState(false)
@@ -104,7 +108,7 @@ export default function Login() {
     }
   }, [])
 
-  if (!loading && user) return <Navigate to="/" replace />
+  if (!loading && user) return <Navigate to={from} replace />
 
   const clr = () => { setError(null); setSuccess(null) }
   const toEmail = (v: string) => v.includes('@') ? v : `${v}@login.teg.local`
@@ -135,7 +139,7 @@ export default function Login() {
           const pct = Math.min(elapsed / dur, 1)
           setLoadProgress(pct * 100)
           if (pct < 1) requestAnimationFrame(tick)
-          else setTimeout(() => nav('/'), 200)
+          else setTimeout(() => nav(from), 200)
         }
         requestAnimationFrame(tick)
       }, 900)
