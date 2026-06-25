@@ -44,55 +44,161 @@ import type { OSCParsed } from '../../hooks/usePMO'
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const fmtMi = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 
-// Resumo dos painéis: KPIs mais relevantes de Produção / Faturamento / Medição (clicáveis)
-function ResumoPaineis({ de, ate, isDark, onGo, cardClass }: { de: string; ate: string; isDark: boolean; onGo: (p: EGPPainelKey) => void; cardClass: string }) {
+const GERAL_PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
+const GERAL_PAC_COR: Record<string, string> = { 'Serv. Preliminares': '#0284c7', 'Canteiro e Mobiliz.': '#0369a1', 'Fundações': '#92400e', 'Montagem de Torres': '#374151', 'Lançamento de Cabos': '#3730a3', 'Administração Local': '#6d28d9', 'Outros': '#64748b' }
+const GERAL_POLO_COR = ['#0d9488', '#2563eb', '#7c3aed', '#e87b2a', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#64748b']
+const poloNm = (s: string) => s.replace(/^F[\d.\/]+\s*-\s*/, '')
+const RIT = (pctFis: number, pctPrazo: number | null) => { if (pctPrazo == null) return '#10b981'; const d = pctFis - pctPrazo; return d >= 0 ? '#10b981' : d >= -15 ? '#f59e0b' : '#ef4444' }
+const mesLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m]}/${y.slice(2)}` }
+
+// Visão Geral: dashboard consolidado (produção · avanço · status · prioridades) — dados reais do contrato
+function VisaoGeralEGP({ de, ate, isDark, cardClass, onGo }: { de: string; ate: string; isDark: boolean; cardClass: string; onGo: (p: EGPPainelKey) => void }) {
   const { data: rows } = useMedicaoMensal()
   const { data: raw } = useEAPFinal(CONTRATO_CEMIG)
-  const ix = useMemo(() => {
-    const byM = new Map<string, number>()
-    for (const r of (rows ?? [])) { if (r.subcontratada) continue; const v = Number(r.realizado ?? 0); if (v <= 0) continue; const c = r.competencia; if (c < de || c > ate) continue; byM.set(c, (byM.get(c) ?? 0) + v) }
-    const meses = [...byM.keys()].sort()
-    const totalFat = [...byM.values()].reduce((s, x) => s + x, 0)
-    const media = meses.length ? totalFat / meses.length : 0
-    const ult = meses[meses.length - 1]; const pen = meses[meses.length - 2]
-    const fUlt = ult ? (byM.get(ult) ?? 0) : 0; const fPen = pen ? (byM.get(pen) ?? 0) : 0
-    const varPct = fPen > 0 ? (fUlt - fPen) / fPen * 100 : null
+  const g = useMemo(() => {
     const polos = aggregatePolos(raw ?? [], new Set())
+    const contr = polos.reduce((s, p) => s + p.contr, 0); const fat = polos.reduce((s, p) => s + p.fat, 0)
+    const torres = polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0)
     const pac = new Map<string, { valor: number; qC: number; qR: number; uni: string | null }>()
     for (const p of polos) for (const x of p.pacotes) { const a = pac.get(x.n) ?? { valor: 0, qC: 0, qR: 0, uni: null }; a.valor += x.valor; a.qC += x.qtdContr; a.qR += x.qtdReal; if (x.unidade) a.uni = x.unidade; pac.set(x.n, a) }
     const wf = [...pac.values()].filter(x => x.qC > 0); const ws = wf.reduce((s, x) => s + x.valor, 0)
     const fisicoGeral = ws ? Math.round([...pac.values()].filter(x => x.qC > 0).reduce((s, x) => s + Math.round(x.qR / x.qC * 100) * x.valor, 0) / ws) : 0
-    const torres = polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0)
-    const drv = (n: string) => { const a = pac.get(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni) ?? '0'}/${fmtQtd(a.qC, a.uni) ?? '—'}` : '—' }
-    const nUlt = ult ? new Set((rows ?? []).filter(r => !r.subcontratada && r.competencia === ult && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
-    const mesLbl = ult ? (() => { const [y, m] = ult.split('-'); return `${['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m]}/${y.slice(2)}` })() : '—'
-    return { totalFat, runrate: media * 12, fUlt, varPct, fisicoGeral, torres, drv, nUlt, mesLbl, nMeses: meses.length }
+    const porPacote = GERAL_PAC_ORD.filter(n => pac.has(n) && pac.get(n)!.qC > 0).map(n => { const a = pac.get(n)!; return { n, pct: Math.round(a.qR / a.qC * 100), qtd: `${fmtQtd(a.qR, a.uni) ?? '0'} / ${fmtQtd(a.qC, a.uni) ?? '—'}` } })
+    const porPolo = polos.map(p => ({ label: p.label, pct: p.pctFis })).sort((a, b) => b.pct - a.pct)
+    // faturamento TEG no período
+    const byM = new Map<string, number>()
+    for (const r of (rows ?? [])) { if (r.subcontratada) continue; const v = Number(r.realizado ?? 0); if (v <= 0) continue; const c = r.competencia; if (c < de || c > ate) continue; byM.set(c, (byM.get(c) ?? 0) + v) }
+    const meses = [...byM.keys()].sort(); const totalFat = [...byM.values()].reduce((s, x) => s + x, 0); const media = meses.length ? totalFat / meses.length : 0
+    const ult = meses[meses.length - 1]; const pen = meses[meses.length - 2]; const fUlt = ult ? (byM.get(ult) ?? 0) : 0; const fPen = pen ? (byM.get(pen) ?? 0) : 0
+    const varPct = fPen > 0 ? (fUlt - fPen) / fPen * 100 : null
+    // obras de construção em andamento + ritmo
+    const hoje = new Date().getTime()
+    type OB = { nome: string; polo: string; valor: number; fat: number; ini: string | null; fim: string | null; pac: Map<string, { valor: number; qC: number; qR: number }> }
+    const om = new Map<string, OB>()
+    for (const polo of (raw ?? [])) for (const o of polo.oscs) {
+      if (o.etapa_atual === 'cancelada' || o.tipo !== 'construcao') continue
+      let a = om.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloNm(polo.label), valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; om.set(o.obra_nome, a) }
+      a.valor += o.valor; a.fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
+      const di = o.data_osc?.slice(0, 10); if (di && (!a.ini || di < a.ini)) a.ini = di
+      const dv = o.vencimento?.slice(0, 10); if (dv && (!a.fim || dv > a.fim)) a.fim = dv
+      for (const [pn, pa] of Object.entries(o.pacotes)) { let x = a.pac.get(pn); if (!x) { x = { valor: 0, qC: 0, qR: 0 }; a.pac.set(pn, x) } x.valor += pa.valor; x.qC += pa.qC; x.qR += pa.qR }
+    }
+    const obras = [...om.values()].map(a => {
+      const wfo = [...a.pac.values()].filter(x => x.qC > 0).map(x => ({ pct: Math.round(x.qR / x.qC * 100), valor: x.valor })); const wso = wfo.reduce((s, x) => s + x.valor, 0)
+      const pctFis = wso ? Math.round(wfo.reduce((s, x) => s + x.pct * x.valor, 0) / wso) : 0
+      const pctFin = a.valor ? Math.round(a.fat / a.valor * 100) : 0
+      const ini = a.ini ? Date.parse(a.ini) : NaN; const fim = a.fim ? Date.parse(a.fim) : NaN
+      const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
+      return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin, pctFis, pctPrazo, cor: RIT(pctFis, pctPrazo) }
+    }).filter(o => o.pctFin < 95)
+    const status = { ok: obras.filter(o => o.cor === '#10b981').length, atencao: obras.filter(o => o.cor === '#f59e0b').length, atraso: obras.filter(o => o.cor === '#ef4444').length }
+    const atencao = obras.filter(o => o.cor !== '#10b981').sort((a, b) => (a.cor === '#ef4444' ? 0 : 1) - (b.cor === '#ef4444' ? 0 : 1) || b.valor - a.valor).slice(0, 6)
+    const topObras = [...obras].sort((a, b) => b.valor - a.valor).slice(0, 6)
+    return { contr, fat, saldo: contr - fat, torres, fisicoGeral, porPacote, porPolo, totalFat, runrate: media * 12, fUlt, varPct, ultLbl: ult ? mesLabel(ult) : '—', nMeses: meses.length, nObras: obras.length, status, atencao, topObras }
   }, [rows, raw, de, ate])
 
-  const Card = ({ label, value, sub, tone, painel }: { label: string; value: string; sub: string; tone: string; painel: EGPPainelKey }) => (
-    <button onClick={() => onGo(painel)} className={`text-left rounded-2xl border px-3 py-2.5 transition hover:shadow-sm ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50/70 hover:bg-white'}`}>
+  const Kpi = ({ label, value, note, tone, painel }: { label: string; value: string; note: string; tone: string; painel: EGPPainelKey }) => (
+    <button onClick={() => onGo(painel)} className={`text-left rounded-2xl border px-3.5 py-3 transition hover:shadow-sm ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50/70 hover:bg-white'}`}>
       <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 truncate">{label}</p>
-      <p className={`mt-1 text-lg leading-none font-black ${tone}`}>{value}</p>
-      <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sub}</p>
+      <p className={`mt-1.5 text-xl leading-none font-black ${tone}`}>{value}</p>
+      <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
     </button>
   )
-  return (
-    <section className={`rounded-3xl shadow-sm p-4 md:p-5 ${cardClass}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Resumo dos painéis</p>
-          <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Produção · Faturamento · Medição <span className="font-normal text-slate-400 text-[11px]">· clique para abrir</span></h3>
-        </div>
+  const Bar = ({ label, pct, color }: { label: string; pct: number; color: string }) => (
+    <div className="flex items-center gap-2.5">
+      <span className={`w-[40%] text-[11px] font-semibold truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={label}>{label}</span>
+      <div className={`flex-1 h-3.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, 2)}%`, background: color }} />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        <Card painel="producao" label="Físico Geral" value={`${ix.fisicoGeral}%`} sub="produção" tone="text-emerald-600" />
-        <Card painel="producao" label="Tubulões m³" value={ix.drv('Fundações')} sub="exec / contr" tone={isDark ? 'text-amber-400' : 'text-amber-600'} />
-        <Card painel="producao" label="Montagem ton" value={ix.drv('Montagem de Torres')} sub={`${ix.torres || '—'} torres`} tone={isDark ? 'text-slate-200' : 'text-slate-700'} />
-        <Card painel="faturamento" label="Faturado TEG" value={fmtMi(ix.totalFat)} sub={`${ix.nMeses} mes(es)`} tone="text-teal-600" />
-        <Card painel="faturamento" label="Run-rate ano" value={fmtMi(ix.runrate)} sub="média × 12" tone={isDark ? 'text-violet-400' : 'text-violet-600'} />
-        <Card painel="medicao" label={`Medição ${ix.mesLbl}`} value={fmtMi(ix.fUlt)} sub={ix.varPct == null ? `${ix.nUlt} OSCs` : `${ix.varPct >= 0 ? '▲ +' : '▼ '}${ix.varPct.toFixed(0)}% · ${ix.nUlt} OSCs`} tone={isDark ? 'text-sky-400' : 'text-sky-600'} />
+      <span className="w-9 text-right text-[11px] font-bold tabular-nums" style={{ color }}>{pct}%</span>
+    </div>
+  )
+  const Sec = ({ title, icon, children, right }: { title: string; icon: React.ReactNode; children: React.ReactNode; right?: React.ReactNode }) => (
+    <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{icon} {title}</h2>
+        {right}
       </div>
+      <div className="p-4">{children}</div>
     </section>
+  )
+  const statusTot = g.status.ok + g.status.atencao + g.status.atraso || 1
+
+  return (
+    <div className="space-y-3">
+      {/* Indicadores consolidados */}
+      <section className={`rounded-3xl shadow-sm p-4 md:p-5 ${cardClass}`}>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">Núcleo EGP · Indicadores consolidados</p>
+        <h2 className={`text-sm font-black mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Contrato CEMIG <span className="font-normal text-slate-400 text-[11px]">· clique para abrir o painel</span></h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <Kpi painel="producao" label="Físico Geral" value={`${g.fisicoGeral}%`} note={`${g.nObras} obras em andamento`} tone="text-emerald-600" />
+          <Kpi painel="faturamento" label="Faturado período" value={fmtMi(g.totalFat)} note={`TEG · ${g.nMeses} mes(es)`} tone="text-teal-600" />
+          <Kpi painel="faturamento" label="Run-rate ano" value={fmtMi(g.runrate)} note="média × 12" tone={isDark ? 'text-violet-400' : 'text-violet-600'} />
+          <Kpi painel="producao" label="Contratado" value={fmtMi(g.contr)} note={`saldo ${fmtMi(g.saldo)}`} tone={isDark ? 'text-slate-200' : 'text-slate-700'} />
+          <Kpi painel="producao" label="Torres" value={`${g.torres || '—'}`} note="cadastradas" tone={isDark ? 'text-amber-400' : 'text-amber-600'} />
+          <Kpi painel="medicao" label={`Medição ${g.ultLbl}`} value={fmtMi(g.fUlt)} note={g.varPct == null ? 'último mês' : `${g.varPct >= 0 ? '▲ +' : '▼ '}${g.varPct.toFixed(0)}% vs anterior`} tone={isDark ? 'text-sky-400' : 'text-sky-600'} />
+        </div>
+      </section>
+
+      {/* Status das obras (ritmo) */}
+      <Sec title="Status das obras — ritmo (produção × prazo)" icon={<TrendingUp size={14} className="text-teal-500" />} right={<span className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{g.nObras} obras</span>}>
+        <div className="flex h-9 rounded-xl overflow-hidden mb-2">
+          {([['#10b981', 'No prazo', g.status.ok], ['#f59e0b', 'Atenção', g.status.atencao], ['#ef4444', 'Atrasadas', g.status.atraso]] as const).map(([c, l, v]) => v > 0 && (
+            <div key={l} className="flex items-center justify-center text-[10px] font-bold text-white" style={{ width: `${v / statusTot * 100}%`, background: c }} title={`${l}: ${v}`}>{v / statusTot >= 0.12 ? `${l} ${v}` : v}</div>
+          ))}
+        </div>
+        <div className="flex gap-4 text-[11px]">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> No prazo <b>{g.status.ok}</b></span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Atenção <b>{g.status.atencao}</b></span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Atrasadas <b>{g.status.atraso}</b></span>
+        </div>
+      </Sec>
+
+      {/* Avanço físico por polo + por pacote */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Sec title="Avanço físico por frente" icon={<Activity size={14} className="text-teal-500" />}>
+          <div className="space-y-2">{g.porPolo.map((p, i) => <Bar key={p.label} label={poloNm(p.label)} pct={p.pct} color={GERAL_POLO_COR[i % GERAL_POLO_COR.length]} />)}</div>
+        </Sec>
+        <Sec title="Avanço físico por pacote" icon={<BarChart3 size={14} className="text-teal-500" />}>
+          <div className="space-y-2">{g.porPacote.map(p => <Bar key={p.n} label={`${p.n} · ${p.qtd}`} pct={p.pct} color={GERAL_PAC_COR[p.n] ?? '#64748b'} />)}</div>
+        </Sec>
+      </div>
+
+      {/* Prioridades + maiores obras */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Sec title="Prioridades — obras que exigem atenção" icon={<AlertTriangle size={14} className="text-red-500" />} right={<span className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{g.atencao.length}</span>}>
+          {g.atencao.length === 0 ? <p className={`text-center py-4 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra atrasada 🎉</p> : (
+            <div className="space-y-2.5">{g.atencao.map(o => (
+              <div key={o.nome} className="flex items-center gap-3">
+                <div className="w-[44%] min-w-0">
+                  <p className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo} · {fmtMi(o.valor)}{o.pctPrazo != null ? ` · ${o.pctPrazo}% prazo` : ''}</p>
+                </div>
+                <div className={`relative flex-1 h-4 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                  <div className="h-full rounded-md" style={{ width: `${Math.max(o.pctFis, 2)}%`, background: o.cor }} />
+                  {o.pctPrazo != null && <div className="absolute top-0 bottom-0 w-[2px]" style={{ left: `${Math.min(o.pctPrazo, 100)}%`, background: isDark ? '#e2e8f0' : '#0f172a' }} />}
+                </div>
+                <span className="w-9 text-right text-[12px] font-extrabold tabular-nums" style={{ color: o.cor }}>{o.pctFis}%</span>
+              </div>
+            ))}</div>
+          )}
+        </Sec>
+        <Sec title="Maiores obras em andamento" icon={<MapPin size={14} className="text-slate-500" />}>
+          <div className="space-y-2.5">{g.topObras.map(o => (
+            <div key={o.nome} className="flex items-center gap-3">
+              <div className="w-[44%] min-w-0">
+                <p className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo} · {o.pctFin}% fat.</p>
+              </div>
+              <div className={`flex-1 h-4 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                <div className="h-full rounded-md" style={{ width: `${Math.max(o.pctFis, 2)}%`, background: o.cor }} />
+              </div>
+              <span className="w-16 text-right text-[12px] font-extrabold tabular-nums text-teal-600">{fmtMi(o.valor)}</span>
+            </div>
+          ))}</div>
+        </Sec>
+      </div>
+    </div>
   )
 }
 import { useLookupObras } from '../../hooks/useLookups'
@@ -872,300 +978,7 @@ export default function EGPPainel() {
       {/* Upload OSC Modal */}
       <UploadOSCModal open={uploadOpen} onClose={() => setUploadOpen(false)} isDark={isDark} />
 
-      {/* Hero 2 colunas */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
-
-        {/* Nucleo EGP */}
-        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
-          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Núcleo EGP
-                </p>
-                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Indicadores consolidados do portfólio
-                </h2>
-              </div>
-              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
-                <Activity size={18} className="text-teal-500" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric
-                label="Avanço Físico"
-                value={fmtPct(avancoFisico)}
-                tone="teal"
-                note="média do portfólio"
-              />
-              <SpotlightMetric
-                label="Prazo"
-                value={`${desvioPrazo > 0 ? '+' : ''}${desvioPrazo}d`}
-                tone={desvioPrazo < 0 ? 'amber' : 'emerald'}
-                note={desvioPrazo < 0 ? 'atrasado em média' : 'dentro do prazo'}
-              />
-              <SpotlightMetric
-                label="Custo Real"
-                value={fmt(custoReal)}
-                tone="sky"
-                note="soma acumulada"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Janela Critica */}
-        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
-          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Janela Crítica
-                </p>
-                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  O que exige ação agora
-                </h2>
-              </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(kpis?.riscosCriticos ?? 0) > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={14} className={(kpis?.riscosCriticos ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard
-                label="Riscos Críticos"
-                value={kpis?.riscosCriticos ?? 0}
-                note={(kpis?.riscosCriticos ?? 0) > 0 ? 'alta prob. + alto impacto' : 'nenhum risco crítico'}
-                icon={AlertTriangle}
-                iconTone={(kpis?.riscosCriticos ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Ações Críticas"
-                value={kpis?.acoesCriticas ?? 0}
-                note={(kpis?.acoesCriticas ?? 0) > 0 ? 'pendentes c/ prazo vencido' : 'nenhuma atrasada'}
-                icon={Zap}
-                iconTone={(kpis?.acoesCriticas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Resumo dos painéis (Produção / Faturamento / Medição) */}
-      <ResumoPaineis de={de} ate={ate} isDark={isDark} onGo={setPainel} cardClass={cardClass} />
-
-      {/* Pulso por Status */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <TrendingUp size={14} className="text-teal-500" /> Pulso por Status
-          </h2>
-        </div>
-        <div className="px-4 py-3">
-          <HorizontalStatusBar
-            isDark={isDark}
-            title="Distribuição atual do portfólio"
-            emptyLabel="Nenhuma OSC cadastrada"
-            segments={statusSegments}
-            totalLabel="OSC(s)"
-          />
-        </div>
-      </section>
-
-      {/* OSCs Criticas */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        {/* Atrasadas */}
-        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
-              <CalendarClock size={14} className="text-red-500" /> Atrasadas
-            </h2>
-            <span className={`text-[10px] font-semibold ${isDark ? 'text-red-400' : 'text-red-600'}`}>{atrasadas.length} OSC(s)</span>
-          </div>
-          {atrasadas.length === 0 ? (
-            <EmptyPanel
-              isDark={isDark}
-              title="Nenhuma OSC atrasada"
-              description="OSCs em andamento com data de termino contratual vencida aparecem aqui."
-            />
-          ) : (
-            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
-              {atrasadas.slice(0, 5).map(p => {
-                const diasAtraso = Math.round((hoje - new Date(p.data_termino_contratual!).getTime()) / (1000 * 60 * 60 * 24))
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => nav(`/egp/portfolio/${p.id}`)}
-                    className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
-                      <AlertTriangle size={14} className="text-red-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{p.numero_osc}</p>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
-                          -{diasAtraso}d
-                        </span>
-                      </div>
-                      <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.nome_obra}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-extrabold text-red-600">{fmt(p.valor_total_osc)}</p>
-                      <p className={`text-[9px] mt-0.5 font-semibold text-red-500`}>
-                        Prazo: {fmtData(p.data_termino_contratual)}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* SPI < 0.85 */}
-        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-amber-500/30' : 'bg-white border border-amber-200'}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-amber-500/20' : 'border-b border-amber-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
-              <BarChart3 size={14} className="text-amber-500" /> SPI &lt; 0.85
-            </h2>
-            <span className={`text-[10px] font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{spiCriticos.length} OSC(s)</span>
-          </div>
-          {spiCriticos.length === 0 ? (
-            <EmptyPanel
-              isDark={isDark}
-              title="Nenhuma OSC com SPI crítico"
-              description="OSCs com índice de performance de prazo abaixo de 0.85 aparecem aqui."
-            />
-          ) : (
-            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-amber-50'}`}>
-              {spiCriticos.slice(0, 5).map(p => {
-                const ind = kpis?.indicadores.find(i => i.portfolio_id === p.id)
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => nav(`/egp/portfolio/${p.id}`)}
-                    className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-amber-50/50'}`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-                      <BarChart3 size={14} className="text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{p.numero_osc}</p>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          IDP {ind?.idp?.toFixed(2) ?? '—'}
-                        </span>
-                      </div>
-                      <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.nome_obra}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-extrabold text-amber-600">{fmt(p.valor_total_osc)}</p>
-                      <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.obra?.nome ?? '—'}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      {/* Por Obra */}
-      {porObra.length > 0 && (
-        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <MapPin size={14} className="text-slate-500" /> Por Obra
-            </h2>
-          </div>
-          <div className="p-4 space-y-2">
-            {porObra.map(o => {
-              const maxValor = Math.max(...porObra.map(x => x.valor), 1)
-              const pct = Math.round((o.valor / maxValor) * 100)
-              return (
-                <div key={o.nome} className={`rounded-2xl p-3.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/80 border-slate-100'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{o.nome}</p>
-                      <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.total} OSC{o.total !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-extrabold text-teal-600">{fmt(o.valor)}</p>
-                    </div>
-                  </div>
-                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
-                    <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Recentes */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Clock size={14} className="text-slate-500" /> Recentes
-          </h2>
-          <button onClick={() => nav('/egp/portfolio')}
-            className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
-            Ver portfólio <ChevronRight size={11} />
-          </button>
-        </div>
-        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-          {recentes.length === 0 ? (
-            <EmptyPanel isDark={isDark} title="Nenhuma atividade recente" description="Atualizações de multas, reuniões, mudanças e ações aparecem aqui." />
-          ) : (
-            recentes.map(r => {
-              const tipoColors: Record<string, string> = {
-                Multa: 'bg-red-100 text-red-700',
-                Reunião: 'bg-blue-100 text-blue-700',
-                Mudança: 'bg-violet-100 text-violet-700',
-                Ação: 'bg-amber-100 text-amber-700',
-              }
-              const tipoIcons: Record<string, string> = {
-                Multa: 'text-red-500',
-                Reunião: 'text-blue-500',
-                Mudança: 'text-violet-500',
-                Ação: 'text-amber-500',
-              }
-              return (
-                <div
-                  key={r.id}
-                  className={`flex items-center gap-3 px-4 py-3 ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'} transition-colors`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                    <DollarSign size={14} className={tipoIcons[r.tipo] ?? 'text-slate-400'} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${tipoColors[r.tipo] ?? 'bg-slate-100 text-slate-600'}`}>
-                        {r.tipo.toUpperCase()}
-                      </span>
-                      <span className={`text-[9px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {r.status}
-                      </span>
-                    </div>
-                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{r.descricao}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDataHora(r.created_at)}</p>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </section>
-      </div>
+      <VisaoGeralEGP de={de} ate={ate} isDark={isDark} cardClass={cardClass} onGo={setPainel} />
       </>)}
 
     </div>
