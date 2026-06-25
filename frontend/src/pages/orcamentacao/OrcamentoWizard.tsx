@@ -971,11 +971,18 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
     if (!v.length) return <span className={muted}>—</span>
     const objs = v.filter(x => x && typeof x === 'object' && !Array.isArray(x)) as Array<Record<string, unknown>>
     if (objs.length === v.length) {
-      const cols = Array.from(new Set(objs.flatMap(o => Object.keys(o))))
-      return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[12px]">
-        <thead className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}><tr>{cols.map(c => <th key={c} className={`text-left font-bold px-2 py-1 whitespace-nowrap ${muted}`}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
-        <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top">{c === 'fonte' && row[c] ? <FonteTag fonte={String(row[c])} isDark={isDark} baixar={baixar} temArq={temArq} /> : <ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} />}</td>)}</tr>)}</tbody>
-      </table></div>
+      // tabela SÓ p/ objetos planos (valores primitivos). Objeto rico (com sub-objetos) → pilha
+      // vertical de seções; senão a tabela vira colunas complexas espremidas e ilegíveis.
+      const ehLeve = (val: unknown) => val === null || typeof val !== 'object' || (Array.isArray(val) && val.every(x => x === null || typeof x !== 'object'))
+      const planos = objs.every(o => Object.entries(o).every(([k, val]) => k === 'fonte' || ehLeve(val)))
+      if (planos) {
+        const cols = Array.from(new Set(objs.flatMap(o => Object.keys(o))))
+        return <div className={`overflow-x-auto rounded-md border ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}><table className="w-full text-[12px]">
+          <thead className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}><tr>{cols.map(c => <th key={c} className={`text-left font-bold px-2 py-1 whitespace-nowrap ${muted}`}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
+          <tbody>{objs.map((row, i) => <tr key={i} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>{cols.map(c => <td key={c} className="px-2 py-1 align-top">{c === 'fonte' && row[c] ? <FonteTag fonte={String(row[c])} isDark={isDark} baixar={baixar} temArq={temArq} /> : <ValorRico v={row[c]} isDark={isDark} baixar={baixar} temArq={temArq} />}</td>)}</tr>)}</tbody>
+        </table></div>
+      }
+      return <div className="space-y-2.5">{objs.map((o, i) => <div key={i} className={objs.length > 1 ? `rounded-lg p-2.5 ${isDark ? 'bg-white/[0.02] border border-white/[0.05]' : 'bg-slate-50/60 border border-slate-100'}` : ''}><ValorRico v={o} isDark={isDark} baixar={baixar} temArq={temArq} /></div>)}</div>
     }
     return <span className="inline-flex flex-wrap gap-1">{v.map((x, i) => <span key={i} className={`text-[11px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}><ValorRico v={x} isDark={isDark} baixar={baixar} temArq={temArq} /></span>)}</span>
   }
