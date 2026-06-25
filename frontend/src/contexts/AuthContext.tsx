@@ -155,6 +155,7 @@ export interface Perfil {
   role_id: string | null
   colaborador_id: string | null
   base_id: string | null
+  pode_receber: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string

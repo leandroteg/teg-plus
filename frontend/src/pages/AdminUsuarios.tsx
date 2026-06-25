@@ -735,6 +735,7 @@ function UserDetailPanel({
   const { data: bases = [] } = useBases()
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [baseId, setBaseId] = useState<string>(user.base_id ?? '')
+  const [podeReceber, setPodeReceber] = useState<boolean>(user.pode_receber ?? true)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
@@ -786,6 +787,7 @@ function UserDetailPanel({
       ativo,
       alterar_senha_proximo_login: altProxLogin,
       base_id: baseId || null,
+      pode_receber: podeReceber,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
@@ -796,6 +798,7 @@ function UserDetailPanel({
   const handleCancel = () => {
     setPapelGlobal(resolvePapelFromPerfil(user))
     setBaseId(user.base_id ?? '')
+    setPodeReceber(user.pode_receber ?? true)
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
@@ -952,6 +955,20 @@ function UserDetailPanel({
             <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Canteiro: abre Requisição de Material (vai à triagem). CD: decide na triagem. Escritório/sem vínculo: compra direta.
             </p>
+
+            {baseId && (
+              <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                <input
+                  type="checkbox"
+                  checked={podeReceber}
+                  onChange={e => setPodeReceber(e.target.checked)}
+                  className="accent-primary"
+                />
+                <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Pode confirmar recebimento de pedidos desta base
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Alçada */}

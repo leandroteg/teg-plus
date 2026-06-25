@@ -1751,8 +1751,10 @@ function DetailModal({
   // Recebimento (segregacao de funcoes): so quem esta no destino, ou CD Araxa (faz_triagem), ou admin — nunca o comprador.
   const baseDestinoId = (pedido.requisicao as any)?.base_destino_id as string | undefined
   const minhaBase = basesLotacao.find(b => b.id === perfil?.base_id)
+  // Quando o pedido nao tem base_destino (compra direta do escritorio), libera p/ qualquer perfil com pode_receber=true.
   const podeConfirmarReceb = isAdmin
-    || (!!perfil?.base_id && perfil.base_id === baseDestinoId)
+    || (!!perfil?.base_id && perfil.base_id === baseDestinoId && perfil.pode_receber !== false)
+    || (!baseDestinoId && perfil?.pode_receber !== false)
     || !!(minhaBase as any)?.faz_triagem
   const podeReceber = !pending
     && ['emitido', 'confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
