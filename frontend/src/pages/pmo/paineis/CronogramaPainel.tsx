@@ -205,6 +205,26 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg).maxMeses
+  const mesesArr = (applied && view.maxMeses > 0) ? Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i)) : []
+  const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
+  const TotalLinha = ({ label, obras, geral }: { label: string; obras: Obra[]; geral?: boolean }) => {
+    const t = totMensal(obras); const tot = t.reduce((s, x) => s + x, 0)
+    const td = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap`
+    const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
+    const hcl = `px-2 py-1 text-right text-[9px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'} whitespace-nowrap`
+    return (
+      <div className={`overflow-x-auto rounded-lg ${geral ? '' : (isDark ? 'bg-white/[0.02]' : 'bg-slate-50/70')}`}>
+        <table className="w-full border-collapse">
+          <thead><tr><th className={`${hcl} text-left ${stk}`}></th>{mesesArr.map(m => <th key={m} className={hcl}>{ymLabel(m)}</th>)}<th className={`${hcl} pr-3`}>Total</th></tr></thead>
+          <tbody><tr className={geral ? 'font-bold' : 'font-semibold'}>
+            <td className={`px-2 py-1 text-left text-[11px] ${stk} ${geral ? (isDark ? 'text-white' : 'text-slate-900') : (isDark ? 'text-teal-300' : 'text-teal-700')}`}>{label}</td>
+            {t.map((v, i) => <td key={i} className={`${td} ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+            <td className={`${td} pr-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtM(tot)}</td>
+          </tr></tbody>
+        </table>
+      </div>
+    )
+  }
 
   const controles = (<>
     <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
@@ -223,40 +243,6 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         <Kpi label="Término previsto" value={view.terminoGeral ? ymLabel(view.terminoGeral) : '—'} tone="violet" isDark={isDark} note={`${view.maxMeses} mes(es)`} />
         <Kpi label="Alocação" value={applied?.modo === 'manual' ? 'Manual' : 'Proporcional'} tone="teal" isDark={isDark} note="recursos por obra" />
       </div>
-
-      {applied && view.maxMeses > 0 && (() => {
-        const meses = Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i))
-        const totMensal = (obras: Obra[]) => { const a = new Array(view.maxMeses).fill(0); for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
-        const geral = totMensal(view.frentesF.flatMap(f => f.obras))
-        const thc = `px-2 py-1.5 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
-        const tdc = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
-        const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
-        return (
-          <PanelCard title="Total mês a mês — por frente e geral (R$)" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <th className={`px-3 py-1.5 text-left text-[10px] font-semibold ${stk} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Frente</th>
-                {meses.map(m => <th key={m} className={thc}>{ymLabel(m)}</th>)}
-                <th className={`${thc} pr-3`}>Total</th>
-              </tr></thead>
-              <tbody>
-                {view.frentesF.map(fr => { const t = totMensal(fr.obras); const tot = t.reduce((s: number, x: number) => s + x, 0); return (
-                  <tr key={fr.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                    <td className={`px-3 py-1 text-left text-[11px] font-medium ${stk} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fr.label}</td>
-                    {t.map((v: number, i: number) => <td key={i} className={tdc}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
-                    <td className={`${tdc} pr-3 font-semibold`}>{fmtM(tot)}</td>
-                  </tr>
-                ) })}
-                <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
-                  <td className={`px-3 py-1.5 text-left text-[11px] ${stk} ${isDark ? 'text-white' : 'text-slate-900'}`}>Total geral</td>
-                  {geral.map((v: number, i: number) => <td key={i} className={`${tdc} font-bold`}>{fmtM(v)}</td>)}
-                  <td className={`${tdc} pr-3 font-bold`}>{fmtM(geral.reduce((s: number, x: number) => s + x, 0))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </PanelCard>
-        )
-      })()}
 
       <PanelCard title="Cronograma por frente e obra" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark}
         right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>barra = duração até o término</span>}>
@@ -332,11 +318,13 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                           </div>
                         )
                       })}
+                      <div className={`mt-1.5 pt-1.5 border-t border-dashed ${isDark ? 'border-white/10' : 'border-slate-200'}`}><TotalLinha label={`Total ${fr.label}`} obras={fr.obras} /></div>
                     </div>
                   )}
                 </div>
               )
             })}
+            {view.frentesF.length > 0 && <div className={`mt-1 pt-2 border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'}`}><TotalLinha label="Total geral" obras={view.frentesF.flatMap(f => f.obras)} geral /></div>}
           </div>
         )}
       </PanelCard>
