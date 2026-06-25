@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import {
   Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2, Circle, Send,
-  Pencil, Trash2, Search, LayoutList, LayoutGrid, AlertTriangle,
+  Pencil, Trash2, Search, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -312,8 +313,8 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
   }
   return (
     <div className={`rounded-2xl border shadow-sm p-4 ${card}`}>
-      <p className={`text-sm font-bold ${txt}`}>{obj.titulo}</p>
-      <p className={`text-[11px] mb-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`} · alvo {alvoLabel(obj, meta.alvo)}</p>
+      <p className={`text-sm font-bold ${txt}`}>{meta.descricao || obj.titulo}</p>
+      <p className={`text-[11px] mb-2.5 ${muted}`}>{meta.periodo === 'anual' ? 'Meta anual' : `Trim. ${meta.trimestre}`}{meta.descricao ? '' : ` · alvo ${alvoLabel(obj, meta.alvo)}`}</p>
       <div className="space-y-1.5 mb-2">
         {mine.length === 0 && <p className={`text-xs ${muted}`}>Nenhuma ação planejada.</p>}
         {mine.map(a => {
@@ -346,6 +347,98 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
   )
 }
 
+// ── Adicionar KR (meta trimestral textual) dentro de uma área ─────────────────
+function AddKR({ obj, trimestre, isDark }: { obj: ObjFull; trimestre: number; isDark: boolean }) {
+  const criarMeta = useCriarMeta()
+  const [desc, setDesc] = useState('')
+  const [prazo, setPrazo] = useState('')
+  const add = () => {
+    if (!desc.trim()) return
+    criarMeta.mutate({ objetivo_id: obj.id, periodo: 'trimestral', trimestre, ano: obj.ano, descricao: desc.trim(), prazo: prazo || undefined })
+    setDesc(''); setPrazo('')
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      <input value={desc} onChange={e => setDesc(e.target.value)} placeholder={`Novo KR para T${trimestre}...`}
+        className={`flex-1 min-w-[140px] text-xs rounded-lg px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+      <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)}
+        className={`w-32 text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200'}`} />
+      <button onClick={add} disabled={criarMeta.isPending || !desc.trim()} className="px-2.5 rounded-lg bg-teal-600 text-white text-xs disabled:opacity-50"><Plus size={13} /></button>
+    </div>
+  )
+}
+
+// ── Accordion: metas agrupadas por Trimestre → Área (tudo recolhido) ──────────
+function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMeta, areaFooter }: {
+  itens: { obj: ObjFull; meta: MetaFull }[]
+  isDark: boolean; txt: string; muted: string; card: string; accentText: string
+  renderMeta: (obj: ObjFull, meta: MetaFull) => ReactNode
+  areaFooter?: (obj: ObjFull, trimestre: number) => ReactNode
+}) {
+  const [openTri, setOpenTri] = useState<Record<number, boolean>>({})
+  const [openArea, setOpenArea] = useState<Record<string, boolean>>({})
+  const grupos = useMemo(() => {
+    const byTri = new Map<number, Map<string, { obj: ObjFull; metas: MetaFull[] }>>()
+    for (const { obj, meta } of itens) {
+      const tri = meta.periodo === 'anual' ? 0 : (meta.trimestre ?? 0)
+      let areas = byTri.get(tri)
+      if (!areas) { areas = new Map(); byTri.set(tri, areas) }
+      let a = areas.get(obj.id)
+      if (!a) { a = { obj, metas: [] }; areas.set(obj.id, a) }
+      a.metas.push(meta)
+    }
+    return [...byTri.entries()].sort((x, y) => x[0] - y[0]).map(([tri, areas]) => ({ tri, areas: [...areas.values()] }))
+  }, [itens])
+
+  if (grupos.length === 0) return <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
+  const hov = isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
+
+  return (
+    <div className="space-y-2.5">
+      {grupos.map(({ tri, areas }) => {
+        const triOpen = openTri[tri] ?? false
+        const triLabel = tri === 0 ? 'Metas Anuais' : `Trimestre ${tri}`
+        const tot = areas.reduce((s, a) => s + a.metas.length, 0)
+        return (
+          <div key={tri} className={`rounded-2xl border overflow-hidden ${card}`}>
+            <button onClick={() => setOpenTri(s => ({ ...s, [tri]: !triOpen }))} className={`w-full flex items-center gap-3 px-4 py-3.5 ${hov}`}>
+              <ChevronRight size={18} className={`shrink-0 transition-transform ${triOpen ? 'rotate-90' : ''} ${accentText}`} />
+              <span className={`text-lg font-extrabold ${txt}`}>{triLabel}</span>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{areas.length} {areas.length === 1 ? 'área' : 'áreas'} · {tot} metas</span>
+            </button>
+            {triOpen && (
+              <div className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                {areas.map(({ obj, metas }) => {
+                  const aKey = `${tri}:${obj.id}`
+                  const aOpen = openArea[aKey] ?? false
+                  return (
+                    <div key={obj.id} className={`border-b last:border-b-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+                      <button onClick={() => setOpenArea(s => ({ ...s, [aKey]: !aOpen }))} className={`w-full flex items-start gap-2.5 px-4 py-3 text-left ${hov}`}>
+                        <ChevronRight size={15} className={`shrink-0 mt-1 transition-transform ${aOpen ? 'rotate-90' : ''} ${muted}`} />
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-base font-bold ${txt}`}>{obj.titulo}</span>
+                          <span className={`ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{metas.length}</span>
+                          {obj.descricao && <p className={`text-[11px] mt-0.5 leading-snug ${muted}`}>{obj.descricao}</p>}
+                        </div>
+                      </button>
+                      {aOpen && (
+                        <div className={`px-3 pb-3 pt-0.5 space-y-2 ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50/60'}`}>
+                          {metas.map(m => <div key={m.id}>{renderMeta(obj, m)}</div>)}
+                          {areaFooter?.(obj, tri)}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SgiObjetivos() {
   const { isDark } = useTheme()
@@ -364,7 +457,6 @@ export default function SgiObjetivos() {
   // Filtros / visão (padrão Padronização) — aplicáveis a todas as abas
   const [busca, setBusca] = useState('')
   const [farolFilter, setFarolFilter] = useState('')
-  const [view, setView] = useState<'table' | 'cards'>('table')
 
   const card = isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -386,6 +478,7 @@ export default function SgiObjetivos() {
   const objetivosFiltrados = useMemo(() => busca ? objetivos.filter(matchObj) : objetivos, [objetivos, busca])
   // Plano de Ação trabalha só o trimestre vigente (T3); os demais são acompanhados via Check-in
   const metasTriFiltradas = useMemo(() => metasTri.filter(({ obj, meta }) => meta.trimestre === 3 && (!busca || matchObj(obj))), [metasTri, busca])
+  const metasTriBusca = useMemo(() => busca ? metasTri.filter(({ obj }) => matchObj(obj)) : metasTri, [metasTri, busca])
   const metasFiltradas = useMemo(() => {
     let items = todasMetas
     if (busca) { const q = busca.toLowerCase(); items = items.filter(({ obj, meta }) => [obj.titulo, obj.indicador, obj.area_processo, meta.periodo === 'anual' ? 'anual' : `trim ${meta.trimestre}`].some(v => v?.toLowerCase().includes(q))) }
@@ -415,7 +508,6 @@ export default function SgiObjetivos() {
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
 
   const isCheckinView = tab === 'checkin' || tab === 'revisao'
-  const metaLabel = (m: MetaFull) => (m.periodo === 'anual' ? 'Anual' : `Trim. ${m.trimestre}`)
   const inputBg = isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-600'
 
   return (
@@ -468,12 +560,6 @@ export default function SgiObjetivos() {
                 {(Object.keys(FAROL_CFG) as Farol[]).map(k => <option key={k} value={k}>{FAROL_CFG[k].label}</option>)}
               </select>
             )}
-            {isCheckinView && (
-              <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-                <button onClick={() => setView('table')} title="Lista" className={`p-1.5 ${view === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
-                <button onClick={() => setView('cards')} title="Cards" className={`p-1.5 ${view === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
-              </div>
-            )}
           </div>
         )}
 
@@ -483,23 +569,32 @@ export default function SgiObjetivos() {
             <p className={`text-sm font-medium ${txt}`}>Nenhum objetivo cadastrado</p>
             <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
           </div>
-        ) : tab === 'anuais' || tab === 'trimestrais' ? (() => {
-          const periodo: 'anual' | 'trimestral' = tab === 'anuais' ? 'anual' : 'trimestral'
-          // Mostra só objetivos que TÊM meta do período (objetivo de OKR só aparece em Trimestrais)
-          const lista = objetivosFiltrados.filter(o => o.metas.some(m => m.periodo === periodo))
+        ) : tab === 'anuais' ? (() => {
+          const lista = objetivosFiltrados.filter(o => o.metas.some(m => m.periodo === 'anual'))
           return lista.length === 0 ? (
-            <p className={`text-xs ${muted}`}>Nenhum objetivo com meta {periodo === 'anual' ? 'anual' : 'trimestral'}.</p>
+            <p className={`text-xs ${muted}`}>Nenhum objetivo com meta anual.</p>
           ) : (
             <div className="space-y-3">
               {lista.map(obj => (
-                <ObjetivoCard key={obj.id} obj={obj} periodo={periodo} isDark={isDark} txt={txt} muted={muted} card={card}
+                <ObjetivoCard key={obj.id} obj={obj} periodo="anual" isDark={isDark} txt={txt} muted={muted} card={card}
                   onEdit={o => setEditObj(o)}
                   onDeleteObj={o => setDelAlvo({ tipo: 'objetivo', id: o.id, label: `O objetivo "${o.titulo}" e todas as suas metas/check-ins serão removidos.` })}
-                  onDeleteMeta={(o, m) => setDelAlvo({ tipo: 'meta', id: m.id, label: `A meta ${m.periodo === 'anual' ? 'anual' : 'T' + m.trimestre} de "${o.titulo}" e seus check-ins serão removidos.` })} />
+                  onDeleteMeta={(o, m) => setDelAlvo({ tipo: 'meta', id: m.id, label: `A meta anual de "${o.titulo}" será removida.` })} />
               ))}
             </div>
           )
-        })() : tab === 'plano' ? (
+        })() : tab === 'trimestrais' ? (
+          <MetasAgrupadas itens={metasTriBusca} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-teal-500"
+            renderMeta={(obj, m) => (
+              <div className={`flex items-start justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white border border-slate-100'}`}>
+                <p className={`text-sm font-medium leading-snug ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}</p>
+                <button onClick={() => setDelAlvo({ tipo: 'meta', id: m.id, label: `A meta T${m.trimestre} de "${obj.titulo}" será removida.` })}
+                  className={`p-1 rounded-lg shrink-0 ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
+              </div>
+            )}
+            areaFooter={(obj, tri) => <AddKR obj={obj} trimestre={tri} isDark={isDark} />}
+          />
+        ) : tab === 'plano' ? (
           metasTriFiltradas.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
               <Target size={36} className="text-violet-500/50" />
@@ -507,128 +602,41 @@ export default function SgiObjetivos() {
               <p className="text-xs">Defina metas trimestrais na aba "Metas Trimestrais" para montar o plano de ação.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {metasTriFiltradas.map(({ obj, meta }) => (
-                <PlanoAcaoMeta key={meta.id} obj={obj} meta={meta} acoes={acoes} isDark={isDark} txt={txt} muted={muted} card={card} />
-              ))}
-            </div>
+            <MetasAgrupadas itens={metasTriFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-violet-500"
+              renderMeta={(obj, m) => <PlanoAcaoMeta obj={obj} meta={m} acoes={acoes} isDark={isDark} txt={txt} muted={muted} card={card} />}
+            />
           )
         ) : tab === 'checkin' ? (
-          metasFiltradas.length === 0 ? (
-            <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
-          ) : view === 'cards' ? (
-            <div className="space-y-2">
-              {metasFiltradas.map(({ obj, meta }) => {
-                const u = ultimoCheckin(meta)
-                const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                return (
-                  <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ?? `alvo ${alvoLabel(obj, meta.alvo)}`}{u ? ` · ${u.competencia}→${u.realizado ?? '—'}` : ''}</p>
-                    </div>
-                    <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                    <button onClick={() => setCheckin({ obj, meta })} className="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                    <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
-                    <th className="text-left px-3 py-2 font-semibold">META</th>
-                    <th className="text-right px-3 py-2 font-semibold">ALVO</th>
-                    <th className="text-center px-3 py-2 font-semibold">FAROL</th>
-                    <th className="text-right px-3 py-2 font-semibold">AÇÃO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metasFiltradas.map(({ obj, meta }) => {
-                    const u = ultimoCheckin(meta)
-                    const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                    return (
-                      <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
-                        <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}{meta.descricao ? ` · ${meta.descricao}` : ''}</td>
-                        <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{alvoLabel(obj, meta.alvo)}</td>
-                        <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
-                        <td className="px-3 py-2.5 text-right"><button onClick={() => setCheckin({ obj, meta })} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> Check-in</button></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
+          <MetasAgrupadas itens={metasFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-sky-500"
+            renderMeta={(obj, m) => {
+              const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+              return (
+                <div className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white border border-slate-100'}`}>
+                  <p className={`text-sm leading-snug min-w-0 flex-1 ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}{u ? <span className={muted}> · {u.competencia}→{u.realizado ?? '—'}</span> : null}</p>
+                  <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                  <button onClick={() => setCheckin({ obj, meta: m })} className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
+                </div>
+              )
+            }}
+          />
         ) : (
           /* Revisão */
-          metasFiltradas.length === 0 ? (
-            <p className={`text-xs ${muted}`}>Nenhuma meta encontrada.</p>
-          ) : view === 'cards' ? (
-            <div className="space-y-2">
-              {metasFiltradas.map(({ obj, meta }) => {
-                const u = ultimoCheckin(meta)
-                const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                const jaEnviado = enviados[meta.id]
-                return (
-                  <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ? `${meta.descricao}${u?.realizado != null ? ` · ${u.realizado}%` : ''}` : `realizado ${u?.realizado ?? '—'} / alvo ${alvoLabel(obj, meta.alvo)}`}</p>
-                    </div>
-                    <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                    {jaEnviado ? (
-                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
-                    ) : (
-                      <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending} className="shrink-0 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5"><Send size={13} /> Enviar p/ Melhoria</button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                    <th className="text-left px-3 py-2 font-semibold">OBJETIVO</th>
-                    <th className="text-left px-3 py-2 font-semibold">META</th>
-                    <th className="text-right px-3 py-2 font-semibold">REALIZADO/ALVO</th>
-                    <th className="text-center px-3 py-2 font-semibold">FAROL</th>
-                    <th className="text-right px-3 py-2 font-semibold">REVISÃO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metasFiltradas.map(({ obj, meta }) => {
-                    const u = ultimoCheckin(meta)
-                    const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-                    const jaEnviado = enviados[meta.id]
-                    return (
-                      <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
-                        <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
-                        <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}{meta.descricao ? ` · ${meta.descricao}` : ''}</td>
-                        <td className={`px-3 py-2.5 text-right ${muted}`}>{meta.descricao ? (u?.realizado != null ? `${u.realizado}%` : '—') : `${u?.realizado ?? '—'} / ${meta.alvo ?? '—'}`}</td>
-                        <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
-                        <td className="px-3 py-2.5 text-right">
-                          {jaEnviado ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Enviado</span>
-                          ) : (
-                            <button onClick={() => enviarMelhoria(obj, meta)} disabled={criarRegistro.isPending}
-                              className="text-[11px] font-bold text-amber-600 hover:text-amber-700 inline-flex items-center gap-1 disabled:opacity-50">
-                              <Send size={12} /> Enviar p/ Melhoria
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
+          <MetasAgrupadas itens={metasFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-amber-500"
+            renderMeta={(obj, m) => {
+              const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']; const jaEnviado = enviados[m.id]
+              return (
+                <div className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white border border-slate-100'}`}>
+                  <p className={`text-sm leading-snug min-w-0 flex-1 ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}{u?.realizado != null ? <span className={muted}> · {u.realizado}%</span> : null}</p>
+                  <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                  {jaEnviado ? (
+                    <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
+                  ) : (
+                    <button onClick={() => enviarMelhoria(obj, m)} disabled={criarRegistro.isPending} className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5"><Send size={13} /> Enviar</button>
+                  )}
+                </div>
+              )
+            }}
+          />
         )}
       </div>
 
