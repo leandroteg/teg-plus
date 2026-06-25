@@ -1,6 +1,6 @@
 import { Suspense, useRef } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -46,18 +46,11 @@ export default function PainelEmbed() {
             <span className={`font-bold truncate ${txt}`}>{def.label}</span>
           </span>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          {!semAcesso && <PainelActions target={panelRef} label={def.label} painelKey={def.key} />}
-          <button
-            onClick={() => navigate(def.route)}
-            title="Abrir o módulo completo"
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${pill}`}
-          >
-            <span className="hidden sm:inline">Abrir módulo completo</span>
-            <span className="sm:hidden">Abrir</span>
-            <ExternalLink size={13} />
-          </button>
-        </div>
+        {!semAcesso && (
+          <div className="flex items-center justify-end">
+            <PainelActions target={panelRef} label={def.label} painelKey={def.key} />
+          </div>
+        )}
       </div>
 
       {/* Painel real do módulo */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { DollarSign, AlertTriangle, CalendarClock, Clock, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
@@ -7,6 +7,8 @@ import {
   MobilePanel, MobileHeader, Segmented, KpiCard, KpiGrid, StatTile, Section,
   RowList, ListRow, LeadingBadge, BarStat, MobileLoading, Empty, SectionBody,
 } from '../../components/paineis-mobile/kit'
+
+const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 
 const fmt = (v: number) => {
   if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -31,15 +33,15 @@ const BAR_COLORS: Record<string, string> = {
 }
 const PIPELINE_ORDER = ['previsto', 'confirmado', 'em_lote', 'aprovado_pgto', 'em_pagamento', 'pago', 'conciliado']
 
-// Versão mobile-native do Painel Financeiro — MESMOS dados (useFinanceiroDashboard).
+// Versão mobile-native do Painel Financeiro — MESMOS dados (useFinanceiroDashboard)
+// + o mesmo seletor de sub-painel do desktop (Painel / Pgtos Previstos).
 export default function DashboardFinanceiroMobile() {
   const nav = useNavigate()
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
+  const [painelAtivo, setPainelAtivo] = useState('painel') // 'painel' | 'pgtos_previstos'
   useEffect(() => { setPeriodo('30d') }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
-
-  if (isLoading) return <MobileLoading />
 
   const kpis = data?.kpis ?? EMPTY_KPIS
   const porStatus = data?.por_status ?? []
@@ -59,92 +61,103 @@ export default function DashboardFinanceiroMobile() {
         subtitle="Pagamentos e recebimentos"
         icon={DollarSign}
         tone="emerald"
-        right={
+        right={painelAtivo === 'painel' ? (
           <button onClick={() => refetch()} className="w-8 h-8 rounded-xl flex items-center justify-center text-emerald-500 active:scale-95">
             <RefreshCw size={15} />
           </button>
-        }
+        ) : undefined}
       />
 
+      {/* Seletor de sub-painel (igual ao desktop) */}
       <Segmented
-        value={periodo}
-        onChange={setPeriodo}
-        options={[{ value: '7d', label: '7d' }, { value: '30d', label: '30d' }, { value: '90d', label: '90d' }, { value: '365d', label: 'Ano' }]}
+        value={painelAtivo}
+        onChange={setPainelAtivo}
+        options={[{ value: 'painel', label: 'Painel' }, { value: 'pgtos_previstos', label: 'Pgtos Previstos' }]}
       />
 
-      {/* KPIs principais */}
-      <KpiGrid>
-        <KpiCard label="Saldo em Aberto" value={fmt(kpis.valor_total_aberto)} tone="emerald" note={`${kpis.total_cp} títulos`} />
-        <KpiCard label="Pago no Período" value={fmt(kpis.valor_pago_periodo)} tone="teal" note={`${kpis.cp_pagas_periodo} pagamentos`} />
-      </KpiGrid>
+      {painelAtivo === 'pgtos_previstos' ? (
+        <Suspense fallback={<MobileLoading />}><PainelPagamentos /></Suspense>
+      ) : isLoading ? (
+        <MobileLoading />
+      ) : (
+        <>
+          <Segmented
+            value={periodo}
+            onChange={setPeriodo}
+            options={[{ value: '7d', label: '7d' }, { value: '30d', label: '30d' }, { value: '90d', label: '90d' }, { value: '365d', label: 'Ano' }]}
+          />
 
-      <KpiGrid cols={3}>
-        <StatTile label="Vence 7 dias" value={fmt(kpis.valor_a_vencer_7d)} icon={Clock} tone={kpis.cp_a_vencer > 0 ? 'amber' : 'slate'} note={`${kpis.cp_a_vencer} tít.`} />
-        <StatTile label="Vencidas" value={kpis.cp_vencidas} icon={AlertTriangle} tone={kpis.cp_vencidas > 0 ? 'red' : 'slate'} note={kpis.cp_vencidas > 0 ? 'atenção!' : 'tudo ok'} />
-        <StatTile label="Aguard. Aprov." value={kpis.aguardando_aprovacao} icon={CalendarClock} tone={kpis.aguardando_aprovacao > 0 ? 'amber' : 'slate'} note="pendentes" />
-      </KpiGrid>
+          <KpiGrid>
+            <KpiCard label="Saldo em Aberto" value={fmt(kpis.valor_total_aberto)} tone="emerald" note={`${kpis.total_cp} títulos`} />
+            <KpiCard label="Pago no Período" value={fmt(kpis.valor_pago_periodo)} tone="teal" note={`${kpis.cp_pagas_periodo} pagamentos`} />
+          </KpiGrid>
 
-      {/* Pulso financeiro (pipeline por status) */}
-      <Section title="Pulso Financeiro" icon={TrendingUp} tone="emerald">
-        <SectionBody>
-          {ordered.length === 0 ? (
-            <Empty>Nenhum título no período</Empty>
-          ) : (
-            <div className="space-y-2.5">
-              <div className="flex h-9 rounded-xl overflow-hidden">
-                {ordered.map((s: any) => (
-                  <div key={s.status} className={`${BAR_COLORS[s.status] ?? 'bg-gray-300'} flex items-center justify-center`}
-                    style={{ width: `${Math.max((s.total / totalPipeline) * 100, 4)}%` }}>
-                    {(s.total / totalPipeline) * 100 >= 16 && <span className="text-[10px] font-bold text-white">{s.total}</span>}
+          <KpiGrid cols={3}>
+            <StatTile label="Vence 7 dias" value={fmt(kpis.valor_a_vencer_7d)} icon={Clock} tone={kpis.cp_a_vencer > 0 ? 'amber' : 'slate'} note={`${kpis.cp_a_vencer} tít.`} />
+            <StatTile label="Vencidas" value={kpis.cp_vencidas} icon={AlertTriangle} tone={kpis.cp_vencidas > 0 ? 'red' : 'slate'} note={kpis.cp_vencidas > 0 ? 'atenção!' : 'tudo ok'} />
+            <StatTile label="Aguard. Aprov." value={kpis.aguardando_aprovacao} icon={CalendarClock} tone={kpis.aguardando_aprovacao > 0 ? 'amber' : 'slate'} note="pendentes" />
+          </KpiGrid>
+
+          <Section title="Pulso Financeiro" icon={TrendingUp} tone="emerald">
+            <SectionBody>
+              {ordered.length === 0 ? (
+                <Empty>Nenhum título no período</Empty>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="flex h-9 rounded-xl overflow-hidden">
+                    {ordered.map((s: any) => (
+                      <div key={s.status} className={`${BAR_COLORS[s.status] ?? 'bg-gray-300'} flex items-center justify-center`}
+                        style={{ width: `${Math.max((s.total / totalPipeline) * 100, 4)}%` }}>
+                        {(s.total / totalPipeline) * 100 >= 16 && <span className="text-[10px] font-bold text-white">{s.total}</span>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {ordered.map((s: any) => (
-                  <span key={s.status} className="flex items-center gap-1 text-[10px] text-slate-500">
-                    <span className={`w-2 h-2 rounded-full ${BAR_COLORS[s.status]}`} /> {STATUS_LABEL[s.status]} · {s.total}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </SectionBody>
-      </Section>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {ordered.map((s: any) => (
+                      <span key={s.status} className="flex items-center gap-1 text-[10px] text-slate-500">
+                        <span className={`w-2 h-2 rounded-full ${BAR_COLORS[s.status]}`} /> {STATUS_LABEL[s.status]} · {s.total}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </SectionBody>
+          </Section>
 
-      {/* Próximos vencimentos */}
-      <Section title="Próximos Vencimentos" icon={Clock} tone="amber" action={{ label: 'Ver todos', onClick: () => nav('/financeiro/cp') }}>
-        {proximos.length === 0 ? (
-          <Empty icon={Clock}>Nenhum vencimento próximo</Empty>
-        ) : (
-          <RowList>
-            {proximos.slice(0, 6).map((cp: ContaPagar) => {
-              const vencido = new Date(cp.data_vencimento) < new Date()
-              return (
-                <ListRow
-                  key={cp.id}
-                  leading={<LeadingBadge tone={vencido ? 'red' : 'emerald'}>{fmtData(cp.data_vencimento).split('/')[0]}</LeadingBadge>}
-                  title={cp.fornecedor_nome}
-                  subtitle={cp.natureza ?? 'Geral'}
-                  value={fmt(cp.valor_original)}
-                  valueSub={fmtData(cp.data_vencimento)}
-                  valueTone={vencido ? 'red' : undefined}
-                />
-              )
-            })}
-          </RowList>
-        )}
-      </Section>
+          <Section title="Próximos Vencimentos" icon={Clock} tone="amber" action={{ label: 'Ver todos', onClick: () => nav('/financeiro/cp') }}>
+            {proximos.length === 0 ? (
+              <Empty icon={Clock}>Nenhum vencimento próximo</Empty>
+            ) : (
+              <RowList>
+                {proximos.slice(0, 6).map((cp: ContaPagar) => {
+                  const vencido = new Date(cp.data_vencimento) < new Date()
+                  return (
+                    <ListRow
+                      key={cp.id}
+                      leading={<LeadingBadge tone={vencido ? 'red' : 'emerald'}>{fmtData(cp.data_vencimento).split('/')[0]}</LeadingBadge>}
+                      title={cp.fornecedor_nome}
+                      subtitle={cp.natureza ?? 'Geral'}
+                      value={fmt(cp.valor_original)}
+                      valueSub={fmtData(cp.data_vencimento)}
+                      valueTone={vencido ? 'red' : undefined}
+                    />
+                  )
+                })}
+              </RowList>
+            )}
+          </Section>
 
-      {/* Por centro de custo */}
-      <Section title="Por Centro de Custo" icon={TrendingDown} tone="emerald">
-        <SectionBody className="space-y-2.5">
-          {porCC.length === 0 ? (
-            <Empty>Nenhum dado por centro de custo</Empty>
-          ) : porCC.slice(0, 8).map((cc: any) => (
-            <BarStat key={cc.centro_custo} label={cc.centro_custo} value={fmt(cc.valor)} pct={(cc.valor / maxCC) * 100} tone="emerald" />
-          ))}
-        </SectionBody>
-      </Section>
+          <Section title="Por Centro de Custo" icon={TrendingDown} tone="emerald">
+            <SectionBody className="space-y-2.5">
+              {porCC.length === 0 ? (
+                <Empty>Nenhum dado por centro de custo</Empty>
+              ) : porCC.slice(0, 8).map((cc: any) => (
+                <BarStat key={cc.centro_custo} label={cc.centro_custo} value={fmt(cc.valor)} pct={(cc.valor / maxCC) * 100} tone="emerald" />
+              ))}
+            </SectionBody>
+          </Section>
+        </>
+      )}
     </MobilePanel>
   )
 }

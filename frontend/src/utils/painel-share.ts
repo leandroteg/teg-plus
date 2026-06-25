@@ -93,6 +93,37 @@ export async function exportarPainel(node: HTMLElement, meta: PainelShareMeta, i
   baixar(blob, filename)
 }
 
+// Compartilhamento NATIVO (share sheet do SO — inclui e-mail, WhatsApp, etc.).
+// Retorna true se o navegador suporta compartilhar arquivo (mobile/PWA); false
+// se precisa do fallback de desktop (menu Email/WhatsApp).
+export async function shareNativoPainel(blob: Blob, filename: string, meta: PainelShareMeta): Promise<boolean> {
+  const file = new File([blob], filename, { type: 'application/pdf' })
+  if (!navigator.canShare?.({ files: [file] })) return false
+  try {
+    await navigator.share({
+      title: `Painel ${meta.label} · TEG+`,
+      text: `Painel ${meta.label} · TEG+\n${location.origin}/paineis/${meta.key}`,
+      files: [file],
+    })
+  } catch {
+    // usuário cancelou — tudo certo, não cai no fallback
+  }
+  return true
+}
+
+// Fallback desktop: baixa o PDF (p/ anexar) e abre o canal com a mensagem + link.
+export function abrirCanalPainel(blob: Blob, filename: string, meta: PainelShareMeta, via: 'email' | 'whatsapp') {
+  baixar(blob, filename)
+  const link = `${location.origin}/paineis/${meta.key}`
+  const assunto = `Painel ${meta.label} · TEG+`
+  const texto = `${assunto}\n${link}`
+  if (via === 'whatsapp') {
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+  } else {
+    window.open(`mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto + '\n\n(PDF do painel baixado automaticamente — anexe ao e-mail.)')}`)
+  }
+}
+
 export async function compartilharPainel(
   node: HTMLElement,
   meta: PainelShareMeta,
