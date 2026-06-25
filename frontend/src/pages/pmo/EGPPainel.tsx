@@ -90,7 +90,7 @@ function VisaoGeralEGP({ de, ate, isDark, cardClass, onGo }: { de: string; ate: 
       const ini = a.ini ? Date.parse(a.ini) : NaN; const fim = a.fim ? Date.parse(a.fim) : NaN
       const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
       return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin, pctFis, pctPrazo, cor: RIT(pctFis, pctPrazo) }
-    }).filter(o => o.pctFin < 95)
+    }).filter(o => o.pctFin < 85) // ≥85% faturado = praticamente concluída, não conta como "em andamento"
     const status = { ok: obras.filter(o => o.cor === '#10b981').length, atencao: obras.filter(o => o.cor === '#f59e0b').length, atraso: obras.filter(o => o.cor === '#ef4444').length }
     const atencao = obras.filter(o => o.cor !== '#10b981').sort((a, b) => (a.cor === '#ef4444' ? 0 : 1) - (b.cor === '#ef4444' ? 0 : 1) || b.valor - a.valor).slice(0, 6)
     const topObras = [...obras].sort((a, b) => b.valor - a.valor).slice(0, 6)

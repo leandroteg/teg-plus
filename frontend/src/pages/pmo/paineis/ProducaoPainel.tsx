@@ -115,7 +115,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
     return { pac, porPacote, fisicoGeral, torres }
   }, [polos])
 
-  // produção por OBRA DE CONSTRUÇÃO em andamento (fat < 95%); + % de prazo decorrido
+  // produção por OBRA DE CONSTRUÇÃO em andamento (fat < 85%); + % de prazo decorrido
   const obras = useMemo(() => {
     type O = { nome: string; polo: string; valor: number; fat: number; ini: string | null; fim: string | null; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
     const m = new Map<string, O>()
@@ -140,7 +140,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
       const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
       const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni) ?? '0'}/${fmtQtd(x.qC, x.uni) ?? '—'}` : '—' }
       return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, pctPrazo, drv }
-    }).filter(o => o.pctFin < 95).sort((x, y) => y.valor - x.valor)
+    }).filter(o => o.pctFin < 85).sort((x, y) => y.valor - x.valor)
   }, [raw])
 
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
