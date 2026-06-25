@@ -173,12 +173,6 @@ export interface GrupoModulos {
 
 export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
   {
-    label: 'Visão Geral',
-    modulos: [
-      { key: 'paineis', label: 'Painéis', icon: '📊' },
-    ],
-  },
-  {
     label: 'Projetos',
     modulos: [
       { key: 'egp', label: 'EGP', icon: '📊' },
@@ -217,6 +211,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
     label: 'Governança',
     modulos: [
       { key: 'sgi', label: 'Gestão (SGI)', icon: '⚖️' },
+      { key: 'paineis', label: 'Painéis', icon: '📊' },
     ],
   },
 ]

@@ -51,19 +51,6 @@ interface Pillar {
 
 const PILLARS: Pillar[] = [
   {
-    key: 'visaogeral',
-    label: 'Visão Geral',
-    tagline: 'Os painéis de todos os módulos num só lugar',
-    Icon: LayoutDashboard,
-    grad: 'from-indigo-500/20 to-violet-600/20',
-    border: 'border-indigo-500/25',
-    glow: 'rgba(99,102,241,0.18)',
-    accent: '#818CF8',
-    subs: [
-      { key: 'paineis', label: 'Painéis', desc: 'Reúne os painéis de todos os módulos num só lugar', Icon: LayoutDashboard, active: true, route: '/paineis' },
-    ],
-  },
-  {
     key: 'projetos',
     label: 'Projetos',
     tagline: 'Gestão de obras e segurança',
@@ -124,6 +111,7 @@ const PILLARS: Pillar[] = [
     accent: '#C4B5FD',
     subs: [
       { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
+      { key: 'paineis', label: 'Painéis', desc: 'Reúne os painéis de todos os módulos num só lugar', Icon: LayoutDashboard, active: true, route: '/paineis' },
     ],
   },
   {
