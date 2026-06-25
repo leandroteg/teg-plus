@@ -228,7 +228,7 @@ function PacoteCard({ pac, polo, portfolioId, isLight, isGeral }: { pac: EAPPaco
       <div className="flex items-center justify-between mt-1">
         <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           {pac.pctFis != null ? `Físico ${pac.pctFis}%` : `Faturado ${pac.pctFin}%`}
-          {pac.pctFis != null && fmtQtd(pac.qtdReal, pac.unidade) ? ` · ${fmtQtd(pac.qtdReal, pac.unidade)}` : ''}
+          {pac.pctFis != null && fmtQtd(pac.qtdContr - (pac.qtdReal ?? 0), pac.unidade) ? ` · saldo ${fmtQtd(pac.qtdContr - (pac.qtdReal ?? 0), pac.unidade)}` : ''}
         </span>
         <span className="text-xs font-bold tabular-nums" style={{ color: isLight ? '#0f2a4a' : '#cbd5e1' }}>{fmtM(pac.valor)}</span>
       </div>
