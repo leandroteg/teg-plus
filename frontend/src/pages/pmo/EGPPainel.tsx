@@ -665,7 +665,7 @@ export default function EGPPainel() {
   const [painel, setPainel] = useState<EGPPainelKey>('geral')
   const [de, setDe] = useState('2026-01') // padrão: jan/26 → mês atual (todos os painéis)
   const [ate, setAte] = useState(ymHoje())
-  const [visaoFat, setVisaoFat] = useState<'producao' | 'faturamento'>('faturamento')
+  const [visaoFat, setVisaoFat] = useState<'producao' | 'faturamento'>('producao')
   const [obraFilter, setObraFilter] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   const obras = useLookupObras()
