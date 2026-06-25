@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronDown, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -312,7 +312,7 @@ export default function ModuleLayout({
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [avatarPos, setAvatarPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [groupFlyout, setGroupFlyout] = useState<{ key: string; top: number; left: number } | null>(null)
 
   // Compute avatar dropdown position from the clicked button rect
   const computeAvatarPosFromRect = useCallback((r: DOMRect) => {
@@ -407,12 +407,29 @@ export default function ModuleLayout({
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
 
-  // Auto-expande o grupo (accordion) que contém a rota ativa
+  // Fecha o flyout de grupo (pilar) ao clicar fora, Esc, rolar ou redimensionar
   useEffect(() => {
-    if (!config.navGroups) return
-    const active = config.navGroups.find(g => g.items.some(it => location.pathname === it.to))
-    if (active) setOpenGroups(s => (s[active.key] ? s : { ...s, [active.key]: true }))
-  }, [location.pathname, config.navGroups])
+    if (!groupFlyout) return
+    function onClickOutside(e: MouseEvent) {
+      const t = e.target as HTMLElement
+      if (!t.closest('[data-nav-group-flyout]') && !t.closest('[data-nav-group-btn]')) setGroupFlyout(null)
+    }
+    function onEscape(e: KeyboardEvent) { if (e.key === 'Escape') setGroupFlyout(null) }
+    function close() { setGroupFlyout(null) }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscape)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscape)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [groupFlyout])
+
+  // Fecha o flyout quando a rota muda (clicou num módulo)
+  useEffect(() => { setGroupFlyout(null) }, [location.pathname])
 
   // Guarda o pathname que estava aberto quando ?nova= estava na URL.
   // Quando a página filho limpa o param (ex: CPPipeline), não redirecionamos
@@ -649,36 +666,80 @@ export default function ModuleLayout({
           </NavLink>
         ))}
         {config.navGroups!.map(group => {
-          const isOpen = openGroups[group.key] ?? group.defaultOpen ?? false
           const GIcon = group.icon
+          const isOpen = groupFlyout?.key === group.key
+          const hasActive = group.items.some(it => location.pathname === it.to)
           return (
-            <div key={group.key} className="pt-1">
-              <button
-                type="button"
-                onClick={() => setOpenGroups(s => ({ ...s, [group.key]: !(s[group.key] ?? group.defaultOpen ?? false) }))}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border border-transparent
-                  ${ls ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50' : 'text-slate-400 hover:text-slate-100 hover:bg-white/6'}`}
-              >
-                <GIcon size={16} className="shrink-0" />
-                <span className="flex-1 text-left">{group.label}</span>
-                <span className={`text-[10px] font-bold tabular-nums ${ls ? 'text-slate-300' : 'text-slate-600'}`}>{group.items.length}</span>
-                <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${ls ? 'text-slate-400' : 'text-slate-500'}`} />
-              </button>
-              {isOpen && (
-                <div className={`ml-4 mt-0.5 pl-2 border-l space-y-0.5 ${ls ? 'border-slate-200' : 'border-white/[0.08]'}`}>
-                  {group.items.map(({ to, icon: Icon, label, end }) => (
-                    <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
-                      <Icon size={15} className="shrink-0" />
-                      <span className="truncate">{label}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              key={group.key}
+              type="button"
+              data-nav-group-btn
+              onClick={e => {
+                if (groupFlyout?.key === group.key) { setGroupFlyout(null); return }
+                const r = e.currentTarget.getBoundingClientRect()
+                const panelH = Math.min(group.items.length * 44 + 56, 420)
+                setGroupFlyout({
+                  key: group.key,
+                  top: Math.min(r.top, Math.max(8, window.innerHeight - panelH - 8)),
+                  left: r.right + 12,
+                })
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                isOpen || hasActive
+                  ? (ls ? `${a.activeBgLight} ${a.activeTextLight} ${a.activeBorderLight}` : `${a.activeBgDark} ${a.activeTextDark} ${a.activeBorderDark}`)
+                  : `border-transparent ${ls ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50' : 'text-slate-400 hover:text-slate-100 hover:bg-white/6'}`
+              }`}
+            >
+              <GIcon size={16} className="shrink-0" />
+              <span className="flex-1 text-left">{group.label}</span>
+              <span className={`text-[10px] font-bold tabular-nums ${ls ? 'text-slate-300' : 'text-slate-600'}`}>{group.items.length}</span>
+              <ChevronRight size={14} className={`shrink-0 transition-transform duration-150 ${isOpen ? 'translate-x-0.5' : ''} ${ls ? 'text-slate-400' : 'text-slate-500'}`} />
+            </button>
           )
         })}
       </>
     )
+  }
+
+  function renderGroupFlyout() {
+    if (!groupFlyout) return null
+    const group = config.navGroups?.find(g => g.key === groupFlyout.key)
+    if (!group) return null
+    const GIcon = group.icon
+    const panel = (
+      <div
+        data-nav-group-flyout
+        className={`fixed z-[80] w-64 rounded-2xl border p-2 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-[#0B1523]'}`}
+        style={{ top: groupFlyout.top, left: groupFlyout.left, animation: 'fadeSlideIn 150ms ease-out' }}
+      >
+        <div className={`flex items-center gap-2 px-3 pt-2 pb-1.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
+          <GIcon size={13} className="shrink-0" />
+          <span className="text-[10px] font-bold uppercase tracking-wider">{group.label}</span>
+        </div>
+        <div className="space-y-0.5">
+          {group.items.map(({ to, icon: Icon, label, end }) => {
+            const active = location.pathname === to
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                onClick={() => setGroupFlyout(null)}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors ${
+                  active
+                    ? (ls ? `${a.activeBgLight} ${a.activeTextLight}` : `${a.activeBgDark} ${a.activeTextDark}`)
+                    : (ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.05] hover:text-white')
+                }`}
+              >
+                <Icon size={16} className="shrink-0" />
+                <span className="truncate">{label}</span>
+              </NavLink>
+            )
+          })}
+        </div>
+      </div>
+    )
+    return createPortal(panel, document.body)
   }
 
   function renderCadastrosLink() {
@@ -1120,6 +1181,8 @@ export default function ModuleLayout({
           {renderCadastrosLink()}
 
         </nav>
+
+        {renderGroupFlyout()}
 
       </aside>
 

@@ -110,8 +110,10 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(167,139,250,0.18)',
     accent: '#C4B5FD',
     subs: [
-      { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
+      // Ordem define a posição no mandala radial (3 nós, 120°): topo · baixo-dir · baixo-esq
       { key: 'paineis', label: 'Painéis', desc: 'Reúne os painéis de todos os módulos num só lugar', Icon: LayoutDashboard, active: true, route: '/paineis' },
+      { key: 'sgi', label: 'Gestão', desc: 'SGI: documentos, NC/melhoria e objetivos', Icon: ClipboardCheck, active: true, route: '/sgi' },
+      { key: 'auditoria', label: 'Auditoria', desc: 'Auditorias internas e conformidade', Icon: ShieldCheck, active: false, route: '' },
     ],
   },
   {
