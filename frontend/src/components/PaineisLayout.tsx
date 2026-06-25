@@ -1,4 +1,4 @@
-import { LayoutGrid, FolderKanban, Layers, Wallet, Scale, Rocket } from 'lucide-react'
+import { LayoutGrid, FolderKanban, Layers, Wallet, Scale, Rocket, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem, NavGroup } from './ModuleLayout'
@@ -6,12 +6,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { PAINEIS } from '../pages/paineis/registry'
 import type { Pilar } from '../pages/paineis/registry'
 
-// Pilares na mesma ordem/ícone da tela inicial (ModuloSelector).
+// Ordem dos pilares no menu lateral de Painéis.
 const PILARES: { label: Pilar; icon: LucideIcon }[] = [
+  { label: 'Governança',  icon: Scale },
   { label: 'Projetos',    icon: FolderKanban },
   { label: 'Suprimentos', icon: Layers },
   { label: 'Backoffice',  icon: Wallet },
-  { label: 'Governança',  icon: Scale },
+  { label: 'RH',          icon: Users },
   { label: 'Expansão',    icon: Rocket },
 ]
 

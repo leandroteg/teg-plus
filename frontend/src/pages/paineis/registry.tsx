@@ -2,7 +2,7 @@ import { lazy } from 'react'
 import type { LazyExoticComponent, ComponentType } from 'react'
 import {
   Banknote, BarChart3, FileText, Receipt, HardHat, FolderKanban, Truck, Car,
-  KeySquare, Building2, Package, Calculator, ShoppingCart, ClipboardCheck,
+  KeySquare, Building2, Package, Calculator, ShoppingCart, ClipboardCheck, Users,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -23,7 +23,7 @@ import {
 //  `Painel` = desktop (lg+) · `Mobile` = versão mobile-native (<lg).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type Pilar = 'Projetos' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão'
+export type Pilar = 'Projetos' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão' | 'RH'
 
 export interface PainelDef {
   key: string
@@ -58,4 +58,6 @@ export const PAINEIS: PainelDef[] = [
   { key: 'orcamentacao',  label: 'Orçamentação',   desc: 'Estimativa de LT por KMZ',                emoji: '📐', Icon: Calculator,     accent: '#FBBF24', route: '/orcamentacao',  pilar: 'Expansão',    Painel: lazy(() => import('../orcamentacao/OrcamentacaoHome')),   Mobile: lazy(() => import('../orcamentacao/OrcamentacaoHomeMobile')) },
   // Governança
   { key: 'sgi',           label: 'Gestão · SGI',   desc: 'Documentos, NC/melhoria e objetivos',     emoji: '⚖️', Icon: ClipboardCheck, accent: '#C4B5FD', route: '/sgi',           pilar: 'Governança',  Painel: lazy(() => import('../sgi/SgiPainel')),                   Mobile: lazy(() => import('../sgi/SgiPainelMobile')) },
+  // RH
+  { key: 'rh',            label: 'RH',             desc: 'Headcount, admissões e movimentações',    emoji: '👥', Icon: Users,          accent: '#A78BFA', route: '/rh/headcount',  pilar: 'RH',          Painel: lazy(() => import('../rh/RHPainel')),                     Mobile: lazy(() => import('../rh/RHPainel')) },
 ]

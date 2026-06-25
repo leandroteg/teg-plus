@@ -7,7 +7,7 @@ import { PAINEIS, type PainelDef } from './registry'
 
 // Ordem da Visão Geral (executiva). Fiscal e Obras ficam de fora por ora.
 // "__SUP__" = card-grupo Suprimentos, que abre uma sub-tela com os painéis de suprimentos.
-const ORDEM: string[] = ['sgi', 'egp', 'controladoria', 'financeiro', 'contratos', '__SUP__', 'orcamentacao']
+const ORDEM: string[] = ['sgi', 'egp', 'controladoria', 'financeiro', 'rh', 'contratos', '__SUP__', 'orcamentacao']
 const SUP_KEYS = ['compras', 'patrimonial', 'estoque', 'frotas', 'logistica', 'locacoes']
 const SUP_ACCENT = '#2DD4BF'
 
