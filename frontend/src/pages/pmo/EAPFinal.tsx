@@ -221,14 +221,19 @@ function PacoteCard({ pac, polo, portfolioId, isLight, isGeral }: { pac: EAPPaco
             : <TorresBadge polo={polo} pac={pac} portfolioId={portfolioId} color={color} isLight={isLight} />)
           : (badge && <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }}>{badge}</span>)}
       </div>
-      {/* barra */}
-      <div className={`h-4 rounded-full overflow-hidden relative ${isLight ? 'bg-slate-200' : 'bg-white/10'}`}>
+      {/* barra: enche com o físico% · rótulo sobre a barra = quantidade concluída */}
+      <div className={`h-5 rounded-full overflow-hidden relative ${isLight ? 'bg-slate-200' : 'bg-white/10'}`}>
         <div className="h-full rounded-full" style={{ width: `${Math.min(barPct, 100)}%`, background: color }} />
+        {pac.pctFis != null && fmtQtd(pac.qtdReal, pac.unidade) && (
+          <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white text-slate-800 shadow-sm ring-1 ring-black/10 whitespace-nowrap"
+            style={{ left: `clamp(2.4rem, ${Math.min(barPct, 100)}%, calc(100% - 2.4rem))` }}>
+            {fmtQtd(pac.qtdReal, pac.unidade)}
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-between mt-1">
         <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-          {pac.pctFis != null ? `Físico ${pac.pctFis}%` : `Faturado ${pac.pctFin}%`}
-          {pac.pctFis != null && fmtQtd(pac.qtdContr - (pac.qtdReal ?? 0), pac.unidade) ? ` · saldo ${fmtQtd(pac.qtdContr - (pac.qtdReal ?? 0), pac.unidade)}` : ''}
+          {pac.pctFis != null ? `Físico ${pac.pctFis}% · falta ${fmtQtd(pac.qtdContr - (pac.qtdReal ?? 0), pac.unidade)}` : `Faturado ${pac.pctFin}%`}
         </span>
         <span className="text-xs font-bold tabular-nums" style={{ color: isLight ? '#0f2a4a' : '#cbd5e1' }}>{fmtM(pac.valor)}</span>
       </div>
