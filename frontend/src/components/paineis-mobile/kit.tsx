@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,18 +89,18 @@ export function MobileHeader({ title, subtitle, icon: Icon, tone = 'emerald', ri
   )
 }
 
-// ── Controle segmentado (período, abas) ──────────────────────────────────────
+// ── Controle segmentado (período, abas) — à prova de overflow (scroll horiz.) ──
 export function Segmented<T extends string>({ value, onChange, options, tone = 'emerald' }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; tone?: Tone
 }) {
   const { isDark } = useTheme()
   return (
-    <div className={`inline-flex items-center gap-0.5 p-0.5 rounded-xl border ${isDark ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-slate-100 border-slate-200'}`}>
+    <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border max-w-full overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-slate-100 border-slate-200'}`}>
       {options.map(o => {
         const active = o.value === value
         return (
           <button key={o.value} type="button" onClick={() => onChange(o.value)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+            className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
               active
                 ? (tone === 'emerald' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white')
                 : (isDark ? 'text-slate-400' : 'text-slate-500')
@@ -109,6 +109,48 @@ export function Segmented<T extends string>({ value, onChange, options, tone = '
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ── Dropdown compacto (ícone + valor atual + chevron → abre lista) ────────────
+//  Para filtros/seletores que não cabem no segmentado (muitas opções ou labels
+//  longos). Não estoura horizontalmente. Usado ex.: seletor de sub-painel.
+export function MobileSelect<T extends string>({ value, onChange, options, tone = 'emerald', icon: Icon, align = 'left' }: {
+  value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; tone?: Tone; icon?: LucideIcon; align?: 'left' | 'right'
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const ativo = options.find(o => o.value === value)
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[12px] font-bold max-w-[60vw] ${t.card} ${t.txt}`}>
+        {Icon && <Icon size={14} className={`${t.toneText(tone)} shrink-0`} />}
+        <span className="truncate">{ativo?.label ?? '—'}</span>
+        <ChevronDown size={14} className={`${t.faint} shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className={`absolute z-30 mt-1 min-w-[170px] max-w-[80vw] rounded-xl border shadow-xl overflow-hidden ${t.card} ${align === 'right' ? 'right-0' : 'left-0'}`}>
+          {options.map(o => {
+            const active = o.value === value
+            return (
+              <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false) }}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[12px] ${active ? `${t.toneText(tone)} font-bold` : t.txt} ${t.isDark ? 'active:bg-white/[0.05]' : 'active:bg-slate-50'}`}>
+                <span className="truncate">{o.label}</span>
+                {active && <Check size={14} className="shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

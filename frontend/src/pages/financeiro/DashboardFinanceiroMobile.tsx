@@ -1,10 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { DollarSign, AlertTriangle, CalendarClock, Clock, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
+import { DollarSign, AlertTriangle, CalendarClock, Clock, TrendingUp, TrendingDown, RefreshCw, LayoutGrid } from 'lucide-react'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
 import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
 import {
-  MobilePanel, MobileHeader, Segmented, KpiCard, KpiGrid, StatTile, Section,
+  MobilePanel, MobileHeader, Segmented, MobileSelect, KpiCard, KpiGrid, StatTile, Section,
   RowList, ListRow, LeadingBadge, BarStat, MobileLoading, Empty, SectionBody,
 } from '../../components/paineis-mobile/kit'
 
@@ -68,10 +68,11 @@ export default function DashboardFinanceiroMobile() {
         ) : undefined}
       />
 
-      {/* Seletor de sub-painel (igual ao desktop) */}
-      <Segmented
+      {/* Seletor de sub-painel (dropdown elegante — abre lista) */}
+      <MobileSelect
         value={painelAtivo}
         onChange={setPainelAtivo}
+        icon={LayoutGrid}
         options={[{ value: 'painel', label: 'Painel' }, { value: 'pgtos_previstos', label: 'Pgtos Previstos' }]}
       />
 
