@@ -30,6 +30,26 @@ export function podeAprovarCompras(email?: string | null): boolean {
   return APROVADORES_COMPRAS.has((email ?? '').toLowerCase().split('@')[0])
 }
 
+// Gate de aprovacao: nega aprovar RC com itens sem vinculo de catalogo.
+// Aprovador estaria decidindo sobre descricao livre, e o recebimento nao geraria
+// entrada de estoque. Comprador precisa vincular (CotacaoForm) antes.
+export async function assertRCSemOrfaos(requisicaoId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('cmp_requisicao_itens')
+    .select('id, descricao')
+    .eq('requisicao_id', requisicaoId)
+    .is('est_item_id', null)
+  if (error) throw error
+  if (data && data.length > 0) {
+    const amostra = data.slice(0, 3).map(i => i.descricao).filter(Boolean).join(', ')
+    const resto = data.length > 3 ? ` e mais ${data.length - 3}` : ''
+    throw new Error(
+      `RC tem ${data.length} item(ns) sem vínculo de catálogo (${amostra}${resto}). ` +
+      `Comprador precisa vincular ou cadastrar esses itens antes da aprovação.`
+    )
+  }
+}
+
 // ── Politica de visibilidade (por categoria) ─────────────────────────────────
 
 interface UserCtx {
@@ -978,6 +998,11 @@ export function useDecisaoGenerica() {
         aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome, selectedItemIds,
       } = payload
 
+      // Gate: aprovacao tecnica de RC exige itens vinculados ao catalogo.
+      if (decisao === 'aprovada' && tipoAprovacao === 'requisicao_compra') {
+        await assertRCSemOrfaos(entidadeId)
+      }
+
       // 1. Update the specific aprovacao record
       // Sobrescreve aprovador_nome/email com QUEM realmente decidiu (e nao
       // quem era o destinatario esperado hardcoded no insert do enviador).
@@ -1358,6 +1383,11 @@ export function useDecisaoRequisicao() {
       // 1. Update cmp_requisicoes status
       const updates: Record<string, unknown> = {}
       const isFinancialApproval = currentStatus === 'cotacao_enviada'
+
+      // Gate: aprovacao tecnica (nao financeira) exige itens vinculados ao catalogo.
+      if (decisao === 'aprovada' && !isFinancialApproval) {
+        await assertRCSemOrfaos(requisicaoId)
+      }
 
       if (decisao === 'aprovada') {
         updates.data_aprovacao = new Date().toISOString()

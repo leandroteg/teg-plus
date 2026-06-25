@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
-  CheckCircle, XCircle, MessageSquare, AlertTriangle,
+  CheckCircle, XCircle, MessageSquare, AlertTriangle, AlertCircle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
   FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
@@ -1275,11 +1275,27 @@ export default function RequisicaoDetalhe() {
         />
       )}
 
-      {canDecide && (
+      {canDecide && (() => {
+        const isFinancial = req.status === 'cotacao_enviada'
+        const orfaos = (req.itens ?? []).filter(i => !(i as any).est_item_id)
+        const bloqueado = !isFinancial && orfaos.length > 0
+        return (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            {req.status === 'cotacao_enviada' ? 'Aprovação Financeira' : 'Decisão'}
+            {isFinancial ? 'Aprovação Financeira' : 'Decisão'}
           </p>
+
+          {bloqueado && (
+            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 space-y-1">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={15} className="text-amber-700 flex-shrink-0" />
+                <p className="text-sm font-bold text-amber-800">Aprovação bloqueada</p>
+              </div>
+              <p className="text-xs text-amber-700">
+                Esta RC tem <b>{orfaos.length}</b> item(ns) sem v&iacute;nculo de cat&aacute;logo. O comprador precisa vincular cada item ao cadastro de estoque (ou solicitar pr&eacute;-cadastro) antes da aprova&ccedil;&atilde;o. Voc&ecirc; ainda pode <b>rejeitar</b> ou pedir <b>esclarecimento</b>.
+              </p>
+            </div>
+          )}
 
           {/* Sucesso */}
           {decisaoMutation.isSuccess && (
@@ -1354,11 +1370,12 @@ export default function RequisicaoDetalhe() {
                   Esclarecer
                 </button>
                 <button
-                  disabled={decisaoMutation.isPending || isLocked}
+                  disabled={decisaoMutation.isPending || isLocked || bloqueado}
+                  title={bloqueado ? `${orfaos.length} item(ns) sem catálogo - vincule antes de aprovar` : undefined}
                   onClick={() => handleDecisao('aprovada')}
                   className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold
                     text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
-                    transition-all disabled:opacity-50"
+                    transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {decisaoMutation.isPending && pendingAction === 'aprovada'
                     ? <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -1385,7 +1402,8 @@ export default function RequisicaoDetalhe() {
             </>
           )}
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
