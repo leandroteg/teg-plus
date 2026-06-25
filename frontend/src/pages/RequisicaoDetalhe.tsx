@@ -921,6 +921,42 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
+      {/* Pular triagem — comprador/admin que NAO e triador, p/ desencalhar RC equivocada */}
+      {!podeTriagem && req?.status === 'em_triagem_cd' && (isAdmin || isAprovadorCompras) && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Send size={16} className="text-amber-700 flex-shrink-0" />
+            <span className="text-sm font-bold text-amber-800">Pular triagem do CD</span>
+          </div>
+          <p className="text-xs text-amber-700">
+            Use quando o destino n&atilde;o &eacute; MG ou o CD n&atilde;o vai atender essa RC. Vai direto para valida&ccedil;&atilde;o t&eacute;cnica.
+          </p>
+          <button
+            disabled={liberarTriagem.isPending}
+            onClick={async () => {
+              try {
+                await liberarTriagem.mutateAsync({ rcId: req.id })
+                setTriagemMsg({ type: 'success', msg: 'RC liberada para validação técnica' })
+              } catch (e) {
+                setTriagemMsg({ type: 'error', msg: (e as Error).message })
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            <Send size={15} />
+            {liberarTriagem.isPending ? 'Liberando…' : 'Pular triagem (ir para aprovação)'}
+          </button>
+          {triagemMsg && (
+            <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+              triagemMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              {triagemMsg.msg}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Itens */}
       {req.itens.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

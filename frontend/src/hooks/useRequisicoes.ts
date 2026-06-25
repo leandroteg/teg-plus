@@ -193,18 +193,20 @@ export function useCriarRequisicao() {
       let centroCustoId: string | null = null
       let centroCustoCodigo: string | null = null
       let baseDestinoId: string | null = null
+      let baseDestinoUf: string | null = null
 
       if (payload.obra_id) {
         try {
           const { data: obra } = await supabase
             .from('sys_obras')
-            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
+            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo), base:est_bases!base_id(uf)')
             .eq('id', payload.obra_id)
             .maybeSingle()
 
           centroCustoId = (obra as any)?.centro_custo_id ?? null
           centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
           baseDestinoId = (obra as any)?.base_id ?? null
+          baseDestinoUf = (obra as any)?.base?.uf ?? null
         } catch {
           // fallback sem centro de custo automatico
         }
@@ -221,7 +223,9 @@ export function useCriarRequisicao() {
             .select('comprador_nome, passa_por_cd, alcada1_limite')
             .eq('codigo', payload.categoria)
             .maybeSingle()
-          passaPorCd = Boolean(cat?.passa_por_cd)
+          // Triagem CD so vale p/ destinos em MG (sede do CD Araxa).
+          // Destino em outra UF, ou sem destino, pula triagem direto p/ aprovacao.
+          passaPorCd = Boolean(cat?.passa_por_cd) && baseDestinoUf === 'MG'
           if (cat?.alcada1_limite != null) alcada1Limite = Number(cat.alcada1_limite)
           if (!compradorId && cat?.comprador_nome) {
             const { data: comp } = await supabase
