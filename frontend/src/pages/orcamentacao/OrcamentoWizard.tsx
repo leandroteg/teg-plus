@@ -753,7 +753,7 @@ function Caracteristicas({ d, estagio, isDark, orcamentoId, onSave, saving }: { 
   )
 }
 
-function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: string; isDark: boolean; tone?: string; small?: boolean }) {
+export function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: string; isDark: boolean; tone?: string; small?: boolean }) {
   const valCls = tone === 'amber' ? (isDark ? 'text-amber-300' : 'text-amber-600') : (isDark ? 'text-white' : 'text-slate-900')
   return (
     <div className="min-w-0">
@@ -763,7 +763,7 @@ function ResumoStat({ lbl, val, isDark, tone, small }: { lbl: string; val: strin
   )
 }
 
-function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: boolean }) {
+export function CardMetric({ lbl, val, isDark }: { lbl: string; val: string; isDark: boolean }) {
   return (
     <div className={`rounded-lg px-2 py-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lbl}</p>
@@ -946,7 +946,7 @@ function ReleveModal({ obra, isDark, onClose, onVerMapa }: {
 // título legível da obra: usa nome real (descricao/nome) quando existe, senão capitaliza a chave
 function tituloObra(chave: string, v: unknown): string {
   const o = (v && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, unknown>) : null
-  const real = o ? (o.descricao ?? o.nome ?? o.obra ?? o.identificacao) : null
+  const real = o ? (o.descricao ?? o.nome ?? o.obra ?? o.obra_nome ?? o.identificacao) : null
   if (typeof real === 'string' && real.trim().length > 4) return real.split(/\s[—–]\s|,\s|\n|\s\(/)[0].trim().slice(0, 72)
   if (chave.includes('_')) return chave.split('_').filter(Boolean).map(w => (w.length <= 3 || /\d/.test(w)) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   if (/[A-ZÀ-Ú]/.test(chave)) return chave
@@ -1004,15 +1004,15 @@ function ValorRico({ v, isDark, baixar, temArq }: { v: unknown; isDark: boolean;
 
 export function BlocoRico({ titulo, Icon, dados, isDark, baixar, temArq, modo }: { titulo: string; Icon: LucideIcon; dados: unknown; isDark: boolean; baixar: (f: string) => void; temArq: (f: string) => boolean; modo?: 'geo' }) {
   const lista = Array.isArray(dados) ? (dados as Array<Record<string, unknown>>) : null
-  const ehPlano = !!lista && lista.length > 0 && lista.every(o => o && typeof o === 'object' && 'obra' in o)
+  const ehPlano = !!lista && lista.length > 0 && lista.every(o => o && typeof o === 'object' && ('obra' in o || 'obra_nome' in o))
   let itens: Array<{ chave: string; v: unknown }>
   if (ehPlano && lista) {
     // lista plana de fatos (têm 'obra') → agrupa por obra (ex.: 227 fatos → ~23 cards)
     const grupos = new Map<string, Array<Record<string, unknown>>>()
-    for (const o of lista) { const k = String(o.obra ?? 'Geral'); const { obra, ...rest } = o; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(rest) }
+    for (const o of lista) { const k = String(o.obra ?? o.obra_nome ?? 'Geral'); const { obra, obra_nome, ...rest } = o; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(rest) }
     itens = Array.from(grupos, ([chave, v]) => ({ chave, v }))
   } else if (lista) {
-    itens = lista.map((o, i) => { const { item, obra, nome, ...rest } = o; return { chave: String(item ?? obra ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
+    itens = lista.map((o, i) => { const { item, obra, obra_nome, nome, ...rest } = o; return { chave: String(item ?? obra ?? obra_nome ?? nome ?? `Item ${i + 1}`), v: Object.keys(rest).length ? rest : o } })
   } else {
     itens = dados && typeof dados === 'object' ? Object.entries(dados as Record<string, unknown>).map(([chave, v]) => ({ chave, v })) : []
   }
