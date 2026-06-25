@@ -10,7 +10,17 @@ const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.',
 const poloCurto = (s: string) => { const m = s.match(/^(F[\d.\/]+)/); return m ? m[1] : s }
 const LIMITE_PRIORITARIA = 1_000_000 // construção-escala (OSC/obra > R$ 1M)
 
-function ObraRow({ o, star, isDark }: { o: { nome: string; polo: string; valor: number; pctFis: number; pctFin: number }; star?: boolean; isDark: boolean }) {
+// cor de ritmo: compara % produzido (físico) com % prazo decorrido
+function ritmoCor(pctFis: number, pctPrazo: number | null): string {
+  if (pctPrazo == null) return '#10b981'
+  const d = pctFis - pctPrazo
+  if (d >= 0) return '#10b981'      // no prazo / adiantado
+  if (d >= -15) return '#f59e0b'    // levemente atrasado
+  return '#ef4444'                   // atrasado
+}
+
+function ObraRow({ o, star, isDark }: { o: { nome: string; polo: string; valor: number; pctFis: number; pctFin: number; pctPrazo: number | null }; star?: boolean; isDark: boolean }) {
+  const cor = ritmoCor(o.pctFis, o.pctPrazo)
   return (
     <div className="flex items-center gap-3">
       <div className="w-[42%] min-w-0">
@@ -18,12 +28,18 @@ function ObraRow({ o, star, isDark }: { o: { nome: string; polo: string; valor: 
           {star && <Star size={11} className="text-amber-500 shrink-0 fill-amber-500" />}
           <span className={`text-[13px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</span>
         </div>
-        <div className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo} · {fmtM(o.valor)} · {o.pctFin}% fat.</div>
+        <div className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo} · {fmtM(o.valor)} · {o.pctFin}% fat.{o.pctPrazo != null ? ` · ${o.pctPrazo}% prazo` : ''}</div>
       </div>
-      <div className={`flex-1 h-5 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-        <div className="h-full rounded-md bg-emerald-500 transition-all" style={{ width: `${Math.max(o.pctFis, 2)}%` }} />
+      <div className={`relative flex-1 h-5 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+        <div className="h-full rounded-md transition-all" style={{ width: `${Math.max(o.pctFis, 2)}%`, background: cor }} />
+        {o.pctPrazo != null && (
+          <div className="absolute top-0 bottom-0 w-[2px] z-10" style={{ left: `${Math.min(o.pctPrazo, 100)}%`, background: isDark ? '#e2e8f0' : '#0f172a' }}
+            title={`Prazo decorrido: ${o.pctPrazo}%`}>
+            <span className={`absolute -top-[1px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-slate-100' : 'bg-slate-900'}`} />
+          </div>
+        )}
       </div>
-      <span className={`w-10 text-right text-[13px] font-extrabold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{o.pctFis}%</span>
+      <span className="w-10 text-right text-[13px] font-extrabold tabular-nums" style={{ color: cor }}>{o.pctFis}%</span>
     </div>
   )
 }
@@ -57,26 +73,32 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
     return { pac, porPacote, fisicoGeral, torres }
   }, [polos])
 
-  // agrega físico por OBRA (a partir dos dados crus) → ranqueado por valor (prioritárias primeiro)
+  // produção por OBRA DE CONSTRUÇÃO em andamento (fat < 95%); + % de prazo decorrido
   const obras = useMemo(() => {
-    type O = { nome: string; polo: string; valor: number; fat: number; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
+    type O = { nome: string; polo: string; valor: number; fat: number; ini: string | null; fim: string | null; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
     const m = new Map<string, O>()
     for (const polo of rawF) for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
-      let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloCurto(polo.label), valor: 0, fat: 0, pac: new Map() }; m.set(o.obra_nome, a) }
+      if (o.tipo !== 'construcao') continue // só obras de construção
+      let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloCurto(polo.label), valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; m.set(o.obra_nome, a) }
       a.valor += o.valor; a.fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
+      const di = o.data_osc?.slice(0, 10); if (di && (!a.ini || di < a.ini)) a.ini = di
+      const dv = o.vencimento?.slice(0, 10); if (dv && (!a.fim || dv > a.fim)) a.fim = dv
       for (const [pn, pa] of Object.entries(o.pacotes)) {
         let x = a.pac.get(pn); if (!x) { x = { valor: 0, qC: 0, qR: 0, uni: null }; a.pac.set(pn, x) }
         x.valor += pa.valor; x.qC += pa.qC; x.qR += pa.qR; if (pa.uni) x.uni = pa.uni
       }
     }
+    const hoje = new Date().getTime()
     return [...m.values()].map(a => {
       const wf = [...a.pac.values()].filter(x => x.qC > 0).map(x => ({ pct: Math.round(x.qR / x.qC * 100), valor: x.valor }))
       const ws = wf.reduce((s, x) => s + x.valor, 0)
       const pctFis = ws ? Math.round(wf.reduce((s, x) => s + x.pct * x.valor, 0) / ws) : 0
+      const ini = a.ini ? Date.parse(a.ini) : NaN; const fim = a.fim ? Date.parse(a.fim) : NaN
+      const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
       const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni)}/${fmtQtd(x.qC, x.uni)}` : '—' }
-      return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, drv }
-    }).sort((x, y) => y.valor - x.valor)
+      return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, pctPrazo, drv }
+    }).filter(o => o.pctFin < 95).sort((x, y) => y.valor - x.valor)
   }, [rawF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -100,8 +122,8 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
         const prioritarias = obras.filter(o => o.valor >= LIMITE_PRIORITARIA)
         const demais = obras.filter(o => o.valor < LIMITE_PRIORITARIA)
         return (
-          <PanelCard title="Produção por obra" icon={<Building2 size={14} className="text-teal-500" />} isDark={isDark}
-            right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>★ prioritária = obra &gt; R$ 1M</span>}>
+          <PanelCard title="Produção por obra — construção em andamento" icon={<Building2 size={14} className="text-teal-500" />} isDark={isDark}
+            right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>│ prazo decorrido · cor = ritmo (<span className="text-emerald-500">no prazo</span>/<span className="text-amber-500">atenção</span>/<span className="text-red-500">atrasado</span>) · ★ &gt; R$ 1M</span>}>
             <div className="space-y-4">
               {prioritarias.length > 0 && (
                 <div className="space-y-2">

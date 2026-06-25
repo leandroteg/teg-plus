@@ -431,6 +431,8 @@ export interface EAPOscRaw {
   saldo_reais: number | null
   etapa_atual: string
   data_osc: string | null
+  vencimento: string | null
+  tipo: string | null
   qtd_torres: number | null
   pacotes: Record<string, PacAcc>
 }
@@ -486,8 +488,8 @@ export function useEAPFinal(portfolioId?: string) {
       const { data: obrasD } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', polosIds)
       const obra2polo = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.pmo_projeto_id as string]))
       const obraNome = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.nome as string]))
-      const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual, data_osc, qtd_torres').eq('portfolio_id', portfolioId!)
-      const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string; data_osc: string | null; qtd_torres: number | null }[]
+      const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual, data_osc, vencimento, tipo, qtd_torres').eq('portfolio_id', portfolioId!)
+      const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string; data_osc: string | null; vencimento: string | null; tipo: string | null; qtd_torres: number | null }[]
       const oscIds = oscs.map(o => o.id)
       let itens: ItemRow[] = []
       for (let i = 0; i < oscIds.length; i += 200) {
@@ -517,7 +519,7 @@ export function useEAPFinal(portfolioId?: string) {
         id: p.id, label: p.nome, codigo: p.codigo, qtdTorres: p.qtd_torres,
         oscs: oscs.filter(o => (o.obra_id ? obra2polo.get(o.obra_id) : undefined) === p.id).map(o => ({
           id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: o.obra_id ? (obraNome.get(o.obra_id) ?? '— Sem obra') : '— Sem obra',
-          valor: Number(o.valor ?? 0), saldo_reais: o.saldo_reais, etapa_atual: o.etapa_atual, data_osc: o.data_osc, qtd_torres: o.qtd_torres,
+          valor: Number(o.valor ?? 0), saldo_reais: o.saldo_reais, etapa_atual: o.etapa_atual, data_osc: o.data_osc, vencimento: o.vencimento, tipo: o.tipo, qtd_torres: o.qtd_torres,
           pacotes: byOsc.get(o.id) ?? {},
         })),
       }))
