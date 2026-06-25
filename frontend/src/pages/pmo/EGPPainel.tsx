@@ -38,8 +38,63 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 import { useQuery } from '@tanstack/react-query'
-import { usePortfolios, useParseOSC, useConfirmarOSC } from '../../hooks/usePMO'
+import { usePortfolios, useParseOSC, useConfirmarOSC, useMedicaoMensal, useEAPFinal, aggregatePolos, fmtQtd } from '../../hooks/usePMO'
 import type { OSCParsed } from '../../hooks/usePMO'
+
+const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
+const fmtMi = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
+
+// Resumo dos painéis: KPIs mais relevantes de Produção / Faturamento / Medição (clicáveis)
+function ResumoPaineis({ de, ate, isDark, onGo, cardClass }: { de: string; ate: string; isDark: boolean; onGo: (p: EGPPainelKey) => void; cardClass: string }) {
+  const { data: rows } = useMedicaoMensal()
+  const { data: raw } = useEAPFinal(CONTRATO_CEMIG)
+  const ix = useMemo(() => {
+    const byM = new Map<string, number>()
+    for (const r of (rows ?? [])) { if (r.subcontratada) continue; const v = Number(r.realizado ?? 0); if (v <= 0) continue; const c = r.competencia; if (c < de || c > ate) continue; byM.set(c, (byM.get(c) ?? 0) + v) }
+    const meses = [...byM.keys()].sort()
+    const totalFat = [...byM.values()].reduce((s, x) => s + x, 0)
+    const media = meses.length ? totalFat / meses.length : 0
+    const ult = meses[meses.length - 1]; const pen = meses[meses.length - 2]
+    const fUlt = ult ? (byM.get(ult) ?? 0) : 0; const fPen = pen ? (byM.get(pen) ?? 0) : 0
+    const varPct = fPen > 0 ? (fUlt - fPen) / fPen * 100 : null
+    const polos = aggregatePolos(raw ?? [], new Set())
+    const pac = new Map<string, { valor: number; qC: number; qR: number; uni: string | null }>()
+    for (const p of polos) for (const x of p.pacotes) { const a = pac.get(x.n) ?? { valor: 0, qC: 0, qR: 0, uni: null }; a.valor += x.valor; a.qC += x.qtdContr; a.qR += x.qtdReal; if (x.unidade) a.uni = x.unidade; pac.set(x.n, a) }
+    const wf = [...pac.values()].filter(x => x.qC > 0); const ws = wf.reduce((s, x) => s + x.valor, 0)
+    const fisicoGeral = ws ? Math.round([...pac.values()].filter(x => x.qC > 0).reduce((s, x) => s + Math.round(x.qR / x.qC * 100) * x.valor, 0) / ws) : 0
+    const torres = polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0)
+    const drv = (n: string) => { const a = pac.get(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni)}/${fmtQtd(a.qC, a.uni)}` : '—' }
+    const nUlt = ult ? new Set((rows ?? []).filter(r => !r.subcontratada && r.competencia === ult && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
+    const mesLbl = ult ? (() => { const [y, m] = ult.split('-'); return `${['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m]}/${y.slice(2)}` })() : '—'
+    return { totalFat, runrate: media * 12, fUlt, varPct, fisicoGeral, torres, drv, nUlt, mesLbl, nMeses: meses.length }
+  }, [rows, raw, de, ate])
+
+  const Card = ({ label, value, sub, tone, painel }: { label: string; value: string; sub: string; tone: string; painel: EGPPainelKey }) => (
+    <button onClick={() => onGo(painel)} className={`text-left rounded-2xl border px-3 py-2.5 transition hover:shadow-sm ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50/70 hover:bg-white'}`}>
+      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 truncate">{label}</p>
+      <p className={`mt-1 text-lg leading-none font-black ${tone}`}>{value}</p>
+      <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sub}</p>
+    </button>
+  )
+  return (
+    <section className={`rounded-3xl shadow-sm p-4 md:p-5 ${cardClass}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Resumo dos painéis</p>
+          <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Produção · Faturamento · Medição <span className="font-normal text-slate-400 text-[11px]">· clique para abrir</span></h3>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        <Card painel="producao" label="Físico Geral" value={`${ix.fisicoGeral}%`} sub="produção" tone="text-emerald-600" />
+        <Card painel="producao" label="Tubulões m³" value={ix.drv('Fundações')} sub="exec / contr" tone={isDark ? 'text-amber-400' : 'text-amber-600'} />
+        <Card painel="producao" label="Montagem ton" value={ix.drv('Montagem de Torres')} sub={`${ix.torres || '—'} torres`} tone={isDark ? 'text-slate-200' : 'text-slate-700'} />
+        <Card painel="faturamento" label="Faturado TEG" value={fmtMi(ix.totalFat)} sub={`${ix.nMeses} mes(es)`} tone="text-teal-600" />
+        <Card painel="faturamento" label="Run-rate ano" value={fmtMi(ix.runrate)} sub="média × 12" tone={isDark ? 'text-violet-400' : 'text-violet-600'} />
+        <Card painel="medicao" label={`Medição ${ix.mesLbl}`} value={fmtMi(ix.fUlt)} sub={ix.varPct == null ? `${ix.nUlt} OSCs` : `${ix.varPct >= 0 ? '▲ +' : '▼ '}${ix.varPct.toFixed(0)}% · ${ix.nUlt} OSCs`} tone={isDark ? 'text-sky-400' : 'text-sky-600'} />
+      </div>
+    </section>
+  )
+}
 import { useLookupObras } from '../../hooks/useLookups'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../services/supabase'
@@ -897,6 +952,9 @@ export default function EGPPainel() {
           </div>
         </section>
       </div>
+
+      {/* Resumo dos painéis (Produção / Faturamento / Medição) */}
+      <ResumoPaineis de={de} ate={ate} isDark={isDark} onGo={setPainel} cardClass={cardClass} />
 
       {/* Pulso por Status */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
