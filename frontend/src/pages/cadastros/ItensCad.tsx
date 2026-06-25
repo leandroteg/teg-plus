@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, RefreshCw } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
 import { useCategorias } from '../../hooks/useCategorias'
@@ -43,6 +43,44 @@ export default function ItensCad() {
   const [sortCol, setSortCol] = useState<string>('descricao')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  // Prefill via query param ?descricao=X — usado pelo fluxo "aguardando_catalogo"
+  // do RequisicaoDetalhe: abre o modal com a descricao livre da RC ja preenchida.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const desc = params.get('descricao')
+    if (desc && desc.trim()) {
+      setEditItem({ ...EMPTY, descricao: desc.trim() })
+      setClasseBusca('')
+      setClasseDropdownOpen(false)
+      setShowForm(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Gera codigo padrao 01.NN.NNNN a partir da descricao (mig 161).
+  async function gerarCodigoNovo(descricao: string): Promise<string | null> {
+    const desc = (descricao || '').trim()
+    if (!desc) return null
+    const { data: prefixo, error: errClass } = await supabase.rpc('est_classificar_descricao', { p_descricao: desc })
+    if (errClass || !prefixo) return null
+    const { data: codigo, error: errCode } = await supabase.rpc('est_proximo_codigo', { p_prefixo: prefixo as string })
+    if (errCode || !codigo) return null
+    return codigo as string
+  }
+
+  // Auto-gera codigo quando o modal abre p/ novo item com descricao prefilled.
+  const [gerandoCodigo, setGerandoCodigo] = useState(false)
+  useEffect(() => {
+    if (!showForm || !editItem || editItem.id || editItem.codigo || !editItem.descricao) return
+    let cancelado = false
+    setGerandoCodigo(true)
+    gerarCodigoNovo(editItem.descricao)
+      .then(c => { if (!cancelado && c) setEditItem(prev => prev ? { ...prev, codigo: c } : prev) })
+      .finally(() => { if (!cancelado) setGerandoCodigo(false) })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, editItem?.id, editItem?.descricao])
 
   const { data: itens = [], isLoading } = useEstoqueItens(
     curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined,
@@ -354,13 +392,36 @@ export default function ItensCad() {
 
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <AutoCodeField
-                  prefix="ITM"
-                  table="est_itens"
-                  value={editItem.codigo ?? ''}
-                  onChange={(value) => setEditItem({ ...editItem, codigo: value })}
-                  disabled={!!editItem.id}
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Codigo *</label>
+                  <div className="relative flex items-center">
+                    <input
+                      value={editItem.codigo ?? ''}
+                      onChange={e => setEditItem({ ...editItem, codigo: e.target.value.toUpperCase() })}
+                      disabled={!!editItem.id}
+                      placeholder="01.NN.NNNN"
+                      className="input-base pr-8 font-mono text-sm"
+                    />
+                    {!editItem.id && (
+                      <button
+                        type="button"
+                        title="Regenerar codigo a partir da descricao"
+                        disabled={gerandoCodigo || !editItem.descricao?.trim()}
+                        onClick={async () => {
+                          if (!editItem.descricao?.trim()) return
+                          setGerandoCodigo(true)
+                          try {
+                            const c = await gerarCodigoNovo(editItem.descricao)
+                            if (c) setEditItem(prev => prev ? { ...prev, codigo: c } : prev)
+                          } finally { setGerandoCodigo(false) }
+                        }}
+                        className="absolute right-2 w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 transition-colors disabled:opacity-40"
+                      >
+                        <RefreshCw size={12} className={gerandoCodigo ? 'animate-spin' : ''} />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Unidade *</label>
                   <select
