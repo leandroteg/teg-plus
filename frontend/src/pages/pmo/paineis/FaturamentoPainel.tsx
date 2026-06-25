@@ -50,6 +50,7 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     const byM = new Map<string, { fat: number; oscs: Set<string> }>()
     for (const r of (rows ?? [])) {
       const v = Number(r.realizado ?? 0); if (v <= 0) continue
+      if (r.subcontratada) continue // gráficos só com execução própria (TEG)
       // produção = 1 mês antes do faturamento (mês de execução)
       const c = isProd ? shiftMonth(r.competencia, -1) : r.competencia
       let a = byM.get(c); if (!a) { a = { fat: 0, oscs: new Set() }; byM.set(c, a) }
@@ -74,13 +75,14 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     for (const r of (rows ?? [])) {
       const v = Number(r.realizado ?? 0); const c = r.competencia
       if (v <= 0 || c < de || c > ateF) continue
+      if (r.subcontratada) { sub += v; continue } // subcontratada só entra no objeto TEG×Sub, não nos gráficos
+      teg += v
       const info = oscMap.get(r.numero_os)
       const obra = info?.obra ?? '— Fora do contrato'; const polo = info?.polo ?? 'Outros'
       porObra.set(obra, (porObra.get(obra) ?? 0) + v)
       porPolo.set(polo, (porPolo.get(polo) ?? 0) + v)
       let pm = poloMes.get(polo); if (!pm) { pm = new Map(); poloMes.set(polo, pm) }
       pm.set(c, (pm.get(c) ?? 0) + v); mesesSet.add(c)
-      if (r.subcontratada) sub += v; else teg += v
     }
     const topObras = [...porObra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
     const totalGeral = [...porObra.values()].reduce((s, x) => s + x, 0) || 1
@@ -92,10 +94,13 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
 
   // por pacote/seção da EAP — REAL (tabela pmo_medicao_secao), no período
   const pacAgg = useMemo(() => {
+    const subSet = new Set<string>()
+    for (const r of (rows ?? [])) if (r.subcontratada) subSet.add(`${r.numero_os}|${r.competencia}`)
     const pacMes = new Map<string, Map<string, number>>(); const porPac = new Map<string, number>(); const mset = new Set<string>()
     for (const r of (secaoRows ?? [])) {
       const v = Number(r.realizado ?? 0); const c = r.competencia
       if (v <= 0 || c < de || c > ateF) continue
+      if (subSet.has(`${r.numero_os}|${r.competencia}`)) continue // subcontratada fora dos gráficos
       const pac = r.pacote
       porPac.set(pac, (porPac.get(pac) ?? 0) + v)
       let pm = pacMes.get(pac); if (!pm) { pm = new Map(); pacMes.set(pac, pm) }
@@ -104,7 +109,7 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
     const ord = (n: string) => { const i = PAC_ORD.indexOf(n); return i < 0 ? 99 : i }
     const pacotes = [...porPac.entries()].sort((a, b) => ord(a[0]) - ord(b[0]) || b[1] - a[1])
     return { pacotes, pacMes, meses: [...mset].sort() }
-  }, [secaoRows, de, ateF])
+  }, [secaoRows, rows, de, ateF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -132,7 +137,7 @@ export default function FaturamentoPainel({ de = '2024-01', ate, visao = 'fatura
         <Kpi label="Run-rate anual" value={fmtM(media * 12)} tone="amber" isDark={isDark} note="média × 12" />
       </div>
 
-      <PanelCard title={`${noun} mensal (medições consolidadas)`} icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}
+      <PanelCard title={`${noun} mensal — execução própria (TEG)`} icon={<TrendingUp size={14} className="text-teal-500" />} isDark={isDark}
         right={<div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#10b981' }} /><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>≥ média</span></span>
           <span className="flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#f59e0b' }} /><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>&lt; média</span></span>
