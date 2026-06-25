@@ -10,11 +10,13 @@ import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const DRV = [
-  { pac: 'Serv. Preliminares', label: 'Topografia', uni: 'km', cor: '#0284c7' },
-  { pac: 'Fundações', label: 'Tubulões', uni: 'm³', cor: '#92400e' },
+  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e' },
   { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#374151' },
   { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3' },
 ]
+// tudo que não é driver (topografia, canteiro, adm, outros) → "ADM + Outros" (só R$)
+const OUTROS_PAC = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Administração Local', 'Outros']
+const COR_OUTROS = '#6d28d9'
 const MES_ABR = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const ymLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${MES_ABR[+m]}/${y.slice(2)}` }
 const shiftYM = (ym: string, d: number) => { let [y, m] = ym.split('-').map(Number); m += d; while (m > 12) { m -= 12; y++ } while (m < 1) { m += 12; y-- } return `${y}-${String(m).padStart(2, '0')}` }
@@ -23,7 +25,7 @@ const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.',
 const fmtQ = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; saldoQ: number; saldoR: number; pctFis: number }
-type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number }
+type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number }
 type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number }
 type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
@@ -64,19 +66,23 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   // árvore frente → obra → drivers (saldo)
   const tree = useMemo(() => {
-    const frentes = new Map<string, { label: string; obras: Map<string, Drv[]> }>()
+    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number }> }>()
     for (const polo of (raw ?? []) as EAPPoloRaw[]) {
       let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
       for (const o of polo.oscs) {
         if (o.etapa_atual === 'cancelada') continue
-        let od = fr.obras.get(o.obra_nome); if (!od) { od = emptyDrivers(); fr.obras.set(o.obra_nome, od) }
-        for (const [pn, pa] of Object.entries(o.pacotes)) { const d = od.find(x => x.pac === pn); if (d) { d.contr += pa.qC; d.real += pa.qR; d.saldoR += Math.max(0, pa.valor - pa.fat) } }
+        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0 }; fr.obras.set(o.obra_nome, od) }
+        for (const [pn, pa] of Object.entries(o.pacotes)) {
+          const d = od.drivers.find(x => x.pac === pn)
+          if (d) { d.contr += pa.qC; d.real += pa.qR; d.saldoR += Math.max(0, pa.valor - pa.fat) }
+          else if (OUTROS_PAC.includes(pn)) od.outrosR += Math.max(0, pa.valor - pa.fat)
+        }
       }
     }
     return [...frentes.values()].map(fr => ({
       label: fr.label,
-      obras: [...fr.obras.entries()].map(([nome, ds]) => { ds.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 }); return { nome, frente: fr.label, drivers: ds, saldoR: ds.reduce((s, d) => s + d.saldoR, 0) } as Obra })
-        .filter(o => o.drivers.some(d => d.contr > 0)).sort((a, b) => b.saldoR - a.saldoR),
+      obras: [...fr.obras.entries()].map(([nome, od]) => { od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 }); return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR } as Obra })
+        .filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0).sort((a, b) => b.saldoR - a.saldoR),
     })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
   }, [raw])
 
@@ -109,13 +115,31 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     return denom > 0 ? C * (cfg.pesos[o.nome] ?? 0) / denom : 0
   }
   const mesesOf = (o: Obra, d: Drv, cfg: Config) => { const r = rateOf(o, d, cfg); return r > 0 ? Math.ceil(d.saldoQ / r) : 0 }
+  // projeção mês a mês da obra: qtd/R$ por driver + ADM&Outros (R$) + total/mês
+  const projObra = (o: Obra, cfg: Config) => {
+    const dM = o.drivers.filter(d => d.contr > 0).map(d => ({ d, r: rateOf(o, d, cfg) }))
+    let maxMeses = Math.max(0, ...dM.map(({ d, r }) => r > 0 && d.saldoQ > 0 ? Math.ceil(d.saldoQ / r) : 0))
+    if (maxMeses === 0 && o.outrosR > 0) maxMeses = 1
+    const meses = Array.from({ length: maxMeses }, (_, i) => shiftYM(start, i))
+    const rows = dM.map(({ d, r }) => {
+      const qty = meses.map((_, i) => { if (r <= 0) return 0; const prev = r * i; return prev >= d.saldoQ ? 0 : Math.min(r, d.saldoQ - prev) })
+      const rMes = qty.map(q => d.saldoQ > 0 ? d.saldoR * (q / d.saldoQ) : 0)
+      const mesesD = r > 0 && d.saldoQ > 0 ? Math.ceil(d.saldoQ / r) : 0
+      return { d, qty, rMes, meses: mesesD }
+    })
+    const drvRmes = meses.map((_, i) => rows.reduce((s, x) => s + x.rMes[i], 0))
+    const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
+    const outrosRmes = meses.map((_, i) => totDrvR > 0 ? o.outrosR * drvRmes[i] / totDrvR : (maxMeses ? o.outrosR / maxMeses : 0))
+    const totalRmes = meses.map((_, i) => drvRmes[i] + outrosRmes[i])
+    return { meses, rows, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
+  }
 
   const view = useMemo(() => {
     if (!applied) return { frentesF: [] as typeof tree, maxMeses: 0, saldoRtot: 0, terminoGeral: null as string | null }
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
       .map(fr => ({ ...fr, obras: fr.obras.filter(o => fObra.size === 0 || fObra.has(o.nome)) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
-    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; for (const d of o.drivers) maxMeses = Math.max(maxMeses, mesesOf(o, d, applied)) }
+    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; const dm = Math.max(0, ...o.drivers.map(d => mesesOf(o, d, applied))); maxMeses = Math.max(maxMeses, dm === 0 && o.outrosR > 0 ? 1 : dm) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, fFrente, fObra, applied])
@@ -125,14 +149,14 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const barW = (meses: number) => view.maxMeses ? Math.max(3, meses / view.maxMeses * 100) : 0
+  const obraMeses = (o: Obra, cfg: Config) => { const m = Math.max(0, ...o.drivers.map(d => mesesOf(o, d, cfg))); return (m === 0 && o.outrosR > 0) ? 1 : m }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
         <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
         <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
+        <button onClick={() => setModalOpen(true)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -148,7 +172,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
           <div className="space-y-1.5">
             {view.frentesF.map(fr => {
               const fOpen = openF.has(fr.label)
-              const frMaxMes = Math.max(0, ...fr.obras.flatMap(o => o.drivers.map(d => mesesOf(o, d, applied))))
+              const frMaxMes = Math.max(0, ...fr.obras.map(o => obraMeses(o, applied)))
               const frTerm = frMaxMes > 0 ? shiftYM(start, frMaxMes - 1) : null
               const frSaldoR = fr.obras.reduce((s, o) => s + o.saldoR, 0)
               return (
@@ -163,7 +187,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                     <div className={`px-2 pb-2 space-y-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                       {fr.obras.map(o => {
                         const okey = fr.label + '|' + o.nome; const oOpen = openO.has(okey)
-                        const oMax = Math.max(0, ...o.drivers.map(d => mesesOf(o, d, applied))); const oTerm = oMax > 0 ? shiftYM(start, oMax - 1) : null
+                        const oMax = obraMeses(o, applied); const oTerm = oMax > 0 ? shiftYM(start, oMax - 1) : null
                         return (
                           <div key={o.nome} className="mt-1">
                             <button onClick={() => togF(okey, setOpenO)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
@@ -171,17 +195,42 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                               <span className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</span>
                               <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={10} />{oTerm ? ymLabel(oTerm) : '—'}</span></span>
                             </button>
-                            {oOpen && (
-                              <div className="pl-6 pr-2 py-1 space-y-1.5">
-                                {o.drivers.filter(d => d.contr > 0).map(d => { const meses = mesesOf(o, d, applied); return (
-                                  <div key={d.label} className="flex items-center gap-2">
-                                    <span className={`w-[22%] text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d.label}</span>
-                                    <span className={`w-[20%] text-[10px] tabular-nums ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtQ(d.saldoQ)}/{fmtQ(d.contr)} {d.uni}</span>
-                                    <div className={`flex-1 h-4 rounded-md overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>{meses > 0 && <div className="h-full rounded-md flex items-center px-1.5" style={{ width: `${barW(meses)}%`, background: d.cor }}><span className="text-[9px] font-bold text-white whitespace-nowrap">{meses}m</span></div>}</div>
-                                    <span className="w-14 text-right text-[10px] font-semibold tabular-nums" style={{ color: d.cor }}>{meses > 0 ? ymLabel(shiftYM(start, meses - 1)) : (d.saldoQ <= 0 ? '✓' : '—')}</span>
-                                  </div>) })}
-                              </div>
-                            )}
+                            {oOpen && (() => {
+                              const pj = projObra(o, applied)
+                              const thx = `px-2 py-1 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
+                              const tdx = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+                              const stick = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
+                              return (
+                                <div className="pl-5 pr-1 pb-2 pt-1 overflow-x-auto">
+                                  {pj.maxMeses === 0 ? <p className="text-[11px] text-slate-400 px-2 py-1">Defina a produtividade pra projetar.</p> : (
+                                    <table className="w-full border-collapse">
+                                      <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                                        <th className={`px-2 py-1 text-left text-[10px] font-semibold ${stick} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Serviço</th>
+                                        {pj.meses.map(m => <th key={m} className={thx}>{ymLabel(m)}</th>)}
+                                      </tr></thead>
+                                      <tbody>
+                                        {pj.rows.map(r => (
+                                          <tr key={r.d.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] ${stick}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.d.cor }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>{r.d.label}</b> <span className="text-slate-400">{fmtQ(r.d.saldoQ)} {r.d.uni} · {fmtM(r.d.saldoR)}</span></td>
+                                            {r.rMes.map((v, i) => <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+                                          </tr>
+                                        ))}
+                                        {o.outrosR > 0 && (
+                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] ${stick}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>ADM + Outros</b> <span className="text-slate-400">{fmtM(o.outrosR)}</span></td>
+                                            {pj.outrosRmes.map((v, i) => <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+                                          </tr>
+                                        )}
+                                        <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
+                                          <td className={`px-2 py-1 text-left text-[11px] ${stick} ${isDark ? 'text-white' : 'text-slate-900'}`}>Total R$/mês</td>
+                                          {pj.totalRmes.map((v, i) => <td key={i} className={`${tdx} font-bold`}>{fmtM(v)}</td>)}
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         )
                       })}
