@@ -8,7 +8,7 @@ import { PanelCard, Kpi, StackedMonthChart, Legenda } from './_ui'
 
 const COR_CLT = '#7c3aed', COR_PJ = '#f59e0b', COR_OUTROS = '#94a3b8'
 
-export default function EvolucaoHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
+export default function EvolucaoHeadcount({ de = '2026-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
 

@@ -20,8 +20,8 @@ const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
 
 type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
-  { key: 'geral', label: 'Visão Geral' },
   { key: 'composicao', label: 'Composição' },
+  { key: 'geral', label: 'Visão Geral' },
   { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
 ]
@@ -100,8 +100,8 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 
 export default function RHPainel() {
   const { isDark } = useTheme()
-  const [painel, setPainel] = useState<PainelKey>('geral')
-  const [de, setDe] = useState('2025-01')
+  const [painel, setPainel] = useState<PainelKey>('composicao')
+  const [de, setDe] = useState('2026-01')
   const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
   const { data: admissoes = [] } = useAdmissoesFluxo()

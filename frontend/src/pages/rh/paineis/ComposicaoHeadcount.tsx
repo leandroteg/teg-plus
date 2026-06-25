@@ -9,7 +9,7 @@ import {
 } from '../../../lib/headcountAnalytics'
 import { PanelCard, Kpi, StackedMonthChart, Legenda, ProporcaoBar } from './_ui'
 
-export default function ComposicaoHeadcount({ de = '2025-01', ate }: { de?: string; ate: string }) {
+export default function ComposicaoHeadcount({ de = '2026-01', ate }: { de?: string; ate: string }) {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
   const [aberto, setAberto] = useState<string | null>(null)
