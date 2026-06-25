@@ -1,13 +1,13 @@
 // Painel Produção — avanço físico e quantitativos (vivo, via useEAPFinal)
 import { useMemo, useState } from 'react'
-import { Activity, Ruler, Layers, Building2, Star, Filter } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Activity, Ruler, Layers, Building2, Star, Filter, ChevronDown, Check } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
 import { useEAPFinal, aggregatePolos, fmtQtd } from '../../../hooks/usePMO'
 import { Kpi, PanelCard, HBarRow } from '../../rh/paineis/_ui'
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
-const poloCurto = (s: string) => { const m = s.match(/^(F[\d.\/]+)/); return m ? m[1] : s }
 const LIMITE_PRIORITARIA = 1_000_000 // construção-escala (OSC/obra > R$ 1M)
 const FIS_BANDS: [string, string, (p: number) => boolean][] = [
   ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50],
@@ -58,6 +58,40 @@ const PAC_COR: Record<string, string> = {
 }
 const PAC_ORD = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Fundações', 'Montagem de Torres', 'Lançamento de Cabos', 'Administração Local', 'Outros']
 
+// dropdown multi-select elegante (caixa com checkboxes)
+function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark }: {
+  label: string; icon?: ReactNode; options: { value: string; label: string }[]
+  selected: Set<string>; onToggle: (v: string) => void; onClear: () => void; isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const n = selected.size
+  const resumo = n === 0 ? 'todas' : n === 1 ? (options.find(o => selected.has(o.value))?.label ?? `${n}`) : `${n} selecionadas`
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border text-[11px] font-semibold transition min-w-[130px] ${n > 0 ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:border-white/20' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300')}`}>
+        {icon}<span className="opacity-70">{label}</span>
+        <span className="flex-1 text-left truncate">{resumo}</span>
+        <ChevronDown size={12} className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+        <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[260px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
+          {n > 0 && <button onClick={onClear} className={`w-full text-left px-2 py-1 mb-0.5 text-[10px] font-semibold ${isDark ? 'text-slate-400 hover:text-rose-300' : 'text-slate-400 hover:text-rose-500'}`}>× limpar seleção</button>}
+          {options.map(o => {
+            const on = selected.has(o.value)
+            return (
+              <button key={o.value} onClick={() => onToggle(o.value)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] text-left transition ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
+                <span className={`shrink-0 w-4 h-4 rounded-md border flex items-center justify-center transition ${on ? 'bg-teal-600 border-teal-600 text-white' : (isDark ? 'border-white/25' : 'border-slate-300')}`}>{on && <Check size={11} strokeWidth={3} />}</span>
+                <span className={`truncate ${on ? (isDark ? 'text-white font-semibold' : 'text-slate-800 font-semibold') : (isDark ? 'text-slate-300' : 'text-slate-600')}`}>{o.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </>)}
+    </div>
+  )
+}
+
 export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string }) {
   const { isDark } = useTheme()
   const portfolioId = useEGPPortfolioId()
@@ -88,7 +122,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
     for (const polo of (raw ?? [])) for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
       if (o.tipo !== 'construcao') continue // só obras de construção
-      let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloCurto(polo.label), valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; m.set(o.obra_nome, a) }
+      let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: polo.label, valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; m.set(o.obra_nome, a) }
       a.valor += o.valor; a.fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
       const di = o.data_osc?.slice(0, 10); if (di && (!a.ini || di < a.ini)) a.ini = di
       const dv = o.vencimento?.slice(0, 10); if (dv && (!a.fim || dv > a.fim)) a.fim = dv
@@ -139,22 +173,17 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
           (fVal.size === 0 || VAL_BANDS.some(b => fVal.has(b[0]) && b[2](o.valor))))
         const prioritarias = obrasF.filter(o => o.valor >= LIMITE_PRIORITARIA)
         const demais = obrasF.filter(o => o.valor < LIMITE_PRIORITARIA)
-        const chip = (active: boolean) => `px-2 py-0.5 rounded-full text-[10px] font-semibold border transition ${active ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400 hover:border-white/30' : 'border-slate-300 text-slate-500 hover:border-slate-400')}`
-        const lbl = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
         const limpar = fFrente.size || fFis.size || fVal.size
         return (
           <PanelCard title="Produção por obra — construção em andamento" icon={<Building2 size={14} className="text-teal-500" />} isDark={isDark}
             right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>│ prazo decorrido · cor = ritmo (<span className="text-emerald-500">no prazo</span>/<span className="text-amber-500">atenção</span>/<span className="text-red-500">atrasado</span>) · ★ &gt; R$ 1M</span>}>
-            {/* filtros: frente · % físico · valor */}
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 pb-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-              <div className="flex items-center gap-1.5"><Filter size={12} className={isDark ? 'text-slate-500' : 'text-slate-400'} /><span className={lbl}>Frente</span>
-                {frentes.map(fr => <button key={fr} onClick={() => toggle(fFrente, setFFrente, fr)} className={chip(fFrente.has(fr))}>{fr}</button>)}</div>
-              <div className="flex items-center gap-1.5"><span className={lbl}>% Físico</span>
-                {FIS_BANDS.map(b => <button key={b[0]} onClick={() => toggle(fFis, setFFis, b[0])} className={chip(fFis.has(b[0]))}>{b[1]}</button>)}</div>
-              <div className="flex items-center gap-1.5"><span className={lbl}>Valor</span>
-                {VAL_BANDS.map(b => <button key={b[0]} onClick={() => toggle(fVal, setFVal, b[0])} className={chip(fVal.has(b[0]))}>{b[1]}</button>)}</div>
-              {limpar ? <button onClick={() => { setFFrente(new Set()); setFFis(new Set()); setFVal(new Set()) }} className={`text-[10px] underline ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>limpar</button> : null}
-              <span className={`ml-auto text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasF.length} de {obras.length} obras</span>
+            {/* filtros: caixas multi-select (frente · % físico · valor) */}
+            <div className={`flex flex-wrap items-center gap-2 mb-3 pb-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <MultiSelect label="Frente" icon={<Filter size={12} className="shrink-0 opacity-70" />} options={frentes.map(f => ({ value: f, label: f }))} selected={fFrente} onToggle={v => toggle(fFrente, setFFrente, v)} onClear={() => setFFrente(new Set())} isDark={isDark} />
+              <MultiSelect label="% Físico" options={FIS_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fFis} onToggle={v => toggle(fFis, setFFis, v)} onClear={() => setFFis(new Set())} isDark={isDark} />
+              <MultiSelect label="Valor" options={VAL_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fVal} onToggle={v => toggle(fVal, setFVal, v)} onClear={() => setFVal(new Set())} isDark={isDark} />
+              {limpar ? <button onClick={() => { setFFrente(new Set()); setFFis(new Set()); setFVal(new Set()) }} className={`text-[10px] underline ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>limpar tudo</button> : null}
+              <span className={`ml-auto text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasF.length} de {obras.length} obras</span>
             </div>
             {obrasF.length === 0 ? (
               <p className={`text-center py-8 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>
