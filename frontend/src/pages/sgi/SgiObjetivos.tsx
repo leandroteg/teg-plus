@@ -265,7 +265,13 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
               <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>{m.periodo === 'anual' ? 'Meta anual' : `Trim. ${m.trimestre}`}</p>
               {m.descricao
                 ? <p className={`text-xs font-medium leading-snug ${txt}`}>{m.descricao}</p>
-                : <p className={`text-2xl font-extrabold leading-tight ${txt}`}>{alvoLabel(obj, m.alvo)}</p>}
+                : (
+                  <p className="flex items-baseline gap-1 leading-tight">
+                    <span className={`text-base font-semibold ${muted}`}>{obj.direcao === 'menor_melhor' ? '≤' : '≥'}</span>
+                    <span className={`text-3xl font-extrabold ${txt}`}>{m.alvo != null ? m.alvo.toLocaleString('pt-BR') : '—'}</span>
+                    {obj.unidade && <span className={`text-xs font-medium ${muted}`}>{obj.unidade}</span>}
+                  </p>
+                )}
             </div>
             {periodo === 'trimestral' && (
               <button onClick={() => onDeleteMeta(obj, m)} title="Remover meta" className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'hover:bg-red-500/15 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}><Trash2 size={13} /></button>
