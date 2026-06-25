@@ -226,6 +226,7 @@ export interface EGPOscRow {
   data_osc: string | null
   vencimento: string | null
   abertura_path: string | null
+  qtd_torres: number | null
 }
 
 export async function getAberturaUrl(path: string, download = false): Promise<string | null> {
@@ -240,7 +241,7 @@ export function useOSCsDoPortfolio(portfolioId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pmo_fluxo_os')
-        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes, tipo, valor, quantidade_us, saldo_reais, data_osc, vencimento, abertura_path')
+        .select('id, obra_id, portfolio_id, numero_os, etapa_atual, tipo_servico, data_recebimento, observacoes, tipo, valor, quantidade_us, saldo_reais, data_osc, vencimento, abertura_path, qtd_torres')
         .eq('portfolio_id', portfolioId!)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -430,6 +431,7 @@ export interface EAPOscRaw {
   saldo_reais: number | null
   etapa_atual: string
   data_osc: string | null
+  qtd_torres: number | null
   pacotes: Record<string, PacAcc>
 }
 // filtra os polos crus pelas OSCs com abertura (data_osc) dentro de [de, ate] (YYYY-MM); vazio = tudo
@@ -484,8 +486,8 @@ export function useEAPFinal(portfolioId?: string) {
       const { data: obrasD } = await supabase.from('sys_obras').select('id, nome, pmo_projeto_id').in('pmo_projeto_id', polosIds)
       const obra2polo = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.pmo_projeto_id as string]))
       const obraNome = new Map((obrasD ?? []).map((o: Record<string, unknown>) => [o.id as string, o.nome as string]))
-      const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual, data_osc').eq('portfolio_id', portfolioId!)
-      const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string; data_osc: string | null }[]
+      const { data: oscsD } = await supabase.from('pmo_fluxo_os').select('id, numero_os, obra_id, valor, saldo_reais, etapa_atual, data_osc, qtd_torres').eq('portfolio_id', portfolioId!)
+      const oscs = (oscsD ?? []) as { id: string; numero_os: string; obra_id: string | null; valor: number | null; saldo_reais: number | null; etapa_atual: string; data_osc: string | null; qtd_torres: number | null }[]
       const oscIds = oscs.map(o => o.id)
       let itens: ItemRow[] = []
       for (let i = 0; i < oscIds.length; i += 200) {
@@ -508,7 +510,7 @@ export function useEAPFinal(portfolioId?: string) {
         id: p.id, label: p.nome, codigo: p.codigo, qtdTorres: p.qtd_torres,
         oscs: oscs.filter(o => (o.obra_id ? obra2polo.get(o.obra_id) : undefined) === p.id).map(o => ({
           id: o.id, numero_os: o.numero_os, obra_id: o.obra_id, obra_nome: o.obra_id ? (obraNome.get(o.obra_id) ?? '— Sem obra') : '— Sem obra',
-          valor: Number(o.valor ?? 0), saldo_reais: o.saldo_reais, etapa_atual: o.etapa_atual, data_osc: o.data_osc,
+          valor: Number(o.valor ?? 0), saldo_reais: o.saldo_reais, etapa_atual: o.etapa_atual, data_osc: o.data_osc, qtd_torres: o.qtd_torres,
           pacotes: byOsc.get(o.id) ?? {},
         })),
       }))
@@ -539,10 +541,12 @@ export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>): E
     const obrasMap = new Map<string, { id: string; numero_os: string }[]>()
     for (const o of oscs) { const k = o.obra_nome || '— Sem obra'; const a = obrasMap.get(k) ?? []; a.push({ id: o.id, numero_os: o.numero_os }); obrasMap.set(k, a) }
     const obras = [...obrasMap.entries()].map(([nome, list]) => ({ nome, oscs: list.sort((a, b) => a.numero_os.localeCompare(b.numero_os, undefined, { numeric: true })) })).sort((a, b) => a.nome.localeCompare(b.nome))
+    const ttOsc = oscs.reduce((s, o) => s + (o.qtd_torres ?? 0), 0)  // torres agora vêm da OSC (somadas no polo)
+    const qtdTorres = ttOsc > 0 ? ttOsc : r.qtdTorres  // fallback: valor antigo por-polo enquanto as OSCs não têm torres
     return {
       id: r.id, label: r.label, codigo: r.codigo,
       contr, fat, saldo: contr - fat, pctFin: contr ? Math.round(fat / contr * 100) : 0,
-      pctFis, qtdTorres: r.qtdTorres, montTon,
+      pctFis, qtdTorres, montTon,
       nOscs: oscs.length, oscs: oscs.map(o => o.numero_os).sort(), obras, pacotes,
     }
   }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
@@ -610,7 +614,7 @@ export function useUpdateOSC() {
 export function useAddOSC() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { portfolio_id: string; obra_id: string; numero_os: string; tipo_servico?: string; observacoes?: string }) => {
+    mutationFn: async (payload: { portfolio_id: string; obra_id: string; numero_os: string; tipo_servico?: string; observacoes?: string; qtd_torres?: number | null }) => {
       const { data, error } = await supabase
         .from('pmo_fluxo_os')
         .insert({ ...payload, etapa_atual: 'recebida' })

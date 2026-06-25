@@ -736,7 +736,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
   const [oForm, setOForm] = useState({ nome: '', codigo: '', pmo_projeto_id: '' })
   const [editOsc, setEditOsc] = useState<EGPOscRow | null>(null)
   const [det, setDet] = useState<EGPOscRow | null>(null)
-  const [eForm, setEForm] = useState({ tipo: '', valor: '', data_osc: '', vencimento: '', tipo_servico: '', observacoes: '' })
+  const [eForm, setEForm] = useState({ tipo: '', valor: '', data_osc: '', vencimento: '', tipo_servico: '', observacoes: '', qtd_torres: '' })
   const { data: oscItens } = useOSCItens(det?.id ?? editOsc?.id)
   const detObraNome = det ? ((obras ?? []).find(o => o.id === det.obra_id)?.nome ?? '') : ''
   const itensTotal = (oscItens ?? []).reduce((s, it) => s + (it.valor ?? 0), 0)
@@ -750,6 +750,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
       tipo: osc.tipo ?? '', valor: osc.valor != null ? String(osc.valor) : '',
       data_osc: osc.data_osc ?? '', vencimento: osc.vencimento ?? '',
       tipo_servico: osc.tipo_servico ?? '', observacoes: osc.observacoes ?? '',
+      qtd_torres: osc.qtd_torres != null ? String(osc.qtd_torres) : '',
     })
   }
   const salvarEdit = async () => {
@@ -760,6 +761,7 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
       valor: eForm.valor.trim() === '' ? null : Number(eForm.valor),
       data_osc: eForm.data_osc || null, vencimento: eForm.vencimento || null,
       tipo_servico: eForm.tipo_servico.trim() || null, observacoes: eForm.observacoes.trim() || null,
+      qtd_torres: eForm.qtd_torres.trim() === '' ? null : Number(eForm.qtd_torres),
     })
     setEditOsc(null)
   }
@@ -1231,9 +1233,15 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
                   <input type="date" value={eForm.vencimento} onChange={e => setEForm(f => ({ ...f, vencimento: e.target.value }))} className={`${inputCls} w-full mt-1`} />
                 </div>
               </div>
-              <div>
-                <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo de serviço</label>
-                <input value={eForm.tipo_servico} onChange={e => setEForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Opcional" className={`${inputCls} w-full mt-1`} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo de serviço</label>
+                  <input value={eForm.tipo_servico} onChange={e => setEForm(f => ({ ...f, tipo_servico: e.target.value }))} placeholder="Opcional" className={`${inputCls} w-full mt-1`} />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nº de torres</label>
+                  <input type="number" min="0" value={eForm.qtd_torres} onChange={e => setEForm(f => ({ ...f, qtd_torres: e.target.value }))} placeholder="—" className={`${inputCls} w-full mt-1`} />
+                </div>
               </div>
               <div>
                 <label className={`text-xs font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Observações</label>

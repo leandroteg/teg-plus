@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Printer, Pencil, Check, X, ChevronDown } from 'lucide-react'
-import { useEAPFinal, aggregatePolos, useUpdatePoloTorres, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
+import { Printer, Check, ChevronDown } from 'lucide-react'
+import { useEAPFinal, aggregatePolos, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
 
 const SEC_COLOR: Record<string, string> = {
   'Serv. Preliminares': '#0284c7',
@@ -216,9 +216,7 @@ function PacoteCard({ pac, polo, portfolioId, isLight, isGeral }: { pac: EAPPaco
       <div className="flex items-center gap-2 mb-1">
         <span className="font-semibold text-sm leading-tight" style={{ color: isLight ? '#0f2a4a' : '#e2e8f0' }}>{pac.n}</span>
         {isMont
-          ? (isGeral
-            ? <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }}>{badge || '—'}</span>
-            : <TorresBadge polo={polo} pac={pac} portfolioId={portfolioId} color={color} isLight={isLight} />)
+          ? <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }} title="Torres somadas das OSCs (editar na tela de OSCs)">{badge || '—'}</span>
           : (badge && <span className="ml-auto text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0" style={{ background: color }}>{badge}</span>)}
       </div>
       {/* barra: enche com o físico% · rótulo sobre a barra = quantidade concluída */}
@@ -241,27 +239,3 @@ function PacoteCard({ pac, polo, portfolioId, isLight, isGeral }: { pac: EAPPaco
   )
 }
 
-function TorresBadge({ polo, pac, portfolioId, color, isLight }: { polo: EAPPolo; pac: EAPPacote; portfolioId?: string; color: string; isLight: boolean }) {
-  const upd = useUpdatePoloTorres(portfolioId)
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(polo.qtdTorres != null ? String(polo.qtdTorres) : '')
-  const ton = fmtQtd(pac.qtdContr, pac.unidade)
-  const save = async () => { await upd.mutateAsync({ poloId: polo.id, torres: val.trim() === '' ? null : Number(val) }); setEditing(false) }
-
-  if (editing) {
-    return (
-      <span className="ml-auto inline-flex items-center gap-1 shrink-0">
-        <input autoFocus type="number" value={val} onChange={e => setVal(e.target.value)} placeholder="torres"
-          className={`w-16 text-[11px] rounded-lg border px-1.5 py-0.5 outline-none ${isLight ? 'bg-white border-slate-300 text-slate-700' : 'bg-slate-800 border-white/20 text-white'}`} />
-        <button onClick={save} className="text-emerald-500" title="Salvar"><Check size={14} /></button>
-        <button onClick={() => { setEditing(false); setVal(polo.qtdTorres != null ? String(polo.qtdTorres) : '') }} className="text-slate-400" title="Cancelar"><X size={14} /></button>
-      </span>
-    )
-  }
-  return (
-    <button onClick={() => setEditing(true)} title="Editar nº de torres" className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-white px-2 py-0.5 rounded-full shrink-0 hover:opacity-90" style={{ background: color }}>
-      {polo.qtdTorres ? `${polo.qtdTorres} torres` : 'torres?'}{ton ? ` · ${ton}` : ''}
-      <Pencil size={10} className="opacity-70" />
-    </button>
-  )
-}
