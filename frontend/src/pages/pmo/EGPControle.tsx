@@ -327,7 +327,7 @@ function ProjetosBarControle({
 
 // ── Medicoes Panel ──────────────────────────────────────────────────────────
 
-function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+export function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: rows, isLoading } = useMedicaoPorOSC(portfolioId)
   const aplicarMed = useAplicarMedicao()
   const [q, setQ] = useState('')

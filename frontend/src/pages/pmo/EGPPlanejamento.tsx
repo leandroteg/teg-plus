@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ContractSelector } from '../../components/EGPLayout'
 import {
-  ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign,
+  ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign, Ruler,
   AlertTriangle, Plus, Trash2, Save, Edit3, X, Check, Sparkles, FolderKanban, ChevronRight,
   Table2, GitBranch,
 } from 'lucide-react'
@@ -20,15 +20,17 @@ import { useLookups } from '../../hooks/useLookups'
 import { ProjetosFilterBar } from './ProjetosFilterBar'
 import EAPFinal, { EAPKpis } from './EAPFinal'
 import CronogramaPainel from './paineis/CronogramaPainel'
+import { MedicoesPanel } from './EGPControle'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
-type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'riscos'
+type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'medicao' | 'riscos'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'eap', label: 'EAP', icon: Network },
   { key: 'cronograma', label: 'Cronograma', icon: CalendarDays },
   { key: 'histograma', label: 'Histograma', icon: BarChart3 },
   { key: 'orcamento', label: 'Orçamento', icon: DollarSign },
+  { key: 'medicao', label: 'Medição', icon: Ruler },
   { key: 'riscos', label: 'Riscos', icon: AlertTriangle },
 ]
 
@@ -37,6 +39,7 @@ const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; text
   cronograma:  { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',    text: 'text-teal-600',    textActive: 'text-teal-800',    border: 'border-teal-500',    bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-teal-500/10',    textDark: 'text-teal-400',    textActiveDark: 'text-teal-300',    borderDark: 'border-teal-500/40' },
   histograma:  { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-violet-500/10',  textDark: 'text-violet-400',  textActiveDark: 'text-violet-300',  borderDark: 'border-violet-500/40' },
   orcamento:   { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-emerald-500/10', textDark: 'text-emerald-400', textActiveDark: 'text-emerald-300', borderDark: 'border-emerald-500/40' },
+  medicao:     { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-sky-500/10',     textDark: 'text-sky-400',     textActiveDark: 'text-sky-300',     borderDark: 'border-sky-500/40' },
   riscos:      { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-amber-500/10',   textDark: 'text-amber-400',   textActiveDark: 'text-amber-300',   borderDark: 'border-amber-500/40' },
 }
 
@@ -79,7 +82,7 @@ export default function EGPPlanejamento() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Compass size={20} className="text-blue-500" />
-          Planejamento
+          Gestão dos Projetos
         </h1>
         <ContractSelector />
       </div>
@@ -129,7 +132,7 @@ export default function EGPPlanejamento() {
         accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
         accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
         isLight={isLight}
-        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : undefined}
+        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : tab === 'cronograma' ? <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap" /> : undefined}
       />
 
       {/* Tab content */}
@@ -137,6 +140,7 @@ export default function EGPPlanejamento() {
       {tab === 'cronograma' && <CronogramaPainel portfolioId={portfolioId} />}
       {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'medicao' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}
     </div>
   )

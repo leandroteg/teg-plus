@@ -1,5 +1,6 @@
 // Painel Cronograma — modal de config (produtividade total + alocação por obra) → Aplicar gera; versões salvas
 import { useMemo, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -23,13 +24,41 @@ const shiftYM = (ym: string, d: number) => { let [y, m] = ym.split('-').map(Numb
 const startYM = () => { const d = new Date(); return shiftYM(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, 1) }
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
 const fmtQ = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
+const ymNum = (ym: string) => { const [y, m] = ym.split('-').map(Number); return y * 12 + m }
+const PROD_BANDS: [string, string, (p: number) => boolean][] = [
+  ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50], ['51-75', '51–75%', p => p >= 51 && p <= 75], ['76-100', '76–100%', p => p >= 76],
+]
+// indicador de produtividade/ritmo: físico vs prazo decorrido
+function ritmoCor(pctFis: number, ini: string | null, fim: string | null): string {
+  if (!ini || !fim) return '#94a3b8'
+  const t0 = Date.parse(ini), t1 = Date.parse(fim), now = Date.now()
+  if (!(t1 > t0)) return '#94a3b8'
+  const dec = Math.min(100, Math.max(0, (now - t0) / (t1 - t0) * 100))
+  const d = pctFis - dec
+  return d >= 0 ? '#10b981' : d >= -15 ? '#f59e0b' : '#ef4444'
+}
+// indicador de prazo: término previsto (YYYY-MM) vs vencimento
+function prazoCor(termino: string | null, fim: string | null): string {
+  if (!termino || !fim) return '#94a3b8'
+  const diff = ymNum(termino) - ymNum(fim.slice(0, 7))
+  return diff <= 0 ? '#10b981' : diff <= 2 ? '#f59e0b' : '#ef4444'
+}
+const worstCor = (cs: string[]) => cs.includes('#ef4444') ? '#ef4444' : cs.includes('#f59e0b') ? '#f59e0b' : cs.includes('#10b981') ? '#10b981' : '#94a3b8'
+function Dots({ ritmo, prazo }: { ritmo: string; prazo: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 mr-1.5">
+      <span className="w-2.5 h-2.5 rounded-full" style={{ background: ritmo }} title="Produtividade (físico × prazo decorrido)" />
+      <span className="w-2.5 h-2.5 rounded-full ring-1 ring-inset ring-black/10" style={{ background: prazo }} title="Prazo (término previsto × vencimento)" />
+    </span>
+  )
+}
 
-type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; saldoQ: number; saldoR: number; pctFis: number }
-type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number }
+type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
+type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; pctFis: number; ini: string | null; fim: string | null }
 type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number; precedencia?: boolean; lag?: number }
 type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
-function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
+function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
 
 function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark }: { label: string; icon?: ReactNode; options: { value: string; label: string }[]; selected: Set<string>; onToggle: (v: string) => void; onClear: () => void; isDark: boolean }) {
   const [open, setOpen] = useState(false); const n = selected.size
@@ -59,6 +88,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
+  const [fPct, setFPct] = useState<Set<string>>(new Set())
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => { setSlot(document.getElementById('crono-filters-slot')) })
   const [openF, setOpenF] = useState<Set<string>>(new Set())
   const [openO, setOpenO] = useState<Set<string>>(new Set())
   const [modalOpen, setModalOpen] = useState(false)
@@ -66,23 +98,29 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   // árvore frente → obra → drivers (saldo)
   const tree = useMemo(() => {
-    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number }> }>()
+    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; ini: string | null; fim: string | null }> }>()
     for (const polo of (raw ?? []) as EAPPoloRaw[]) {
       let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
       for (const o of polo.oscs) {
         if (o.etapa_atual === 'cancelada') continue
-        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0 }; fr.obras.set(o.obra_nome, od) }
+        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
+        const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
+        const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
         for (const [pn, pa] of Object.entries(o.pacotes)) {
           const d = od.drivers.find(x => x.pac === pn)
-          if (d) { d.contr += pa.qC; d.real += pa.qR; d.saldoR += Math.max(0, pa.valor - pa.fat) }
+          if (d) { d.contr += pa.qC; d.real += pa.qR; d.valor += pa.valor; d.fat += pa.fat; d.saldoR += Math.max(0, pa.valor - pa.fat) }
           else if (OUTROS_PAC.includes(pn)) od.outrosR += Math.max(0, pa.valor - pa.fat)
         }
       }
     }
     return [...frentes.values()].map(fr => ({
       label: fr.label,
-      obras: [...fr.obras.entries()].map(([nome, od]) => { od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 }); return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR } as Obra })
-        .filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0).sort((a, b) => b.saldoR - a.saldoR),
+      obras: [...fr.obras.entries()].map(([nome, od]) => {
+        od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 })
+        const wf = od.drivers.filter(d => d.contr > 0); const wsum = wf.reduce((s, d) => s + d.valor, 0)
+        const pctFis = wsum ? Math.round(wf.reduce((s, d) => s + (d.real / d.contr * 100) * d.valor, 0) / wsum) : 0
+        return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR } as Obra
+      }).filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0).sort((a, b) => b.saldoR - a.saldoR),
     })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
   }, [raw])
 
@@ -154,12 +192,12 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const view = useMemo(() => {
     if (!applied) return { frentesF: [] as typeof tree, maxMeses: 0, saldoRtot: 0, terminoGeral: null as string | null }
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
-      .map(fr => ({ ...fr, obras: fr.obras.filter(o => fObra.size === 0 || fObra.has(o.nome)) })).filter(fr => fr.obras.length > 0)
+      .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis)))) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
     for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied).maxMeses) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, fFrente, fObra, applied])
+  }, [tree, fFrente, fObra, fPct, applied])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
@@ -168,13 +206,16 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg).maxMeses
 
+  const controles = (<>
+    <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
+    <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
+    <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
+    <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
+  </>)
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
-        <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
-        <button onClick={() => setModalOpen(true)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
-      </div>
+      {slot ? createPortal(controles, slot) : <div className="flex flex-wrap items-center gap-2">{controles}</div>}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <Kpi label="Saldo a faturar" value={fmtM(view.saldoRtot)} tone="amber" isDark={isDark} note="R$ restante (filtro)" />
@@ -192,10 +233,13 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
               const frMaxMes = Math.max(0, ...fr.obras.map(o => obraMeses(o, applied)))
               const frTerm = frMaxMes > 0 ? shiftYM(start, frMaxMes - 1) : null
               const frSaldoR = fr.obras.reduce((s, o) => s + o.saldoR, 0)
+              const frRitmo = worstCor(fr.obras.map(o => ritmoCor(o.pctFis, o.ini, o.fim)))
+              const frPrazo = worstCor(fr.obras.map(o => { const m = obraMeses(o, applied); return prazoCor(m > 0 ? shiftYM(start, m - 1) : null, o.fim) }))
               return (
                 <div key={fr.label} className={`rounded-xl border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
                   <button onClick={() => togF(fr.label, setOpenF)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                     {fOpen ? <ChevronDown size={14} className="shrink-0 text-teal-500" /> : <ChevronRight size={14} className="shrink-0 text-slate-400" />}
+                    <Dots ritmo={frRitmo} prazo={frPrazo} />
                     <span className={`text-[13px] font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fr.label}</span>
                     <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fr.obras.length} obra(s)</span>
                     <span className="ml-auto flex items-center gap-3 text-[11px]"><span className={isDark ? 'text-amber-400' : 'text-amber-600'}>{fmtM(frSaldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={11} />{frTerm ? ymLabel(frTerm) : '—'}</span></span>
@@ -209,6 +253,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                           <div key={o.nome} className="mt-1">
                             <button onClick={() => togF(okey, setOpenO)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                               {oOpen ? <ChevronDown size={12} className="shrink-0 text-teal-500" /> : <ChevronRight size={12} className="shrink-0 text-slate-400" />}
+                              <Dots ritmo={ritmoCor(o.pctFis, o.ini, o.fim)} prazo={prazoCor(oTerm, o.fim)} />
                               <span className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</span>
                               <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={10} />{oTerm ? ymLabel(oTerm) : '—'}</span></span>
                             </button>
