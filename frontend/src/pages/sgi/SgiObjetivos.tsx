@@ -10,8 +10,8 @@ import {
   useAtualizarObjetivo, useAtualizarMeta, useRemoverObjetivo, useRemoverMeta,
   useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro,
 } from '../../hooks/useSgi'
-import { FAROL_CFG, STATUS_ACAO_LABEL } from '../../types/sgi'
-import type { SgiObjetivo, SgiMeta, SgiCheckin, SgiAcao, DirecaoMeta, Farol } from '../../types/sgi'
+import { FAROL_CFG, STATUS_ACAO_LABEL, STATUS_CHECKIN_CFG, STATUS_REVISAO_CFG } from '../../types/sgi'
+import type { SgiObjetivo, SgiMeta, SgiCheckin, SgiAcao, DirecaoMeta, Farol, StatusCheckinMeta, StatusRevisaoMeta } from '../../types/sgi'
 
 type MetaFull = SgiMeta & { checkins: SgiCheckin[] }
 type ObjFull = SgiObjetivo & { metas: MetaFull[] }
@@ -439,6 +439,34 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
   )
 }
 
+// ── Campo destacado (label pequeno + valor em negrito) ────────────────────────
+function Campo({ label, value, tone, isDark }: { label: string; value: ReactNode; tone?: string; isDark: boolean }) {
+  return (
+    <div>
+      <p className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-sm font-extrabold leading-none mt-0.5 ${tone || (isDark ? 'text-white' : 'text-slate-800')}`}>{value}</p>
+    </div>
+  )
+}
+
+// ── Status como badge-select colorido ─────────────────────────────────────────
+function StatusBadgeSelect<T extends string>({ value, cfg, onChange, emptyLabel, isDark }: {
+  value: T | null | undefined
+  cfg: Record<T, { label: string; badge: string }>
+  onChange: (v: T) => void
+  emptyLabel?: string
+  isDark: boolean
+}) {
+  const badge = value ? cfg[value].badge : (isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-100 text-slate-500')
+  return (
+    <select value={value ?? ''} onClick={e => e.stopPropagation()} onChange={e => { if (e.target.value) onChange(e.target.value as T) }}
+      className={`shrink-0 text-[10px] font-bold rounded-full pl-2.5 pr-1.5 py-1 border-0 outline-none cursor-pointer ${badge}`}>
+      {emptyLabel && <option value="">{emptyLabel}</option>}
+      {(Object.keys(cfg) as T[]).map(k => <option key={k} value={k}>{cfg[k].label}</option>)}
+    </select>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SgiObjetivos() {
   const { isDark } = useTheme()
@@ -447,6 +475,7 @@ export default function SgiObjetivos() {
   const criarRegistro = useCriarRegistro()
   const removerObjetivo = useRemoverObjetivo()
   const removerMeta = useRemoverMeta()
+  const atualizarMeta = useAtualizarMeta()
   const [tab, setTab] = useState<TabKey>('anuais')
   const [showNovo, setShowNovo] = useState(false)
   const [editObj, setEditObj] = useState<ObjFull | null>(null)
@@ -611,10 +640,21 @@ export default function SgiObjetivos() {
             renderMeta={(obj, m) => {
               const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']
               return (
-                <div className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white border border-slate-100'}`}>
-                  <p className={`text-sm leading-snug min-w-0 flex-1 ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}{u ? <span className={muted}> · {u.competencia}→{u.realizado ?? '—'}</span> : null}</p>
-                  <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                  <button onClick={() => setCheckin({ obj, meta: m })} className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
+                <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className={`text-[8px] font-bold uppercase tracking-wider ${muted}`}>Meta</p>
+                      <p className={`text-sm font-semibold leading-snug ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}</p>
+                    </div>
+                    <StatusBadgeSelect value={(m.status_checkin ?? 'aberto') as StatusCheckinMeta} cfg={STATUS_CHECKIN_CFG} isDark={isDark}
+                      onChange={s => atualizarMeta.mutate({ id: m.id, status_checkin: s })} />
+                  </div>
+                  <div className="flex items-center gap-4 mt-2.5">
+                    <Campo label="Realizado" value={u?.realizado != null ? `${u.realizado}%` : '—'} tone={u ? f.text : undefined} isDark={isDark} />
+                    <Campo label="Data" value={u?.competencia ?? '—'} isDark={isDark} />
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
+                    <button onClick={() => setCheckin({ obj, meta: m })} className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
+                  </div>
                 </div>
               )
             }}
@@ -625,14 +665,24 @@ export default function SgiObjetivos() {
             renderMeta={(obj, m) => {
               const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']; const jaEnviado = enviados[m.id]
               return (
-                <div className={`flex items-center justify-between gap-2 rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white border border-slate-100'}`}>
-                  <p className={`text-sm leading-snug min-w-0 flex-1 ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}{u?.realizado != null ? <span className={muted}> · {u.realizado}%</span> : null}</p>
-                  <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
-                  {jaEnviado ? (
-                    <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
-                  ) : (
-                    <button onClick={() => enviarMelhoria(obj, m)} disabled={criarRegistro.isPending} className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5"><Send size={13} /> Enviar</button>
-                  )}
+                <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className={`text-[8px] font-bold uppercase tracking-wider ${muted}`}>Meta</p>
+                      <p className={`text-sm font-semibold leading-snug ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}</p>
+                    </div>
+                    <StatusBadgeSelect value={m.status_revisao ?? null} cfg={STATUS_REVISAO_CFG} emptyLabel="Avaliar…" isDark={isDark}
+                      onChange={(s: StatusRevisaoMeta) => atualizarMeta.mutate({ id: m.id, status_revisao: s })} />
+                  </div>
+                  <div className="flex items-center gap-4 mt-2.5">
+                    <Campo label="Realizado" value={u?.realizado != null ? `${u.realizado}%` : '—'} tone={u ? f.text : undefined} isDark={isDark} />
+                    <Campo label="Data" value={u?.competencia ?? '—'} isDark={isDark} />
+                    {jaEnviado ? (
+                      <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
+                    ) : (
+                      <button onClick={() => enviarMelhoria(obj, m)} disabled={criarRegistro.isPending} className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5"><Send size={13} /> Enviar</button>
+                    )}
+                  </div>
                 </div>
               )
             }}

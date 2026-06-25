@@ -178,7 +178,26 @@ export interface SgiMeta {
   descricao?: string | null
   /** Prazo do KR (data-limite). */
   prazo?: string | null
+  /** Acompanhamento (Check-in): aberto / encerrado / cancelado. */
+  status_checkin?: StatusCheckinMeta
+  /** Resultado (Revisão): atingida / parcial / não atingida / cancelada. */
+  status_revisao?: StatusRevisaoMeta | null
   created_at: string
+}
+
+export type StatusCheckinMeta = 'aberto' | 'encerrado' | 'cancelado'
+export type StatusRevisaoMeta = 'atingida' | 'parcial' | 'nao_atingida' | 'cancelada'
+
+export const STATUS_CHECKIN_CFG: Record<StatusCheckinMeta, { label: string; badge: string }> = {
+  aberto:    { label: 'Aberto',    badge: 'bg-sky-100 text-sky-700' },
+  encerrado: { label: 'Encerrado', badge: 'bg-emerald-100 text-emerald-700' },
+  cancelado: { label: 'Cancelado', badge: 'bg-slate-200 text-slate-600' },
+}
+export const STATUS_REVISAO_CFG: Record<StatusRevisaoMeta, { label: string; badge: string }> = {
+  atingida:     { label: 'Atingida',       badge: 'bg-emerald-100 text-emerald-700' },
+  parcial:      { label: 'Atingida parcial',badge: 'bg-amber-100 text-amber-700' },
+  nao_atingida: { label: 'Não atingida',   badge: 'bg-red-100 text-red-700' },
+  cancelada:    { label: 'Cancelada',      badge: 'bg-slate-200 text-slate-600' },
 }
 export interface SgiCheckin {
   id: string
