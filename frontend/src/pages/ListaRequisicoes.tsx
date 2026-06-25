@@ -38,7 +38,7 @@ type ViewMode = 'list' | 'cards'
 // ── Pipeline stages ─────────────────────────────────────────────────────────
 
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
-  { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho', 'devolvida_solicitante'] },
+  { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho', 'aguardando_catalogo', 'devolvida_solicitante'] },
   { status: 'em_triagem',   label: 'Em Triagem CD',           icon: ClipboardList, statuses: ['em_triagem_cd'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
@@ -76,6 +76,7 @@ const NIVEL_LABEL: Record<number, string> = {
 
 function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')          return 'Aguard. Valid. Técnica'
+  if (status === 'aguardando_catalogo') return 'Falta vincular catálogo'
   if (status === 'em_triagem_cd')     return 'Aguardando CD Araxá'
   if (status === 'em_aprovacao')      return 'Em Validação Técnica'
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
