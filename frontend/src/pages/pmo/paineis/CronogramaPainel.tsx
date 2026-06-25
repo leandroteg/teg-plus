@@ -212,7 +212,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                                         {pj.rows.map(r => (
                                           <tr key={r.d.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                                             <td className={`px-2 py-1 text-left text-[11px] ${stick}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.d.cor }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>{r.d.label}</b> <span className="text-slate-400">{fmtQ(r.d.saldoQ)} {r.d.uni} · {fmtM(r.d.saldoR)}</span></td>
-                                            {r.rMes.map((v, i) => <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td>)}
+                                            {r.rMes.map((v, i) => { const q = r.qty[i]; return (
+                                              <td key={i} className={`${tdx} leading-tight`}>{q > 0 ? <><div className="font-semibold" style={{ color: r.d.cor }}>{fmtQ(q)} {r.d.uni}</div><div className="text-[9px] text-slate-400">{fmtM(v)}</div></> : <span className="text-slate-400">·</span>}</td>
+                                            ) })}
                                           </tr>
                                         ))}
                                         {o.outrosR > 0 && (
