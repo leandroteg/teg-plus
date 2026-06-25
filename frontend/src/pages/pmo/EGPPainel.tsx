@@ -10,13 +10,15 @@ import {
 const ProducaoPainel = lazy(() => import('./paineis/ProducaoPainel'))
 const FaturamentoPainel = lazy(() => import('./paineis/FaturamentoPainel'))
 const MedicaoPainel = lazy(() => import('./paineis/MedicaoPainel'))
+const CronogramaPainel = lazy(() => import('./paineis/CronogramaPainel'))
 const CustosPainel = lazy(() => import('./paineis/CustosPainel'))
-type EGPPainelKey = 'geral' | 'producao' | 'faturamento' | 'medicao' | 'custos'
+type EGPPainelKey = 'geral' | 'producao' | 'faturamento' | 'medicao' | 'cronograma' | 'custos'
 const EGP_PAINEIS: Array<{ key: EGPPainelKey; label: string }> = [
   { key: 'geral', label: 'Visão Geral' },
   { key: 'producao', label: 'Produção' },
   { key: 'faturamento', label: 'Faturamento' },
   { key: 'medicao', label: 'Medição' },
+  { key: 'cronograma', label: 'Cronograma' },
   { key: 'custos', label: 'Custos' },
 ]
 
@@ -970,6 +972,7 @@ export default function EGPPainel() {
           {painel === 'producao' && <ProducaoPainel de={de} ate={ate} />}
           {painel === 'faturamento' && <FaturamentoPainel de={de} ate={ate} visao={visaoFat} />}
           {painel === 'medicao' && <MedicaoPainel de={de} ate={ate} />}
+          {painel === 'cronograma' && <CronogramaPainel />}
           {painel === 'custos' && <CustosPainel />}
         </Suspense>
       )}
