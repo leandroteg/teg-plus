@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Loader2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { PAINEIS } from './registry'
 import PainelActions from './PainelActions'
 
@@ -13,6 +14,7 @@ export default function PainelEmbed() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
   const { isAdmin, hasModule } = useAuth()
+  const isMobile = useIsMobile()
   const def = PAINEIS.find(p => p.key === moduleKey)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -66,7 +68,7 @@ export default function PainelEmbed() {
       ) : (
         <div ref={panelRef}>
           <Suspense fallback={<div className="flex items-center justify-center py-24"><Loader2 size={28} className="animate-spin text-indigo-500" /></div>}>
-            <def.Painel />
+            {isMobile ? <def.Mobile /> : <def.Painel />}
           </Suspense>
         </div>
       )}

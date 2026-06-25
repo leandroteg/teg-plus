@@ -39,6 +39,7 @@ import LocacaoLayout from './components/LocacaoLayout'
 import SgiLayout from './components/SgiLayout'
 import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 import PaineisLayout from './components/PaineisLayout'
+import ResponsivePainel from './components/paineis-mobile/ResponsivePainel'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -197,6 +198,22 @@ const SgiPadronizacao = lazy(() => import('./pages/sgi/SgiPadronizacao'))
 const PaineisOverview = lazy(() => import('./pages/paineis/PaineisOverview'))
 const PainelEmbed = lazy(() => import('./pages/paineis/PainelEmbed'))
 
+// Versões MOBILE-native dos painéis (renderizadas <lg via ResponsivePainel; desktop intacto)
+const DashboardFinanceiroMobile = lazy(() => import('./pages/financeiro/DashboardFinanceiroMobile'))
+const ControladoriaHomeMobile = lazy(() => import('./pages/controladoria/ControladoriaHomeMobile'))
+const DashboardContratosMobile = lazy(() => import('./pages/contratos/DashboardContratosMobile'))
+const FiscalHomeMobile = lazy(() => import('./pages/fiscal/FiscalHomeMobile'))
+const EGPPainelMobile = lazy(() => import('./pages/pmo/EGPPainelMobile'))
+const ObrasHomeMobile = lazy(() => import('./pages/obras/ObrasHomeMobile'))
+const DashboardMobile = lazy(() => import('./pages/DashboardMobile'))
+const LogisticaHomeMobile = lazy(() => import('./pages/logistica/LogisticaHomeMobile'))
+const EstoqueHomeMobile = lazy(() => import('./pages/estoque/EstoqueHomeMobile'))
+const PatrimonialHomeMobile = lazy(() => import('./pages/patrimonial/PatrimonialHomeMobile'))
+const FrotasHomeMobile = lazy(() => import('./pages/frotas/FrotasHomeMobile'))
+const LocacaoHomeMobile = lazy(() => import('./pages/locacao/LocacaoHomeMobile'))
+const OrcamentacaoHomeMobile = lazy(() => import('./pages/orcamentacao/OrcamentacaoHomeMobile'))
+const SgiPainelMobile = lazy(() => import('./pages/sgi/SgiPainelMobile'))
+
 // Patrimonial (módulo próprio)
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
 const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
@@ -285,7 +302,7 @@ export default function App() {
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
-              <Route path="/financeiro"              element={<LazyDash><DashboardFinanceiro /></LazyDash>} />
+              <Route path="/financeiro"              element={<LazyDash><ResponsivePainel desktop={<DashboardFinanceiro />} mobile={<DashboardFinanceiroMobile />} /></LazyDash>} />
               <Route path="/financeiro/contas-a-pagar" element={<LazyTable><CPPipeline /></LazyTable>} />
               <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<Lazy><ContasReceber /></Lazy>} />
@@ -315,7 +332,7 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<LazyDash><FiscalHome /></LazyDash>} />
+              <Route path="/fiscal"              element={<LazyDash><ResponsivePainel desktop={<FiscalHome />} mobile={<FiscalHomeMobile />} /></LazyDash>} />
               <Route path="/fiscal/notas"        element={<Lazy><NotasFiscais /></Lazy>} />
               <Route path="/fiscal/pipeline"     element={<Lazy><FiscalPipeline /></Lazy>} />
             </Route>
@@ -324,7 +341,7 @@ export default function App() {
           {/* Módulo Estoque */}
           <Route element={<ModuleRoute moduleKey="estoque" />}>
             <Route element={<EstoqueLayout />}>
-              <Route path="/estoque"               element={<LazyDash><EstoqueHome /></LazyDash>} />
+              <Route path="/estoque"               element={<LazyDash><ResponsivePainel desktop={<EstoqueHome />} mobile={<EstoqueHomeMobile />} /></LazyDash>} />
               <Route path="/estoque/itens"         element={<Lazy><Itens /></Lazy>} />
               <Route path="/estoque/movimentacoes" element={<Lazy><Movimentacoes /></Lazy>} />
               <Route path="/estoque/inventario"    element={<Lazy><Inventario /></Lazy>} />
@@ -340,7 +357,7 @@ export default function App() {
           {/* Módulo Logística */}
           <Route element={<ModuleRoute moduleKey="logistica" />}>
             <Route element={<LogisticaLayout />}>
-              <Route path="/logistica"                   element={<LazyDash><LogisticaHome /></LazyDash>} />
+              <Route path="/logistica"                   element={<LazyDash><ResponsivePainel desktop={<LogisticaHome />} mobile={<LogisticaHomeMobile />} /></LazyDash>} />
               <Route path="/logistica/solicitacoes"      element={<Lazy><SolicitacoesPipeline /></Lazy>} />
               <Route path="/logistica/expedicao"         element={<Lazy><ExpedicaoPipeline /></Lazy>} />
               <Route path="/logistica/transportes"       element={<Lazy><TransportesPipeline /></Lazy>} />
@@ -351,7 +368,7 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"                element={<LazyDash><FrotasHome /></LazyDash>} />
+              <Route path="/frotas"                element={<LazyDash><ResponsivePainel desktop={<FrotasHome />} mobile={<FrotasHomeMobile />} /></LazyDash>} />
               <Route path="/frotas/solicitacoes"  element={<Lazy><SolicitacoesFrotas /></Lazy>} />
               <Route path="/frotas/frota"         element={<Lazy><FrotaHub /></Lazy>} />
               <Route path="/frotas/manutencao"    element={<Lazy><ManutencaoHub /></Lazy>} />
@@ -362,7 +379,7 @@ export default function App() {
           {/* Módulo Locação de Imóveis */}
           <Route element={<ModuleRoute moduleKey="locacoes" />}>
             <Route element={<LocacaoLayout />}>
-              <Route path="/locacoes"          element={<LazyDash><LocacaoHome /></LazyDash>} />
+              <Route path="/locacoes"          element={<LazyDash><ResponsivePainel desktop={<LocacaoHome />} mobile={<LocacaoHomeMobile />} /></LazyDash>} />
               <Route path="/locacoes/entradas" element={<Lazy><EntradasPipeline /></Lazy>} />
               <Route path="/locacoes/gestao"   element={<Lazy><LocGestao /></Lazy>} />
               <Route path="/locacoes/saida"    element={<Lazy><SaidaPipeline /></Lazy>} />
@@ -372,7 +389,7 @@ export default function App() {
           {/* Módulo SGI (Governança › Gestão) */}
           <Route element={<ModuleRoute moduleKey="sgi" />}>
             <Route element={<SgiLayout />}>
-              <Route path="/sgi"               element={<LazyDash><SgiPainel /></LazyDash>} />
+              <Route path="/sgi"               element={<LazyDash><ResponsivePainel desktop={<SgiPainel />} mobile={<SgiPainelMobile />} /></LazyDash>} />
               <Route path="/sgi/novo"          element={<Lazy><SgiNovoRegistro /></Lazy>} />
               <Route path="/sgi/objetivos"     element={<Lazy><SgiObjetivos /></Lazy>} />
               <Route path="/sgi/melhoria"      element={<Lazy><SgiMelhoriaContinua /></Lazy>} />
@@ -391,7 +408,7 @@ export default function App() {
           {/* Módulo Patrimonial */}
           <Route element={<ModuleRoute moduleKey="patrimonial" />}>
             <Route element={<PatrimonialLayout />}>
-              <Route path="/patrimonial"               element={<LazyDash><PatrimonialHome /></LazyDash>} />
+              <Route path="/patrimonial"               element={<LazyDash><ResponsivePainel desktop={<PatrimonialHome />} mobile={<PatrimonialHomeMobile />} /></LazyDash>} />
               <Route path="/patrimonial/patrimonio"    element={<Lazy><PatrimonialPatrimonio /></Lazy>} />
               <Route path="/patrimonial/historico"    element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
               <Route path="/patrimonial/movimentacoes" element={<Navigate to="/patrimonial/historico" replace />} />
@@ -429,7 +446,7 @@ export default function App() {
           {/* Módulo Contratos */}
           <Route element={<ModuleRoute moduleKey="contratos" />}>
             <Route element={<ContratosLayout />}>
-              <Route path="/contratos"            element={<LazyDash><DashboardContratos /></LazyDash>} />
+              <Route path="/contratos"            element={<LazyDash><ResponsivePainel desktop={<DashboardContratos />} mobile={<DashboardContratosMobile />} /></LazyDash>} />
               <Route path="/contratos/lista"      element={<Lazy><ListaContratos /></Lazy>} />
               <Route path="/contratos/novo"       element={<Lazy><NovoContrato /></Lazy>} />
               <Route path="/contratos/previsao"   element={<Lazy><ParcelasContratos /></Lazy>} />
@@ -451,7 +468,7 @@ export default function App() {
           {/* Módulo Controladoria */}
           <Route element={<ModuleRoute moduleKey="controladoria" />}>
             <Route element={<ControladoriaLayout />}>
-              <Route path="/controladoria"                          element={<LazyDash><ControladoriaHome /></LazyDash>} />
+              <Route path="/controladoria"                          element={<LazyDash><ResponsivePainel desktop={<ControladoriaHome />} mobile={<ControladoriaHomeMobile />} /></LazyDash>} />
               <Route path="/controladoria/controle-orcamentario" element={<Lazy><ControleOrcamentarioHub /></Lazy>} />
               <Route path="/controladoria/controle-custos"        element={<Lazy><ControleCustosHub /></Lazy>} />
               <Route path="/controladoria/controle-projetos"      element={<Lazy><ControleProjetosHub /></Lazy>} />
@@ -463,7 +480,7 @@ export default function App() {
           {/* Módulo Obras */}
           <Route element={<ModuleRoute moduleKey="obras" />}>
             <Route element={<ObrasLayout />}>
-              <Route path="/obras"                    element={<LazyDash><ObrasHome /></LazyDash>} />
+              <Route path="/obras"                    element={<LazyDash><ResponsivePainel desktop={<ObrasHome />} mobile={<ObrasHomeMobile />} /></LazyDash>} />
               <Route path="/obras/apontamentos"       element={<Lazy><Apontamentos /></Lazy>} />
               <Route path="/obras/rdo"                element={<Lazy><RDO /></Lazy>} />
               <Route path="/obras/adiantamentos"      element={<Lazy><AdiantamentosObras /></Lazy>} />
@@ -477,7 +494,7 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="egp" />}>
             <Route element={<EGPLayout />}>
               {/* Painel */}
-              <Route path="/egp"                                  element={<LazyDash><EGPPainel /></LazyDash>} />
+              <Route path="/egp"                                  element={<LazyDash><ResponsivePainel desktop={<EGPPainel />} mobile={<EGPPainelMobile />} /></LazyDash>} />
               {/* Ciclo de Vida — carregam contrato do seletor persistente */}
               <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacao /></Lazy>} />
               <Route path="/egp/iniciacao/:portfolioId"           element={<Lazy><EGPIniciacao /></Lazy>} />
@@ -534,7 +551,7 @@ export default function App() {
           {/* Módulo Orçamentação (Expansão) */}
           <Route element={<ModuleRoute moduleKey="orcamentacao" />}>
             <Route element={<OrcamentacaoLayout />}>
-              <Route path="/orcamentacao"           element={<LazyDash><OrcamentacaoHome /></LazyDash>} />
+              <Route path="/orcamentacao"           element={<LazyDash><ResponsivePainel desktop={<OrcamentacaoHome />} mobile={<OrcamentacaoHomeMobile />} /></LazyDash>} />
               <Route path="/orcamentacao/orcamentos" element={<Lazy><OrcamentosLista /></Lazy>} />
               <Route path="/orcamentacao/novo"       element={<Lazy><NovoOrcamento /></Lazy>} />
               <Route path="/orcamentacao/:id"        element={<Lazy><OrcamentoDetalhe /></Lazy>} />
@@ -555,7 +572,7 @@ export default function App() {
           {/* Módulo Compras */}
           <Route element={<ModuleRoute moduleKey="compras" />}>
             <Route element={<Layout />}>
-              <Route path="/compras"     element={<LazyDash><Dashboard /></LazyDash>} />
+              <Route path="/compras"     element={<LazyDash><ResponsivePainel desktop={<Dashboard />} mobile={<DashboardMobile />} /></LazyDash>} />
               <Route path="/nova"             element={<Lazy><NovaRequisicao /></Lazy>} />
               <Route path="/requisicoes"      element={<Lazy><ListaRequisicoes /></Lazy>} />
               <Route path="/cotacoes"    element={<Lazy><FilaCotacoes /></Lazy>} />
