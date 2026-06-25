@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { Activity, Ruler, Layers, Building2, Star, Filter } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, filtrarRawPorPeriodo, fmtQtd } from '../../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, fmtQtd } from '../../../hooks/usePMO'
 import { Kpi, PanelCard, HBarRow } from '../../rh/paineis/_ui'
 
 const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
@@ -62,8 +62,9 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
   const { isDark } = useTheme()
   const portfolioId = useEGPPortfolioId()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
-  const rawF = useMemo(() => filtrarRawPorPeriodo(raw ?? [], de, ate), [raw, de, ate])
-  const polos = useMemo(() => aggregatePolos(rawF, new Set()), [rawF])
+  // físico é CUMULATIVO (acum do contrato) — não filtra por período (senão sobram só OSCs do período e zera)
+  void de; void ate
+  const polos = useMemo(() => aggregatePolos(raw ?? [], new Set()), [raw])
 
   const ag = useMemo(() => {
     const pac = new Map<string, { valor: number; qC: number; qR: number; uni: string | null }>()
@@ -84,7 +85,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
   const obras = useMemo(() => {
     type O = { nome: string; polo: string; valor: number; fat: number; ini: string | null; fim: string | null; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
     const m = new Map<string, O>()
-    for (const polo of rawF) for (const o of polo.oscs) {
+    for (const polo of (raw ?? [])) for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
       if (o.tipo !== 'construcao') continue // só obras de construção
       let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: poloCurto(polo.label), valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; m.set(o.obra_nome, a) }
@@ -103,10 +104,10 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
       const pctFis = ws ? Math.round(wf.reduce((s, x) => s + x.pct * x.valor, 0) / ws) : 0
       const ini = a.ini ? Date.parse(a.ini) : NaN; const fim = a.fim ? Date.parse(a.fim) : NaN
       const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
-      const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni)}/${fmtQtd(x.qC, x.uni)}` : '—' }
+      const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni) ?? '0'}/${fmtQtd(x.qC, x.uni) ?? '—'}` : '—' }
       return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, pctPrazo, drv }
     }).filter(o => o.pctFin < 95).sort((x, y) => y.valor - x.valor)
-  }, [rawF])
+  }, [raw])
 
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fFis, setFFis] = useState<Set<string>>(new Set())
@@ -117,7 +118,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
   if (!polos.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados.</p>
 
   const drv = (n: string) => ag.pac.get(n)
-  const driverKpi = (n: string) => { const a = drv(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni)} / ${fmtQtd(a.qC, a.uni)}` : '—' }
+  const driverKpi = (n: string) => { const a = drv(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni) ?? '0'} / ${fmtQtd(a.qC, a.uni) ?? '—'}` : '—' }
   const polosOrd = [...polos].sort((a, b) => b.pctFis - a.pctFis)
 
   return (

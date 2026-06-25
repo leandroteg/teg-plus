@@ -63,7 +63,7 @@ function ResumoPaineis({ de, ate, isDark, onGo, cardClass }: { de: string; ate: 
     const wf = [...pac.values()].filter(x => x.qC > 0); const ws = wf.reduce((s, x) => s + x.valor, 0)
     const fisicoGeral = ws ? Math.round([...pac.values()].filter(x => x.qC > 0).reduce((s, x) => s + Math.round(x.qR / x.qC * 100) * x.valor, 0) / ws) : 0
     const torres = polos.reduce((s, p) => s + (p.qtdTorres ?? 0), 0)
-    const drv = (n: string) => { const a = pac.get(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni)}/${fmtQtd(a.qC, a.uni)}` : '—' }
+    const drv = (n: string) => { const a = pac.get(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni) ?? '0'}/${fmtQtd(a.qC, a.uni) ?? '—'}` : '—' }
     const nUlt = ult ? new Set((rows ?? []).filter(r => !r.subcontratada && r.competencia === ult && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
     const mesLbl = ult ? (() => { const [y, m] = ult.split('-'); return `${['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m]}/${y.slice(2)}` })() : '—'
     return { totalFat, runrate: media * 12, fUlt, varPct, fisicoGeral, torres, drv, nUlt, mesLbl, nMeses: meses.length }
