@@ -26,7 +26,7 @@ const fmtQ = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.is
 
 type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; saldoQ: number; saldoR: number; pctFis: number }
 type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number }
-type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number }
+type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number; precedencia?: boolean; lag?: number }
 type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
@@ -93,7 +93,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const defaultConfig = useMemo<Config>(() => {
     const prod: Record<string, number> = {}; DRV.forEach(d => prod[d.label] = saldoGlobal[d.label] > 0 ? Math.max(0.1, Math.round(saldoGlobal[d.label] / 12 * 10) / 10) : 0)
     const pesos: Record<string, number> = {}; allObras.forEach(o => pesos[o.nome] = Math.round(o.saldoR / 1000))
-    return { prod, modo: 'saldo', pesos, horizonte: 12 }
+    return { prod, modo: 'saldo', pesos, horizonte: 12, precedencia: true, lag: 0 }
   }, [saldoGlobal, allObras])
 
   // aplica o default automaticamente na 1ª carga (não fica vazio)
@@ -114,23 +114,40 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     let denom = 0; for (const ob of allObras) { const dd = ob.drivers.find(x => x.label === d.label); if (dd && dd.saldoQ > 0) denom += (cfg.pesos[ob.nome] ?? 0) }
     return denom > 0 ? C * (cfg.pesos[o.nome] ?? 0) / denom : 0
   }
-  const mesesOf = (o: Obra, d: Drv, cfg: Config) => { const r = rateOf(o, d, cfg); return r > 0 ? Math.ceil(d.saldoQ / r) : 0 }
-  // projeção mês a mês da obra: qtd/R$ por driver + ADM&Outros (R$) + total/mês
+  // projeção mês a mês da obra com PRECEDÊNCIA: Fundação libera Montagem, Montagem libera Lançamento
   const projObra = (o: Obra, cfg: Config) => {
-    const dM = o.drivers.filter(d => d.contr > 0).map(d => ({ d, r: rateOf(o, d, cfg) }))
-    let maxMeses = Math.max(0, ...dM.map(({ d, r }) => r > 0 && d.saldoQ > 0 ? Math.ceil(d.saldoQ / r) : 0))
+    const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
+    const order = present.map(d => d.label)
+    const rate: Record<string, number> = {}, contr: Record<string, number> = {}, real: Record<string, number> = {}, cum: Record<string, number> = {}
+    const hist: Record<string, number[]> = {}, monthly: Record<string, number[]> = {}
+    present.forEach(d => { rate[d.label] = rateOf(o, d, cfg); contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = [] })
+    const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
+    let i = 0
+    while (i < 120) {
+      for (let k = 0; k < order.length; k++) {
+        const lbl = order[k]
+        let capPct = 1
+        if (prec && k > 0) { const pl = order[k - 1]; const predCum = lag <= 0 ? cum[pl] : (i - lag >= 0 ? hist[pl][i - lag] : real[pl]); capPct = contr[pl] > 0 ? predCum / contr[pl] : 1 }
+        const adv = Math.max(0, Math.min(rate[lbl], contr[lbl] - cum[lbl], capPct * contr[lbl] - cum[lbl]))
+        monthly[lbl].push(adv); cum[lbl] += adv
+      }
+      order.forEach(l => hist[l].push(cum[l]))
+      i++
+      if (!order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
+    }
+    let maxMeses = 0; for (let m = 0; m < i; m++) if (order.some(l => monthly[l][m] > 0.001)) maxMeses = m + 1
     if (maxMeses === 0 && o.outrosR > 0) maxMeses = 1
-    const meses = Array.from({ length: maxMeses }, (_, i) => shiftYM(start, i))
-    const rows = dM.map(({ d, r }) => {
-      const qty = meses.map((_, i) => { if (r <= 0) return 0; const prev = r * i; return prev >= d.saldoQ ? 0 : Math.min(r, d.saldoQ - prev) })
+    const meses = Array.from({ length: maxMeses }, (_, m) => shiftYM(start, m))
+    const rows = present.map(d => {
+      const qty = Array.from({ length: maxMeses }, (_, m) => monthly[d.label][m] || 0)
       const rMes = qty.map(q => d.saldoQ > 0 ? d.saldoR * (q / d.saldoQ) : 0)
-      const mesesD = r > 0 && d.saldoQ > 0 ? Math.ceil(d.saldoQ / r) : 0
+      const mesesD = qty.reduce((a, q, m) => q > 0.001 ? m + 1 : a, 0)
       return { d, qty, rMes, meses: mesesD }
     })
-    const drvRmes = meses.map((_, i) => rows.reduce((s, x) => s + x.rMes[i], 0))
+    const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + x.rMes[m], 0))
     const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
-    const outrosRmes = meses.map((_, i) => totDrvR > 0 ? o.outrosR * drvRmes[i] / totDrvR : (maxMeses ? o.outrosR / maxMeses : 0))
-    const totalRmes = meses.map((_, i) => drvRmes[i] + outrosRmes[i])
+    const outrosRmes = meses.map((_, m) => totDrvR > 0 ? o.outrosR * drvRmes[m] / totDrvR : (maxMeses ? o.outrosR / maxMeses : 0))
+    const totalRmes = meses.map((_, m) => drvRmes[m] + outrosRmes[m])
     return { meses, rows, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
   }
 
@@ -139,7 +156,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
       .map(fr => ({ ...fr, obras: fr.obras.filter(o => fObra.size === 0 || fObra.has(o.nome)) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
-    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; const dm = Math.max(0, ...o.drivers.map(d => mesesOf(o, d, applied))); maxMeses = Math.max(maxMeses, dm === 0 && o.outrosR > 0 ? 1 : dm) }
+    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied).maxMeses) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, fFrente, fObra, applied])
@@ -149,7 +166,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const obraMeses = (o: Obra, cfg: Config) => { const m = Math.max(0, ...o.drivers.map(d => mesesOf(o, d, cfg))); return (m === 0 && o.outrosR > 0) ? 1 : m }
+  const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg).maxMeses
 
   return (
     <div className="space-y-3">
@@ -346,6 +363,22 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Premissas (precedência) */}
+          <div>
+            <p className={`${lbl} mb-2`}>Premissas — precedência entre serviços</p>
+            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+              <span onClick={() => setCfg(c => ({ ...c, precedencia: !(c.precedencia !== false) }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.precedencia !== false ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.precedencia !== false ? 'translate-x-4' : ''}`} /></span>
+              <span className="text-[12px] font-semibold">Fundação libera Montagem · Montagem libera Lançamento</span>
+            </label>
+            {cfg.precedencia !== false && (
+              <div className="flex items-center gap-2 text-[11px] pl-1">
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Defasagem (meses) entre liberar e iniciar o próximo:</span>
+                <input type="number" min="0" max="12" value={cfg.lag || 0} onChange={e => setCfg(c => ({ ...c, lag: Math.max(0, Number(e.target.value)) }))} className={`w-14 text-[12px] font-semibold rounded-lg border px-1.5 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+              </div>
+            )}
+            <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Montagem não avança além do % de fundação já concluído (volume liberado); lançamento idem em relação à montagem.</p>
           </div>
         </div>
         {/* Footer */}
