@@ -31,19 +31,24 @@ function MetaScore({ entry, big, isDark }: { entry?: { o: ObjFull; m: MetaFull; 
   if (!entry) return <div className={`rounded-xl ${soft}`} />
   const { o, m, u } = entry
   const fr = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+  const num = u?.realizado != null ? u.realizado.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—'
+  const unit = o.unidade || ''
   return (
-    <div className={`rounded-xl p-3 flex flex-col justify-between gap-2 ${soft}`}>
+    <div className={`rounded-xl ${big ? 'p-4' : 'p-3'} flex flex-col ${soft}`}>
       <div className="min-w-0">
         <p className={`text-[9px] font-bold uppercase tracking-wider ${faint}`}>{o.area_processo || '—'}</p>
         <p className={`text-sm font-bold leading-tight truncate ${txt}`}>{o.titulo}</p>
       </div>
-      <div>
+      <div className="flex-1 flex flex-col justify-center py-1">
         <p className={`text-[8px] font-bold uppercase tracking-wider ${faint}`}>Realizado</p>
-        <p className={`${big ? 'text-[2rem]' : 'text-2xl'} font-extrabold leading-none ${fr.text}`}>{fmtVal(u?.realizado, o.unidade)}</p>
-        <div className="flex items-center justify-between gap-2 mt-1.5">
-          <span className={`text-[10px] font-semibold ${muted}`}>Meta {o.direcao === 'menor_melhor' ? '≤' : '≥'} {fmtVal(m.alvo, o.unidade)}</span>
-          <span className={`inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${fr.bg} ${fr.text}`}><span className={`w-1.5 h-1.5 rounded-full ${fr.dot}`} />{fr.label}</span>
-        </div>
+        <p className="flex items-baseline gap-1.5 flex-wrap leading-none">
+          <span className={`${big ? 'text-5xl sm:text-6xl' : 'text-3xl'} font-black tracking-tight ${fr.text}`}>{num}</span>
+          {unit && <span className={`${big ? 'text-lg' : 'text-sm'} font-bold ${fr.text} opacity-70`}>{unit}</span>}
+        </p>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[10px] font-semibold ${muted}`}>Meta {o.direcao === 'menor_melhor' ? '≤' : '≥'} {fmtVal(m.alvo, o.unidade)}</span>
+        <span className={`inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${fr.bg} ${fr.text}`}><span className={`w-1.5 h-1.5 rounded-full ${fr.dot}`} />{fr.label}</span>
       </div>
     </div>
   )
