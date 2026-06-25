@@ -476,20 +476,23 @@ export default function SgiObjetivos() {
             <p className={`text-sm font-medium ${txt}`}>Nenhum objetivo cadastrado</p>
             <p className="text-xs">Crie o primeiro objetivo e defina a meta anual.</p>
           </div>
-        ) : tab === 'anuais' || tab === 'trimestrais' ? (
-          objetivosFiltrados.length === 0 ? (
-            <p className={`text-xs ${muted}`}>Nenhum objetivo encontrado.</p>
+        ) : tab === 'anuais' || tab === 'trimestrais' ? (() => {
+          const periodo: 'anual' | 'trimestral' = tab === 'anuais' ? 'anual' : 'trimestral'
+          // Mostra só objetivos que TÊM meta do período (objetivo de OKR só aparece em Trimestrais)
+          const lista = objetivosFiltrados.filter(o => o.metas.some(m => m.periodo === periodo))
+          return lista.length === 0 ? (
+            <p className={`text-xs ${muted}`}>Nenhum objetivo com meta {periodo === 'anual' ? 'anual' : 'trimestral'}.</p>
           ) : (
             <div className="space-y-3">
-              {objetivosFiltrados.map(obj => (
-                <ObjetivoCard key={obj.id} obj={obj} periodo={tab === 'anuais' ? 'anual' : 'trimestral'} isDark={isDark} txt={txt} muted={muted} card={card}
+              {lista.map(obj => (
+                <ObjetivoCard key={obj.id} obj={obj} periodo={periodo} isDark={isDark} txt={txt} muted={muted} card={card}
                   onEdit={o => setEditObj(o)}
                   onDeleteObj={o => setDelAlvo({ tipo: 'objetivo', id: o.id, label: `O objetivo "${o.titulo}" e todas as suas metas/check-ins serão removidos.` })}
                   onDeleteMeta={(o, m) => setDelAlvo({ tipo: 'meta', id: m.id, label: `A meta ${m.periodo === 'anual' ? 'anual' : 'T' + m.trimestre} de "${o.titulo}" e seus check-ins serão removidos.` })} />
               ))}
             </div>
           )
-        ) : tab === 'plano' ? (
+        })() : tab === 'plano' ? (
           metasTriFiltradas.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 text-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
               <Target size={36} className="text-violet-500/50" />
