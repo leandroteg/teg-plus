@@ -370,7 +370,7 @@ export default function SgiObjetivos() {
   const counts = useMemo(() => ({
     anuais: objetivos.filter(o => o.metas.some(m => m.periodo === 'anual')).length,
     trimestrais: objetivos.filter(o => o.metas.some(m => m.periodo === 'trimestral')).length,
-    plano: metasTri.length,
+    plano: metasTri.filter(({ meta }) => meta.trimestre === 3).length,
     checkin: todasMetas.length,
     revisao: todasMetas.filter(({ meta }) => (meta.checkins?.length ?? 0) > 0).length,
   }), [objetivos, metasTri, todasMetas])
@@ -378,7 +378,8 @@ export default function SgiObjetivos() {
   // Filtragem
   const matchObj = (o: ObjFull) => { const q = busca.toLowerCase(); return [o.titulo, o.indicador, o.area_processo].some(v => v?.toLowerCase().includes(q)) }
   const objetivosFiltrados = useMemo(() => busca ? objetivos.filter(matchObj) : objetivos, [objetivos, busca])
-  const metasTriFiltradas = useMemo(() => busca ? metasTri.filter(({ obj }) => matchObj(obj)) : metasTri, [metasTri, busca])
+  // Plano de Ação trabalha só o trimestre vigente (T3); os demais são acompanhados via Check-in
+  const metasTriFiltradas = useMemo(() => metasTri.filter(({ obj, meta }) => meta.trimestre === 3 && (!busca || matchObj(obj))), [metasTri, busca])
   const metasFiltradas = useMemo(() => {
     let items = todasMetas
     if (busca) { const q = busca.toLowerCase(); items = items.filter(({ obj, meta }) => [obj.titulo, obj.indicador, obj.area_processo, meta.periodo === 'anual' ? 'anual' : `trim ${meta.trimestre}`].some(v => v?.toLowerCase().includes(q))) }
@@ -570,7 +571,7 @@ export default function SgiObjetivos() {
                   <div key={meta.id} className={`w-full rounded-xl border shadow-sm p-3 flex items-center justify-between gap-3 ${card}`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${txt}`}>{obj.titulo}</p>
-                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ?? `realizado ${u?.realizado ?? '—'} / alvo ${alvoLabel(obj, meta.alvo)}`}</p>
+                      <p className={`text-[11px] mt-0.5 truncate ${muted}`}>{metaLabel(meta)} · {meta.descricao ? `${meta.descricao}${u?.realizado != null ? ` · ${u.realizado}%` : ''}` : `realizado ${u?.realizado ?? '—'} / alvo ${alvoLabel(obj, meta.alvo)}`}</p>
                     </div>
                     <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     {jaEnviado ? (
@@ -603,7 +604,7 @@ export default function SgiObjetivos() {
                       <tr key={meta.id} className={`${isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-100'}`}>
                         <td className={`px-3 py-2.5 font-semibold ${txt}`}>{obj.titulo}</td>
                         <td className={`px-3 py-2.5 ${muted}`}>{metaLabel(meta)}{meta.descricao ? ` · ${meta.descricao}` : ''}</td>
-                        <td className={`px-3 py-2.5 text-right ${muted}`}>{u?.realizado ?? '—'} / {meta.alvo ?? '—'}</td>
+                        <td className={`px-3 py-2.5 text-right ${muted}`}>{meta.descricao ? (u?.realizado != null ? `${u.realizado}%` : '—') : `${u?.realizado ?? '—'} / ${meta.alvo ?? '—'}`}</td>
                         <td className="px-3 py-2.5 text-center"><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span></td>
                         <td className="px-3 py-2.5 text-right">
                           {jaEnviado ? (

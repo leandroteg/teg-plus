@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   SgiDocumento, StatusDocumento, TipoDocumento, CriarDocumentoPayload,
-  SgiRegistro, SgiAcao, SgiObjetivo, SgiMeta, SgiCheckin,
+  SgiRegistro, SgiAcao, SgiObjetivo, SgiMeta, SgiCheckin, SgiAnaliseCausa,
 } from '../types/sgi'
 
 const QK = {
@@ -159,6 +159,36 @@ export function useAtualizarAcao() {
       return data as SgiAcao
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
+  })
+}
+
+// ── Análise / Identificação de Causa (Ishikawa + 5 Porquês) ───────────────────
+export function useAnaliseCausa(registroId?: string) {
+  return useQuery({
+    queryKey: ['sgi_analise_causa', registroId],
+    enabled: !!registroId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('sgi_analise_causa').select('*').eq('registro_id', registroId!).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return (data ?? null) as SgiAnaliseCausa | null
+    },
+  })
+}
+export function useSalvarAnaliseCausa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, registro_id, metodo, conteudo, causa_raiz }: Partial<SgiAnaliseCausa> & { registro_id: string }) => {
+      const payload = { metodo: metodo ?? 'outro', conteudo: conteudo ?? {}, causa_raiz: causa_raiz ?? null }
+      if (id) {
+        const { data, error } = await supabase.from('sgi_analise_causa').update(payload).eq('id', id).select().single()
+        if (error) throw error
+        return data as SgiAnaliseCausa
+      }
+      const { data, error } = await supabase.from('sgi_analise_causa').insert({ registro_id, ...payload }).select().single()
+      if (error) throw error
+      return data as SgiAnaliseCausa
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['sgi_analise_causa', v.registro_id] }),
   })
 }
 

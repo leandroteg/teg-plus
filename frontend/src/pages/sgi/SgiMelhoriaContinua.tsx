@@ -1,17 +1,20 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle,
+  RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle, Save,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useRegistros, useCriarRegistro, useAtualizarRegistro,
   useAcoes, useCriarAcao, useAtualizarAcao,
+  useObjetivos, useAnaliseCausa, useSalvarAnaliseCausa,
 } from '../../hooks/useSgi'
+import { useLookupObras } from '../../hooks/useLookups'
 import {
   PDCA_STAGES, TIPO_REGISTRO_LABEL, ORIGEM_REGISTRO_LABEL, GRAVIDADE_CFG, STATUS_ACAO_LABEL,
+  ISHIKAWA_6M, ISHIKAWA_LABEL,
 } from '../../types/sgi'
 import type {
-  SgiRegistro, StatusPdca, TipoRegistro, OrigemRegistro, Gravidade,
+  SgiRegistro, StatusPdca, TipoRegistro, OrigemRegistro, Gravidade, Ishikawa6M,
 } from '../../types/sgi'
 
 const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—')
@@ -39,16 +42,41 @@ const TAB_ACCENT_DARK: Record<StatusPdca, AccentSet> = {
 function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; onClose: () => void; isDark: boolean }) {
   const atualizar = useAtualizarRegistro()
   const { data: acoes = [] } = useAcoes({ origem_id: registro.id })
+  const obras = useLookupObras()
   const criarAcao = useCriarAcao()
   const atualizarAcao = useAtualizarAcao()
   const [novaAcao, setNovaAcao] = useState('')
   const [novaPrazo, setNovaPrazo] = useState('')
+
+  // Identificação de causa (Ishikawa + 5 Porquês) → sgi_analise_causa
+  const { data: analise } = useAnaliseCausa(registro.id)
+  const salvarAnalise = useSalvarAnaliseCausa()
+  const [metodoCausa, setMetodoCausa] = useState<'5porques' | 'ishikawa'>('5porques')
+  const [porques, setPorques] = useState<string[]>(['', '', '', '', ''])
+  const [ishikawa, setIshikawa] = useState<Record<Ishikawa6M, string>>({ metodo: '', maquina: '', mao_obra: '', material: '', medicao: '', meio_ambiente: '' })
+  const [causaRaiz, setCausaRaiz] = useState('')
+  useEffect(() => {
+    if (!analise) return
+    const c = analise.conteudo || {}
+    setPorques([...(c.porques ?? []), '', '', '', '', ''].slice(0, 5))
+    const ish = c.ishikawa
+    if (ish) setIshikawa({
+      metodo: (ish.metodo ?? []).join('\n'), maquina: (ish.maquina ?? []).join('\n'), mao_obra: (ish.mao_obra ?? []).join('\n'),
+      material: (ish.material ?? []).join('\n'), medicao: (ish.medicao ?? []).join('\n'), meio_ambiente: (ish.meio_ambiente ?? []).join('\n'),
+    })
+    setCausaRaiz(analise.causa_raiz ?? '')
+  }, [analise])
+  const salvarCausa = async () => {
+    const ish = Object.fromEntries(ISHIKAWA_6M.map(k => [k, ishikawa[k].split('\n').map(s => s.trim()).filter(Boolean)])) as Record<Ishikawa6M, string[]>
+    await salvarAnalise.mutateAsync({ id: analise?.id, registro_id: registro.id, metodo: metodoCausa, conteudo: { porques: porques.map(p => p.trim()), ishikawa: ish }, causa_raiz: causaRaiz.trim() || null })
+  }
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
   const txt = isDark ? 'text-white' : 'text-slate-800'
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'
   const g = GRAVIDADE_CFG[registro.gravidade]
+  const obraNome = registro.obra_id ? (obras.find(o => o.id === registro.obra_id)?.nome ?? null) : null
   const stageIdx = PDCA_STAGES.findIndex(s => s.key === registro.status_pdca)
 
   const setStatus = (s: StatusPdca) => atualizar.mutate({ id: registro.id, status_pdca: s, ...(s === 'encerrado' ? { encerrado_em: new Date().toISOString() } : {}) })
@@ -92,7 +120,8 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
               <div><p className={muted}>Tipo</p><p className={`font-semibold ${txt}`}>{TIPO_REGISTRO_LABEL[registro.tipo]}</p></div>
               <div><p className={muted}>Origem</p><p className={`font-semibold ${txt}`}>{ORIGEM_REGISTRO_LABEL[registro.origem]}</p></div>
               <div><p className={muted}>Gravidade</p><span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${g.bg} ${g.text}`}><span className={`w-1.5 h-1.5 rounded-full ${g.dot}`} />{g.label}</span></div>
-              <div><p className={muted}>Área</p><p className={`font-semibold ${txt}`}>{registro.area_processo || '—'}</p></div>
+              <div><p className={muted}>Departamento</p><p className={`font-semibold ${txt}`}>{registro.area_processo || '—'}</p></div>
+              {obraNome && <div><p className={muted}>Projeto</p><p className={`font-semibold ${txt}`}>{obraNome}</p></div>}
             </div>
             <div className="flex gap-1.5">
               {([['nc', 'É Não Conformidade'], ['registro', 'Só registro'], ['dispensado', 'Dispensar']] as const).map(([c, lbl]) => (
@@ -104,6 +133,53 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
                   }`}>{lbl}</button>
               ))}
             </div>
+          </div>
+
+          {/* Identificação de Causa (Ishikawa + 5 Porquês) */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Identificação de Causa</p>
+              <div className={`inline-flex items-center gap-0.5 p-0.5 rounded-lg border ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-100'}`}>
+                {(['5porques', 'ishikawa'] as const).map(mt => (
+                  <button key={mt} type="button" onClick={() => setMetodoCausa(mt)}
+                    className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all ${metodoCausa === mt ? 'bg-blue-600 text-white' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {mt === '5porques' ? '5 Porquês' : 'Ishikawa'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {metodoCausa === '5porques' ? (
+              <div className="space-y-1.5">
+                {porques.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="w-5 h-5 shrink-0 rounded-md bg-blue-500/15 text-blue-500 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                    <input value={p} onChange={e => setPorques(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                      placeholder={i === 0 ? 'Por que o problema ocorreu?' : 'Por quê?'}
+                      className={`flex-1 text-xs rounded-lg px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {ISHIKAWA_6M.map(k => (
+                  <div key={k}>
+                    <p className={`text-[10px] font-semibold mb-0.5 ${txt}`}>{ISHIKAWA_LABEL[k]}</p>
+                    <textarea rows={2} value={ishikawa[k]} onChange={e => setIshikawa(prev => ({ ...prev, [k]: e.target.value }))}
+                      placeholder="uma causa por linha"
+                      className={`w-full text-[11px] rounded-lg px-2 py-1.5 border outline-none resize-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3">
+              <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Causa raiz identificada</p>
+              <input value={causaRaiz} onChange={e => setCausaRaiz(e.target.value)} placeholder="Conclusão da análise..."
+                className={`w-full text-xs rounded-lg px-2.5 py-1.5 border outline-none ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+            </div>
+            <button onClick={salvarCausa} disabled={salvarAnalise.isPending}
+              className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {salvarAnalise.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar análise
+            </button>
           </div>
 
           {registro.descricao && (
@@ -157,11 +233,15 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
 // ── Modal nova anomalia (categorização inicial) ───────────────────────────────
 function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
   const criar = useCriarRegistro()
+  const obras = useLookupObras()
+  const { data: objetivos = [] } = useObjetivos()
+  const departamentos = useMemo(() => objetivos.filter(o => o.indicador === 'OKR').map(o => o.titulo), [objetivos])
   const [titulo, setTitulo] = useState('')
   const [tipo, setTipo] = useState<TipoRegistro>('anomalia')
   const [origem, setOrigem] = useState<OrigemRegistro>('campo')
   const [gravidade, setGravidade] = useState<Gravidade>('media')
   const [area, setArea] = useState('')
+  const [obraId, setObraId] = useState('')
   const [descricao, setDescricao] = useState('')
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -172,7 +252,7 @@ function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: b
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!titulo.trim()) return
-    await criar.mutateAsync({ titulo: titulo.trim(), tipo, origem, gravidade, area_processo: area || undefined, descricao: descricao || undefined, status_pdca: 'pendente', classificacao: 'pendente' })
+    await criar.mutateAsync({ titulo: titulo.trim(), tipo, origem, gravidade, area_processo: area || undefined, obra_id: obraId || undefined, descricao: descricao || undefined, status_pdca: 'pendente', classificacao: 'pendente' })
     onClose()
   }
 
@@ -208,9 +288,19 @@ function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: b
               </select>
             </div>
             <div>
-              <label className={`block text-xs font-semibold mb-1 ${muted}`}>Área / Processo</label>
-              <input value={area} onChange={e => setArea(e.target.value)} placeholder="Ex.: Campo / LT" className={inputCls} />
+              <label className={`block text-xs font-semibold mb-1 ${muted}`}>Departamento</label>
+              <select value={area} onChange={e => setArea(e.target.value)} className={inputCls}>
+                <option value="">Selecione…</option>
+                {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
+          </div>
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${muted}`}>Projeto / Obra <span className="font-normal opacity-60">(se operacional)</span></label>
+            <select value={obraId} onChange={e => setObraId(e.target.value)} className={inputCls}>
+              <option value="">— Nenhum / não operacional</option>
+              {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} · ` : ''}{o.nome}</option>)}
+            </select>
           </div>
           <div>
             <label className={`block text-xs font-semibold mb-1 ${muted}`}>Descrição</label>

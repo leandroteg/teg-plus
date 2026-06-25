@@ -102,11 +102,29 @@ export interface SgiAcao {
   updated_at: string
 }
 
+// Identificação de causa (Ishikawa 6M + 5 Porquês) — guardado em sgi_analise_causa.conteudo (jsonb)
+export const ISHIKAWA_6M = ['metodo', 'maquina', 'mao_obra', 'material', 'medicao', 'meio_ambiente'] as const
+export type Ishikawa6M = (typeof ISHIKAWA_6M)[number]
+export const ISHIKAWA_LABEL: Record<Ishikawa6M, string> = {
+  metodo: 'Método', maquina: 'Máquina', mao_obra: 'Mão de obra', material: 'Material', medicao: 'Medição', meio_ambiente: 'Meio ambiente',
+}
+export interface AnaliseCausaConteudo {
+  porques: string[]
+  ishikawa: Record<Ishikawa6M, string[]>
+}
+export interface SgiAnaliseCausa {
+  id: string
+  registro_id: string
+  metodo: '5porques' | 'ishikawa' | 'outro'
+  conteudo: Partial<AnaliseCausaConteudo>
+  causa_raiz?: string | null
+  created_at: string
+}
+
 export const PDCA_STAGES: { key: StatusPdca; label: string; dot: string; bar: string }[] = [
   { key: 'pendente',      label: 'Pendente',              dot: 'bg-slate-400',   bar: 'bg-slate-400' },
   { key: 'analise_causa', label: 'Análise de Causa',      dot: 'bg-blue-500',    bar: 'bg-blue-500' },
   { key: 'plano_acao',    label: 'Plano de Ação',         dot: 'bg-violet-500',  bar: 'bg-violet-500' },
-  { key: 'execucao',      label: 'Execução',              dot: 'bg-amber-500',   bar: 'bg-amber-500' },
   { key: 'verificacao',   label: 'Verificação e Revisão', dot: 'bg-cyan-500',    bar: 'bg-cyan-500' },
   { key: 'encerrado',     label: 'Encerrado',             dot: 'bg-emerald-500', bar: 'bg-emerald-500' },
 ]
