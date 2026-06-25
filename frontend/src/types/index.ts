@@ -1,5 +1,5 @@
 export type StatusRequisicao =
-  | 'rascunho' | 'em_triagem_cd' | 'atendida_cd'
+  | 'rascunho' | 'aguardando_catalogo' | 'em_triagem_cd' | 'atendida_cd'
   | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
   | 'devolvida_solicitante'

@@ -245,12 +245,18 @@ export function useCriarRequisicao() {
       const limiteAlcada1 = alcada1Limite ?? 2000
       const alcadaNivel = valorEstimado > limiteAlcada1 ? 2 : 1
 
+      // Item sem est_item_id (descricao livre) prende RC com o comprador ate
+      // ser vinculado ao catalogo. Aprovador nao deve ver descricao livre.
+      const temOrfaos = payload.itens.some(i => !i.est_item_id)
+
       // Categorias com passa_por_cd: RC vai p/ triagem do CD Araxa antes
       // de seguir para validacao tecnica. Sem rascunho, sem apr_aprovacoes
       // ate o triador liberar.
       const statusInicial: string = payload.rascunho
         ? 'rascunho'
-        : passaPorCd ? 'em_triagem_cd' : 'em_aprovacao'
+        : temOrfaos
+          ? 'aguardando_catalogo'
+          : passaPorCd ? 'em_triagem_cd' : 'em_aprovacao'
 
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
@@ -347,7 +353,9 @@ export function useCriarRequisicao() {
 
       // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e p/
       // categorias que passam pelo CD - o triador cria a aprovacao no liberar).
-      if (!payload.rascunho && !passaPorCd) try {
+      // Tambem skip quando RC esta aguardando vinculo de catalogo - aprovacao
+      // sera criada apos comprador vincular todos os itens.
+      if (!payload.rascunho && !passaPorCd && !temOrfaos) try {
         // Busca aprovador da alçada correspondente
         const { data: alcadaData } = await supabase
           .from('apr_alcadas')
@@ -382,6 +390,98 @@ export function useCriarRequisicao() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// Comprador promove RC de aguardando_catalogo p/ aprovacao tecnica apos vincular
+// todos os itens. Replica a logica de criacao apr_aprovacoes da useCriarRequisicao.
+export function useEnviarParaAprovacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ requisicaoId }: { requisicaoId: string }) => {
+      const { data: rc, error: rcErr } = await supabase
+        .from('cmp_requisicoes')
+        .select('id, numero, status, categoria, alcada_nivel, solicitante_nome, base_destino_id')
+        .eq('id', requisicaoId)
+        .maybeSingle()
+      if (rcErr) throw rcErr
+      if (!rc) throw new Error('Requisicao nao encontrada')
+      if (rc.status !== 'aguardando_catalogo') {
+        throw new Error(`Status atual e ${rc.status}; so e possivel enviar de aguardando_catalogo`)
+      }
+
+      const { data: itens, error: itErr } = await supabase
+        .from('cmp_requisicao_itens')
+        .select('id, descricao')
+        .eq('requisicao_id', requisicaoId)
+        .is('est_item_id', null)
+      if (itErr) throw itErr
+      if (itens && itens.length > 0) {
+        throw new Error(`Ainda ha ${itens.length} item(ns) sem vinculo de catalogo`)
+      }
+
+      // Categoria com passa_por_cd vai pra triagem; senao direto pra em_aprovacao.
+      // Mesma regra UF=MG aplicada na criacao.
+      let passaPorCd = false
+      if (rc.categoria) {
+        const { data: cat } = await supabase
+          .from('cmp_categorias')
+          .select('passa_por_cd')
+          .eq('codigo', rc.categoria)
+          .maybeSingle()
+        passaPorCd = Boolean(cat?.passa_por_cd)
+      }
+      let baseUf: string | null = null
+      if (rc.base_destino_id) {
+        const { data: base } = await supabase
+          .from('est_bases').select('uf').eq('id', rc.base_destino_id).maybeSingle()
+        baseUf = (base as any)?.uf ?? null
+      }
+      const irPraTriagem = passaPorCd && baseUf === 'MG'
+      const novoStatus = irPraTriagem ? 'em_triagem_cd' : 'em_aprovacao'
+
+      const { error: updErr } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: novoStatus })
+        .eq('id', requisicaoId)
+      if (updErr) throw updErr
+
+      // Triagem: apr_aprovacoes sera criada pelo triador no liberar.
+      if (irPraTriagem) return { status: novoStatus }
+
+      // Cria apr_aprovacoes pendente
+      const { data: alcadaData } = await supabase
+        .from('apr_alcadas')
+        .select('id, prazo_horas, aprovador_padrao:sys_usuarios!aprovador_padrao_id(id, nome, email)')
+        .eq('nivel', rc.alcada_nivel)
+        .eq('ativo', true)
+        .maybeSingle()
+      const aprovador = (alcadaData?.aprovador_padrao as { id: string; nome: string; email: string } | null)
+      const prazoHoras = (alcadaData?.prazo_horas as number) ?? 48
+      const dataLimite = new Date(Date.now() + prazoHoras * 3600_000).toISOString()
+
+      const { error: aprErr } = await supabase
+        .from('apr_aprovacoes')
+        .insert({
+          modulo: 'cmp',
+          tipo_aprovacao: 'requisicao_compra',
+          entidade_id: rc.id,
+          entidade_numero: rc.numero,
+          aprovador_nome: aprovador?.nome ?? rc.solicitante_nome,
+          aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+          nivel: rc.alcada_nivel,
+          status: 'pendente',
+          data_limite: dataLimite,
+        })
+      if (aprErr) console.warn('Aviso: apr_aprovacoes nao inserido:', aprErr.message)
+      return { status: novoStatus }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

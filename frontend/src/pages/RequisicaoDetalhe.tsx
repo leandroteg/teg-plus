@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle, AlertCircle,
-  ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
+  ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink, RefreshCw,
   FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, useEnviarParaAprovacao, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useCriarSolicitacaoContratoFromRC } from '../hooks/useSolicitacoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento, useRenegociarValorEsclarecimento } from '../hooks/useCotacoes'
@@ -147,6 +147,8 @@ export default function RequisicaoDetalhe() {
   const cancelarMutation = useCancelarRequisicao()
   const atenderTriagem = useTriagemAtenderItem()
   const liberarTriagem = useTriagemLiberarRC()
+  const enviarParaAprovacao = useEnviarParaAprovacao()
+  const [enviarMsg, setEnviarMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { data: bases = [] } = useBases()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
@@ -920,6 +922,85 @@ export default function RequisicaoDetalhe() {
           )}
         </div>
       )}
+
+      {/* Aguardando catalogo — comprador vincula itens livres antes da aprovacao */}
+      {req?.status === 'aguardando_catalogo' && (isAdmin || isAprovadorCompras) && (() => {
+        const orfaos = (req.itens ?? []).filter(i => !(i as any).est_item_id)
+        const podeEnviar = orfaos.length === 0
+        return (
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-orange-700 flex-shrink-0" />
+              <span className="text-sm font-bold text-orange-800">Falta vincular catálogo ({orfaos.length}/{req.itens?.length ?? 0})</span>
+            </div>
+            <p className="text-xs text-orange-700">
+              Cadastre cada item livre no cat&aacute;logo de estoque. Depois volte aqui e clique em <b>Atualizar v&iacute;nculos</b>. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
+            </p>
+
+            {/* Lista dos orfaos com botao Cadastrar individual — abre cadastro pre-preenchido */}
+            {orfaos.length > 0 && (
+              <div className="bg-white rounded-xl border border-orange-200 divide-y divide-orange-100 max-h-72 overflow-y-auto">
+                {orfaos.map(i => (
+                  <div key={i.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="text-xs text-slate-700 flex-1 truncate" title={i.descricao}>{i.descricao}</span>
+                    <button
+                      onClick={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}`, '_blank', 'noopener')}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500 text-white text-[10px] font-bold hover:bg-orange-600 transition-all flex-shrink-0"
+                    >
+                      <ExternalLink size={11} /> Cadastrar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                disabled={!podeEnviar || enviarParaAprovacao.isPending}
+                title={!podeEnviar ? `Ainda ha ${orfaos.length} item(ns) sem catalogo` : undefined}
+                onClick={async () => {
+                  try {
+                    const r = await enviarParaAprovacao.mutateAsync({ requisicaoId: req.id })
+                    setEnviarMsg({ type: 'success', msg: `RC enviada para ${(r as any).status === 'em_triagem_cd' ? 'triagem do CD' : 'aprovação'}` })
+                  } catch (e) {
+                    setEnviarMsg({ type: 'error', msg: (e as Error).message })
+                  }
+                }}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send size={15} />
+                {enviarParaAprovacao.isPending ? 'Enviando…' : 'Enviar para Aprovação'}
+              </button>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  const { data, error } = await supabase.rpc('fn_catchup_vinculacao_itens_orfaos')
+                  if (error) throw error
+                  const r = (data as any) ?? {}
+                  setEnviarMsg({ type: 'success', msg: `${r.vinculados ?? 0} item(ns) vinculado(s) - recarregando…` })
+                  window.location.reload()
+                } catch (e) {
+                  setEnviarMsg({ type: 'error', msg: (e as Error).message })
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white text-orange-600 border border-orange-200 text-xs font-semibold hover:bg-orange-50 transition-all"
+            >
+              <RefreshCw size={13} /> Já cadastrei - Atualizar vínculos
+            </button>
+
+            {enviarMsg && (
+              <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                enviarMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}>
+                {enviarMsg.msg}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Pular triagem — comprador/admin que NAO e triador, p/ desencalhar RC equivocada */}
       {!podeTriagem && req?.status === 'em_triagem_cd' && (isAdmin || isAprovadorCompras) && (
