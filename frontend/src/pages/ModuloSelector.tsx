@@ -506,7 +506,7 @@ export default function ModuloSelector() {
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isLight ? 'bg-teal-500' : 'bg-teal-400'}`} />
           <span className={`text-[11px] font-semibold uppercase tracking-widest ${isLight ? 'text-teal-600' : 'text-teal-400/70'}`}>TEG+ ERP</span>
           <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>&middot;</span>
-          <span className={`text-[11px] font-medium ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>v2.0</span>
+          <span className={`text-[11px] font-medium ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>v1.0</span>
         </div>
 
         <div className="flex items-center gap-3">
