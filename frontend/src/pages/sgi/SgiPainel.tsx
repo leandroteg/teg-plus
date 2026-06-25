@@ -22,6 +22,33 @@ const fmtVal = (v: number | null | undefined, unidade?: string | null) => {
 const FAROL_ORDER: Farol[] = ['verde', 'amarelo', 'vermelho', 'cinza']
 const FAROL_BAR: Record<Farol, string> = { verde: 'bg-emerald-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: 'bg-slate-300' }
 
+// Card de uma meta anual (scorecard): Realizado em destaque (cor do farol) + Meta + farol
+function MetaScore({ entry, big, isDark }: { entry?: { o: ObjFull; m: MetaFull; u: SgiCheckin | null }; big?: boolean; isDark: boolean }) {
+  const faint = isDark ? 'text-slate-500' : 'text-slate-400'
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const soft = isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'
+  if (!entry) return <div className={`rounded-xl ${soft}`} />
+  const { o, m, u } = entry
+  const fr = FAROL_CFG[(u?.farol as Farol) || 'cinza']
+  return (
+    <div className={`rounded-xl p-3 flex flex-col justify-between gap-2 ${soft}`}>
+      <div className="min-w-0">
+        <p className={`text-[9px] font-bold uppercase tracking-wider ${faint}`}>{o.area_processo || '—'}</p>
+        <p className={`text-sm font-bold leading-tight truncate ${txt}`}>{o.titulo}</p>
+      </div>
+      <div>
+        <p className={`text-[8px] font-bold uppercase tracking-wider ${faint}`}>Realizado</p>
+        <p className={`${big ? 'text-[2rem]' : 'text-2xl'} font-extrabold leading-none ${fr.text}`}>{fmtVal(u?.realizado, o.unidade)}</p>
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <span className={`text-[10px] font-semibold ${muted}`}>Meta {o.direcao === 'menor_melhor' ? '≤' : '≥'} {fmtVal(m.alvo, o.unidade)}</span>
+          <span className={`inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${fr.bg} ${fr.text}`}><span className={`w-1.5 h-1.5 rounded-full ${fr.dot}`} />{fr.label}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SgiPainel() {
   const { isDark } = useTheme()
   const nav = useNavigate()
@@ -44,6 +71,7 @@ export default function SgiPainel() {
     anuais.forEach(a => { c[(a.u?.farol as Farol) || 'cinza']++ })
     return c
   }, [anuais])
+  const byT = useMemo(() => Object.fromEntries(anuais.map(a => [a.o.titulo, a])) as Record<string, { o: ObjFull; m: MetaFull; u: SgiCheckin | null }>, [anuais])
 
   // Saúde por trimestre (check-in dos KRs)
   const tris = useMemo(() => [1, 2, 3, 4].map(t => {
@@ -72,52 +100,46 @@ export default function SgiPainel() {
         </button>
       </div>
 
-      {/* Scorecard estratégico — Metas Anuais */}
-      <section className={`rounded-3xl border shadow-sm overflow-hidden ${card}`}>
-        <div className={`px-4 md:px-5 pt-4 pb-3 flex items-center justify-between gap-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          <div>
-            <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${faint}`}>Scorecard Estratégico 2026</p>
-            <h2 className={`mt-0.5 text-base font-black ${txt}`}>Metas Anuais</h2>
+      {/* Scorecard estratégico — 2 blocos da mesma altura */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-3 items-stretch">
+        {/* Bloco 1: resultados principais (1 linha) */}
+        <section className={`rounded-3xl border shadow-sm overflow-hidden flex flex-col ${card}`}>
+          <div className={`px-4 md:px-5 pt-4 pb-3 flex items-center justify-between gap-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+            <div>
+              <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${faint}`}>Scorecard Estratégico 2026</p>
+              <h2 className={`mt-0.5 text-base font-black ${txt}`}>Resultados principais</h2>
+            </div>
+            <div className="flex items-center gap-2.5 text-xs font-bold">
+              <span className="inline-flex items-center gap-1 text-emerald-500"><span className="w-2 h-2 rounded-full bg-emerald-500" />{faroisAnuais.verde}</span>
+              <span className="inline-flex items-center gap-1 text-amber-500"><span className="w-2 h-2 rounded-full bg-amber-500" />{faroisAnuais.amarelo}</span>
+              <span className="inline-flex items-center gap-1 text-red-500"><span className="w-2 h-2 rounded-full bg-red-500" />{faroisAnuais.vermelho}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 text-xs font-bold">
-            <span className="inline-flex items-center gap-1 text-emerald-500"><span className="w-2 h-2 rounded-full bg-emerald-500" />{faroisAnuais.verde}</span>
-            <span className="inline-flex items-center gap-1 text-amber-500"><span className="w-2 h-2 rounded-full bg-amber-500" />{faroisAnuais.amarelo}</span>
-            <span className="inline-flex items-center gap-1 text-red-500"><span className="w-2 h-2 rounded-full bg-red-500" />{faroisAnuais.vermelho}</span>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
+            <MetaScore entry={byT['Produção']} big isDark={isDark} />
+            <MetaScore entry={byT['Lucratividade']} big isDark={isDark} />
+            <MetaScore entry={byT['Acidentes graves']} big isDark={isDark} />
           </div>
-        </div>
-        {anuais.length === 0 ? (
-          <p className={`text-xs p-5 ${muted}`}>Nenhuma meta anual cadastrada.</p>
-        ) : (
-          <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
-            {anuais.map(({ o, m, u }) => {
-              const fr = FAROL_CFG[(u?.farol as Farol) || 'cinza']
-              return (
-                <div key={m.id} className={`rounded-xl p-3 ${soft}`}>
-                  <p className={`text-[9px] font-bold uppercase tracking-wider ${faint}`}>{o.area_processo || '—'}</p>
-                  <p className={`text-sm font-bold leading-tight truncate ${txt}`}>{o.titulo}</p>
-                  <div className="flex items-end justify-between gap-2 mt-2">
-                    <div className="min-w-0">
-                      <p className={`text-[8px] font-bold uppercase tracking-wider ${faint}`}>Realizado</p>
-                      <p className={`text-xl font-extrabold leading-none ${fr.text}`}>{fmtVal(u?.realizado, o.unidade)}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-[8px] font-bold uppercase tracking-wider ${faint}`}>Meta</p>
-                      <p className={`text-xs font-bold ${muted}`}>{o.direcao === 'menor_melhor' ? '≤' : '≥'} {fmtVal(m.alvo, o.unidade)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${fr.bg} ${fr.text}`}><span className={`w-1.5 h-1.5 rounded-full ${fr.dot}`} />{fr.label}</span>
-                    {u && <span className={`text-[9px] ${faint}`}>{u.competencia}</span>}
-                  </div>
-                </div>
-              )
-            })}
+        </section>
+
+        {/* Bloco 2: pessoas & crescimento (2x2) */}
+        <section className={`rounded-3xl border shadow-sm overflow-hidden flex flex-col ${card}`}>
+          <div className={`px-4 md:px-5 pt-4 pb-3 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+            <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${faint}`}>Pessoas & Crescimento</p>
+            <h2 className={`mt-0.5 text-base font-black ${txt}`}>Metas de apoio</h2>
           </div>
-        )}
-        <button onClick={() => nav('/sgi/objetivos')} className={`w-full px-4 py-2.5 text-[11px] font-semibold flex items-center justify-center gap-1 border-t ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-white/[0.03]' : 'border-slate-100 text-violet-600 hover:bg-slate-50'}`}>
-          Ver Objetivos e Metas <ArrowRight size={12} />
-        </button>
-      </section>
+          <div className="p-4 grid grid-cols-2 gap-2.5 flex-1">
+            <MetaScore entry={byT['Produtividade']} isDark={isDark} />
+            <MetaScore entry={byT['Novos contratos']} isDark={isDark} />
+            <MetaScore entry={byT['Turnover']} isDark={isDark} />
+            <MetaScore entry={byT['Clima organizacional']} isDark={isDark} />
+          </div>
+        </section>
+      </div>
+
+      <button onClick={() => nav('/sgi/objetivos')} className={`text-xs font-semibold flex items-center gap-1 ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
+        Ver Objetivos e Metas <ArrowRight size={12} />
+      </button>
 
       {/* OKRs por trimestre — saúde dos KRs */}
       {tris.length > 0 && (
