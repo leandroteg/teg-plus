@@ -1,5 +1,5 @@
 import { useState, useMemo, Fragment } from 'react'
-import { ChevronDown, TrendingUp, DollarSign, Target, Wallet } from 'lucide-react'
+import { ChevronDown, Target } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePlanoOrcamentario } from '../../hooks/useControladoria'
 import type { PlanoOrcamentarioRow } from '../../hooks/useControladoria'
@@ -37,6 +37,7 @@ const SECTIONS: Section[] = [
     title: 'DESPESAS APÓS O LUCRO',
     items: [
       'Amortizações',
+      'Investimentos',
       'Impostos (PIS/COFINS/IRPJ/CSLL)',
     ],
   },
@@ -53,9 +54,6 @@ const fmtM = (v: number): string => {
   if (abs >= 1_000) return (v / 1_000).toFixed(0) + 'K'
   return v.toFixed(0)
 }
-
-const fmtBRL = (v: number): string =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 
 const currentYear = new Date().getFullYear()
 
@@ -114,15 +112,6 @@ export default function PlanoOrcamentario() {
     }
     return t
   }
-
-  // KPI cards data
-  const kpis = useMemo(() => {
-    const fat = grandTotal.totalr
-    const meta = grandTotal.total
-    const desvio = meta > 0 ? ((fat - meta) / meta) * 100 : 0
-    const margem = fat > 0 ? ((fat - grandTotal.totalr) / fat) * 100 : 0
-    return { fat, meta, desvio, margem }
-  }, [grandTotal])
 
   // ── Year options ─────────────────────────────────────────────
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
@@ -318,113 +307,7 @@ export default function PlanoOrcamentario() {
         )}
       </div>
 
-      {/* ── KPI Cards ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Faturamento Real vs Meta */}
-        <KPICard
-          isLight={isLight}
-          icon={<DollarSign size={18} />}
-          label="Faturamento Real vs Meta"
-          value={fmtBRL(kpis.fat)}
-          sub={`Meta: ${fmtBRL(kpis.meta)}`}
-          color="emerald"
-        />
-        {/* Margem Liquida */}
-        <KPICard
-          isLight={isLight}
-          icon={<TrendingUp size={18} />}
-          label="Margem Liquida"
-          value={`${kpis.margem.toFixed(1)}%`}
-          sub={kpis.margem >= 0 ? 'Positiva' : 'Negativa'}
-          color={kpis.margem >= 0 ? 'emerald' : 'red'}
-        />
-        {/* Desvio de Custos */}
-        <KPICard
-          isLight={isLight}
-          icon={<Target size={18} />}
-          label="Desvio de Custos"
-          value={`${kpis.desvio >= 0 ? '+' : ''}${kpis.desvio.toFixed(1)}%`}
-          sub={Math.abs(kpis.desvio) <= 5 ? 'Dentro da faixa' : 'Fora da faixa'}
-          color={Math.abs(kpis.desvio) <= 5 ? 'emerald' : 'amber'}
-        />
-        {/* Fluxo de Caixa */}
-        <KPICard
-          isLight={isLight}
-          icon={<Wallet size={18} />}
-          label="Fluxo de Caixa"
-          value={fmtBRL(kpis.fat - grandTotal.totalr)}
-          sub={kpis.fat - grandTotal.totalr >= 0 ? 'Superavit' : 'Deficit'}
-          color={kpis.fat - grandTotal.totalr >= 0 ? 'emerald' : 'red'}
-        />
-      </div>
     </div>
   )
 }
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
-
-function KPICard({
-  isLight,
-  icon,
-  label,
-  value,
-  sub,
-  color,
-}: {
-  isLight: boolean
-  icon: React.ReactNode
-  label: string
-  value: string
-  sub: string
-  color: string
-}) {
-  const colorMap: Record<string, { iconBg: string; iconText: string; valueCls: string }> = {
-    emerald: {
-      iconBg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/10',
-      iconText: 'text-emerald-500',
-      valueCls: isLight ? 'text-emerald-600' : 'text-emerald-400',
-    },
-    red: {
-      iconBg: isLight ? 'bg-red-50' : 'bg-red-500/10',
-      iconText: 'text-red-500',
-      valueCls: isLight ? 'text-red-600' : 'text-red-400',
-    },
-    amber: {
-      iconBg: isLight ? 'bg-amber-50' : 'bg-amber-500/10',
-      iconText: 'text-amber-500',
-      valueCls: isLight ? 'text-amber-600' : 'text-amber-400',
-    },
-    violet: {
-      iconBg: isLight ? 'bg-violet-50' : 'bg-violet-500/10',
-      iconText: 'text-violet-500',
-      valueCls: isLight ? 'text-violet-600' : 'text-violet-400',
-    },
-  }
-
-  const c = colorMap[color] ?? colorMap.emerald
-
-  return (
-    <div className={`rounded-2xl border p-4 transition-all hover:scale-[1.01] ${
-      isLight
-        ? 'bg-white border-slate-200 shadow-sm hover:shadow-md'
-        : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'
-    }`}>
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${c.iconBg} ${c.iconText}`}>
-          {icon}
-        </div>
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${
-          isLight ? 'text-slate-400' : 'text-slate-500'
-        }`}>
-          {label}
-        </span>
-      </div>
-      <div className={`text-xl font-extrabold ${c.valueCls}`}>
-        {value}
-      </div>
-      <div className={`text-[11px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-        {sub}
-      </div>
-    </div>
-  )
-}
