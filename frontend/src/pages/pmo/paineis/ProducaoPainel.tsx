@@ -166,7 +166,7 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <Kpi label="Físico Geral" value={`${ag.fisicoGeral}%`} tone="emerald" isDark={isDark} note="realizado / contratado" />
         <Kpi label="Topografia" value={driverKpi('Serv. Preliminares')} tone="sky" isDark={isDark} note="km" />
-        <Kpi label="Tubulões" value={driverKpi('Fundações')} tone="amber" isDark={isDark} note="m³" />
+        <Kpi label="Fundação" value={driverKpi('Fundações')} tone="amber" isDark={isDark} note="m³" />
         <Kpi label="Montagem" value={driverKpi('Montagem de Torres')} tone="slate" isDark={isDark} note="ton" />
         <Kpi label="Lançamento" value={driverKpi('Lançamento de Cabos')} tone="violet" isDark={isDark} note="km" />
         <Kpi label="Torres" value={ag.torres || '—'} tone="rose" isDark={isDark} note="cadastradas" />
