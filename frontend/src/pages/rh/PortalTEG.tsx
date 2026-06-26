@@ -3,19 +3,23 @@ import {
   Clock, FileText, Receipt, MessageSquare,
   ClipboardList, BookOpen, ArrowLeft, Smartphone,
   Target, Users, Star, ChevronRight, Wifi, Signal,
-  BatteryFull, Lock,
+  BatteryFull, Lock, ExternalLink, type LucideIcon,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
+// Link do Secullum — espelho/registros de ponto do colaborador.
+const SECULLUM_PONTO_URL = 'https://autenticador.secullum.com.br/Authorization?response_type=code&client_id=3001&redirect_uri=https://pontoweb.secullum.com.br/Auth'
+
 // ── Tiles do app ──────────────────────────────────────────────────────────────
-const TILES = [
+const TILES: { icon: LucideIcon; label: string; color: string; glow: string; iconColor: string; available: boolean; href?: string }[] = [
   {
     icon: Clock,
     label: 'Acesso\nao Ponto',
     color: 'from-teal-500 to-teal-600',
     glow: 'shadow-teal-500/30',
     iconColor: 'text-white',
-    available: false,
+    available: true,
+    href: SECULLUM_PONTO_URL,
   },
   {
     icon: FileText,
@@ -23,7 +27,8 @@ const TILES = [
     color: 'from-cyan-500 to-cyan-600',
     glow: 'shadow-cyan-500/30',
     iconColor: 'text-white',
-    available: false,
+    available: true,
+    href: SECULLUM_PONTO_URL,
   },
   {
     icon: Receipt,
@@ -148,6 +153,12 @@ export default function PortalTEG() {
             Um app simples, leve e direto. Ponto, holerite, recados e o manual da TEG —
             acessíveis pelo celular, sem complicação.
           </p>
+          <div className="mt-6 flex justify-center">
+            <a href={SECULLUM_PONTO_URL} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white text-sm font-bold shadow-lg shadow-teal-500/30 transition-all">
+              <Clock size={18} /> Acessar meu Ponto <ExternalLink size={15} />
+            </a>
+          </div>
         </div>
 
         {/* Layout principal */}
@@ -218,8 +229,8 @@ export default function PortalTEG() {
                     <div className="grid grid-cols-3 gap-2">
                       {TILES.map((tile, i) => {
                         const Icon = tile.icon
-                        return (
-                          <div key={i} className="flex flex-col items-center gap-1">
+                        const inner = (
+                          <>
                             <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tile.color} shadow-lg ${tile.glow} flex items-center justify-center`}>
                               <Icon size={22} className={tile.iconColor} />
                             </div>
@@ -228,7 +239,12 @@ export default function PortalTEG() {
                                 <span key={j} className="block">{l}</span>
                               ))}
                             </p>
-                          </div>
+                          </>
+                        )
+                        return tile.href ? (
+                          <a key={i} href={tile.href} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 active:scale-95 transition-transform">{inner}</a>
+                        ) : (
+                          <div key={i} className="flex flex-col items-center gap-1">{inner}</div>
                         )
                       })}
                     </div>
