@@ -415,6 +415,15 @@ export interface PMORisco {
   status: StatusRisco
   created_at?: string
   updated_at?: string
+  // matriz qualitativa (1..5) + análise IA / incremental
+  prob_score?: number | null
+  impacto_score?: number | null
+  origem?: 'ia' | 'manual' | null
+  gatilho?: string | null
+  mitigacao?: string | null
+  analise_ia?: string | null
+  codigo?: string | null
+  run_id?: string | null
 }
 
 // ── Plano de Ação ──

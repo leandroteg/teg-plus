@@ -22,6 +22,7 @@ import EAPFinal, { EAPKpis } from './EAPFinal'
 import CronogramaPainel from './paineis/CronogramaPainel'
 import HistogramaRecursos from './paineis/HistogramaPainel'
 import CustosPainel from './paineis/CustosPainel'
+import RiscosPainel from './paineis/RiscosPainel'
 import { MedicoesPanel } from './EGPControle'
 import { Wallet } from 'lucide-react'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
@@ -151,7 +152,7 @@ export default function EGPPlanejamento() {
       {tab === 'custos' && <CustosPainel portfolioId={portfolioId} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'medicao' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
-      {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'riscos' && <RiscosPainel portfolioId={portfolioId} />}
     </div>
   )
 }
