@@ -19,10 +19,22 @@ interface ObraN { nome: string; valor: number; qtd: number; grupos: GrupoN[] }
 interface PoloN { nome: string; valor: number; qtd: number; obras: ObraN[] }
 interface BlocoN { titulo: string; total: number; grupos: GrupoN[] }
 
+// Nome do polo/projeto (centro de custo) no lugar do código da frente.
+const POLO_NOME: Record<string, string> = {
+  'F1': 'Frutal',
+  'F2': 'Três Marias',
+  'F3.1/3.2': 'Araxá / Perdizes',
+  'F3.3/3.4': 'Patrocínio / Ituiutaba',
+  'F3.5/3.6/3.7': 'Uberlândia',
+  'F3.12': 'Paracatu',
+  'F4': 'Rio Paranaíba',
+  'F8': 'Comendador Gomes',
+}
+
 function buildTree(rows: LegadoResumo[]) {
   const obraLabel = (r: LegadoResumo) =>
     r.obra_nome ?? (r.tipo_cc === 'estrutura' ? 'Estrutura (overhead, sem obra)' : r.tipo_cc === 'frota' ? 'Frota (overhead, sem obra)' : '— Sem obra')
-  const poloLabel = (r: LegadoResumo) => r.polo ?? '— Sem polo (overhead)'
+  const poloLabel = (r: LegadoResumo) => r.polo ? `${POLO_NOME[r.polo] ?? r.polo} (${r.polo})` : '— Sem polo (overhead)'
 
   // custo direto -> árvore polo/obra/grupo/natureza
   const pmap = new Map<string, { valor: number; qtd: number; obras: Map<string, { valor: number; qtd: number; grupos: Map<string, { valor: number; qtd: number; nats: Map<string, { valor: number; qtd: number }> }> }> }>()
