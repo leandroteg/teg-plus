@@ -1,8 +1,8 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, Fragment } from 'react'
 import {
   Users2, Search, Plus, X, List, CalendarRange, LayoutGrid,
   HardHat, UserCog, ShieldCheck, ChevronDown, ChevronUp, Building2,
-  Filter, Loader2, Trash2, ArrowRight, Calendar, Briefcase, UserPlus,
+  Filter, Loader2, Trash2, ArrowRight, Calendar, Briefcase, UserPlus, Eye, EyeOff,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -642,6 +642,7 @@ function ProgramacaoView({
   isDark: boolean
 }) {
   const [minimizados, setMinimizados] = useState<Set<string>>(new Set())
+  const [verRecursos, setVerRecursos] = useState(false)
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -653,14 +654,20 @@ function ProgramacaoView({
 
   // Time não aparece como linha individual — só o número por encarregado.
   const rows = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status) && e.papel !== 'time'), [equipe])
-  const timeCountByLider = useMemo(() => {
-    const m = new Map<string, number>()
+  const timeRowsByLider = useMemo(() => {
+    const m = new Map<string, ObraPlanejamentoEquipe[]>()
     equipe.filter(e => STATUS_ATIVO.includes(e.status) && e.papel === 'time').forEach(e => {
       const k = e.lider_id ?? ''
-      m.set(k, (m.get(k) ?? 0) + 1)
+      const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr)
     })
+    m.forEach(arr => arr.sort((a, b) => a.nome.localeCompare(b.nome)))
     return m
   }, [equipe])
+  const timeCountByLider = useMemo(() => {
+    const m = new Map<string, number>()
+    timeRowsByLider.forEach((arr, k) => m.set(k, arr.length))
+    return m
+  }, [timeRowsByLider])
 
   // Agrupa por projeto
   const groups = useMemo(() => {
@@ -709,10 +716,46 @@ function ProgramacaoView({
   const leftW = COL_W.pessoa + COL_W.obra
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
+  const PersonRow = ({ r, recurso }: { r: ObraPlanejamentoEquipe; recurso?: boolean }) => {
+    const start = new Date(r.data_inicio)
+    const end = new Date(r.data_fim || addDays(start, 30).toISOString())
+    const cfg = PAPEL_CONFIG[r.papel]
+    const obra = obraById.get(r.obra_id)
+    const barColor = recurso ? 'bg-slate-400' : (r.papel === 'apoio' ? 'bg-cyan-500' : 'bg-orange-500')
+    const count = !recurso && r.papel === 'encarregado' ? (timeCountByLider.get(r.id) ?? 0) : 0
+    return (
+      <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
+        <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
+          <div className={`py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: recurso ? 28 : 12, paddingRight: 8 }}>
+            <span className={`${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+            <span className={`${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
+            {count > 0 && (
+              <span className={`ml-auto shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
+            )}
+          </div>
+          <div className={`px-2 py-1.5 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{recurso ? '' : (obra?.nome ?? '—')}</div>
+        </div>
+        {weeks.map((w, i) => {
+          const ativo = start <= addDays(w.sat, 1) && end >= w.mon
+          return (
+            <div key={i} className={`shrink-0 border-r ${border} flex items-center justify-center py-1.5`} style={{ width: `${COL_W.semana}px` }}>
+              {ativo && <div className={`${recurso ? 'h-2.5' : 'h-3.5'} w-full mx-1 rounded ${barColor} shadow-sm`} title={`${primeiroNome(r.nome)} — Sem. ${w.label}`} />}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
-      <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-        <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas (segunda a sábado)
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
+          <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas (segunda a sábado)
+        </div>
+        <button onClick={() => setVerRecursos(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${verRecursos ? 'bg-orange-500 text-white border-orange-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+          {verRecursos ? <EyeOff size={13} /> : <Eye size={13} />} {verRecursos ? 'Ocultar recursos' : 'Ver recursos'}
+        </button>
       </div>
 
       <div className={`rounded-xl border overflow-x-auto ${border}`}>
@@ -752,37 +795,14 @@ function ProgramacaoView({
                 </div>
               </button>
 
-              {!min && group.rows.map(r => {
-                const start = new Date(r.data_inicio)
-                const end = new Date(r.data_fim || addDays(start, 30).toISOString())
-                const cfg = PAPEL_CONFIG[r.papel]
-                const obra = obraById.get(r.obra_id)
-                const barColor = r.papel === 'apoio' ? 'bg-cyan-500' : 'bg-orange-500'
-                return (
-                  <div key={r.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
-                    <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
-                      <div className={`px-3 py-2 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px` }}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
-                        <span className={`text-[11px] font-semibold truncate ${txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
-                        {r.papel === 'encarregado' && (timeCountByLider.get(r.id) ?? 0) > 0 && (
-                          <span className={`ml-auto shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe">
-                            <Users2 size={9} /> {timeCountByLider.get(r.id)}
-                          </span>
-                        )}
-                      </div>
-                      <div className={`px-2 py-2 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{obra?.nome ?? '—'}</div>
-                    </div>
-                    {weeks.map((w, i) => {
-                      const ativo = start <= addDays(w.sat, 1) && end >= w.mon
-                      return (
-                        <div key={i} className={`shrink-0 border-r ${border} flex items-center justify-center py-2`} style={{ width: `${COL_W.semana}px` }}>
-                          {ativo && <div className={`h-3.5 w-full mx-1 rounded ${barColor} shadow-sm`} title={`${primeiroNome(r.nome)} — Sem. ${w.label}`} />}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
+              {!min && group.rows.map(r => (
+                (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
+                  <Fragment key={r.id}>
+                    <PersonRow r={r} />
+                    {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso />)}
+                  </Fragment>
+                ) : <PersonRow key={r.id} r={r} />
+              ))}
             </div>
           )
         })}
