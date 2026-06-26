@@ -73,7 +73,7 @@ export default function RiscosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
       if (error) throw error
       if (data?.ok === false) throw new Error(data.motivo || 'Falha na análise')
       if (data?.sincrono) { setMsg(`Análise concluída: ${data.novos ?? 0} novos, ${data.atualizados ?? 0} atualizados.`); await refetch() }
-      else { setMsg('Análise solicitada ao SuperTEG. Os riscos aparecem aqui quando concluir (atualizando…).'); for (let i = 0; i < 24; i++) { await new Promise(r => setTimeout(r, 5000)); await refetch() } }
+      else { setMsg('Análise solicitada ao SuperTEG (Claude na VPS) — leva ~2 min. Os riscos aparecem aqui automaticamente.'); let antes = riscos.length; for (let i = 0; i < 48; i++) { await new Promise(r => setTimeout(r, 5000)); const { data: novos } = await refetch(); if ((novos?.length ?? 0) > antes) { setMsg(`Análise concluída: ${(novos?.length ?? 0) - antes} risco(s) novo(s)/atualizado(s).`); break } } }
     } catch (e: any) { setMsg('Erro: ' + (e?.message || String(e))) }
     finally { setRodando(false) }
   }
