@@ -1,20 +1,13 @@
 import {
   LayoutDashboard, Rocket, Compass, BarChart3, CheckCircle2,
-  ChevronDown, Building2,
+  ChevronDown, Building2, PlusCircle, FileSignature, FolderPlus, HardHat, Ruler,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 import { EGPContractProvider, useEGPContract } from '../contexts/EGPContractContext'
 import { useTheme } from '../contexts/ThemeContext'
-
-const NAV = [
-  { to: '/egp',              icon: LayoutDashboard, label: 'Painel',        end: true },
-  { to: '/egp/iniciacao',    icon: Rocket,          label: 'Iniciação' },
-  { to: '/egp/planejamento', icon: Compass,         label: 'Gestão de Projetos' },
-  // { to: '/egp/controle',  icon: BarChart3,       label: 'Controle' }, // OCULTO — Medições movido p/ Gestão dos Projetos; remover a tela depois
-  { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
-]
+import NovoRegistroModal, { type NovoTipo } from '../pages/pmo/NovoRegistroModal'
 
 export function ContractSelector() {
   const { isDark } = useTheme()
@@ -88,6 +81,20 @@ export function ContractSelector() {
 }
 
 export default function EGPLayout() {
+  const [novo, setNovo] = useState<NovoTipo | null>(null)
+  const nav = [
+    { to: '/egp', icon: LayoutDashboard, label: 'Painel', end: true },
+    { to: '#novo-registro', icon: PlusCircle, label: 'Novo Registro', accent: true, actionMenu: { title: 'Novo Registro', items: [
+      { icon: FileSignature, label: 'Novo Contrato', description: 'Cadastrar contrato + anexo', tone: 'blue' as const, action: () => setNovo('contrato') },
+      { icon: FolderPlus, label: 'Novo Projeto', description: 'Projeto sob um contrato', tone: 'emerald' as const, action: () => setNovo('projeto') },
+      { icon: HardHat, label: 'Nova Obra / OSC', description: 'Anexar OSC(s) → projeto pai', tone: 'amber' as const, action: () => setNovo('osc') },
+      { icon: Ruler, label: 'Nova Medição', description: 'Anexar medição(ões) → OSC', tone: 'sky' as const, action: () => setNovo('medicao') },
+    ] } },
+    { to: '/egp/iniciacao', icon: Rocket, label: 'Iniciação' },
+    { to: '/egp/planejamento', icon: Compass, label: 'Gestão de Projetos' },
+    // { to: '/egp/controle', icon: BarChart3, label: 'Controle' }, // OCULTO
+    { to: '/egp/encerramento', icon: CheckCircle2, label: 'Encerramento' },
+  ]
   return (
     <EGPContractProvider>
       <ModuleLayout
@@ -95,10 +102,11 @@ export default function EGPLayout() {
         moduleName="EGP"
         moduleEmoji="📊"
         accent="blue"
-        nav={NAV}
+        nav={nav}
         moduleSubtitle="Escritório de Gestão de Projetos"
         bottomNavMaxItems={6}
       />
+      {novo && <NovoRegistroModal tipo={novo} onClose={() => setNovo(null)} />}
     </EGPContractProvider>
   )
 }
