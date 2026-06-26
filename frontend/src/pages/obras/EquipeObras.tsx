@@ -806,6 +806,9 @@ function ProgramacaoView({
   const [minimizados, setMinimizados] = useState<Set<string>>(new Set())
   const [recAbertos, setRecAbertos] = useState<Set<string>>(new Set())  // obras c/ bloco Recursos (frota) aberto
   const [editAloc, setEditAloc] = useState<ObraPlanejamentoEquipe | null>(null)
+  const [projFiltro, setProjFiltro] = useState('todos')
+  const [obraFiltro, setObraFiltro] = useState('todas')
+  const [busca, setBusca] = useState('')
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -886,6 +889,31 @@ function ProgramacaoView({
       return { id: p.id, nome: p.nome, engenheiros: p.engenheiros, obras }
     }).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
+
+  // Filtros: projeto, obra, busca (nome de pessoa OU recurso/frota)
+  const filteredGroups = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const matchP = (r: ObraPlanejamentoEquipe) => !q || r.nome.toLowerCase().includes(q) || (r.funcao_equipe ?? '').toLowerCase().includes(q)
+    const matchV = (f: { veic: FroVeiculo }) => !q || `${CATEGORIA_LABEL[f.veic.categoria] ?? ''} ${f.veic.marca ?? ''} ${f.veic.modelo ?? ''} ${f.veic.placa ?? ''} ${f.veic.numero_serie ?? ''}`.toLowerCase().includes(q)
+    return groups
+      .filter(p => projFiltro === 'todos' || p.id === projFiltro)
+      .map(p => ({
+        ...p,
+        engenheiros: p.engenheiros.filter(matchP),
+        obras: p.obras
+          .filter(ob => obraFiltro === 'todas' || ob.id === obraFiltro)
+          .map(ob => ({ ...ob, rows: ob.rows.filter(matchP), frota: (frotaByObra.get(ob.id) ?? []).filter(matchV) }))
+          .filter(ob => ob.rows.length > 0 || ob.frota.length > 0),
+      }))
+      .filter(p => p.engenheiros.length > 0 || p.obras.length > 0)
+  }, [groups, frotaByObra, projFiltro, obraFiltro, busca])
+
+  const projetosOpts = useMemo(() => groups.map(p => ({ id: p.id, nome: p.nome })), [groups])
+  const obrasOpts = useMemo(() => {
+    const list: { id: string; nome: string }[] = []
+    groups.filter(p => projFiltro === 'todos' || p.id === projFiltro).forEach(p => p.obras.forEach(ob => list.push({ id: ob.id, nome: ob.nome })))
+    return list
+  }, [groups, projFiltro])
 
   // ── Colunas semanais (segunda → sábado) ──
   const mondayOf = (d: Date) => { const x = new Date(d); const day = x.getDay(); return addDays(x, day === 0 ? -6 : 1 - day) }
@@ -977,6 +1005,7 @@ function ProgramacaoView({
 
   const totalW = leftW + weeks.length * COL_W.semana
   const obrasComFrota = useMemo(() => [...frotaByObra.keys()], [frotaByObra])
+  const selCls = `rounded-lg border px-2 py-1.5 text-[11px] font-semibold outline-none max-w-[170px] ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-600'}`
 
   return (
     <div className="space-y-3">
@@ -984,9 +1013,23 @@ function ProgramacaoView({
         <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
           <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas · clique numa pessoa para editar a alocação
         </div>
-        <button onClick={() => setRecAbertos(prev => (prev.size >= obrasComFrota.length && obrasComFrota.length > 0) ? new Set() : new Set(obrasComFrota))} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${recAbertos.size > 0 ? 'bg-emerald-500 text-white border-emerald-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-          <Truck size={13} /> {recAbertos.size > 0 ? 'Ocultar recursos' : 'Ver recursos (frota)'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select value={projFiltro} onChange={e => { setProjFiltro(e.target.value); setObraFiltro('todas') }} className={selCls}>
+            <option value="todos">Todos os projetos</option>
+            {projetosOpts.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </select>
+          <select value={obraFiltro} onChange={e => setObraFiltro(e.target.value)} className={selCls}>
+            <option value="todas">Todas as obras</option>
+            {obrasOpts.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </select>
+          <div className="relative">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar recurso / pessoa..." className={`${selCls} pl-7 w-[180px] max-w-none`} />
+          </div>
+          <button onClick={() => setRecAbertos(prev => (prev.size >= obrasComFrota.length && obrasComFrota.length > 0) ? new Set() : new Set(obrasComFrota))} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${recAbertos.size > 0 ? 'bg-emerald-500 text-white border-emerald-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <Truck size={13} /> {recAbertos.size > 0 ? 'Ocultar recursos' : 'Ver recursos (frota)'}
+          </button>
+        </div>
       </div>
 
       <div className={`rounded-xl border overflow-x-auto ${border}`}>
@@ -1009,7 +1052,9 @@ function ProgramacaoView({
             <CalendarRange size={36} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">Nenhuma alocação cadastrada</p>
           </div>
-        ) : groups.map(proj => {
+        ) : filteredGroups.length === 0 ? (
+          <div className={`text-center py-10 ${txtMuted}`}><p className="text-xs">Nada encontrado no filtro.</p></div>
+        ) : filteredGroups.map(proj => {
           const pmin = minimizados.has(proj.id)
           const total = proj.engenheiros.length + proj.obras.reduce((a, ob) => a + ob.rows.length, 0)
           return (
@@ -1029,6 +1074,7 @@ function ProgramacaoView({
                   {proj.engenheiros.map(e => <PersonRow key={e.id} r={e} indent={28} />)}
                   {proj.obras.map(ob => {
                     const omin = minimizados.has(`${proj.id}:${ob.id}`)
+                    const recOpen = recAbertos.has(ob.id) || (!!busca.trim() && ob.frota.length > 0)
                     return (
                       <div key={ob.id}>
                         <button onClick={() => toggle(`${proj.id}:${ob.id}`)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'}`} style={{ minWidth: `${totalW}px` }}>
@@ -1042,17 +1088,17 @@ function ProgramacaoView({
                         {!omin && (
                           <>
                             {ob.rows.map(r => <PersonRow key={r.id} r={r} indent={40} />)}
-                            {(frotaByObra.get(ob.id)?.length ?? 0) > 0 && (
+                            {ob.frota.length > 0 && (
                               <>
                                 <button onClick={() => toggleRec(ob.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]' : 'border-slate-100 bg-emerald-50/40 hover:bg-emerald-50'}`} style={{ minWidth: `${totalW}px` }}>
                                   <div className="flex items-center gap-1.5 py-1.5 shrink-0" style={{ width: `${leftW}px`, paddingLeft: 40, paddingRight: 8 }}>
-                                    {recAbertos.has(ob.id) ? <ChevronUp size={11} className={txtMuted} /> : <ChevronDown size={11} className={txtMuted} />}
+                                    {recOpen ? <ChevronUp size={11} className={txtMuted} /> : <ChevronDown size={11} className={txtMuted} />}
                                     <Truck size={11} className="text-emerald-500" />
                                     <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>Recursos</span>
-                                    <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{frotaByObra.get(ob.id)!.length} máq.</span>
+                                    <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{ob.frota.length} máq.</span>
                                   </div>
                                 </button>
-                                {recAbertos.has(ob.id) && frotaByObra.get(ob.id)!.map(f => <VeiculoRow key={f.aloc.id} aloc={f.aloc} veic={f.veic} />)}
+                                {recOpen && ob.frota.map(f => <VeiculoRow key={f.aloc.id} aloc={f.aloc} veic={f.veic} />)}
                               </>
                             )}
                           </>
