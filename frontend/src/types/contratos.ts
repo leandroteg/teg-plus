@@ -135,7 +135,7 @@ export interface Parcela {
   created_at: string
   updated_at: string
   // Joins
-  contrato?: Pick<Contrato, 'numero' | 'objeto' | 'tipo_contrato' | 'status'>
+  contrato?: Pick<Contrato, 'numero' | 'objeto' | 'tipo_contrato' | 'status' | 'valor_mensal' | 'recorrente' | 'data_inicio' | 'data_fim_previsto'>
 }
 
 export interface ParcelaPlanejada {

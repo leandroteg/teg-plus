@@ -151,7 +151,7 @@ export function useParcelas(contratoId?: string, filters?: { status?: string }) 
         .from('con_parcelas')
         .select(`
           *,
-          contrato:con_contratos!contrato_id(numero, objeto, tipo_contrato, status)
+          contrato:con_contratos!contrato_id(numero, objeto, tipo_contrato, status, valor_mensal, recorrente, data_inicio, data_fim_previsto)
         `)
         .order('data_vencimento', { ascending: true })
       if (contratoId) q = q.eq('contrato_id', contratoId)
