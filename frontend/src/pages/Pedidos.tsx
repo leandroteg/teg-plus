@@ -2476,34 +2476,9 @@ export default function Pedidos() {
         source_cotacao: { id: c.id, comprador_id: c.comprador_id },
       }))
 
-    // Requisições aguardando contrato (compra recorrente)
-    const aguardandoContrato = cotacoes
-      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'aguardando_contrato')
-      .filter(c => !pedidosByReq.has(c.requisicao_id))
-      .map(c => ({
-        id: `aguardando-contrato-${c.id}`,
-        requisicao_id: c.requisicao_id,
-        cotacao_id: c.id,
-        comprador_id: c.comprador_id,
-        fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
-        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
-        status: 'emitido' as const,
-        created_at: c.data_conclusao ?? c.created_at,
-        observacoes: c.observacao,
-        requisicao: c.requisicao
-          ? {
-              numero: c.requisicao.numero,
-              descricao: c.requisicao.descricao,
-              obra_nome: c.requisicao.obra_nome,
-              obra_id: (c.requisicao as any).obra_id,
-              categoria: c.requisicao.categoria,
-              compra_recorrente: (c.requisicao as any).compra_recorrente,
-            }
-          : undefined,
-        pending_emissao: true,
-        aguardando_contrato: true,
-        source_cotacao: { id: c.id, comprador_id: c.comprador_id },
-      }))
+    // RC recorrente em 'aguardando_contrato' NAO aparece mais em Pedidos:
+    // a solicitacao de contrato e criada automaticamente (trigger mig 167) e
+    // vive no modulo Contratos. Manter aqui so confundia ("voltou pra Pedidos").
 
     // Recorrentes com contrato formalizado → aba Encerrado com link
     const contratoFormalizado = cotacoes
@@ -2533,7 +2508,7 @@ export default function Pedidos() {
         contrato_ativo: true,
       }))
 
-    return [...pendingEmission, ...aguardandoContrato, ...contratoFormalizado]
+    return [...pendingEmission, ...contratoFormalizado]
   }, [cotacoes, pedidosByReq])
   const allPedidoItems = useMemo<PedidoListItem[]>(
     () => [...pendingApprovalPedidos, ...allPedidos],
