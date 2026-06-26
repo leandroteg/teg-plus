@@ -742,7 +742,7 @@ function ProgramacaoView({
   }, [rows])
 
   const today = new Date()
-  const COL_W = { pessoa: 180, obra: 140, semana: 96 }
+  const COL_W = { pessoa: 240, obra: 140, semana: 96 }
   const leftW = COL_W.pessoa + COL_W.obra
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -757,13 +757,13 @@ function ProgramacaoView({
       <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
         <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
           <div className={`py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: recurso ? 28 : 12, paddingRight: 8 }}>
-            <span className={`${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+            <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+            <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
             {r.papel === 'encarregado' && r.funcao_equipe && (
               <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
             )}
-            <span className={`${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
             {count > 0 && (
-              <span className={`ml-auto shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
+              <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
             )}
           </div>
           <div className={`px-2 py-1.5 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{recurso ? '' : (obra?.nome ?? '—')}</div>
