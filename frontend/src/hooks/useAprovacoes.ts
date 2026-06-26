@@ -432,7 +432,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
       // 5b. Busca historico de esclarecimentos (cmp + fin)
       const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
-      const escIds = [...cmpIds, ...finIds]
+      const escIds = [...cmpIds, ...finIds, ...conIds]
       if (escIds.length > 0) {
         const { data: escData } = await supabase
           .from(TABLE_APR)
