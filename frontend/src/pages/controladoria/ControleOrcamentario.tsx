@@ -131,7 +131,8 @@ export default function ControleOrcamentario() {
   }, [dataMap, grandTotal])
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
-  const mesLabel = mes === 0 ? 'Ano todo' : (MONTHS[mes - 1] ?? '')
+  const mesLabel = mes === 0 ? 'Ano todo' : mes >= 101 ? `${mes - 100}º Trimestre` : (MONTHS[mes - 1] ?? '')
+  const periodoCol = mes === 0 ? String(ano) : mes >= 101 ? `${mes - 100}ºT/${ano}` : `${mes}/${ano}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,10 @@ export default function ControleOrcamentario() {
               }`}
             >
               <option value={0}>Ano todo</option>
+              <option value={101}>1º Trimestre</option>
+              <option value={102}>2º Trimestre</option>
+              <option value={103}>3º Trimestre</option>
+              <option value={104}>4º Trimestre</option>
               {MONTHS.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
@@ -254,10 +259,10 @@ export default function ControleOrcamentario() {
                     Premissa do Orcamento
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Orcado {mes === 0 ? ano : `${mes}/${ano}`}
+                    Orcado {periodoCol}
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Realizado {mes === 0 ? ano : `${mes}/${ano}`}
+                    Realizado {periodoCol}
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider min-w-[110px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Variacao (R$)

@@ -277,12 +277,19 @@ export interface ControleOrcamentarioRow {
 }
 
 const semAcento = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+// mes: 0 = ano todo · 1-12 = mês · 101-104 = trimestre → meses a filtrar (null = ano todo)
+function mesesDoFiltro(mes: number): number[] | null {
+  if (mes >= 101 && mes <= 104) { const q = mes - 100; return [q * 3 - 2, q * 3 - 1, q * 3] }
+  if (mes >= 1 && mes <= 12) return [mes]
+  return null
+}
 
 export function useControleOrcamentario(ano: number, mes: number) {
   return useQuery<ControleOrcamentarioRow[]>({
     queryKey: ['ctrl-controle-orcamentario', ano, mes],
     queryFn: async () => {
-      // ── Orçado: plano (ctrl_orcamento_linhas) do mês selecionado ──
+      const mm = mesesDoFiltro(mes)
+      // ── Orçado: plano (ctrl_orcamento_linhas) ──
       const orcadoMap = new Map<string, { orcado: number; premissa: string; desvio: string; plano: string }>()
       const { data: orcamentos } = await supabase.from('ctrl_orcamentos').select('id').eq('ano', ano)
       const ids = (orcamentos ?? []).map(o => o.id)
@@ -291,7 +298,7 @@ export function useControleOrcamentario(ano: number, mes: number) {
           .from('ctrl_orcamento_linhas')
           .select('categoria, valor_planejado, premissa, desvio_explicacao, plano_acao')
           .in('orcamento_id', ids)
-        if (mes > 0) lq = lq.eq('mes', mes)
+        if (mm) lq = lq.in('mes', mm)
         const { data: linhas } = await lq
         for (const l of (linhas ?? [])) {
           const k = semAcento(l.categoria as string)
@@ -304,10 +311,10 @@ export function useControleOrcamentario(ano: number, mes: number) {
         }
       }
 
-      // ── Realizado: legado agregado (vw_ctrl_realizado_categoria) — mês (mes>0) ou ano todo (mes=0) ──
+      // ── Realizado: legado agregado (vw_ctrl_realizado_categoria) — mês/trimestre/ano todo ──
       const realMap = new Map<string, number>()
       let rq = supabase.from('vw_ctrl_realizado_categoria').select('categoria, realizado, mes').eq('ano', ano)
-      if (mes > 0) rq = rq.eq('mes', mes)
+      if (mm) rq = rq.in('mes', mm)
       const { data: leg } = await rq
       for (const r of (leg ?? [])) {
         const k = semAcento(r.categoria as string)
