@@ -6,11 +6,12 @@ import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
+import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
   DRV, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
-  buildTree, makeDefaultConfig, projObra, type Obra, type Config, type Versao,
+  buildTree, makeDefaultConfig, projObra, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
@@ -52,6 +53,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const { isDark } = useTheme()
   const qc = useQueryClient()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
+  const { data: efetivo } = useEfetivoReal(portfolioId)
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
   const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
@@ -251,6 +253,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       </PanelCard>
 
       {modalOpen && <ConfigModal isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
+        tree={tree} efetivoFrente={efetivo?.porFrente}
         inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
         onAplicar={c => { setApplied(c); setModalOpen(false) }} onClose={() => setModalOpen(false)} />}
     </div>
@@ -258,8 +261,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 }
 
 // ── Modal de configuração ────────────────────────────────────────────────────
-function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defaultConfig, versoes, qc, onAplicar, onClose }: {
+function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, inicial, defaultConfig, versoes, qc, onAplicar, onClose }: {
   isDark: boolean; portfolioId: string; allObras: Obra[]; saldoGlobal: Record<string, number>
+  tree: Frente[]; efetivoFrente?: Record<string, { fundacao: number; montlanc: number }>
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
   onAplicar: (c: Config) => void; onClose: () => void
 }) {
@@ -270,6 +274,9 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
   const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
+  // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
+  const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
+  const fillFromReal = () => setCfg(c => ({ ...c, equipe: equipeFromEfetivo(tree, efetivoFrente ?? {}, true) }))
   const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
 
   const salvar = useMutation({
@@ -328,8 +335,9 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className={lbl}>Equipe por obra — nº de pessoas</p>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400">preencher p/ terminar em</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
+                <span className="text-[10px] text-slate-400 ml-1">terminar em</span>
                 {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
               </div>
             </div>

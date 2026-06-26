@@ -88,6 +88,29 @@ export function makeDefaultConfig(allObras: Obra[]): Config {
   return { prodPP, equipe, horizonte: h, precedencia: true, lag: 0 }
 }
 
+// distribui o efetivo real de cada frente (Fundação + Montagem&Lançamento) entre as obras ∝ saldo.
+// Montagem e Lançamento são equipe única → mesma alocação nos dois drivers (a precedência sequencia).
+export function equipeFromEfetivo(tree: Frente[], porFrente: Record<string, { fundacao: number; montlanc: number }>, round = true): Record<string, Record<string, number>> {
+  const sQ = (o: Obra, lbl: string) => o.drivers.find(d => d.label === lbl)?.saldoQ || 0
+  const r = (v: number) => round ? Math.round(v) : v
+  const equipe: Record<string, Record<string, number>> = {}
+  for (const fr of tree) {
+    const ef = porFrente[fr.label]
+    const fundS = fr.obras.map(o => sQ(o, 'Fundação')); const fundT = fundS.reduce((s, x) => s + x, 0)
+    const mlS = fr.obras.map(o => sQ(o, 'Montagem') + sQ(o, 'Lançamento')); const mlT = mlS.reduce((s, x) => s + x, 0)
+    fr.obras.forEach((o, i) => {
+      const e: Record<string, number> = {}
+      const fund = ef && fundT > 0 ? ef.fundacao * fundS[i] / fundT : 0
+      const ml = ef && mlT > 0 ? ef.montlanc * mlS[i] / mlT : 0
+      if (sQ(o, 'Fundação') > 0) e['Fundação'] = r(fund)
+      if (sQ(o, 'Montagem') > 0) e['Montagem'] = r(ml)
+      if (sQ(o, 'Lançamento') > 0) e['Lançamento'] = r(ml)
+      equipe[o.nome] = e
+    })
+  }
+  return equipe
+}
+
 // rate (qtd/mês) por (obra, driver) = nº de pessoas × produtividade por pessoa
 export function rateOf(o: Obra, d: Drv, cfg: Config) {
   if (d.saldoQ <= 0) return 0

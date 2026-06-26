@@ -12,7 +12,7 @@ import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
-  ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra,
+  ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra, equipeFromEfetivo,
   type Obra, type Config, type Versao,
 } from './cronogramaEngine'
 
@@ -23,7 +23,6 @@ const GRUPOS = [
   { key: 'fund', label: 'Fundação', cor: '#92400e', drivers: ['Fundação'] },
   { key: 'ml', label: 'Montagem e Lançamento', cor: '#374151', drivers: ['Montagem', 'Lançamento'] },
 ] as const
-const saldoDe = (o: Obra, lbl: string) => o.drivers.find(d => d.label === lbl)?.saldoQ || 0
 
 export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { portfolioId?: string } = {}) {
   const { isDark } = useTheme()
@@ -51,24 +50,10 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   // config a partir do efetivo REAL: distribui o efetivo de cada frente entre suas obras ∝ saldo.
   // ML (Montagem+Lançamento) é equipe única → mesma alocação nos dois drivers (precedência sequencia).
-  const realCfg = useMemo<Config>(() => {
-    const equipe: Record<string, Record<string, number>> = {}
-    for (const fr of tree) {
-      const ef = efetivo?.porFrente[fr.label]
-      const fundS = fr.obras.map(o => saldoDe(o, 'Fundação')); const fundT = fundS.reduce((s, x) => s + x, 0)
-      const mlS = fr.obras.map(o => saldoDe(o, 'Montagem') + saldoDe(o, 'Lançamento')); const mlT = mlS.reduce((s, x) => s + x, 0)
-      fr.obras.forEach((o, i) => {
-        const e: Record<string, number> = {}
-        const fund = ef && fundT > 0 ? ef.fundacao * fundS[i] / fundT : 0
-        const ml = ef && mlT > 0 ? ef.montlanc * mlS[i] / mlT : 0
-        if (saldoDe(o, 'Fundação') > 0) e['Fundação'] = fund
-        if (saldoDe(o, 'Montagem') > 0) e['Montagem'] = ml
-        if (saldoDe(o, 'Lançamento') > 0) e['Lançamento'] = ml
-        equipe[o.nome] = e
-      })
-    }
-    return { prodPP: defaultConfig.prodPP, equipe, horizonte: 12, precedencia: true, lag: 0 }
-  }, [tree, efetivo, defaultConfig])
+  const realCfg = useMemo<Config>(() => ({
+    prodPP: defaultConfig.prodPP, horizonte: 12, precedencia: true, lag: 0,
+    equipe: equipeFromEfetivo(tree, efetivo?.porFrente ?? {}, false), // fracionado p/ preservar o total
+  }), [tree, efetivo, defaultConfig])
 
   const start = startYM()
   const hist = useMemo(() => {
