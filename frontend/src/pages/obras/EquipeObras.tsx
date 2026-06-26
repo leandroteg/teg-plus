@@ -672,9 +672,10 @@ function ProgramacaoView({
       if (!map.has(id)) map.set(id, { id, nome, rows: [] })
       map.get(id)!.rows.push(r)
     })
+    const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
     map.forEach(g => g.rows.sort((a, b) => {
       const oa = obraById.get(a.obra_id)?.nome ?? '', ob = obraById.get(b.obra_id)?.nome ?? ''
-      return oa.localeCompare(ob) || a.nome.localeCompare(b.nome)
+      return oa.localeCompare(ob) || (rank[a.papel] - rank[b.papel]) || a.nome.localeCompare(b.nome)
     }))
     return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
