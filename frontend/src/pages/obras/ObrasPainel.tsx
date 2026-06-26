@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { HardHat, Users2, UserCog, Truck, Building2, Layers } from 'lucide-react'
+import { HardHat, Users2, Truck, Building2, Layers } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePlanejamentoEquipe, useObrasComProjeto } from '../../hooks/useObras'
 import { useAlocacoes, useVeiculos } from '../../hooks/useFrotas'
@@ -18,9 +18,8 @@ export default function ObrasPainel() {
   const { data: alocFrota = [] } = useAlocacoes()
   const { data: veiculos = [] } = useVeiculos()
 
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
+  const cardClass = isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-white border border-slate-200 shadow-sm'
 
   const d = useMemo(() => {
     const obraById = new Map(obras.map(o => [o.id, o]))
@@ -78,21 +77,20 @@ export default function ObrasPainel() {
   }, [equipe, obras, alocFrota, veiculos])
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className={`text-xl font-extrabold ${txtMain}`}>Obras — Mobilização & Equipes</h1>
-        <p className={`text-xs ${txtMuted}`}>Efetivo e frota alocados nas obras ativas · dados reais do RH e Frotas</p>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        <Kpi isDark={isDark} icon={Building2} cor="#f97316" label="Obras com equipe" value={d.kpi.obras} />
-        <Kpi isDark={isDark} icon={Users2}    cor="#6366f1" label="Pessoas mobilizadas" value={d.kpi.pessoas} />
-        <Kpi isDark={isDark} icon={UserCog}   cor="#8b5cf6" label="Supervisores" value={d.kpi.supervisores} />
-        <Kpi isDark={isDark} icon={HardHat}   cor="#f97316" label="Encarregados" value={d.kpi.encarregados} />
-        <Kpi isDark={isDark} icon={Layers}    cor="#6366f1" label="Engenheiros" value={d.kpi.engenheiros} />
-        <Kpi isDark={isDark} icon={Truck}     cor="#10b981" label="Máquinas" value={d.maquinas} />
-      </div>
+    <div className="space-y-3">
+      {/* Indicadores consolidados — padrão EGP */}
+      <section className={`rounded-3xl p-4 md:p-5 ${cardClass}`}>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">Obras · Indicadores consolidados</p>
+        <h2 className={`text-sm font-black mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Mobilização <span className="font-normal text-slate-400 text-[11px]">· efetivo e frota nas obras ativas</span></h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <Kpi isDark={isDark} label="Obras com equipe"    value={`${d.kpi.obras}`}        note="com efetivo"   tone={isDark ? 'text-orange-400' : 'text-orange-600'} />
+          <Kpi isDark={isDark} label="Pessoas mobilizadas" value={`${d.kpi.pessoas}`}      note="efetivo total" tone={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
+          <Kpi isDark={isDark} label="Supervisores"        value={`${d.kpi.supervisores}`} note="líderes"       tone={isDark ? 'text-violet-400' : 'text-violet-600'} />
+          <Kpi isDark={isDark} label="Encarregados"        value={`${d.kpi.encarregados}`} note="equipes"       tone={isDark ? 'text-amber-400' : 'text-amber-600'} />
+          <Kpi isDark={isDark} label="Engenheiros"         value={`${d.kpi.engenheiros}`}  note="responsáveis"  tone={isDark ? 'text-sky-400' : 'text-sky-600'} />
+          <Kpi isDark={isDark} label="Máquinas"            value={`${d.maquinas}`}         note="frota alocada" tone={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <Bloco isDark={isDark} className={card} titulo="Efetivo por obra" icon={Building2}>
@@ -118,14 +116,12 @@ export default function ObrasPainel() {
   )
 }
 
-function Kpi({ isDark, icon: Icon, cor, label, value }: { isDark: boolean; icon: typeof Users2; cor: string; label: string; value: number }) {
+function Kpi({ isDark, label, value, note, tone }: { isDark: boolean; label: string; value: string; note: string; tone: string }) {
   return (
-    <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`}>
-      <div className="flex items-center justify-between mb-1">
-        <Icon size={15} style={{ color: cor }} strokeWidth={2.2} />
-        <span className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{value}</span>
-      </div>
-      <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{label}</p>
+    <div className={`rounded-2xl border px-3.5 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/70'}`}>
+      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 truncate">{label}</p>
+      <p className={`mt-1.5 text-xl leading-none font-black ${tone}`}>{value}</p>
+      <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
     </div>
   )
 }
