@@ -140,10 +140,31 @@ export type CategoriaEquipePlan = 'mod' | 'moi' | 'maquinario' | 'terceirizado'
 export type StatusEquipePlan = 'planejado' | 'mobilizado' | 'ativo' | 'desmobilizado' | 'cancelado'
 export type TurnoEquipePlan = 'diurno' | 'noturno' | 'revezamento'
 
+// Papel da pessoa na obra. Lideranca (eng/superv/encarregado) pode liderar um Time;
+// 'time' = membro da tropa de um encarregado; 'apoio' = staff de apoio (Obras / SSMA).
+export type PapelEquipe = 'engenheiro' | 'supervisor' | 'encarregado' | 'time' | 'apoio'
+
+// Colaborador ativo do RH (headcount) — fonte das pessoas alocaveis.
+export interface ColaboradorAtivo {
+  id: string
+  nome: string
+  cargo?: string
+  departamento?: string
+  setor?: string
+  base_id?: string
+  base_nome?: string
+  foto_url?: string
+  tipo_contrato?: string
+  papel_sugerido: PapelEquipe
+}
+
 export interface ObraPlanejamentoEquipe {
   id: string
   obra_id: string
   portfolio_id?: string
+  colaborador_id?: string
+  papel: PapelEquipe
+  lider_id?: string
   nome: string
   funcao: string
   categoria: CategoriaEquipePlan
@@ -163,6 +184,7 @@ export interface ObraPlanejamentoEquipe {
   obra?: { id: string; nome: string }
   portfolio?: { id: string; nome_obra: string; numero_osc: string }
   tarefa?: { id: string; nome: string }
+  colaborador?: { id: string; nome: string; cargo?: string; foto_url?: string; departamento?: string }
 }
 
 export interface ObraMobilizacao {
