@@ -18,6 +18,15 @@ const META: Record<NovoTipo, { label: string; icon: any; cor: string }> = {
   medicao: { label: 'Nova Medição', icon: Ruler, cor: '#0ea5e9' },
 }
 const slug = (s: string) => (s || 'doc').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
+const N8N_PARSE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/egp-parse-cadastro'
+// dispara o parse+cadastro pelo SuperTEG (via n8n) — assíncrono, fire-and-forget
+async function dispararParse(bucket: string, path: string, tipo: 'osc' | 'medicao', contexto: any) {
+  try {
+    const { data: signed } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
+    if (!signed?.signedUrl) return
+    await fetch(N8N_PARSE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, doc_url: signed.signedUrl, contexto, run_id: crypto.randomUUID() }) })
+  } catch { /* não bloqueia o cadastro da casca */ }
+}
 
 export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; onClose: () => void }) {
   const { isDark } = useTheme()
@@ -74,16 +83,18 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
           await supabase.storage.from('egp-osc-abertura').upload(path, f.file, { upsert: true })
           const { error } = await supabase.from('pmo_fluxo_os').insert({ portfolio_id: proj?.portfolio_id ?? null, projeto_id: f.projeto_id, numero_os: f.numero_os.trim(), tipo: f.tipo, abertura_path: path, etapa_atual: 'aberta', data_osc: new Date().toISOString().slice(0, 10) })
           if (error) throw error
+          await dispararParse('egp-osc-abertura', path, 'osc', { numero_os: f.numero_os.trim(), projeto_id: f.projeto_id, portfolio_id: proj?.portfolio_id ?? null, tipo: f.tipo })
         }
-        setOk(`${oscFiles.length} OSC(s) cadastrada(s).`); qc.invalidateQueries({ queryKey: ['nr-oscs'] }); qc.invalidateQueries({ queryKey: ['eap-final'] })
+        setOk(`${oscFiles.length} OSC(s) cadastrada(s) — SuperTEG está lendo os documentos…`); qc.invalidateQueries({ queryKey: ['nr-oscs'] }); qc.invalidateQueries({ queryKey: ['eap-final'] })
       } else if (tipo === 'medicao') {
         for (const f of medFiles) {
           const path = `${slug(f.numero_os)}/${f.competencia}/${slug(f.file.name)}`
           await supabase.storage.from('egp-medicoes').upload(path, f.file, { upsert: true })
           const { error } = await supabase.from('pmo_medicoes').insert({ numero_os: f.numero_os.trim(), competencia: f.competencia + '-01', arquivo_nome: f.file.name, storage_path: path, tamanho: f.file.size })
           if (error) throw error
+          await dispararParse('egp-medicoes', path, 'medicao', { numero_os: f.numero_os.trim(), competencia: f.competencia + '-01' })
         }
-        setOk(`${medFiles.length} medição(ões) cadastrada(s).`)
+        setOk(`${medFiles.length} medição(ões) cadastrada(s) — SuperTEG está lendo os documentos…`)
       }
       setTimeout(onClose, 900)
     } catch (e: any) { setErro(e?.message || String(e)) }
