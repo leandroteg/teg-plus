@@ -176,7 +176,6 @@ export default function EquipeObras() {
               <ListaView
                 colaboradores={colaboradores} equipe={equipe} obras={obras}
                 isDark={isDark}
-                onAlocar={(preset) => handleOpenAlocar(preset)}
               />
             )}
             {tab === 'programacao' && (
@@ -260,151 +259,337 @@ const PAPEL_PLURAL: Record<PapelEquipe, string> = {
   engenheiro: 'Engenheiros', supervisor: 'Supervisores', encarregado: 'Encarregados', apoio: 'Apoio', time: 'Time',
 }
 
+// Popover de pessoas disponíveis (busca + lista) para os botões "+"
+function PickerPopover({ isDark, items, onPick, onClose }: {
+  isDark: boolean; items: ColaboradorAtivo[]; onPick: (c: ColaboradorAtivo) => void; onClose: () => void
+}) {
+  const [q, setQ] = useState('')
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const ql = q.trim().toLowerCase()
+  const filtered = items.filter(c => !ql || c.nome.toLowerCase().includes(ql) || (c.cargo ?? '').toLowerCase().includes(ql)).slice(0, 50)
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className={`absolute right-0 mt-1 w-[260px] rounded-xl border shadow-xl z-50 overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'}`}>
+        <div className={`p-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="relative">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar disponível..." className={`w-full pl-7 pr-2 py-1.5 rounded-lg text-xs outline-none ${isDark ? 'bg-white/[0.04] border border-white/[0.06] text-slate-200' : 'bg-slate-50 border border-slate-200'}`} />
+          </div>
+        </div>
+        <div className="max-h-[230px] overflow-y-auto styled-scrollbar">
+          {filtered.length === 0 ? (
+            <p className={`text-[11px] italic px-3 py-3 ${txtMuted}`}>Nenhum disponível</p>
+          ) : filtered.map(c => (
+            <button key={c.id} onClick={() => { onPick(c); onClose() }} className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}>
+              <Avatar nome={c.nome} fotoUrl={c.foto_url} isDark={isDark} size={22} />
+              <span className={`text-[11px] font-medium truncate ${txtMain}`}>{c.nome}</span>
+              <span className={`ml-auto text-[9px] truncate ${txtMuted}`}>{c.cargo}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// Linha simples (engenheiro / apoio — solto na obra)
+function FlatRow({ a, isDark, onRemove, small }: { a: ObraPlanejamentoEquipe; isDark: boolean; onRemove: () => void; small?: boolean }) {
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  return (
+    <div className={`flex items-center gap-2 ${small ? 'px-2 py-1' : 'px-3 py-2'} rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}>
+      <Avatar nome={a.nome} fotoUrl={a.colaborador?.foto_url} isDark={isDark} size={small ? 20 : 26} />
+      <div className="min-w-0">
+        <p className={`${small ? 'text-[10px]' : 'text-xs'} font-bold truncate ${txtMain}`}>{small ? primeiroNome(a.nome) : a.nome}</p>
+        {!small && <p className={`text-[9px] truncate ${txtMuted}`}>{a.funcao}</p>}
+      </div>
+      <PapelBadge papel={a.papel} isDark={isDark} />
+      <button onClick={onRemove} className={`ml-auto p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={small ? 11 : 12} /></button>
+    </div>
+  )
+}
+
 function ListaView({
-  colaboradores, equipe, obras, isDark, onAlocar,
+  colaboradores, equipe, obras, isDark,
 }: {
   colaboradores: ColaboradorAtivo[]
   equipe: ObraPlanejamentoEquipe[]
   obras: ObraComProjeto[]
   isDark: boolean
-  onAlocar: (preset: { colaboradorId?: string; papel?: PapelEquipe } | null) => void
 }) {
+  const { perfil } = useAuth()
+  const criar = useCriarPlanEquipe()
+  const excluir = useExcluirPlanEquipe()
+
   const [busca, setBusca] = useState('')
   const [escopo, setEscopo] = useState('obras_ssma')
-  const [papelFiltro, setPapelFiltro] = useState<'todos' | 'liderancas' | PapelEquipe>('todos')
+  const [drag, setDrag] = useState<{ colaboradorId: string; papel: PapelEquipe } | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [picker, setPicker] = useState<string | null>(null)
+  const [obrasExtra, setObrasExtra] = useState<Set<string>>(new Set())
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const cardCls  = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
   const inputCls = `w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'}`
+  const today = new Date().toISOString().split('T')[0]
 
-  // alocacao ativa por colaborador (p/ status na lista)
-  const alocByColab = useMemo(() => {
-    const m = new Map<string, ObraPlanejamentoEquipe>()
-    equipe.filter(e => STATUS_ATIVO.includes(e.status)).forEach(e => { if (e.colaborador_id) m.set(e.colaborador_id, e) })
-    return m
-  }, [equipe])
-  const obraNome = (id: string) => obras.find(o => o.id === id)?.nome ?? '—'
+  const active = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
+  const alocadosIds = useMemo(() => { const s = new Set<string>(); active.forEach(e => { if (e.colaborador_id) s.add(e.colaborador_id) }); return s }, [active])
 
-  // departamentos p/ o seletor de escopo
-  const departamentos = useMemo(() => {
-    const s = new Set<string>()
-    colaboradores.forEach(c => { if (c.departamento) s.add(c.departamento) })
-    return Array.from(s).sort()
-  }, [colaboradores])
+  const inEscopo = (c: ColaboradorAtivo) =>
+    escopo === 'todos' ? true
+    : escopo === 'obras_ssma' ? (c.departamento === 'Obras' || c.papel_sugerido === 'apoio')
+    : c.departamento === escopo
 
-  const escopoSet = useMemo(() => {
-    const inEscopo = (c: ColaboradorAtivo) =>
-      escopo === 'todos' ? true
-      : escopo === 'obras_ssma' ? (c.departamento === 'Obras' || c.papel_sugerido === 'apoio')
-      : c.departamento === escopo
-    return colaboradores.filter(inEscopo)
-  }, [colaboradores, escopo])
-
-  const kpis = useMemo(() => ({
-    total:      escopoSet.length,
-    liderancas: escopoSet.filter(c => PAPEL_CONFIG[c.papel_sugerido].lidera).length,
-    time:       escopoSet.filter(c => c.papel_sugerido === 'time').length,
-    apoio:      escopoSet.filter(c => c.papel_sugerido === 'apoio').length,
-  }), [escopoSet])
-
-  const filtrados = useMemo(() => {
+  // roster disponível por papel (no escopo + busca)
+  const dispByPapel = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    const papelOk = (p: PapelEquipe) =>
-      papelFiltro === 'todos' ? true
-      : papelFiltro === 'liderancas' ? PAPEL_CONFIG[p].lidera
-      : p === papelFiltro
-    return escopoSet.filter(c =>
-      papelOk(c.papel_sugerido) &&
-      (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q)),
-    )
-  }, [escopoSet, papelFiltro, busca])
+    const m = new Map<PapelEquipe, ColaboradorAtivo[]>()
+    PAPEL_ORDER.forEach(p => m.set(p, []))
+    colaboradores
+      .filter(c => !alocadosIds.has(c.id) && inEscopo(c) && (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q)))
+      .forEach(c => m.get(c.papel_sugerido)!.push(c))
+    return m
+  }, [colaboradores, alocadosIds, escopo, busca])
 
-  const grupos = useMemo(() =>
-    PAPEL_ORDER
-      .map(papel => ({ papel, pessoas: filtrados.filter(c => c.papel_sugerido === papel).sort((a, b) => a.nome.localeCompare(b.nome)) }))
-      .filter(g => g.pessoas.length > 0),
-    [filtrados])
+  // pool por papel SEM busca (p/ os botões "+")
+  const poolByPapel = useMemo(() => {
+    const m = new Map<PapelEquipe, ColaboradorAtivo[]>()
+    PAPEL_ORDER.forEach(p => m.set(p, []))
+    colaboradores.filter(c => !alocadosIds.has(c.id)).forEach(c => m.get(c.papel_sugerido)!.push(c))
+    return m
+  }, [colaboradores, alocadosIds])
+
+  // árvore: encarregados por supervisor, time por encarregado
+  const encBySup = useMemo(() => {
+    const m = new Map<string, ObraPlanejamentoEquipe[]>()
+    active.filter(e => e.papel === 'encarregado').forEach(e => { const k = e.lider_id ?? '__sem__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
+    return m
+  }, [active])
+  const timeByEnc = useMemo(() => {
+    const m = new Map<string, ObraPlanejamentoEquipe[]>()
+    active.filter(e => e.papel === 'time').forEach(e => { const k = e.lider_id ?? '__sem__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
+    return m
+  }, [active])
+
+  const obrasComAloc = useMemo(() => { const s = new Set<string>(); active.forEach(e => s.add(e.obra_id)); return s }, [active])
+  const obrasVisiveis = useMemo(() => {
+    const ids = new Set<string>([...obrasComAloc, ...obrasExtra])
+    return obras.filter(o => ids.has(o.id)).sort((a, b) => (a.projeto_nome ?? '').localeCompare(b.projeto_nome ?? '') || a.nome.localeCompare(b.nome))
+  }, [obras, obrasComAloc, obrasExtra])
+
+  const escopoCount = useMemo(() => {
+    const set = colaboradores.filter(inEscopo)
+    return { total: set.length, alocados: set.filter(c => alocadosIds.has(c.id)).length, disp: set.filter(c => !alocadosIds.has(c.id)).length }
+  }, [colaboradores, escopo, alocadosIds])
+  const departamentos = useMemo(() => { const s = new Set<string>(); colaboradores.forEach(c => { if (c.departamento) s.add(c.departamento) }); return Array.from(s).sort() }, [colaboradores])
+
+  const toggleExp = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  async function alocar(colaboradorId: string, papel: PapelEquipe, obraId: string, liderId?: string) {
+    const c = colaboradores.find(x => x.id === colaboradorId)
+    if (!c) return
+    try {
+      await criar.mutateAsync({
+        obra_id: obraId, colaborador_id: c.id, nome: c.nome, funcao: c.cargo ?? '—',
+        papel, lider_id: liderId ?? null, categoria: categoriaFromPapel(papel),
+        data_inicio: today, turno: 'diurno', horas_dia: 8, status: 'planejado',
+        custo_hora: 0, custo_diaria: 0, created_by: perfil?.auth_id,
+      } as any)
+    } catch (err) { alert('Erro ao alocar: ' + (err instanceof Error ? err.message : String(err))) }
+  }
+  // remove a alocação e toda a subárvore (descendentes)
+  async function remover(allocId: string) {
+    const ids: string[] = []
+    const gather = (id: string) => { ids.push(id); active.filter(e => e.lider_id === id).forEach(e => gather(e.id)) }
+    gather(allocId)
+    try { for (const id of ids.reverse()) await excluir.mutateAsync(id) }
+    catch (err) { alert('Erro ao remover: ' + (err instanceof Error ? err.message : String(err))) }
+  }
+
+  const RosterCard = (c: ColaboradorAtivo) => (
+    <div key={c.id} draggable onDragStart={() => setDrag({ colaboradorId: c.id, papel: c.papel_sugerido })} onDragEnd={() => setDrag(null)}
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-grab active:cursor-grabbing ${isDark ? 'border-white/[0.05] bg-white/[0.02] hover:border-white/[0.12]' : 'border-slate-100 bg-white hover:shadow-sm'} ${drag?.colaboradorId === c.id ? 'opacity-40' : ''}`}>
+      <Avatar nome={c.nome} fotoUrl={c.foto_url} isDark={isDark} size={24} />
+      <div className="min-w-0 flex-1">
+        <p className={`text-[11px] font-bold truncate ${txtMain}`} title={c.nome}>{primeiroNome(c.nome)}</p>
+        <p className={`text-[9px] truncate ${txtMuted}`}>{c.cargo}</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="space-y-4">
-      {/* KPIs (clicáveis p/ filtrar papel) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KpiCard isDark={isDark} icon={Users2}      label="No escopo"  value={kpis.total}      color="orange" onClick={() => setPapelFiltro('todos')}      active={papelFiltro === 'todos'} />
-        <KpiCard isDark={isDark} icon={UserCog}      label="Lideranças" value={kpis.liderancas} color="indigo" onClick={() => setPapelFiltro('liderancas')} active={papelFiltro === 'liderancas'} />
-        <KpiCard isDark={isDark} icon={Users2}      label="Time"       value={kpis.time}       color="slate"  onClick={() => setPapelFiltro('time')}       active={papelFiltro === 'time'} />
-        <KpiCard isDark={isDark} icon={ShieldCheck}  label="Apoio"      value={kpis.apoio}      color="cyan"   onClick={() => setPapelFiltro('apoio')}      active={papelFiltro === 'apoio'} />
-      </div>
-
-      {/* Filtros */}
+    <div className="space-y-3">
+      {/* topo */}
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou cargo..." className={`${inputCls} pl-8 pr-7`} />
-          {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
-        </div>
         <select value={escopo} onChange={e => setEscopo(e.target.value)} className={`${inputCls} max-w-[230px]`}>
           <option value="obras_ssma">Setor Obras + Apoio SSMA</option>
           <option value="todos">Todos os setores</option>
           {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        {papelFiltro !== 'todos' && (
-          <button onClick={() => setPapelFiltro('todos')} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            <X size={11} /> {papelFiltro === 'liderancas' ? 'Lideranças' : PAPEL_CONFIG[papelFiltro as PapelEquipe].label}
-          </button>
-        )}
-        <span className={`ml-auto text-[11px] ${txtMuted}`}>{filtrados.length} colaborador(es)</span>
+        <select value="" onChange={e => { if (e.target.value) setObrasExtra(prev => new Set(prev).add(e.target.value)) }} className={`${inputCls} max-w-[240px]`}>
+          <option value="">➕ Trabalhar em outra obra...</option>
+          {obras.filter(o => !obrasComAloc.has(o.id) && !obrasExtra.has(o.id)).map(o => <option key={o.id} value={o.id}>{o.projeto_nome ? `${o.projeto_nome} · ` : ''}{o.nome}</option>)}
+        </select>
+        <span className={`ml-auto text-[11px] ${txtMuted}`}>{escopoCount.alocados}/{escopoCount.total} alocados · {escopoCount.disp} disponíveis</span>
       </div>
 
-      {/* Roster por papel */}
-      {grupos.length === 0 ? (
-        <div className={`text-center py-14 rounded-xl border border-dashed ${isDark ? 'border-white/10 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
-          <Users2 size={34} className="mx-auto mb-2 opacity-40" />
-          <p className="text-sm font-semibold">Nenhum colaborador no filtro atual</p>
-          <p className="text-xs mt-1">Ajuste o escopo ou a busca.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {grupos.map(g => {
-            const cfg = PAPEL_CONFIG[g.papel]; const Icon = cfg.icon
-            return (
-              <div key={g.papel} className={`rounded-2xl border ${cardCls}`}>
-                <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  <Icon size={15} className={isDark ? cfg.textDark : cfg.text} />
-                  <span className={`text-sm font-extrabold ${txtMain}`}>{PAPEL_PLURAL[g.papel]}</span>
-                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? `${cfg.bgDark} ${cfg.textDark}` : `${cfg.bg} ${cfg.text}`}`}>{g.pessoas.length}</span>
+      <div className="flex flex-col lg:flex-row gap-3">
+        {/* Disponíveis (roster) */}
+        <div className={`lg:w-[300px] shrink-0 rounded-2xl border ${cardCls}`}>
+          <div className={`px-3 py-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar disponível..." className={`w-full pl-8 pr-3 py-1.5 rounded-lg text-xs outline-none ${isDark ? 'bg-white/[0.04] border border-white/[0.06] text-slate-200' : 'bg-slate-50 border border-slate-200'}`} />
+            </div>
+            <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Arraste para a obra / encarregado, ou use os botões “+”.</p>
+          </div>
+          <div className="p-2 space-y-2 max-h-[68vh] overflow-y-auto styled-scrollbar">
+            {PAPEL_ORDER.map(papel => {
+              const list = dispByPapel.get(papel) ?? []
+              if (list.length === 0) return null
+              const cfg = PAPEL_CONFIG[papel]; const Icon = cfg.icon
+              return (
+                <div key={papel}>
+                  <div className="flex items-center gap-1.5 px-1 mb-1">
+                    <Icon size={12} className={isDark ? cfg.textDark : cfg.text} />
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{PAPEL_PLURAL[papel]}</span>
+                    <span className={`ml-auto text-[9px] font-bold ${txtMuted}`}>{list.length}</span>
+                  </div>
+                  <div className="space-y-1">{list.slice(0, 60).map(RosterCard)}</div>
+                  {list.length > 60 && <p className={`text-[9px] italic px-1 mt-1 ${txtMuted}`}>+{list.length - 60} — refine a busca</p>}
                 </div>
-                <div className="p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
-                  {g.pessoas.map(c => {
-                    const aloc = alocByColab.get(c.id)
+              )
+            })}
+            {[...dispByPapel.values()].every(l => l.length === 0) && (
+              <p className={`text-[11px] italic text-center py-6 ${txtMuted}`}>Nenhum disponível no escopo</p>
+            )}
+          </div>
+        </div>
+
+        {/* Organograma por obra */}
+        <div className="flex-1 space-y-3 min-w-0">
+          {obrasVisiveis.length === 0 ? (
+            <div className={`text-center py-14 rounded-2xl border border-dashed ${isDark ? 'border-white/10 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+              <Building2 size={32} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-semibold">Nenhuma obra no quadro</p>
+              <p className="text-xs mt-1">Use “Trabalhar em outra obra” acima para começar a montar a equipe.</p>
+            </div>
+          ) : obrasVisiveis.map(o => {
+            const engs = active.filter(e => e.papel === 'engenheiro' && e.obra_id === o.id)
+            const sups = active.filter(e => e.papel === 'supervisor' && e.obra_id === o.id)
+            const apoios = active.filter(e => e.papel === 'apoio' && e.obra_id === o.id)
+            const totalPessoas = active.filter(e => e.obra_id === o.id).length
+            const dropObra = !!drag && (drag.papel === 'engenheiro' || drag.papel === 'supervisor' || drag.papel === 'apoio')
+            return (
+              <div key={o.id} className={`rounded-2xl border ${cardCls}`}>
+                <div onDragOver={e => { if (dropObra) e.preventDefault() }} onDrop={() => { if (dropObra && drag) { alocar(drag.colaboradorId, drag.papel, o.id); setDrag(null) } }}
+                  className={`flex flex-wrap items-center gap-2 px-4 py-2.5 border-b ${dropObra ? (isDark ? 'bg-orange-500/10' : 'bg-orange-50') : ''} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                  <Building2 size={14} className="text-orange-500" />
+                  <span className={`text-sm font-extrabold ${txtMain}`}>{o.nome}</span>
+                  {o.projeto_nome && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{o.projeto_nome}</span>}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-600'}`}>{totalPessoas} pessoas</span>
+                  <div className="ml-auto flex items-center gap-1">
+                    {(['engenheiro', 'supervisor', 'apoio'] as PapelEquipe[]).map(p => (
+                      <div key={p} className="relative">
+                        <button onClick={() => setPicker(picker === `obra:${o.id}:${p}` ? null : `obra:${o.id}:${p}`)} className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                          <Plus size={9} /> {PAPEL_CONFIG[p].label}
+                        </button>
+                        {picker === `obra:${o.id}:${p}` && <PickerPopover isDark={isDark} items={poolByPapel.get(p) ?? []} onClose={() => setPicker(null)} onPick={c => alocar(c.id, p, o.id)} />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 space-y-2">
+                  {engs.map(e => <FlatRow key={e.id} a={e} isDark={isDark} onRemove={() => remover(e.id)} />)}
+
+                  {sups.map(sup => {
+                    const encs = encBySup.get(sup.id) ?? []
+                    const expS = expanded.has(sup.id)
+                    const dropSup = drag?.papel === 'encarregado'
                     return (
-                      <div key={c.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${isDark ? 'border-white/[0.05] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
-                        <Avatar nome={c.nome} fotoUrl={c.foto_url} isDark={isDark} size={28} />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-[11px] font-bold truncate ${txtMain}`} title={c.nome}>{c.nome}</p>
-                          <p className={`text-[9px] truncate ${txtMuted}`}>{c.cargo}{c.base_nome ? ` · ${c.base_nome}` : ''}</p>
+                      <div key={sup.id} className={`rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}
+                        onDragOver={ev => { if (dropSup) ev.preventDefault() }} onDrop={() => { if (dropSup && drag) { alocar(drag.colaboradorId, 'encarregado', sup.obra_id, sup.id); setDrag(null); setExpanded(p => new Set(p).add(sup.id)) } }}>
+                        <div className={`flex items-center gap-2 px-3 py-2 ${dropSup ? (isDark ? 'bg-orange-500/10 rounded-t-xl' : 'bg-orange-50 rounded-t-xl') : ''}`}>
+                          <button onClick={() => toggleExp(sup.id)} className={txtMuted}>{expS ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+                          <Avatar nome={sup.nome} fotoUrl={sup.colaborador?.foto_url} isDark={isDark} size={26} />
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold truncate ${txtMain}`}>{sup.nome}</p>
+                            <p className={`text-[9px] truncate ${txtMuted}`}>{sup.funcao}</p>
+                          </div>
+                          <PapelBadge papel="supervisor" isDark={isDark} />
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{encs.length} enc.</span>
+                          <div className="relative ml-auto">
+                            <button onClick={() => setPicker(picker === `node:${sup.id}` ? null : `node:${sup.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Encarreg.</button>
+                            {picker === `node:${sup.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('encarregado') ?? []} onClose={() => setPicker(null)} onPick={c => { alocar(c.id, 'encarregado', sup.obra_id, sup.id); setExpanded(p => new Set(p).add(sup.id)) }} />}
+                          </div>
+                          <button onClick={() => remover(sup.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={12} /></button>
                         </div>
-                        {aloc ? (
-                          <span className={`shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`} title={`Alocado em ${obraNome(aloc.obra_id)}`}>
-                            <Building2 size={9} /> {obraNome(aloc.obra_id)}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => onAlocar({ colaboradorId: c.id, papel: c.papel_sugerido })}
-                            className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
-                          >
-                            <Plus size={9} /> Alocar
-                          </button>
+                        {expS && (
+                          <div className={`px-3 pb-2 pt-1 space-y-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                            {encs.length === 0 && <p className={`text-[11px] italic ${txtMuted}`}>Sem encarregados. Arraste um, ou use “+ Encarreg.”.</p>}
+                            {encs.map(enc => {
+                              const tm = timeByEnc.get(enc.id) ?? []
+                              const expE = expanded.has(enc.id)
+                              const dropEnc = drag?.papel === 'time'
+                              return (
+                                <div key={enc.id} className={`rounded-lg border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}
+                                  onDragOver={ev => { if (dropEnc) ev.preventDefault() }} onDrop={ev => { ev.stopPropagation(); if (dropEnc && drag) { alocar(drag.colaboradorId, 'time', enc.obra_id, enc.id); setDrag(null); setExpanded(p => new Set(p).add(enc.id)) } }}>
+                                  <div className={`flex items-center gap-2 px-2.5 py-1.5 ${dropEnc ? (isDark ? 'bg-orange-500/10 rounded-t-lg' : 'bg-orange-50 rounded-t-lg') : ''}`}>
+                                    <button onClick={() => toggleExp(enc.id)} className={txtMuted}>{expE ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
+                                    <Avatar nome={enc.nome} fotoUrl={enc.colaborador?.foto_url} isDark={isDark} size={22} />
+                                    <p className={`text-[11px] font-bold truncate min-w-0 ${txtMain}`}>{primeiroNome(enc.nome)}</p>
+                                    <PapelBadge papel="encarregado" isDark={isDark} />
+                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`}><Users2 size={9} /> {tm.length}</span>
+                                    <div className="relative ml-auto">
+                                      <button onClick={() => setPicker(picker === `node:${enc.id}` ? null : `node:${enc.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Time</button>
+                                      {picker === `node:${enc.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('time') ?? []} onClose={() => setPicker(null)} onPick={c => { alocar(c.id, 'time', enc.obra_id, enc.id); setExpanded(p => new Set(p).add(enc.id)) }} />}
+                                    </div>
+                                    <button onClick={() => remover(enc.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={11} /></button>
+                                  </div>
+                                  {expE && (
+                                    <div className={`px-2.5 pb-2 pt-1 border-t grid grid-cols-1 sm:grid-cols-2 gap-1 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                                      {tm.length === 0 ? <p className={`text-[10px] italic ${txtMuted}`}>Sem equipe. Arraste pessoas do Time, ou “+ Time”.</p>
+                                        : tm.map(m => (
+                                          <div key={m.id} className={`flex items-center gap-1.5 px-1.5 py-1 rounded ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+                                            <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={18} />
+                                            <span className={`text-[10px] truncate ${txtMain}`}>{primeiroNome(m.nome)}</span>
+                                            <button onClick={() => remover(m.id)} className={`ml-auto p-0.5 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`}><X size={10} /></button>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
                       </div>
                     )
                   })}
+
+                  {apoios.length > 0 && (
+                    <div>
+                      <p className={`text-[9px] font-bold uppercase tracking-wider mt-1 mb-1 ${txtMuted}`}>Apoio (Obras / SSMA)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                        {apoios.map(a => <FlatRow key={a.id} a={a} isDark={isDark} onRemove={() => remover(a.id)} small />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {engs.length === 0 && sups.length === 0 && apoios.length === 0 && (
+                    <p className={`text-[11px] italic text-center py-3 ${txtMuted}`}>Arraste um Supervisor / Engenheiro aqui, ou use os botões “+” no topo.</p>
+                  )}
                 </div>
               </div>
             )
           })}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -430,7 +615,16 @@ function ProgramacaoView({
     const m = new Map<string, ObraComProjeto>(); obras.forEach(o => m.set(o.id, o)); return m
   }, [obras])
 
-  const rows = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
+  // Time não aparece como linha individual — só o número por encarregado.
+  const rows = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status) && e.papel !== 'time'), [equipe])
+  const timeCountByLider = useMemo(() => {
+    const m = new Map<string, number>()
+    equipe.filter(e => STATUS_ATIVO.includes(e.status) && e.papel === 'time').forEach(e => {
+      const k = e.lider_id ?? ''
+      m.set(k, (m.get(k) ?? 0) + 1)
+    })
+    return m
+  }, [equipe])
 
   // Agrupa por projeto
   const groups = useMemo(() => {
@@ -536,6 +730,11 @@ function ProgramacaoView({
                       <div className={`px-3 py-2 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px` }}>
                         <span className={`w-1.5 h-1.5 rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
                         <span className={`text-[11px] font-semibold truncate ${txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
+                        {r.papel === 'encarregado' && (timeCountByLider.get(r.id) ?? 0) > 0 && (
+                          <span className={`ml-auto shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe">
+                            <Users2 size={9} /> {timeCountByLider.get(r.id)}
+                          </span>
+                        )}
                       </div>
                       <div className={`px-2 py-2 border-r ${border} text-[11px] truncate ${txtMuted}`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{obra?.nome ?? '—'}</div>
                       <div className={`px-2 py-2 border-r ${border} text-[10px] ${txtMain}`} style={{ width: `${COL_W.periodo}px` }}>{fmtDate(r.data_inicio)} → {fmtDate(r.data_fim)}</div>
@@ -555,7 +754,7 @@ function ProgramacaoView({
       <div className={`flex flex-wrap gap-3 text-[10px] ${txtMuted}`}>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-orange-500" /> Liderança</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-cyan-500" /> Apoio</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-slate-400" /> Time</span>
+        <span className="inline-flex items-center gap-1"><Users2 size={10} /> nº da equipe (sob o encarregado)</span>
         <span className="inline-flex items-center gap-1"><span className="w-[2px] h-3 bg-red-500" /> Hoje</span>
       </div>
     </div>
