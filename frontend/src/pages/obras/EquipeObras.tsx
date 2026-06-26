@@ -1102,13 +1102,15 @@ function AlocarPessoaModal({
   const colabSelecionado = colaboradores.find(c => c.id === colabId)
 
   // lista filtrada de colaboradores (disponiveis + o ja selecionado)
+  // Engenheiro/Apoio podem ir em várias obras → puxa do headcount inteiro (não filtra alocados)
+  const multiObra = papel === 'engenheiro' || papel === 'apoio'
   const colabFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return colaboradores
-      .filter(c => !alocadosIds.has(c.id) || c.id === colabId)
+      .filter(c => multiObra ? c.papel_sugerido === papel : (!alocadosIds.has(c.id) || c.id === colabId))
       .filter(c => !q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q))
       .slice(0, 60)
-  }, [colaboradores, alocadosIds, colabId, busca])
+  }, [colaboradores, alocadosIds, colabId, busca, multiObra, papel])
 
   const encarregadosDaObra = useMemo(
     () => encarregados.filter(e => e.obra_id === obraId),
@@ -1195,9 +1197,9 @@ function AlocarPessoaModal({
               <>
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome ou cargo..." className={`${inputCls} pl-8`} autoFocus />
+                  <input value={busca} onChange={e => setBusca(e.target.value)} placeholder={multiObra ? 'Engenheiros do headcount — busque ou escolha…' : 'Buscar por nome ou cargo...'} className={`${inputCls} pl-8`} autoFocus />
                 </div>
-                {busca && (
+                {(busca || multiObra) && (
                   <div className={`mt-1 max-h-[180px] overflow-y-auto rounded-xl border ${isDark ? 'border-white/[0.08] bg-[#0b1220]' : 'border-slate-200 bg-white'}`}>
                     {colabFiltrados.length === 0 ? (
                       <p className={`text-[11px] italic px-3 py-2 ${txtMuted}`}>Nenhum disponível encontrado</p>
