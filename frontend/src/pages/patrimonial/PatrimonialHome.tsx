@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Landmark, TrendingDown, Wrench,
   ArrowRight, Zap,
-  Archive, MapPin, Truck, Laptop,
+  Archive, MapPin, Truck, Laptop, Grid3x3,
 } from 'lucide-react'
 import { usePatrimonialKPIs, useImobilizados } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -108,6 +108,23 @@ export default function PatrimonialHome() {
   })
   const bases = Array.from(baseMap.values()).sort((a, b) => b.valor - a.valor)
   const maxBaseVal = bases[0]?.valor || 1
+
+  // Matriz (heatmap): contagem de itens por categoria (linhas) x base (colunas)
+  const ativosMatriz = imobilizados.filter(i => i.status !== 'baixado')
+  const catTot = new Map<string, number>()
+  const baseTot = new Map<string, number>()
+  const cell = new Map<string, number>()
+  ativosMatriz.forEach(i => {
+    const cat = i.categoria || 'Sem categoria'
+    const base = i.base_nome || 'Sem base'
+    catTot.set(cat, (catTot.get(cat) ?? 0) + 1)
+    baseTot.set(base, (baseTot.get(base) ?? 0) + 1)
+    const k = `${cat}||${base}`
+    cell.set(k, (cell.get(k) ?? 0) + 1)
+  })
+  const catRows = [...catTot.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
+  const baseCols = [...baseTot.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
+  const maxCell = Math.max(1, ...Array.from(cell.values()))
 
   return (
     <div className="space-y-3">
@@ -285,6 +302,61 @@ export default function PatrimonialHome() {
           </div>
         </section>
       </div>
+
+      {/* ── Matriz: itens por Categoria x Base (heatmap) ── */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between gap-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Grid3x3 size={14} className="text-teal-500" /> Itens por Categoria x Base
+          </h2>
+          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>quantidade de ativos</span>
+        </div>
+        {catRows.length === 0 ? (
+          <p className={`text-xs p-5 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum ativo cadastrado.</p>
+        ) : (
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs" style={{ borderCollapse: 'separate', borderSpacing: '3px' }}>
+              <thead>
+                <tr>
+                  <th className={`text-left font-bold px-2 py-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Categoria</th>
+                  {baseCols.map(b => (
+                    <th key={b} className={`px-2 py-1 text-center font-bold whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{b}</th>
+                  ))}
+                  <th className={`px-2 py-1 text-center font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catRows.map(cat => (
+                  <tr key={cat}>
+                    <td className={`text-left font-semibold pr-2 whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{cat}</td>
+                    {baseCols.map(b => {
+                      const v = cell.get(`${cat}||${b}`) ?? 0
+                      const t = v / maxCell
+                      const txt = v === 0
+                        ? (isDark ? 'text-slate-700' : 'text-slate-300')
+                        : (t > 0.55 ? 'text-white' : (isDark ? 'text-slate-100' : 'text-slate-700'))
+                      return (
+                        <td key={b} className={`text-center font-bold rounded-md py-1.5 tabular-nums ${txt}`}
+                          style={{ background: v === 0 ? (isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc') : `rgba(13,148,136,${0.12 + 0.82 * t})` }}>
+                          {v || ''}
+                        </td>
+                      )
+                    })}
+                    <td className={`text-center font-extrabold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{catTot.get(cat)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className={`text-left font-bold pr-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total</td>
+                  {baseCols.map(b => (
+                    <td key={b} className={`text-center font-extrabold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{baseTot.get(b)}</td>
+                  ))}
+                  <td className={`text-center font-black tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>{ativosMatriz.length}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
     </div>
   )
