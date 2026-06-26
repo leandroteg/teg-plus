@@ -1053,18 +1053,12 @@ function TabRecebiveis() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
-                      <div className="text-right shrink-0 leading-tight">
-                        <p className="text-sm font-extrabold text-emerald-600">{fmtFull(p.valor)}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">saldo</p>
-                      </div>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.valor)}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
                       <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
                       </span>
-                      {p.contrato?.recorrente && p.contrato?.valor_mensal ? (
-                        <span className="bg-amber-50 text-amber-700 font-semibold rounded-full px-2 py-0.5">Mensal {fmt(p.contrato.valor_mensal)}</span>
-                      ) : null}
                       <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
                         {p.contrato?.numero} — #{p.numero}
                       </span>
@@ -1203,12 +1197,18 @@ function TabProvisionado() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
-                      <p className="text-sm font-extrabold text-amber-600 shrink-0">{fmtFull(p.valor)}</p>
+                      <div className="text-right shrink-0 leading-tight">
+                        <p className="text-sm font-extrabold text-amber-600">{fmtFull(p.valor)}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">saldo</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
                       <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
                       </span>
+                      {p.contrato?.recorrente && p.contrato?.valor_mensal ? (
+                        <span className="bg-amber-50 text-amber-700 font-semibold rounded-full px-2 py-0.5">Mensal {fmt(p.contrato.valor_mensal)}</span>
+                      ) : null}
                       <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
                         {p.contrato?.numero} — #{p.numero}
                       </span>
