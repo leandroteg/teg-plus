@@ -1,27 +1,38 @@
-// Painel Histograma — recursos (mão de obra + máquinas) mês a mês, com base no plano do Cronograma.
-// Usa a mesma engine (árvore EAP + precedência + equipe). Máquinas = pessoas × (máquinas por pessoa).
+// Painel Histograma — recursos (mão de obra + máquinas) mês a mês.
+// Fonte "Efetivo real": pessoas vindas do RH (rh_colaboradores) e máquinas da frota (fro_veiculos),
+// por frente, alimentando o plano (engine do cronograma define QUANDO cada fase roda; o efetivo real
+// define QUANTAS pessoas/máquinas). Grupos: Fundação e "Montagem e Lançamento" (equipe única).
+// Fonte "Plano": usa a equipe configurada numa versão do cronograma.
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Users, HardHat, ChevronDown, Filter, Gauge } from 'lucide-react'
+import { Users, HardHat, ChevronDown, Filter, Info } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
+import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
-  DRV, ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra,
-  type Config, type Versao,
+  ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra,
+  type Obra, type Config, type Versao,
 } from './cronogramaEngine'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const fmtN = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v))
+// 2 grupos de recurso (Montagem e Lançamento = equipe única)
+const GRUPOS = [
+  { key: 'fund', label: 'Fundação', cor: '#92400e', drivers: ['Fundação'] },
+  { key: 'ml', label: 'Montagem e Lançamento', cor: '#374151', drivers: ['Montagem', 'Lançamento'] },
+] as const
+const saldoDe = (o: Obra, lbl: string) => o.drivers.find(d => d.label === lbl)?.saldoQ || 0
 
 export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { portfolioId?: string } = {}) {
   const { isDark } = useTheme()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
+  const { data: efetivo } = useEfetivoReal(portfolioId)
+  const [fonte, setFonte] = useState<'real' | 'plano'>('real')
   const [recurso, setRecurso] = useState<'pessoas' | 'maquinas'>('pessoas')
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [verId, setVerId] = useState<string | null>(null)
-  const [maqRatio, setMaqRatio] = useState<Record<string, number>>(() => { const m: Record<string, number> = {}; DRV.forEach(d => m[d.label] = d.maq); return m })
   const [openF, setOpenF] = useState(false)
 
   const tree = useMemo(() => buildTree(raw), [raw])
@@ -32,51 +43,96 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     queryKey: ['crono-versoes', portfolioId],
     queryFn: async () => { const { data } = await supabase.from('pmo_cronograma_versao').select('id, nome, config, updated_at').eq('portfolio_id', portfolioId).order('updated_at', { ascending: false }); return (data ?? []) as Versao[] },
   })
-  // config selecionada (versão salva normalizada, ou default)
-  const cfg = useMemo<Config>(() => {
-    const v = versoes.find(x => x.id === verId)
-    if (!v) return defaultConfig
+  const planoCfg = useMemo<Config>(() => {
+    const v = versoes.find(x => x.id === verId); if (!v) return defaultConfig
     const c = v.config as Partial<Config>
     return { prodPP: c.prodPP ?? defaultConfig.prodPP, equipe: c.equipe ?? defaultConfig.equipe, horizonte: c.horizonte ?? 12, precedencia: c.precedencia, lag: c.lag }
   }, [versoes, verId, defaultConfig])
 
+  // config a partir do efetivo REAL: distribui o efetivo de cada frente entre suas obras ∝ saldo.
+  // ML (Montagem+Lançamento) é equipe única → mesma alocação nos dois drivers (precedência sequencia).
+  const realCfg = useMemo<Config>(() => {
+    const equipe: Record<string, Record<string, number>> = {}
+    for (const fr of tree) {
+      const ef = efetivo?.porFrente[fr.label]
+      const fundS = fr.obras.map(o => saldoDe(o, 'Fundação')); const fundT = fundS.reduce((s, x) => s + x, 0)
+      const mlS = fr.obras.map(o => saldoDe(o, 'Montagem') + saldoDe(o, 'Lançamento')); const mlT = mlS.reduce((s, x) => s + x, 0)
+      fr.obras.forEach((o, i) => {
+        const e: Record<string, number> = {}
+        const fund = ef && fundT > 0 ? ef.fundacao * fundS[i] / fundT : 0
+        const ml = ef && mlT > 0 ? ef.montlanc * mlS[i] / mlT : 0
+        if (saldoDe(o, 'Fundação') > 0) e['Fundação'] = fund
+        if (saldoDe(o, 'Montagem') > 0) e['Montagem'] = ml
+        if (saldoDe(o, 'Lançamento') > 0) e['Lançamento'] = ml
+        equipe[o.nome] = e
+      })
+    }
+    return { prodPP: defaultConfig.prodPP, equipe, horizonte: 12, precedencia: true, lag: 0 }
+  }, [tree, efetivo, defaultConfig])
+
   const start = startYM()
-  // histograma: pessoas e máquinas por driver, mês a mês (soma das obras filtradas)
   const hist = useMemo(() => {
-    const obras = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras)
-    const pjs = obras.map(o => projObra(o, cfg, start))
-    let H = 0; for (const pj of pjs) H = Math.max(H, pj.maxMeses)
-    const pessoas: Record<string, number[]> = {}; DRV.forEach(d => pessoas[d.label] = new Array(H).fill(0))
-    for (const pj of pjs) for (const r of pj.rows) r.pessoas.forEach((p, m) => { pessoas[r.d.label][m] += p })
-    let last = -1; for (let m = 0; m < H; m++) if (DRV.some(d => pessoas[d.label][m] > 0)) last = m
+    const cfg = fonte === 'real' ? realCfg : planoCfg
+    const frentes = fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree
+    const pjMap = new Map<Obra, ReturnType<typeof projObra>>()
+    let H = 0
+    for (const fr of frentes) for (const o of fr.obras) { const pj = projObra(o, cfg, start); pjMap.set(o, pj); H = Math.max(H, pj.maxMeses) }
+    // pessoas por grupo/mês
+    const pplFund = new Array(H).fill(0), pplML = new Array(H).fill(0)
+    // máquinas por grupo/mês (frota real, alocada nos meses em que a fase roda)
+    const maqFund = new Array(H).fill(0), maqML = new Array(H).fill(0)
+    for (const fr of frentes) {
+      const ef = efetivo?.porFrente[fr.label]
+      const fundAtivo = new Array(H).fill(false), mlAtivo = new Array(H).fill(false)
+      for (const o of fr.obras) {
+        const pj = pjMap.get(o)!; const eq = cfg.equipe[o.nome] ?? {}
+        const fundRow = pj.rows.find(r => r.d.label === 'Fundação')
+        const montRow = pj.rows.find(r => r.d.label === 'Montagem')
+        const lancRow = pj.rows.find(r => r.d.label === 'Lançamento')
+        const mlTeam = eq['Montagem'] ?? eq['Lançamento'] ?? 0
+        for (let m = 0; m < pj.maxMeses; m++) {
+          if (fundRow && (fundRow.qty[m] || 0) > 0.001) { pplFund[m] += fundRow.pessoas[m] || 0; fundAtivo[m] = true }
+          const mlOn = (montRow && (montRow.qty[m] || 0) > 0.001) || (lancRow && (lancRow.qty[m] || 0) > 0.001)
+          if (mlOn) { pplML[m] += mlTeam; mlAtivo[m] = true }
+        }
+      }
+      if (ef) for (let m = 0; m < H; m++) { if (fundAtivo[m]) maqFund[m] += ef.maqFund; if (mlAtivo[m]) maqML[m] += ef.maqML }
+    }
+    // trim trailing zeros
+    const peopleTot = (m: number) => pplFund[m] + pplML[m]
+    let last = -1; for (let m = 0; m < H; m++) if (peopleTot(m) > 0.001 || maqFund[m] + maqML[m] > 0) last = m
     const len = last + 1
     const meses = Array.from({ length: len }, (_, m) => shiftYM(start, m))
-    const maq: Record<string, number[]> = {}
-    DRV.forEach(d => { pessoas[d.label] = pessoas[d.label].slice(0, len); maq[d.label] = pessoas[d.label].map(p => p * (maqRatio[d.label] || 0)) })
-    const data = recurso === 'pessoas' ? pessoas : maq
-    const totMes = meses.map((_, m) => DRV.reduce((s, d) => s + data[d.label][m], 0))
+    const ppl = { fund: pplFund.slice(0, len), ml: pplML.slice(0, len) }
+    const maq = { fund: maqFund.slice(0, len), ml: maqML.slice(0, len) }
+    const ds = recurso === 'pessoas' ? ppl : maq
+    const data: Record<string, number[]> = { fund: ds.fund, ml: ds.ml }
+    const totMes = meses.map((_, m) => data.fund[m] + data.ml[m])
     const peak = Math.max(1, ...totMes)
     const peakMes = totMes.indexOf(Math.max(0, ...totMes))
     const totGeral = totMes.reduce((s, x) => s + x, 0)
-    // picos (ambos os recursos) p/ KPIs
-    const totPessoasMes = meses.map((_, m) => DRV.reduce((s, d) => s + pessoas[d.label][m], 0))
-    const totMaqMes = meses.map((_, m) => DRV.reduce((s, d) => s + maq[d.label][m], 0))
-    const picoPessoas = Math.max(0, ...totPessoasMes), picoMaq = Math.max(0, ...totMaqMes)
-    return { meses, pessoas, maq, data, totMes, peak, peakMes, totGeral, picoPessoas, picoMaq, picoPessoasMes: totPessoasMes.indexOf(picoPessoas), picoMaqMes: totMaqMes.indexOf(picoMaq) }
-  }, [tree, fFrente, cfg, start, recurso, maqRatio])
+    const totPplMes = meses.map((_, m) => ppl.fund[m] + ppl.ml[m])
+    const totMaqMes = meses.map((_, m) => maq.fund[m] + maq.ml[m])
+    const picoPpl = Math.max(0, ...totPplMes), picoMaq = Math.max(0, ...totMaqMes)
+    return { meses, data, totMes, peak, peakMes, totGeral, picoPpl, picoMaq, picoPplMes: totPplMes.indexOf(picoPpl), picoMaqMes: totMaqMes.indexOf(picoMaq) }
+  }, [tree, fFrente, fonte, realCfg, planoCfg, efetivo, start, recurso])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
 
   const H_BAR = 180
   const uniRec = recurso === 'pessoas' ? 'pessoas' : 'máquinas'
-  const inp = `w-16 text-sm font-bold rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`
-  const lbl = `text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+  const totReal = efetivo?.total
 
   return (
     <div className="space-y-3">
       {/* Controles */}
       <div className="flex flex-wrap items-center gap-2">
+        <div className={`inline-flex rounded-xl border overflow-hidden text-[12px] ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+          {([['real', 'Efetivo real'], ['plano', 'Plano']] as const).map(([f, lb]) => (
+            <button key={f} onClick={() => setFonte(f)} className={`px-3 py-1.5 font-semibold ${fonte === f ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>{lb}</button>
+          ))}
+        </div>
         <div className={`inline-flex rounded-xl border overflow-hidden text-[12px] ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
           {(['pessoas', 'maquinas'] as const).map(r => (
             <button key={r} onClick={() => setRecurso(r)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 font-semibold ${recurso === r ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>
@@ -90,7 +146,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
             <Filter size={12} className="opacity-70" /><span className="opacity-70">Frente</span><span className="flex-1 text-left truncate">{fFrente.size === 0 ? 'todas' : `${fFrente.size} selec.`}</span><ChevronDown size={12} className={`shrink-0 transition ${openF ? 'rotate-180' : ''}`} />
           </button>
           {openF && (<><div className="fixed inset-0 z-20" onClick={() => setOpenF(false)} />
-            <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[300px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
+            <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[320px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
               {fFrente.size > 0 && <button onClick={() => setFFrente(new Set())} className="w-full text-left px-2 py-1 mb-0.5 text-[10px] font-semibold text-slate-400">× limpar</button>}
               {tree.map(f => { const on = fFrente.has(f.label); return (
                 <button key={f.label} onClick={() => setFFrente(s => { const n = new Set(s); n.has(f.label) ? n.delete(f.label) : n.add(f.label); return n })} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] text-left ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
@@ -99,41 +155,35 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                 </button>) })}
             </div></>)}
         </div>
-        {/* versão do cronograma */}
-        {versoes.length > 0 && (
+        {fonte === 'plano' && versoes.length > 0 && (
           <select value={verId ?? ''} onChange={e => setVerId(e.target.value || null)} className={`text-[12px] font-semibold rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
             <option value="">Plano padrão</option>
             {versoes.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
           </select>
         )}
-        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>plano do cronograma · {versoes.length ? (verId ? versoes.find(v => v.id === verId)?.nome : 'padrão') : 'padrão'}</span>
+        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fonte === 'real' ? 'pessoas: RH · máquinas: frota' : 'equipe do plano · máquinas: frota'}</span>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <Kpi label="Pico de mão de obra" value={`${Math.round(hist.picoPessoas)}`} tone="teal" isDark={isDark} note={hist.meses[hist.picoPessoasMes] ? ymLabel(hist.meses[hist.picoPessoasMes]) : '—'} />
+        <Kpi label="Pico de mão de obra" value={`${Math.round(hist.picoPpl)}`} tone="teal" isDark={isDark} note={hist.meses[hist.picoPplMes] ? ymLabel(hist.meses[hist.picoPplMes]) : '—'} />
         <Kpi label="Pico de máquinas" value={`${Math.round(hist.picoMaq)}`} tone="amber" isDark={isDark} note={hist.meses[hist.picoMaqMes] ? ymLabel(hist.meses[hist.picoMaqMes]) : '—'} />
-        <Kpi label={`Total ${uniRec}·mês`} value={fmtN(hist.totGeral)} tone="violet" isDark={isDark} note="soma do horizonte" />
+        <Kpi label={fonte === 'real' ? 'Efetivo real (RH)' : `Total ${uniRec}·mês`} value={fonte === 'real' && totReal ? `${totReal.fundacao + totReal.montlanc} pessoas` : fmtN(hist.totGeral)} tone="violet" isDark={isDark} note={fonte === 'real' && totReal ? `${totReal.maqFund + totReal.maqML} máquinas` : 'soma do horizonte'} />
         <Kpi label="Horizonte" value={`${hist.meses.length} mes(es)`} tone="sky" isDark={isDark} note={hist.meses.length ? `${ymLabel(hist.meses[0])} → ${ymLabel(hist.meses[hist.meses.length - 1])}` : '—'} />
       </div>
 
-      {/* Máquinas por pessoa (config) */}
-      <PanelCard title="Máquinas por pessoa (por driver)" icon={<Gauge size={14} className="text-teal-500" />} isDark={isDark}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {DRV.map(d => (
-            <div key={d.label} className={`rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
-              <div className="flex items-center gap-1.5 mb-1"><span className="w-2 h-2 rounded-full" style={{ background: d.cor }} /><span className="text-[11px] font-bold">{d.label}</span></div>
-              <div className="flex items-center gap-1"><input type="number" min="0" step="0.05" value={maqRatio[d.label] ?? 0} onChange={e => setMaqRatio(m => ({ ...m, [d.label]: Math.max(0, Number(e.target.value)) }))} className={inp} /><span className="text-[10px] text-slate-400">máq / pessoa</span></div>
-            </div>
-          ))}
+      {/* aviso de cobertura (honestidade) */}
+      {fonte === 'real' && efetivo && (efetivo.semFrente.fundacao + efetivo.semFrente.montlanc > 0) && (
+        <div className={`flex items-start gap-2 px-3 py-2 rounded-xl text-[11px] ${isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span><b>{efetivo.semFrente.fundacao + efetivo.semFrente.montlanc} pessoas</b> em bases sem frente correspondente ({efetivo.semFrente.bases.join(', ') || '—'}) não entram no histograma. Frentes sem base no RH aparecem zeradas.</span>
         </div>
-        <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Máquinas = nº de pessoas (do cronograma) × esta razão. Ajuste por driver.</p>
-      </PanelCard>
+      )}
 
-      {/* Histograma (gráfico de barras empilhadas) */}
+      {/* Histograma */}
       <PanelCard title={`Histograma de ${recurso === 'pessoas' ? 'mão de obra' : 'máquinas'} — mês a mês`} icon={recurso === 'pessoas' ? <Users size={14} className="text-teal-500" /> : <HardHat size={14} className="text-teal-500" />} isDark={isDark}
-        right={<div className="flex items-center gap-3">{DRV.map(d => <span key={d.label} className="inline-flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.cor }} />{d.label}</span>)}</div>}>
-        {hist.meses.length === 0 ? <p className="text-center py-8 text-sm text-slate-400">Sem alocação de recursos no horizonte.</p> : (
+        right={<div className="flex items-center gap-3">{GRUPOS.map(g => <span key={g.key} className="inline-flex items-center gap-1 text-[10px]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: g.cor }} />{g.label}</span>)}</div>}>
+        {hist.meses.length === 0 ? <p className="text-center py-8 text-sm text-slate-400">Sem recursos no horizonte {fonte === 'real' ? '(verifique se há efetivo no RH para as frentes filtradas)' : ''}.</p> : (
           <div className="overflow-x-auto pb-1">
             <div className="flex items-end gap-1.5" style={{ minWidth: hist.meses.length * 52 }}>
               {hist.meses.map((m, i) => {
@@ -142,7 +192,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                   <div key={m} className="flex-1 min-w-[44px] flex flex-col items-center gap-1">
                     <span className={`text-[10px] font-bold tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tot > 0 ? Math.round(tot) : ''}</span>
                     <div className="w-full flex flex-col-reverse rounded-t overflow-hidden" style={{ height: H_BAR }}>
-                      {DRV.map(d => { const v = hist.data[d.label][i]; return v > 0 ? <div key={d.label} style={{ height: v / hist.peak * H_BAR, background: d.cor }} title={`${d.label}: ${Math.round(v)} ${uniRec} · ${ymLabel(m)}`} /> : null })}
+                      {GRUPOS.map(g => { const v = hist.data[g.key][i]; return v > 0 ? <div key={g.key} style={{ height: v / hist.peak * H_BAR, background: g.cor }} title={`${g.label}: ${Math.round(v)} ${uniRec} · ${ymLabel(m)}`} /> : null })}
                     </div>
                     <span className={`text-[9px] whitespace-nowrap ${i === hist.peakMes ? 'font-bold text-teal-500' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>{ymLabel(m)}</span>
                   </div>
@@ -155,25 +205,25 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
       {/* Tabela */}
       {hist.meses.length > 0 && (
-        <PanelCard title={`${recurso === 'pessoas' ? 'Mão de obra' : 'Máquinas'} por driver e mês`} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
+        <PanelCard title={`${recurso === 'pessoas' ? 'Mão de obra' : 'Máquinas'} por grupo e mês`} isDark={isDark} pad={false} bodyClassName="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-              <th className={`sticky left-0 px-3 py-1.5 text-left text-[10px] font-semibold ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`}>Driver</th>
+              <th className={`sticky left-0 px-3 py-1.5 text-left text-[10px] font-semibold ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`}>Grupo</th>
               {hist.meses.map(m => <th key={m} className={`px-2 py-1.5 text-right text-[10px] font-semibold whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ymLabel(m)}</th>)}
-              <th className={`px-2 py-1.5 text-right text-[10px] font-semibold pr-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total</th>
+              <th className={`px-2 py-1.5 text-right text-[10px] font-semibold pr-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Pico</th>
             </tr></thead>
             <tbody>
-              {DRV.map(d => { const arr = hist.data[d.label]; const tot = arr.reduce((s, x) => s + x, 0); return (
-                <tr key={d.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                  <td className={`sticky left-0 px-3 py-1 text-left text-[11px] font-medium ${isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-700'}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: d.cor }} />{d.label}</td>
+              {GRUPOS.map(g => { const arr = hist.data[g.key]; const pico = Math.max(0, ...arr); return (
+                <tr key={g.key} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                  <td className={`sticky left-0 px-3 py-1 text-left text-[11px] font-medium ${isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-700'}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: g.cor }} />{g.label}</td>
                   {arr.map((v, i) => <td key={i} className={`px-2 py-1 text-right text-[11px] tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{v > 0 ? Math.round(v) : <span className="text-slate-400">·</span>}</td>)}
-                  <td className={`px-2 py-1 text-right text-[11px] tabular-nums font-semibold pr-3`}>{Math.round(tot)}</td>
+                  <td className={`px-2 py-1 text-right text-[11px] tabular-nums font-semibold pr-3`}>{Math.round(pico)}</td>
                 </tr>
               ) })}
               <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
                 <td className={`sticky left-0 px-3 py-1.5 text-left text-[11px] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>Total {uniRec}</td>
                 {hist.totMes.map((v, i) => <td key={i} className={`px-2 py-1 text-right text-[11px] tabular-nums font-bold ${i === hist.peakMes ? 'text-teal-500' : ''}`}>{Math.round(v)}</td>)}
-                <td className={`px-2 py-1 text-right text-[11px] tabular-nums font-bold pr-3`}>{Math.round(hist.totGeral)}</td>
+                <td className={`px-2 py-1 text-right text-[11px] tabular-nums font-bold pr-3`}>{Math.round(hist.peak)}</td>
               </tr>
             </tbody>
           </table>
