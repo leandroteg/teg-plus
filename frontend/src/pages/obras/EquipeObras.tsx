@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, Fragment } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect, Fragment } from 'react'
 import {
   Users2, Search, Plus, X, List, CalendarRange, LayoutGrid,
   HardHat, UserCog, ShieldCheck, ChevronDown, ChevronUp, Building2,
@@ -809,6 +809,17 @@ function ProgramacaoView({
   const [projFiltro, setProjFiltro] = useState('todos')
   const [obraFiltro, setObraFiltro] = useState('todas')
   const [busca, setBusca] = useState('')
+  const topScrollRef = useRef<HTMLDivElement | null>(null)
+  const mainScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const top = topScrollRef.current, main = mainScrollRef.current
+    if (!top || !main) return
+    let syncing = false
+    const onTop = () => { if (syncing) return; syncing = true; main.scrollLeft = top.scrollLeft; requestAnimationFrame(() => { syncing = false }) }
+    const onMain = () => { if (syncing) return; syncing = true; top.scrollLeft = main.scrollLeft; requestAnimationFrame(() => { syncing = false }) }
+    top.addEventListener('scroll', onTop); main.addEventListener('scroll', onMain)
+    return () => { top.removeEventListener('scroll', onTop); main.removeEventListener('scroll', onMain) }
+  }, [])
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -920,14 +931,14 @@ function ProgramacaoView({
   const ddmm = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
   const weeks = useMemo(() => {
     let startMon: Date, endDate: Date
-    const starts: number[] = rows.map(r => new Date(r.data_inicio).getTime())
+    // começa SEMPRE na semana de hoje; vai até a maior data fim (pessoas + frota)
+    const hoje = new Date()
     const ends: number[] = rows.map(r => new Date(r.data_fim || addDays(new Date(r.data_inicio), 30).toISOString()).getTime())
     alocacoesFrota.filter(a => a.status === 'ativa').forEach(a => {
-      starts.push(new Date(a.data_saida).getTime())
       ends.push(new Date(a.data_retorno_real || a.data_retorno_prev || addDays(new Date(a.data_saida), 30).toISOString()).getTime())
     })
-    if (starts.length === 0) { const n = new Date(); startMon = mondayOf(n); endDate = addDays(n, 56) }
-    else { startMon = mondayOf(new Date(Math.min(...starts))); endDate = new Date(Math.max(...ends)) }
+    startMon = mondayOf(hoje)
+    endDate = ends.length ? new Date(Math.max(...ends)) : addDays(hoje, 56)
     const minEnd = addDays(startMon, 7 * 8)
     if (endDate < minEnd) endDate = minEnd
     const list: { mon: Date; sat: Date; label: string }[] = []
@@ -1032,7 +1043,12 @@ function ProgramacaoView({
         </div>
       </div>
 
-      <div className={`rounded-xl border overflow-x-auto ${border}`}>
+      {/* Barra de rolagem horizontal fixa (sticky) — sincronizada com a tabela */}
+      <div ref={topScrollRef} className={`sticky top-0 z-20 overflow-x-scroll overflow-y-hidden h-3.5 rounded-lg border ${isDark ? 'bg-white/[0.03] border-white/[0.08]' : 'bg-slate-100 border-slate-200'}`}>
+        <div style={{ width: `${totalW}px`, height: 1 }} />
+      </div>
+
+      <div ref={mainScrollRef} className={`rounded-xl border overflow-x-auto ${border}`}>
         {/* Header */}
         <div className={`flex items-stretch border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
           <div className={`shrink-0 px-3 py-2 border-r ${border} flex items-center text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>Projeto › Obra › Pessoa</div>
