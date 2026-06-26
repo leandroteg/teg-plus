@@ -1141,7 +1141,7 @@ export default function ModuleLayout({
             </button>
             <button onClick={() => navigate('/')} className="flex-1 min-w-0 text-left" title="Ir para início">
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
-              <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP 1.0 · 26/06</p>
+              <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP 1.0</p>
             </button>
             <div className="flex items-center gap-1 shrink-0">
               <ApprovalBadge isDark={!ls} />
