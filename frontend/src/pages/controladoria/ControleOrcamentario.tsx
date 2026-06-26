@@ -145,13 +145,6 @@ export default function ControleOrcamentario() {
             <Target size={20} className="text-violet-500" />
             Orcado vs. Realizado
           </h1>
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Painel Executivo de Acompanhamento Orcamentario &middot; {mesLabel} / {ano}
-          </p>
-          <p className={`text-[10px] mt-1.5 flex items-center gap-1.5 ${isLight ? 'text-amber-600' : 'text-amber-400/80'}`}>
-            <Star size={10} className="fill-amber-400 text-amber-400" />
-            Contas marcadas com <span className="font-bold">&#9733;</span> possuem Plano de Acao ativo
-          </p>
         </div>
 
         {/* ── Month / Year selectors ───────────────────── */}
