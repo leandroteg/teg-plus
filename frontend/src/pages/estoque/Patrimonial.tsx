@@ -36,10 +36,10 @@ const EMPTY_FORM: Partial<PatImobilizado> = {
 }
 
 const CATEGORIA_PREFIX: Record<string, string> = {
-  'Mobília': 'MOB',
+  'Mobília e Eletro': 'MOB',
   'Veículos': 'VEI',
   'Equipamentos': 'EQP',
-  'Informática': 'INF',
+  'Informática e Comunicação': 'INF',
 }
 
 const CATEGORIAS_PADRAO = Object.keys(CATEGORIA_PREFIX)
