@@ -16,6 +16,10 @@ import type {
   ObraPlanejamentoEquipe, ColaboradorAtivo, PapelEquipe,
   CategoriaEquipePlan, StatusEquipePlan,
 } from '../../types/obras'
+import { useVeiculos, useAlocacoes } from '../../hooks/useFrotas'
+import type { FroVeiculo, FroAlocacao } from '../../types/frotas'
+import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
+import { Truck } from 'lucide-react'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 
@@ -797,8 +801,10 @@ function ProgramacaoView({
   isDark: boolean
 }) {
   const atualizar = useAtualizarPlanEquipe()
+  const { data: alocacoesFrota = [] } = useAlocacoes()
+  const { data: veiculos = [] } = useVeiculos()
   const [minimizados, setMinimizados] = useState<Set<string>>(new Set())
-  const [verRecursos, setVerRecursos] = useState(false)
+  const [recAbertos, setRecAbertos] = useState<Set<string>>(new Set())  // obras c/ bloco Recursos (frota) aberto
   const [editAloc, setEditAloc] = useState<ObraPlanejamentoEquipe | null>(null)
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
@@ -808,6 +814,19 @@ function ProgramacaoView({
   const obraById = useMemo(() => {
     const m = new Map<string, ObraComProjeto>(); obras.forEach(o => m.set(o.id, o)); return m
   }, [obras])
+
+  // Frota (veículos/máquinas) alocada por obra — fonte: módulo Frotas
+  const veicById = useMemo(() => { const m = new Map<string, FroVeiculo>(); veiculos.forEach(v => m.set(v.id, v)); return m }, [veiculos])
+  const frotaByObra = useMemo(() => {
+    const m = new Map<string, { aloc: FroAlocacao; veic: FroVeiculo }[]>()
+    alocacoesFrota.filter(a => a.status === 'ativa' && a.obra_id).forEach(a => {
+      const veic = veicById.get(a.veiculo_id); if (!veic) return
+      const arr = m.get(a.obra_id!) ?? []; arr.push({ aloc: a, veic }); m.set(a.obra_id!, arr)
+    })
+    m.forEach(arr => arr.sort((x, y) => (CATEGORIA_LABEL[x.veic.categoria] ?? '').localeCompare(CATEGORIA_LABEL[y.veic.categoria] ?? '')))
+    return m
+  }, [alocacoesFrota, veicById])
+  const toggleRec = (id: string) => setRecAbertos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const active = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
   // Time não aparece como linha individual — só o número por encarregado.
@@ -873,24 +892,25 @@ function ProgramacaoView({
   const ddmm = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
   const weeks = useMemo(() => {
     let startMon: Date, endDate: Date
-    if (rows.length === 0) { const n = new Date(); startMon = mondayOf(n); endDate = addDays(n, 56) }
-    else {
-      const starts = rows.map(r => new Date(r.data_inicio).getTime())
-      const ends = rows.map(r => new Date(r.data_fim || addDays(new Date(r.data_inicio), 30).toISOString()).getTime())
-      startMon = mondayOf(new Date(Math.min(...starts)))
-      endDate = new Date(Math.max(...ends))
-    }
+    const starts: number[] = rows.map(r => new Date(r.data_inicio).getTime())
+    const ends: number[] = rows.map(r => new Date(r.data_fim || addDays(new Date(r.data_inicio), 30).toISOString()).getTime())
+    alocacoesFrota.filter(a => a.status === 'ativa').forEach(a => {
+      starts.push(new Date(a.data_saida).getTime())
+      ends.push(new Date(a.data_retorno_real || a.data_retorno_prev || addDays(new Date(a.data_saida), 30).toISOString()).getTime())
+    })
+    if (starts.length === 0) { const n = new Date(); startMon = mondayOf(n); endDate = addDays(n, 56) }
+    else { startMon = mondayOf(new Date(Math.min(...starts))); endDate = new Date(Math.max(...ends)) }
     const minEnd = addDays(startMon, 7 * 8)
     if (endDate < minEnd) endDate = minEnd
     const list: { mon: Date; sat: Date; label: string }[] = []
     let cur = startMon, guard = 0
-    while (cur <= endDate && guard < 30) {
+    while (cur <= endDate && guard < 40) {
       const sat = addDays(cur, 5)
       list.push({ mon: cur, sat, label: `${ddmm(cur)} - ${ddmm(sat)}` })
       cur = addDays(cur, 7); guard++
     }
     return list
-  }, [rows])
+  }, [rows, alocacoesFrota])
 
   const today = new Date()
   const COL_W = { pessoa: 340, semana: 96 }
@@ -931,7 +951,32 @@ function ProgramacaoView({
     )
   }
 
+  const VeiculoRow = ({ aloc, veic }: { aloc: FroAlocacao; veic: FroVeiculo }) => {
+    const start = new Date(aloc.data_saida)
+    const end = new Date(aloc.data_retorno_real || aloc.data_retorno_prev || addDays(start, 30).toISOString())
+    return (
+      <div className={`flex items-stretch border-b ${isDark ? 'border-white/[0.03] bg-emerald-500/[0.03]' : 'border-slate-100 bg-emerald-50/30'}`}>
+        <div className={`shrink-0 py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: 54, paddingRight: 8 }}>
+          <span className="shrink-0 w-1 h-1 rounded-full bg-emerald-500" />
+          <span className={`flex-1 min-w-0 text-[10px] truncate ${txtMuted}`} title={`${veic.marca} ${veic.modelo}`}>
+            <span className="font-semibold">{CATEGORIA_LABEL[veic.categoria] ?? veic.categoria}</span> — {veic.marca} {veic.modelo}
+          </span>
+          {(veic.placa || veic.numero_serie) && <span className={`shrink-0 text-[9px] font-mono ${txtMuted}`}>{veic.placa || veic.numero_serie}</span>}
+        </div>
+        {weeks.map((w, i) => {
+          const ativo = start <= addDays(w.sat, 1) && end >= w.mon
+          return (
+            <div key={i} className={`shrink-0 border-r ${border} flex items-center justify-center py-1.5`} style={{ width: `${COL_W.semana}px` }}>
+              {ativo && <div className="h-2.5 w-full mx-1 rounded bg-emerald-500 shadow-sm" title={`${fmtDate(aloc.data_saida)} → ${fmtDate(aloc.data_retorno_real || aloc.data_retorno_prev)}`} />}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   const totalW = leftW + weeks.length * COL_W.semana
+  const obrasComFrota = useMemo(() => [...frotaByObra.keys()], [frotaByObra])
 
   return (
     <div className="space-y-3">
@@ -939,8 +984,8 @@ function ProgramacaoView({
         <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
           <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas · clique numa pessoa para editar a alocação
         </div>
-        <button onClick={() => setVerRecursos(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${verRecursos ? 'bg-orange-500 text-white border-orange-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-          {verRecursos ? <EyeOff size={13} /> : <Eye size={13} />} {verRecursos ? 'Ocultar recursos' : 'Ver recursos'}
+        <button onClick={() => setRecAbertos(prev => (prev.size >= obrasComFrota.length && obrasComFrota.length > 0) ? new Set() : new Set(obrasComFrota))} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${recAbertos.size > 0 ? 'bg-emerald-500 text-white border-emerald-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+          <Truck size={13} /> {recAbertos.size > 0 ? 'Ocultar recursos' : 'Ver recursos (frota)'}
         </button>
       </div>
 
@@ -994,14 +1039,24 @@ function ProgramacaoView({
                             <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-white text-slate-500 border border-slate-200'}`}>{ob.rows.length}</span>
                           </div>
                         </button>
-                        {!omin && ob.rows.map(r => (
-                          (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
-                            <Fragment key={r.id}>
-                              <PersonRow r={r} indent={40} />
-                              {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso indent={54} />)}
-                            </Fragment>
-                          ) : <PersonRow key={r.id} r={r} indent={40} />
-                        ))}
+                        {!omin && (
+                          <>
+                            {ob.rows.map(r => <PersonRow key={r.id} r={r} indent={40} />)}
+                            {(frotaByObra.get(ob.id)?.length ?? 0) > 0 && (
+                              <>
+                                <button onClick={() => toggleRec(ob.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]' : 'border-slate-100 bg-emerald-50/40 hover:bg-emerald-50'}`} style={{ minWidth: `${totalW}px` }}>
+                                  <div className="flex items-center gap-1.5 py-1.5 shrink-0" style={{ width: `${leftW}px`, paddingLeft: 40, paddingRight: 8 }}>
+                                    {recAbertos.has(ob.id) ? <ChevronUp size={11} className={txtMuted} /> : <ChevronDown size={11} className={txtMuted} />}
+                                    <Truck size={11} className="text-emerald-500" />
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>Recursos</span>
+                                    <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{frotaByObra.get(ob.id)!.length} máq.</span>
+                                  </div>
+                                </button>
+                                {recAbertos.has(ob.id) && frotaByObra.get(ob.id)!.map(f => <VeiculoRow key={f.aloc.id} aloc={f.aloc} veic={f.veic} />)}
+                              </>
+                            )}
+                          </>
+                        )}
                       </div>
                     )
                   })}
