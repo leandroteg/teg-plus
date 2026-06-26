@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, BriefcaseBusiness, ReceiptText, FolderKanban, Lightbulb, Archive,
+  LayoutDashboard, BriefcaseBusiness, ReceiptText, Archive,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -7,8 +7,6 @@ const NAV = [
   { to: '/controladoria', icon: LayoutDashboard, label: 'Painel', end: true },
   { to: '/controladoria/controle-orcamentario', icon: BriefcaseBusiness, label: 'Controle Orçamentário' },
   { to: '/controladoria/controle-custos', icon: ReceiptText, label: 'Controle de Custos' },
-  { to: '/controladoria/controle-projetos', icon: FolderKanban, label: 'Controle Projetos' },
-  { to: '/controladoria/cenarios', icon: Lightbulb, label: 'Cenários' },
   { to: '/controladoria/relatorios-legado', icon: Archive, label: 'Relatórios Legado' },
 ]
 

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { BarChart3, Filter, Search } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOrcamentos } from '../../hooks/useControladoria'
-import { useLookupObras } from '../../hooks/useLookups'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { StatusOrcamento } from '../../types/controladoria'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -20,14 +20,14 @@ const STATUS_CFG: Record<StatusOrcamento, { label: string; bg: string; text: str
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Orcamentos() {
   const { isLightSidebar: isLight } = useTheme()
-  const obras = useLookupObras()
+  const centros = useLookupCentrosCusto()
 
-  const [filterObra, setFilterObra] = useState('')
+  const [filterCC, setFilterCC] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [search, setSearch] = useState('')
 
   const { data: orcamentos = [], isLoading } = useOrcamentos({
-    obra_id: filterObra || undefined,
+    centro_custo_id: filterCC || undefined,
     status: filterStatus || undefined,
   })
 
@@ -35,7 +35,7 @@ export default function Orcamentos() {
     if (!search) return orcamentos
     const term = search.toLowerCase()
     return orcamentos.filter(o =>
-      (o.obra?.nome ?? '').toLowerCase().includes(term) ||
+      (o.centro_custo?.descricao ?? '').toLowerCase().includes(term) ||
       String(o.ano).includes(term)
     )
   }, [orcamentos, search])
@@ -60,7 +60,7 @@ export default function Orcamentos() {
             Orcamentos
           </h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Orcamentos anuais por obra com detalhamento de custos
+            Orcamentos anuais por centro de custo / area com detalhamento de custos
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -96,17 +96,17 @@ export default function Orcamentos() {
         </div>
 
         <select
-          value={filterObra}
-          onChange={e => setFilterObra(e.target.value)}
+          value={filterCC}
+          onChange={e => setFilterCC(e.target.value)}
           className={`px-3 py-1.5 rounded-lg text-xs border ${
             isLight
               ? 'bg-white border-slate-200 text-slate-700'
               : 'bg-slate-800 border-slate-600 text-white'
           }`}
         >
-          <option value="">Todas as Obras</option>
-          {obras.map(o => (
-            <option key={o.id} value={o.id}>{o.nome}</option>
+          <option value="">Todos os Centros de Custo</option>
+          {centros.map(c => (
+            <option key={c.id} value={c.id}>{c.codigo} — {c.descricao}</option>
           ))}
         </select>
 
@@ -139,7 +139,7 @@ export default function Orcamentos() {
             <table className="w-full text-left">
               <thead>
                 <tr className={`${isLight ? 'bg-slate-50 text-slate-600' : 'bg-white/[0.02] text-slate-400'} text-xs font-semibold uppercase tracking-wider`}>
-                  <th className="px-4 py-3">Obra</th>
+                  <th className="px-4 py-3">Centro de Custo</th>
                   <th className="px-4 py-3 text-center">Ano</th>
                   <th className="px-4 py-3 text-right">Vl. Contrato</th>
                   <th className="px-4 py-3 text-right">Mao de Obra</th>
@@ -166,7 +166,7 @@ export default function Orcamentos() {
                           className={`border-b ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'}`}
                         >
                           <td className={`px-4 py-3 text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-white'}`}>
-                            {o.obra?.nome ?? '—'}
+                            {o.centro_custo?.descricao ?? '—'}
                           </td>
                           <td className={`px-4 py-3 text-sm text-center font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                             {o.ano}

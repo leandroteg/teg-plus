@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
-import { BriefcaseBusiness, ClipboardList, ScanSearch, Siren, FileText } from 'lucide-react'
+import { BriefcaseBusiness, ClipboardList, ScanSearch, Siren } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import PlanoOrcamentario from './PlanoOrcamentario'
-import PlanoOrcamentarioVisual from './PlanoOrcamentarioVisual'
 import Orcamentos from './Orcamentos'
 import ControleOrcamentario from './ControleOrcamentario'
 import AlertasDesvio from './AlertasDesvio'
@@ -17,16 +16,9 @@ const STEPS: FlowStep[] = [
     accent: { bg: 'hover:bg-slate-50', bgActive: 'bg-slate-100', text: 'text-slate-600', textActive: 'text-slate-800', border: 'border-slate-400', badge: 'bg-slate-200 text-slate-700' },
   },
   {
-    key: 'visao-executiva',
-    label: 'Visão Executiva',
-    description: 'Documento consolidado com cenários, receitas, custos e KPIs do plano 2026.',
-    icon: FileText,
-    accent: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  },
-  {
     key: 'budget-area',
     label: 'Budget por Área',
-    description: 'Organize os budgets por obra, área e responsáveis.',
+    description: 'Budgets anuais por área e centro de custo.',
     icon: BriefcaseBusiness,
     accent: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', badge: 'bg-violet-100 text-violet-700' },
   },
@@ -50,8 +42,6 @@ function getStepComponent(step: string) {
   switch (step) {
     case 'plano':
       return <PlanoOrcamentario />
-    case 'visao-executiva':
-      return <PlanoOrcamentarioVisual />
     case 'budget-area':
       return <Orcamentos />
     case 'acoes':

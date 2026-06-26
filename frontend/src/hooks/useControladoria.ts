@@ -12,15 +12,15 @@ import type {
 
 // ── Orcamentos ────────────────────────────────────────────────────────────────
 
-export function useOrcamentos(filters?: { obra_id?: string; status?: string }) {
+export function useOrcamentos(filters?: { centro_custo_id?: string; status?: string }) {
   return useQuery<CtrlOrcamento[]>({
     queryKey: ['ctrl-orcamentos', filters],
     queryFn: async () => {
       let q = supabase
         .from('ctrl_orcamentos')
-        .select('*, obra:sys_obras!obra_id(id, nome)')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, codigo, descricao)')
         .order('ano', { ascending: false })
-      if (filters?.obra_id) q = q.eq('obra_id', filters.obra_id)
+      if (filters?.centro_custo_id) q = q.eq('centro_custo_id', filters.centro_custo_id)
       if (filters?.status) q = q.eq('status', filters.status)
       const { data, error } = await q
       if (error) return []

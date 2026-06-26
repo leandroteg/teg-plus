@@ -8,7 +8,8 @@ export type SeveridadeAlerta = 'amarelo' | 'vermelho' | 'critico'
 
 export interface CtrlOrcamento {
   id: string
-  obra_id: string
+  obra_id?: string
+  centro_custo_id?: string
   ano: number
   valor_contrato: number
   valor_mao_obra: number
@@ -25,6 +26,7 @@ export interface CtrlOrcamento {
   created_at: string
   updated_at: string
   obra?: { id: string; nome: string }
+  centro_custo?: { id: string; codigo: string; descricao: string }
 }
 
 export interface CtrlOrcamentoLinha {

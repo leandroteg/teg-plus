@@ -15,7 +15,7 @@ const SECTIONS: Section[] = [
   {
     title: 'CUSTOS DIRETOS E IND. OBRAS',
     items: [
-      'Materiais (Aco, Concreto, EPIs)',
+      'Materiais (Aco, Concreto)',
       'Mao de Obra Direta',
       'Alojamentos e Alimentacao',
       'Frotas',
