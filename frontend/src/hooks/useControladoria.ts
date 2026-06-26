@@ -276,55 +276,83 @@ export interface ControleOrcamentarioRow {
   plano_acao: string
 }
 
+// grupo_dre do legado → categoria da tela (sem acento, igual aos labels do Controle Orçamentário)
+const LEGADO_GRUPO_CAT: Record<string, string> = {
+  'Materiais': 'Materiais (Aco, Concreto)',
+  'Mao de Obra Direta': 'Mao de Obra Direta',
+  'Alojamentos e Alimentacao': 'Alojamentos e Alimentacao',
+  'Frotas': 'Frotas',
+  'Servicos Terc. + Outros C. Diretos': 'Servicos Terc. + Outros C. Diretos',
+  'Equipamentos e EPIs': 'Equipamentos e EPIs',
+  'Pessoal Administrativo': 'Pessoal',
+  'Administrativo': 'Administrativo',
+  'Sistemas/TI': 'Sistemas',
+  'Despesas Financeiras': 'Desp Fin. e Outra Desp Adm',
+  'Impostos s/ Lucro': 'Impostos (PIS/COFINS/IRPJ/CSLL)',
+}
+const semAcento = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+
 export function useControleOrcamentario(ano: number, mes: number) {
   return useQuery<ControleOrcamentarioRow[]>({
     queryKey: ['ctrl-controle-orcamentario', ano, mes],
     queryFn: async () => {
-      // Fetch all orcamento_ids for the given year
-      const { data: orcamentos, error: orcErr } = await supabase
-        .from('ctrl_orcamentos')
-        .select('id')
-        .eq('ano', ano)
-      if (orcErr || !orcamentos?.length) return []
-
-      const ids = orcamentos.map(o => o.id)
-      const { data: linhas, error: linErr } = await supabase
-        .from('ctrl_orcamento_linhas')
-        .select('categoria, mes, valor_planejado, valor_realizado, premissa, desvio_explicacao, plano_acao')
-        .in('orcamento_id', ids)
-        .eq('mes', mes)
-      if (linErr || !linhas?.length) return []
-
-      // Aggregate by categoria for the selected month
-      const map = new Map<string, ControleOrcamentarioRow>()
-      for (const l of linhas) {
-        const key = l.categoria as string
-        if (!map.has(key)) {
-          map.set(key, {
-            categoria: key,
-            premissa: (l.premissa as string) ?? '',
-            valor_orcado: 0,
-            valor_realizado: 0,
-            variacao: 0,
-            desvio_explicacao: (l.desvio_explicacao as string) ?? '',
-            plano_acao: (l.plano_acao as string) ?? '',
-          })
+      // ── Orçado: plano (ctrl_orcamento_linhas) do mês selecionado ──
+      const orcadoMap = new Map<string, { orcado: number; premissa: string; desvio: string; plano: string }>()
+      const { data: orcamentos } = await supabase.from('ctrl_orcamentos').select('id').eq('ano', ano)
+      const ids = (orcamentos ?? []).map(o => o.id)
+      if (ids.length) {
+        const { data: linhas } = await supabase
+          .from('ctrl_orcamento_linhas')
+          .select('categoria, valor_planejado, premissa, desvio_explicacao, plano_acao')
+          .in('orcamento_id', ids)
+          .eq('mes', mes)
+        for (const l of (linhas ?? [])) {
+          const k = semAcento(l.categoria as string)
+          const e = orcadoMap.get(k) ?? { orcado: 0, premissa: '', desvio: '', plano: '' }
+          e.orcado += (l.valor_planejado ?? 0) as number
+          if (l.premissa) e.premissa = l.premissa as string
+          if (l.desvio_explicacao) e.desvio = l.desvio_explicacao as string
+          if (l.plano_acao) e.plano = l.plano_acao as string
+          orcadoMap.set(k, e)
         }
-        const row = map.get(key)!
-        row.valor_orcado += (l.valor_planejado ?? 0) as number
-        row.valor_realizado += (l.valor_realizado ?? 0) as number
-        // Keep last non-empty text fields
-        if (l.premissa) row.premissa = l.premissa as string
-        if (l.desvio_explicacao) row.desvio_explicacao = l.desvio_explicacao as string
-        if (l.plano_acao) row.plano_acao = l.plano_acao as string
       }
 
-      // Compute variacao
-      for (const row of map.values()) {
-        row.variacao = row.valor_orcado - row.valor_realizado
+      // ── Realizado: legado (fin_legado_custos) do mês, grupo_dre/classe → categoria ──
+      const realMap = new Map<string, number>()
+      const { data: leg } = await supabase
+        .from('fin_legado_custos')
+        .select('grupo_dre, classe_desc, natureza_dre, valor')
+        .eq('ano', ano).eq('mes', mes)
+        .range(0, 9999)
+      for (const r of (leg ?? [])) {
+        if (r.natureza_dre === 'receita') continue
+        // Amortizações vem da classe (dentro do grupo Capital/Investimentos)
+        const cat = semAcento(r.classe_desc as string) === 'Amortizacao de Emprestimos'
+          ? 'Amortizacoes'
+          : LEGADO_GRUPO_CAT[r.grupo_dre as string]
+        if (!cat) continue
+        const k = semAcento(cat)
+        realMap.set(k, (realMap.get(k) ?? 0) + ((r.valor ?? 0) as number))
       }
 
-      return Array.from(map.values())
+      // ── Merge por categoria (chave sem acento = label da tela) ──
+      const cats = new Set<string>([...orcadoMap.keys(), ...realMap.keys()])
+      const rows: ControleOrcamentarioRow[] = []
+      for (const k of cats) {
+        const o = orcadoMap.get(k)
+        const orcado = o?.orcado ?? 0
+        const realizado = realMap.get(k) ?? 0
+        rows.push({
+          categoria: k,
+          premissa: o?.premissa ?? '',
+          valor_orcado: orcado,
+          valor_realizado: realizado,
+          variacao: orcado - realizado,
+          desvio_explicacao: o?.desvio ?? '',
+          plano_acao: o?.plano ?? '',
+        })
+      }
+      return rows
     },
   })
 }
