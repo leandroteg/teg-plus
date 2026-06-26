@@ -471,7 +471,7 @@ export function usePlanejamentoEquipe(filters?: {
     queryFn: async () => {
       let q = supabase
         .from('obr_planejamento_equipe')
-        .select('*, obra:sys_obras!obra_id(id, nome), portfolio:pmo_portfolio!portfolio_id(id, nome_obra, numero_osc), tarefa:pmo_tarefas!tarefa_id(id, nome), colaborador:rh_colaboradores!colaborador_id(id, nome, cargo, foto_url, departamento)')
+        .select('*, obra:sys_obras!obra_id(id, nome), portfolio:pmo_portfolio!portfolio_id(id, nome_obra, numero_osc), colaborador:rh_colaboradores!colaborador_id(id, nome, cargo, foto_url, departamento)')
         .order('data_inicio', { ascending: true })
       if (filters?.obra_id) q = q.eq('obra_id', filters.obra_id)
       if (filters?.status) q = q.eq('status', filters.status)
