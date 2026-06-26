@@ -70,6 +70,7 @@ export default function PatrimonialHome() {
   const emManutencao = kpis?.imobilizados_em_manutencao ?? 0
   const depreciados = imobilizados.filter(i => (i.percentual_depreciado ?? 0) >= 100 && i.status !== 'baixado').length
   const baixados = imobilizados.filter(i => i.status === 'baixado').length
+  const valorTotal = imobilizados.reduce((s, i) => s + (i.valor_aquisicao ?? 0), 0)
 
   const cardClass = isDark
     ? 'bg-[#111827] border border-white/[0.06]'
@@ -163,7 +164,7 @@ export default function PatrimonialHome() {
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric label="Total Ativos" value={imobilizados.length} tone="amber" isDark={isDark} note={`${ativos} em uso`} />
-              <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} note="valor contabil atual" />
+              <SpotlightMetric label="Valor Total" value={fmt(valorTotal)} tone="emerald" isDark={isDark} note="patrimonio + frota" />
               <SpotlightMetric label="Depreciacao Acum." value={fmt(kpis?.depreciacao_acumulada ?? 0)} tone="red" isDark={isDark} note={depreciados > 0 ? `${depreciados} totalmente depreciados` : 'nenhum 100% depreciado'} />
             </div>
           </div>
