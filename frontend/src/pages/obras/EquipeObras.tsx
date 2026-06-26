@@ -59,7 +59,7 @@ const STEPS: FlowStep[] = [
     accent: { bg: 'hover:bg-blue-50', bgActive: 'bg-blue-50', text: 'text-blue-600', textActive: 'text-blue-800', border: 'border-blue-500', badge: 'bg-blue-100 text-blue-700' },
   },
   {
-    key: 'kanban', label: 'Kanban',
+    key: 'kanban', label: 'Quadro Geral',
     description: 'Arraste pessoas entre obras — encarregado leva o time junto.',
     icon: LayoutGrid,
     accent: { bg: 'hover:bg-orange-50', bgActive: 'bg-orange-50', text: 'text-orange-600', textActive: 'text-orange-800', border: 'border-orange-500', badge: 'bg-orange-100 text-orange-700' },

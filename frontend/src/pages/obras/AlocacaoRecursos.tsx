@@ -63,7 +63,7 @@ const STEPS: FlowStep[] = [
   },
   {
     key: 'kanban',
-    label: 'Kanban',
+    label: 'Quadro Geral',
     description: 'Cards arrastáveis entre canteiros — solicita movimentação para Frotas confirmar.',
     icon: LayoutGrid,
     accent: {
