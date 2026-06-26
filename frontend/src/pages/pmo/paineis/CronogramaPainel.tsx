@@ -26,7 +26,7 @@ const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.',
 const fmtQ = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
 const ymNum = (ym: string) => { const [y, m] = ym.split('-').map(Number); return y * 12 + m }
 const PROD_BANDS: [string, string, (p: number) => boolean][] = [
-  ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50], ['51-75', '51–75%', p => p >= 51 && p <= 75], ['76-100', '76–100%', p => p >= 76],
+  ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50], ['51-75', '51–75%', p => p >= 51 && p <= 75], ['75-85', '75–85%', p => p > 75 && p <= 85], ['85-95', '85–95%', p => p > 85 && p <= 95], ['95+', '>95%', p => p > 95],
 ]
 // indicador de produtividade/ritmo: físico vs prazo decorrido
 function ritmoCor(pctFis: number, ini: string | null, fim: string | null): string {
