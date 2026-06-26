@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   usePlanejamentoEquipe, useColaboradoresAtivos, useObrasComProjeto,
-  useCriarPlanEquipe, useExcluirPlanEquipe, useMoverLiderTime,
+  useCriarPlanEquipe, useExcluirPlanEquipe, useAtualizarPlanEquipe, useMoverLiderTime,
   papelSugerido, type ObraComProjeto,
 } from '../../hooks/useObras'
 import type {
@@ -312,7 +312,7 @@ function FlatRow({ a, isDark, onRemove, small }: { a: ObraPlanejamentoEquipe; is
 }
 
 function ListaView({
-  colaboradores, equipe, obras, isDark,
+  colaboradores, equipe, isDark,
 }: {
   colaboradores: ColaboradorAtivo[]
   equipe: ObraPlanejamentoEquipe[]
@@ -322,19 +322,18 @@ function ListaView({
   const { perfil } = useAuth()
   const criar = useCriarPlanEquipe()
   const excluir = useExcluirPlanEquipe()
+  const atualizar = useAtualizarPlanEquipe()
 
   const [busca, setBusca] = useState('')
   const [escopo, setEscopo] = useState('obras_ssma')
-  const [drag, setDrag] = useState<{ colaboradorId: string; papel: PapelEquipe } | null>(null)
+  const [drag, setDrag] = useState<{ kind: 'new' | 'move'; colaboradorId?: string; allocId?: string; papel: PapelEquipe } | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<string | null>(null)
-  const [obrasExtra, setObrasExtra] = useState<Set<string>>(new Set())
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const cardCls  = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
   const inputCls = `w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'}`
-  const today = new Date().toISOString().split('T')[0]
 
   const active = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
   const alocadosIds = useMemo(() => { const s = new Set<string>(); active.forEach(e => { if (e.colaborador_id) s.add(e.colaborador_id) }); return s }, [active])
@@ -344,42 +343,47 @@ function ListaView({
     : escopo === 'obras_ssma' ? (c.departamento === 'Obras' || c.papel_sugerido === 'apoio')
     : c.departamento === escopo
 
-  // roster disponível por papel (no escopo + busca)
+  // roster disponível por papel (no escopo + busca) — só lideranças e time entram na composição
+  const COMPOR: PapelEquipe[] = ['supervisor', 'encarregado', 'time']
   const dispByPapel = useMemo(() => {
     const q = busca.trim().toLowerCase()
     const m = new Map<PapelEquipe, ColaboradorAtivo[]>()
-    PAPEL_ORDER.forEach(p => m.set(p, []))
+    COMPOR.forEach(p => m.set(p, []))
     colaboradores
-      .filter(c => !alocadosIds.has(c.id) && inEscopo(c) && (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q)))
+      .filter(c => COMPOR.includes(c.papel_sugerido) && !alocadosIds.has(c.id) && inEscopo(c) && (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q)))
       .forEach(c => m.get(c.papel_sugerido)!.push(c))
     return m
   }, [colaboradores, alocadosIds, escopo, busca])
 
-  // pool por papel SEM busca (p/ os botões "+")
   const poolByPapel = useMemo(() => {
     const m = new Map<PapelEquipe, ColaboradorAtivo[]>()
-    PAPEL_ORDER.forEach(p => m.set(p, []))
-    colaboradores.filter(c => !alocadosIds.has(c.id)).forEach(c => m.get(c.papel_sugerido)!.push(c))
+    COMPOR.forEach(p => m.set(p, []))
+    colaboradores.filter(c => COMPOR.includes(c.papel_sugerido) && !alocadosIds.has(c.id)).forEach(c => m.get(c.papel_sugerido)!.push(c))
     return m
   }, [colaboradores, alocadosIds])
 
-  // árvore: encarregados por supervisor, time por encarregado
-  const encBySup = useMemo(() => {
+  // árvore: encarregados/time por lider_id
+  const encByLider = useMemo(() => {
     const m = new Map<string, ObraPlanejamentoEquipe[]>()
-    active.filter(e => e.papel === 'encarregado').forEach(e => { const k = e.lider_id ?? '__sem__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
+    active.filter(e => e.papel === 'encarregado').forEach(e => { const k = e.lider_id ?? '__top__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
     return m
   }, [active])
-  const timeByEnc = useMemo(() => {
+  const timeByLider = useMemo(() => {
     const m = new Map<string, ObraPlanejamentoEquipe[]>()
-    active.filter(e => e.papel === 'time').forEach(e => { const k = e.lider_id ?? '__sem__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
+    active.filter(e => e.papel === 'time').forEach(e => { const k = e.lider_id ?? '__top__'; const arr = m.get(k) ?? []; arr.push(e); m.set(k, arr) })
     return m
   }, [active])
 
-  const obrasComAloc = useMemo(() => { const s = new Set<string>(); active.forEach(e => s.add(e.obra_id)); return s }, [active])
-  const obrasVisiveis = useMemo(() => {
-    const ids = new Set<string>([...obrasComAloc, ...obrasExtra])
-    return obras.filter(o => ids.has(o.id)).sort((a, b) => (a.projeto_nome ?? '').localeCompare(b.projeto_nome ?? '') || a.nome.localeCompare(b.nome))
-  }, [obras, obrasComAloc, obrasExtra])
+  const supervisores = useMemo(() => active.filter(e => e.papel === 'supervisor').sort((a, b) => a.nome.localeCompare(b.nome)), [active])
+  const encSemSup = useMemo(() => encByLider.get('__top__') ?? [], [encByLider])
+  const encIds = useMemo(() => new Set(active.filter(e => e.papel === 'encarregado').map(e => e.id)), [active])
+
+  const kpis = useMemo(() => ({
+    sup: supervisores.length,
+    enc: active.filter(e => e.papel === 'encarregado').length,
+    time: active.filter(e => e.papel === 'time').length,
+    orf: active.filter(e => e.papel === 'time' && (!e.lider_id || !encIds.has(e.lider_id))).length,
+  }), [active, supervisores, encIds])
 
   const escopoCount = useMemo(() => {
     const set = colaboradores.filter(inEscopo)
@@ -389,19 +393,30 @@ function ListaView({
 
   const toggleExp = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  async function alocar(colaboradorId: string, papel: PapelEquipe, obraId: string, liderId?: string) {
+  // cria pessoa nova na composição (sem obra)
+  async function criarPessoa(colaboradorId: string, papel: PapelEquipe, liderId: string | null) {
     const c = colaboradores.find(x => x.id === colaboradorId)
     if (!c) return
     try {
       await criar.mutateAsync({
-        obra_id: obraId, colaborador_id: c.id, nome: c.nome, funcao: c.cargo ?? '—',
-        papel, lider_id: liderId ?? null, categoria: categoriaFromPapel(papel),
-        data_inicio: today, turno: 'diurno', horas_dia: 8, status: 'planejado',
+        obra_id: null, colaborador_id: c.id, nome: c.nome, funcao: c.cargo ?? '—',
+        papel, lider_id: liderId, categoria: categoriaFromPapel(papel),
+        data_inicio: '2026-06-26', turno: 'diurno', horas_dia: 8, status: 'planejado',
         custo_hora: 0, custo_diaria: 0, created_by: perfil?.auth_id,
       } as any)
-    } catch (err) { alert('Erro ao alocar: ' + (err instanceof Error ? err.message : String(err))) }
+    } catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
   }
-  // remove a alocação e toda a subárvore (descendentes)
+  async function reparent(allocId: string, liderId: string | null) {
+    try { await atualizar.mutateAsync({ id: allocId, lider_id: liderId } as any) }
+    catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
+  }
+  // dropar item (novo do roster ou movido) sob um lider; papelEsperado valida
+  function dropUnder(liderId: string | null, papelEsperado: PapelEquipe) {
+    if (!drag || drag.papel !== papelEsperado) return
+    if (drag.kind === 'new' && drag.colaboradorId) criarPessoa(drag.colaboradorId, papelEsperado, liderId)
+    else if (drag.kind === 'move' && drag.allocId) reparent(drag.allocId, liderId)
+    setDrag(null)
+  }
   async function remover(allocId: string) {
     const ids: string[] = []
     const gather = (id: string) => { ids.push(id); active.filter(e => e.lider_id === id).forEach(e => gather(e.id)) }
@@ -411,7 +426,7 @@ function ListaView({
   }
 
   const RosterCard = (c: ColaboradorAtivo) => (
-    <div key={c.id} draggable onDragStart={() => setDrag({ colaboradorId: c.id, papel: c.papel_sugerido })} onDragEnd={() => setDrag(null)}
+    <div key={c.id} draggable onDragStart={() => setDrag({ kind: 'new', colaboradorId: c.id, papel: c.papel_sugerido })} onDragEnd={() => setDrag(null)}
       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-grab active:cursor-grabbing ${isDark ? 'border-white/[0.05] bg-white/[0.02] hover:border-white/[0.12]' : 'border-slate-100 bg-white hover:shadow-sm'} ${drag?.colaboradorId === c.id ? 'opacity-40' : ''}`}>
       <Avatar nome={c.nome} fotoUrl={c.foto_url} isDark={isDark} size={24} />
       <div className="min-w-0 flex-1">
@@ -421,20 +436,68 @@ function ListaView({
     </div>
   )
 
+  // ── card de um encarregado (com seu time) ──
+  function EncarregadoCard({ enc }: { enc: ObraPlanejamentoEquipe }) {
+    const tm = timeByLider.get(enc.id) ?? []
+    const expE = expanded.has(enc.id)
+    const dropEnc = drag?.papel === 'time'
+    return (
+      <div className={`rounded-lg border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}
+        onDragOver={ev => { if (dropEnc) ev.preventDefault() }} onDrop={ev => { ev.stopPropagation(); dropUnder(enc.id, 'time'); setExpanded(p => new Set(p).add(enc.id)) }}>
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 ${dropEnc ? (isDark ? 'bg-orange-500/10 rounded-t-lg' : 'bg-orange-50 rounded-t-lg') : ''}`}>
+          <button onClick={() => toggleExp(enc.id)} className={txtMuted}>{expE ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
+          <div draggable onDragStart={() => setDrag({ kind: 'move', allocId: enc.id, papel: 'encarregado' })} onDragEnd={() => setDrag(null)} className="flex items-center gap-2 min-w-0 cursor-grab active:cursor-grabbing">
+            <Avatar nome={enc.nome} fotoUrl={enc.colaborador?.foto_url} isDark={isDark} size={22} />
+            <p className={`text-[11px] font-bold truncate min-w-0 ${txtMain}`}>{primeiroNome(enc.nome)}</p>
+          </div>
+          <PapelBadge papel="encarregado" isDark={isDark} />
+          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`}><Users2 size={9} /> {tm.length}</span>
+          <div className="relative ml-auto">
+            <button onClick={() => setPicker(picker === `node:${enc.id}` ? null : `node:${enc.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Time</button>
+            {picker === `node:${enc.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('time') ?? []} onClose={() => setPicker(null)} onPick={c => { criarPessoa(c.id, 'time', enc.id); setExpanded(p => new Set(p).add(enc.id)) }} />}
+          </div>
+          <button onClick={() => remover(enc.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={11} /></button>
+        </div>
+        {expE && (
+          <div className={`px-2.5 pb-2 pt-1 border-t grid grid-cols-1 sm:grid-cols-2 gap-1 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            {tm.length === 0 ? <p className={`text-[10px] italic ${txtMuted}`}>Sem equipe. Arraste do Time, ou “+ Time”.</p>
+              : tm.map(m => (
+                <div key={m.id} draggable onDragStart={() => setDrag({ kind: 'move', allocId: m.id, papel: 'time' })} onDragEnd={() => setDrag(null)}
+                  className={`flex items-center gap-1.5 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+                  <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={18} />
+                  <span className={`text-[10px] truncate ${txtMain}`}>{primeiroNome(m.nome)}</span>
+                  <button onClick={() => remover(m.id)} className={`ml-auto p-0.5 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`}><X size={10} /></button>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
-      {/* topo */}
+      {/* KPIs + escopo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <KpiCard isDark={isDark} icon={UserCog}     label="Supervisores" value={kpis.sup}  color="indigo" />
+        <KpiCard isDark={isDark} icon={HardHat}      label="Encarregados" value={kpis.enc}  color="orange" />
+        <KpiCard isDark={isDark} icon={Users2}       label="Time"         value={kpis.time} color="slate" />
+        <KpiCard isDark={isDark} icon={Briefcase}    label="Sem encarreg." value={kpis.orf} color="cyan" />
+      </div>
+
       <div className="flex flex-wrap gap-2 items-center">
         <select value={escopo} onChange={e => setEscopo(e.target.value)} className={`${inputCls} max-w-[230px]`}>
           <option value="obras_ssma">Setor Obras + Apoio SSMA</option>
           <option value="todos">Todos os setores</option>
           {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        <select value="" onChange={e => { if (e.target.value) setObrasExtra(prev => new Set(prev).add(e.target.value)) }} className={`${inputCls} max-w-[240px]`}>
-          <option value="">➕ Trabalhar em outra obra...</option>
-          {obras.filter(o => !obrasComAloc.has(o.id) && !obrasExtra.has(o.id)).map(o => <option key={o.id} value={o.id}>{o.projeto_nome ? `${o.projeto_nome} · ` : ''}{o.nome}</option>)}
-        </select>
-        <span className={`ml-auto text-[11px] ${txtMuted}`}>{escopoCount.alocados}/{escopoCount.total} alocados · {escopoCount.disp} disponíveis</span>
+        <div className="relative">
+          <button onClick={() => setPicker(picker === 'novo-sup' ? null : 'novo-sup')} className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
+            <Plus size={13} /> Supervisor
+          </button>
+          {picker === 'novo-sup' && <PickerPopover isDark={isDark} items={poolByPapel.get('supervisor') ?? []} onClose={() => setPicker(null)} onPick={c => criarPessoa(c.id, 'supervisor', null)} />}
+        </div>
+        <span className={`ml-auto text-[11px] ${txtMuted}`}>{escopoCount.alocados}/{escopoCount.total} em equipe · {escopoCount.disp} disponíveis</span>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3">
@@ -445,10 +508,10 @@ function ListaView({
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar disponível..." className={`w-full pl-8 pr-3 py-1.5 rounded-lg text-xs outline-none ${isDark ? 'bg-white/[0.04] border border-white/[0.06] text-slate-200' : 'bg-slate-50 border border-slate-200'}`} />
             </div>
-            <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Arraste para a obra / encarregado, ou use os botões “+”.</p>
+            <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Arraste p/ o Supervisor (encarregado) ou Encarregado (time), ou use “+”.</p>
           </div>
           <div className="p-2 space-y-2 max-h-[68vh] overflow-y-auto styled-scrollbar">
-            {PAPEL_ORDER.map(papel => {
+            {COMPOR.map(papel => {
               const list = dispByPapel.get(papel) ?? []
               if (list.length === 0) return null
               const cfg = PAPEL_CONFIG[papel]; const Icon = cfg.icon
@@ -464,130 +527,103 @@ function ListaView({
                 </div>
               )
             })}
-            {[...dispByPapel.values()].every(l => l.length === 0) && (
+            {COMPOR.every(p => (dispByPapel.get(p) ?? []).length === 0) && (
               <p className={`text-[11px] italic text-center py-6 ${txtMuted}`}>Nenhum disponível no escopo</p>
             )}
           </div>
         </div>
 
-        {/* Organograma por obra */}
+        {/* Composição: Supervisor › Encarregado › Time */}
         <div className="flex-1 space-y-3 min-w-0">
-          {obrasVisiveis.length === 0 ? (
+          {supervisores.length === 0 && encSemSup.length === 0 ? (
             <div className={`text-center py-14 rounded-2xl border border-dashed ${isDark ? 'border-white/10 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
-              <Building2 size={32} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-semibold">Nenhuma obra no quadro</p>
-              <p className="text-xs mt-1">Use “Trabalhar em outra obra” acima para começar a montar a equipe.</p>
+              <UserCog size={32} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-semibold">Nenhuma equipe ainda</p>
+              <p className="text-xs mt-1">Use “+ Supervisor” para começar a montar.</p>
             </div>
-          ) : obrasVisiveis.map(o => {
-            const engs = active.filter(e => e.papel === 'engenheiro' && e.obra_id === o.id)
-            const sups = active.filter(e => e.papel === 'supervisor' && e.obra_id === o.id)
-            const apoios = active.filter(e => e.papel === 'apoio' && e.obra_id === o.id)
-            const totalPessoas = active.filter(e => e.obra_id === o.id).length
-            const dropObra = !!drag && (drag.papel === 'engenheiro' || drag.papel === 'supervisor' || drag.papel === 'apoio')
-            return (
-              <div key={o.id} className={`rounded-2xl border ${cardCls}`}>
-                <div onDragOver={e => { if (dropObra) e.preventDefault() }} onDrop={() => { if (dropObra && drag) { alocar(drag.colaboradorId, drag.papel, o.id); setDrag(null) } }}
-                  className={`flex flex-wrap items-center gap-2 px-4 py-2.5 border-b ${dropObra ? (isDark ? 'bg-orange-500/10' : 'bg-orange-50') : ''} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  <Building2 size={14} className="text-orange-500" />
-                  <span className={`text-sm font-extrabold ${txtMain}`}>{o.nome}</span>
-                  {o.projeto_nome && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{o.projeto_nome}</span>}
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-600'}`}>{totalPessoas} pessoas</span>
-                  <div className="ml-auto flex items-center gap-1">
-                    {(['engenheiro', 'supervisor', 'apoio'] as PapelEquipe[]).map(p => (
-                      <div key={p} className="relative">
-                        <button onClick={() => setPicker(picker === `obra:${o.id}:${p}` ? null : `obra:${o.id}:${p}`)} className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                          <Plus size={9} /> {PAPEL_CONFIG[p].label}
-                        </button>
-                        {picker === `obra:${o.id}:${p}` && <PickerPopover isDark={isDark} items={poolByPapel.get(p) ?? []} onClose={() => setPicker(null)} onPick={c => alocar(c.id, p, o.id)} />}
+          ) : (
+            <>
+              {supervisores.map(sup => {
+                const encs = (encByLider.get(sup.id) ?? [])
+                const orf = (timeByLider.get(sup.id) ?? [])  // time pendurado direto no supervisor = sem encarregado
+                const expS = expanded.has(sup.id)
+                const dropSup = drag?.papel === 'encarregado'
+                const totalSub = encs.length + encs.reduce((a, e) => a + (timeByLider.get(e.id)?.length ?? 0), 0) + orf.length
+                return (
+                  <div key={sup.id} className={`rounded-2xl border ${cardCls}`}
+                    onDragOver={ev => { if (dropSup) ev.preventDefault() }} onDrop={() => { dropUnder(sup.id, 'encarregado'); setExpanded(p => new Set(p).add(sup.id)) }}>
+                    <div className={`flex flex-wrap items-center gap-2 px-4 py-2.5 border-b ${dropSup ? (isDark ? 'bg-orange-500/10' : 'bg-orange-50') : ''} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                      <button onClick={() => toggleExp(sup.id)} className={txtMuted}>{expS ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
+                      <Avatar nome={sup.nome} fotoUrl={sup.colaborador?.foto_url} isDark={isDark} size={28} />
+                      <div className="min-w-0">
+                        <p className={`text-sm font-extrabold truncate ${txtMain}`}>{sup.nome}</p>
+                        <p className={`text-[9px] truncate ${txtMuted}`}>{sup.funcao}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <PapelBadge papel="supervisor" isDark={isDark} />
+                      {sup.observacoes?.includes('VÁRIOS') && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title={sup.observacoes}>⚠ revisar</span>}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{encs.length} enc · {totalSub} pessoas</span>
+                      <div className="relative ml-auto">
+                        <button onClick={() => setPicker(picker === `node:${sup.id}` ? null : `node:${sup.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Encarreg.</button>
+                        {picker === `node:${sup.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('encarregado') ?? []} onClose={() => setPicker(null)} onPick={c => { criarPessoa(c.id, 'encarregado', sup.id); setExpanded(p => new Set(p).add(sup.id)) }} />}
+                      </div>
+                      <button onClick={() => remover(sup.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover supervisor + equipe"><Trash2 size={12} /></button>
+                    </div>
+                    {expS && (
+                      <div className="p-3 space-y-1.5">
+                        {encs.length === 0 && orf.length === 0 && <p className={`text-[11px] italic ${txtMuted}`}>Sem encarregados. Arraste um, ou use “+ Encarreg.”.</p>}
+                        {encs.map(enc => <EncarregadoCard key={enc.id} enc={enc} />)}
 
-                <div className="p-3 space-y-2">
-                  {engs.map(e => <FlatRow key={e.id} a={e} isDark={isDark} onRemove={() => remover(e.id)} />)}
-
-                  {sups.map(sup => {
-                    const encs = encBySup.get(sup.id) ?? []
-                    const expS = expanded.has(sup.id)
-                    const dropSup = drag?.papel === 'encarregado'
-                    return (
-                      <div key={sup.id} className={`rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}
-                        onDragOver={ev => { if (dropSup) ev.preventDefault() }} onDrop={() => { if (dropSup && drag) { alocar(drag.colaboradorId, 'encarregado', sup.obra_id, sup.id); setDrag(null); setExpanded(p => new Set(p).add(sup.id)) } }}>
-                        <div className={`flex items-center gap-2 px-3 py-2 ${dropSup ? (isDark ? 'bg-orange-500/10 rounded-t-xl' : 'bg-orange-50 rounded-t-xl') : ''}`}>
-                          <button onClick={() => toggleExp(sup.id)} className={txtMuted}>{expS ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
-                          <Avatar nome={sup.nome} fotoUrl={sup.colaborador?.foto_url} isDark={isDark} size={26} />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold truncate ${txtMain}`}>{sup.nome}</p>
-                            <p className={`text-[9px] truncate ${txtMuted}`}>{sup.funcao}</p>
-                          </div>
-                          <PapelBadge papel="supervisor" isDark={isDark} />
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{encs.length} enc.</span>
-                          <div className="relative ml-auto">
-                            <button onClick={() => setPicker(picker === `node:${sup.id}` ? null : `node:${sup.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Encarreg.</button>
-                            {picker === `node:${sup.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('encarregado') ?? []} onClose={() => setPicker(null)} onPick={c => { alocar(c.id, 'encarregado', sup.obra_id, sup.id); setExpanded(p => new Set(p).add(sup.id)) }} />}
-                          </div>
-                          <button onClick={() => remover(sup.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={12} /></button>
-                        </div>
-                        {expS && (
-                          <div className={`px-3 pb-2 pt-1 space-y-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-                            {encs.length === 0 && <p className={`text-[11px] italic ${txtMuted}`}>Sem encarregados. Arraste um, ou use “+ Encarreg.”.</p>}
-                            {encs.map(enc => {
-                              const tm = timeByEnc.get(enc.id) ?? []
-                              const expE = expanded.has(enc.id)
-                              const dropEnc = drag?.papel === 'time'
-                              return (
-                                <div key={enc.id} className={`rounded-lg border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}
-                                  onDragOver={ev => { if (dropEnc) ev.preventDefault() }} onDrop={ev => { ev.stopPropagation(); if (dropEnc && drag) { alocar(drag.colaboradorId, 'time', enc.obra_id, enc.id); setDrag(null); setExpanded(p => new Set(p).add(enc.id)) } }}>
-                                  <div className={`flex items-center gap-2 px-2.5 py-1.5 ${dropEnc ? (isDark ? 'bg-orange-500/10 rounded-t-lg' : 'bg-orange-50 rounded-t-lg') : ''}`}>
-                                    <button onClick={() => toggleExp(enc.id)} className={txtMuted}>{expE ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
-                                    <Avatar nome={enc.nome} fotoUrl={enc.colaborador?.foto_url} isDark={isDark} size={22} />
-                                    <p className={`text-[11px] font-bold truncate min-w-0 ${txtMain}`}>{primeiroNome(enc.nome)}</p>
-                                    <PapelBadge papel="encarregado" isDark={isDark} />
-                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`}><Users2 size={9} /> {tm.length}</span>
-                                    <div className="relative ml-auto">
-                                      <button onClick={() => setPicker(picker === `node:${enc.id}` ? null : `node:${enc.id}`)} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"><Plus size={9} /> Time</button>
-                                      {picker === `node:${enc.id}` && <PickerPopover isDark={isDark} items={poolByPapel.get('time') ?? []} onClose={() => setPicker(null)} onPick={c => { alocar(c.id, 'time', enc.obra_id, enc.id); setExpanded(p => new Set(p).add(enc.id)) }} />}
-                                    </div>
-                                    <button onClick={() => remover(enc.id)} className={`p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={11} /></button>
+                        {/* Time sem encarregado (reatribuir) */}
+                        {orf.length > 0 && (
+                          <div className={`rounded-lg border border-dashed ${isDark ? 'border-amber-500/30 bg-amber-500/[0.04]' : 'border-amber-300 bg-amber-50/60'}`}>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider px-2.5 pt-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>⚠ Time sem encarregado — definir</p>
+                            <div className="px-2.5 pb-2 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                              {orf.map(m => (
+                                <div key={m.id} draggable onDragStart={() => setDrag({ kind: 'move', allocId: m.id, papel: 'time' })} onDragEnd={() => setDrag(null)}
+                                  className={`flex items-center gap-1.5 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing ${isDark ? 'bg-white/[0.02]' : 'bg-white'}`}>
+                                  <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={18} />
+                                  <span className={`text-[10px] truncate ${txtMain}`} title={m.observacoes ?? ''}>{primeiroNome(m.nome)}</span>
+                                  <div className="relative ml-auto">
+                                    <button onClick={() => setPicker(picker === `orf:${m.id}` ? null : `orf:${m.id}`)} className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Encarreg.</button>
+                                    {picker === `orf:${m.id}` && (
+                                      <div className="absolute right-0 z-50">
+                                        <div className="fixed inset-0 z-40" onClick={() => setPicker(null)} />
+                                        <div className={`relative mt-1 w-[200px] rounded-lg border shadow-xl z-50 max-h-[220px] overflow-y-auto ${isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'}`}>
+                                          {encs.length === 0 ? <p className={`text-[10px] italic px-2 py-2 ${txtMuted}`}>Crie um encarregado antes.</p>
+                                            : encs.map(e => (
+                                              <button key={e.id} onClick={() => { reparent(m.id, e.id); setPicker(null) }} className={`block w-full text-left text-[10px] px-2 py-1.5 ${isDark ? 'hover:bg-white/[0.05] text-slate-200' : 'hover:bg-slate-50 text-slate-700'}`}>{primeiroNome(e.nome)}</button>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                  {expE && (
-                                    <div className={`px-2.5 pb-2 pt-1 border-t grid grid-cols-1 sm:grid-cols-2 gap-1 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-                                      {tm.length === 0 ? <p className={`text-[10px] italic ${txtMuted}`}>Sem equipe. Arraste pessoas do Time, ou “+ Time”.</p>
-                                        : tm.map(m => (
-                                          <div key={m.id} className={`flex items-center gap-1.5 px-1.5 py-1 rounded ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
-                                            <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={18} />
-                                            <span className={`text-[10px] truncate ${txtMain}`}>{primeiroNome(m.nome)}</span>
-                                            <button onClick={() => remover(m.id)} className={`ml-auto p-0.5 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`}><X size={10} /></button>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  )}
+                                  <button onClick={() => remover(m.id)} className={`p-0.5 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`}><X size={10} /></button>
                                 </div>
-                              )
-                            })}
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
+                )
+              })}
 
-                  {apoios.length > 0 && (
-                    <div>
-                      <p className={`text-[9px] font-bold uppercase tracking-wider mt-1 mb-1 ${txtMuted}`}>Apoio (Obras / SSMA)</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                        {apoios.map(a => <FlatRow key={a.id} a={a} isDark={isDark} onRemove={() => remover(a.id)} small />)}
-                      </div>
-                    </div>
-                  )}
-
-                  {engs.length === 0 && sups.length === 0 && apoios.length === 0 && (
-                    <p className={`text-[11px] italic text-center py-3 ${txtMuted}`}>Arraste um Supervisor / Engenheiro aqui, ou use os botões “+” no topo.</p>
-                  )}
+              {/* Encarregados sem supervisor */}
+              {encSemSup.length > 0 && (
+                <div className={`rounded-2xl border ${cardCls}`}>
+                  <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                    <HardHat size={14} className="text-orange-500" />
+                    <span className={`text-sm font-extrabold ${txtMain}`}>Encarregados sem supervisor</span>
+                    <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{encSemSup.length}</span>
+                  </div>
+                  <div className="p-3 space-y-1.5">
+                    {encSemSup.map(enc => <EncarregadoCard key={enc.id} enc={enc} />)}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
