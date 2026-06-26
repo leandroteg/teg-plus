@@ -157,17 +157,19 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
   if (!polos.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados.</p>
 
   const drv = (n: string) => ag.pac.get(n)
-  const driverKpi = (n: string) => { const a = drv(n); return a && a.qC ? `${fmtQtd(a.qR, a.uni) ?? '0'} / ${fmtQtd(a.qC, a.uni) ?? '—'}` : '—' }
+  const numN = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
+  const driverKpi = (n: string) => { const a = drv(n); return a && a.qC ? `${numN(a.qR || 0)} / ${numN(a.qC)}` : '—' } // só números (unidade vai no note)
   const polosOrd = [...polos].sort((a, b) => b.pctFis - a.pctFis)
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <Kpi label="Físico Geral" value={`${ag.fisicoGeral}%`} tone="emerald" isDark={isDark} note="realizado / contratado" />
         <Kpi label="Topografia" value={driverKpi('Serv. Preliminares')} tone="sky" isDark={isDark} note="km" />
         <Kpi label="Tubulões" value={driverKpi('Fundações')} tone="amber" isDark={isDark} note="m³" />
-        <Kpi label="Montagem" value={driverKpi('Montagem de Torres')} tone="slate" isDark={isDark} note="toneladas" />
-        <Kpi label="Torres" value={ag.torres || '—'} tone="violet" isDark={isDark} note="cadastradas" />
+        <Kpi label="Montagem" value={driverKpi('Montagem de Torres')} tone="slate" isDark={isDark} note="ton" />
+        <Kpi label="Lançamento" value={driverKpi('Lançamento de Cabos')} tone="violet" isDark={isDark} note="km" />
+        <Kpi label="Torres" value={ag.torres || '—'} tone="rose" isDark={isDark} note="cadastradas" />
       </div>
 
       {obras.length > 0 && (() => {
