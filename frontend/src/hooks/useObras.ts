@@ -25,6 +25,7 @@ export function papelSugerido(cargo?: string | null, departamento?: string | nul
   if (/SUPERVISOR/.test(c)) return 'supervisor'
   if (/ENCARREGAD|MESTRE|TOPOGRAF/.test(c)) return 'encarregado'
   if (d === 'QSMA' || d === 'TST' || /SEGURAN/.test(c)) return 'apoio'
+  if (/LIMPEZA|SERVI[CÇ]OS GERAIS|COPEIR|JARDINEIR/.test(c)) return 'apoio'  // não entram no time
   return 'time'
 }
 
