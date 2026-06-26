@@ -176,6 +176,7 @@ export default function EquipeObras() {
               <ListaView
                 colaboradores={colaboradores} equipe={equipe} obras={obras}
                 isDark={isDark}
+                onAlocar={(preset) => handleOpenAlocar(preset)}
               />
             )}
             {tab === 'programacao' && (
@@ -318,12 +319,13 @@ function FlatRow({ a, isDark, onRemove, small }: { a: ObraPlanejamentoEquipe; is
 }
 
 function ListaView({
-  colaboradores, equipe, isDark,
+  colaboradores, equipe, obras, isDark, onAlocar,
 }: {
   colaboradores: ColaboradorAtivo[]
   equipe: ObraPlanejamentoEquipe[]
   obras: ObraComProjeto[]
   isDark: boolean
+  onAlocar: (preset: { papel?: PapelEquipe } | null) => void
 }) {
   const { perfil } = useAuth()
   const criar = useCriarPlanEquipe()
@@ -654,6 +656,36 @@ function ListaView({
               )}
             </>
           )}
+
+          {/* Engenheiros & Apoio — direto na obra (fora das equipes) */}
+          <div className={`rounded-2xl border ${cardCls}`}>
+            <div className={`flex flex-wrap items-center gap-2 px-4 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <UserCog size={14} className="text-indigo-500" />
+              <span className={`text-sm font-extrabold ${txtMain}`}>Engenheiros & Apoio</span>
+              <span className={`text-[10px] ${txtMuted}`}>direto na obra (fora das equipes)</span>
+              <div className="ml-auto flex items-center gap-1">
+                <button onClick={() => onAlocar({ papel: 'engenheiro' })} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={9} /> Engenheiro</button>
+                <button onClick={() => onAlocar({ papel: 'apoio' })} className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-1 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700"><Plus size={9} /> Apoio</button>
+              </div>
+            </div>
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
+              {active.filter(e => e.papel === 'engenheiro' || e.papel === 'apoio').length === 0 ? (
+                <p className={`text-[11px] italic ${txtMuted}`}>Nenhum engenheiro/apoio alocado. Use “+ Engenheiro” / “+ Apoio”.</p>
+              ) : active.filter(e => e.papel === 'engenheiro' || e.papel === 'apoio')
+                  .sort((a, b) => (a.papel.localeCompare(b.papel)) || a.nome.localeCompare(b.nome))
+                  .map(e => (
+                    <div key={e.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}>
+                      <Avatar nome={e.nome} fotoUrl={e.colaborador?.foto_url} isDark={isDark} size={24} />
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-[11px] font-bold truncate ${txtMain}`} title={e.nome}>{primeiroNome(e.nome)}</p>
+                        <p className={`text-[9px] truncate ${txtMuted}`} title={obras.find(o => o.id === e.obra_id)?.nome}>{obras.find(o => o.id === e.obra_id)?.nome ?? '—'}</p>
+                      </div>
+                      <PapelBadge papel={e.papel} isDark={isDark} />
+                      <button onClick={() => remover(e.id)} className={`shrink-0 p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={11} /></button>
+                    </div>
+                  ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -751,7 +783,8 @@ function ProgramacaoView({
     const end = new Date(r.data_fim || addDays(start, 30).toISOString())
     const cfg = PAPEL_CONFIG[r.papel]
     const obra = obraById.get(r.obra_id)
-    const barColor = recurso ? 'bg-slate-400' : (r.papel === 'apoio' ? 'bg-cyan-500' : 'bg-orange-500')
+    const barColorMap: Record<string, string> = { engenheiro: 'bg-indigo-500', supervisor: 'bg-violet-500', encarregado: 'bg-orange-500', apoio: 'bg-cyan-500', time: 'bg-slate-400' }
+    const barColor = recurso ? 'bg-slate-400' : (barColorMap[r.papel] ?? 'bg-orange-500')
     const count = !recurso && r.papel === 'encarregado' ? (timeCountByLider.get(r.id) ?? 0) : 0
     return (
       <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
@@ -842,9 +875,11 @@ function ProgramacaoView({
       </div>
 
       <div className={`flex flex-wrap gap-3 text-[10px] ${txtMuted}`}>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-orange-500" /> Liderança alocada</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-indigo-500" /> Engenheiro</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-violet-500" /> Supervisor</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-orange-500" /> Encarregado</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-cyan-500" /> Apoio</span>
-        <span className="inline-flex items-center gap-1"><Users2 size={10} /> nº da equipe (sob o encarregado)</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-slate-400" /> Time</span>
         <span className="inline-flex items-center gap-1"><span className={`w-3 h-2 rounded ${isDark ? 'bg-red-500/30' : 'bg-red-100'}`} /> Semana atual</span>
       </div>
     </div>
