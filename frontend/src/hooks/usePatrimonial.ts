@@ -32,6 +32,28 @@ export function useImobilizados(filtros?: { status?: string; categoria?: string;
   })
 }
 
+// Painel: patrimônio + frota (view pat_view_frotas) — frota entra como categoria "Frotas"
+export function useImobilizadosComFrota() {
+  return useQuery<PatImobilizado[]>({
+    queryKey: ['pat-view-frotas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pat_view_frotas')
+        .select('*')
+        .order('valor_aquisicao', { ascending: false })
+      if (error) return []
+      return (data ?? []).map((d: any) => ({
+        ...d,
+        depreciacao_acumulada: (d.valor_aquisicao ?? 0) - (d.valor_atual ?? d.valor_aquisicao ?? 0),
+        percentual_depreciado: d.valor_aquisicao > 0
+          ? Math.round(((d.valor_aquisicao - (d.valor_atual ?? d.valor_aquisicao)) / d.valor_aquisicao) * 100)
+          : 0,
+      })) as PatImobilizado[]
+    },
+    staleTime: 2 * 60 * 1000,
+  })
+}
+
 export function useImobilizado(id: string | undefined) {
   return useQuery<PatImobilizado | null>({
     queryKey: ['pat-imobilizado', id],

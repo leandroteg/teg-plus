@@ -4,7 +4,7 @@ import {
   ArrowRight, Zap,
   Archive, MapPin, Truck, Laptop, Grid3x3,
 } from 'lucide-react'
-import { usePatrimonialKPIs, useImobilizados } from '../../hooks/usePatrimonial'
+import { usePatrimonialKPIs, useImobilizadosComFrota } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../services/supabase'
 
@@ -52,7 +52,7 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
 export default function PatrimonialHome() {
   const { isDark } = useTheme()
   const { data: kpis } = usePatrimonialKPIs()
-  const { data: imobilizados = [] } = useImobilizados()
+  const { data: imobilizados = [] } = useImobilizadosComFrota()
 
   // Equipamentos criticos: veiculos (frota) + notebooks
   const { data: veiculosCount = 0 } = useQuery({
@@ -162,7 +162,7 @@ export default function PatrimonialHome() {
             </div>
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric label="Total Ativos" value={kpis?.total_imobilizados ?? 0} tone="amber" isDark={isDark} note={`${ativos} em uso`} />
+              <SpotlightMetric label="Total Ativos" value={imobilizados.length} tone="amber" isDark={isDark} note={`${ativos} em uso`} />
               <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} note="valor contabil atual" />
               <SpotlightMetric label="Depreciacao Acum." value={fmt(kpis?.depreciacao_acumulada ?? 0)} tone="red" isDark={isDark} note={depreciados > 0 ? `${depreciados} totalmente depreciados` : 'nenhum 100% depreciado'} />
             </div>
