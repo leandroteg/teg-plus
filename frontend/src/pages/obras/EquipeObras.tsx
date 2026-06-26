@@ -315,6 +315,75 @@ function FlatRow({ a, isDark, onRemove, small }: { a: ObraPlanejamentoEquipe; is
   )
 }
 
+// Modal de alocação de uma pessoa (supervisor / engenheiro / encarregado): obra, datas, função
+function EditAlocacaoModal({ alloc, obras, isDark, saving, onClose, onSave }: {
+  alloc: ObraPlanejamentoEquipe
+  obras: ObraComProjeto[]
+  isDark: boolean
+  saving: boolean
+  onClose: () => void
+  onSave: (v: { obraId: string; dataInicio: string; dataFim: string; funcao: string }) => void
+}) {
+  const [obraId, setObraId] = useState(alloc.obra_id ?? '')
+  const [dataInicio, setDataInicio] = useState((alloc.data_inicio ?? '').slice(0, 10) || new Date().toISOString().split('T')[0])
+  const [dataFim, setDataFim] = useState((alloc.data_fim ?? '').slice(0, 10))
+  const [funcao, setFuncao] = useState(alloc.funcao_equipe ?? '')
+  const inputCls = `w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'}`
+  const labelCls = `text-[10px] font-bold uppercase tracking-wider block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const obrasPorProjeto = useMemo(() => {
+    const m = new Map<string, { nome: string; obras: ObraComProjeto[] }>()
+    obras.forEach(o => { const k = o.projeto_id ?? '__sem__'; const g = m.get(k) ?? { nome: o.projeto_nome ?? 'Sem projeto', obras: [] }; g.obras.push(o); m.set(k, g) })
+    return Array.from(m.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [obras])
+  const cfg = PAPEL_CONFIG[alloc.papel]
+  const temEquipe = alloc.papel === 'supervisor' || alloc.papel === 'encarregado'
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-md" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className={`relative w-full max-w-lg rounded-2xl border overflow-hidden shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar nome={alloc.nome} fotoUrl={alloc.colaborador?.foto_url} isDark={isDark} size={32} />
+            <div className="min-w-0">
+              <p className={`text-sm font-extrabold truncate ${txtMain}`}>{alloc.nome}</p>
+              <p className={`text-[10px] truncate ${txtMuted}`}>{cfg.label} · {alloc.funcao}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`p-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-400'}`}><X size={16} /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <label className={labelCls}>Obra (Projeto › Obra)</label>
+            <select value={obraId} onChange={e => setObraId(e.target.value)} className={inputCls}>
+              <option value="">— sem obra —</option>
+              {obrasPorProjeto.map(g => <optgroup key={g.nome} label={g.nome}>{g.obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}</optgroup>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Data início</label><input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Data fim</label><input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputCls} /></div>
+          </div>
+          {alloc.papel === 'encarregado' && (
+            <div>
+              <label className={labelCls}>Frente / Função</label>
+              <select value={funcao} onChange={e => setFuncao(e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {FUNCOES_EQUIPE.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+          )}
+          {temEquipe && <p className={`text-[10px] ${txtMuted}`}>A obra e as datas valem também para a equipe sob {alloc.papel === 'supervisor' ? 'este supervisor' : 'este encarregado'}.</p>}
+        </div>
+        <div className={`flex justify-end gap-2 px-5 py-3 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <button onClick={onClose} className={`px-3 py-2 rounded-xl text-xs font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Cancelar</button>
+          <button onClick={() => onSave({ obraId, dataInicio, dataFim, funcao })} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 inline-flex items-center gap-1.5">{saving && <Loader2 size={12} className="animate-spin" />} Salvar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ListaView({
   colaboradores, equipe, obras, isDark, onAlocar,
 }: {
@@ -334,6 +403,7 @@ function ListaView({
   const [drag, setDrag] = useState<{ kind: 'new' | 'move'; colaboradorId?: string; allocId?: string; papel: PapelEquipe } | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<string | null>(null)
+  const [editAloc, setEditAloc] = useState<ObraPlanejamentoEquipe | null>(null)
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -419,6 +489,23 @@ function ListaView({
     try { await atualizar.mutateAsync({ id: allocId, funcao_equipe: funcao } as any) }
     catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
   }
+  // salva o modal de alocação: obra+datas valem p/ a subárvore (equipe junto); função só no encarregado
+  async function handleSaveAloc(v: { obraId: string; dataInicio: string; dataFim: string; funcao: string }) {
+    if (!editAloc) return
+    const ids: string[] = []
+    if (editAloc.papel === 'supervisor' || editAloc.papel === 'encarregado') {
+      const gather = (id: string) => { ids.push(id); active.filter(e => e.lider_id === id).forEach(e => gather(e.id)) }
+      gather(editAloc.id)
+    } else ids.push(editAloc.id)
+    try {
+      for (const id of ids) {
+        const patch: any = { id, obra_id: v.obraId || null, data_inicio: v.dataInicio, data_fim: v.dataFim || null }
+        if (id === editAloc.id && editAloc.papel === 'encarregado') patch.funcao_equipe = v.funcao || null
+        await atualizar.mutateAsync(patch)
+      }
+      setEditAloc(null)
+    } catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
+  }
   // dropar item (novo do roster ou movido) sob um lider; papelEsperado valida
   function dropUnder(liderId: string | null, papelEsperado: PapelEquipe) {
     if (!drag || drag.papel !== papelEsperado) return
@@ -455,7 +542,7 @@ function ListaView({
         onDragOver={ev => { if (dropEnc) ev.preventDefault() }} onDrop={ev => { ev.stopPropagation(); dropUnder(enc.id, 'time'); setExpanded(p => new Set(p).add(enc.id)) }}>
         <div className={`flex items-center gap-2 px-2.5 py-1.5 ${dropEnc ? (isDark ? 'bg-orange-500/10 rounded-t-lg' : 'bg-orange-50 rounded-t-lg') : ''}`}>
           <button onClick={() => toggleExp(enc.id)} className={txtMuted}>{expE ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
-          <div draggable onDragStart={() => setDrag({ kind: 'move', allocId: enc.id, papel: 'encarregado' })} onDragEnd={() => setDrag(null)} className="flex items-center gap-2 min-w-0 cursor-grab active:cursor-grabbing">
+          <div draggable onClick={() => setEditAloc(enc)} onDragStart={() => setDrag({ kind: 'move', allocId: enc.id, papel: 'encarregado' })} onDragEnd={() => setDrag(null)} className="flex items-center gap-2 min-w-0 cursor-pointer active:cursor-grabbing hover:opacity-80" title="Editar alocação (obra, datas, função)">
             <Avatar nome={enc.nome} fotoUrl={enc.colaborador?.foto_url} isDark={isDark} size={22} />
             <p className={`text-[11px] font-bold truncate min-w-0 ${txtMain}`}>{primeiroNome(enc.nome)}</p>
           </div>
@@ -583,11 +670,13 @@ function ListaView({
                     onDragOver={ev => { if (dropSup) ev.preventDefault() }} onDrop={() => { dropUnder(sup.id, 'encarregado'); setExpanded(p => new Set(p).add(sup.id)) }}>
                     <div className={`flex flex-wrap items-center gap-2 px-4 py-2.5 border-b ${dropSup ? (isDark ? 'bg-orange-500/10' : 'bg-orange-50') : ''} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                       <button onClick={() => toggleExp(sup.id)} className={txtMuted}>{expS ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
-                      <Avatar nome={sup.nome} fotoUrl={sup.colaborador?.foto_url} isDark={isDark} size={28} />
-                      <div className="min-w-0">
-                        <p className={`text-sm font-extrabold truncate ${txtMain}`}>{sup.nome}</p>
-                        <p className={`text-[9px] truncate ${txtMuted}`}>{sup.funcao}</p>
-                      </div>
+                      <button onClick={() => setEditAloc(sup)} className="flex items-center gap-2 min-w-0 text-left hover:opacity-80" title="Editar alocação (obra, datas)">
+                        <Avatar nome={sup.nome} fotoUrl={sup.colaborador?.foto_url} isDark={isDark} size={28} />
+                        <div className="min-w-0">
+                          <p className={`text-sm font-extrabold truncate ${txtMain}`}>{sup.nome}</p>
+                          <p className={`text-[9px] truncate ${txtMuted}`}>{sup.funcao}</p>
+                        </div>
+                      </button>
                       <PapelBadge papel="supervisor" isDark={isDark} />
                       {sup.observacoes?.includes('VÁRIOS') && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title={sup.observacoes}>⚠ revisar</span>}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>{encs.length} enc · {totalSub} pessoas</span>
@@ -672,11 +761,13 @@ function ListaView({
                   .sort((a, b) => (a.papel.localeCompare(b.papel)) || a.nome.localeCompare(b.nome))
                   .map(e => (
                     <div key={e.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}>
-                      <Avatar nome={e.nome} fotoUrl={e.colaborador?.foto_url} isDark={isDark} size={24} />
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[11px] font-bold truncate ${txtMain}`} title={e.nome}>{primeiroNome(e.nome)}</p>
-                        <p className={`text-[9px] truncate ${txtMuted}`} title={obras.find(o => o.id === e.obra_id)?.nome}>{obras.find(o => o.id === e.obra_id)?.nome ?? '—'}</p>
-                      </div>
+                      <button onClick={() => setEditAloc(e)} className="flex items-center gap-2 min-w-0 flex-1 text-left hover:opacity-80" title="Editar alocação (obra, datas)">
+                        <Avatar nome={e.nome} fotoUrl={e.colaborador?.foto_url} isDark={isDark} size={24} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[11px] font-bold truncate ${txtMain}`} title={e.nome}>{primeiroNome(e.nome)}</p>
+                          <p className={`text-[9px] truncate ${txtMuted}`} title={obras.find(o => o.id === e.obra_id)?.nome}>{obras.find(o => o.id === e.obra_id)?.nome ?? '—'}</p>
+                        </div>
+                      </button>
                       <PapelBadge papel={e.papel} isDark={isDark} />
                       <button onClick={() => remover(e.id)} className={`shrink-0 p-1 rounded ${isDark ? 'hover:bg-rose-500/15 text-rose-400' : 'hover:bg-rose-50 text-rose-500'}`} title="Remover"><Trash2 size={11} /></button>
                     </div>
@@ -685,6 +776,11 @@ function ListaView({
           </div>
         </div>
       </div>
+
+      {editAloc && (
+        <EditAlocacaoModal alloc={editAloc} obras={obras} isDark={isDark} saving={atualizar.isPending}
+          onClose={() => setEditAloc(null)} onSave={handleSaveAloc} />
+      )}
     </div>
   )
 }
@@ -728,27 +824,22 @@ function ProgramacaoView({
     return m
   }, [timeRowsByLider])
 
-  // Agrupa Projeto(Polo) › Obra › pessoas. Engenheiro fica no nível do Projeto (Polo), não na obra.
-  type ObraGrp = { id: string; nome: string; rows: ObraPlanejamentoEquipe[] }
+  // Agrupa por projeto
   const groups = useMemo(() => {
-    const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
-    const projMap = new Map<string, { id: string; nome: string; engenheiros: ObraPlanejamentoEquipe[]; obrasMap: Map<string, ObraGrp> }>()
+    const map = new Map<string, { id: string; nome: string; rows: ObraPlanejamentoEquipe[] }>()
     rows.forEach(r => {
       const o = obraById.get(r.obra_id)
-      const pid = o?.projeto_id ?? '__sem__'
-      if (!projMap.has(pid)) projMap.set(pid, { id: pid, nome: o?.projeto_nome ?? 'Sem projeto', engenheiros: [], obrasMap: new Map() })
-      const proj = projMap.get(pid)!
-      if (r.papel === 'engenheiro') { proj.engenheiros.push(r); return }
-      const oid = r.obra_id ?? '__sem_obra__'
-      if (!proj.obrasMap.has(oid)) proj.obrasMap.set(oid, { id: oid, nome: o?.nome ?? 'Sem obra', rows: [] })
-      proj.obrasMap.get(oid)!.rows.push(r)
+      const id = o?.projeto_id ?? '__sem__'
+      const nome = o?.projeto_nome ?? 'Sem projeto'
+      if (!map.has(id)) map.set(id, { id, nome, rows: [] })
+      map.get(id)!.rows.push(r)
     })
-    return Array.from(projMap.values()).map(p => {
-      p.engenheiros.sort((a, b) => a.nome.localeCompare(b.nome))
-      const obras = Array.from(p.obrasMap.values()).sort((a, b) => a.nome.localeCompare(b.nome))
-      obras.forEach(ob => ob.rows.sort((a, b) => (rank[a.papel] - rank[b.papel]) || a.nome.localeCompare(b.nome)))
-      return { id: p.id, nome: p.nome, engenheiros: p.engenheiros, obras }
-    }).sort((a, b) => a.nome.localeCompare(b.nome))
+    const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
+    map.forEach(g => g.rows.sort((a, b) => {
+      const oa = obraById.get(a.obra_id)?.nome ?? '', ob = obraById.get(b.obra_id)?.nome ?? ''
+      return (rank[a.papel] - rank[b.papel]) || oa.localeCompare(ob) || a.nome.localeCompare(b.nome)
+    }))
+    return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
 
   // ── Colunas semanais (segunda → sábado) ──
@@ -776,31 +867,32 @@ function ProgramacaoView({
   }, [rows])
 
   const today = new Date()
-  const COL_W = { pessoa: 340, semana: 96 }
-  const leftW = COL_W.pessoa
+  const COL_W = { pessoa: 290, obra: 140, semana: 96 }
+  const leftW = COL_W.pessoa + COL_W.obra
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const PersonRow = ({ r, recurso, indent = 12 }: { r: ObraPlanejamentoEquipe; recurso?: boolean; indent?: number }) => {
+  const PersonRow = ({ r, recurso }: { r: ObraPlanejamentoEquipe; recurso?: boolean }) => {
     const start = new Date(r.data_inicio)
     const end = new Date(r.data_fim || addDays(start, 30).toISOString())
     const cfg = PAPEL_CONFIG[r.papel]
+    const obra = obraById.get(r.obra_id)
     const barColorMap: Record<string, string> = { engenheiro: 'bg-indigo-500', supervisor: 'bg-violet-500', encarregado: 'bg-orange-500', apoio: 'bg-cyan-500', time: 'bg-slate-400' }
     const barColor = recurso ? 'bg-slate-400' : (barColorMap[r.papel] ?? 'bg-orange-500')
     const count = !recurso && r.papel === 'encarregado' ? (timeCountByLider.get(r.id) ?? 0) : 0
     return (
       <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
-        <div className={`shrink-0 py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: indent, paddingRight: 8 }}>
-          <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
-          <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
-          {r.papel === 'encarregado' && r.funcao_equipe && (
-            <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
-          )}
-          {r.papel === 'engenheiro' && (
-            <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}`}>Polo</span>
-          )}
-          {count > 0 && (
-            <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
-          )}
+        <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
+          <div className={`py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: recurso ? 28 : 12, paddingRight: 8 }}>
+            <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+            <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
+            {r.papel === 'encarregado' && r.funcao_equipe && (
+              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
+            )}
+            {count > 0 && (
+              <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
+            )}
+          </div>
+          <div className={`px-2 py-1.5 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{recurso ? '' : (obra?.nome ?? '—')}</div>
         </div>
         {weeks.map((w, i) => {
           const ativo = start <= addDays(w.sat, 1) && end >= w.mon
@@ -828,7 +920,10 @@ function ProgramacaoView({
       <div className={`rounded-xl border overflow-x-auto ${border}`}>
         {/* Header */}
         <div className={`flex items-stretch border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className={`shrink-0 px-3 py-2 border-r ${border} flex items-center text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>Projeto › Obra › Pessoa</div>
+          <div className={`flex shrink-0 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>
+            <div className={`px-3 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.pessoa}px` }}>Pessoa</div>
+            <div className={`px-2 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.obra}px` }}>Obra</div>
+          </div>
           {weeks.map((w, i) => {
             const atual = today >= w.mon && today <= addDays(w.sat, 1)
             return (
@@ -845,53 +940,28 @@ function ProgramacaoView({
             <CalendarRange size={36} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">Nenhuma alocação cadastrada</p>
           </div>
-        ) : groups.map(proj => {
-          const pmin = minimizados.has(proj.id)
-          const total = proj.engenheiros.length + proj.obras.reduce((a, ob) => a + ob.rows.length, 0)
+        ) : groups.map(group => {
+          const min = minimizados.has(group.id)
           const totalW = leftW + weeks.length * COL_W.semana
           return (
-            <div key={proj.id}>
-              {/* Projeto (Polo) */}
-              <button onClick={() => toggle(proj.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.06] hover:bg-white/[0.08]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
+            <div key={group.id}>
+              <button onClick={() => toggle(group.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.04] hover:bg-white/[0.06]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
                 <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${leftW}px` }}>
-                  {pmin ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
-                  <Briefcase size={13} className={txtMuted} />
-                  <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{proj.nome}</span>
-                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{total}</span>
+                  {min ? <ChevronDown size={13} className={txtMuted} /> : <ChevronUp size={13} className={txtMuted} />}
+                  <Briefcase size={12} className={txtMuted} />
+                  <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{group.nome}</span>
+                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{group.rows.length}</span>
                 </div>
               </button>
 
-              {!pmin && (
-                <>
-                  {/* Engenheiro no nível do Polo */}
-                  {proj.engenheiros.map(e => <PersonRow key={e.id} r={e} indent={28} />)}
-
-                  {/* Obras colapsáveis */}
-                  {proj.obras.map(ob => {
-                    const omin = minimizados.has(`${proj.id}:${ob.id}`)
-                    return (
-                      <div key={ob.id}>
-                        <button onClick={() => toggle(`${proj.id}:${ob.id}`)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'}`} style={{ minWidth: `${totalW}px` }}>
-                          <div className="flex items-center gap-1.5 py-1.5 shrink-0" style={{ width: `${leftW}px`, paddingLeft: 24, paddingRight: 8 }}>
-                            {omin ? <ChevronDown size={12} className={txtMuted} /> : <ChevronUp size={12} className={txtMuted} />}
-                            <Building2 size={11} className="text-orange-500" />
-                            <span className={`text-[11px] font-bold truncate ${txtMain}`}>{ob.nome}</span>
-                            <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-white text-slate-500 border border-slate-200'}`}>{ob.rows.length}</span>
-                          </div>
-                        </button>
-                        {!omin && ob.rows.map(r => (
-                          (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
-                            <Fragment key={r.id}>
-                              <PersonRow r={r} indent={40} />
-                              {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso indent={54} />)}
-                            </Fragment>
-                          ) : <PersonRow key={r.id} r={r} indent={40} />
-                        ))}
-                      </div>
-                    )
-                  })}
-                </>
-              )}
+              {!min && group.rows.map(r => (
+                (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
+                  <Fragment key={r.id}>
+                    <PersonRow r={r} />
+                    {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso />)}
+                  </Fragment>
+                ) : <PersonRow key={r.id} r={r} />
+              ))}
             </div>
           )
         })}
