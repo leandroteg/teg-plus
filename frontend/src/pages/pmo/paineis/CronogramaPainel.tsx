@@ -11,9 +11,9 @@ import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const DRV = [
-  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e' },
-  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#374151' },
-  { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3' },
+  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 40 }, // pp = produtividade padrão por pessoa/mês
+  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#374151', pp: 8 },
+  { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2 },
 ]
 // tudo que não é driver (topografia, canteiro, adm, outros) → "ADM + Outros" (só R$)
 const OUTROS_PAC = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Administração Local', 'Outros']
@@ -55,7 +55,8 @@ function Dots({ ritmo, prazo }: { ritmo: string; prazo: string }) {
 
 type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
 type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; omR: number; pctFis: number; ini: string | null; fim: string | null }
-type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number; precedencia?: boolean; lag?: number }
+// prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver
+type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number }
 type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
@@ -136,12 +137,13 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const toggleAll = () => { if (allOpen) { setOpenF(new Set()); setOpenO(new Set()) } else { setOpenF(new Set(allKeys.frentes)); setOpenO(new Set(allKeys.obras)) } }
   const saldoGlobal = useMemo(() => { const m: Record<string, number> = {}; DRV.forEach(d => m[d.label] = 0); for (const o of allObras) for (const d of o.drivers) m[d.label] += d.saldoQ; return m }, [allObras])
 
-  // config default (capacidade p/ terminar em 12m, alocação proporcional ao saldo)
+  // config default (produtividade/pessoa padrão; equipe p/ terminar cada obra em 12m, ∝ saldo)
   const defaultConfig = useMemo<Config>(() => {
-    const prod: Record<string, number> = {}; DRV.forEach(d => prod[d.label] = saldoGlobal[d.label] > 0 ? Math.max(0.1, Math.round(saldoGlobal[d.label] / 12 * 10) / 10) : 0)
-    const pesos: Record<string, number> = {}; allObras.forEach(o => pesos[o.nome] = Math.round(o.saldoR / 1000))
-    return { prod, modo: 'saldo', pesos, horizonte: 12, precedencia: true, lag: 0 }
-  }, [saldoGlobal, allObras])
+    const prodPP: Record<string, number> = {}; DRV.forEach(d => prodPP[d.label] = d.pp)
+    const h = 12, equipe: Record<string, Record<string, number>> = {}
+    allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e })
+    return { prodPP, equipe, horizonte: h, precedencia: true, lag: 0 }
+  }, [allObras])
 
   // aplica o default automaticamente na 1ª carga (não fica vazio)
   useEffect(() => { if (!applied && allObras.length) setApplied(defaultConfig) }, [applied, allObras.length, defaultConfig])
@@ -153,13 +155,10 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   })
 
   const start = startYM()
-  // rate por (obra, driver) a partir da capacidade + alocação
+  // rate (qtd/mês) por (obra, driver) = nº de pessoas × produtividade por pessoa
   const rateOf = (o: Obra, d: Drv, cfg: Config) => {
-    const C = cfg.prod[d.label] || 0; if (C <= 0 || d.saldoQ <= 0) return 0
-    if (cfg.modo === 'saldo') { const tot = saldoGlobal[d.label] || 0; return tot > 0 ? C * d.saldoQ / tot : 0 }
-    // manual: divide a capacidade pelas obras (peso), só entre as que têm saldo nesse driver
-    let denom = 0; for (const ob of allObras) { const dd = ob.drivers.find(x => x.label === d.label); if (dd && dd.saldoQ > 0) denom += (cfg.pesos[ob.nome] ?? 0) }
-    return denom > 0 ? C * (cfg.pesos[o.nome] ?? 0) / denom : 0
+    if (d.saldoQ <= 0) return 0
+    return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
   }
   // projeção mês a mês da obra com PRECEDÊNCIA: Fundação libera Montagem, Montagem libera Lançamento
   const projObra = (o: Obra, cfg: Config) => {
@@ -213,6 +212,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, fFrente, fObra, fPct, hideOM, applied])
 
+  const totPessoas = useMemo(() => applied ? view.frentesF.flatMap(f => f.obras).reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, view.frentesF])
+
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
 
@@ -261,7 +262,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         <Kpi label="Saldo a faturar" value={fmtM(view.saldoRtot)} tone="amber" isDark={isDark} note="R$ restante (filtro)" />
         <Kpi label="Início" value={ymLabel(start)} tone="sky" isDark={isDark} note="próximo mês" />
         <Kpi label="Término previsto" value={view.terminoGeral ? ymLabel(view.terminoGeral) : '—'} tone="violet" isDark={isDark} note={`${view.maxMeses} mes(es)`} />
-        <Kpi label="Alocação" value={applied?.modo === 'manual' ? 'Manual' : 'Proporcional'} tone="teal" isDark={isDark} note="recursos por obra" />
+        <Kpi label="Equipe" value={`${totPessoas} pessoas`} tone="teal" isDark={isDark} note="Fund. + Mont. + Lanç." />
       </div>
 
       <PanelCard title="Cronograma por frente e obra" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark}
@@ -376,13 +377,14 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
   onAplicar: (c: Config) => void; onClose: () => void
 }) {
-  const [cfg, setCfg] = useState<Config>(inicial)
+  // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag })
+  const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
-  const setProd = (k: string, v: number) => setCfg(c => ({ ...c, prod: { ...c.prod, [k]: v } }))
-  const setPeso = (o: string, v: number) => setCfg(c => ({ ...c, pesos: { ...c.pesos, [o]: v } }))
-  const semear = (h: number) => setCfg(c => { const prod: Record<string, number> = {}; DRV.forEach(d => prod[d.label] = saldoGlobal[d.label] > 0 ? Math.max(0.1, Math.round(saldoGlobal[d.label] / h * 10) / 10) : 0); return { ...c, prod, horizonte: h } })
-  const propPesos = () => setCfg(c => ({ ...c, pesos: Object.fromEntries(allObras.map(o => [o.nome, Math.round(o.saldoR / 1000)])) }))
-  const totPeso = allObras.reduce((s, o) => s + (cfg.pesos[o.nome] ?? 0), 0) || 1
+  const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
+  const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
+  const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
+  const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -414,7 +416,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
               <div className="flex flex-wrap gap-1.5">
                 {versoes.map(v => (
                   <span key={v.id} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[11px] font-semibold border ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-50'}`}>
-                    <button onClick={() => { setCfg(v.config); setNome(v.nome) }} className="hover:text-teal-500">{v.nome}</button>
+                    <button onClick={() => { setCfg(normalize(v.config)); setNome(v.nome) }} className="hover:text-teal-500">{v.nome}</button>
                     <button onClick={() => excluir.mutate(v.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={11} /></button>
                   </span>
                 ))}
@@ -422,48 +424,48 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, inicial, defa
             </div>
           )}
 
-          {/* Produtividade total */}
+          {/* Produtividade por pessoa */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className={lbl}><Gauge size={11} className="inline mr-1 text-teal-500" />Capacidade total (produtividade/mês)</p>
-              <div className="flex items-center gap-1">{[6, 12, 18, 24].map(h => <button key={h} onClick={() => semear(h)} className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}</div>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <p className={`${lbl} mb-2`}><Gauge size={11} className="inline mr-1 text-teal-500" />Produtividade por pessoa (por mês)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {DRV.map(d => (
                 <div key={d.label} className={`rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
                   <div className="flex items-center gap-1.5 mb-1"><span className="w-2 h-2 rounded-full" style={{ background: d.cor }} /><span className="text-[11px] font-bold">{d.label}</span></div>
-                  <p className={`text-[9px] mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saldo {fmtQ(saldoGlobal[d.label] || 0)} {d.uni}</p>
-                  <div className="flex items-center gap-1"><input type="number" min="0" step="0.5" value={cfg.prod[d.label] ?? 0} onChange={e => setProd(d.label, Number(e.target.value))} className={inp} /><span className="text-[10px] text-slate-400">{d.uni}/mês</span></div>
+                  <p className={`text-[9px] mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saldo total {fmtQ(saldoGlobal[d.label] || 0)} {d.uni}</p>
+                  <div className="flex items-center gap-1"><input type="number" min="0" step="0.1" value={cfg.prodPP[d.label] ?? 0} onChange={e => setPP(d.label, Number(e.target.value))} className={inp} /><span className="text-[10px] text-slate-400">{d.uni}/pessoa·mês</span></div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Alocação por obra */}
+          {/* Equipe por obra (nº de pessoas) */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className={lbl}>Alocação dos recursos por obra</p>
-              <div className={`inline-flex rounded-lg border overflow-hidden text-[10px] ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                {(['saldo', 'manual'] as const).map(m => <button key={m} onClick={() => setCfg(c => ({ ...c, modo: m }))} className={`px-2.5 py-1 font-semibold ${cfg.modo === m ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>{m === 'saldo' ? 'Proporcional ao saldo' : 'Manual'}</button>)}
+              <p className={lbl}>Equipe por obra — nº de pessoas</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400">preencher p/ terminar em</span>
+                {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
               </div>
             </div>
-            {cfg.modo === 'saldo' ? (
-              <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>A capacidade é distribuída automaticamente entre as obras na proporção do saldo de cada uma — todas avançam juntas.</p>
-            ) : (
-              <div>
-                <button onClick={propPesos} className="text-[10px] font-semibold text-teal-500 mb-1.5 inline-flex items-center gap-1"><Sparkles size={11} /> preencher proporcional ao saldo</button>
-                <div className={`max-h-56 overflow-auto rounded-xl border ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {allObras.map(o => { const peso = cfg.pesos[o.nome] ?? 0; const share = Math.round(peso / totPeso * 100); return (
-                    <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                      <span className={`flex-1 text-[11px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={o.nome}>{o.nome}</span>
-                      <div className={`w-20 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}><div className="h-full bg-teal-500" style={{ width: `${share}%` }} /></div>
-                      <span className="w-8 text-right text-[10px] tabular-nums text-slate-400">{share}%</span>
-                      <input type="number" min="0" value={peso} onChange={e => setPeso(o.nome, Number(e.target.value))} className={`w-16 text-[12px] font-semibold rounded-lg border px-1.5 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
-                    </div>
-                  ) })}
-                </div>
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+                <span className="flex-1">Obra</span>
+                {DRV.map(d => <span key={d.label} className="w-14 text-center" style={{ color: d.cor }}>{d.label}</span>)}
+                <span className="w-9 text-right">total</span>
               </div>
-            )}
+              <div className="max-h-52 overflow-auto">
+                {allObras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
+                  <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
+                    <span className={`flex-1 text-[11px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={o.nome}>{o.nome}</span>
+                    {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
+                      <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                    ) })}
+                    <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
+                  </div>
+                ) })}
+              </div>
+            </div>
+            <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total: <b>{totPessoas} pessoas</b> · cada obra avança no ritmo nº pessoas × produtividade/pessoa. Drivers que a obra não tem ficam desabilitados.</p>
           </div>
 
           {/* Premissas (precedência) */}
