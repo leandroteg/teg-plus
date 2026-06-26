@@ -20,6 +20,7 @@ import { useLookups } from '../../hooks/useLookups'
 import { ProjetosFilterBar } from './ProjetosFilterBar'
 import EAPFinal, { EAPKpis } from './EAPFinal'
 import CronogramaPainel from './paineis/CronogramaPainel'
+import HistogramaRecursos from './paineis/HistogramaPainel'
 import { MedicoesPanel } from './EGPControle'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
@@ -116,8 +117,8 @@ export default function EGPPlanejamento() {
         })}
       </div>
 
-      {/* Barra de filtro: Cronograma não usa o seletor de Projetos (contrato inteiro) — só os filtros próprios, à direita */}
-      {tab === 'cronograma' ? (
+      {/* Barra de filtro: Cronograma/Histograma não usam o seletor de Projetos (contrato inteiro) */}
+      {tab === 'histograma' ? null : tab === 'cronograma' ? (
         <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-end" />
       ) : (
         <ProjetosFilterBar
@@ -142,7 +143,7 @@ export default function EGPPlanejamento() {
       {/* Tab content */}
       {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPainel portfolioId={portfolioId} />}
-      {tab === 'histograma' && <HistogramaPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'histograma' && <HistogramaRecursos portfolioId={portfolioId} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'medicao' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}
