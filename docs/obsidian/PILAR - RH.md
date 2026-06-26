@@ -4,6 +4,7 @@ type: pilar
 status: ativo
 tags: [pilar, rh, headcount, cultura, dp, recrutamento, performance]
 criado: 2026-04-09
+atualizado: 2026-06-26
 relacionado: ["[[00 - TEG+ INDEX]]"]
 ---
 
@@ -31,6 +32,26 @@ relacionado: ["[[00 - TEG+ INDEX]]"]
 |-----|-----------|
 | [[25 - Mural de Recados]] | Slideshow corporativo, gestão admin |
 | [[28 - Módulo Cadastros AI]] | Cadastro de colaboradores com CPF lookup |
+
+## Funcionalidades do Headcount (Jun/2026)
+
+### Ficha do colaborador (`RHColaboradorDetalhe.tsx`)
+
+- Seção **Contrato & Trabalho** inclui campo **Status (Ativo/Inativo)** editável
+- Campo ligado a `rh_colaboradores.ativo` (boolean)
+- Editável no modo edição; salvo pelo `useSalvarRHColaborador` (update padrão)
+- Filtros da lista (Ativos / Inativos) refletem o valor salvo
+
+### Verificações e Relatórios
+
+- Aba **Verificações**: checagem de docs assinados em lote (resolução fuzzy de pasta OneDrive, 3× paralelo)
+- Aba **Relatórios**: comandos ao SuperTEG viram PDF histórico (rh_colaborador_relatorios)
+
+### Estrutura organizacional
+
+- `base_id` = fonte de origem da obra para o Secullum
+- `departamento` = organograma (do cargo)
+- `setor` = subárea interna
 
 ## Integrações futuras
 

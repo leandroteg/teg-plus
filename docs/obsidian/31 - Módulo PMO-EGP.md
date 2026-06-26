@@ -3,194 +3,146 @@ title: Módulo PMO/EGP — Escritório de Gestão de Projetos
 type: modulo
 modulo: pmo
 status: ativo
-tags: [pmo, egp, portfolio, eap, cronograma, medicoes, gestao-projetos]
+tags: [pmo, egp, portfolio, eap, cronograma, medicoes, gestao-projetos, riscos, custos, histograma, osc, ia]
 criado: 2026-03-12
-atualizado: 2026-03-12
+atualizado: 2026-06-26
 relacionado: ["[[PILAR - Projetos]]", "[[27 - Módulo Contratos Gestão]]", "[[32 - Módulo Obras]]", "[[30 - Módulo Controladoria]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo PMO/EGP — Escritório de Gestão de Projetos
 
-> Gerenciamento completo do portfólio de obras da TEG com visão física-financeira, cronograma, EAP, TAP, medições, histograma de recursos, controle de custos, reuniões e status reports.
+> Gerenciamento completo do portfólio de obras da TEG com visão física-financeira por ciclo de vida PMBOK: EAP, cronograma, histograma de recursos, custos realizado vs. orçado, medições OSC, análise de riscos via IA e indicadores.
 
 ---
 
 ## Visão Geral
 
-O módulo EGP (Escritório de Gestão de Projetos) — acessível via rota `/egp` — centraliza a gestão técnica e financeira do portfólio de obras. Cada projeto/obra é representado como um **Portfólio** com todas as suas dimensões associadas: escopo (EAP), tempo (cronograma), recursos (histograma), custos, medições contratuais e indicadores de desempenho.
+O módulo EGP (`/egp`) centraliza a gestão técnica e financeira do portfólio de obras. Cada portfólio (obra) é navegado pelo **ciclo de vida PMBOK em 5 fases**, cada uma com suas próprias abas de trabalho. Um seletor persistente de portfólio no topo mantém o contexto entre páginas.
 
 ---
 
-## Estrutura de Portfólio
+## Estrutura de Rotas
 
-```mermaid
-graph TD
-    P[Portfólio / Obra] --> TAP[TAP\nTermo de Abertura]
-    P --> EAP[EAP\nEstrutura Analítica]
-    P --> CRON[Cronograma\nGantt]
-    P --> MED[Medições\nBoletins BM]
-    P --> HIST[Histograma\nRecursos]
-    P --> CUST[Controle\nde Custos]
-    P --> REU[Reuniões\nAtas]
-    P --> SR[Status\nReports]
+| Rota | Componente | Abas disponíveis |
+|------|-----------|-----------------|
+| `/egp` | `EGPPainel` / `EGPPainelMobile` | Painel executivo do portfólio |
+| `/egp/iniciacao/:id?` | `EGPIniciacao` | TAP, Stakeholders, Viabilidade |
+| `/egp/planejamento/:id?` | `EGPPlanejamento` | EAP · Cronograma · Histograma · Custos · Medição · Riscos |
+| `/egp/controle/:id?` | `EGPControle` | Medições · Eventos · Status Report · Indicadores |
+| `/egp/encerramento/:id?` | `EGPEncerramento` | Lições aprendidas, aceite, desmobilização |
+| `/egp/portfolio` | `Portfolio` | Lista de todos os portfólios |
+| `/egp/portfolio/novo` | `NovoPortfolio` | Criar portfólio |
+| `/egp/portfolio/:id` | `PortfolioDetalhe` | Detalhe do portfólio |
 
-    style P fill:#6366F1,color:#fff
-    style TAP fill:#8B5CF6,color:#fff
-    style EAP fill:#14B8A6,color:#fff
-    style CRON fill:#F59E0B,color:#fff
-    style MED fill:#10B981,color:#fff
-    style HIST fill:#3B82F6,color:#fff
-    style CUST fill:#EF4444,color:#fff
-```
+> **Redirects legados:** `/egp/tap`, `/egp/eap`, `/egp/cronograma`, `/egp/histograma`, `/egp/custos`, `/egp/medicoes` → redirecionam para a fase correspondente (sem quebrar bookmarks antigos).
 
 ---
 
-## Status de Portfólio
+## Fase: Planejamento (`EGPPlanejamento.tsx`)
 
-| Status | Descrição |
-|--------|-----------|
-| `em_analise_ate` | Em análise pela ATE (Análise Técnico-Econômica) |
-| `revisao_cliente` | Aguardando revisão/aprovação do cliente |
-| `liberado_iniciar` | Aprovado — aguardando início de obra |
-| `obra_andamento` | Obra em execução |
-| `obra_paralisada` | Obra paralisada temporariamente |
-| `obra_concluida` | Obra concluída |
-| `cancelada` | Cancelada |
+Maior tela do módulo. Abas em tab-bar colorida:
 
----
+| Aba | Descrição |
+|-----|-----------|
+| **EAP** | Estrutura Analítica do Projeto (WBS) — árvore hierárquica gerada ou editada manualmente; botão "Gerar via IA" |
+| **Cronograma** | Gantt de tarefas com datas, durações, dependências e % de avanço físico; geração por IA |
+| **Histograma** | Histograma de recursos: efetivo real do RH (base → frente) + máquinas (fro_veiculos); engine `cronogramaEngine.ts` |
+| **Custos** | Base (80% contrato × 7 naturezas) · Projetado (×% físico) · Realizado (via `fin_legado_custos`, mapeamento `grupo_dre → natureza`); R$ 12,2 mi lidos do legado |
+| **Medição** | OSCs: lista de boletins importados via PDF (SuperTEG `/osc/parse`); itens normalizados na EAP + faturado por OSC |
+| **Riscos** | Matriz 5×5 probabilidade × impacto; CRUD; agrupamento frente/obra; análise incremental por IA (edge `egp-riscos-analisar` → n8n → SuperTEG → callback grava) |
 
-## Páginas e Componentes
+### Histograma — detalhe
 
-### Dashboard — `PMOHome.tsx` (`EGPHome`) — `/egp`
+- Fonte RH: `rh_colaboradores` filtrado por `base_id` (base → frente TEG); cargo → grupo de recursos
+- Fonte frota: `fro_veiculos` (tipo_ativo = 'maquina'), alocações ativas por obra
+- Limitação conhecida: colaboradores sem `obra_id` direto (só `base_id`); Uberlândia/Comendador Gomes sem base cadastrada
 
-Dashboard executivo do portfólio:
-- **KPIs consolidados:** Obras em andamento, Valor total do portfólio, Margem média, Obras concluídas
-- **Quick Links:** Portfolio, Fluxo OS, Indicadores, Reuniões, Multas, Histograma
-- **Lista de portfólios:** status, progresso físico, valor OSC, custo real, margem
+### Custos — detalhe
 
-### Portfolio — `/egp/portfolio`
+- **Base:** 80% do valor do contrato rateado em 7 naturezas (MO, Material, Equip., Subcontrat., etc.)
+- **Projetado:** Base × % físico do cronograma
+- **Realizado:** consulta `fin_legado_custos` (totvs + nibo, 31.312 linhas, R$ 95,2 mi total); mapeamento `grupo_dre → natureza`
+- Observação: folha de pagamento não está no `fin_legado_custos` → MO realizado aparece baixo
 
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `Portfolio.tsx` | `/egp/portfolio` | Lista de todos os portfólios/obras com filtros e KPIs |
-| `NovoPortfolio.tsx` | `/egp/portfolio/novo` | Formulário de criação de novo portfólio |
-| `PortfolioDetalhe.tsx` | `/egp/portfolio/:id` | Visão detalhada com todas as dimensões da obra |
+### Riscos — detalhe
 
-### TAP (Termo de Abertura do Projeto) — `/egp/tap`
+- Análise via IA: botão "Analisar" → edge function `egp-riscos-analisar` → n8n workflow "EGP - Riscos AI" (ativo) → SuperTEG `/chat` → callback grava análise na tabela
+- Análise incremental: apenas riscos sem análise prévia são enviados por vez
+- Resultado salvo como texto livre na coluna `analise_ia`
 
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `TapHub.tsx` | `/egp/tap` | Seletor — lista portfólios para navegar ao TAP |
-| `TapPage.tsx` | `/egp/tap/:portfolioId` | Formulário completo do TAP: objetivo, escopo, cronograma macro, riscos, equipe, recursos |
+### OSC / Medição — detalhe
 
-### EAP (Estrutura Analítica do Projeto) — `/egp/eap`
-
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `EAPHub.tsx` | `/egp/eap` | Seletor de portfólio |
-| `EAP.tsx` | `/egp/eap/:portfolioId` | Árvore hierárquica do escopo do projeto (WBS) com pacotes de trabalho e entregáveis |
-
-### Cronograma — `/egp/cronograma`
-
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `CronogramaHub.tsx` | `/egp/cronograma` | Seletor de portfólio |
-| `Cronograma.tsx` | `/egp/cronograma/:portfolioId` | Diagrama de Gantt com atividades, durações, dependências e % de avanço físico |
-
-### Medições — `/egp/medicoes`
-
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `MedicoesHub.tsx` | `/egp/medicoes` | Seletor de portfólio |
-| `Medicoes.tsx` | `/egp/medicoes/:portfolioId` | Boletins de Medição (BM) com itens medidos, valores e aprovação |
-
-### Histograma de Recursos — `/egp/histograma`
-
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `HistogramaHub.tsx` | `/egp/histograma` | Seletor de portfólio |
-| `Histograma.tsx` | `/egp/histograma/:portfolioId` | Histograma de alocação de recursos (HH) por período e frente de trabalho |
-
-### Controle de Custos — `/egp/custos`
-
-| Componente | Rota | Descrição |
-|------------|------|-----------|
-| `CustosHub.tsx` | `/egp/custos` | Seletor de portfólio |
-| `ControleCustos.tsx` | `/egp/custos/:portfolioId` | Orçado vs realizado por pacote de trabalho/EAP |
-
-### Reuniões — `/egp/reunioes`
-
-Componente `Reunioes.tsx` — Atas de reuniões de acompanhamento:
-- Registro de pauta, participantes, deliberações e ações
-- Histórico de reuniões por portfólio
-- Exportação de ata em PDF
-
-### Fluxo OS — `/egp/fluxo-os`
-
-Componente `FluxoOS.tsx` — Fluxo de Ordens de Serviço do portfólio:
-- Visão kanban das OS por status
-- Vinculação com atividades do cronograma
-
-### Status Reports — `/egp/indicadores`
-
-Componente `StatusReportList.tsx` — Relatórios de status periódicos:
-- Status Report semanal/quinzenal por portfólio
-- KPIs físico-financeiros: CPI (Cost Performance Index), SPI (Schedule Performance Index)
-- Semáforo de risco
-- Multas e penalidades por atraso
+- Parse de PDF via SuperTEG (`/osc/parse`): extrai OSC, itens, valores acumulados
+- Backfill automático: 107 OSCs processadas (652 itens normalizados + "Outros")
+- Faturado por OSC: lê coluna "Acum" → calcula valor-saldo por boletim
+- Rota de medição dentro de Planejamento; rota `/egp/medicoes` redireciona aqui
 
 ---
 
-## Hooks (`src/hooks/usePMO.ts`)
+## Fase: Controle (`EGPControle.tsx`)
 
-| Hook | Responsabilidade |
-|------|------------------|
-| `usePortfolios()` | Lista todos os portfólios com KPIs consolidados |
-| `usePortfolioDetalhe(id)` | Detalhe de portfólio específico |
-| `useTAP(portfolioId)` | TAP do portfólio |
-| `useEAP(portfolioId)` | Estrutura analítica do projeto |
-| `useCronograma(portfolioId)` | Atividades do cronograma Gantt |
-| `useMedicoes(portfolioId)` | Boletins de medição |
-| `useHistograma(portfolioId)` | Histograma de recursos por período |
-| `useControleCustos(portfolioId)` | Controle orçado vs realizado |
-| `useReunioes(portfolioId?)` | Atas de reuniões |
-| `useStatusReports(portfolioId?)` | Status reports periódicos |
-| `useFluxoOS(portfolioId?)` | Ordens de serviço |
+| Aba | Descrição |
+|-----|-----------|
+| **Medições** | Boletins de medição por portfólio (BM) — itens medidos, valores, aprovação |
+| **Eventos** | Alertas e eventos contratuais (prazo, multas, paralisações) |
+| **Status Report** | Relatório periódico: KPIs físico-financeiros, semáforo de risco |
+| **Indicadores** | CPI, SPI, curva S, projeções de término |
+
+---
+
+## Painel Executivo (`EGPPainel.tsx`)
+
+Dashboard do portfólio com:
+- KPIs consolidados: Obras em andamento · Valor total · Margem média · Progresso físico
+- Lista de portfólios com status, progresso, valor OSC, custo real e margem
+- **Aba Produção:** check-ins mensais da meta de produção (SGI); dados sourced do EGP
+- Registrado no hub `/paineis` (pilar Projetos)
 
 ---
 
 ## Schema do Banco
 
-Prefixo de tabelas: `pmo_`
+Prefixo: `pmo_`
 
 | Tabela | Descrição |
 |--------|-----------|
 | `pmo_portfolios` | Portfólios/obras com dados gerenciais e financeiros |
 | `pmo_tap` | Termo de Abertura do Projeto |
-| `pmo_eap` | Estrutura Analítica do Projeto (hierarquia) |
+| `pmo_eap` | Estrutura Analítica — nós da árvore |
 | `pmo_eap_itens` | Pacotes de trabalho e entregáveis |
-| `pmo_cronograma` | Atividades do cronograma |
-| `pmo_medicoes` | Boletins de medição |
-| `pmo_medicao_itens` | Itens de cada medição |
+| `pmo_cronograma` | Tarefas / atividades do Gantt |
+| `pmo_medicoes` | Boletins de medição (BM) |
+| `pmo_medicao_itens` | Itens de cada BM |
 | `pmo_histograma` | Alocação de recursos por período |
-| `pmo_custos` | Controle de custos por EAP |
+| `pmo_orcamento` | Orçamento por natureza (7 linhas) |
+| `pmo_riscos` | Riscos: probabilidade, impacto, analise_ia |
 | `pmo_reunioes` | Atas e deliberações |
 | `pmo_reuniao_acoes` | Ações resultantes de reuniões |
 | `pmo_status_reports` | Status reports periódicos |
 | `pmo_multas` | Registro de multas contratuais |
+| `pmo_mudancas` | Mudanças de escopo/prazo/custo |
+| `egp_tap` | TAPs gerados/editados (tabela separada da pmo_tap legacy) |
+| `egp_osc` | OSCs importadas via PDF |
+| `egp_osc_itens` | Itens normalizados das OSCs |
 
 ---
 
-## KPIs do Dashboard
+## Hooks (`src/hooks/usePMO.ts` + `useEGP.ts`)
 
-| KPI | Descrição |
-|-----|-----------|
-| `obras_andamento` | Portfólios com status `obra_andamento` |
-| `valor_total_osc` | Soma do valor total de OSC (Ordem de Serviço de Construção) |
-| `margem_media` | Média de `(valor_osc - custo_real) / valor_osc` |
-| `progresso_fisico` | % de avanço físico médio do portfólio |
-| `cpi` | Cost Performance Index por portfólio |
-| `spi` | Schedule Performance Index por portfólio |
+| Hook | Responsabilidade |
+|------|------------------|
+| `usePortfolios()` | Lista portfólios com KPIs |
+| `usePortfolioDetalhe(id)` | Detalhe completo |
+| `useTAP(id)` | TAP do portfólio |
+| `useEAP(id)` | Árvore EAP |
+| `useCronograma(id)` | Tarefas Gantt |
+| `useHistograma(id)` | Histograma de recursos |
+| `useControleCustos(id)` | Orçado vs realizado |
+| `useRiscos(id)` | Riscos do portfólio |
+| `useMedicaoPorOSC(id)` | Medições via OSC importada |
+| `useOSCItens(oscId)` | Itens de uma OSC |
+| `useReunioes(id?)` | Atas |
+| `useStatusReports(id?)` | Status reports |
 
 ---
 
@@ -198,60 +150,31 @@ Prefixo de tabelas: `pmo_`
 
 | Módulo | Integração |
 |--------|-----------|
-| **Controladoria** | KPIs e custos da Controladoria alimentam o EGP |
-| **Contratos** | Medições do EGP podem ser vinculadas a contratos |
-| **Obras** | Apontamentos de campo alimentam o avanço físico |
-| **Financeiro** | Custos realizados alimentam o controle de custos EGP |
-| **RH** | Histograma consome dados de alocação de colaboradores |
+| **Financeiro (legado)** | `fin_legado_custos` alimenta aba Custos (Realizado) |
+| **Contratos** | Valor do contrato base do orçamento EGP |
+| **Obras** | `obr_planejamento_equipe` lido pelo Histograma de Recursos |
+| **RH** | `rh_colaboradores` (base_id → frente) alimenta Histograma |
+| **Frotas** | `fro_veiculos` (máquinas) aparece no Histograma |
+| **SGI/Governança** | Aba Produção do painel EGP serve de fonte para check-ins de meta no SGI |
+| **n8n/SuperTEG** | Análise de riscos via IA + parse de OSC em PDF |
+| **Painéis** | `EGPPainel` registrado no hub `/paineis` |
 
 ---
 
-## Fases do Ciclo de Vida do Projeto
-
-O EGP estrutura cada portfólio em 5 fases do PMBOK:
+## Fases do Ciclo de Vida (PMBOK)
 
 1. **Iniciação** — TAP, análise de viabilidade, stakeholders
-2. **Planejamento** — EAP, cronograma, histograma, orçamento
-3. **Execução** — Acompanhamento de atividades, medições, custos
-4. **Controle** — Status reports, KPIs (CPI/SPI), alertas de desvio
+2. **Planejamento** — EAP, cronograma, histograma, orçamento, medição OSC, riscos
+3. **Execução** → *redirect para Planejamento* (execução acompanhada pelas abas de Planejamento)
+4. **Controle** — Status reports, KPIs (CPI/SPI), medições, eventos
 5. **Encerramento** — Lições aprendidas, aceite final, desmobilização
-
----
-
-## Geração de TAP por IA
-
-O TAP (Termo de Abertura do Projeto) pode ser gerado automaticamente via **Gemini AI**:
-- Input: dados básicos do portfólio (cliente, escopo, valor, prazo)
-- Output: objetivo, justificativa, escopo macro, premissas, restrições, riscos iniciais, equipe sugerida
-- A geração é acionada via botão na tela `TapPage.tsx` e chama endpoint n8n
-
-A tabela `egp_tap` armazena TAPs gerados e editados manualmente.
-
----
-
-## Tabelas Adicionais
-
-Além das 13 tabelas com prefixo `pmo_`, o módulo utiliza:
-
-| Tabela | Descrição |
-|--------|-----------|
-| `egp_tap` | Termos de Abertura do Projeto gerados por IA ou manual |
-| `pmo_mudancas` | Registro de mudanças de escopo/prazo/custo |
-| `pmo_penalidades` | Multas e penalidades contratuais por atraso |
-
----
-
-## Dimensão do Módulo
-
-- **Páginas:** 32 (maior módulo do sistema)
-- **Tipos:** 517 linhas em `src/types/pmo.ts`
-- **Hooks:** `usePMO.ts` com 11+ hooks React Query
 
 ---
 
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Rotas do módulo
-- [[27 - Módulo Contratos Gestão]] — Contratos e medições
 - [[30 - Módulo Controladoria]] — Orçado vs realizado
-- [[32 - Módulo Obras]] — Apontamentos de campo
+- [[32 - Módulo Obras]] — Equipe e apontamentos de campo
+- [[49 - SuperTEG AI Agent]] — Parse OSC e análise de riscos
+- [[51 - Módulo Governança SGI]] — Check-ins de produção

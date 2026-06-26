@@ -229,9 +229,15 @@ atualizado: 2026-04-10
 
 | Modulo | Status | Doc |
 |--------|--------|-----|
-| EGP (PMO) | ✅ 80% | [[31 - Módulo PMO-EGP]] |
-| Obras | ✅ 75% | [[32 - Módulo Obras]] |
+| EGP (PMO) | ✅ 85% | [[31 - Módulo PMO-EGP]] |
+| Obras | ✅ 80% | [[32 - Módulo Obras]] |
 | SSMA | 🔴 0% nao iniciado | [[33 - Módulo SSMA]] |
+
+#### 🟣 Governança (1 modulo)
+
+| Modulo | Status | Doc |
+|--------|--------|-----|
+| SGI / Gestão | ✅ 70% (Fases 1-3 ativas) | [[51 - Módulo Governança SGI]] |
 
 #### 🟠 RH (5 sub-modulos)
 
