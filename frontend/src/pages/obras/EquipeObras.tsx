@@ -728,22 +728,27 @@ function ProgramacaoView({
     return m
   }, [timeRowsByLider])
 
-  // Agrupa por projeto
+  // Agrupa Projeto(Polo) › Obra › pessoas. Engenheiro fica no nível do Projeto (Polo), não na obra.
+  type ObraGrp = { id: string; nome: string; rows: ObraPlanejamentoEquipe[] }
   const groups = useMemo(() => {
-    const map = new Map<string, { id: string; nome: string; rows: ObraPlanejamentoEquipe[] }>()
+    const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
+    const projMap = new Map<string, { id: string; nome: string; engenheiros: ObraPlanejamentoEquipe[]; obrasMap: Map<string, ObraGrp> }>()
     rows.forEach(r => {
       const o = obraById.get(r.obra_id)
-      const id = o?.projeto_id ?? '__sem__'
-      const nome = o?.projeto_nome ?? 'Sem projeto'
-      if (!map.has(id)) map.set(id, { id, nome, rows: [] })
-      map.get(id)!.rows.push(r)
+      const pid = o?.projeto_id ?? '__sem__'
+      if (!projMap.has(pid)) projMap.set(pid, { id: pid, nome: o?.projeto_nome ?? 'Sem projeto', engenheiros: [], obrasMap: new Map() })
+      const proj = projMap.get(pid)!
+      if (r.papel === 'engenheiro') { proj.engenheiros.push(r); return }
+      const oid = r.obra_id ?? '__sem_obra__'
+      if (!proj.obrasMap.has(oid)) proj.obrasMap.set(oid, { id: oid, nome: o?.nome ?? 'Sem obra', rows: [] })
+      proj.obrasMap.get(oid)!.rows.push(r)
     })
-    const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
-    map.forEach(g => g.rows.sort((a, b) => {
-      const oa = obraById.get(a.obra_id)?.nome ?? '', ob = obraById.get(b.obra_id)?.nome ?? ''
-      return (rank[a.papel] - rank[b.papel]) || oa.localeCompare(ob) || a.nome.localeCompare(b.nome)
-    }))
-    return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+    return Array.from(projMap.values()).map(p => {
+      p.engenheiros.sort((a, b) => a.nome.localeCompare(b.nome))
+      const obras = Array.from(p.obrasMap.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+      obras.forEach(ob => ob.rows.sort((a, b) => (rank[a.papel] - rank[b.papel]) || a.nome.localeCompare(b.nome)))
+      return { id: p.id, nome: p.nome, engenheiros: p.engenheiros, obras }
+    }).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
 
   // ── Colunas semanais (segunda → sábado) ──
@@ -771,32 +776,31 @@ function ProgramacaoView({
   }, [rows])
 
   const today = new Date()
-  const COL_W = { pessoa: 290, obra: 140, semana: 96 }
-  const leftW = COL_W.pessoa + COL_W.obra
+  const COL_W = { pessoa: 340, semana: 96 }
+  const leftW = COL_W.pessoa
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const PersonRow = ({ r, recurso }: { r: ObraPlanejamentoEquipe; recurso?: boolean }) => {
+  const PersonRow = ({ r, recurso, indent = 12 }: { r: ObraPlanejamentoEquipe; recurso?: boolean; indent?: number }) => {
     const start = new Date(r.data_inicio)
     const end = new Date(r.data_fim || addDays(start, 30).toISOString())
     const cfg = PAPEL_CONFIG[r.papel]
-    const obra = obraById.get(r.obra_id)
     const barColorMap: Record<string, string> = { engenheiro: 'bg-indigo-500', supervisor: 'bg-violet-500', encarregado: 'bg-orange-500', apoio: 'bg-cyan-500', time: 'bg-slate-400' }
     const barColor = recurso ? 'bg-slate-400' : (barColorMap[r.papel] ?? 'bg-orange-500')
     const count = !recurso && r.papel === 'encarregado' ? (timeCountByLider.get(r.id) ?? 0) : 0
     return (
       <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
-        <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
-          <div className={`py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: recurso ? 28 : 12, paddingRight: 8 }}>
-            <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
-            <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
-            {r.papel === 'encarregado' && r.funcao_equipe && (
-              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
-            )}
-            {count > 0 && (
-              <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
-            )}
-          </div>
-          <div className={`px-2 py-1.5 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{recurso ? '' : (obra?.nome ?? '—')}</div>
+        <div className={`shrink-0 py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: indent, paddingRight: 8 }}>
+          <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+          <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
+          {r.papel === 'encarregado' && r.funcao_equipe && (
+            <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
+          )}
+          {r.papel === 'engenheiro' && (
+            <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}`}>Polo</span>
+          )}
+          {count > 0 && (
+            <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
+          )}
         </div>
         {weeks.map((w, i) => {
           const ativo = start <= addDays(w.sat, 1) && end >= w.mon
@@ -824,10 +828,7 @@ function ProgramacaoView({
       <div className={`rounded-xl border overflow-x-auto ${border}`}>
         {/* Header */}
         <div className={`flex items-stretch border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className={`flex shrink-0 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>
-            <div className={`px-3 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.pessoa}px` }}>Pessoa</div>
-            <div className={`px-2 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.obra}px` }}>Obra</div>
-          </div>
+          <div className={`shrink-0 px-3 py-2 border-r ${border} flex items-center text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>Projeto › Obra › Pessoa</div>
           {weeks.map((w, i) => {
             const atual = today >= w.mon && today <= addDays(w.sat, 1)
             return (
@@ -844,28 +845,53 @@ function ProgramacaoView({
             <CalendarRange size={36} className="mx-auto mb-2 opacity-30" />
             <p className="text-xs">Nenhuma alocação cadastrada</p>
           </div>
-        ) : groups.map(group => {
-          const min = minimizados.has(group.id)
+        ) : groups.map(proj => {
+          const pmin = minimizados.has(proj.id)
+          const total = proj.engenheiros.length + proj.obras.reduce((a, ob) => a + ob.rows.length, 0)
           const totalW = leftW + weeks.length * COL_W.semana
           return (
-            <div key={group.id}>
-              <button onClick={() => toggle(group.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.04] hover:bg-white/[0.06]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
+            <div key={proj.id}>
+              {/* Projeto (Polo) */}
+              <button onClick={() => toggle(proj.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.06] hover:bg-white/[0.08]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
                 <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${leftW}px` }}>
-                  {min ? <ChevronDown size={13} className={txtMuted} /> : <ChevronUp size={13} className={txtMuted} />}
-                  <Briefcase size={12} className={txtMuted} />
-                  <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{group.nome}</span>
-                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{group.rows.length}</span>
+                  {pmin ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
+                  <Briefcase size={13} className={txtMuted} />
+                  <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{proj.nome}</span>
+                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{total}</span>
                 </div>
               </button>
 
-              {!min && group.rows.map(r => (
-                (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
-                  <Fragment key={r.id}>
-                    <PersonRow r={r} />
-                    {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso />)}
-                  </Fragment>
-                ) : <PersonRow key={r.id} r={r} />
-              ))}
+              {!pmin && (
+                <>
+                  {/* Engenheiro no nível do Polo */}
+                  {proj.engenheiros.map(e => <PersonRow key={e.id} r={e} indent={28} />)}
+
+                  {/* Obras colapsáveis */}
+                  {proj.obras.map(ob => {
+                    const omin = minimizados.has(`${proj.id}:${ob.id}`)
+                    return (
+                      <div key={ob.id}>
+                        <button onClick={() => toggle(`${proj.id}:${ob.id}`)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'}`} style={{ minWidth: `${totalW}px` }}>
+                          <div className="flex items-center gap-1.5 py-1.5 shrink-0" style={{ width: `${leftW}px`, paddingLeft: 24, paddingRight: 8 }}>
+                            {omin ? <ChevronDown size={12} className={txtMuted} /> : <ChevronUp size={12} className={txtMuted} />}
+                            <Building2 size={11} className="text-orange-500" />
+                            <span className={`text-[11px] font-bold truncate ${txtMain}`}>{ob.nome}</span>
+                            <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-white text-slate-500 border border-slate-200'}`}>{ob.rows.length}</span>
+                          </div>
+                        </button>
+                        {!omin && ob.rows.map(r => (
+                          (r.papel === 'encarregado' && verRecursos && (timeRowsByLider.get(r.id)?.length ?? 0) > 0) ? (
+                            <Fragment key={r.id}>
+                              <PersonRow r={r} indent={40} />
+                              {(timeRowsByLider.get(r.id) ?? []).map(t => <PersonRow key={t.id} r={t} recurso indent={54} />)}
+                            </Fragment>
+                          ) : <PersonRow key={r.id} r={r} indent={40} />
+                        ))}
+                      </div>
+                    )
+                  })}
+                </>
+              )}
             </div>
           )
         })}
