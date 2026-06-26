@@ -928,14 +928,22 @@ export default function RequisicaoDetalhe() {
         const orfaos = (req.itens ?? []).filter(i => !(i as any).est_item_id)
         const podeEnviar = orfaos.length === 0
         return (
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 space-y-3">
+          <div className={`border-2 rounded-2xl p-4 space-y-3 ${podeEnviar ? 'bg-emerald-50 border-emerald-200' : 'bg-orange-50 border-orange-200'}`}>
             <div className="flex items-center gap-2">
-              <AlertCircle size={16} className="text-orange-700 flex-shrink-0" />
-              <span className="text-sm font-bold text-orange-800">Falta vincular catálogo ({orfaos.length}/{req.itens?.length ?? 0})</span>
+              {podeEnviar
+                ? <CheckCircle size={16} className="text-emerald-700 flex-shrink-0" />
+                : <AlertCircle size={16} className="text-orange-700 flex-shrink-0" />}
+              <span className={`text-sm font-bold ${podeEnviar ? 'text-emerald-800' : 'text-orange-800'}`}>
+                {podeEnviar
+                  ? `Itens vinculados (${req.itens?.length ?? 0}/${req.itens?.length ?? 0}) — pronto para enviar`
+                  : `Falta vincular catálogo (${orfaos.length}/${req.itens?.length ?? 0})`}
+              </span>
             </div>
-            <p className="text-xs text-orange-700">
-              Cadastre cada item livre no cat&aacute;logo de estoque. Depois volte aqui e clique em <b>Atualizar v&iacute;nculos</b>. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
-            </p>
+            {!podeEnviar && (
+              <p className="text-xs text-orange-700">
+                Cadastre cada item livre no cat&aacute;logo de estoque — o v&iacute;nculo &eacute; autom&aacute;tico ao salvar. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
+              </p>
+            )}
 
             {/* Lista dos orfaos com botao Cadastrar individual — abre cadastro pre-preenchido */}
             {orfaos.length > 0 && (
@@ -966,29 +974,31 @@ export default function RequisicaoDetalhe() {
                     setEnviarMsg({ type: 'error', msg: (e as Error).message })
                   }
                 }}
-                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-bold active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${podeEnviar ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-500 hover:bg-orange-600'}`}
               >
                 <Send size={15} />
                 {enviarParaAprovacao.isPending ? 'Enviando…' : 'Enviar para Aprovação'}
               </button>
             </div>
 
-            <button
-              onClick={async () => {
-                try {
-                  const { data, error } = await supabase.rpc('fn_catchup_vinculacao_itens_orfaos')
-                  if (error) throw error
-                  const r = (data as any) ?? {}
-                  setEnviarMsg({ type: 'success', msg: `${r.vinculados ?? 0} item(ns) vinculado(s) - recarregando…` })
-                  window.location.reload()
-                } catch (e) {
-                  setEnviarMsg({ type: 'error', msg: (e as Error).message })
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white text-orange-600 border border-orange-200 text-xs font-semibold hover:bg-orange-50 transition-all"
-            >
-              <RefreshCw size={13} /> Já cadastrei - Atualizar vínculos
-            </button>
+            {!podeEnviar && (
+              <button
+                onClick={async () => {
+                  try {
+                    const { data, error } = await supabase.rpc('fn_catchup_vinculacao_itens_orfaos')
+                    if (error) throw error
+                    const r = (data as any) ?? {}
+                    setEnviarMsg({ type: 'success', msg: `${r.vinculados ?? 0} item(ns) vinculado(s) - recarregando…` })
+                    window.location.reload()
+                  } catch (e) {
+                    setEnviarMsg({ type: 'error', msg: (e as Error).message })
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white text-orange-600 border border-orange-200 text-xs font-semibold hover:bg-orange-50 transition-all"
+              >
+                <RefreshCw size={13} /> Já cadastrei - Atualizar vínculos
+              </button>
+            )}
 
             {enviarMsg && (
               <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
