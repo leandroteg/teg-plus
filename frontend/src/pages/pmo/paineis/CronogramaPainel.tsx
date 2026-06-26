@@ -54,7 +54,7 @@ function Dots({ ritmo, prazo }: { ritmo: string; prazo: string }) {
 }
 
 type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
-type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; pctFis: number; ini: string | null; fim: string | null }
+type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; omR: number; pctFis: number; ini: string | null; fim: string | null }
 type Config = { prod: Record<string, number>; modo: 'saldo' | 'manual'; pesos: Record<string, number>; horizonte: number; precedencia?: boolean; lag?: number }
 type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
@@ -98,14 +98,19 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   // árvore frente → obra → drivers (saldo)
   const tree = useMemo(() => {
-    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; ini: string | null; fim: string | null }> }>()
+    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; omR: number; ini: string | null; fim: string | null }> }>()
     for (const polo of (raw ?? []) as EAPPoloRaw[]) {
       let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
       for (const o of polo.oscs) {
-        if (o.etapa_atual === 'cancelada' || o.tipo !== 'construcao') continue // só obras de construção
-        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
+        if (o.etapa_atual === 'cancelada') continue
+        if (o.tipo !== 'construcao' && o.tipo !== 'manutencao') continue // exclui depósito; construção+O&M
+        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, omR: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
         const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
         const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
+        if (o.tipo === 'manutencao') { // O&M → uma linha "Execução" (saldo R$ total)
+          for (const pa of Object.values(o.pacotes)) od.omR += Math.max(0, pa.valor - pa.fat)
+          continue
+        }
         for (const [pn, pa] of Object.entries(o.pacotes)) {
           const d = od.drivers.find(x => x.pac === pn)
           if (d) { d.contr += pa.qC; d.real += pa.qR; d.valor += pa.valor; d.fat += pa.fat; d.saldoR += Math.max(0, pa.valor - pa.fat) }
@@ -119,8 +124,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 })
         const wf = od.drivers.filter(d => d.contr > 0); const wsum = wf.reduce((s, d) => s + d.valor, 0)
         const pctFis = wsum ? Math.round(wf.reduce((s, d) => s + (d.real / d.contr * 100) * d.valor, 0) / wsum) : 0
-        return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR } as Obra
-      }).filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0).sort((a, b) => b.saldoR - a.saldoR),
+        return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, omR: od.omR, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR + od.omR } as Obra
+      }).filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0 || o.omR > 0).sort((a, b) => b.saldoR - a.saldoR),
     })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
   }, [raw])
 
@@ -173,7 +178,10 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       i++
       if (!order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
     }
-    let maxMeses = 0; for (let m = 0; m < i; m++) if (order.some(l => monthly[l][m] > 0.001)) maxMeses = m + 1
+    let drvMax = 0; for (let m = 0; m < i; m++) if (order.some(l => monthly[l][m] > 0.001)) drvMax = m + 1
+    // O&M (manutenção): execução distribuída uniformemente até o vencimento (sem drivers/precedência)
+    const omMeses = o.omR > 0 ? (present.length > 0 ? drvMax : Math.max(1, Math.min(60, o.fim ? (ymNum(o.fim.slice(0, 7)) - ymNum(start) + 1) : 12))) : 0
+    let maxMeses = Math.max(drvMax, omMeses)
     if (maxMeses === 0 && o.outrosR > 0) maxMeses = 1
     const meses = Array.from({ length: maxMeses }, (_, m) => shiftYM(start, m))
     const rows = present.map(d => {
@@ -182,11 +190,12 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       const mesesD = qty.reduce((a, q, m) => q > 0.001 ? m + 1 : a, 0)
       return { d, qty, rMes, meses: mesesD }
     })
-    const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + x.rMes[m], 0))
+    const execMes = meses.map((_, m) => (omMeses > 0 && m < omMeses) ? o.omR / omMeses : 0)
+    const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + (x.rMes[m] || 0), 0))
     const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
-    const outrosRmes = meses.map((_, m) => totDrvR > 0 ? o.outrosR * drvRmes[m] / totDrvR : (maxMeses ? o.outrosR / maxMeses : 0))
-    const totalRmes = meses.map((_, m) => drvRmes[m] + outrosRmes[m])
-    return { meses, rows, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
+    const outrosRmes = meses.map((_, m) => totDrvR > 0 ? o.outrosR * drvRmes[m] / totDrvR : (drvMax ? o.outrosR / drvMax : 0))
+    const totalRmes = meses.map((_, m) => drvRmes[m] + outrosRmes[m] + execMes[m])
+    return { meses, rows, execMes, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
   }
 
   const view = useMemo(() => {
@@ -310,6 +319,13 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                                             <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>ADM + Outros</b> <span className="text-slate-400">{fmtM(o.outrosR)}</span></td>
                                             {mesesArr.map((_, i) => { const v = pj.outrosRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
                                             <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.outrosR)}</td>
+                                          </tr>
+                                        )}
+                                        {o.omR > 0 && (
+                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: '#0d9488' }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Execução</b> <span className="text-slate-400">O&amp;M · {fmtM(o.omR)}</span></td>
+                                            {mesesArr.map((_, i) => { const v = pj.execMes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                            <td className={`${tdx} pr-3 font-semibold text-teal-600`}>{fmtM(o.omR)}</td>
                                           </tr>
                                         )}
                                         <tr className={`border-t-2 ${isDark ? 'border-slate-600' : 'border-slate-300'} font-bold`}>
