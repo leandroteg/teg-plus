@@ -33,6 +33,7 @@ const fmtPct = (v: number) =>
 // ── Seletor de período (mês/ano) — mesmo visual dos painéis ──────────────────
 function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function ymMais(meses: number) { const d = new Date(); d.setMonth(d.getMonth() + meses); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+function isoDay(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const MESES_OPT: Array<[string, string]> = [
   ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
   ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
@@ -1082,19 +1083,20 @@ function TabProvisionado() {
   const [statusFilter, setStatusFilter] = useState('')
   const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
   const [ate, setAte] = useState(ymMais(36))
+  const [quick, setQuick] = useState<'7d' | null>(null)   // atalho "próximos 7 dias" (precisão de dia)
   const { data: parcelas = [], isLoading } = useParcelas()
 
-  // Only despesa parcels — filtrados pelo período. Recorrente (aluguel): mostra se o contrato
-  // está ATIVO no período (tem aluguel devido). Não-recorrente: pelo vencimento da parcela.
+  // janela "próximos 7 dias" (precisão de dia)
+  const d7a = isoDay(new Date())
+  const d7b = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return isoDay(d) })()
+
+  // Só despesa — filtrado pela data de Vencimento da parcela (a que aparece no card "Vence:"),
+  // dentro da janela: atalho 7 dias = precisão de dia; senão pelo mês de/até.
   const compromissos = parcelas.filter(p => {
     if (p.contrato?.tipo_contrato !== 'despesa') return false
-    const c = p.contrato
-    if (c?.recorrente) {
-      const ini = (c.data_inicio || '').slice(0, 7)
-      const fim = (c.data_fim_previsto || '9999-12').slice(0, 7)
-      return ini <= ate && fim >= de
-    }
-    const ym = (p.data_vencimento || '').slice(0, 7)
+    const dv = p.data_vencimento || ''
+    if (quick === '7d') return dv.slice(0, 10) >= d7a && dv.slice(0, 10) <= d7b
+    const ym = dv.slice(0, 7)
     return ym >= de && ym <= ate
   })
 
@@ -1131,6 +1133,17 @@ function TabProvisionado() {
     { label: 'Pago', value: 'pago' },
   ]
 
+  // atalhos de período
+  const mesAtual = ymHoje(), mesProx = ymMais(1)
+  const anoAtual = new Date().getFullYear()
+  const anoIni = `${anoAtual}-01`, anoFim = `${anoAtual}-12`
+  const ATALHOS: Array<[string, boolean, () => void]> = [
+    ['Próx. 7 dias', quick === '7d', () => setQuick('7d')],
+    ['Esse mês', quick === null && de === mesAtual && ate === mesAtual, () => { setQuick(null); setDe(mesAtual); setAte(mesAtual) }],
+    ['Próx. mês', quick === null && de === mesProx && ate === mesProx, () => { setQuick(null); setDe(mesProx); setAte(mesProx) }],
+    ['Esse ano', quick === null && de === anoIni && ate === anoFim, () => { setQuick(null); setDe(anoIni); setAte(anoFim) }],
+  ]
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1164,11 +1177,18 @@ function TabProvisionado() {
             </button>
           ))}
         </div>
-        <div className="ml-auto inline-flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
-          <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
+          {ATALHOS.map(([label, active, onClick]) => (
+            <button key={label} onClick={onClick}
+              className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+                ${active ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+              {label}
+            </button>
+          ))}
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
           <span className="text-xs text-slate-400">→</span>
-          <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+          <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
         </div>
       </div>
 
