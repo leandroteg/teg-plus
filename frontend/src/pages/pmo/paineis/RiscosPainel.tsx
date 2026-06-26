@@ -11,7 +11,7 @@ import { useCustosReal, NATUREZAS, MARGEM_LUCRO } from '../../../hooks/useCustos
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import { buildTree, makeDefaultConfig, projObra, startYM, shiftYM, ymLabel } from './cronogramaEngine'
-import { useFiltrosTree, FiltrosFrenteObra, togFiltro } from './egpFiltros'
+import { useFiltrosTree, FiltrosFrenteObra, filtrarTree, togFiltro } from './egpFiltros'
 import type { PMORisco } from '../../../types/pmo'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
@@ -73,7 +73,7 @@ export default function RiscosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
       if (error) throw error
       if (data?.ok === false) throw new Error(data.motivo || 'Falha na análise')
       if (data?.sincrono) { setMsg(`Análise concluída: ${data.novos ?? 0} novos, ${data.atualizados ?? 0} atualizados.`); await refetch() }
-      else { setMsg('Análise solicitada ao SuperTEG (Claude na VPS) — leva ~2 min. Os riscos aparecem aqui automaticamente.'); let antes = riscos.length; for (let i = 0; i < 48; i++) { await new Promise(r => setTimeout(r, 5000)); const { data: novos } = await refetch(); if ((novos?.length ?? 0) > antes) { setMsg(`Análise concluída: ${(novos?.length ?? 0) - antes} risco(s) novo(s)/atualizado(s).`); break } } }
+      else { setMsg('Análise solicitada ao SuperTEG. Os riscos aparecem aqui quando concluir (atualizando…).'); for (let i = 0; i < 24; i++) { await new Promise(r => setTimeout(r, 5000)); await refetch() } }
     } catch (e: any) { setMsg('Erro: ' + (e?.message || String(e))) }
     finally { setRodando(false) }
   }
@@ -97,18 +97,26 @@ export default function RiscosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
   const criticos = ativos.filter(r => scoreOf(r, 'prob') * scoreOf(r, 'imp') >= 16).length
   const iaCount = riscos.filter(r => r.origem === 'ia').length
 
-  // agrupa o registro por frente → obra (ordenado por severidade)
+  // agrupa o registro por PROJETO (frente) → OBRAS, baseado na árvore da EAP (mostra a estrutura
+  // mesmo sem riscos, p/ navegar/adicionar). + grupo "Geral" p/ riscos do projeto todo.
   const grupos = useMemo(() => {
     const sev = (r: PMORisco) => scoreOf(r, 'prob') * scoreOf(r, 'imp')
-    const sorted = [...riscosView].sort((a, b) => sev(b) - sev(a))
-    const byFr = new Map<string, PMORisco[]>()
-    for (const r of sorted) { const k = r.frente || 'Geral'; if (!byFr.has(k)) byFr.set(k, []); byFr.get(k)!.push(r) }
-    return [...byFr.entries()].map(([frente, rs]) => {
+    const ordena = (rs: PMORisco[]) => [...rs].sort((a, b) => sev(b) - sev(a))
+    const treeLabels = new Set(tree.map(f => f.label))
+    const frentesTree = filtrarTree(tree, flt)
+    const grupos: { frente: string; geral?: boolean; total: number; criticos: number; obras: { obra: string; riscos: PMORisco[] }[] }[] = []
+    // Geral (projeto todo) — riscos sem frente ou de frente fora da EAP
+    const geral = riscosView.filter(r => !r.frente || !treeLabels.has(r.frente))
+    if (geral.length && !flt.fFrente.size) grupos.push({ frente: 'Geral (projeto todo)', geral: true, total: geral.length, criticos: geral.filter(r => sev(r) >= 16).length, obras: [{ obra: '', riscos: ordena(geral) }] })
+    // por frente (todas da árvore filtrada) → obras
+    for (const fr of frentesTree) {
+      const rs = riscosView.filter(r => r.frente === fr.label)
       const byOb = new Map<string, PMORisco[]>()
-      for (const r of rs) { const k = r.obra || '— frente toda'; if (!byOb.has(k)) byOb.set(k, []); byOb.get(k)!.push(r) }
-      return { frente, total: rs.length, criticos: rs.filter(r => sev(r) >= 16).length, obras: [...byOb.entries()].map(([obra, ors]) => ({ obra, riscos: ors })) }
-    }).sort((a, b) => a.frente === 'Geral' ? 1 : b.frente === 'Geral' ? -1 : a.frente.localeCompare(b.frente, undefined, { numeric: true }))
-  }, [riscosView])
+      for (const r of ordena(rs)) { const k = r.obra || '— frente toda'; if (!byOb.has(k)) byOb.set(k, []); byOb.get(k)!.push(r) }
+      grupos.push({ frente: fr.label, total: rs.length, criticos: rs.filter(r => sev(r) >= 16).length, obras: [...byOb.entries()].map(([obra, ors]) => ({ obra, riscos: ors })) })
+    }
+    return grupos
+  }, [riscosView, tree, flt])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -184,26 +192,33 @@ export default function RiscosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
         <div className="flex items-center gap-3 mt-2 text-[10px]">{[['Baixo', '#22c55e'], ['Médio', '#eab308'], ['Alto', '#f97316'], ['Crítico', '#ef4444']].map(([l, c]) => <span key={l} className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: c }} />{l}</span>)}{fSev && <button onClick={() => setFSev(null)} className="ml-2 text-teal-500 font-semibold">× limpar filtro ({fSev})</button>}</div>
       </PanelCard>
 
-      {/* Registro de riscos — agrupado por frente → obra */}
-      <PanelCard title={`Registro de riscos${fSev ? ` — ${fSev}` : ''}`} icon={<ShieldAlert size={14} className="text-teal-500" />} isDark={isDark}>
-        {grupos.length === 0 ? <p className="text-center py-8 text-sm text-slate-400">Nenhum risco{(fSev || flt.fFrente.size || flt.fObra.size) ? ' com esse filtro' : ''}. Rode a análise do SuperTEG ou adicione manualmente.</p> : (
+      {/* Registro de riscos — Projeto (frente) → Obras (estrutura da EAP) */}
+      <PanelCard title={`Registro de riscos — Projeto › Obras${fSev ? ` (${fSev})` : ''}`} icon={<ShieldAlert size={14} className="text-teal-500" />} isDark={isDark}>
+        {grupos.length === 0 ? <p className="text-center py-8 text-sm text-slate-400">Sem dados da EAP.</p> : (
           <div className="space-y-1.5">
-            {grupos.map(g => { const fo = openG.has(g.frente); return (
+            {grupos.map(g => { const fo = openG.has(g.frente); const addBtn = (frente: string | null, obra: string | null) => (
+              <button onClick={e => { e.stopPropagation(); setEdit({ descricao: '', categoria: '', prob_score: 3, impacto_score: 3, status: 'aberto', origem: 'manual', frente, obra }) }} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-teal-500 hover:text-teal-600"><Plus size={11} /> risco</button>
+            ); return (
               <div key={g.frente} className={`rounded-xl border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
                 <button onClick={() => togFiltro(g.frente, setOpenG)} className={`w-full flex items-center gap-2 px-3 py-2 ${fo ? 'rounded-t-xl' : 'rounded-xl'} ${isDark ? 'bg-slate-800/80 hover:bg-slate-800' : 'bg-slate-200/80 hover:bg-slate-200'}`}>
                   {fo ? <ChevronDown size={14} className="shrink-0 text-teal-500" /> : <ChevronRight size={14} className="shrink-0 text-slate-400" />}
-                  <span className={`text-[13px] font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{g.frente}</span>
+                  <span className={`text-[13px] font-bold ${g.geral ? 'text-violet-500' : (isDark ? 'text-white' : 'text-slate-800')}`}>{g.frente}</span>
                   <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{g.total} risco(s)</span>
-                  {g.criticos > 0 && <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ef444422', color: '#ef4444' }}>{g.criticos} crítico(s)</span>}
+                  <span className="ml-auto flex items-center gap-2">
+                    {g.criticos > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ef444422', color: '#ef4444' }}>{g.criticos} crítico(s)</span>}
+                    {!g.geral && addBtn(g.frente, null)}
+                  </span>
                 </button>
                 {fo && (
                   <div className={`px-2 pb-2 pt-1 space-y-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                    {g.obras.map(ob => (
+                    {g.obras.length === 0 ? (
+                      <p className="px-1 py-2 text-[11px] text-slate-400">Nenhum risco nesta frente. {!g.geral && <>Use {addBtn(g.frente, null)} ou rode a análise do SuperTEG.</>}</p>
+                    ) : g.obras.map(ob => { const obraNome = ob.obra && ob.obra !== '— frente toda' ? ob.obra : null; return (
                       <div key={ob.obra}>
-                        <div className={`px-1 py-1 text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ob.obra}</div>
+                        {!g.geral && <div className="flex items-center gap-2 px-1 py-1"><span className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{ob.obra}</span>{addBtn(g.frente, obraNome)}</div>}
                         <div className="overflow-x-auto"><table className="w-full border-collapse"><tbody>{ob.riscos.map(r => <RiscoRow key={r.id} r={r} />)}</tbody></table></div>
                       </div>
-                    ))}
+                    ) })}
                   </div>
                 )}
               </div>
