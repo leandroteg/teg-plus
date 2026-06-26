@@ -218,6 +218,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
   // larguras fixas p/ TODAS as tabelas alinharem as colunas
   const W_LABEL = 190, W_MES = 72, W_TOT = 78
+  const tableW = W_LABEL + mesesArr.length * W_MES + W_TOT // largura fixa idêntica p/ todas as tabelas (não esticar)
   const colGroup = <colgroup><col style={{ width: W_LABEL }} />{mesesArr.map((_, i) => <col key={i} style={{ width: W_MES }} />)}<col style={{ width: W_TOT }} /></colgroup>
   const stk = `sticky left-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`
   const TotalLinha = ({ label, obras, geral }: { label: string; obras: Obra[]; geral?: boolean }) => {
@@ -226,7 +227,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const hcl = `px-2 py-1 text-right text-[9px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'} whitespace-nowrap`
     return (
       <div className="overflow-x-auto">
-        <table className="border-collapse table-fixed">
+        <table className="border-collapse table-fixed" style={{ width: tableW }}>
           {colGroup}
           <thead><tr><th className={`${hcl} text-left ${stk}`}></th>{mesesArr.map(m => <th key={m} className={hcl}>{ymLabel(m)}</th>)}<th className={`${hcl} pr-3`}>Total</th></tr></thead>
           <tbody><tr className={geral ? 'font-bold' : 'font-semibold'}>
@@ -284,7 +285,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                         const oMax = obraMeses(o, applied); const oTerm = oMax > 0 ? shiftYM(start, oMax - 1) : null
                         return (
                           <div key={o.nome} className="mt-1">
-                            <button onClick={() => togF(okey, setOpenO)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                            <button onClick={() => togF(okey, setOpenO)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-slate-100/80 hover:bg-slate-200/70'}`}>
                               {oOpen ? <ChevronDown size={12} className="shrink-0 text-teal-500" /> : <ChevronRight size={12} className="shrink-0 text-slate-400" />}
                               <Dots ritmo={ritmoCor(o.pctFis, o.ini, o.fim)} prazo={prazoCor(oTerm, o.fim)} />
                               <span className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</span>
@@ -297,7 +298,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                               return (
                                 <div className="pr-1 pb-2 pt-1 overflow-x-auto">
                                   {pj.maxMeses === 0 ? <p className="text-[11px] text-slate-400 px-2 py-1">Defina a produtividade pra projetar.</p> : (
-                                    <table className="border-collapse table-fixed">
+                                    <table className="border-collapse table-fixed" style={{ width: tableW }}>
                                       {colGroup}
                                       <thead><tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                                         <th className={`px-2 py-1 text-left text-[10px] font-semibold ${stk} ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Serviço</th>
