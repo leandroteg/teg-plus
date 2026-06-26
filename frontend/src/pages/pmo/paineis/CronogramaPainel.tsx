@@ -89,8 +89,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
-  const [fPct, setFPct] = useState<Set<string>>(new Set())
-  const [hideOM, setHideOM] = useState(false) // ocultar obras de O&M (manutenção)
+  const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
+  const [hideOM, setHideOM] = useState(true) // O&M (manutenção) oculto por padrão
   const [slot, setSlot] = useState<HTMLElement | null>(null)
   useEffect(() => { setSlot(document.getElementById('crono-filters-slot')) })
   const [openF, setOpenF] = useState<Set<string>>(new Set())
