@@ -33,7 +33,7 @@ const fmtPct = (v: number) =>
 // ── Seletor de período (mês/ano) — mesmo visual dos painéis ──────────────────
 function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function ymMais(meses: number) { const d = new Date(); d.setMonth(d.getMonth() + meses); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
-function isoDay(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+function diffMeses(a: string, b: string) { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by - ay) * 12 + (bm - am) }
 const MESES_OPT: Array<[string, string]> = [
   ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
   ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
@@ -1086,19 +1086,38 @@ function TabProvisionado() {
   const [quick, setQuick] = useState<'7d' | null>(null)   // atalho "próximos 7 dias" (precisão de dia)
   const { data: parcelas = [], isLoading } = useParcelas()
 
-  // janela "próximos 7 dias" (precisão de dia)
-  const d7a = isoDay(new Date())
-  const d7b = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return isoDay(d) })()
-
-  // Só despesa — filtrado pela data de Vencimento da parcela (a que aparece no card "Vence:"),
-  // dentro da janela: atalho 7 dias = precisão de dia; senão pelo mês de/até.
-  const compromissos = parcelas.filter(p => {
-    if (p.contrato?.tipo_contrato !== 'despesa') return false
-    const dv = p.data_vencimento || ''
-    if (quick === '7d') return dv.slice(0, 10) >= d7a && dv.slice(0, 10) <= d7b
-    const ym = dv.slice(0, 7)
-    return ym >= de && ym <= ate
-  })
+  // "Quanto tenho que pagar" na janela: aluguel (recorrente) = valor_mensal × meses ativos
+  // dentro da janela [de, ate]; não-recorrente = a parcela, se vence na janela. Atalho 7 dias =
+  // aluguel cujo dia de vencimento cai nos próximos 7 dias (1 mês).
+  const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0)
+  const lim7d = new Date(hoje0); lim7d.setDate(lim7d.getDate() + 7)
+  const mesHoje = ymHoje()
+  const aPagarDe = (p: typeof parcelas[number]): number => {
+    const c = p.contrato
+    if (quick === '7d') {
+      const fim = (c?.data_fim_previsto || '9999-12').slice(0, 7)
+      if (fim < mesHoje) return 0
+      const dia = parseInt((p.data_vencimento || '').slice(8, 10)) || 1
+      let occ = new Date(hoje0.getFullYear(), hoje0.getMonth(), dia)
+      if (occ < hoje0) occ = new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, dia)
+      if (occ > lim7d) return 0
+      return c?.recorrente ? (c.valor_mensal || 0) : p.valor
+    }
+    if (c?.recorrente) {
+      const ini = (c.data_inicio || '').slice(0, 7) || '0000-00'
+      const fim = (c.data_fim_previsto || '9999-12').slice(0, 7)
+      const lo = ini > de ? ini : de
+      const hi = fim < ate ? fim : ate
+      if (lo > hi) return 0
+      return (c.valor_mensal || 0) * (diffMeses(lo, hi) + 1)
+    }
+    const ym = (p.data_vencimento || '').slice(0, 7)
+    return (ym >= de && ym <= ate) ? p.valor : 0
+  }
+  const compromissos = parcelas
+    .filter(p => p.contrato?.tipo_contrato === 'despesa')
+    .map(p => ({ ...p, aPagar: aPagarDe(p) }))
+    .filter(p => p.aPagar > 0)
 
   const filtered = compromissos.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false
@@ -1107,10 +1126,10 @@ function TabProvisionado() {
 
   const totalEmAberto = compromissos
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
-    .reduce((s, p) => s + p.valor, 0)
+    .reduce((s, p) => s + p.aPagar, 0)
   const totalPago = compromissos
     .filter(p => p.status === 'pago')
-    .reduce((s, p) => s + p.valor, 0)
+    .reduce((s, p) => s + p.aPagar, 0)
   const pendentes = compromissos.filter(p => p.status === 'pendente' || p.status === 'liberado').length
   const atrasadas = compromissos.filter(p =>
     p.status !== 'pago' && p.status !== 'cancelado' &&
@@ -1135,13 +1154,12 @@ function TabProvisionado() {
 
   // atalhos de período
   const mesAtual = ymHoje(), mesProx = ymMais(1)
-  const anoAtual = new Date().getFullYear()
-  const anoIni = `${anoAtual}-01`, anoFim = `${anoAtual}-12`
+  const anoFim = `${new Date().getFullYear()}-12`
   const ATALHOS: Array<[string, boolean, () => void]> = [
     ['Próx. 7 dias', quick === '7d', () => setQuick('7d')],
     ['Esse mês', quick === null && de === mesAtual && ate === mesAtual, () => { setQuick(null); setDe(mesAtual); setAte(mesAtual) }],
     ['Próx. mês', quick === null && de === mesProx && ate === mesProx, () => { setQuick(null); setDe(mesProx); setAte(mesProx) }],
-    ['Esse ano', quick === null && de === anoIni && ate === anoFim, () => { setQuick(null); setDe(anoIni); setAte(anoFim) }],
+    ['Esse ano', quick === null && de === mesAtual && ate === anoFim, () => { setQuick(null); setDe(mesAtual); setAte(anoFim) }],
   ]
 
   return (
@@ -1218,8 +1236,8 @@ function TabProvisionado() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
                       <div className="text-right shrink-0 leading-tight">
-                        <p className="text-sm font-extrabold text-amber-600">{fmtFull(p.valor)}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">saldo</p>
+                        <p className="text-sm font-extrabold text-amber-600">{fmtFull(p.aPagar)}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">a pagar</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
