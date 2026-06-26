@@ -672,7 +672,6 @@ function ProgramacaoView({
       if (!map.has(id)) map.set(id, { id, nome, rows: [] })
       map.get(id)!.rows.push(r)
     })
-    // ordena rows internas por obra+nome
     map.forEach(g => g.rows.sort((a, b) => {
       const oa = obraById.get(a.obra_id)?.nome ?? '', ob = obraById.get(b.obra_id)?.nome ?? ''
       return oa.localeCompare(ob) || a.nome.localeCompare(b.nome)
@@ -680,57 +679,57 @@ function ProgramacaoView({
     return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
 
-  // Janela temporal
-  const win = useMemo(() => {
-    if (rows.length === 0) { const n = new Date(); return { start: addDays(n, -7), end: addDays(n, 60) } }
-    const starts = rows.map(r => new Date(r.data_inicio))
-    const ends = rows.map(r => new Date(r.data_fim || addDays(new Date(r.data_inicio), 30).toISOString()))
-    const min = new Date(Math.min(...starts.map(d => d.getTime())))
-    const max = new Date(Math.max(...ends.map(d => d.getTime())))
-    return { start: addDays(min, -2), end: addDays(max, 2) }
+  // ── Colunas semanais (segunda → sábado) ──
+  const mondayOf = (d: Date) => { const x = new Date(d); const day = x.getDay(); return addDays(x, day === 0 ? -6 : 1 - day) }
+  const ddmm = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const weeks = useMemo(() => {
+    let startMon: Date, endDate: Date
+    if (rows.length === 0) { const n = new Date(); startMon = mondayOf(n); endDate = addDays(n, 56) }
+    else {
+      const starts = rows.map(r => new Date(r.data_inicio).getTime())
+      const ends = rows.map(r => new Date(r.data_fim || addDays(new Date(r.data_inicio), 30).toISOString()).getTime())
+      startMon = mondayOf(new Date(Math.min(...starts)))
+      endDate = new Date(Math.max(...ends))
+    }
+    const minEnd = addDays(startMon, 7 * 8)  // pelo menos 8 semanas
+    if (endDate < minEnd) endDate = minEnd
+    const list: { mon: Date; sat: Date; label: string }[] = []
+    let cur = startMon, guard = 0
+    while (cur <= endDate && guard < 30) {
+      const sat = addDays(cur, 5)
+      list.push({ mon: cur, sat, label: `${ddmm(cur)} - ${ddmm(sat)}` })
+      cur = addDays(cur, 7); guard++
+    }
+    return list
   }, [rows])
 
-  const totalDays = daysBetween(win.start, win.end) || 1
   const today = new Date()
-  const todayPct = Math.max(0, Math.min(100, (daysBetween(win.start, today) / totalDays) * 100))
-
-  const monthLabels = useMemo(() => {
-    const labels: { label: string; pct: number }[] = []
-    const cursor = new Date(win.start.getFullYear(), win.start.getMonth(), 1)
-    while (cursor <= win.end) {
-      labels.push({ label: cursor.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }), pct: (daysBetween(win.start, cursor) / totalDays) * 100 })
-      cursor.setMonth(cursor.getMonth() + 1)
-    }
-    return labels
-  }, [win, totalDays])
-
-  const COL_W = { pessoa: 200, obra: 150, periodo: 110 }
-  const tableW = COL_W.pessoa + COL_W.obra + COL_W.periodo
-
+  const COL_W = { pessoa: 180, obra: 140, semana: 96 }
+  const leftW = COL_W.pessoa + COL_W.obra
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   return (
     <div className="space-y-3">
       <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-        <CalendarRange size={12} /> {rows.length} alocação(ões) ativas · agrupadas por projeto
+        <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas (segunda a sábado)
       </div>
 
       <div className={`rounded-xl border overflow-x-auto ${border}`}>
         {/* Header */}
-        <div className={`flex items-center border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className={`flex shrink-0 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${tableW}px` }}>
-            <div className={`px-3 py-2 border-r ${border}`} style={{ width: `${COL_W.pessoa}px` }}>Pessoa</div>
-            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.obra}px` }}>Obra</div>
-            <div className={`px-2 py-2 border-r ${border}`} style={{ width: `${COL_W.periodo}px` }}>Período</div>
+        <div className={`flex items-stretch border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+          <div className={`flex shrink-0 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${leftW}px` }}>
+            <div className={`px-3 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.pessoa}px` }}>Pessoa</div>
+            <div className={`px-2 py-2 border-r ${border} flex items-center`} style={{ width: `${COL_W.obra}px` }}>Obra</div>
           </div>
-          <div className="flex-1 relative h-8 min-w-[400px]">
-            {monthLabels.map((m, i) => (
-              <div key={i} className={`absolute top-0 bottom-0 flex items-center text-[10px] font-semibold ${txtMuted} border-l ${border}`} style={{ left: `${m.pct}%`, paddingLeft: '4px' }}>{m.label}</div>
-            ))}
-            <div className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-10 pointer-events-none" style={{ left: `${todayPct}%` }}>
-              <div className="absolute -top-0.5 -translate-x-1/2 text-[9px] font-bold text-red-500">hoje</div>
-            </div>
-          </div>
+          {weeks.map((w, i) => {
+            const atual = today >= w.mon && today <= addDays(w.sat, 1)
+            return (
+              <div key={i} className={`shrink-0 border-r px-1 py-1 text-center ${border} ${atual ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : ''}`} style={{ width: `${COL_W.semana}px` }}>
+                <div className={`text-[8px] font-bold uppercase ${atual ? 'text-red-500' : txtMuted}`}>Sem.{atual ? ' • atual' : ''}</div>
+                <div className={`text-[9px] font-semibold leading-tight ${txtMain}`}>{w.label}</div>
+              </div>
+            )
+          })}
         </div>
 
         {rows.length === 0 ? (
@@ -740,29 +739,27 @@ function ProgramacaoView({
           </div>
         ) : groups.map(group => {
           const min = minimizados.has(group.id)
+          const totalW = leftW + weeks.length * COL_W.semana
           return (
             <div key={group.id}>
-              <button onClick={() => toggle(group.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.04] hover:bg-white/[0.06]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${tableW + 400}px` }}>
-                <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${tableW}px` }}>
+              <button onClick={() => toggle(group.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.04] hover:bg-white/[0.06]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
+                <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${leftW}px` }}>
                   {min ? <ChevronDown size={13} className={txtMuted} /> : <ChevronUp size={13} className={txtMuted} />}
                   <Briefcase size={12} className={txtMuted} />
                   <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{group.nome}</span>
                   <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{group.rows.length}</span>
                 </div>
-                <div className="flex-1 h-7" />
               </button>
 
               {!min && group.rows.map(r => {
                 const start = new Date(r.data_inicio)
                 const end = new Date(r.data_fim || addDays(start, 30).toISOString())
-                const leftPct = (daysBetween(win.start, start) / totalDays) * 100
-                const widthPct = Math.max(1, (Math.max(1, daysBetween(start, end)) / totalDays) * 100)
                 const cfg = PAPEL_CONFIG[r.papel]
                 const obra = obraById.get(r.obra_id)
-                const barColor = r.papel === 'time' ? 'bg-slate-400' : r.papel === 'apoio' ? 'bg-cyan-500' : 'bg-orange-500'
+                const barColor = r.papel === 'apoio' ? 'bg-cyan-500' : 'bg-orange-500'
                 return (
-                  <div key={r.id} className={`flex items-center border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
-                    <div className="flex shrink-0" style={{ width: `${tableW}px` }}>
+                  <div key={r.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                    <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
                       <div className={`px-3 py-2 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px` }}>
                         <span className={`w-1.5 h-1.5 rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
                         <span className={`text-[11px] font-semibold truncate ${txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
@@ -772,13 +769,16 @@ function ProgramacaoView({
                           </span>
                         )}
                       </div>
-                      <div className={`px-2 py-2 border-r ${border} text-[11px] truncate ${txtMuted}`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{obra?.nome ?? '—'}</div>
-                      <div className={`px-2 py-2 border-r ${border} text-[10px] ${txtMain}`} style={{ width: `${COL_W.periodo}px` }}>{fmtDate(r.data_inicio)} → {fmtDate(r.data_fim)}</div>
+                      <div className={`px-2 py-2 border-r ${border} text-[10px] truncate ${txtMuted} flex items-center`} style={{ width: `${COL_W.obra}px` }} title={obra?.nome}>{obra?.nome ?? '—'}</div>
                     </div>
-                    <div className="flex-1 relative h-9 min-w-[400px]">
-                      <div className="absolute top-0 bottom-0 w-[1px] bg-red-500/40 pointer-events-none" style={{ left: `${todayPct}%` }} />
-                      <div className={`absolute top-1/2 -translate-y-1/2 h-4 rounded ${barColor} shadow-sm`} style={{ left: `${leftPct}%`, width: `${widthPct}%`, minWidth: 10 }} title={`${fmtDate(r.data_inicio)} → ${fmtDate(r.data_fim)}`} />
-                    </div>
+                    {weeks.map((w, i) => {
+                      const ativo = start <= addDays(w.sat, 1) && end >= w.mon
+                      return (
+                        <div key={i} className={`shrink-0 border-r ${border} flex items-center justify-center py-2`} style={{ width: `${COL_W.semana}px` }}>
+                          {ativo && <div className={`h-3.5 w-full mx-1 rounded ${barColor} shadow-sm`} title={`${primeiroNome(r.nome)} — Sem. ${w.label}`} />}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })}
@@ -788,10 +788,10 @@ function ProgramacaoView({
       </div>
 
       <div className={`flex flex-wrap gap-3 text-[10px] ${txtMuted}`}>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-orange-500" /> Liderança</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-orange-500" /> Liderança alocada</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-cyan-500" /> Apoio</span>
         <span className="inline-flex items-center gap-1"><Users2 size={10} /> nº da equipe (sob o encarregado)</span>
-        <span className="inline-flex items-center gap-1"><span className="w-[2px] h-3 bg-red-500" /> Hoje</span>
+        <span className="inline-flex items-center gap-1"><span className={`w-3 h-2 rounded ${isDark ? 'bg-red-500/30' : 'bg-red-100'}`} /> Semana atual</span>
       </div>
     </div>
   )
