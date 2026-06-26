@@ -4,7 +4,6 @@ import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { usePWAInstall } from '../hooks/usePWAInstall'
-import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
 type View = 'login' | 'reset'
@@ -238,7 +237,7 @@ export default function Login() {
 
           {/* Logo */}
           <div style={{ animation: 'vortex-fade-in 0.6s ease-out', marginBottom: 32 }}>
-            <LogoTeg size={100} animated={false} glowing={false} />
+            <img src="/logo-teg-uniao.png" alt="TEG União" width={200} draggable={false} className="object-contain select-none" />
           </div>
 
           {/* TEG+ text */}
@@ -399,7 +398,7 @@ export default function Login() {
             {/* Logo */}
             <div className="text-center mb-7">
               <div className="inline-flex items-center justify-center mb-2" style={{ animation: 'vortex-logo-glow 3s ease-in-out infinite' }}>
-                <LogoTeg size={120} animated={false} glowing={false} />
+                <img src="/logo-teg-uniao.png" alt="TEG União" width={220} draggable={false} className="object-contain select-none" />
               </div>
               <p style={{ color: t.textDim, fontSize: '0.65rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                 Sistema ERP · Acesso Restrito
