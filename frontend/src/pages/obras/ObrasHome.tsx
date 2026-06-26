@@ -176,22 +176,6 @@ export default function ObrasHome() {
         </p>
       </div>
 
-      {/* KPIs */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`rounded-2xl h-28 animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.03]'}`} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <KpiCard label="Apontamentos Hoje" value={kpis?.apontamentos_hoje ?? 0} sub="registros do dia" icon={ClipboardList} accent="blue" isLight={isLight} />
-          <KpiCard label="RDOs Pendentes" value={kpis?.rdos_pendentes ?? 0} sub="aguardando finalizar" icon={CloudSun} accent="amber" isLight={isLight} />
-          <KpiCard label="Adiantamentos Abertos" value={kpis?.adiantamentos_abertos ?? 0} sub="aguardando prestacao" icon={Wallet} accent="violet" isLight={isLight} />
-          <KpiCard label="Prestacoes Pendentes" value={kpis?.prestacoes_pendentes ?? 0} sub="aguardando aprovacao" icon={Receipt} accent="rose" isLight={isLight} />
-        </div>
-      )}
-
       {/* Mobilização & Equipes — dados reais (efetivo RH + frota por obra) */}
       <ObrasPainel />
 
