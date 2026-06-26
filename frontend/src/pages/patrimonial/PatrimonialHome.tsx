@@ -126,6 +126,12 @@ export default function PatrimonialHome() {
   const baseCols = [...baseTot.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
   const maxCell = Math.max(1, ...Array.from(cell.values()))
 
+  // Top equipamentos mais caros (categoria Equipamentos) e onde estao
+  const topEquip = imobilizados
+    .filter(i => i.status !== 'baixado' && i.categoria === 'Equipamentos')
+    .sort((a, b) => (b.valor_aquisicao ?? 0) - (a.valor_aquisicao ?? 0))
+    .slice(0, 8)
+
   return (
     <div className="space-y-3">
 
@@ -303,8 +309,9 @@ export default function PatrimonialHome() {
         </section>
       </div>
 
-      {/* ── Matriz: itens por Categoria x Base (heatmap) ── */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+      {/* ── Matriz heatmap (2/3) + Top Equipamentos (1/3) ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-3 items-stretch">
+      <section className={`rounded-2xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between gap-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Grid3x3 size={14} className="text-teal-500" /> Itens por Categoria x Base
@@ -357,6 +364,33 @@ export default function PatrimonialHome() {
           </div>
         )}
       </section>
+
+      {/* Top Equipamentos — mais caros e onde estao */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+        <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Wrench size={14} className="text-amber-500" /> Top Equipamentos
+          </h2>
+          <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>mais caros e onde estao</p>
+        </div>
+        <div className={`flex-1 divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+          {topEquip.length === 0 ? (
+            <p className={`text-xs p-5 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum equipamento.</p>
+          ) : topEquip.map((i, idx) => (
+            <div key={i.id} className="px-4 py-2.5 flex items-center gap-2.5">
+              <span className={`w-5 h-5 rounded-md shrink-0 flex items-center justify-center text-[10px] font-extrabold ${idx < 3 ? 'bg-amber-100 text-amber-700' : (isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-slate-100 text-slate-500')}`}>{idx + 1}</span>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={i.descricao}>{i.descricao}</p>
+                <p className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <MapPin size={9} /> {i.base_nome || '—'}
+                </p>
+              </div>
+              <p className="text-xs font-extrabold text-amber-600 shrink-0 tabular-nums">{fmt(i.valor_aquisicao ?? 0)}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+      </div>
 
     </div>
   )

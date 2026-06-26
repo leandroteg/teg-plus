@@ -95,7 +95,7 @@ export default function Patrimonial({
   // Open new form when navigated with ?novo=1
   useEffect(() => {
     if (searchParams.get('novo') === '1') {
-      setEditItem({ ...EMPTY })
+      setEditItem({ ...EMPTY_FORM })
       setShowForm(true)
       searchParams.delete('novo')
       setSearchParams(searchParams, { replace: true })
