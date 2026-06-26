@@ -30,6 +30,26 @@ const fmtData = (d: string) =>
 const fmtPct = (v: number) =>
   `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 
+// ── Seletor de período (mês/ano) — mesmo visual dos painéis ──────────────────
+function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+function ymMais(meses: number) { const d = new Date(); d.setMonth(d.getMonth() + meses); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []; for (let a = 2021; a <= anoAtual + 4; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">{MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">{anos.map(a => <option key={a} value={a}>{a}</option>)}</select>
+    </span>
+  )
+}
+
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
@@ -1058,11 +1078,18 @@ function TabRecebiveis() {
 
 // ── Tab: Provisionado (A Pagar) ──────────────────────────────────────────────
 function TabProvisionado() {
+  const { isDark } = useTheme()
   const [statusFilter, setStatusFilter] = useState('')
+  const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
+  const [ate, setAte] = useState(ymMais(36))
   const { data: parcelas = [], isLoading } = useParcelas()
 
-  // Only despesa parcels
-  const compromissos = parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa')
+  // Only despesa parcels — filtrados pelo período do vencimento
+  const compromissos = parcelas.filter(p => {
+    if (p.contrato?.tipo_contrato !== 'despesa') return false
+    const ym = (p.data_vencimento || '').slice(0, 7)
+    return ym >= de && ym <= ate
+  })
 
   const filtered = compromissos.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false
@@ -1118,16 +1145,24 @@ function TabProvisionado() {
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+          {FILTROS.map(f => (
+            <button key={f.value} onClick={() => setStatusFilter(f.value)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+                ${statusFilter === f.value
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-white text-slate-500 border border-slate-200'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto inline-flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className="text-xs text-slate-400">→</span>
+          <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        </div>
       </div>
 
       {isLoading ? (
