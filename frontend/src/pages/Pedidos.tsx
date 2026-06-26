@@ -364,9 +364,13 @@ const contratoAtivoStatus = {
 function getStatusMeta(pedido: PedidoListItem) {
   if ((pedido as any).contrato_ativo) return contratoAtivoStatus
   if (isAguardandoContrato(pedido)) return aguardandoContratoStatus
-  return isPendingEmission(pedido)
-    ? pendingEmissionStatus
-    : (statusConfig[pedido.status] || statusConfig.emitido)
+  if (isPendingEmission(pedido)) {
+    // Recorrente em emissão vai para Contrato (Solicitar Contrato), não vira Pedido.
+    // Rotular como "Pedido Aprovado" engana — usa o badge de contrato.
+    if ((pedido.requisicao as any)?.compra_recorrente) return aguardandoContratoStatus
+    return pendingEmissionStatus
+  }
+  return statusConfig[pedido.status] || statusConfig.emitido
 }
 
 function getDisplayNumber(pedido: PedidoListItem) {
