@@ -261,10 +261,7 @@ const PAPEL_PLURAL: Record<PapelEquipe, string> = {
 }
 
 // Frente de trabalho da equipe (definida na alocação, varia por obra)
-const FUNCOES_EQUIPE = [
-  'Topografia', 'Supressão', 'Acesso/Escavação', 'Fundação', 'Concretagem',
-  'Armação/Pátio', 'Pré-montagem', 'Montagem', 'Lançamento', 'Contrapeso', 'Civil',
-]
+const FUNCOES_EQUIPE = ['Supressão', 'Fundação', 'Montagem', 'Lançamento']
 
 // Popover de pessoas disponíveis (busca + lista) para os botões "+"
 function PickerPopover({ isDark, items, onPick, onClose }: {
@@ -465,7 +462,7 @@ function ListaView({
           {/* Frente/função da equipe — escolhível (vale p/ a alocação) */}
           <div className="relative shrink-0">
             <button onClick={() => setPicker(picker === `func:${enc.id}` ? null : `func:${enc.id}`)}
-              className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded ${enc.funcao_equipe
+              className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded ${enc.funcao_equipe
                 ? (isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700')
                 : (isDark ? 'border border-dashed border-white/15 text-slate-400' : 'border border-dashed border-slate-300 text-slate-400')}`}>
               {enc.funcao_equipe || '+ frente'}
@@ -774,7 +771,7 @@ function ProgramacaoView({
   }, [rows])
 
   const today = new Date()
-  const COL_W = { pessoa: 240, obra: 140, semana: 96 }
+  const COL_W = { pessoa: 290, obra: 140, semana: 96 }
   const leftW = COL_W.pessoa + COL_W.obra
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -793,7 +790,7 @@ function ProgramacaoView({
             <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
             <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
             {r.papel === 'encarregado' && r.funcao_equipe && (
-              <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
+              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
             )}
             {count > 0 && (
               <span className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>
