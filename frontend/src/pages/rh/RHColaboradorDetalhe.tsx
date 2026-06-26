@@ -196,6 +196,19 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
             <Field label="Salário" value={data?.salario != null ? String(data.salario) : ''} onChange={v => set('salario', Number(v) || undefined)}
               editable={editMode} type="number" cls={inputCls} isLight={isLight} />
             <Field label="Data Admissão" value={data?.data_admissao} onChange={v => set('data_admissao', v)} editable={editMode} type="date" cls={inputCls} isLight={isLight} />
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Status</label>
+              {editMode ? (
+                <select value={data?.ativo === false ? 'inativo' : 'ativo'} onChange={e => set('ativo', e.target.value === 'ativo')} className={inputCls}>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+              ) : (
+                <p className={`text-sm font-semibold ${data?.ativo === false ? (isLight ? 'text-red-600' : 'text-red-400') : (isLight ? 'text-emerald-600' : 'text-emerald-400')}`}>
+                  {data?.ativo === false ? 'Inativo' : 'Ativo'}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
