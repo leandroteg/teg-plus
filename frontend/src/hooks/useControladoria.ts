@@ -276,20 +276,6 @@ export interface ControleOrcamentarioRow {
   plano_acao: string
 }
 
-// grupo_dre do legado → categoria da tela (sem acento, igual aos labels do Controle Orçamentário)
-const LEGADO_GRUPO_CAT: Record<string, string> = {
-  'Materiais': 'Materiais (Aco, Concreto)',
-  'Mao de Obra Direta': 'Mao de Obra Direta',
-  'Alojamentos e Alimentacao': 'Alojamentos e Alimentacao',
-  'Frotas': 'Frotas',
-  'Servicos Terc. + Outros C. Diretos': 'Servicos Terc. + Outros C. Diretos',
-  'Equipamentos e EPIs': 'Equipamentos e EPIs',
-  'Pessoal Administrativo': 'Pessoal',
-  'Administrativo': 'Administrativo',
-  'Sistemas/TI': 'Sistemas',
-  'Despesas Financeiras': 'Desp Fin. e Outra Desp Adm',
-  'Impostos s/ Lucro': 'Impostos (PIS/COFINS/IRPJ/CSLL)',
-}
 const semAcento = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
 
 export function useControleOrcamentario(ano: number, mes: number) {
@@ -301,11 +287,12 @@ export function useControleOrcamentario(ano: number, mes: number) {
       const { data: orcamentos } = await supabase.from('ctrl_orcamentos').select('id').eq('ano', ano)
       const ids = (orcamentos ?? []).map(o => o.id)
       if (ids.length) {
-        const { data: linhas } = await supabase
+        let lq = supabase
           .from('ctrl_orcamento_linhas')
           .select('categoria, valor_planejado, premissa, desvio_explicacao, plano_acao')
           .in('orcamento_id', ids)
-          .eq('mes', mes)
+        if (mes > 0) lq = lq.eq('mes', mes)
+        const { data: linhas } = await lq
         for (const l of (linhas ?? [])) {
           const k = semAcento(l.categoria as string)
           const e = orcadoMap.get(k) ?? { orcado: 0, premissa: '', desvio: '', plano: '' }
@@ -317,22 +304,14 @@ export function useControleOrcamentario(ano: number, mes: number) {
         }
       }
 
-      // ── Realizado: legado (fin_legado_custos) do mês, grupo_dre/classe → categoria ──
+      // ── Realizado: legado agregado (vw_ctrl_realizado_categoria) — mês (mes>0) ou ano todo (mes=0) ──
       const realMap = new Map<string, number>()
-      const { data: leg } = await supabase
-        .from('fin_legado_custos')
-        .select('grupo_dre, classe_desc, natureza_dre, valor')
-        .eq('ano', ano).eq('mes', mes)
-        .range(0, 9999)
+      let rq = supabase.from('vw_ctrl_realizado_categoria').select('categoria, realizado, mes').eq('ano', ano)
+      if (mes > 0) rq = rq.eq('mes', mes)
+      const { data: leg } = await rq
       for (const r of (leg ?? [])) {
-        if (r.natureza_dre === 'receita') continue
-        // Amortizações vem da classe (dentro do grupo Capital/Investimentos)
-        const cat = semAcento(r.classe_desc as string) === 'Amortizacao de Emprestimos'
-          ? 'Amortizacoes'
-          : LEGADO_GRUPO_CAT[r.grupo_dre as string]
-        if (!cat) continue
-        const k = semAcento(cat)
-        realMap.set(k, (realMap.get(k) ?? 0) + ((r.valor ?? 0) as number))
+        const k = semAcento(r.categoria as string)
+        realMap.set(k, (realMap.get(k) ?? 0) + ((r.realizado ?? 0) as number))
       }
 
       // ── Merge por categoria (chave sem acento = label da tela) ──

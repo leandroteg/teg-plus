@@ -71,14 +71,13 @@ const fmtVariacao = (v: number): string => {
 }
 
 const currentYear = new Date().getFullYear()
-const currentMonth = new Date().getMonth() + 1
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ControleOrcamentario() {
   const { isLightSidebar: isLight } = useTheme()
   const [ano, setAno] = useState(currentYear)
-  const [mes, setMes] = useState(currentMonth)
+  const [mes, setMes] = useState(0) // 0 = ano todo (padrão)
   const { data: rows = [], isLoading } = useControleOrcamentario(ano, mes)
 
   // Build lookup map
@@ -132,7 +131,7 @@ export default function ControleOrcamentario() {
   }, [dataMap, grandTotal])
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
-  const mesLabel = MONTHS[mes - 1] ?? ''
+  const mesLabel = mes === 0 ? 'Ano todo' : (MONTHS[mes - 1] ?? '')
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +166,7 @@ export default function ControleOrcamentario() {
                   : 'bg-slate-700 border-slate-600 text-white hover:border-violet-500/50'
               }`}
             >
+              <option value={0}>Ano todo</option>
               {MONTHS.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
@@ -261,10 +261,10 @@ export default function ControleOrcamentario() {
                     Premissa do Orcamento
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Orcado {mes}/{ano}
+                    Orcado {mes === 0 ? ano : `${mes}/${ano}`}
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Realizado {mes}/{ano}
+                    Realizado {mes === 0 ? ano : `${mes}/${ano}`}
                   </th>
                   <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider min-w-[110px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Variacao (R$)
