@@ -123,7 +123,7 @@ export default function PatrimonialHome() {
     cell.set(k, (cell.get(k) ?? 0) + 1)
   })
   const catRows = [...catTot.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
-  const baseCols = [...baseTot.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
+  const baseCols = [...baseTot.entries()].sort((a, b) => (a[0] === 'Sem base' ? -1 : b[0] === 'Sem base' ? 1 : b[1] - a[1])).map(e => e[0])
   const maxCell = Math.max(1, ...Array.from(cell.values()))
 
   // Top equipamentos mais caros (categoria Equipamentos) e onde estao
