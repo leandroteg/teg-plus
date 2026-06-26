@@ -5,45 +5,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useEAPFinal, type EAPPoloRaw } from '../../../hooks/usePMO'
+import { useEAPFinal } from '../../../hooks/usePMO'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
+import {
+  DRV, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
+  buildTree, makeDefaultConfig, projObra, type Obra, type Config, type Versao,
+} from './cronogramaEngine'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
-const DRV = [
-  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 40 }, // pp = produtividade padrão por pessoa/mês
-  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#374151', pp: 8 },
-  { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2 },
-]
-// tudo que não é driver (topografia, canteiro, adm, outros) → "ADM + Outros" (só R$)
-const OUTROS_PAC = ['Serv. Preliminares', 'Canteiro e Mobiliz.', 'Administração Local', 'Outros']
-const COR_OUTROS = '#6d28d9'
-const MES_ABR = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-const ymLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${MES_ABR[+m]}/${y.slice(2)}` }
-const shiftYM = (ym: string, d: number) => { let [y, m] = ym.split('-').map(Number); m += d; while (m > 12) { m -= 12; y++ } while (m < 1) { m += 12; y-- } return `${y}-${String(m).padStart(2, '0')}` }
-const startYM = () => { const d = new Date(); return shiftYM(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, 1) }
-const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + 'M' : v >= 1e3 ? 'R$ ' + Math.round(v / 1e3) + 'k' : 'R$ ' + Math.round(v)
-const fmtQ = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : (Number.isInteger(v) ? String(v) : v.toFixed(1))
-const ymNum = (ym: string) => { const [y, m] = ym.split('-').map(Number); return y * 12 + m }
 const PROD_BANDS: [string, string, (p: number) => boolean][] = [
   ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50], ['51-75', '51–75%', p => p >= 51 && p <= 75], ['75-85', '75–85%', p => p > 75 && p <= 85], ['85-95', '85–95%', p => p > 85 && p <= 95], ['95+', '>95%', p => p > 95],
 ]
-// indicador de produtividade/ritmo: físico vs prazo decorrido
-function ritmoCor(pctFis: number, ini: string | null, fim: string | null): string {
-  if (!ini || !fim) return '#94a3b8'
-  const t0 = Date.parse(ini), t1 = Date.parse(fim), now = Date.now()
-  if (!(t1 > t0)) return '#94a3b8'
-  const dec = Math.min(100, Math.max(0, (now - t0) / (t1 - t0) * 100))
-  const d = pctFis - dec
-  return d >= 0 ? '#10b981' : d >= -15 ? '#f59e0b' : '#ef4444'
-}
-// indicador de prazo: término previsto (YYYY-MM) vs vencimento
-function prazoCor(termino: string | null, fim: string | null): string {
-  if (!termino || !fim) return '#94a3b8'
-  const diff = ymNum(termino) - ymNum(fim.slice(0, 7))
-  return diff <= 0 ? '#10b981' : diff <= 2 ? '#f59e0b' : '#ef4444'
-}
-const worstCor = (cs: string[]) => cs.includes('#ef4444') ? '#ef4444' : cs.includes('#f59e0b') ? '#f59e0b' : cs.includes('#10b981') ? '#10b981' : '#94a3b8'
 function Dots({ ritmo, prazo }: { ritmo: string; prazo: string }) {
   return (
     <span className="inline-flex items-center gap-1 mr-1.5">
@@ -52,14 +25,6 @@ function Dots({ ritmo, prazo }: { ritmo: string; prazo: string }) {
     </span>
   )
 }
-
-type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
-type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; omR: number; omOscs: string[]; pctFis: number; ini: string | null; fim: string | null }
-// prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver
-type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number }
-type Versao = { id: string; nome: string; config: Config; updated_at: string }
-
-function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
 
 function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark }: { label: string; icon?: ReactNode; options: { value: string; label: string }[]; selected: Set<string>; onToggle: (v: string) => void; onClear: () => void; isDark: boolean }) {
   const [open, setOpen] = useState(false); const n = selected.size
@@ -98,39 +63,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const [modalOpen, setModalOpen] = useState(false)
   const [applied, setApplied] = useState<Config | null>(null)
 
-  // árvore frente → obra → drivers (saldo)
-  const tree = useMemo(() => {
-    const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; omR: number; omOscs: string[]; ini: string | null; fim: string | null }> }>()
-    for (const polo of (raw ?? []) as EAPPoloRaw[]) {
-      let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
-      for (const o of polo.oscs) {
-        if (o.etapa_atual === 'cancelada') continue
-        if (o.tipo !== 'construcao' && o.tipo !== 'manutencao') continue // exclui depósito; construção+O&M
-        let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, omR: 0, omOscs: [], ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
-        const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
-        const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
-        if (o.tipo === 'manutencao') { // O&M → uma linha "Execução" (saldo R$ total), identificando a OSC
-          let s = 0; for (const pa of Object.values(o.pacotes)) s += Math.max(0, pa.valor - pa.fat)
-          if (s > 0) { od.omR += s; if (o.numero_os && !od.omOscs.includes(o.numero_os)) od.omOscs.push(o.numero_os) }
-          continue
-        }
-        for (const [pn, pa] of Object.entries(o.pacotes)) {
-          const d = od.drivers.find(x => x.pac === pn)
-          if (d) { d.contr += pa.qC; d.real += pa.qR; d.valor += pa.valor; d.fat += pa.fat; d.saldoR += Math.max(0, pa.valor - pa.fat) }
-          else if (OUTROS_PAC.includes(pn)) od.outrosR += Math.max(0, pa.valor - pa.fat)
-        }
-      }
-    }
-    return [...frentes.values()].map(fr => ({
-      label: fr.label,
-      obras: [...fr.obras.entries()].map(([nome, od]) => {
-        od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 })
-        const wf = od.drivers.filter(d => d.contr > 0); const wsum = wf.reduce((s, d) => s + d.valor, 0)
-        const pctFis = wsum ? Math.round(wf.reduce((s, d) => s + (d.real / d.contr * 100) * d.valor, 0) / wsum) : 0
-        return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, omR: od.omR, omOscs: od.omOscs, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR + od.omR } as Obra
-      }).filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0 || o.omR > 0).sort((a, b) => b.saldoR - a.saldoR),
-    })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
-  }, [raw])
+  // árvore frente → obra → drivers (saldo) — engine compartilhada
+  const tree = useMemo(() => buildTree(raw), [raw])
 
   const allObras = useMemo(() => tree.flatMap(f => f.obras), [tree])
   const allKeys = useMemo(() => ({ frentes: tree.map(f => f.label), obras: tree.flatMap(f => f.obras.map(o => f.label + '|' + o.nome)) }), [tree])
@@ -139,12 +73,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const saldoGlobal = useMemo(() => { const m: Record<string, number> = {}; DRV.forEach(d => m[d.label] = 0); for (const o of allObras) for (const d of o.drivers) m[d.label] += d.saldoQ; return m }, [allObras])
 
   // config default (produtividade/pessoa padrão; equipe p/ terminar cada obra em 12m, ∝ saldo)
-  const defaultConfig = useMemo<Config>(() => {
-    const prodPP: Record<string, number> = {}; DRV.forEach(d => prodPP[d.label] = d.pp)
-    const h = 12, equipe: Record<string, Record<string, number>> = {}
-    allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e })
-    return { prodPP, equipe, horizonte: h, precedencia: true, lag: 0 }
-  }, [allObras])
+  const defaultConfig = useMemo<Config>(() => makeDefaultConfig(allObras), [allObras])
 
   // aplica o default automaticamente na 1ª carga (não fica vazio)
   useEffect(() => { if (!applied && allObras.length) setApplied(defaultConfig) }, [applied, allObras.length, defaultConfig])
@@ -156,51 +85,6 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   })
 
   const start = startYM()
-  // rate (qtd/mês) por (obra, driver) = nº de pessoas × produtividade por pessoa
-  const rateOf = (o: Obra, d: Drv, cfg: Config) => {
-    if (d.saldoQ <= 0) return 0
-    return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
-  }
-  // projeção mês a mês da obra com PRECEDÊNCIA: Fundação libera Montagem, Montagem libera Lançamento
-  const projObra = (o: Obra, cfg: Config) => {
-    const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
-    const order = present.map(d => d.label)
-    const rate: Record<string, number> = {}, contr: Record<string, number> = {}, real: Record<string, number> = {}, cum: Record<string, number> = {}
-    const hist: Record<string, number[]> = {}, monthly: Record<string, number[]> = {}
-    present.forEach(d => { rate[d.label] = rateOf(o, d, cfg); contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = [] })
-    const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
-    let i = 0
-    while (i < 120) {
-      for (let k = 0; k < order.length; k++) {
-        const lbl = order[k]
-        let capPct = 1
-        if (prec && k > 0) { const pl = order[k - 1]; const predCum = lag <= 0 ? cum[pl] : (i - lag >= 0 ? hist[pl][i - lag] : real[pl]); capPct = contr[pl] > 0 ? predCum / contr[pl] : 1 }
-        const adv = Math.max(0, Math.min(rate[lbl], contr[lbl] - cum[lbl], capPct * contr[lbl] - cum[lbl]))
-        monthly[lbl].push(adv); cum[lbl] += adv
-      }
-      order.forEach(l => hist[l].push(cum[l]))
-      i++
-      if (!order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
-    }
-    let drvMax = 0; for (let m = 0; m < i; m++) if (order.some(l => monthly[l][m] > 0.001)) drvMax = m + 1
-    // O&M (manutenção): execução distribuída uniformemente até o vencimento (sem drivers/precedência)
-    const omMeses = o.omR > 0 ? (present.length > 0 ? drvMax : Math.max(1, Math.min(60, o.fim ? (ymNum(o.fim.slice(0, 7)) - ymNum(start) + 1) : 12))) : 0
-    let maxMeses = Math.max(drvMax, omMeses)
-    if (maxMeses === 0 && o.outrosR > 0) maxMeses = 1
-    const meses = Array.from({ length: maxMeses }, (_, m) => shiftYM(start, m))
-    const rows = present.map(d => {
-      const qty = Array.from({ length: maxMeses }, (_, m) => monthly[d.label][m] || 0)
-      const rMes = qty.map(q => d.saldoQ > 0 ? d.saldoR * (q / d.saldoQ) : 0)
-      const mesesD = qty.reduce((a, q, m) => q > 0.001 ? m + 1 : a, 0)
-      return { d, qty, rMes, meses: mesesD }
-    })
-    const execMes = meses.map((_, m) => (omMeses > 0 && m < omMeses) ? o.omR / omMeses : 0)
-    const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + (x.rMes[m] || 0), 0))
-    const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
-    const outrosRmes = meses.map((_, m) => totDrvR > 0 ? o.outrosR * drvRmes[m] / totDrvR : (drvMax ? o.outrosR / drvMax : 0))
-    const totalRmes = meses.map((_, m) => drvRmes[m] + outrosRmes[m] + execMes[m])
-    return { meses, rows, execMes, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
-  }
 
   const view = useMemo(() => {
     if (!applied) return { frentesF: [] as typeof tree, maxMeses: 0, saldoRtot: 0, terminoGeral: null as string | null }
@@ -209,7 +93,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
       .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o))).map(stripOM) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
-    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied).maxMeses) }
+    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied, start).maxMeses) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, fFrente, fObra, fPct, hideOM, applied])
@@ -221,9 +105,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg).maxMeses
+  const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg, start).maxMeses
   const mesesArr = (applied && view.maxMeses > 0) ? Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i)) : []
-  const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
+  const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied, start).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
   // larguras fixas p/ TODAS as tabelas alinharem as colunas
   const W_LABEL = 190, W_MES = 72, W_TOT = 78
   const tableW = W_LABEL + mesesArr.length * W_MES + W_TOT // largura fixa idêntica p/ todas as tabelas (não esticar)
@@ -304,7 +188,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                               <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={10} />{oTerm ? ymLabel(oTerm) : '—'}</span></span>
                             </button>
                             {oOpen && (() => {
-                              const pj = projObra(o, applied)
+                              const pj = projObra(o, applied, start)
                               const thx = `px-2 py-1 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
                               const tdx = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
                               return (
