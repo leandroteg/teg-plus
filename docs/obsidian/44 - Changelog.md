@@ -23,6 +23,32 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[17 - Roadmap]]", "[[15 - Deploy e GitHub
 
 ---
 
+## [2026-06-26] — Controladoria: NIBO, Plano Orçamentário, Acompanhamento + Portal TEG
+
+### Added
+- **NIBO import** — 21.655 linhas de custos NIBO (dez/2023→jul/2025) carregadas em `fin_legado_custos` com `origem='nibo'`, R$ 68,4mi. Base total agora: 31.312 linhas (totvs 9.657 + nibo 21.655), R$ 95,2mi. TOTVS não foi tocado.
+- **Plano Orçamentário V1/2026** — 168 linhas carregadas em `ctrl_orcamento_linhas` (14 categorias × 12 meses), R$ 65,72mi.
+- **Investimentos** adicionado como categoria em `PlanoOrcamentario.tsx` (grupo "DESPESAS APÓS O LUCRO").
+- **`vw_ctrl_realizado_categoria`** — nova view que agrega `fin_legado_custos` por (ano, mes, categoria) mapeando `grupo_dre` → categoria do plano; alimenta o Acompanhamento.
+- **Filtro De → Até** em Relatórios Legado (seletores mês/ano independentes, default dez/23 → hoje); substituiu toggle "jun/25–mai/26 / Tudo".
+- **Nomes de polo** no Relatórios Legado: F1→Frutal, F2→Três Marias, F3.1/3.2→Araxá/Perdizes, F3.3/3.4→Patrocínio/Ituiutaba, F3.5/3.6/3.7→Uberlândia, F3.12→Paracatu, F4→Rio Paranaíba, F8→Comendador Gomes.
+- **Filtro por trimestre** no Acompanhamento: 1º-4º Tri (codificados 101-104); `mesesDoFiltro()` em `useControladoria.ts`.
+- **"Ano todo"** como filtro padrão do Acompanhamento (antes era mês atual).
+- **Portal TEG** — botão Ponto corrigido para `https://autenticador.secullum.com.br/Authorization?...`; logos atualizadas (login: "Teg União TRANSIÇÃO", header: "Teg TRANSIÇÃO").
+
+### Changed
+- **Budget por Centro de Custo** — `Orcamentos.tsx` agora filtra/exibe por `centro_custo_id` em vez de `obra_id`; migration `ctrl_orcamentos_centro_custo` adicionou FK + tornou `obra_id` nullable.
+- **Materiais sem EPIs** — "Materiais (Aço, Concreto, EPIs)" → "Materiais (Aço, Concreto)" em `PlanoOrcamentario.tsx` e `ControleOrcamentario.tsx`.
+- **Acompanhamento sem subtítulos** — removidos textos "Painel Executivo de Acompanhamento..." e "Contas marcadas com ★..." para ganhar espaço.
+
+### Removed
+- **"Controle Projetos"** removido da navegação lateral da Controladoria (`ControladoriaLayout.tsx`).
+- **"Cenários"** removido da navegação lateral da Controladoria.
+- **"Visão Executiva"** removida do hub Controle Orçamentário (`ControleOrcamentarioHub.tsx`).
+- **4 KPI cards** removidos do `PlanoOrcamentario.tsx` (Faturamento Real vs Meta, Margem Líquida, Desvio de Custos, Fluxo de Caixa).
+
+---
+
 ## [2026-06-17] — Painel de Pagamentos Previstos + Fatura ↔ CP (Cartão & Locação)
 
 ### Added

@@ -206,12 +206,12 @@ Ver [[24 - Módulo Frotas e Manutenção]].
 
 | Rota | Componente | Descricao |
 |------|-----------|-----------|
-| `/obras` | `ObrasHome.tsx` | Dashboard — KPIs, apontamentos recentes, mobilizacoes |
+| `/obras` | `ObrasHome.tsx` | Dashboard — ObrasPainel (indicadores mobilizacao EGP), apontamentos recentes, mobilizacoes |
 | `/obras/apontamentos` | `Apontamentos.tsx` | Apontamentos de campo (HH, equipes) |
 | `/obras/rdo` | `RDO.tsx` | Relatorio Diario de Obra |
 | `/obras/adiantamentos` | `Adiantamentos.tsx` | Adiantamentos financeiros para obras |
 | `/obras/prestacao` | `PrestacaoContas.tsx` | Prestacao de contas de adiantamentos |
-| `/obras/equipe` | `PlanejamentoEquipe.tsx` | Planejamento e gestao de equipe por obra |
+| `/obras/equipe` | `EquipeObras.tsx` | Lista / Programacao (Gantt + frota + drag) / Quadro Geral (Kanban) |
 
 Ver [[32 - Módulo Obras]].
 
