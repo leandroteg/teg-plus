@@ -116,24 +116,28 @@ export default function EGPPlanejamento() {
         })}
       </div>
 
-      {/* Barra de filtro de Projetos (multi-select) */}
-      <ProjetosFilterBar
-        projetos={projetos ?? []}
-        loadingProjetos={loadingProjetos}
-        excluded={excluded}
-        setExcluded={setExcluded}
-        criando={criando}
-        setCriando={setCriando}
-        novoProjeto={novoProjeto}
-        setNovoProjeto={setNovoProjeto}
-        handleCriarProjeto={handleCriarProjeto}
-        criarProjetoPending={criarProjeto.isPending}
-        lookupsCC={lookups?.centros_custo ?? []}
-        accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
-        accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
-        isLight={isLight}
-        rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : tab === 'cronograma' ? <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap" /> : undefined}
-      />
+      {/* Barra de filtro: Cronograma não usa o seletor de Projetos (contrato inteiro) — só os filtros próprios, à direita */}
+      {tab === 'cronograma' ? (
+        <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-end" />
+      ) : (
+        <ProjetosFilterBar
+          projetos={projetos ?? []}
+          loadingProjetos={loadingProjetos}
+          excluded={excluded}
+          setExcluded={setExcluded}
+          criando={criando}
+          setCriando={setCriando}
+          novoProjeto={novoProjeto}
+          setNovoProjeto={setNovoProjeto}
+          handleCriarProjeto={handleCriarProjeto}
+          criarProjetoPending={criarProjeto.isPending}
+          lookupsCC={lookups?.centros_custo ?? []}
+          accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
+          accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
+          isLight={isLight}
+          rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : undefined}
+        />
+      )}
 
       {/* Tab content */}
       {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
