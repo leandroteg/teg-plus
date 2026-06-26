@@ -11,7 +11,7 @@ import { useTheme } from '../contexts/ThemeContext'
 const NAV = [
   { to: '/egp',              icon: LayoutDashboard, label: 'Painel',        end: true },
   { to: '/egp/iniciacao',    icon: Rocket,          label: 'Iniciação' },
-  { to: '/egp/planejamento', icon: Compass,         label: 'Gestão dos Projetos' },
+  { to: '/egp/planejamento', icon: Compass,         label: 'Gestão de Projetos' },
   // { to: '/egp/controle',  icon: BarChart3,       label: 'Controle' }, // OCULTO — Medições movido p/ Gestão dos Projetos; remover a tela depois
   { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
 ]

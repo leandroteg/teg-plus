@@ -88,7 +88,7 @@ export default function EGPPlanejamento() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Compass size={20} className="text-blue-500" />
-          Gestão dos Projetos
+          Gestão de Projetos
         </h1>
         <ContractSelector />
       </div>
