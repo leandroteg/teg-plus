@@ -33,11 +33,22 @@ const VIEWS: Array<{ key: View; label: string; icon: React.ElementType }> = [
   { key: 'natureza',  label: 'Por Natureza',  icon: Tags },
 ]
 
-function inPeriodoReal(r: LegadoResumo) {
-  // jun/2025 a mai/2026 (período efetivo; resto é ruído de digitação)
-  if (r.ano === 2025) return (r.mes ?? 0) >= 6
-  if (r.ano === 2026) return (r.mes ?? 0) <= 5
-  return false
+function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []; for (let a = 2021; a <= anoAtual + 1; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">{MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">{anos.map(a => <option key={a} value={a}>{a}</option>)}</select>
+    </span>
+  )
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -45,7 +56,8 @@ export default function RelatoriosLegado() {
   const { isDark } = useTheme()
   const { data: rows = [], isLoading, isError, refetch, isFetching } = useLegadoResumo()
 
-  const [periodo, setPeriodo] = useState<'real' | 'tudo'>('real')
+  const [de, setDe] = useState('2023-12')
+  const [ate, setAte] = useState(ymHoje())
   const [polo, setPolo] = useState<string>('')
   const [grupo, setGrupo] = useState<string>('')
   const [nat, setNat] = useState<string>('')
@@ -55,12 +67,13 @@ export default function RelatoriosLegado() {
   const grupos = useMemo(() => [...new Set(rows.map(r => r.grupo_dre).filter(Boolean))].sort() as string[], [rows])
   const nats = useMemo(() => [...new Set(rows.map(r => r.natureza_dre).filter(Boolean))].sort() as string[], [rows])
 
-  const filtered = useMemo(() => rows.filter(r =>
-    (periodo === 'tudo' || inPeriodoReal(r)) &&
-    (!polo || r.polo === polo) &&
-    (!grupo || r.grupo_dre === grupo) &&
-    (!nat || r.natureza_dre === nat),
-  ), [rows, periodo, polo, grupo, nat])
+  const filtered = useMemo(() => rows.filter(r => {
+    const ym = `${r.ano}-${String(r.mes ?? 0).padStart(2, '0')}`
+    return ym >= de && ym <= ate &&
+      (!polo || r.polo === polo) &&
+      (!grupo || r.grupo_dre === grupo) &&
+      (!nat || r.natureza_dre === nat)
+  }), [rows, de, ate, polo, grupo, nat])
 
   const total = useMemo(() => filtered.reduce((s, r) => s + r.valor, 0), [filtered])
   const porNatDre = useMemo(() => {
@@ -96,7 +109,7 @@ export default function RelatoriosLegado() {
   if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (isError) return <div className={`rounded-2xl p-8 text-center text-sm ${cardClass} text-rose-500`}>Erro ao carregar os dados do legado.</div>
 
-  const hasFilter = polo || grupo || nat || periodo !== 'real'
+  const hasFilter = polo || grupo || nat
 
   return (
     <div className="space-y-3">
@@ -119,12 +132,10 @@ export default function RelatoriosLegado() {
       {/* Filtros */}
       <div className={`rounded-2xl p-3 flex flex-wrap items-center gap-2 ${cardClass}`}>
         <span className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Filter size={12} /> Filtros</span>
-        <div className={`flex rounded-xl p-0.5 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          {(['real', 'tudo'] as const).map(p => (
-            <button key={p} onClick={() => setPeriodo(p)} className={`text-xs px-3 py-1 rounded-lg font-semibold transition-colors ${periodo === p ? 'bg-teal-600 text-white' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {p === 'real' ? 'jun/25–mai/26' : 'Tudo'}
-            </button>
-          ))}
+        <div className="inline-flex items-center gap-1.5">
+          <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+          <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
         </div>
         <select className={selCls} value={polo} onChange={e => setPolo(e.target.value)}>
           <option value="">Todos os polos</option>
@@ -139,7 +150,7 @@ export default function RelatoriosLegado() {
           {nats.map(n => <option key={n} value={n}>{NAT_CFG[n]?.label ?? n}</option>)}
         </select>
         {hasFilter && (
-          <button onClick={() => { setPolo(''); setGrupo(''); setNat(''); setPeriodo('real') }} className="flex items-center gap-1 text-[11px] text-rose-500 font-semibold ml-auto">
+          <button onClick={() => { setPolo(''); setGrupo(''); setNat('') }} className="flex items-center gap-1 text-[11px] text-rose-500 font-semibold ml-auto">
             <X size={11} /> Limpar
           </button>
         )}
@@ -213,7 +224,7 @@ export default function RelatoriosLegado() {
       </section>
 
       <p className={`text-[10px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-        Fonte: <code>fin_legado_custos</code> · TOTVS jun/25–mai/26 (R$ 26,95 mi) · valores diretos por lançamento; Estrutura/Frota = overhead (rateio em aba própria)
+        Fonte: <code>fin_legado_custos</code> · TOTVS + NIBO (dez/23 → mai/26) · valores diretos por lançamento; Estrutura/Frota = overhead (rateio em aba própria)
       </p>
       </>)}
     </div>
