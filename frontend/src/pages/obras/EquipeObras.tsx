@@ -259,6 +259,12 @@ const PAPEL_PLURAL: Record<PapelEquipe, string> = {
   engenheiro: 'Engenheiros', supervisor: 'Supervisores', encarregado: 'Encarregados', apoio: 'Apoio', time: 'Time',
 }
 
+// Frente de trabalho da equipe (definida na alocação, varia por obra)
+const FUNCOES_EQUIPE = [
+  'Topografia', 'Supressão', 'Acesso/Escavação', 'Fundação', 'Concretagem',
+  'Armação/Pátio', 'Pré-montagem', 'Montagem', 'Lançamento', 'Contrapeso', 'Civil',
+]
+
 // Popover de pessoas disponíveis (busca + lista) para os botões "+"
 function PickerPopover({ isDark, items, onPick, onClose }: {
   isDark: boolean; items: ColaboradorAtivo[]; onPick: (c: ColaboradorAtivo) => void; onClose: () => void
@@ -410,6 +416,10 @@ function ListaView({
     try { await atualizar.mutateAsync({ id: allocId, lider_id: liderId } as any) }
     catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
   }
+  async function setFuncao(allocId: string, funcao: string | null) {
+    try { await atualizar.mutateAsync({ id: allocId, funcao_equipe: funcao } as any) }
+    catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
+  }
   // dropar item (novo do roster ou movido) sob um lider; papelEsperado valida
   function dropUnder(liderId: string | null, papelEsperado: PapelEquipe) {
     if (!drag || drag.papel !== papelEsperado) return
@@ -449,6 +459,26 @@ function ListaView({
           <div draggable onDragStart={() => setDrag({ kind: 'move', allocId: enc.id, papel: 'encarregado' })} onDragEnd={() => setDrag(null)} className="flex items-center gap-2 min-w-0 cursor-grab active:cursor-grabbing">
             <Avatar nome={enc.nome} fotoUrl={enc.colaborador?.foto_url} isDark={isDark} size={22} />
             <p className={`text-[11px] font-bold truncate min-w-0 ${txtMain}`}>{primeiroNome(enc.nome)}</p>
+          </div>
+          {/* Frente/função da equipe — escolhível (vale p/ a alocação) */}
+          <div className="relative shrink-0">
+            <button onClick={() => setPicker(picker === `func:${enc.id}` ? null : `func:${enc.id}`)}
+              className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded ${enc.funcao_equipe
+                ? (isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700')
+                : (isDark ? 'border border-dashed border-white/15 text-slate-400' : 'border border-dashed border-slate-300 text-slate-400')}`}>
+              {enc.funcao_equipe || '+ frente'}
+            </button>
+            {picker === `func:${enc.id}` && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setPicker(null)} />
+                <div className={`absolute left-0 mt-1 w-[170px] rounded-lg border shadow-xl z-50 max-h-[240px] overflow-y-auto ${isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'}`}>
+                  {FUNCOES_EQUIPE.map(f => (
+                    <button key={f} onClick={() => { setFuncao(enc.id, f); setPicker(null) }} className={`block w-full text-left text-[10px] px-2 py-1.5 ${isDark ? 'hover:bg-white/[0.05] text-slate-200' : 'hover:bg-slate-50 text-slate-700'} ${enc.funcao_equipe === f ? 'font-bold' : ''}`}>{f}</button>
+                  ))}
+                  {enc.funcao_equipe && <button onClick={() => { setFuncao(enc.id, null); setPicker(null) }} className={`block w-full text-left text-[10px] px-2 py-1.5 border-t ${isDark ? 'border-white/10 text-rose-400 hover:bg-white/[0.05]' : 'border-slate-100 text-rose-500 hover:bg-slate-50'}`}>Limpar</button>}
+                </div>
+              </>
+            )}
           </div>
           <PapelBadge papel="encarregado" isDark={isDark} />
           <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`}><Users2 size={9} /> {tm.length}</span>
@@ -682,7 +712,7 @@ function ProgramacaoView({
     const rank: Record<string, number> = { engenheiro: 0, supervisor: 1, encarregado: 2, apoio: 3, time: 4 }
     map.forEach(g => g.rows.sort((a, b) => {
       const oa = obraById.get(a.obra_id)?.nome ?? '', ob = obraById.get(b.obra_id)?.nome ?? ''
-      return oa.localeCompare(ob) || (rank[a.papel] - rank[b.papel]) || a.nome.localeCompare(b.nome)
+      return (rank[a.papel] - rank[b.papel]) || oa.localeCompare(ob) || a.nome.localeCompare(b.nome)
     }))
     return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [rows, obraById])
@@ -728,6 +758,9 @@ function ProgramacaoView({
         <div className="flex shrink-0" style={{ width: `${leftW}px` }}>
           <div className={`py-1.5 border-r ${border} flex items-center gap-1.5`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: recurso ? 28 : 12, paddingRight: 8 }}>
             <span className={`${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
+            {r.papel === 'encarregado' && r.funcao_equipe && (
+              <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-700'}`} title={`Frente: ${r.funcao_equipe}`}>{r.funcao_equipe}</span>
+            )}
             <span className={`${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{primeiroNome(r.nome)}</span>
             {count > 0 && (
               <span className={`ml-auto shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Pessoas na equipe"><Users2 size={9} /> {count}</span>

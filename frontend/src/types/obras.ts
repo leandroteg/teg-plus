@@ -165,6 +165,7 @@ export interface ObraPlanejamentoEquipe {
   colaborador_id?: string
   papel: PapelEquipe
   lider_id?: string
+  funcao_equipe?: string
   nome: string
   funcao: string
   categoria: CategoriaEquipePlan
