@@ -174,7 +174,7 @@ export default function EquipeObras() {
           <>
             {tab === 'lista' && (
               <ListaView
-                equipe={equipe} obras={obras} disponiveis={disponiveis}
+                colaboradores={colaboradores} equipe={equipe} obras={obras}
                 isDark={isDark}
                 onAlocar={(preset) => handleOpenAlocar(preset)}
               />
@@ -256,216 +256,149 @@ function PapelBadge({ papel, isDark }: { papel: PapelEquipe; isDark: boolean }) 
 // LISTA VIEW — montador de times
 // ══════════════════════════════════════════════════════════════════════════════
 
+const PAPEL_PLURAL: Record<PapelEquipe, string> = {
+  engenheiro: 'Engenheiros', supervisor: 'Supervisores', encarregado: 'Encarregados', apoio: 'Apoio', time: 'Time',
+}
+
 function ListaView({
-  equipe, obras, disponiveis, isDark, onAlocar,
+  colaboradores, equipe, obras, isDark, onAlocar,
 }: {
+  colaboradores: ColaboradorAtivo[]
   equipe: ObraPlanejamentoEquipe[]
   obras: ObraComProjeto[]
-  disponiveis: ColaboradorAtivo[]
   isDark: boolean
-  onAlocar: (preset: { obraId?: string; papel?: PapelEquipe; liderId?: string } | null) => void
+  onAlocar: (preset: { colaboradorId?: string; papel?: PapelEquipe } | null) => void
 }) {
-  const [projetoFiltro, setProjetoFiltro] = useState('todos')
-  const [obraFiltro, setObraFiltro] = useState('todas')
   const [busca, setBusca] = useState('')
-  const [timesAbertos, setTimesAbertos] = useState<Set<string>>(new Set())
+  const [escopo, setEscopo] = useState('obras_ssma')
+  const [papelFiltro, setPapelFiltro] = useState<'todos' | 'liderancas' | PapelEquipe>('todos')
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const cardCls  = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
   const inputCls = `w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'}`
 
-  const ativos = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
+  // alocacao ativa por colaborador (p/ status na lista)
+  const alocByColab = useMemo(() => {
+    const m = new Map<string, ObraPlanejamentoEquipe>()
+    equipe.filter(e => STATUS_ATIVO.includes(e.status)).forEach(e => { if (e.colaborador_id) m.set(e.colaborador_id, e) })
+    return m
+  }, [equipe])
+  const obraNome = (id: string) => obras.find(o => o.id === id)?.nome ?? '—'
+
+  // departamentos p/ o seletor de escopo
+  const departamentos = useMemo(() => {
+    const s = new Set<string>()
+    colaboradores.forEach(c => { if (c.departamento) s.add(c.departamento) })
+    return Array.from(s).sort()
+  }, [colaboradores])
+
+  const escopoSet = useMemo(() => {
+    const inEscopo = (c: ColaboradorAtivo) =>
+      escopo === 'todos' ? true
+      : escopo === 'obras_ssma' ? (c.departamento === 'Obras' || c.papel_sugerido === 'apoio')
+      : c.departamento === escopo
+    return colaboradores.filter(inEscopo)
+  }, [colaboradores, escopo])
 
   const kpis = useMemo(() => ({
-    alocados:   ativos.length,
-    liderancas: ativos.filter(e => PAPEL_CONFIG[e.papel].lidera).length,
-    apoio:      ativos.filter(e => e.papel === 'apoio').length,
-    disponiveis: disponiveis.length,
-  }), [ativos, disponiveis])
+    total:      escopoSet.length,
+    liderancas: escopoSet.filter(c => PAPEL_CONFIG[c.papel_sugerido].lidera).length,
+    time:       escopoSet.filter(c => c.papel_sugerido === 'time').length,
+    apoio:      escopoSet.filter(c => c.papel_sugerido === 'apoio').length,
+  }), [escopoSet])
 
-  const projetos = useMemo(() => {
-    const m = new Map<string, string>()
-    obras.forEach(o => { if (o.projeto_id) m.set(o.projeto_id, o.projeto_nome ?? o.projeto_id) })
-    return Array.from(m.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome))
-  }, [obras])
-
-  const obrasFiltradas = useMemo(
-    () => projetoFiltro === 'todos' ? obras : obras.filter(o => o.projeto_id === projetoFiltro),
-    [obras, projetoFiltro],
-  )
-
-  // Agrupa alocacoes ativas por obra
-  const porObra = useMemo(() => {
+  const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    const obraOk = (id: string) =>
-      (obraFiltro === 'todas' || id === obraFiltro) &&
-      obrasFiltradas.some(o => o.id === id)
-    const map = new Map<string, ObraPlanejamentoEquipe[]>()
-    ativos.forEach(e => {
-      if (!obraOk(e.obra_id)) return
-      if (q && !(e.nome?.toLowerCase().includes(q) || e.funcao?.toLowerCase().includes(q))) return
-      const arr = map.get(e.obra_id) ?? []
-      arr.push(e)
-      map.set(e.obra_id, arr)
-    })
-    return Array.from(map.entries())
-      .map(([obraId, rows]) => ({
-        obraId,
-        obra: obras.find(o => o.id === obraId),
-        rows,
-      }))
-      .sort((a, b) => (a.obra?.nome ?? '').localeCompare(b.obra?.nome ?? ''))
-  }, [ativos, busca, obraFiltro, obrasFiltradas, obras])
+    const papelOk = (p: PapelEquipe) =>
+      papelFiltro === 'todos' ? true
+      : papelFiltro === 'liderancas' ? PAPEL_CONFIG[p].lidera
+      : p === papelFiltro
+    return escopoSet.filter(c =>
+      papelOk(c.papel_sugerido) &&
+      (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q)),
+    )
+  }, [escopoSet, papelFiltro, busca])
 
-  const toggleTime = (id: string) => setTimesAbertos(prev => {
-    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
-  })
+  const grupos = useMemo(() =>
+    PAPEL_ORDER
+      .map(papel => ({ papel, pessoas: filtrados.filter(c => c.papel_sugerido === papel).sort((a, b) => a.nome.localeCompare(b.nome)) }))
+      .filter(g => g.pessoas.length > 0),
+    [filtrados])
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
+      {/* KPIs (clicáveis p/ filtrar papel) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KpiCard isDark={isDark} icon={Users2}      label="Alocados"    value={kpis.alocados}    color="orange" />
-        <KpiCard isDark={isDark} icon={UserCog}      label="Lideranças"  value={kpis.liderancas}  color="indigo" />
-        <KpiCard isDark={isDark} icon={ShieldCheck}  label="Apoio"       value={kpis.apoio}       color="cyan" />
-        <KpiCard isDark={isDark} icon={Briefcase}    label="Disponíveis" value={kpis.disponiveis} color="emerald" />
+        <KpiCard isDark={isDark} icon={Users2}      label="No escopo"  value={kpis.total}      color="orange" onClick={() => setPapelFiltro('todos')}      active={papelFiltro === 'todos'} />
+        <KpiCard isDark={isDark} icon={UserCog}      label="Lideranças" value={kpis.liderancas} color="indigo" onClick={() => setPapelFiltro('liderancas')} active={papelFiltro === 'liderancas'} />
+        <KpiCard isDark={isDark} icon={Users2}      label="Time"       value={kpis.time}       color="slate"  onClick={() => setPapelFiltro('time')}       active={papelFiltro === 'time'} />
+        <KpiCard isDark={isDark} icon={ShieldCheck}  label="Apoio"      value={kpis.apoio}      color="cyan"   onClick={() => setPapelFiltro('apoio')}      active={papelFiltro === 'apoio'} />
       </div>
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou função..." className={`${inputCls} pl-8 pr-7`} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou cargo..." className={`${inputCls} pl-8 pr-7`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>
-        <select value={projetoFiltro} onChange={e => { setProjetoFiltro(e.target.value); setObraFiltro('todas') }} className={`${inputCls} max-w-[200px]`}>
-          <option value="todos">Todos os projetos</option>
-          {projetos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        <select value={escopo} onChange={e => setEscopo(e.target.value)} className={`${inputCls} max-w-[230px]`}>
+          <option value="obras_ssma">Setor Obras + Apoio SSMA</option>
+          <option value="todos">Todos os setores</option>
+          {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        <select value={obraFiltro} onChange={e => setObraFiltro(e.target.value)} className={`${inputCls} max-w-[180px]`}>
-          <option value="todas">Todas as obras</option>
-          {obrasFiltradas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-        </select>
-        <span className={`ml-auto text-[11px] ${txtMuted}`}>{porObra.length} obra(s) com equipe</span>
+        {papelFiltro !== 'todos' && (
+          <button onClick={() => setPapelFiltro('todos')} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+            <X size={11} /> {papelFiltro === 'liderancas' ? 'Lideranças' : PAPEL_CONFIG[papelFiltro as PapelEquipe].label}
+          </button>
+        )}
+        <span className={`ml-auto text-[11px] ${txtMuted}`}>{filtrados.length} colaborador(es)</span>
       </div>
 
-      {/* Lista por obra */}
-      {porObra.length === 0 ? (
+      {/* Roster por papel */}
+      {grupos.length === 0 ? (
         <div className={`text-center py-14 rounded-xl border border-dashed ${isDark ? 'border-white/10 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
           <Users2 size={34} className="mx-auto mb-2 opacity-40" />
-          <p className="text-sm font-semibold">Nenhuma pessoa alocada ainda</p>
-          <p className="text-xs mt-1">Clique em "Alocar pessoa" para montar os times.</p>
+          <p className="text-sm font-semibold">Nenhum colaborador no filtro atual</p>
+          <p className="text-xs mt-1">Ajuste o escopo ou a busca.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {porObra.map(grp => {
-            const lideres = grp.rows.filter(r => PAPEL_CONFIG[r.papel].lidera)
-            const apoio   = grp.rows.filter(r => r.papel === 'apoio')
-            const timeByLider = new Map<string, ObraPlanejamentoEquipe[]>()
-            grp.rows.filter(r => r.papel === 'time').forEach(r => {
-              const k = r.lider_id ?? '__sem__'
-              const arr = timeByLider.get(k) ?? []; arr.push(r); timeByLider.set(k, arr)
-            })
+          {grupos.map(g => {
+            const cfg = PAPEL_CONFIG[g.papel]; const Icon = cfg.icon
             return (
-              <div key={grp.obraId} className={`rounded-2xl border ${cardCls}`}>
-                {/* Header obra */}
+              <div key={g.papel} className={`rounded-2xl border ${cardCls}`}>
                 <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  <Building2 size={14} className="text-orange-500" />
-                  <span className={`text-sm font-extrabold ${txtMain}`}>{grp.obra?.nome ?? '—'}</span>
-                  {grp.obra?.projeto_nome && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{grp.obra.projeto_nome}</span>}
-                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-50 text-orange-600'}`}>{grp.rows.length} pessoas</span>
-                  <button
-                    onClick={() => onAlocar({ obraId: grp.obraId })}
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    <Plus size={11} /> Pessoa
-                  </button>
+                  <Icon size={15} className={isDark ? cfg.textDark : cfg.text} />
+                  <span className={`text-sm font-extrabold ${txtMain}`}>{PAPEL_PLURAL[g.papel]}</span>
+                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? `${cfg.bgDark} ${cfg.textDark}` : `${cfg.bg} ${cfg.text}`}`}>{g.pessoas.length}</span>
                 </div>
-
-                <div className="p-3 space-y-2">
-                  {/* Lideres */}
-                  {lideres.map(l => {
-                    const time = timeByLider.get(l.id) ?? []
-                    const aberto = timesAbertos.has(l.id)
-                    const podeTime = l.papel === 'encarregado'
+                <div className="p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
+                  {g.pessoas.map(c => {
+                    const aloc = alocByColab.get(c.id)
                     return (
-                      <div key={l.id} className={`rounded-xl border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}>
-                        <div className="flex items-center gap-2 px-3 py-2">
-                          <Avatar nome={l.nome} fotoUrl={l.colaborador?.foto_url} isDark={isDark} />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold truncate ${txtMain}`}>{l.nome}</p>
-                            <p className={`text-[10px] truncate ${txtMuted}`}>{l.funcao}</p>
-                          </div>
-                          <PapelBadge papel={l.papel} isDark={isDark} />
-                          {podeTime && (
-                            <button
-                              onClick={() => toggleTime(l.id)}
-                              className={`ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
-                            >
-                              {aberto ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                              Time {time.length > 0 && `(${time.length})`}
-                            </button>
-                          )}
+                      <div key={c.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${isDark ? 'border-white/[0.05] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
+                        <Avatar nome={c.nome} fotoUrl={c.foto_url} isDark={isDark} size={28} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[11px] font-bold truncate ${txtMain}`} title={c.nome}>{c.nome}</p>
+                          <p className={`text-[9px] truncate ${txtMuted}`}>{c.cargo}{c.base_nome ? ` · ${c.base_nome}` : ''}</p>
                         </div>
-                        {podeTime && aberto && (
-                          <div className={`px-3 pb-2.5 pt-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-                            {time.length === 0 ? (
-                              <p className={`text-[11px] italic ${txtMuted} mb-2`}>Sem membros no time ainda.</p>
-                            ) : (
-                              <div className="space-y-1 mb-2">
-                                {time.map(m => (
-                                  <div key={m.id} className="flex items-center gap-2">
-                                    <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={22} />
-                                    <span className={`text-[11px] font-medium truncate ${txtMain}`}>{primeiroNome(m.nome)}</span>
-                                    <span className={`text-[10px] truncate ${txtMuted}`}>· {m.funcao}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <button
-                              onClick={() => onAlocar({ obraId: grp.obraId, papel: 'time', liderId: l.id })}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
-                            >
-                              <Plus size={10} /> Adicionar ao time
-                            </button>
-                          </div>
+                        {aloc ? (
+                          <span className={`shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`} title={`Alocado em ${obraNome(aloc.obra_id)}`}>
+                            <Building2 size={9} /> {obraNome(aloc.obra_id)}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onAlocar({ colaboradorId: c.id, papel: c.papel_sugerido })}
+                            className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+                          >
+                            <Plus size={9} /> Alocar
+                          </button>
                         )}
                       </div>
                     )
                   })}
-
-                  {/* Apoio */}
-                  {apoio.length > 0 && (
-                    <div>
-                      <p className={`text-[9px] font-bold uppercase tracking-wider mt-2 mb-1 ${txtMuted}`}>Apoio (Obras / SSMA)</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {apoio.map(a => (
-                          <div key={a.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
-                            <Avatar nome={a.nome} fotoUrl={a.colaborador?.foto_url} isDark={isDark} size={22} />
-                            <span className={`text-[11px] font-medium truncate ${txtMain}`}>{primeiroNome(a.nome)}</span>
-                            <span className={`ml-auto text-[10px] truncate ${txtMuted}`}>{a.funcao}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Time orfao (sem lider) */}
-                  {(timeByLider.get('__sem__')?.length ?? 0) > 0 && (
-                    <div>
-                      <p className={`text-[9px] font-bold uppercase tracking-wider mt-2 mb-1 ${txtMuted}`}>Time sem encarregado</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {timeByLider.get('__sem__')!.map(m => (
-                          <div key={m.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
-                            <Avatar nome={m.nome} fotoUrl={m.colaborador?.foto_url} isDark={isDark} size={22} />
-                            <span className={`text-[11px] font-medium truncate ${txtMain}`}>{primeiroNome(m.nome)}</span>
-                            <span className={`ml-auto text-[10px] truncate ${txtMuted}`}>{m.funcao}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )
