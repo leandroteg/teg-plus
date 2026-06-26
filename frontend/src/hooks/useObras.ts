@@ -12,7 +12,21 @@ import type {
   ObraEquipe,
   ObraMobilizacao,
   ObraPlanejamentoEquipe,
+  ColaboradorAtivo,
+  PapelEquipe,
 } from '../types/obras'
+
+// Sugere o papel na obra a partir do cargo/departamento do RH.
+// Topografo conta como encarregado (leva Time). Seguranca (QSMA/TST) -> apoio.
+export function papelSugerido(cargo?: string | null, departamento?: string | null): PapelEquipe {
+  const c = (cargo ?? '').toUpperCase()
+  const d = (departamento ?? '').toUpperCase()
+  if (/ENGENHEIR/.test(c)) return (/SEGURAN/.test(c) || d === 'QSMA' || d === 'TST') ? 'apoio' : 'engenheiro'
+  if (/SUPERVISOR/.test(c)) return 'supervisor'
+  if (/ENCARREGAD|MESTRE|TOPOGRAF/.test(c)) return 'encarregado'
+  if (d === 'QSMA' || d === 'TST' || /SEGURAN/.test(c)) return 'apoio'
+  return 'time'
+}
 
 // ── Frentes ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +43,42 @@ export function useObrasFrentes(obraId?: string) {
       if (error) return []
       return (data ?? []) as ObraFrente[]
     },
+  })
+}
+
+// ── Obras com Projeto (lookup p/ agrupar Projeto > Obra) ─────────────────────
+
+export interface ObraComProjeto {
+  id: string
+  nome: string
+  codigo: string
+  status: string
+  projeto_id?: string
+  projeto_nome?: string
+  projeto_codigo?: string
+}
+
+export function useObrasComProjeto() {
+  return useQuery<ObraComProjeto[]>({
+    queryKey: ['obras-com-projeto'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sys_obras')
+        .select('id, nome, codigo, status, pmo_projeto_id, projeto:pmo_projetos!pmo_projeto_id(id, nome, codigo)')
+        .neq('status', 'concluida')
+        .order('nome')
+      if (error) return []
+      return ((data ?? []) as any[]).map(o => ({
+        id: o.id,
+        nome: o.nome,
+        codigo: o.codigo,
+        status: o.status,
+        projeto_id: o.pmo_projeto_id ?? undefined,
+        projeto_nome: o.projeto?.nome ?? undefined,
+        projeto_codigo: o.projeto?.codigo ?? undefined,
+      })) as ObraComProjeto[]
+    },
+    staleTime: 300_000,
   })
 }
 
@@ -414,20 +464,91 @@ export function usePlanejamentoEquipe(filters?: {
   obra_id?: string
   status?: string
   categoria?: string
+  papel?: PapelEquipe
 }) {
   return useQuery<ObraPlanejamentoEquipe[]>({
     queryKey: ['obr-plan-equipe', filters],
     queryFn: async () => {
       let q = supabase
         .from('obr_planejamento_equipe')
-        .select('*, obra:sys_obras!obra_id(id, nome), portfolio:pmo_portfolio!portfolio_id(id, nome_obra, numero_osc), tarefa:pmo_tarefas!tarefa_id(id, nome)')
+        .select('*, obra:sys_obras!obra_id(id, nome), portfolio:pmo_portfolio!portfolio_id(id, nome_obra, numero_osc), tarefa:pmo_tarefas!tarefa_id(id, nome), colaborador:rh_colaboradores!colaborador_id(id, nome, cargo, foto_url, departamento)')
         .order('data_inicio', { ascending: true })
       if (filters?.obra_id) q = q.eq('obra_id', filters.obra_id)
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.categoria) q = q.eq('categoria', filters.categoria)
+      if (filters?.papel) q = q.eq('papel', filters.papel)
       const { data, error } = await q
       if (error) return []
       return (data ?? []) as ObraPlanejamentoEquipe[]
+    },
+  })
+}
+
+// Colaboradores ativos do RH (headcount) — pessoas alocaveis na Equipe.
+export function useColaboradoresAtivos() {
+  return useQuery<ColaboradorAtivo[]>({
+    queryKey: ['rh-colaboradores-ativos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rh_colaboradores')
+        .select('id, nome, cargo, departamento, setor, base_id, foto_url, tipo_contrato, base:est_bases!base_id(nome)')
+        .eq('ativo', true)
+        .order('nome')
+      if (error) return []
+      return ((data ?? []) as any[]).map(c => ({
+        id: c.id,
+        nome: c.nome,
+        cargo: c.cargo ?? undefined,
+        departamento: c.departamento ?? undefined,
+        setor: c.setor ?? undefined,
+        base_id: c.base_id ?? undefined,
+        base_nome: c.base?.nome ?? undefined,
+        foto_url: c.foto_url ?? undefined,
+        tipo_contrato: c.tipo_contrato ?? undefined,
+        papel_sugerido: papelSugerido(c.cargo, c.departamento),
+      })) as ColaboradorAtivo[]
+    },
+    staleTime: 300_000,
+  })
+}
+
+export function useExcluirPlanEquipe() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Membros do Time desse lider voltam ao pool (lider_id -> null via FK ON DELETE SET NULL).
+      const { error } = await supabase.from('obr_planejamento_equipe').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-plan-equipe'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+// Move uma lideranca para outra obra. Se for encarregado, leva o Time junto
+// (cascade no obra_id de todas as alocacoes com lider_id = ele).
+export function useMoverLiderTime() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ alocacaoId, obraId }: { alocacaoId: string; obraId: string }) => {
+      const nowIso = new Date().toISOString()
+      const { error: e1 } = await supabase
+        .from('obr_planejamento_equipe')
+        .update({ obra_id: obraId, updated_at: nowIso })
+        .eq('id', alocacaoId)
+      if (e1) throw e1
+      // Time vai junto
+      const { error: e2 } = await supabase
+        .from('obr_planejamento_equipe')
+        .update({ obra_id: obraId, updated_at: nowIso })
+        .eq('lider_id', alocacaoId)
+      if (e2) throw e2
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-plan-equipe'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
     },
   })
 }
