@@ -36,7 +36,7 @@ const EMPTY_FORM: Partial<PatImobilizado> = {
 }
 
 const CATEGORIA_PREFIX: Record<string, string> = {
-  'Móveis': 'MOB',
+  'Mobília': 'MOB',
   'Veículos': 'VEI',
   'Equipamentos': 'EQP',
   'Informática': 'INF',

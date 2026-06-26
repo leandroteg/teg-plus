@@ -1,10 +1,12 @@
+import { useQuery } from '@tanstack/react-query'
 import {
-  Landmark, TrendingDown, Wrench, FileText,
+  Landmark, TrendingDown, Wrench,
   ArrowRight, Zap,
-  Archive, ArrowDownUp, MapPin,
+  Archive, MapPin, Truck, Laptop,
 } from 'lucide-react'
 import { usePatrimonialKPIs, useImobilizados } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
+import { supabase } from '../../services/supabase'
 
 const fmt = (v: number) => {
   if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -51,6 +53,17 @@ export default function PatrimonialHome() {
   const { isDark } = useTheme()
   const { data: kpis } = usePatrimonialKPIs()
   const { data: imobilizados = [] } = useImobilizados()
+
+  // Equipamentos criticos: veiculos (frota) + notebooks
+  const { data: veiculosCount = 0 } = useQuery({
+    queryKey: ['pat-frota-count'],
+    queryFn: async () => {
+      const { count } = await supabase.from('fro_veiculos').select('id', { count: 'exact', head: true })
+      return count ?? 0
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+  const notebooks = imobilizados.filter(i => /noteb|noteo/i.test(i.descricao || '')).length
 
   const aguardandoEntrada = imobilizados.filter(i => i.status === 'pendente_registro').length
   const ativos = imobilizados.filter(i => ['ativo', 'cedido', 'em_transferencia'].includes(i.status)).length
@@ -133,31 +146,27 @@ export default function PatrimonialHome() {
           </div>
         </section>
 
-        {/* Janela Critica — somente 2 cards */}
+        {/* Equipamentos Criticos — veiculos + notebooks */}
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Janela Critica
+                  Equipamentos Criticos
                 </p>
                 <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  O que exige acao agora
+                  Ativos de maior atencao
                 </h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                (aguardandoEntrada + (kpis?.termos_pendentes ?? 0)) > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'
-              }`}>
-                <Zap size={14} className={(aguardandoEntrada + (kpis?.termos_pendentes ?? 0)) > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                <Zap size={14} className="text-amber-500" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard label="Aguardando Entrada" value={aguardandoEntrada} icon={ArrowDownUp}
-                iconTone={aguardandoEntrada > 0 ? (isDark ? 'text-violet-400' : 'text-violet-500') : 'text-slate-400'}
-                note={aguardandoEntrada > 0 ? 'pendentes de registro' : 'tudo ok'} isDark={isDark} />
-              <MiniInfoCard label="Termos Pendentes" value={kpis?.termos_pendentes ?? 0} icon={FileText}
-                iconTone={(kpis?.termos_pendentes ?? 0) > 0 ? (isDark ? 'text-red-400' : 'text-red-500') : 'text-slate-400'}
-                note="responsabilidade" isDark={isDark} />
+              <MiniInfoCard label="Veiculos" value={veiculosCount} icon={Truck}
+                iconTone={isDark ? 'text-sky-400' : 'text-sky-500'} note="frota da empresa" isDark={isDark} />
+              <MiniInfoCard label="Notebooks" value={notebooks} icon={Laptop}
+                iconTone={isDark ? 'text-violet-400' : 'text-violet-500'} note="equipamentos de TI" isDark={isDark} />
             </div>
           </div>
         </section>
