@@ -809,6 +809,7 @@ function ProgramacaoView({
   const [projFiltro, setProjFiltro] = useState('todos')
   const [obraFiltro, setObraFiltro] = useState('todas')
   const [busca, setBusca] = useState('')
+  const [dragId, setDragId] = useState<string | null>(null)
   const topScrollRef = useRef<HTMLDivElement | null>(null)
   const mainScrollRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -876,6 +877,21 @@ function ProgramacaoView({
       }
       setEditAloc(null)
     } catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
+  }
+
+  // arrastar uma pessoa pra outra obra → realoca (subárvore junto) a partir de hoje
+  async function handleDropObra(obraId: string) {
+    const dragged = dragId ? active.find(e => e.id === dragId) : null
+    setDragId(null)
+    if (!dragged || dragged.obra_id === obraId) return
+    const ids: string[] = []
+    if (dragged.papel === 'supervisor' || dragged.papel === 'encarregado') {
+      const gather = (id: string) => { ids.push(id); active.filter(e => e.lider_id === id).forEach(e => gather(e.id)) }
+      gather(dragged.id)
+    } else ids.push(dragged.id)
+    const hoje = new Date().toISOString().split('T')[0]
+    try { for (const id of ids) await atualizar.mutateAsync({ id, obra_id: obraId, data_inicio: hoje } as any) }
+    catch (err) { alert('Erro: ' + (err instanceof Error ? err.message : String(err))) }
   }
 
   // Agrupa Projeto(Polo) › Obra › pessoas. Engenheiro fica no nível do Projeto (Polo), não na obra.
@@ -965,7 +981,9 @@ function ProgramacaoView({
     const count = !recurso && r.papel === 'encarregado' ? (timeCountByLider.get(r.id) ?? 0) : 0
     return (
       <div className={`flex items-stretch border-b ${recurso ? (isDark ? 'border-white/[0.03] bg-white/[0.01]' : 'border-slate-100 bg-slate-50/40') : (isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50')}`}>
-        <div onClick={recurso ? undefined : () => setEditAloc(r)} className={`shrink-0 py-1.5 border-r ${border} flex items-center gap-1.5 ${recurso ? '' : 'cursor-pointer'}`} style={{ width: `${COL_W.pessoa}px`, paddingLeft: indent, paddingRight: 8 }} title={recurso ? r.nome : 'Editar alocação (obra, datas, função)'}>
+        <div onClick={recurso ? undefined : () => setEditAloc(r)} draggable={!recurso} onDragStart={() => { if (!recurso) setDragId(r.id) }} onDragEnd={() => setDragId(null)}
+          className={`shrink-0 py-1.5 border-r ${border} flex items-center gap-1.5 ${recurso ? '' : 'cursor-pointer active:cursor-grabbing'} ${dragId === r.id ? 'opacity-40' : ''}`}
+          style={{ width: `${COL_W.pessoa}px`, paddingLeft: indent, paddingRight: 8 }} title={recurso ? r.nome : 'Clique p/ editar · arraste p/ outra obra'}>
           <span className={`shrink-0 ${recurso ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isDark ? cfg.textDark.replace('text-', 'bg-') : cfg.text.replace('text-', 'bg-')}`} />
           <span className={`flex-1 min-w-0 ${recurso ? 'text-[10px]' : 'text-[11px] font-semibold'} truncate ${recurso ? txtMuted : txtMain}`} title={r.nome}>{r.nome}</span>
           {r.papel === 'encarregado' && r.funcao_equipe && (
@@ -1022,7 +1040,7 @@ function ProgramacaoView({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-          <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas · clique numa pessoa para editar a alocação
+          <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas · clique numa pessoa p/ editar · arraste p/ outra obra (início = hoje)
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select value={projFiltro} onChange={e => { setProjFiltro(e.target.value); setObraFiltro('todas') }} className={selCls}>
@@ -1093,7 +1111,9 @@ function ProgramacaoView({
                     const recOpen = recAbertos.has(ob.id) || (!!busca.trim() && ob.frota.length > 0)
                     return (
                       <div key={ob.id}>
-                        <button onClick={() => toggle(`${proj.id}:${ob.id}`)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'}`} style={{ minWidth: `${totalW}px` }}>
+                        <button onClick={() => toggle(`${proj.id}:${ob.id}`)}
+                          onDragOver={e => { if (dragId) e.preventDefault() }} onDrop={() => handleDropObra(ob.id)}
+                          className={`flex items-center w-full text-left border-b transition-colors ${dragId ? (isDark ? 'bg-orange-500/15 ring-1 ring-inset ring-orange-500/50' : 'bg-orange-50 ring-1 ring-inset ring-orange-300') : (isDark ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]' : 'border-slate-100 bg-slate-50 hover:bg-slate-100')}`} style={{ minWidth: `${totalW}px` }}>
                           <div className="flex items-center gap-1.5 py-1.5 shrink-0" style={{ width: `${leftW}px`, paddingLeft: 24, paddingRight: 8 }}>
                             {omin ? <ChevronDown size={12} className={txtMuted} /> : <ChevronUp size={12} className={txtMuted} />}
                             <Building2 size={11} className="text-orange-500" />
