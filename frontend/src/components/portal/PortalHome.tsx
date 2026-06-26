@@ -17,7 +17,7 @@ interface BotaoConfig {
 }
 
 const BOTOES: BotaoConfig[] = [
-  { key: 'ponto',         label: 'Ponto',                 icon: Clock,         bg: 'from-sky-500 to-blue-600',         iconBg: 'bg-sky-400/30',     href: 'https://autenticador.secullum.com.br/Authorization?response_type=code&client_id=3001&redirect_uri=https://pontoweb.secullum.com.br/Auth', external: true },
+  { key: 'ponto',         label: 'Ponto',                 icon: Clock,         bg: 'from-sky-500 to-blue-600',         iconBg: 'bg-sky-400/30',     href: 'https://ponto.teguniao.com.br', external: true },
   { key: 'holerite',      label: 'Holerite',              icon: FileText,      bg: 'from-emerald-500 to-teal-600',     iconBg: 'bg-emerald-400/30', href: 'https://holerite.teguniao.com.br', external: true },
   { key: 'manual',        label: 'Manual do Colaborador', icon: BookOpen,      bg: 'from-violet-500 to-purple-600',    iconBg: 'bg-violet-400/30',  href: '/portal/manual' },
   { key: 'procedimentos', label: 'Procedimentos',         icon: ClipboardList, bg: 'from-amber-500 to-orange-600',     iconBg: 'bg-amber-400/30',   href: '/portal/procedimentos' },
