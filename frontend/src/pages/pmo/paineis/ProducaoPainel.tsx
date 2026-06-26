@@ -1,7 +1,7 @@
 // Painel Produção — avanço físico e quantitativos (vivo, via useEAPFinal)
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Activity, Ruler, Layers, Building2, Star, Filter, ChevronDown, Check } from 'lucide-react'
+import { Activity, Ruler, Layers, Building2, Star, Filter, ChevronDown, Check, Eye, EyeOff } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../../contexts/EGPContractContext'
 import { useEAPFinal, aggregatePolos, fmtQtd } from '../../../hooks/usePMO'
@@ -117,35 +117,41 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
 
   // produção por OBRA DE CONSTRUÇÃO em andamento (fat < 85%); + % de prazo decorrido
   const obras = useMemo(() => {
-    type O = { nome: string; polo: string; valor: number; fat: number; ini: string | null; fim: string | null; pac: Map<string, { valor: number; qC: number; qR: number; uni: string | null }> }
-    const m = new Map<string, O>()
+    // agrupa por obra; obra é O&M se não tiver NENHUMA OSC de construção
+    const m = new Map<string, { nome: string; polo: string; oscs: any[] }>()
     for (const polo of (raw ?? [])) for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
-      if (o.tipo !== 'construcao') continue // só obras de construção
-      let a = m.get(o.obra_nome); if (!a) { a = { nome: o.obra_nome, polo: polo.label, valor: 0, fat: 0, ini: null, fim: null, pac: new Map() }; m.set(o.obra_nome, a) }
-      a.valor += o.valor; a.fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
-      const di = o.data_osc?.slice(0, 10); if (di && (!a.ini || di < a.ini)) a.ini = di
-      const dv = o.vencimento?.slice(0, 10); if (dv && (!a.fim || dv > a.fim)) a.fim = dv
-      for (const [pn, pa] of Object.entries(o.pacotes)) {
-        let x = a.pac.get(pn); if (!x) { x = { valor: 0, qC: 0, qR: 0, uni: null }; a.pac.set(pn, x) }
-        x.valor += pa.valor; x.qC += pa.qC; x.qR += pa.qR; if (pa.uni) x.uni = pa.uni
-      }
+      if (o.tipo !== 'construcao' && o.tipo !== 'manutencao') continue
+      let g = m.get(o.obra_nome); if (!g) { g = { nome: o.obra_nome, polo: polo.label, oscs: [] }; m.set(o.obra_nome, g) }
+      g.oscs.push(o)
     }
     const hoje = new Date().getTime()
-    return [...m.values()].map(a => {
-      const wf = [...a.pac.values()].filter(x => x.qC > 0).map(x => ({ pct: Math.round(x.qR / x.qC * 100), valor: x.valor }))
+    return [...m.values()].map(g => {
+      const isOM = !g.oscs.some(o => o.tipo === 'construcao')
+      const oscs = g.oscs.filter(o => isOM ? o.tipo === 'manutencao' : o.tipo === 'construcao')
+      let valor = 0, fat = 0, ini: string | null = null, fim: string | null = null
+      const pac = new Map<string, { valor: number; qC: number; qR: number; uni: string | null }>()
+      for (const o of oscs) {
+        valor += o.valor; fat += (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0)
+        const di = o.data_osc?.slice(0, 10); if (di && (!ini || di < ini)) ini = di
+        const dv = o.vencimento?.slice(0, 10); if (dv && (!fim || dv > fim)) fim = dv
+        for (const [pn, pa] of Object.entries(o.pacotes) as [string, any][]) { let x = pac.get(pn); if (!x) { x = { valor: 0, qC: 0, qR: 0, uni: null }; pac.set(pn, x) } x.valor += pa.valor; x.qC += pa.qC; x.qR += pa.qR; if (pa.uni) x.uni = pa.uni }
+      }
+      const wf = [...pac.values()].filter(x => x.qC > 0).map(x => ({ pct: Math.round(x.qR / x.qC * 100), valor: x.valor }))
       const ws = wf.reduce((s, x) => s + x.valor, 0)
       const pctFis = ws ? Math.round(wf.reduce((s, x) => s + x.pct * x.valor, 0) / ws) : 0
-      const ini = a.ini ? Date.parse(a.ini) : NaN; const fim = a.fim ? Date.parse(a.fim) : NaN
-      const pctPrazo = (a.ini && a.fim && fim > ini) ? Math.round(Math.min(100, Math.max(0, (hoje - ini) / (fim - ini) * 100))) : null
-      const drv = (n: string) => { const x = a.pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni) ?? '0'}/${fmtQtd(x.qC, x.uni) ?? '—'}` : '—' }
-      return { nome: a.nome, polo: a.polo, valor: a.valor, pctFin: a.valor ? Math.round(a.fat / a.valor * 100) : 0, pctFis, pctPrazo, drv }
+      const iniT = ini ? Date.parse(ini) : NaN; const fimT = fim ? Date.parse(fim) : NaN
+      const pctPrazo = (ini && fim && fimT > iniT) ? Math.round(Math.min(100, Math.max(0, (hoje - iniT) / (fimT - iniT) * 100))) : null
+      const drv = (n: string) => { const x = pac.get(n); return x && x.qC ? `${fmtQtd(x.qR, x.uni) ?? '0'}/${fmtQtd(x.qC, x.uni) ?? '—'}` : '—' }
+      return { nome: g.nome, polo: g.polo, valor, pctFin: valor ? Math.round(fat / valor * 100) : 0, pctFis, pctPrazo, drv, isOM }
     }).filter(o => o.pctFin < 85).sort((x, y) => y.valor - x.valor)
   }, [raw])
 
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fFis, setFFis] = useState<Set<string>>(new Set())
   const [fVal, setFVal] = useState<Set<string>>(new Set())
+  const [hideOM, setHideOM] = useState(true)   // ocultar O&M por padrão
+  const [hide85, setHide85] = useState(true)   // ocultar obras >85% físico por padrão
   const toggle = (s: Set<string>, set: (v: Set<string>) => void, k: string) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); set(n) }
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -168,6 +174,8 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
       {obras.length > 0 && (() => {
         const frentes = [...new Set(obras.map(o => o.polo))].sort()
         const obrasF = obras.filter(o =>
+          !(hideOM && o.isOM) &&
+          !(hide85 && o.pctFis > 85) &&
           (fFrente.size === 0 || fFrente.has(o.polo)) &&
           (fFis.size === 0 || FIS_BANDS.some(b => fFis.has(b[0]) && b[2](o.pctFis))) &&
           (fVal.size === 0 || VAL_BANDS.some(b => fVal.has(b[0]) && b[2](o.valor))))
@@ -182,6 +190,8 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
               <MultiSelect label="Frente" icon={<Filter size={12} className="shrink-0 opacity-70" />} options={frentes.map(f => ({ value: f, label: f }))} selected={fFrente} onToggle={v => toggle(fFrente, setFFrente, v)} onClear={() => setFFrente(new Set())} isDark={isDark} />
               <MultiSelect label="% Físico" options={FIS_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fFis} onToggle={v => toggle(fFis, setFFis, v)} onClear={() => setFFis(new Set())} isDark={isDark} />
               <MultiSelect label="Valor" options={VAL_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fVal} onToggle={v => toggle(fVal, setFVal, v)} onClear={() => setFVal(new Set())} isDark={isDark} />
+              <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700')}`}>{hideOM ? <EyeOff size={13} /> : <Eye size={13} />} O&amp;M</button>
+              <button onClick={() => setHide85(v => !v)} title={hide85 ? 'Mostrar obras ≥85% físico' : 'Ocultar obras >85% físico'} className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border ${hide85 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700')}`}>{hide85 ? <EyeOff size={13} /> : <Eye size={13} />} &gt;85%</button>
               {limpar ? <button onClick={() => { setFFrente(new Set()); setFFis(new Set()); setFVal(new Set()) }} className={`text-[10px] underline ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>limpar tudo</button> : null}
               <span className={`ml-auto text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasF.length} de {obras.length} obras</span>
             </div>
