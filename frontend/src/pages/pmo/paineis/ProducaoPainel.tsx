@@ -11,7 +11,7 @@ const fmtM = (v: number) => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(1).replace('.',
 const LIMITE_PRIORITARIA = 1_000_000 // construção-escala (OSC/obra > R$ 1M)
 const FIS_BANDS: [string, string, (p: number) => boolean][] = [
   ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50],
-  ['51-75', '51–75%', p => p >= 51 && p <= 75], ['76-100', '76–100%', p => p >= 76],
+  ['51-75', '51–75%', p => p >= 51 && p <= 75], ['75-90', '75–90%', p => p > 75 && p <= 90], ['91-100', '91–100%', p => p > 90],
 ]
 const VAL_BANDS: [string, string, (v: number) => boolean][] = [
   ['<1', '< 1M', v => v < 1e6], ['1-5', '1–5M', v => v >= 1e6 && v < 5e6], ['5-10', '5–10M', v => v >= 5e6 && v < 10e6], ['>=10', '≥ 10M', v => v >= 10e6],
@@ -148,10 +148,9 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
   }, [raw])
 
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
-  const [fFis, setFFis] = useState<Set<string>>(new Set())
+  const [fFis, setFFis] = useState<Set<string>>(new Set(FIS_BANDS.slice(0, -1).map(b => b[0]))) // oculta 91–100% por padrão
   const [fVal, setFVal] = useState<Set<string>>(new Set())
   const [hideOM, setHideOM] = useState(true)   // ocultar O&M por padrão
-  const [hide85, setHide85] = useState(true)   // ocultar obras >85% físico por padrão
   const toggle = (s: Set<string>, set: (v: Set<string>) => void, k: string) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); set(n) }
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -175,7 +174,6 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
         const frentes = [...new Set(obras.map(o => o.polo))].sort()
         const obrasF = obras.filter(o =>
           !(hideOM && o.isOM) &&
-          !(hide85 && o.pctFis > 85) &&
           (fFrente.size === 0 || fFrente.has(o.polo)) &&
           (fFis.size === 0 || FIS_BANDS.some(b => fFis.has(b[0]) && b[2](o.pctFis))) &&
           (fVal.size === 0 || VAL_BANDS.some(b => fVal.has(b[0]) && b[2](o.valor))))
@@ -191,7 +189,6 @@ export default function ProducaoPainel({ de, ate }: { de?: string; ate?: string 
               <MultiSelect label="% Físico" options={FIS_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fFis} onToggle={v => toggle(fFis, setFFis, v)} onClear={() => setFFis(new Set())} isDark={isDark} />
               <MultiSelect label="Valor" options={VAL_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fVal} onToggle={v => toggle(fVal, setFVal, v)} onClear={() => setFVal(new Set())} isDark={isDark} />
               <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700')}`}>{hideOM ? <EyeOff size={13} /> : <Eye size={13} />} O&amp;M</button>
-              <button onClick={() => setHide85(v => !v)} title={hide85 ? 'Mostrar obras ≥85% físico' : 'Ocultar obras >85% físico'} className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold border ${hide85 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700')}`}>{hide85 ? <EyeOff size={13} /> : <Eye size={13} />} &gt;85%</button>
               {limpar ? <button onClick={() => { setFFrente(new Set()); setFFis(new Set()); setFVal(new Set()) }} className={`text-[10px] underline ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>limpar tudo</button> : null}
               <span className={`ml-auto text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasF.length} de {obras.length} obras</span>
             </div>
