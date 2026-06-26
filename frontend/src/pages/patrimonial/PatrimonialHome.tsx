@@ -1,10 +1,9 @@
-import { useNavigate } from 'react-router-dom'
 import {
   Landmark, TrendingDown, Wrench, FileText,
-  ArrowLeftRight, ArrowRight, Zap,
-  Archive, ArrowDownUp, Clock, ChevronRight,
+  ArrowRight, Zap,
+  Archive, ArrowDownUp, MapPin,
 } from 'lucide-react'
-import { usePatrimonialKPIs, useImobilizados, useMovimentacoesPatrimonial } from '../../hooks/usePatrimonial'
+import { usePatrimonialKPIs, useImobilizados } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
 
 const fmt = (v: number) => {
@@ -49,18 +48,15 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function PatrimonialHome() {
-  const nav = useNavigate()
   const { isDark } = useTheme()
   const { data: kpis } = usePatrimonialKPIs()
   const { data: imobilizados = [] } = useImobilizados()
-  const { data: movimentacoes = [] } = useMovimentacoesPatrimonial()
 
   const aguardandoEntrada = imobilizados.filter(i => i.status === 'pendente_registro').length
   const ativos = imobilizados.filter(i => ['ativo', 'cedido', 'em_transferencia'].includes(i.status)).length
   const emManutencao = kpis?.imobilizados_em_manutencao ?? 0
   const depreciados = imobilizados.filter(i => (i.percentual_depreciado ?? 0) >= 100 && i.status !== 'baixado').length
   const baixados = imobilizados.filter(i => i.status === 'baixado').length
-  const recentes = movimentacoes.slice(0, 8)
 
   const cardClass = isDark
     ? 'bg-[#111827] border border-white/[0.06]'
@@ -81,12 +77,24 @@ export default function PatrimonialHome() {
   imobilizados.filter(i => i.status !== 'baixado').forEach(i => {
     const nome = i.categoria || 'Sem categoria'
     const cur = catMap.get(nome) || { nome, valor: 0, qtd: 0 }
-    cur.valor += i.valor_liquido ?? i.valor_aquisicao ?? 0
+    cur.valor += i.valor_aquisicao ?? 0
     cur.qtd += 1
     catMap.set(nome, cur)
   })
   const categorias = Array.from(catMap.values()).sort((a, b) => b.valor - a.valor)
   const maxCatVal = categorias[0]?.valor || 1
+
+  // Valor por base (chart de barras horizontais)
+  const baseMap = new Map<string, { nome: string; valor: number; qtd: number }>()
+  imobilizados.filter(i => i.status !== 'baixado').forEach(i => {
+    const nome = i.base_nome || 'Sem base'
+    const cur = baseMap.get(nome) || { nome, valor: 0, qtd: 0 }
+    cur.valor += i.valor_aquisicao ?? 0
+    cur.qtd += 1
+    baseMap.set(nome, cur)
+  })
+  const bases = Array.from(baseMap.values()).sort((a, b) => b.valor - a.valor)
+  const maxBaseVal = bases[0]?.valor || 1
 
   return (
     <div className="space-y-3">
@@ -198,41 +206,36 @@ export default function PatrimonialHome() {
       {/* ── Row: Movimentacoes Recentes + Por Categoria ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
-        {/* Movimentacoes Recentes */}
+        {/* Valor por Base */}
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Clock size={14} className="text-slate-500" /> Movimentacoes Recentes
+              <MapPin size={14} className="text-teal-500" /> Valor por Base
             </h2>
-            <button onClick={() => nav('/patrimonial/movimentacoes')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">
-              Ver todas <ChevronRight size={11} />
-            </button>
           </div>
-          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-            {recentes.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <ArrowLeftRight size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
-                <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma movimentacao</p>
-                <p className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Movimentacoes aparecem aqui</p>
+          <div className="p-4 space-y-2.5">
+            {bases.length === 0 ? (
+              <div className="py-8 text-center">
+                <MapPin size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum ativo</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Bases aparecem aqui</p>
               </div>
-            ) : recentes.map(mov => (
-              <div key={mov.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'} transition-colors`}>
-                <div className="min-w-0">
-                  <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                    {mov.imobilizado?.numero_patrimonio ?? '--'} — {mov.imobilizado?.descricao ?? 'Sem descricao'}
-                  </p>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {mov.tipo} {mov.responsavel_destino ? `— ${mov.responsavel_destino}` : ''}
-                  </p>
+            ) : bases.slice(0, 8).map(b => (
+              <div key={b.nome} className="flex items-center gap-3">
+                <p className={`text-[11px] font-semibold text-right shrink-0 w-[120px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={`${b.nome} · ${b.qtd} ${b.qtd === 1 ? 'item' : 'itens'}`}>
+                  {b.nome}
+                </p>
+                <div className="flex-1 relative">
+                  <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-600 transition-all duration-500"
+                      style={{ width: `${Math.max((b.valor / maxBaseVal) * 100, 4)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-xs font-semibold ${mov.confirmado ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {mov.confirmado ? 'Confirmado' : 'Pendente'}
-                  </p>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {new Date(mov.data_movimentacao).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
+                <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {fmt(b.valor)}
+                </p>
               </div>
             ))}
           </div>
