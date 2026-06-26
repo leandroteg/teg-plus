@@ -21,16 +21,19 @@ import { ProjetosFilterBar } from './ProjetosFilterBar'
 import EAPFinal, { EAPKpis } from './EAPFinal'
 import CronogramaPainel from './paineis/CronogramaPainel'
 import HistogramaRecursos from './paineis/HistogramaPainel'
+import CustosPainel from './paineis/CustosPainel'
 import { MedicoesPanel } from './EGPControle'
+import { Wallet } from 'lucide-react'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
-type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'medicao' | 'riscos'
+type Tab = 'eap' | 'cronograma' | 'histograma' | 'orcamento' | 'custos' | 'medicao' | 'riscos'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'eap', label: 'EAP', icon: Network },
   { key: 'cronograma', label: 'Cronograma', icon: CalendarDays },
   { key: 'histograma', label: 'Histograma', icon: BarChart3 },
   { key: 'orcamento', label: 'Orçamento', icon: DollarSign },
+  { key: 'custos', label: 'Custos', icon: Wallet },
   { key: 'medicao', label: 'Medição', icon: Ruler },
   { key: 'riscos', label: 'Riscos', icon: AlertTriangle },
 ]
@@ -40,6 +43,7 @@ const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; text
   cronograma:  { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',    text: 'text-teal-600',    textActive: 'text-teal-800',    border: 'border-teal-500',    bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-teal-500/10',    textDark: 'text-teal-400',    textActiveDark: 'text-teal-300',    borderDark: 'border-teal-500/40' },
   histograma:  { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',  text: 'text-violet-600',  textActive: 'text-violet-800',  border: 'border-violet-500',  bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-violet-500/10',  textDark: 'text-violet-400',  textActiveDark: 'text-violet-300',  borderDark: 'border-violet-500/40' },
   orcamento:   { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-emerald-500/10', textDark: 'text-emerald-400', textActiveDark: 'text-emerald-300', borderDark: 'border-emerald-500/40' },
+  custos:      { bg: 'hover:bg-rose-50',    bgActive: 'bg-rose-50',    text: 'text-rose-600',    textActive: 'text-rose-800',    border: 'border-rose-500',    bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-rose-500/10',    textDark: 'text-rose-400',    textActiveDark: 'text-rose-300',    borderDark: 'border-rose-500/40' },
   medicao:     { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-sky-500/10',     textDark: 'text-sky-400',     textActiveDark: 'text-sky-300',     borderDark: 'border-sky-500/40' },
   riscos:      { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-amber-500/10',   textDark: 'text-amber-400',   textActiveDark: 'text-amber-300',   borderDark: 'border-amber-500/40' },
 }
@@ -118,7 +122,7 @@ export default function EGPPlanejamento() {
       </div>
 
       {/* Barra de filtro: Cronograma/Histograma não usam o seletor de Projetos (contrato inteiro) */}
-      {tab === 'histograma' ? null : tab === 'cronograma' ? (
+      {tab === 'histograma' || tab === 'custos' ? null : tab === 'cronograma' ? (
         <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-end" />
       ) : (
         <ProjetosFilterBar
@@ -144,6 +148,7 @@ export default function EGPPlanejamento() {
       {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
       {tab === 'cronograma' && <CronogramaPainel portfolioId={portfolioId} />}
       {tab === 'histograma' && <HistogramaRecursos portfolioId={portfolioId} />}
+      {tab === 'custos' && <CustosPainel portfolioId={portfolioId} />}
       {tab === 'orcamento' && <OrcamentoPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'medicao' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}

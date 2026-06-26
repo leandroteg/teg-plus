@@ -38,7 +38,7 @@ export function prazoCor(termino: string | null, fim: string | null): string {
 export const worstCor = (cs: string[]) => cs.includes('#ef4444') ? '#ef4444' : cs.includes('#f59e0b') ? '#f59e0b' : cs.includes('#10b981') ? '#10b981' : '#94a3b8'
 
 export type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
-export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; omR: number; omOscs: string[]; pctFis: number; ini: string | null; fim: string | null }
+export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; pctFis: number; ini: string | null; fim: string | null }
 export type Frente = { label: string; obras: Obra[] }
 // prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver
 export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number }
@@ -48,13 +48,14 @@ export function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, r
 
 // árvore frente → obra → drivers (saldo) a partir do raw da EAP
 export function buildTree(raw: EAPPoloRaw[] | undefined): Frente[] {
-  const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; omR: number; omOscs: string[]; ini: string | null; fim: string | null }> }>()
+  const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; outrosR: number; omR: number; omOscs: string[]; valorContr: number; ini: string | null; fim: string | null }> }>()
   for (const polo of (raw ?? [])) {
     let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
     for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
       if (o.tipo !== 'construcao' && o.tipo !== 'manutencao') continue // exclui depósito; construção+O&M
-      let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, omR: 0, omOscs: [], ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
+      let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), outrosR: 0, omR: 0, omOscs: [], valorContr: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
+      od.valorContr += Number(o.valor || 0) // valor contratual previsto (todas as OSCs da obra)
       const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
       const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
       if (o.tipo === 'manutencao') { // O&M → uma linha "Execução" (saldo R$ total), identificando a OSC
@@ -75,7 +76,7 @@ export function buildTree(raw: EAPPoloRaw[] | undefined): Frente[] {
       od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 })
       const wf = od.drivers.filter(d => d.contr > 0); const wsum = wf.reduce((s, d) => s + d.valor, 0)
       const pctFis = wsum ? Math.round(wf.reduce((s, d) => s + (d.real / d.contr * 100) * d.valor, 0) / wsum) : 0
-      return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, omR: od.omR, omOscs: od.omOscs, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR + od.omR } as Obra
+      return { nome, frente: fr.label, drivers: od.drivers, outrosR: od.outrosR, omR: od.omR, omOscs: od.omOscs, valorContr: od.valorContr, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.outrosR + od.omR } as Obra
     }).filter(o => o.drivers.some(d => d.contr > 0) || o.outrosR > 0 || o.omR > 0).sort((a, b) => b.saldoR - a.saldoR),
   })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
 }
