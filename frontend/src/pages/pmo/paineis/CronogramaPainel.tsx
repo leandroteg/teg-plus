@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal, type EAPPoloRaw } from '../../../hooks/usePMO'
@@ -131,6 +131,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   }, [raw])
 
   const allObras = useMemo(() => tree.flatMap(f => f.obras), [tree])
+  const allKeys = useMemo(() => ({ frentes: tree.map(f => f.label), obras: tree.flatMap(f => f.obras.map(o => f.label + '|' + o.nome)) }), [tree])
+  const allOpen = allKeys.frentes.length > 0 && allKeys.frentes.every(l => openF.has(l)) && allKeys.obras.every(k => openO.has(k))
+  const toggleAll = () => { if (allOpen) { setOpenF(new Set()); setOpenO(new Set()) } else { setOpenF(new Set(allKeys.frentes)); setOpenO(new Set(allKeys.obras)) } }
   const saldoGlobal = useMemo(() => { const m: Record<string, number> = {}; DRV.forEach(d => m[d.label] = 0); for (const o of allObras) for (const d of o.drivers) m[d.label] += d.saldoQ; return m }, [allObras])
 
   // config default (capacidade p/ terminar em 12m, alocação proporcional ao saldo)
@@ -262,7 +265,10 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       </div>
 
       <PanelCard title="Cronograma por frente e obra" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark}
-        right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>barra = duração até o término</span>}>
+        right={<div className="flex items-center gap-2.5">
+          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>barra = duração até o término</span>
+          <button onClick={toggleAll} title={allOpen ? 'Recolher tudo' : 'Expandir tudo'} className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border transition-colors ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50 hover:text-teal-400' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>{allOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}</button>
+        </div>}>
         {!applied ? <p className={`text-center py-8 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Use <b>Configurar / Gerar</b> pra montar o cronograma.</p> : (
           <div className="space-y-1.5">
             {view.frentesF.map(fr => {
