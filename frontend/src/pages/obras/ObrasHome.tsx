@@ -14,6 +14,7 @@ import {
 } from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
 import type { TipoMobilizacao } from '../../types/obras'
+import ObrasPainel from './ObrasPainel'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -142,9 +143,9 @@ export default function ObrasHome() {
       colaboradores: [],
       equipamentos: [],
       status: 'planejada',
-      data_prevista: mobForm.data_prevista || null,
-      responsavel: mobForm.responsavel || null,
-      observacoes: mobForm.observacoes || null,
+      data_prevista: mobForm.data_prevista || undefined,
+      responsavel: mobForm.responsavel || undefined,
+      observacoes: mobForm.observacoes || undefined,
     })
     setShowMobModal(false)
     setMobForm(EMPTY_MOB)
@@ -190,6 +191,9 @@ export default function ObrasHome() {
           <KpiCard label="Prestacoes Pendentes" value={kpis?.prestacoes_pendentes ?? 0} sub="aguardando aprovacao" icon={Receipt} accent="rose" isLight={isLight} />
         </div>
       )}
+
+      {/* Mobilização & Equipes — dados reais (efetivo RH + frota por obra) */}
+      <ObrasPainel />
 
       {/* Two-column layout: Recent Apontamentos + Mobilizacoes */}
       <div className="grid lg:grid-cols-2 gap-6">
