@@ -7,6 +7,7 @@ import { useEAPFinal } from '../../../hooks/usePMO'
 import { useCustosReal, NATUREZAS, MARGEM_LUCRO, type NatKey } from '../../../hooks/useCustos'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import { buildTree, fmtM } from './cronogramaEngine'
+import { useFiltrosTree, FiltrosFrenteObra, filtrarTree } from './egpFiltros'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const ORC = 1 - MARGEM_LUCRO // 0.8
@@ -20,10 +21,11 @@ export default function CustosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
   const { data: custos } = useCustosReal(portfolioId)
   const [openF, setOpenF] = useState<Set<string>>(new Set())
   const [openO, setOpenO] = useState<Set<string>>(new Set())
+  const flt = useFiltrosTree()
 
   const tree = useMemo(() => buildTree(raw), [raw])
   const dados = useMemo(() => {
-    const frentes = tree.map(fr => {
+    const frentes = filtrarTree(tree, flt).map(fr => {
       const obras = fr.obras.map(o => {
         const base = zero(), proj = zero(), real = zero()
         NATUREZAS.forEach(n => { const b = ORC * o.valorContr * n.pct; base[n.key] = b; proj[n.key] = b * o.pctFis / 100; real[n.key] = custos?.porObra[o.nome]?.[n.key] || 0 })
@@ -40,7 +42,7 @@ export default function CustosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
     const valorContr = frentes.reduce((s, f) => s + f.valorContr, 0)
     const pctFis = valorContr > 0 ? Math.round(frentes.reduce((s, f) => s + f.pctFis * f.valorContr, 0) / valorContr) : 0
     return { frentes, total: { base, proj, real } as Tri, valorContr, pctFis }
-  }, [tree, custos])
+  }, [tree, custos, flt.fFrente, flt.fObra, flt.fPct])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
@@ -94,6 +96,7 @@ export default function CustosPainel({ portfolioId = CONTRATO_CEMIG }: { portfol
 
   return (
     <div className="space-y-3">
+      <FiltrosFrenteObra tree={tree} f={flt} isDark={isDark} />
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         <Kpi label="Valor contratado" value={fmtM(contratado)} tone="sky" isDark={isDark} note="previsto (OSCs)" />

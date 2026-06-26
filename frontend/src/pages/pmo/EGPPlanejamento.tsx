@@ -121,7 +121,7 @@ export default function EGPPlanejamento() {
       </div>
 
       {/* Barra de filtro: Cronograma/Histograma não usam o seletor de Projetos (contrato inteiro) */}
-      {tab === 'histograma' || tab === 'custos' ? null : tab === 'cronograma' ? (
+      {tab === 'histograma' || tab === 'custos' || tab === 'riscos' ? null : tab === 'cronograma' ? (
         <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-end" />
       ) : (
         <ProjetosFilterBar

@@ -424,6 +424,8 @@ export interface PMORisco {
   analise_ia?: string | null
   codigo?: string | null
   run_id?: string | null
+  frente?: string | null // frente/projeto associado (null = geral)
+  obra?: string | null   // obra associada (null = frente toda / geral)
 }
 
 // ── Plano de Ação ──

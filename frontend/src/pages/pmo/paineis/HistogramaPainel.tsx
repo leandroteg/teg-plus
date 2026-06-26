@@ -4,7 +4,7 @@
 // Fonte "Plano": usa a equipe de uma versão do cronograma. Montagem+Lançamento = equipe única.
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Users, ChevronDown, Filter, Info } from 'lucide-react'
+import { Users, Info } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
 import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
@@ -14,6 +14,7 @@ import {
   ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra, equipeFromEfetivo,
   type Obra, type Config, type Versao,
 } from './cronogramaEngine'
+import { useFiltrosTree, FiltrosFrenteObra, filtrarTree } from './egpFiltros'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 // recursos (linhas da matriz): 2 de mão de obra + 2 de máquinas
@@ -32,9 +33,8 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const { data: efetivo } = useEfetivoReal(portfolioId)
   const [fonte, setFonte] = useState<'real' | 'plano'>('real')
-  const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [verId, setVerId] = useState<string | null>(null)
-  const [openF, setOpenF] = useState(false)
+  const flt = useFiltrosTree()
 
   const tree = useMemo(() => buildTree(raw), [raw])
   const allObras = useMemo(() => tree.flatMap(f => f.obras), [tree])
@@ -57,7 +57,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const start = startYM()
   const hist = useMemo(() => {
     const cfg = fonte === 'real' ? realCfg : planoCfg
-    const frentesSel = fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree
+    const frentesSel = filtrarTree(tree, flt)
     const pjMap = new Map<Obra, ReturnType<typeof projObra>>()
     let H = 0
     for (const fr of frentesSel) for (const o of fr.obras) { const pj = projObra(o, cfg, start); pjMap.set(o, pj); H = Math.max(H, pj.maxMeses) }
@@ -93,7 +93,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const totMaq = meses.map((_, m) => totals.maqF[m] + totals.maqM[m])
     const picoPpl = Math.max(0, ...totPpl), picoMaq = Math.max(0, ...totMaq)
     return { meses, frentes: frentesF, totals, picoPpl, picoMaq, picoPplMes: totPpl.indexOf(picoPpl), picoMaqMes: totMaq.indexOf(picoMaq) }
-  }, [tree, fFrente, fonte, realCfg, planoCfg, efetivo, start])
+  }, [tree, flt.fFrente, flt.fObra, flt.fPct, fonte, realCfg, planoCfg, efetivo, start])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
@@ -129,20 +129,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
             <button key={f} onClick={() => setFonte(f)} className={`px-3 py-1.5 font-semibold ${fonte === f ? 'bg-teal-600 text-white' : (isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50')}`}>{lb}</button>
           ))}
         </div>
-        <div className="relative">
-          <button onClick={() => setOpenF(o => !o)} className={`inline-flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border text-[11px] font-semibold min-w-[150px] ${fFrente.size ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
-            <Filter size={12} className="opacity-70" /><span className="opacity-70">Frente</span><span className="flex-1 text-left truncate">{fFrente.size === 0 ? 'todas' : `${fFrente.size} selec.`}</span><ChevronDown size={12} className={`shrink-0 transition ${openF ? 'rotate-180' : ''}`} />
-          </button>
-          {openF && (<><div className="fixed inset-0 z-20" onClick={() => setOpenF(false)} />
-            <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[320px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
-              {fFrente.size > 0 && <button onClick={() => setFFrente(new Set())} className="w-full text-left px-2 py-1 mb-0.5 text-[10px] font-semibold text-slate-400">× limpar</button>}
-              {tree.map(f => { const on = fFrente.has(f.label); return (
-                <button key={f.label} onClick={() => setFFrente(s => { const n = new Set(s); n.has(f.label) ? n.delete(f.label) : n.add(f.label); return n })} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] text-left ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
-                  <span className={`shrink-0 w-4 h-4 rounded-md border flex items-center justify-center ${on ? 'bg-teal-600 border-teal-600 text-white' : (isDark ? 'border-white/25' : 'border-slate-300')}`}>{on && '✓'}</span>
-                  <span className={`truncate ${on ? 'font-semibold' : ''} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{f.label}</span>
-                </button>) })}
-            </div></>)}
-        </div>
+        <FiltrosFrenteObra tree={tree} f={flt} isDark={isDark} />
         {fonte === 'plano' && versoes.length > 0 && (
           <select value={verId ?? ''} onChange={e => setVerId(e.target.value || null)} className={`text-[12px] font-semibold rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
             <option value="">Plano padrão</option>
