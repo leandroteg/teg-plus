@@ -558,7 +558,7 @@ export default function NovaCautela() {
         <div className="flex items-center gap-2 mb-3">
           <Camera size={15} className="text-teal-500" />
           <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Foto do Colaborador
+            Foto do Item
           </span>
         </div>
 
@@ -575,7 +575,7 @@ export default function NovaCautela() {
           <div className="relative">
             <img
               src={fotoPreview}
-              alt="Foto do colaborador"
+              alt="Foto do item"
               className="w-full max-h-48 object-cover rounded-xl"
             />
             <button
