@@ -17,8 +17,12 @@ export interface TermoAceiteData {
   cautela: Cautela
   /** Nome da base/almoxarifado (não persistido no registro da cautela) */
   baseNome?: string
-  /** Assinatura do colaborador capturada no tablet (data URL PNG) */
+  /** Assinatura do colaborador na RETIRADA (data URL PNG) */
   assinaturaDataUrl?: string
+  /** Assinatura de quem DEVOLVEU o material (colaborador) na devolução (data URL PNG) */
+  assinaturaDevolucaoColaboradorDataUrl?: string
+  /** Assinatura de quem RECEBEU a entrega final na devolução (data URL PNG) */
+  assinaturaDevolucaoRecebedorDataUrl?: string
 }
 
 // ── Logo Loader ─────────────────────────────────────────────────────────────
@@ -326,6 +330,67 @@ function buildTermoDoc(
     `${empresa.cidade || ''}${empresa.cidade ? ', ' : ''}${fmtDateFull(cautela.data_retirada || cautela.criado_em)}`,
     M, y,
   )
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION: DEVOLUÇÃO (só quando o material já foi devolvido)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const temDevolucao = !!(
+    cautela.data_devolucao_real ||
+    data.assinaturaDevolucaoColaboradorDataUrl ||
+    data.assinaturaDevolucaoRecebedorDataUrl
+  )
+  if (temDevolucao) {
+    checkPage(58)
+    y += 6
+    sectionTitle('DEVOLUÇÃO')
+    addFieldPair(
+      'Data da Devolução', fmtDate(cautela.data_devolucao_real),
+      'Recebido por', cautela.recebedor_nome || '—',
+    )
+    y += 16
+
+    // Assinatura de quem devolveu (colaborador) — esquerda
+    if (data.assinaturaDevolucaoColaboradorDataUrl) {
+      try { doc.addImage(data.assinaturaDevolucaoColaboradorDataUrl, 'PNG', M, y - 18, 70, 18) } catch { /* ignore */ }
+    }
+    // Assinatura de quem recebeu (recebedor) — direita
+    if (data.assinaturaDevolucaoRecebedorDataUrl) {
+      try { doc.addImage(data.assinaturaDevolucaoRecebedorDataUrl, 'PNG', W - M - 75, y - 18, 70, 18) } catch { /* ignore */ }
+    }
+
+    doc.setDrawColor(...LIGHT)
+    doc.setLineWidth(0.3)
+
+    // Left: quem devolveu
+    doc.line(M, y, M + 75, y)
+    doc.setFontSize(7)
+    doc.setTextColor(...MID)
+    doc.text('Assinatura de quem devolveu', M + 37.5, y + 4, { align: 'center' })
+    if (cautela.solicitante_nome) {
+      doc.setFontSize(6)
+      doc.text(cautela.solicitante_nome, M + 37.5, y + 8, { align: 'center' })
+    }
+
+    // Right: quem recebeu a entrega final
+    doc.line(W - M - 75, y, W - M, y)
+    doc.setFontSize(7)
+    doc.setTextColor(...MID)
+    doc.text('Assinatura de quem recebeu', W - M - 37.5, y + 4, { align: 'center' })
+    if (cautela.recebedor_nome) {
+      doc.setFontSize(6)
+      doc.text(cautela.recebedor_nome, W - M - 37.5, y + 8, { align: 'center' })
+    }
+
+    // Local e data da devolução
+    y += 14
+    doc.setFontSize(7)
+    doc.setTextColor(...MID)
+    doc.text(
+      `${empresa.cidade || ''}${empresa.cidade ? ', ' : ''}${fmtDateFull(cautela.data_devolucao_real)}`,
+      M, y,
+    )
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // FOOTER

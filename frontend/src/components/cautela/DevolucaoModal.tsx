@@ -4,6 +4,7 @@ import type { Cautela } from '../../types/cautela'
 import { useDevolverItens } from '../../hooks/useCautelas'
 import { supabase, verifySenha } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { gerarTermoPdfBlob } from '../../utils/termo-aceite-cautela-pdf'
 
 interface Props {
   cautela: Cautela
@@ -254,6 +255,56 @@ export default function DevolucaoModal({ cautela, isDark, onClose }: Props) {
         cautela_id: cautela.id,
         itens: itensPayload,
       })
+
+      // Regenera o termo (agora com a seção DEVOLUÇÃO + as 2 assinaturas) e
+      // substitui o termo_url. Não bloqueia a devolução se falhar.
+      try {
+        const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => {
+          const r = new FileReader()
+          r.onload = () => res(r.result as string)
+          r.onerror = rej
+          r.readAsDataURL(b)
+        })
+
+        // Assinatura de retirada (arquivada no storage) → dataURL, p/ manter no PDF
+        let assinaturaRetiradaDataUrl: string | undefined
+        if (cautela.assinatura_retirada_url) {
+          const { data: signed } = await supabase.storage
+            .from('cautelas-termos')
+            .createSignedUrl(cautela.assinatura_retirada_url, 120)
+          if (signed?.signedUrl) {
+            const resp = await fetch(signed.signedUrl)
+            if (resp.ok) assinaturaRetiradaDataUrl = await blobToDataUrl(await resp.blob())
+          }
+        }
+
+        // Registro atualizado (data_devolucao_real / status pós-RPC)
+        const { data: freshRow } = await supabase
+          .from('est_cautelas').select('*').eq('id', cautela.id).single()
+
+        const cautelaPdf: Cautela = {
+          ...((freshRow as Cautela) ?? cautela),
+          itens: cautela.itens ?? [],
+          recebedor_nome: senhaOk.nome,
+        }
+
+        const termoBlob = await gerarTermoPdfBlob({
+          cautela: cautelaPdf,
+          baseNome: cautela.base?.nome,
+          assinaturaDataUrl: assinaturaRetiradaDataUrl,
+          assinaturaDevolucaoColaboradorDataUrl: await blobToDataUrl(assColabBlob),
+          assinaturaDevolucaoRecebedorDataUrl: await blobToDataUrl(assRecBlob),
+        })
+
+        const termoPath = `${cautela.id}/termo_${ts}.pdf`
+        const upT = await supabase.storage.from('cautelas-termos')
+          .upload(termoPath, termoBlob, { contentType: 'application/pdf', upsert: true })
+        if (!upT.error) {
+          await supabase.from('est_cautelas').update({ termo_url: termoPath }).eq('id', cautela.id)
+        }
+      } catch (regenErr) {
+        console.warn('Falha ao regenerar termo com devolução:', regenErr)
+      }
 
       setSavedOk(true)
       setTimeout(() => onClose(), 1500)
