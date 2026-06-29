@@ -362,6 +362,28 @@ export default function ContratoDetalhe() {
   const totalMedido = medicoes.reduce((s, m) => s + m.valor_medido, 0)
   const execPct = valorTotal > 0 ? Math.round((totalMedido / valorTotal) * 100) : (totalPago > 0 && valorTotal > 0 ? Math.round((totalPago / valorTotal) * 100) : 0)
   const grupoLabel = contrato.grupo_contrato ? (GRUPO_CONTRATO_LABEL[contrato.grupo_contrato as GrupoContrato] ?? contrato.grupo_contrato) : '—'
+  const porMedicao = contrato.forma_faturamento === 'medicao'
+
+  const switchForma = async (forma: 'parcela' | 'medicao') => {
+    if (forma === 'medicao' && !confirm('Mudar para faturamento por medição?\n\nAs parcelas previstas (ainda não pagas) deste contrato serão removidas — o pagamento passa a ser por medição (BM).')) return
+    const { data, error } = await supabase.rpc('con_definir_forma_faturamento', { p_contrato_id: contrato.id, p_forma: forma })
+    if (error || !(data as any)?.ok) {
+      setMedToast({ type: 'error', msg: 'Erro ao mudar a forma de faturamento' })
+      setTimeout(() => setMedToast(null), 4000)
+      return
+    }
+    qc.invalidateQueries({ queryKey: ['contrato-detalhe', id] })
+    qc.invalidateQueries({ queryKey: ['contrato-parcelas', id] })
+    qc.invalidateQueries({ queryKey: ['contrato-medicoes', id] })
+    const removidas = (data as any).parcelas_previstas_removidas ?? 0
+    setMedToast({
+      type: 'success',
+      msg: forma === 'medicao'
+        ? `Faturamento por medição${removidas ? ` · ${removidas} parcela(s) prevista(s) removida(s)` : ''}`
+        : 'Faturamento por parcelas',
+    })
+    setTimeout(() => setMedToast(null), 4000)
+  }
 
   // ── Timeline dot color ────────────────────────────────────────────────────
   const timelineDot = (h: SolicitacaoHistorico) => {
@@ -669,18 +691,34 @@ export default function ContratoDetalhe() {
 
       {/* ── Section 5: Medicoes ───────────────────────────────────────────── */}
       <Section icon={BarChart3} title="Medicoes" count={medicoes.length} defaultOpen={true}>
-        {contrato.recorrente ? (
-          <div className="mb-3 text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
-            Contrato recorrente — pagamento por parcelas mensais (não usa medição).
-          </div>
-        ) : (
-          <div className="flex justify-end mb-3">
+        {porMedicao ? (
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => switchForma('parcela')}
+              className="text-[11px] text-slate-400 hover:text-slate-600 underline decoration-dotted"
+            >
+              Faturamento por medição · mudar para parcelas
+            </button>
             <button
               onClick={() => setNovaMedicaoOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all"
             >
               <Plus size={13} /> Nova Medição
             </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+              Faturamento por <b>parcelas</b> — este contrato não usa medição.
+            </span>
+            {!contrato.recorrente && (
+              <button
+                onClick={() => switchForma('medicao')}
+                className="shrink-0 text-[11px] font-semibold text-fuchsia-600 hover:text-fuchsia-700 underline decoration-dotted"
+              >
+                Mudar para medição
+              </button>
+            )}
           </div>
         )}
         {medicoes.length === 0 ? (

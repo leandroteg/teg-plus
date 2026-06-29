@@ -84,6 +84,7 @@ export interface Contrato {
   contraparte_nome?: string
   valor_mensal?: number
   recorrente?: boolean
+  forma_faturamento?: 'parcela' | 'medicao'
   // Audit
   created_at: string
   updated_at: string
