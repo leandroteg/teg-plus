@@ -6,7 +6,7 @@ import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
   ChevronRight, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
-  LayoutList, LayoutGrid, GraduationCap, Gavel,
+  LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaboradores } from '../../hooks/useRH'
@@ -36,6 +36,7 @@ export default function RHColaboradores() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [comProcesso, setComProcesso] = useState(false)
+  const [semDados, setSemDados] = useState(false)
 
   const { data: todos = [], isLoading } = useRHColaboradores()
   const { data: bases = [] } = useBases()
@@ -51,6 +52,8 @@ export default function RHColaboradores() {
       if (filtros.ativo !== undefined && c.ativo !== filtros.ativo) return false
       // Processo trabalhista
       if (comProcesso && !c.tem_processo_trabalhista) return false
+      // Sem CPF ou Data de Nascimento
+      if (semDados && c.cpf && c.data_nascimento) return false
       // Tipo contrato
       if (filtros.tipo_contrato && (c.tipo_contrato || 'CLT') !== filtros.tipo_contrato) return false
       // Departamento
@@ -88,7 +91,7 @@ export default function RHColaboradores() {
       }
       return true
     })
-  }, [todos, filtros, busca, comProcesso])
+  }, [todos, filtros, busca, comProcesso, semDados])
 
   // KPI calculations
   const kpis = useMemo(() => {
@@ -201,6 +204,22 @@ export default function RHColaboradores() {
               ? isLight ? 'bg-amber-200 text-amber-700' : 'bg-amber-500/30 text-amber-200'
               : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
           }`}>{todos.filter(c => c.tem_processo_trabalhista).length}</span>
+        </button>
+
+        {/* Sem CPF / Data de Nascimento */}
+        <button onClick={() => setSemDados(v => !v)}
+          title="Filtrar colaboradores sem CPF ou sem data de nascimento"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            semDados
+              ? isLight ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+              : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
+          }`}>
+          <AlertTriangle size={13} /> Sem CPF/Nasc.
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+            semDados
+              ? isLight ? 'bg-rose-200 text-rose-700' : 'bg-rose-500/30 text-rose-200'
+              : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
+          }`}>{todos.filter(c => (filtros.ativo === undefined ? true : c.ativo === filtros.ativo) && (!c.cpf || !c.data_nascimento)).length}</span>
         </button>
 
         {/* Busca (encolhe pra caber) */}
@@ -340,6 +359,7 @@ export default function RHColaboradores() {
                 <thead>
                   <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Colaborador</th>
+                    <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden sm:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Matrícula</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden md:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Cargo</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden lg:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</th>
                     <th className={`text-left text-[10px] uppercase tracking-widest font-bold px-4 py-3 hidden sm:table-cell ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Tipo</th>
@@ -369,19 +389,33 @@ export default function RHColaboradores() {
                               ) : getInitials(c.nome)}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{c.nome}</p>
                                 {c.tem_processo_trabalhista && (
                                   <span title={c.processo_trabalhista_info || 'Processo trabalhista'} className="shrink-0">
                                     <Gavel size={12} className={isLight ? 'text-amber-500' : 'text-amber-400'} />
                                   </span>
                                 )}
+                                {!c.cpf && (
+                                  <span title="Sem CPF cadastrado" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-rose-100 text-rose-600' : 'bg-rose-500/20 text-rose-300'}`}>sem CPF</span>
+                                )}
+                                {!c.data_nascimento && (
+                                  <span title="Sem data de nascimento" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/20 text-amber-300'}`}>sem nasc</span>
+                                )}
                               </div>
                               {c.matricula && (
-                                <p className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{c.matricula}</p>
+                                <p className={`text-[10px] font-mono sm:hidden ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{c.matricula}</p>
                               )}
                             </div>
                           </div>
+                        </td>
+                        {/* Matrícula */}
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          {c.matricula ? (
+                            <span className={`text-xs font-mono ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{c.matricula}</span>
+                          ) : (
+                            <span className={`text-xs ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>
+                          )}
                         </td>
                         {/* Cargo + Departamento */}
                         <td className={`px-4 py-3 hidden md:table-cell`}>
@@ -465,6 +499,12 @@ export default function RHColaboradores() {
                             <span title={c.processo_trabalhista_info || 'Processo trabalhista'} className="shrink-0">
                               <Gavel size={12} className={isLight ? 'text-amber-500' : 'text-amber-400'} />
                             </span>
+                          )}
+                          {!c.cpf && (
+                            <span title="Sem CPF cadastrado" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-rose-100 text-rose-600' : 'bg-rose-500/20 text-rose-300'}`}>sem CPF</span>
+                          )}
+                          {!c.data_nascimento && (
+                            <span title="Sem data de nascimento" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/20 text-amber-300'}`}>sem nasc</span>
                           )}
                           {c.matricula && (
                             <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-500'}`}>
