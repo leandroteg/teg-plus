@@ -669,14 +669,20 @@ export default function ContratoDetalhe() {
 
       {/* ── Section 5: Medicoes ───────────────────────────────────────────── */}
       <Section icon={BarChart3} title="Medicoes" count={medicoes.length} defaultOpen={true}>
-        <div className="flex justify-end mb-3">
-          <button
-            onClick={() => setNovaMedicaoOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all"
-          >
-            <Plus size={13} /> Nova Medição
-          </button>
-        </div>
+        {contrato.recorrente ? (
+          <div className="mb-3 text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+            Contrato recorrente — pagamento por parcelas mensais (não usa medição).
+          </div>
+        ) : (
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => setNovaMedicaoOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all"
+            >
+              <Plus size={13} /> Nova Medição
+            </button>
+          </div>
+        )}
         {medicoes.length === 0 ? (
           <Empty text="Nenhuma medicao registrada" />
         ) : (

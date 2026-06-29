@@ -1543,7 +1543,7 @@ function TabMedicoes() {
           const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
           showToast('success', `Enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
         } else {
-          showToast('error', `Não enviada: ${res.motivo ?? 'desconhecido'}`)
+          showToast('error', (res as any).mensagem ?? `Não enviada: ${res.motivo ?? 'desconhecido'}`)
         }
       },
       onError: () => showToast('error', 'Erro ao enviar medição'),
@@ -1573,7 +1573,7 @@ function TabMedicoes() {
               const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
               showToast('success', `Aprovada e enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
             } else {
-              showToast('error', `Aprovada, mas não enviada: ${res.motivo ?? 'desconhecido'}`)
+              showToast('error', (res as any).mensagem ?? `Aprovada, mas não enviada: ${res.motivo ?? 'desconhecido'}`)
             }
           },
           onError: () => showToast('error', 'Aprovada, mas falhou ao enviar ao Financeiro'),

@@ -337,7 +337,24 @@ export function useAvancarEtapa() {
               resumo: resumo ?? null,
             })
 
-            const parcelasResolvidas = parcelasPlanejadas.length > 0 ? parcelasPlanejadas : parcelasFallback
+            // Recorrente: gera 1 parcela por mes (prazo_meses x valor_mensal), vencendo
+            // mensalmente a partir da data de inicio. Evita cair na inferencia de forma
+            // de pagamento (que gerava poucas parcelas grandes em vez das mensais).
+            const parcelasRecorrente = (() => {
+              const vm = Number(sol.valor_mensal ?? 0)
+              const pm = Number(sol.prazo_meses ?? 0)
+              if (!sol.recorrente || vm <= 0 || pm <= 0) return null
+              const [yy, mm, dd] = String(sol.data_inicio_prevista ?? today).split('-').map(Number)
+              return Array.from({ length: pm }, (_, i) => ({
+                numero: i + 1,
+                valor: vm,
+                data_vencimento: new Date(Date.UTC(yy, (mm - 1) + i, dd)).toISOString().slice(0, 10),
+              }))
+            })()
+
+            const parcelasResolvidas = parcelasPlanejadas.length > 0
+              ? parcelasPlanejadas
+              : (parcelasRecorrente ?? parcelasFallback)
 
             const { data: parcelasExistentes, error: parcelasExistentesErr } = await supabase
               .from('con_parcelas')
