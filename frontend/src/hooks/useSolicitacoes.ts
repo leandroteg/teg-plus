@@ -297,6 +297,9 @@ export function useAvancarEtapa() {
                   tipo_contrato:      tipoContrato,
                   tipo_categoria:     sol.grupo_contrato ?? sol.categoria_contrato ?? sol.tipo_contrato,
                   fornecedor_id:      tipoContrato === 'despesa' ? (sol.contraparte_id ?? undefined) : undefined,
+                  // Nome da contraparte sempre herdado da solicitacao — sem fornecedor_id
+                  // vinculado, o financeiro (con_faturar_medicao) usa este nome como favorecido.
+                  contraparte_nome:   sol.contraparte_nome ?? undefined,
                   obra_id:            sol.obra_id ?? undefined,
                   objeto:             sol.objeto,
                   descricao:          sol.descricao_escopo ?? undefined,
