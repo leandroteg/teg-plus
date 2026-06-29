@@ -1274,19 +1274,26 @@ const STATUS_MEDICAO: Record<string, { label: string; dot: string; bg: string; t
 }
 
 // ── Nova Medição modal ──────────────────────────────────────────────────────
-function NovaMedicaoModal({
-  open, onClose, contratos, medicoes, onToast,
+export function NovaMedicaoModal({
+  open, onClose, contratos, medicoes, onToast, contratoInicial,
 }: {
   open: boolean
   onClose: () => void
   contratos: Contrato[]
   medicoes: ContratoMedicao[]
   onToast: (type: 'success' | 'error', msg: string) => void
+  // Quando informado, o contrato vem pré-selecionado e travado (uso na tela de detalhe).
+  contratoInicial?: string
 }) {
   const criar = useCriarMedicao()
   const today = new Date().toISOString().slice(0, 10)
-  const [contratoId, setContratoId] = useState('')
-  const [numeroBm, setNumeroBm] = useState('')
+  const [contratoId, setContratoId] = useState(contratoInicial ?? '')
+  const [numeroBm, setNumeroBm] = useState(() => {
+    const cid = contratoInicial ?? ''
+    if (!cid) return ''
+    const n = medicoes.filter(m => m.contrato_id === cid).length + 1
+    return `BM-${String(n).padStart(3, '0')}`
+  })
   const [bmTouched, setBmTouched] = useState(false)
   const [periodoInicio, setPeriodoInicio] = useState(today)
   const [periodoFim, setPeriodoFim] = useState(today)
@@ -1316,7 +1323,7 @@ function NovaMedicaoModal({
   const liquido = Math.max(medido - retencao, 0)
 
   const reset = () => {
-    setContratoId(''); setNumeroBm(''); setBmTouched(false)
+    setContratoId(contratoInicial ?? ''); setNumeroBm(''); setBmTouched(false)
     setPeriodoInicio(today); setPeriodoFim(today)
     setValorMedido(''); setValorRetencao(''); setObservacoes('')
   }
@@ -1370,19 +1377,29 @@ function NovaMedicaoModal({
         <div className="p-5 space-y-3">
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contrato</label>
-            <select
-              value={contratoId}
-              onChange={e => handleContratoChange(e.target.value)}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
-            >
-              <option value="">Selecione um contrato vigente</option>
-              {contratosElegiveis.map(c => {
-                const cp = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
-                return (
-                  <option key={c.id} value={c.id}>{c.numero} — {cp}</option>
-                )
-              })}
-            </select>
+            {contratoInicial ? (
+              <div className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-600">
+                {(() => {
+                  const c = contratos.find(x => x.id === contratoInicial)
+                  const cp = c?.fornecedor?.razao_social || c?.fornecedor?.nome_fantasia || c?.cliente?.nome || ''
+                  return c ? `${c.numero}${cp ? ` — ${cp}` : ''}` : 'Contrato atual'
+                })()}
+              </div>
+            ) : (
+              <select
+                value={contratoId}
+                onChange={e => handleContratoChange(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+              >
+                <option value="">Selecione um contrato vigente</option>
+                {contratosElegiveis.map(c => {
+                  const cp = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                  return (
+                    <option key={c.id} value={c.id}>{c.numero} — {cp}</option>
+                  )
+                })}
+              </select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

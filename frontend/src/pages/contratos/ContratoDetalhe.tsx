@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronLeft, ChevronDown, FileText, Clock, DollarSign, BarChart3,
   FileSignature, RefreshCw, Download, ExternalLink, Calendar,
   Building2, MapPin, Loader2, AlertTriangle, CheckCircle2,
   CircleDot, ArrowUpRight, ArrowDownRight, Hash, Briefcase,
-  Pencil, X, Check, Upload, Folder, File as FileIcon,
+  Pencil, X, Check, Upload, Folder, File as FileIcon, Plus,
 } from 'lucide-react'
+import { NovaMedicaoModal } from './GestaoContratos'
 import { supabase } from '../../services/supabase'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
@@ -203,6 +204,9 @@ export default function ContratoDetalhe() {
   const atualizarContrato = useAtualizarContrato()
   const uploadArquivo = useUploadContratoArquivo()
   const [uploadErro, setUploadErro] = useState<string | null>(null)
+  const qc = useQueryClient()
+  const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
+  const [medToast, setMedToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const { data: contrato, isLoading: loadingContrato } = useQuery({
@@ -665,6 +669,14 @@ export default function ContratoDetalhe() {
 
       {/* ── Section 5: Medicoes ───────────────────────────────────────────── */}
       <Section icon={BarChart3} title="Medicoes" count={medicoes.length} defaultOpen={true}>
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() => setNovaMedicaoOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all"
+          >
+            <Plus size={13} /> Nova Medição
+          </button>
+        </div>
         {medicoes.length === 0 ? (
           <Empty text="Nenhuma medicao registrada" />
         ) : (
@@ -791,6 +803,30 @@ export default function ContratoDetalhe() {
         criadoPor={contrato?.criado_por_nome}
         atualizadoPor={contrato?.atualizado_por_nome}
       />
+
+      {novaMedicaoOpen && (
+        <NovaMedicaoModal
+          open
+          onClose={() => setNovaMedicaoOpen(false)}
+          contratos={[contrato]}
+          medicoes={medicoes}
+          contratoInicial={contrato.id}
+          onToast={(type, msg) => {
+            if (type === 'success') {
+              qc.invalidateQueries({ queryKey: ['contrato-medicoes', id] })
+              qc.invalidateQueries({ queryKey: ['contrato-parcelas', id] })
+            }
+            setMedToast({ type, msg })
+            setTimeout(() => setMedToast(null), 4000)
+          }}
+        />
+      )}
+
+      {medToast && (
+        <div className={`fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-xl shadow-lg text-xs font-bold ${medToast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+          {medToast.msg}
+        </div>
+      )}
 
     </div>
   )
