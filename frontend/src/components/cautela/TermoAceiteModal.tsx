@@ -306,6 +306,37 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
             )}
           </div>
 
+          {/* Histórico de devoluções (cada etapa, inclusive parciais) */}
+          {(cautela.devolucoes?.length ?? 0) > 0 && (
+            <div>
+              <div className="flex items-center mb-1.5">
+                <label className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${txtMuted}`}>
+                  <PackageCheck size={13} /> Histórico de devoluções
+                </label>
+              </div>
+              <ul className="space-y-1.5">
+                {cautela.devolucoes!.map((ev, i) => (
+                  <li key={i} className={`rounded-xl border p-2.5 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[11px] font-bold ${txtMain}`}>
+                        {new Date(ev.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className={`text-[10px] ${txtMuted}`}>
+                        {(ev.itens ?? []).reduce((s, it) => s + (Number(it.quantidade) || 0), 0)} un
+                      </span>
+                    </div>
+                    <p className={`text-[10px] mt-0.5 ${txtMuted}`}>
+                      {(ev.itens ?? []).map(it => `${it.quantidade}× ${it.descricao || 'item'}`).join(', ') || '—'}
+                    </p>
+                    <p className={`text-[10px] mt-0.5 ${txtMuted}`}>
+                      Devolvido por <strong>{ev.devolvido_por_nome || '—'}</strong> · Recebido por <strong>{ev.recebedor_nome || '—'}</strong>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {erro && (
             <div className="rounded-xl border border-red-300 bg-red-50 text-red-700 text-xs font-semibold px-3 py-2">
               {erro}

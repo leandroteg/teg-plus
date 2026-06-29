@@ -19,10 +19,15 @@ export interface TermoAceiteData {
   baseNome?: string
   /** Assinatura do colaborador na RETIRADA (data URL PNG) */
   assinaturaDataUrl?: string
-  /** Assinatura de quem DEVOLVEU o material (colaborador) na devolução (data URL PNG) */
-  assinaturaDevolucaoColaboradorDataUrl?: string
-  /** Assinatura de quem RECEBEU a entrega final na devolução (data URL PNG) */
-  assinaturaDevolucaoRecebedorDataUrl?: string
+  /** Histórico de devoluções (cada etapa, total ou parcial, com suas assinaturas). */
+  devolucoes?: Array<{
+    data?: string
+    devolvido_por_nome?: string
+    recebedor_nome?: string
+    itens?: Array<{ descricao?: string; quantidade: number; condicao?: string }>
+    assinaturaDevolucaoDataUrl?: string
+    assinaturaRecebedorDataUrl?: string
+  }>
 }
 
 // ── Logo Loader ─────────────────────────────────────────────────────────────
@@ -332,64 +337,55 @@ function buildTermoDoc(
   )
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SECTION: DEVOLUÇÃO (só quando o material já foi devolvido)
+  // SECTION: DEVOLUÇÕES (histórico — cada etapa, total ou parcial)
   // ══════════════════════════════════════════════════════════════════════════
 
-  const temDevolucao = !!(
-    cautela.data_devolucao_real ||
-    data.assinaturaDevolucaoColaboradorDataUrl ||
-    data.assinaturaDevolucaoRecebedorDataUrl
-  )
-  if (temDevolucao) {
-    checkPage(58)
+  const devolucoes = data.devolucoes ?? []
+  if (devolucoes.length > 0) {
+    checkPage(18)
     y += 6
-    sectionTitle('DEVOLUÇÃO')
-    addFieldPair(
-      'Data da Devolução', fmtDate(cautela.data_devolucao_real),
-      'Recebido por', cautela.recebedor_nome || '—',
-    )
-    y += 16
+    sectionTitle('DEVOLUÇÕES')
 
-    // Assinatura de quem devolveu (colaborador) — esquerda
-    if (data.assinaturaDevolucaoColaboradorDataUrl) {
-      try { doc.addImage(data.assinaturaDevolucaoColaboradorDataUrl, 'PNG', M, y - 18, 70, 18) } catch { /* ignore */ }
-    }
-    // Assinatura de quem recebeu (recebedor) — direita
-    if (data.assinaturaDevolucaoRecebedorDataUrl) {
-      try { doc.addImage(data.assinaturaDevolucaoRecebedorDataUrl, 'PNG', W - M - 75, y - 18, 70, 18) } catch { /* ignore */ }
-    }
+    devolucoes.forEach((ev, idx) => {
+      checkPage(44)
+      // Cabeçalho da etapa
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8.5)
+      doc.setTextColor(...DARK)
+      doc.text(`${idx + 1}. Devolução em ${fmtDate(ev.data)}`, M, y)
+      y += 5
 
-    doc.setDrawColor(...LIGHT)
-    doc.setLineWidth(0.3)
+      // Itens devolvidos nesta etapa
+      const itensTxt = (ev.itens ?? [])
+        .map(it => `${it.quantidade}× ${it.descricao || 'item'}${it.condicao ? ` (${it.condicao})` : ''}`)
+        .join('  ·  ')
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...MID)
+      const itensLines = doc.splitTextToSize(itensTxt || '—', CW)
+      doc.text(itensLines.slice(0, 3), M, y)
+      y += Math.min(itensLines.length, 3) * 4 + 12
 
-    // Left: quem devolveu
-    doc.line(M, y, M + 75, y)
-    doc.setFontSize(7)
-    doc.setTextColor(...MID)
-    doc.text('Assinatura de quem devolveu', M + 37.5, y + 4, { align: 'center' })
-    if (cautela.solicitante_nome) {
+      // Assinaturas da etapa (esquerda: quem devolveu / direita: quem recebeu)
+      if (ev.assinaturaDevolucaoDataUrl) {
+        try { doc.addImage(ev.assinaturaDevolucaoDataUrl, 'PNG', M, y - 16, 65, 16) } catch { /* ignore */ }
+      }
+      if (ev.assinaturaRecebedorDataUrl) {
+        try { doc.addImage(ev.assinaturaRecebedorDataUrl, 'PNG', W - M - 70, y - 16, 65, 16) } catch { /* ignore */ }
+      }
+      doc.setDrawColor(...LIGHT)
+      doc.setLineWidth(0.3)
+      doc.line(M, y, M + 70, y)
+      doc.line(W - M - 70, y, W - M, y)
+      doc.setFontSize(7)
+      doc.setTextColor(...MID)
+      doc.text('Devolvido por', M + 35, y + 4, { align: 'center' })
+      doc.text('Recebido por', W - M - 35, y + 4, { align: 'center' })
       doc.setFontSize(6)
-      doc.text(cautela.solicitante_nome, M + 37.5, y + 8, { align: 'center' })
-    }
-
-    // Right: quem recebeu a entrega final
-    doc.line(W - M - 75, y, W - M, y)
-    doc.setFontSize(7)
-    doc.setTextColor(...MID)
-    doc.text('Assinatura de quem recebeu', W - M - 37.5, y + 4, { align: 'center' })
-    if (cautela.recebedor_nome) {
-      doc.setFontSize(6)
-      doc.text(cautela.recebedor_nome, W - M - 37.5, y + 8, { align: 'center' })
-    }
-
-    // Local e data da devolução
-    y += 14
-    doc.setFontSize(7)
-    doc.setTextColor(...MID)
-    doc.text(
-      `${empresa.cidade || ''}${empresa.cidade ? ', ' : ''}${fmtDateFull(cautela.data_devolucao_real)}`,
-      M, y,
-    )
+      if (ev.devolvido_por_nome) doc.text(ev.devolvido_por_nome, M + 35, y + 7.5, { align: 'center' })
+      if (ev.recebedor_nome) doc.text(ev.recebedor_nome, W - M - 35, y + 7.5, { align: 'center' })
+      y += 13
+    })
   }
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -165,13 +165,21 @@ export function useAtualizarCautela() {
 export function useDevolverItens() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ cautela_id, itens }: {
+    mutationFn: async ({ cautela_id, itens, recebedor_id, recebedor_nome, assinatura_devolucao_url, assinatura_recebedor_url }: {
       cautela_id: string
       itens: Array<{ id: string; quantidade_devolvida: number; condicao_devolucao?: string }>
+      recebedor_id?: string
+      recebedor_nome?: string
+      assinatura_devolucao_url?: string
+      assinatura_recebedor_url?: string
     }) => {
       const { data, error } = await supabase.rpc('est_cautela_devolver_itens', {
         p_cautela_id: cautela_id,
         p_itens: itens,
+        p_recebedor_id: recebedor_id ?? null,
+        p_recebedor_nome: recebedor_nome ?? null,
+        p_assinatura_devolucao_url: assinatura_devolucao_url ?? null,
+        p_assinatura_recebedor_url: assinatura_recebedor_url ?? null,
       })
       if (error) throw error
       return data

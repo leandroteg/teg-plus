@@ -44,9 +44,24 @@ export interface Cautela {
   observacao?: string
   criado_em: string
   atualizado_em: string
+  /** Histórico de devoluções (1 objeto por evento, inclusive parciais). */
+  devolucoes?: DevolucaoEvento[]
   // joined
   itens?: CautelaItem[]
   base?: { id: string; nome: string; eh_sede: boolean } | null
+}
+
+// ── Evento de devolução (uma etapa, total ou parcial) ────────────────────────
+export interface DevolucaoEvento {
+  data: string
+  devolvido_por_nome?: string
+  recebedor_id?: string
+  recebedor_nome?: string
+  /** Caminho no storage (bucket cautelas-termos) da assinatura de quem devolveu. */
+  assinatura_devolucao_url?: string
+  /** Caminho no storage da assinatura de quem recebeu a entrega. */
+  assinatura_recebedor_url?: string
+  itens: Array<{ item_id?: string; descricao?: string; quantidade: number; condicao?: string }>
 }
 
 // ── Cautela item ────────────────────────────────────────────────────────────

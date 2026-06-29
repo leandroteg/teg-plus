@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { X, PackageCheck, Eraser, Loader2, PenLine, CheckCircle2, AlertTriangle, Package, ShieldCheck, Eye, EyeOff, Mail, Lock } from 'lucide-react'
-import type { Cautela } from '../../types/cautela'
+import type { Cautela, DevolucaoEvento } from '../../types/cautela'
 import { useDevolverItens } from '../../hooks/useCautelas'
 import { supabase, verifySenha } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -231,19 +231,8 @@ export default function DevolucaoModal({ cautela, isDark, onClose }: Props) {
         .upload(assRecPath, assRecBlob, { contentType: 'image/png', upsert: false })
       if (up2.error) throw up2.error
 
-      // Grava paths + recebedor na cautela
-      const { error: updErr } = await supabase
-        .from('est_cautelas')
-        .update({
-          assinatura_devolucao_url: assColabPath,
-          assinatura_recebedor_devolucao_url: assRecPath,
-          recebedor_id: senhaOk.userId,
-          recebedor_nome: senhaOk.nome,
-        })
-        .eq('id', cautela.id)
-      if (updErr) throw updErr
-
-      // Chama RPC que registra mov de devolucao + transita status
+      // RPC: registra mov de devolucao + transita status + grava o EVENTO de
+      // devolução (histórico) com as assinaturas e o recebedor.
       const itensPayload = linhas
         .filter(l => l.quantidade_devolver > 0)
         .map(l => ({
@@ -254,10 +243,14 @@ export default function DevolucaoModal({ cautela, isDark, onClose }: Props) {
       await devolverMutation.mutateAsync({
         cautela_id: cautela.id,
         itens: itensPayload,
+        recebedor_id: senhaOk.userId,
+        recebedor_nome: senhaOk.nome,
+        assinatura_devolucao_url: assColabPath,
+        assinatura_recebedor_url: assRecPath,
       })
 
-      // Regenera o termo (agora com a seção DEVOLUÇÃO + as 2 assinaturas) e
-      // substitui o termo_url. Não bloqueia a devolução se falhar.
+      // Regenera o termo com o HISTÓRICO completo de devoluções (cada etapa com
+      // suas assinaturas). Não bloqueia a devolução se falhar.
       try {
         const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => {
           const r = new FileReader()
@@ -265,35 +258,42 @@ export default function DevolucaoModal({ cautela, isDark, onClose }: Props) {
           r.onerror = rej
           r.readAsDataURL(b)
         })
-
-        // Assinatura de retirada (arquivada no storage) → dataURL, p/ manter no PDF
-        let assinaturaRetiradaDataUrl: string | undefined
-        if (cautela.assinatura_retirada_url) {
+        const pathToDataUrl = async (path?: string | null): Promise<string | undefined> => {
+          if (!path) return undefined
           const { data: signed } = await supabase.storage
-            .from('cautelas-termos')
-            .createSignedUrl(cautela.assinatura_retirada_url, 120)
-          if (signed?.signedUrl) {
-            const resp = await fetch(signed.signedUrl)
-            if (resp.ok) assinaturaRetiradaDataUrl = await blobToDataUrl(await resp.blob())
-          }
+            .from('cautelas-termos').createSignedUrl(path, 120)
+          if (!signed?.signedUrl) return undefined
+          const resp = await fetch(signed.signedUrl)
+          if (!resp.ok) return undefined
+          return blobToDataUrl(await resp.blob())
         }
 
-        // Registro atualizado (data_devolucao_real / status pós-RPC)
+        const assinaturaRetiradaDataUrl = await pathToDataUrl(cautela.assinatura_retirada_url)
+
+        // Registro atualizado — devolucoes já inclui o evento recém-criado
         const { data: freshRow } = await supabase
           .from('est_cautelas').select('*').eq('id', cautela.id).single()
+        const eventos = (((freshRow as Cautela)?.devolucoes) ?? []) as DevolucaoEvento[]
+
+        const devolucoesPdf = await Promise.all(eventos.map(async ev => ({
+          data: ev.data,
+          devolvido_por_nome: ev.devolvido_por_nome,
+          recebedor_nome: ev.recebedor_nome,
+          itens: ev.itens ?? [],
+          assinaturaDevolucaoDataUrl: await pathToDataUrl(ev.assinatura_devolucao_url),
+          assinaturaRecebedorDataUrl: await pathToDataUrl(ev.assinatura_recebedor_url),
+        })))
 
         const cautelaPdf: Cautela = {
           ...((freshRow as Cautela) ?? cautela),
           itens: cautela.itens ?? [],
-          recebedor_nome: senhaOk.nome,
         }
 
         const termoBlob = await gerarTermoPdfBlob({
           cautela: cautelaPdf,
           baseNome: cautela.base?.nome,
           assinaturaDataUrl: assinaturaRetiradaDataUrl,
-          assinaturaDevolucaoColaboradorDataUrl: await blobToDataUrl(assColabBlob),
-          assinaturaDevolucaoRecebedorDataUrl: await blobToDataUrl(assRecBlob),
+          devolucoes: devolucoesPdf,
         })
 
         const termoPath = `${cautela.id}/termo_${ts}.pdf`
@@ -361,6 +361,36 @@ export default function DevolucaoModal({ cautela, isDark, onClose }: Props) {
               <AlertTriangle size={14} /> {erro}
             </div>
           )}
+
+          {/* ─ Resumo do parcial + histórico de devoluções anteriores ──── */}
+          {(() => {
+            const totalRet = linhas.reduce((s, l) => s + (l.quantidade_total ?? 0), 0)
+            const totalDev = linhas.reduce((s, l) => s + (l.quantidade_devolvida_antes ?? 0), 0)
+            const historico = cautela.devolucoes ?? []
+            if (totalDev <= 0 && historico.length === 0) return null
+            return (
+              <div className={`rounded-xl border p-2.5 ${isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'}`}>
+                <p className={`text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+                  Devolução parcial — {totalDev} de {totalRet} un já devolvidas
+                </p>
+                {historico.length > 0 && (
+                  <ul className={`mt-1.5 space-y-1 text-[10px] ${isDark ? 'text-amber-200/80' : 'text-amber-700'}`}>
+                    {historico.map((ev, i) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                        <span>
+                          {new Date(ev.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          {' · '}
+                          {(ev.itens ?? []).reduce((s, it) => s + (Number(it.quantidade) || 0), 0)} un
+                          {ev.recebedor_nome ? ` · recebido por ${ev.recebedor_nome}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })()}
 
           {/* ─ Itens ───────────────────────────────────────────────────── */}
           <div>
