@@ -1126,6 +1126,12 @@ export default function CotacaoForm() {
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
       const novos: FornecedorForm[] = parsed.map(p => {
+        // rcUsed evita que UM fornecedor mapeie o mesmo item da RC 2x. O escopo é
+        // por fornecedor: quando o documento traz vários fornecedores cotando os
+        // MESMOS itens, cada um precisa poder mapear a RC do zero. Sem este reset,
+        // o 1º fornecedor "consome" todos os itens e os demais ficam sem match →
+        // descartados (apareciam zerados, sem nem carregar nome/CNPJ).
+        rcUsed.clear()
         // Só inclui itens que têm preço E batem com algum item da RC.
         // Itens fora do escopo são descartados (contagem vai para toast de aviso).
         const itensComValor: ItemPreco[] = (p.itens ?? [])
