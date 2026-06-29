@@ -46,6 +46,7 @@ export interface Cautela {
   atualizado_em: string
   // joined
   itens?: CautelaItem[]
+  base?: { id: string; nome: string; eh_sede: boolean } | null
 }
 
 // ── Cautela item ────────────────────────────────────────────────────────────

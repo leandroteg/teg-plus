@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X, FileText, Download, Printer, Loader2, PenLine, User, Building2, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, PackageCheck } from 'lucide-react'
 import type { Cautela } from '../../types/cautela'
 import { abrirTermoPdf, downloadTermoPdf, getTermoPdfFileName } from '../../utils/termo-aceite-cautela-pdf'
-import { useAtualizarCautela } from '../../hooks/useCautelas'
+import { useAtualizarCautela, podeDevolverCautela } from '../../hooks/useCautelas'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
 import { UpperTextarea } from '../UpperInput'
@@ -19,11 +19,14 @@ export default function TermoAceiteModal({ cautela, isDark, onClose, baseNome }:
   const [busy, setBusy] = useState<'open' | 'download' | 'aprovar' | 'rejeitar' | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const atualizarMutation = useAtualizarCautela()
-  const { perfil } = useAuth()
+  const { perfil, isAdmin } = useAuth()
   const jaSalvo = !!cautela.assinatura_retirada_url
   const isPendente = cautela.status === 'pendente'
   const isAprovadaSemAssinatura = cautela.status === 'aprovada' && !jaSalvo
-  const podeDevolver = cautela.status === 'em_aberto' || cautela.status === 'em_devolucao'
+  // Status permite devolver E o usuário tem permissão (admin / comprador na Sede /
+  // almoxarife lotado na obra; o próprio detentor não, salvo admin). Espelha a RPC.
+  const statusPermiteDevolver = cautela.status === 'em_aberto' || cautela.status === 'em_devolucao'
+  const podeDevolver = statusPermiteDevolver && podeDevolverCautela({ cautela, perfil, isAdmin })
   const [showRejeitar, setShowRejeitar] = useState(false)
   const [motivoRejeicao, setMotivoRejeicao] = useState('')
   const [decisao, setDecisao] = useState<null | 'aprovada' | 'rejeitada'>(null)

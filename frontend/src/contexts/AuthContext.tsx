@@ -156,6 +156,10 @@ export interface Perfil {
   colaborador_id: string | null
   base_id: string | null
   pode_receber: boolean
+  /** Pode registrar devolução de cautela em OBRA — restrito à sua base de lotação. */
+  almoxarife: boolean
+  /** Pode registrar devolução de cautela na SEDE (Escritório Central). */
+  comprador: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string

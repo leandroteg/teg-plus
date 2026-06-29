@@ -5,6 +5,35 @@ import type {
   NovaCautelaPayload, StatusCautela, CautelaKPIs,
 } from '../types/cautela'
 
+// ── Regra de quem pode REGISTRAR DEVOLUÇÃO ───────────────────────────────────
+// Espelha o enforço da RPC est_cautela_devolver_itens (mig 154):
+//   - O próprio detentor NÃO pode (salvo Admin).
+//   - Admin sempre pode.
+//   - Cautela na SEDE (base.eh_sede) → só `comprador`.
+//   - Cautela em OBRA → só `almoxarife` lotado na MESMA base (perfil.base_id == cautela.base_id).
+// Obs: solicitante_id da cautela é o id do COLABORADOR → compara com perfil.colaborador_id.
+export function podeDevolverCautela(opts: {
+  cautela: Pick<Cautela, 'solicitante_id' | 'base_id' | 'base'>
+  perfil: {
+    colaborador_id: string | null
+    base_id: string | null
+    almoxarife?: boolean
+    comprador?: boolean
+  } | null | undefined
+  isAdmin: boolean
+}): boolean {
+  const { cautela, perfil, isAdmin } = opts
+  if (!perfil) return false
+
+  const isHolder = !!perfil.colaborador_id && cautela.solicitante_id === perfil.colaborador_id
+  if (isHolder && !isAdmin) return false   // o próprio não devolve, salvo admin
+  if (isAdmin) return true
+
+  if (cautela.base?.eh_sede) return !!perfil.comprador   // Sede → comprador
+  // Obra → almoxarife lotado na mesma base
+  return !!perfil.almoxarife && !!perfil.base_id && perfil.base_id === cautela.base_id
+}
+
 // ── List cautelas ───────────────────────────────────────────────────────────
 export function useCautelas(filtros?: { status?: StatusCautela; solicitante_id?: string }) {
   return useQuery<Cautela[]>({
@@ -14,7 +43,8 @@ export function useCautelas(filtros?: { status?: StatusCautela; solicitante_id?:
         .from('est_cautelas')
         .select(`
           *,
-          itens:est_cautela_itens(*, item:est_itens(codigo, descricao, unidade))
+          itens:est_cautela_itens(*, item:est_itens(codigo, descricao, unidade)),
+          base:est_bases(id, nome, eh_sede)
         `)
         .order('criado_em', { ascending: false })
 
@@ -39,7 +69,8 @@ export function useCautela(id: string | undefined) {
         .from('est_cautelas')
         .select(`
           *,
-          itens:est_cautela_itens(*, item:est_itens(codigo, descricao, unidade))
+          itens:est_cautela_itens(*, item:est_itens(codigo, descricao, unidade)),
+          base:est_bases(id, nome, eh_sede)
         `)
         .eq('id', id!)
         .single()

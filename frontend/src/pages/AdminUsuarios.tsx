@@ -736,6 +736,8 @@ function UserDetailPanel({
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [baseId, setBaseId] = useState<string>(user.base_id ?? '')
   const [podeReceber, setPodeReceber] = useState<boolean>(user.pode_receber ?? true)
+  const [almoxarife, setAlmoxarife] = useState<boolean>(user.almoxarife ?? false)
+  const [comprador, setComprador] = useState<boolean>(user.comprador ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
@@ -788,6 +790,8 @@ function UserDetailPanel({
       alterar_senha_proximo_login: altProxLogin,
       base_id: baseId || null,
       pode_receber: podeReceber,
+      almoxarife,
+      comprador,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
@@ -799,6 +803,8 @@ function UserDetailPanel({
     setPapelGlobal(resolvePapelFromPerfil(user))
     setBaseId(user.base_id ?? '')
     setPodeReceber(user.pode_receber ?? true)
+    setAlmoxarife(user.almoxarife ?? false)
+    setComprador(user.comprador ?? false)
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
@@ -957,18 +963,45 @@ function UserDetailPanel({
             </p>
 
             {baseId && (
-              <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
-                <input
-                  type="checkbox"
-                  checked={podeReceber}
-                  onChange={e => setPodeReceber(e.target.checked)}
-                  className="accent-primary"
-                />
-                <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Pode confirmar recebimento de pedidos desta base
-                </span>
-              </label>
+              <>
+                <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                  <input
+                    type="checkbox"
+                    checked={podeReceber}
+                    onChange={e => setPodeReceber(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Pode confirmar recebimento de pedidos desta base
+                  </span>
+                </label>
+
+                <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                  <input
+                    type="checkbox"
+                    checked={almoxarife}
+                    onChange={e => setAlmoxarife(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Almoxarife desta base (registra devolução de cautela das obras lotadas aqui)
+                  </span>
+                </label>
+              </>
             )}
+
+            {/* Comprador: registra devolução de cautela na Sede (Escritório Central) */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={comprador}
+                onChange={e => setComprador(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Comprador — pode registrar devolução de cautela na Sede
+              </span>
+            </label>
           </div>
 
           {/* Alçada */}
