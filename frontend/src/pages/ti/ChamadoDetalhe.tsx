@@ -1,309 +1,329 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import {
-  ArrowLeft, Loader2, Send, Lock, UserCircle2, Headset, CheckCircle2,
-  PauseCircle, PlayCircle, XCircle,
-} from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
-import { UpperTextarea } from '../../components/UpperInput'
-import AuditoriaCard from '../../components/AuditoriaCard'
-import {
-  useChamado, useIsAtendenteTi,
-  adicionarComentario, atualizarStatus, assumirChamado,
-} from './hooks'
-import AnexosBox from './AnexosBox'
-import {
-  STATUS_COLOR, STATUS_LABEL, formatNumero, getCategoria, PRIORIDADE_LABEL,
-  type StatusChamado,
-} from './types'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Send, Lock, CircleDot } from 'lucide-react'
+import { getTicket, patchTicket, addComment, type TicketPatch } from './data/tickets'
+import { listAssignees } from './data/users'
+import { listCategories, listSectors } from './data/meta'
+import { listCanned } from './data/canned'
+import { listAssets } from './data/assets'
+import { uploadAttachments, deleteAttachment } from './data/attachments'
+import { useTiAuth } from './data/auth'
+import type { Activity, Attachment, Status, Priority } from './data/shapes'
+import { STATUS_LABEL, PRIORITY_LABEL, type StatusDb, type PriorityDb } from './data/enums'
+import { isStaff, STATUS_LIST, PRIORITY_LIST, STATUS_META, PRIORITY_META } from './lib/constants'
+import { Spinner, ErrorNote } from './components/ui'
+import { StatusBadge, PriorityBadge, CategoryBadge, EscaladoBadge } from './components/Badges'
+import { SlaBadge } from './components/SlaBadge'
+import { Avatar } from './components/Avatar'
+import { FileUpload } from './components/FileUpload'
+import { AttachmentList } from './components/AttachmentList'
+import { formatDateTime, timeAgo } from './lib/format'
+
+function parseMeta(meta: string | null): Record<string, string | number | null> {
+  try { return meta ? JSON.parse(meta) : {} } catch { return {} }
+}
+
+function activityText(a: Activity): string {
+  const m = parseMeta(a.meta)
+  const who = a.actor?.name ?? 'Sistema'
+  const st = (v: unknown) => (v ? STATUS_LABEL[v as StatusDb] ?? String(v) : '—')
+  const pr = (v: unknown) => (v ? PRIORITY_LABEL[v as PriorityDb] ?? String(v) : '—')
+  switch (a.type) {
+    case 'CRIADO': return `${who} abriu o chamado`
+    case 'STATUS': return `${who} alterou o status: ${st(m.de)} → ${st(m.para)}`
+    case 'REABERTO': return `${who} reabriu o chamado`
+    case 'PRIORIDADE': return `${who} mudou a prioridade: ${pr(m.de)} → ${pr(m.para)}`
+    case 'CATEGORIA': return `${who} mudou a categoria: ${m.de ?? '—'} → ${m.para ?? '—'}`
+    case 'SETOR': return `${who} mudou o setor: ${m.de ?? '—'} → ${m.para ?? '—'}`
+    case 'ATRIBUIDO': return m.para ? `${who} atribuiu para ${m.para}` : `${who} removeu o responsável`
+    case 'ANEXOU': return `${who} anexou ${m.qtd ?? ''} arquivo(s)`.replace('  ', ' ')
+    case 'ATIVO': return m.para ? `${who} vinculou o equipamento ${m.para}` : `${who} removeu o equipamento vinculado`
+    default: return `${who}: ${a.type}`
+  }
+}
+
+function SidebarField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      {children}
+    </div>
+  )
+}
 
 export default function ChamadoDetalhe() {
-  const { id } = useParams<{ id: string }>()
-  const { perfil } = useAuth()
-  const isAtendente = useIsAtendenteTi()
-  const { chamado, comentarios, loading, erro, reload } = useChamado(id)
+  const { id } = useParams()
+  const { user, isStaff: staff } = useTiAuth()
+  const queryClient = useQueryClient()
 
-  const [mensagem, setMensagem] = useState('')
-  const [interno, setInterno] = useState(false)
-  const [enviando, setEnviando] = useState(false)
-  const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const ticketQ = useQuery({ queryKey: ['ti', 'ticket', id], queryFn: () => getTicket(id!), enabled: !!id })
+  const assigneesQ = useQuery({ queryKey: ['ti', 'assignees'], queryFn: listAssignees, enabled: staff })
+  const catQ = useQuery({ queryKey: ['ti', 'categories'], queryFn: listCategories, enabled: staff })
+  const secQ = useQuery({ queryKey: ['ti', 'sectors'], queryFn: listSectors, enabled: staff })
+  const cannedQ = useQuery({ queryKey: ['ti', 'canned'], queryFn: listCanned, enabled: staff })
+  const assetsQ = useQuery({ queryKey: ['ti', 'assets'], queryFn: listAssets, enabled: staff })
 
-  if (loading) {
+  const patchMut = useMutation({
+    mutationFn: (patch: TicketPatch) => patchTicket(id!, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ti', 'ticket', id] })
+      queryClient.invalidateQueries({ queryKey: ['ti', 'tickets'] })
+      queryClient.invalidateQueries({ queryKey: ['ti', 'stats'] })
+    },
+  })
+
+  const [body, setBody] = useState('')
+  const [internal, setInternal] = useState(false)
+  const [commentError, setCommentError] = useState('')
+  const commentMut = useMutation({
+    mutationFn: () => addComment({ chamadoId: id!, body: body.trim(), internal, autorId: user!.id }),
+    onSuccess: () => {
+      setBody(''); setInternal(false); setCommentError('')
+      queryClient.invalidateQueries({ queryKey: ['ti', 'ticket', id] })
+    },
+    onError: (e) => setCommentError(e instanceof Error ? e.message : 'Não foi possível enviar a mensagem.'),
+  })
+
+  const [files, setFiles] = useState<File[]>([])
+  const uploadMut = useMutation({
+    mutationFn: () => uploadAttachments({ chamadoId: id!, files, autorId: user!.id }),
+    onSuccess: () => { setFiles([]); queryClient.invalidateQueries({ queryKey: ['ti', 'ticket', id] }) },
+  })
+  const deleteAttMut = useMutation({
+    mutationFn: (attId: string) => deleteAttachment(attId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ti', 'ticket', id] }),
+  })
+
+  if (ticketQ.isLoading) return <Spinner label="Carregando chamado…" />
+  if (ticketQ.error || !ticketQ.data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-      </div>
-    )
-  }
-
-  if (erro || !chamado) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-8">
-        <div className="max-w-3xl mx-auto">
-          <Link to="/ti" className="text-sm text-sky-500">← Voltar</Link>
-          <p className="mt-6 text-rose-500">{erro ?? 'Chamado não encontrado.'}</p>
+      <div className="ti-scope mx-auto max-w-md">
+        <div className="card p-8 text-center">
+          <p className="text-slate-600">Chamado não encontrado ou você não tem acesso a ele.</p>
+          <Link to="/ti/chamados" className="btn-primary mt-4 inline-flex">Voltar aos chamados</Link>
         </div>
       </div>
     )
   }
 
-  const cat = getCategoria(chamado.categoria)
-  const ehSolicitante = chamado.solicitante_id === perfil?.id
-  const podeComentar = chamado.status !== 'fechado'
-
-  async function handleComentar(e: React.FormEvent) {
+  const t = ticketQ.data
+  const onSubmitComment = (e: FormEvent) => {
     e.preventDefault()
-    if (!perfil?.id || !id) return
-    if (mensagem.trim().length < 1) return
-    setEnviando(true)
-    setErroAcao(null)
-    try {
-      await adicionarComentario({
-        chamado_id: id,
-        autor_id: perfil.id,
-        autor_nome: perfil.nome,
-        autor_email: perfil.email,
-        autor_eh_atendente: isAtendente,
-        mensagem: mensagem.trim(),
-        interno: isAtendente ? interno : false,
-      })
-      // Se atendente respondeu e estava 'aberto', move pra em_atendimento
-      if (isAtendente && chamado!.status === 'aberto' && !interno) {
-        await atualizarStatus(id, 'em_atendimento', perfil.id)
-      }
-      // Se solicitante comentou em chamado aguardando, devolve pra em_atendimento
-      if (ehSolicitante && chamado!.status === 'aguardando_usuario') {
-        await atualizarStatus(id, 'em_atendimento')
-      }
-      setMensagem('')
-      setInterno(false)
-      reload()
-    } catch (err) {
-      setErroAcao(err instanceof Error ? err.message : 'Erro ao enviar mensagem.')
-    } finally {
-      setEnviando(false)
-    }
+    if (body.trim()) commentMut.mutate()
   }
+  const canDelete = (a: Attachment) => staff || a.uploadedBy?.id === user?.id
 
-  async function handleStatus(novo: StatusChamado) {
-    if (!id) return
-    setErroAcao(null)
-    try {
-      await atualizarStatus(id, novo)
-      reload()
-    } catch (err) {
-      setErroAcao(err instanceof Error ? err.message : 'Erro ao mudar status.')
-    }
-  }
-
-  async function handleAssumir() {
-    if (!id || !perfil?.id) return
-    setErroAcao(null)
-    try {
-      await assumirChamado(id, perfil.id)
-      reload()
-    } catch (err) {
-      setErroAcao(err instanceof Error ? err.message : 'Erro ao assumir.')
-    }
-  }
+  const timeline = [
+    ...t.comments.map((c) => ({ kind: 'comment' as const, at: c.createdAt, comment: c })),
+    ...t.activities.filter((a) => a.type !== 'COMENTOU').map((a) => ({ kind: 'activity' as const, at: a.createdAt, activity: a })),
+  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <Link to={isAtendente ? '/ti/fila' : '/ti/meus'} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-sky-500 mb-6">
-          <ArrowLeft className="w-4 h-4" /> Voltar
-        </Link>
+    <div className="ti-scope">
+      <Link to="/ti/chamados" className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-sky-600">
+        <ArrowLeft className="h-4 w-4" /> Voltar
+      </Link>
 
-        {/* Header card */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 mb-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0">
-                <cat.Icon className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                  {formatNumero(chamado.numero)} · {cat.label} · {PRIORIDADE_LABEL[chamado.prioridade]}
-                </p>
-                <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50 mt-0.5 break-words">
-                  {chamado.titulo}
-                </h1>
-              </div>
-            </div>
-            <span className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap ${STATUS_COLOR[chamado.status]}`}>
-              {STATUS_LABEL[chamado.status]}
-            </span>
-          </div>
-
-          <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
-            {chamado.descricao}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <AuditoriaCard
-              createdAt={chamado.created_at}
-              updatedAt={chamado.updated_at}
-              criadoPor={chamado.criado_por_nome ?? chamado.solicitante?.nome}
-              atualizadoPor={chamado.atualizado_por_nome}
-              extra={[
-                { label: 'Atendente', value: chamado.atendente?.nome },
-              ]}
-            />
-          </div>
+      <div className="card mb-6 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm text-slate-400">{t.code}</span>
+          <StatusBadge status={t.status} />
+          <PriorityBadge priority={t.priority} />
+          <CategoryBadge name={t.category.name} />
+          <SlaBadge dueAt={t.dueAt} status={t.status} />
+          {t.escalatedAt && <EscaladoBadge />}
         </div>
+        <h1 className="mt-2 text-xl font-bold text-slate-800">{t.title}</h1>
+        <p className="mt-1 text-xs text-slate-400">Aberto por {t.requester.name} · {formatDateTime(t.createdAt)}</p>
+      </div>
 
-        {/* Atendente actions */}
-        {isAtendente && (
-          <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300 mb-3">
-              Ações de atendimento
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {!chamado.atendente_id && (
-                <button onClick={handleAssumir} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-medium">
-                  <Headset className="w-4 h-4" /> Assumir
-                </button>
-              )}
-              {chamado.status !== 'em_atendimento' && chamado.status !== 'fechado' && chamado.status !== 'resolvido' && (
-                <button onClick={() => handleStatus('em_atendimento')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
-                  <PlayCircle className="w-4 h-4" /> Em atendimento
-                </button>
-              )}
-              {chamado.status !== 'aguardando_usuario' && chamado.status !== 'fechado' && chamado.status !== 'resolvido' && (
-                <button onClick={() => handleStatus('aguardando_usuario')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
-                  <PauseCircle className="w-4 h-4" /> Aguardar usuário
-                </button>
-              )}
-              {chamado.status !== 'resolvido' && chamado.status !== 'fechado' && (
-                <button onClick={() => handleStatus('resolvido')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> Marcar resolvido
-                </button>
-              )}
-              {chamado.status === 'resolvido' && (
-                <button onClick={() => handleStatus('fechado')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
-                  <XCircle className="w-4 h-4" /> Fechar
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <div className="card p-5">
+            <h2 className="mb-2 text-sm font-semibold text-slate-700">Descrição</h2>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.description}</p>
+          </div>
+
+          <div className="card p-5">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Anexos</h2>
+            <AttachmentList attachments={t.attachments} canDelete={canDelete} onDelete={(a) => deleteAttMut.mutate(a.id)} />
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <FileUpload files={files} onChange={setFiles} />
+              {files.length > 0 && (
+                <button className="btn-accent mt-3" onClick={() => uploadMut.mutate()} disabled={uploadMut.isPending}>
+                  {uploadMut.isPending ? 'Enviando…' : `Enviar ${files.length} arquivo(s)`}
                 </button>
               )}
             </div>
           </div>
-        )}
 
-        {/* Resolvido — solicitante confirma */}
-        {ehSolicitante && chamado.status === 'resolvido' && (
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 mb-6">
-            <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">
-              A TI marcou seu chamado como <strong>resolvido</strong>. Está tudo certo?
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleStatus('fechado')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium"
-              >
-                <CheckCircle2 className="w-4 h-4" /> Confirmar e fechar
-              </button>
-              <button
-                onClick={() => handleStatus('em_atendimento')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm"
-              >
-                Reabrir — ainda não resolvido
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Anexos */}
-        <div className="mb-6">
-          <AnexosBox
-            chamadoId={chamado.id}
-            podeAnexar={chamado.status !== 'fechado'}
-          />
-        </div>
-
-        {/* Thread */}
-        <section className="mb-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
-            Conversa
-          </h2>
-          {comentarios.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400 italic">
-              Nenhuma resposta ainda. {isAtendente ? 'Seja o primeiro a responder.' : 'A TI vai responder em breve.'}
-            </p>
-          )}
-          <div className="space-y-3">
-            {comentarios.map(c => {
-              const meuComentario = c.autor_id === perfil?.id
-              return (
-                <div
-                  key={c.id}
-                  className={`p-4 rounded-xl border ${
-                    c.interno
-                      ? 'border-amber-500/40 bg-amber-50/50 dark:bg-amber-500/10'
-                      : meuComentario
-                        ? 'border-sky-500/30 bg-sky-50/50 dark:bg-sky-500/10'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-1.5">
-                    <UserCircle2 className="w-4 h-4" />
-                    <span className="font-medium text-slate-700 dark:text-slate-200">{c.autor?.nome ?? 'Usuário'}</span>
-                    <span>·</span>
-                    <span>{new Date(c.created_at).toLocaleString('pt-BR')}</span>
-                    {c.interno && (
-                      <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] uppercase font-semibold tracking-wide">
-                        <Lock className="w-3 h-3" /> Nota interna
-                      </span>
-                    )}
+          <div className="card p-5">
+            <h2 className="mb-4 text-sm font-semibold text-slate-700">Histórico</h2>
+            <div className="space-y-5">
+              {timeline.map((item, i) =>
+                item.kind === 'comment' ? (
+                  <div key={`c-${item.comment.id}`} className="flex gap-3">
+                    <Avatar name={item.comment.author.name} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">{item.comment.author.name}</span>
+                        {isStaff(item.comment.author.role) && (
+                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">Equipe T.I.</span>
+                        )}
+                        <span className="text-xs text-slate-400">{formatDateTime(item.comment.createdAt)}</span>
+                        {item.comment.isInternal && (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            <Lock className="h-3 w-3" /> Nota interna
+                          </span>
+                        )}
+                      </div>
+                      <div className={`mt-1 whitespace-pre-wrap rounded-lg border p-3 text-sm ${
+                        item.comment.isInternal ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-100 bg-slate-50 text-slate-700'
+                      }`}>
+                        {item.comment.body}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap">{c.mensagem}</p>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* Compose */}
-        {podeComentar && (
-          <form onSubmit={handleComentar} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <UpperTextarea
-              value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              placeholder="ESCREVA UMA RESPOSTA..."
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-y"
-            />
-            {erroAcao && (
-              <p className="mt-2 text-sm text-rose-500">{erroAcao}</p>
-            )}
-            <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-              {isAtendente ? (
-                <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 select-none cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={interno}
-                    onChange={(e) => setInterno(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300"
-                  />
-                  <Lock className="w-3.5 h-3.5" />
-                  Nota interna (só atendentes veem)
-                </label>
-              ) : <span />}
-              <button
-                type="submit"
-                disabled={enviando || mensagem.trim().length === 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-60 text-white text-sm font-semibold"
-              >
-                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Enviar
-              </button>
+                ) : (
+                  <div key={`a-${item.activity.id}-${i}`} className="flex items-center gap-2 pl-1 text-xs text-slate-400">
+                    <CircleDot className="h-3.5 w-3.5 shrink-0" />
+                    <span>{activityText(item.activity)}</span>
+                    <span>·</span>
+                    <span>{timeAgo(item.at)}</span>
+                  </div>
+                ),
+              )}
             </div>
-          </form>
-        )}
 
-        {!podeComentar && (
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400 italic">
-            Este chamado está fechado. Abra um novo se precisar de mais ajuda.
-          </p>
-        )}
+            <form onSubmit={onSubmitComment} className="mt-6 border-t border-slate-100 pt-4">
+              {commentError && <div className="mb-2"><ErrorNote message={commentError} /></div>}
+              {staff && (cannedQ.data?.length ?? 0) > 0 && (
+                <select
+                  className="input mb-2"
+                  value=""
+                  onChange={(e) => {
+                    const c = cannedQ.data?.find((x) => x.id === e.target.value)
+                    if (c) setBody((prev) => (prev ? `${prev}\n\n${c.body}` : c.body))
+                    e.currentTarget.value = ''
+                  }}
+                >
+                  <option value="">Inserir modelo de resposta…</option>
+                  {cannedQ.data?.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                </select>
+              )}
+              <textarea className="input min-h-[90px] resize-y" placeholder="Escreva uma resposta…" value={body} onChange={(e) => setBody(e.target.value)} />
+              <div className="mt-2 flex items-center justify-between">
+                {staff ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                    Nota interna (só a equipe vê)
+                  </label>
+                ) : <span />}
+                <button type="submit" className="btn-primary" disabled={commentMut.isPending || !body.trim()}>
+                  <Send className="h-4 w-4" /> {commentMut.isPending ? 'Enviando…' : 'Responder'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="card space-y-4 p-5">
+            <h2 className="text-sm font-semibold text-slate-700">Propriedades</h2>
+
+            <SidebarField label="Status">
+              {staff ? (
+                <select className="input" value={t.status} disabled={patchMut.isPending} onChange={(e) => patchMut.mutate({ status: e.target.value as Status })}>
+                  {STATUS_LIST.map((s) => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
+                </select>
+              ) : <StatusBadge status={t.status} />}
+            </SidebarField>
+
+            <SidebarField label="Prioridade">
+              {staff ? (
+                <select className="input" value={t.priority} disabled={patchMut.isPending} onChange={(e) => patchMut.mutate({ priority: e.target.value as Priority })}>
+                  {PRIORITY_LIST.map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
+                </select>
+              ) : <PriorityBadge priority={t.priority} />}
+            </SidebarField>
+
+            <SidebarField label="Categoria">
+              {staff ? (
+                <select className="input" value={t.category.id} disabled={patchMut.isPending} onChange={(e) => {
+                  const cat = catQ.data?.find((c) => c.id === e.target.value)
+                  patchMut.mutate({ categoryId: e.target.value, categoryName: cat?.name })
+                }}>
+                  {(catQ.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              ) : <CategoryBadge name={t.category.name} />}
+            </SidebarField>
+
+            <SidebarField label="Setor">
+              {staff ? (
+                <select className="input" value={t.sector?.id ?? ''} disabled={patchMut.isPending} onChange={(e) => patchMut.mutate({ sectorId: e.target.value || null })}>
+                  <option value="">— Não definido</option>
+                  {(secQ.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : <span className="text-sm text-slate-700">{t.sector?.name ?? '—'}</span>}
+            </SidebarField>
+
+            <SidebarField label="Responsável">
+              {staff ? (
+                <select className="input" value={t.assignee?.id ?? ''} disabled={patchMut.isPending} onChange={(e) => patchMut.mutate({ assigneeId: e.target.value || null })}>
+                  <option value="">Não atribuído</option>
+                  {(assigneesQ.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              ) : t.assignee ? (
+                <div className="flex items-center gap-2"><Avatar name={t.assignee.name} size="sm" /><span className="text-sm text-slate-700">{t.assignee.name}</span></div>
+              ) : <span className="text-sm text-slate-400">Não atribuído</span>}
+            </SidebarField>
+
+            <SidebarField label="Equipamento">
+              {staff ? (
+                <select className="input" value={t.asset?.id ?? ''} disabled={patchMut.isPending} onChange={(e) => patchMut.mutate({ assetId: e.target.value || null })}>
+                  <option value="">— Nenhum</option>
+                  {(assetsQ.data ?? []).map((a) => (
+                    <option key={a.id} value={a.id}>{(a.tag ? `${a.tag} · ` : '') + (a.model ?? a.type)}</option>
+                  ))}
+                </select>
+              ) : t.asset ? (
+                <span className="text-sm text-slate-700">{(t.asset.tag ? `${t.asset.tag} · ` : '') + (t.asset.model ?? t.asset.type)}</span>
+              ) : <span className="text-sm text-slate-400">—</span>}
+            </SidebarField>
+          </div>
+
+          {(t.customFields?.length ?? 0) > 0 && (
+            <div className="card space-y-3 p-5">
+              <h2 className="text-sm font-semibold text-slate-700">Informações adicionais</h2>
+              {t.customFields!.map((f) => (
+                <div key={f.id}>
+                  <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</div>
+                  <div className="text-sm text-slate-700">{f.value || '—'}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="card space-y-3 p-5 text-sm">
+            <SidebarField label="Solicitante">
+              <div className="flex items-center gap-2">
+                <Avatar name={t.requester.name} size="sm" />
+                <div>
+                  <div className="text-slate-700">{t.requester.name}</div>
+                  <div className="text-xs text-slate-400">{t.externalContact ? `WhatsApp: ${t.externalContact.phone}` : t.requester.email}</div>
+                  {t.externalContact && <div className="text-[11px] font-medium text-emerald-600">Contato externo · via WhatsApp</div>}
+                </div>
+              </div>
+            </SidebarField>
+            <div className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+              <div>Aberto em {formatDateTime(t.createdAt)}</div>
+              {t.dueAt && <div>Prazo (SLA): {formatDateTime(t.dueAt)}</div>}
+              <div>Atualizado {timeAgo(t.updatedAt)}</div>
+              {t.resolvedAt && <div>Resolvido em {formatDateTime(t.resolvedAt)}</div>}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

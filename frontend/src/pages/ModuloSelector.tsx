@@ -143,7 +143,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(14,165,233,0.16)',
     accent: '#38BDF8',
     subs: [
-      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti', open: true },
+      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti', adminOnly: true },
       { key: 'ai', label: 'AI Agents', desc: 'Agentes inteligentes TEG+', Icon: Bot, active: false, route: '' },
     ],
   },
