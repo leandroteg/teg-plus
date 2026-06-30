@@ -1,14 +1,14 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, AlertTriangle, FileText, Lock, Filter } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, AlertTriangle, FileText, Lock, Filter, Send } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras,
-  usePontoAtestados, useAprovarItem,
+  usePontoAtestados, useAprovarItem, useEnviarItens,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes } from '../../../lib/ponto'
-import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo } from '../../../types/ponto'
+import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -33,11 +33,10 @@ function useThemeCls() {
     input: isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white',
   }
 }
+const STATUS_CLS: Record<string, string> = { pendente: 'bg-amber-500/15 text-amber-500', em_aprovacao: 'bg-sky-500/15 text-sky-500', aprovado: 'bg-emerald-500/15 text-emerald-500', reprovado: 'bg-rose-500/15 text-rose-500' }
+const STATUS_LBL: Record<string, string> = { pendente: 'pendente', em_aprovacao: 'em aprovação', aprovado: 'aprovado', reprovado: 'reprovado' }
 function Status({ s }: { s: AprovStatus }) {
-  const m: Record<AprovStatus, string> = {
-    pendente: 'bg-amber-500/15 text-amber-500', aprovado: 'bg-emerald-500/15 text-emerald-500', reprovado: 'bg-rose-500/15 text-rose-500',
-  }
-  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${m[s] || m.pendente}`}>{s}</span>
+  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${STATUS_CLS[s] || STATUS_CLS.pendente}`}>{STATUS_LBL[s] || s}</span>
 }
 function useAprovador() {
   const { user } = useAuth()
@@ -46,14 +45,62 @@ function useAprovador() {
 const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
 const tipoLabel: Record<AprovTipo, string> = { retificacao: 'Retificação', hora_extra: 'Hora extra', atestado: 'Atestado' }
 const tipoCor: Record<AprovTipo, string> = { retificacao: 'text-amber-500', hora_extra: 'text-orange-500', atestado: 'text-rose-500' }
-
-// ════════════════════════════════════════════════════════════════════════════
-// 1) REGISTROS PONTO
-// ════════════════════════════════════════════════════════════════════════════
 function matchPessoa(nome: string | null | undefined, q: string) {
   return !q.trim() || (nome ?? '').toLowerCase().includes(q.trim().toLowerCase())
 }
 
+// seleção em lote (checkbox por linha + marcar/desmarcar todos)
+function useSelecao() {
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  return {
+    sel,
+    toggle: (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }),
+    setAll: (ids: string[]) => setSel(new Set(ids)),
+    clear: () => setSel(new Set()),
+  }
+}
+function SelecaoBar({ n, onEnviar, pending }: { n: number; onEnviar: () => void; pending: boolean }) {
+  const c = useThemeCls()
+  if (!n) return null
+  return (
+    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl ${c.isLight ? 'bg-violet-50 border border-violet-100' : 'bg-violet-500/10 border border-violet-500/20'}`}>
+      <span className={`text-xs font-semibold ${c.txt}`}>{n} selecionado(s)</span>
+      <button onClick={onEnviar} disabled={pending} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-50"><Send size={12} /> Enviar para aprovação</button>
+    </div>
+  )
+}
+function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: string[]; ocultos: Set<string>; toggle: (m: string) => void }) {
+  const c = useThemeCls()
+  const [open, setOpen] = useState(false)
+  const sel = motivos.filter(m => !ocultos.has(m)).length
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${c.input}`}>
+        Justificativas <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-500">{sel}/{motivos.length}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+        <div className={`absolute z-20 mt-1 min-w-[230px] max-h-64 overflow-y-auto rounded-xl border shadow-xl p-1.5 ${c.isLight ? 'bg-white border-slate-200' : 'bg-slate-800 border-white/10'}`}>
+          {!motivos.length && <div className={`text-xs px-2 py-1.5 ${c.sub}`}>Nenhuma justificativa</div>}
+          {motivos.map(m => (
+            <label key={m} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg cursor-pointer ${c.isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'} ${c.txt}`}>
+              <input type="checkbox" checked={!ocultos.has(m)} onChange={() => toggle(m)} className="accent-violet-500" /> {m}
+            </label>
+          ))}
+        </div>
+      </>)}
+    </div>
+  )
+}
+// célula de checkbox no header
+function ThCheck({ all, none, onToggle }: { all: boolean; none: boolean; onToggle: () => void }) {
+  return <th className={`${TH} w-px`}><input type="checkbox" checked={all} onChange={onToggle} disabled={none} className="accent-violet-500" /></th>
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1) REGISTROS PONTO
+// ════════════════════════════════════════════════════════════════════════════
 export function RegistrosPontoTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const c = useThemeCls()
@@ -125,56 +172,42 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 2) RETIFICAÇÕES
+// 2) RETIFICAÇÕES — selecionável + enviar p/ aprovação
 // ════════════════════════════════════════════════════════════════════════════
-function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: string[]; ocultos: Set<string>; toggle: (m: string) => void }) {
-  const c = useThemeCls()
-  const [open, setOpen] = useState(false)
-  const sel = motivos.filter(m => !ocultos.has(m)).length
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${c.input}`}>
-        Justificativas <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-500">{sel}/{motivos.length}</span>
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (<>
-        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-        <div className={`absolute z-20 mt-1 min-w-[230px] max-h-64 overflow-y-auto rounded-xl border shadow-xl p-1.5 ${c.isLight ? 'bg-white border-slate-200' : 'bg-slate-800 border-white/10'}`}>
-          {!motivos.length && <div className={`text-xs px-2 py-1.5 ${c.sub}`}>Nenhuma justificativa</div>}
-          {motivos.map(m => (
-            <label key={m} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg cursor-pointer ${c.isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'} ${c.txt}`}>
-              <input type="checkbox" checked={!ocultos.has(m)} onChange={() => toggle(m)} className="accent-violet-500" /> {m}
-            </label>
-          ))}
-        </div>
-      </>)}
-    </div>
-  )
-}
-
-export function RetificacoesTab({ anoMes, baseId, pessoa }: PontoTabProps) {
+export function RetificacoesTab({ anoMes, baseId, pessoa, status }: PontoTabProps) {
   const { data = [], isLoading } = usePontoRetificacoes(anoMes)
   const c = useThemeCls()
-  // por padrão, "Mudança de ponto" começa oculta
+  const aprovador = useAprovador()
+  const enviar = useEnviarItens()
+  const { sel, toggle, setAll, clear } = useSelecao()
   const [ocultos, setOcultos] = useState<Set<string>>(new Set(['Mudança de ponto']))
   const semNoise = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
   const motivos = [...new Set(semNoise.map(r => r.motivo!).filter(Boolean))].sort()
-  const lista = semNoise.filter(r => !ocultos.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa))
-  const toggle = (m: string) => setOcultos(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
+  const lista = semNoise.filter(r => !ocultos.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa) && (!status || r.aprov_status === status))
+  const toggleMot = (m: string) => setOcultos(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
+  const idOf = (r: PontoRetificacao) => String(r.nsr)
+  const pend = lista.filter(r => r.aprov_status === 'pendente')
+  const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
+  const onEnviar = () => enviar.mutate({ keys: lista.filter(r => sel.has(idOf(r))).map(r => ({ tipo: 'retificacao', nsr: r.nsr } as AprovKey)), por: aprovador }, { onSuccess: clear })
 
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções manuais de marcação (Origem: cartão). Pendentes vão para a aba Aprovação.</div>
+      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções manuais de marcação (Origem: cartão). Selecione e envie para aprovação.</div>
       <div className="flex items-center gap-2 flex-wrap">
-        <MultiSelectJustif motivos={motivos} ocultos={ocultos} toggle={toggle} />
+        <MultiSelectJustif motivos={motivos} ocultos={ocultos} toggle={toggleMot} />
+        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
       </div>
       <Painel>
-        {!lista.length ? <Vazio msg="Nenhuma retificação no mês." /> : (
+        {!lista.length ? <Vazio msg="Nenhuma retificação no filtro." /> : (
           <table className="w-full">
-            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data/Hora</th><th className={TH}>Tipo (motivo)</th><th className={TH}>Status</th></tr></thead>
+            <thead><tr className={c.head}>
+              <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(idOf))} />
+              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data/Hora</th><th className={TH}>Tipo (motivo)</th><th className={TH}>Status</th>
+            </tr></thead>
             <tbody>{lista.map((r, i) => (
               <tr key={i} className={`border-t ${c.row}`}>
+                <td className={`${TD} w-px`}>{r.aprov_status === 'pendente' && <input type="checkbox" checked={sel.has(idOf(r))} onChange={() => toggle(idOf(r))} className="accent-violet-500" />}</td>
                 <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
                 <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.colaborador?.base?.nome ?? '—'}</td>
                 <td className={`${TD} ${c.sub}`}>{new Date(r.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
@@ -190,26 +223,41 @@ export function RetificacoesTab({ anoMes, baseId, pessoa }: PontoTabProps) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 3) HORAS EXTRAS
+// 3) HORAS EXTRAS — selecionável + enviar p/ aprovação
 // ════════════════════════════════════════════════════════════════════════════
-export function HorasExtrasTab({ anoMes, baseId, pessoa }: PontoTabProps) {
+export function HorasExtrasTab({ anoMes, baseId, pessoa, status }: PontoTabProps) {
   const { data = [], isLoading } = usePontoHorasExtras(anoMes, baseId || undefined)
   const c = useThemeCls()
-  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa))
+  const aprovador = useAprovador()
+  const enviar = useEnviarItens()
+  const { sel, toggle, setAll, clear } = useSelecao()
+  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (!status || r.aprov_status === status))
   const total = lista.reduce((s, r) => s + intervalToMin(r.extras_total), 0)
+  const idOf = (r: { data: string; secullum_func_id: number }) => `${r.data}|${r.secullum_func_id}`
+  const pend = lista.filter(r => r.aprov_status === 'pendente')
+  const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
+  const onEnviar = () => enviar.mutate({ keys: lista.filter(r => sel.has(idOf(r))).map(r => ({ tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id } as AprovKey)), por: aprovador }, { onSuccess: clear })
+
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className={`rounded-2xl border px-4 py-3 ${c.isLight ? 'bg-orange-50 border-orange-100' : 'bg-orange-500/10 border-orange-500/20'}`}>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras · {labelMes(anoMes)}</span>
-        <p className={`text-xl font-extrabold ${c.txt}`}>{minToHoras(total)} <span className={`text-xs font-normal ${c.sub}`}>· {lista.length} lançamentos</span></p>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className={`rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-orange-50 border-orange-100' : 'bg-orange-500/10 border-orange-500/20'}`}>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras · {labelMes(anoMes)}</span>
+          <p className={`text-lg font-extrabold ${c.txt}`}>{minToHoras(total)} <span className={`text-xs font-normal ${c.sub}`}>· {lista.length} lançamentos</span></p>
+        </div>
+        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
       </div>
       <Painel>
-        {!lista.length ? <Vazio msg="Nenhuma hora extra no mês." /> : (
+        {!lista.length ? <Vazio msg="Nenhuma hora extra no filtro." /> : (
           <table className="w-full">
-            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data</th><th className={`${TH} hidden sm:table-cell`}>50%</th><th className={`${TH} hidden sm:table-cell`}>100%</th><th className={TH}>Total</th><th className={TH}>Status</th></tr></thead>
+            <thead><tr className={c.head}>
+              <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(idOf))} />
+              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data</th><th className={`${TH} hidden sm:table-cell`}>50%</th><th className={`${TH} hidden sm:table-cell`}>100%</th><th className={TH}>Total</th><th className={TH}>Status</th>
+            </tr></thead>
             <tbody>{lista.map((r, i) => (
               <tr key={i} className={`border-t ${c.row}`}>
+                <td className={`${TD} w-px`}>{r.aprov_status === 'pendente' && <input type="checkbox" checked={sel.has(idOf(r))} onChange={() => toggle(idOf(r))} className="accent-violet-500" />}</td>
                 <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}</td>
                 <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
                 <td className={`${TD} ${c.sub}`}>{new Date(r.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
@@ -227,38 +275,52 @@ export function HorasExtrasTab({ anoMes, baseId, pessoa }: PontoTabProps) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 4) ATESTADOS
+// 4) ATESTADOS — selecionável + enviar p/ aprovação
 // ════════════════════════════════════════════════════════════════════════════
-export function AtestadosTab({ anoMes, baseId, pessoa }: PontoTabProps) {
+export function AtestadosTab({ anoMes, baseId, pessoa, status }: PontoTabProps) {
   const { data = [], isLoading } = usePontoAtestados(anoMes)
   const c = useThemeCls()
-  const lista = data.filter(a => (!baseId || a.colaborador?.base_id === baseId) && matchPessoa(a.colaborador?.nome, pessoa))
+  const aprovador = useAprovador()
+  const enviar = useEnviarItens()
+  const { sel, toggle, setAll, clear } = useSelecao()
+  const lista = data.filter(a => (!baseId || a.colaborador?.base_id === baseId) && matchPessoa(a.colaborador?.nome, pessoa) && (!status || a.aprov_status === status))
+  const pend = lista.filter(a => a.aprov_status === 'pendente')
+  const allSel = pend.length > 0 && pend.every(a => sel.has(a.id))
+  const onEnviar = () => enviar.mutate({ keys: lista.filter(a => sel.has(a.id)).map(a => ({ tipo: 'atestado', id: a.id } as AprovKey)), por: aprovador }, { onSuccess: clear })
+
   if (isLoading) return <Painel><Loading /></Painel>
   return (
-    <Painel>
-      {!lista.length ? <Vazio msg={`Nenhum afastamento vigente em ${labelMes(anoMes)}.`} /> : (
-        <table className="w-full">
-          <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={TH}>Tipo</th><th className={TH}>Início</th><th className={TH}>Fim</th><th className={TH}>Status</th></tr></thead>
-          <tbody>{lista.map(a => (
-            <tr key={a.id} className={`border-t ${c.row}`}>
-              <td className={`${TD} font-semibold ${c.txt}`}><span className="inline-flex items-center gap-1.5"><FileText size={12} className="text-rose-400" />{a.colaborador?.nome ?? '—'}</span></td>
-              <td className={`${TD} ${c.txt}`}>{a.justificativa ?? a.motivo ?? '—'}</td>
-              <td className={`${TD} ${c.sub}`}>{new Date(a.inicio + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-              <td className={`${TD} ${c.sub}`}>{a.fim ? new Date(a.fim + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-              <td className={TD}><Status s={a.aprov_status} /></td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
-    </Painel>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap"><SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} /></div>
+      <Painel>
+        {!lista.length ? <Vazio msg={`Nenhum afastamento no filtro em ${labelMes(anoMes)}.`} /> : (
+          <table className="w-full">
+            <thead><tr className={c.head}>
+              <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(a => a.id))} />
+              <th className={TH}>Colaborador</th><th className={TH}>Tipo</th><th className={TH}>Início</th><th className={TH}>Fim</th><th className={TH}>Status</th>
+            </tr></thead>
+            <tbody>{lista.map(a => (
+              <tr key={a.id} className={`border-t ${c.row}`}>
+                <td className={`${TD} w-px`}>{a.aprov_status === 'pendente' && <input type="checkbox" checked={sel.has(a.id)} onChange={() => toggle(a.id)} className="accent-violet-500" />}</td>
+                <td className={`${TD} font-semibold ${c.txt}`}><span className="inline-flex items-center gap-1.5"><FileText size={12} className="text-rose-400" />{a.colaborador?.nome ?? '—'}</span></td>
+                <td className={`${TD} ${c.txt}`}>{a.justificativa ?? a.motivo ?? '—'}</td>
+                <td className={`${TD} ${c.sub}`}>{new Date(a.inicio + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                <td className={`${TD} ${c.sub}`}>{a.fim ? new Date(a.fim + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                <td className={TD}><Status s={a.aprov_status} /></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </Painel>
+    </div>
   )
 }
 
-// ── modelo unificado da fila de aprovação ────────────────────────────────────
+// ── fila de aprovação ────────────────────────────────────────────────────────
 interface FilaItem { tipo: AprovTipo; key: AprovKey; nome: string; baseId: string; baseNome: string; quando: string; desc: string }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 5) APROVAÇÃO — grupos colapsáveis por base + modal com filtro de data/pessoa
+// 5) APROVAÇÃO — itens "em aprovação", agrupados por base + modal c/ filtros
 // ════════════════════════════════════════════════════════════════════════════
 export function AprovacaoTab({ anoMes }: PontoTabProps) {
   const ret = usePontoRetificacoes(anoMes)
@@ -270,11 +332,11 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
 
   const itens: FilaItem[] = useMemo(() => {
     const out: FilaItem[] = []
-    for (const r of (ret.data ?? [])) if (r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && r.aprov_status === 'pendente')
+    for (const r of (ret.data ?? [])) if (r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && r.aprov_status === 'em_aprovacao')
       out.push({ tipo: 'retificacao', key: { tipo: 'retificacao', nsr: r.nsr }, nome: r.colaborador?.nome ?? '—', baseId: r.colaborador?.base_id ?? '', baseNome: r.colaborador?.base?.nome ?? '(sem base)', quando: r.data_hora, desc: r.motivo ?? '' })
-    for (const r of (he.data ?? [])) if (r.aprov_status === 'pendente')
+    for (const r of (he.data ?? [])) if (r.aprov_status === 'em_aprovacao')
       out.push({ tipo: 'hora_extra', key: { tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: fmtHoras(r.extras_total) })
-    for (const a of (at.data ?? [])) if (a.aprov_status === 'pendente')
+    for (const a of (at.data ?? [])) if (a.aprov_status === 'em_aprovacao')
       out.push({ tipo: 'atestado', key: { tipo: 'atestado', id: a.id }, nome: a.colaborador?.nome ?? '—', baseId: a.colaborador?.base_id ?? '', baseNome: a.colaborador?.base?.nome ?? '(sem base)', quando: a.inicio, desc: a.justificativa ?? a.motivo ?? '' })
     return out
   }, [ret.data, he.data, at.data])
@@ -286,7 +348,7 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
   }, [itens])
 
   if (ret.isLoading || he.isLoading || at.isLoading) return <Painel><Loading /></Painel>
-  if (!itens.length) return <Painel><div className="text-center py-16"><Check className="mx-auto mb-3 text-emerald-500" size={26} /><p className={`text-sm ${c.sub}`}>Nada pendente em {labelMes(anoMes)}. Tudo aprovado. 🎉</p></div></Painel>
+  if (!itens.length) return <Painel><div className="text-center py-16"><Check className="mx-auto mb-3 text-emerald-500" size={26} /><p className={`text-sm ${c.sub}`}>Nada em aprovação em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>Itens enviados nas abas Retificações/Horas Extras/Atestados aparecem aqui.</p></div></Painel>
 
   const cont = (its: FilaItem[]) => {
     const r = its.filter(i => i.tipo === 'retificacao').length, h = its.filter(i => i.tipo === 'hora_extra').length, a = its.filter(i => i.tipo === 'atestado').length
@@ -295,7 +357,7 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
 
   return (
     <div className="space-y-2">
-      <div className={`text-xs ${c.sub}`}><b className={c.txt}>{itens.length}</b> pendente(s) em {labelMes(anoMes)}, em {grupos.length} área(s).</div>
+      <div className={`text-xs ${c.sub}`}><b className={c.txt}>{itens.length}</b> em aprovação em {labelMes(anoMes)}, em {grupos.length} área(s).</div>
       {grupos.map(([base, its]) => {
         const open = aberta === base
         return (
@@ -316,7 +378,6 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
   )
 }
 
-// lista simples (inline, sem botão) — visão rápida do grupo expandido
 function ListaFila({ itens }: { itens: FilaItem[] }) {
   const c = useThemeCls()
   return (
@@ -333,7 +394,6 @@ function ListaFila({ itens }: { itens: FilaItem[] }) {
   )
 }
 
-// modal com filtro de datas + pessoa + aprovar/reprovar (individual e em lote)
 function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; onClose: () => void }) {
   const c = useThemeCls()
   const aprovar = useAprovarItem()
@@ -347,7 +407,7 @@ function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; 
     if (pessoa && it.nome !== pessoa) return false
     return true
   })
-  const act = (key: AprovKey, status: AprovStatus) => aprovar.mutate({ key, status, aprovador })
+  const act = (key: AprovKey, st: AprovStatus) => aprovar.mutate({ key, status: st, aprovador })
   const aprovarTodos = () => filtrados.forEach(it => aprovar.mutate({ key: it.key, status: 'aprovado', aprovador }))
 
   return (
@@ -357,7 +417,6 @@ function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; 
           <div><p className={`text-sm font-bold ${c.txt}`}>Aprovação · {base}</p><p className={`text-[10px] ${c.sub}`}>{filtrados.length} de {itens.length} itens</p></div>
           <button onClick={onClose} className={`p-1.5 rounded-lg ${c.isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}><X size={16} className={c.sub} /></button>
         </div>
-        {/* filtros */}
         <div className={`flex items-center gap-2 flex-wrap px-4 py-3 border-b ${c.isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <label className={`text-[10px] ${c.sub}`}>De</label>
           <input type="date" value={de} onChange={e => setDe(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`} />
@@ -371,7 +430,6 @@ function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; 
           <button disabled={aprovar.isPending || !filtrados.length} onClick={aprovarTodos}
             className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 disabled:opacity-40"><Check size={12} /> Aprovar filtrados ({filtrados.length})</button>
         </div>
-        {/* lista */}
         <div className="overflow-y-auto">
           <table className="w-full">
             <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden sm:table-cell`}>Tipo</th><th className={TH}>Data</th><th className={TH}>Detalhe</th><th className={TH}></th></tr></thead>

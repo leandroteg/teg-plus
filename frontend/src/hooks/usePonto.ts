@@ -87,6 +87,27 @@ export function usePontoAtestados(anoMes: string) {
   })
 }
 
+// Enviar itens selecionados para aprovação (pendente -> em_aprovacao), em lote
+export function useEnviarItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { keys: AprovKey[]; por: string }) => {
+      const patch = { aprov_status: 'em_aprovacao', aprov_por: v.por, aprov_em: new Date().toISOString() }
+      const nsrs = v.keys.filter(k => k.tipo === 'retificacao').map(k => k.nsr).filter((x): x is number => x != null)
+      const ids = v.keys.filter(k => k.tipo === 'atestado').map(k => k.id).filter((x): x is string => !!x)
+      const hes = v.keys.filter(k => k.tipo === 'hora_extra')
+      if (nsrs.length) { const { error } = await supabase.from('rh_ponto_marcacao').update(patch).in('nsr', nsrs); if (error) throw error }
+      if (ids.length) { const { error } = await supabase.from('rh_ponto_afastamento').update(patch).in('id', ids); if (error) throw error }
+      for (const k of hes) { const { error } = await supabase.from('rh_ponto_dia').update(patch).eq('data', k.data!).eq('secullum_func_id', k.secullum_func_id!); if (error) throw error }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ponto-retificacoes'] })
+      qc.invalidateQueries({ queryKey: ['ponto-horas-extras'] })
+      qc.invalidateQueries({ queryKey: ['ponto-atestados'] })
+    },
+  })
+}
+
 // Aprovar / reprovar um item (status no próprio registro)
 export function useAprovarItem() {
   const qc = useQueryClient()

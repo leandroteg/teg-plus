@@ -1,6 +1,6 @@
 // types/ponto.ts — módulo Ponto (DP)
 
-export type AprovStatus = 'pendente' | 'aprovado' | 'reprovado'
+export type AprovStatus = 'pendente' | 'em_aprovacao' | 'aprovado' | 'reprovado'
 
 export interface PontoResumoMes {
   ano_mes: string
@@ -93,6 +93,7 @@ export interface PontoTabProps {
   anoMes: string
   baseId: string
   pessoa: string
+  status: string
   bases: { id: string; nome: string; codigo: string }[]
 }
 
