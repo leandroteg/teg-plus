@@ -69,6 +69,16 @@ export function ultimosMeses(n = 12): string[] {
   return out
 }
 
+// datas ISO YYYY-MM-DD
+export function hojeISO(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+export function ontemISO(): string {
+  const d = new Date(); d.setDate(d.getDate() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // proximo mes (p/ filtros de data) a partir de YYYY-MM-01
 export function proximoMes(anoMes: string): string {
   const [y, m] = anoMes.split('-').map(Number)

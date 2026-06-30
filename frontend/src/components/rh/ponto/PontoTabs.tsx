@@ -6,7 +6,7 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras,
-  usePontoAtestados, useAprovarItem, useEnviarItens,
+  usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
@@ -109,7 +109,11 @@ export const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
   { k: 'ausencias', label: 'Ausências', icon: UserX },
 ]
 
-export function RegistrosPontoTab({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
+export function RegistrosPontoTab(props: PontoTabProps) {
+  return props.vista === 'dia' ? <RegistrosDia {...props} /> : <RegistrosMes {...props} />
+}
+
+function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const { data: atestados = [] } = usePontoAtestados(anoMes)
   const c = useThemeCls()
@@ -184,6 +188,45 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
           })}</tbody>
         </table>
       )}
+    </Painel>
+  )
+}
+
+// visão diária — registros de UM dia (todos os colaboradores)
+function RegistrosDia({ baseId, pessoa, diaData }: PontoTabProps) {
+  const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
+  const c = useThemeCls()
+  const lista = data
+    .filter(r => matchPessoa(r.colaborador?.nome, pessoa))
+    .sort((a, b) => (a.colaborador?.nome || '').localeCompare(b.colaborador?.nome || ''))
+  if (isLoading) return <Painel><Loading /></Painel>
+  if (!lista.length) return <Painel><Vazio msg={`Sem registros em ${new Date(diaData + 'T00:00:00').toLocaleDateString('pt-BR')}.`} /></Painel>
+  return (
+    <Painel>
+      <table className="w-full">
+        <thead><tr className={c.head}>
+          <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th>
+          <th className={TH}>E1</th><th className={TH}>S1</th><th className={TH}>E2</th><th className={TH}>S2</th>
+          <th className={`${TH} hidden sm:table-cell`}>Normais</th><th className={TH}>Faltas</th><th className={TH}>Extras</th>
+        </tr></thead>
+        <tbody>{lista.map((r, i) => {
+          const ex = intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)
+          const falta = intervalToMin(r.faltas) > 0
+          return (
+            <tr key={i} className={`border-t ${c.row}`}>
+              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
+              <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base?.nome ?? '—'}</td>
+              <td className={`${TD} ${c.txt}`}>{fmtHora(r.entrada1)}</td>
+              <td className={`${TD} ${c.txt}`}>{fmtHora(r.saida1)}</td>
+              <td className={`${TD} ${c.txt}`}>{fmtHora(r.entrada2)}</td>
+              <td className={`${TD} ${c.txt}`}>{fmtHora(r.saida2)}</td>
+              <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{fmtHoras(r.normais)}</td>
+              <td className={`${TD} ${falta ? 'text-rose-500 font-semibold' : c.sub}`}>{fmtHoras(r.faltas)}</td>
+              <td className={`${TD} ${ex > 0 ? 'text-orange-500 font-semibold' : c.sub}`}>{ex > 0 ? minToHoras(ex) : '—'}</td>
+            </tr>
+          )
+        })}</tbody>
+      </table>
     </Painel>
   )
 }

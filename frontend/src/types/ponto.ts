@@ -96,7 +96,23 @@ export interface PontoTabProps {
   status: string
   ocultosJustif: Set<string>
   quickReg: string
+  vista: string
+  diaData: string
   bases: { id: string; nome: string; codigo: string }[]
+}
+
+// linha da visão diária (1 colaborador no dia)
+export interface PontoDiaLista {
+  data: string
+  secullum_func_id: number
+  colaborador_id: string | null
+  base_id: string | null
+  entrada1: string | null; saida1: string | null; entrada2: string | null; saida2: string | null
+  normais: string | null; faltas: string | null
+  ex50: string | null; ex70: string | null; ex100: string | null
+  aprov_status: AprovStatus
+  colaborador?: { nome: string | null } | null
+  base?: { nome: string | null } | null
 }
 
 // item genérico p/ a fila de aprovação

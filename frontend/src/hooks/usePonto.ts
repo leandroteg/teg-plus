@@ -3,8 +3,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { proximoMes } from '../lib/ponto'
 import type {
-  PontoResumoMes, PontoDia, PontoAfastamento, PontoRetificacao, HoraExtraItem, AprovKey, AprovStatus,
+  PontoResumoMes, PontoDia, PontoAfastamento, PontoRetificacao, HoraExtraItem, AprovKey, AprovStatus, PontoDiaLista,
 } from '../types/ponto'
+
+// Visão diária: todas as marcações/apuração de UM dia
+export function usePontoDia(dataISO: string, baseId?: string) {
+  return useQuery<PontoDiaLista[]>({
+    queryKey: ['ponto-dia', dataISO, baseId || 'all'],
+    enabled: !!dataISO,
+    queryFn: async () => {
+      let q = supabase.from('rh_ponto_dia')
+        .select('data, secullum_func_id, colaborador_id, base_id, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, aprov_status, colaborador:rh_colaboradores!colaborador_id(nome), base:est_bases!base_id(nome)')
+        .eq('data', dataISO)
+      if (baseId) q = q.eq('base_id', baseId)
+      const { data, error } = await q.limit(2000)
+      if (error) { console.error('usePontoDia:', error); return [] }
+      return (data ?? []) as unknown as PontoDiaLista[]
+    },
+  })
+}
 
 // Resumo mensal por colaborador (Registros / Consolidação)
 export function usePontoResumoMes(anoMes: string, baseId?: string) {
