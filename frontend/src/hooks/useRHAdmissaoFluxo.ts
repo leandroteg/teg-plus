@@ -88,17 +88,39 @@ export async function parseDocumentoAdmissao(file: File, tipo?: string): Promise
 }
 
 // ── IA: preenche a Ficha de Registro inteira lendo os anexos do candidato ──────
-// Gera URLs assinadas dos documentos do candidato e manda ao SuperTEG via n8n;
-// ele lê tudo e devolve os campos da ficha. Síncrono do ponto de vista da UI.
+// Baixa cada anexo do bucket, converte p/ base64 e manda ao n8n (Gemini), que lê
+// tudo e devolve os campos da ficha consolidados. Síncrono do ponto de vista da UI.
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      resolve(res.includes(',') ? res.split(',')[1] : res)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+const MAX_DOC_BYTES = 10 * 1024 * 1024   // pula anexo individual > 10MB
+const MAX_TOTAL_B64 = 14 * 1024 * 1024   // limite do payload n8n (~16MB)
+
 export async function preencherFichaRegistroAuto(
   cand: RHAdmissaoCandidato,
 ): Promise<Record<string, unknown> | null> {
   try {
     const anexos = cand.anexos ?? []
-    const documentos: { tipo: string; nome: string; url: string }[] = []
+    const documentos: { tipo: string; nome: string; mime_type: string; base64: string }[] = []
+    let totalB64 = 0
     for (const a of anexos) {
-      const url = await getAnexoSignedUrl(a.arquivo_path)
-      if (url) documentos.push({ tipo: a.tipo, nome: a.arquivo_nome, url })
+      if (a.tamanho_bytes && a.tamanho_bytes > MAX_DOC_BYTES) { console.warn('anexo grande pulado:', a.arquivo_nome); continue }
+      const { data, error } = await supabase.storage.from(BUCKET).download(a.arquivo_path)
+      if (error || !data) { console.warn('falha ao baixar anexo:', a.arquivo_nome, error); continue }
+      const base64 = await blobToBase64(data)
+      if (!base64) continue
+      if (totalB64 + base64.length > MAX_TOTAL_B64) { console.warn('payload cheio, anexo ignorado:', a.arquivo_nome); continue }
+      totalB64 += base64.length
+      documentos.push({ tipo: a.tipo, nome: a.arquivo_nome, mime_type: a.mime_type || data.type || 'application/pdf', base64 })
     }
     if (!documentos.length) return null
     const resp = await fetch(`${N8N_URL}/rh/admissao/preencher-ficha-ai`, {
