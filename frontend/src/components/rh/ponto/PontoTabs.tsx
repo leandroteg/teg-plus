@@ -1,6 +1,7 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -101,15 +102,48 @@ function ThCheck({ all, none, onToggle }: { all: boolean; none: boolean; onToggl
 // ════════════════════════════════════════════════════════════════════════════
 // 1) REGISTROS PONTO
 // ════════════════════════════════════════════════════════════════════════════
+const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
+  { k: 'todos', label: 'Todos', icon: Users },
+  { k: 'aberto', label: 'Pontos em aberto', icon: Clock },
+  { k: 'extras', label: 'Horas extras', icon: Timer },
+  { k: 'ausencias', label: 'Ausências', icon: UserX },
+]
+
 export function RegistrosPontoTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
+  const { data: atestados = [] } = usePontoAtestados(anoMes)
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
-  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa))
-  if (isLoading) return <Painel><Loading /></Painel>
-  if (!lista.length) return <Painel><Vazio msg={`Sem registros de ponto em ${labelMes(anoMes)}${pessoa ? ' para esse filtro' : ''}.`} /></Painel>
+  const [quick, setQuick] = useState('todos')
+  const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
+  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (
+    quick === 'aberto' ? (intervalToMin(r.faltas) > 0 || intervalToMin(r.atrasos) > 0)
+      : quick === 'extras' ? intervalToMin(r.extras) > 0
+        : quick === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
+          : true
+  ))
+
+  const chips = (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {REG_CHIPS.map(ch => {
+        const on = quick === ch.k
+        return (
+          <button key={ch.k} onClick={() => setQuick(ch.k)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${on
+              ? (c.isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')
+              : (c.isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`}>
+            <ch.icon size={13} /> {ch.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (isLoading) return <div className="space-y-3">{chips}<Painel><Loading /></Painel></div>
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {chips}
+      {!lista.length ? <Painel><Vazio msg={`Nenhum registro nesse filtro em ${labelMes(anoMes)}.`} /></Painel> : (
       <Painel>
         <table className="w-full">
           <thead><tr className={c.head}>
@@ -129,6 +163,7 @@ export function RegistrosPontoTab({ anoMes, baseId, pessoa }: PontoTabProps) {
           ))}</tbody>
         </table>
       </Painel>
+      )}
       {sel && <CartaoDiario colab={sel} anoMes={anoMes} onClose={() => setSel(null)} />}
     </div>
   )
