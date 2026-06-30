@@ -13,7 +13,7 @@ export function usePontoDia(dataISO: string, baseId?: string) {
     enabled: !!dataISO,
     queryFn: async () => {
       let q = supabase.from('rh_ponto_dia')
-        .select('data, secullum_func_id, colaborador_id, base_id, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, aprov_status, colaborador:rh_colaboradores!colaborador_id(nome), base:est_bases!base_id(nome)')
+        .select('data, secullum_func_id, colaborador_id, base_id, cargo, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, aprov_status, colaborador:rh_colaboradores!colaborador_id(nome), base:est_bases!base_id(nome)')
         .eq('data', dataISO)
       if (baseId) q = q.eq('base_id', baseId)
       const { data, error } = await q.limit(2000)

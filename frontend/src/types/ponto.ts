@@ -25,6 +25,8 @@ export interface PontoResumoMes {
   faltas: string | null
   atrasos: string | null
   banco_saldo: string | null
+  dias_em_aberto: number
+  dias_fora_horario: number
 }
 
 export interface PontoDia {
@@ -107,6 +109,7 @@ export interface PontoDiaLista {
   secullum_func_id: number
   colaborador_id: string | null
   base_id: string | null
+  cargo: string | null
   entrada1: string | null; saida1: string | null; entrada2: string | null; saida2: string | null
   normais: string | null; faltas: string | null
   ex50: string | null; ex70: string | null; ex100: string | null

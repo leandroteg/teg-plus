@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -8,7 +8,7 @@ import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras,
   usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia,
 } from '../../../hooks/usePonto'
-import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes } from '../../../lib/ponto'
+import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
@@ -105,6 +105,7 @@ function ThCheck({ all, none, onToggle }: { all: boolean; none: boolean; onToggl
 export const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
   { k: 'todos', label: 'Todos', icon: Users },
   { k: 'aberto', label: 'Pontos em aberto', icon: Clock },
+  { k: 'fora_horario', label: 'Pontos fora do horário', icon: AlarmClock },
   { k: 'extras', label: 'Horas extras', icon: Timer },
   { k: 'ausencias', label: 'Ausências', icon: UserX },
 ]
@@ -120,10 +121,11 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
   const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
   const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (
-    quickReg === 'aberto' ? (intervalToMin(r.faltas) > 0 || intervalToMin(r.atrasos) > 0)
-      : quickReg === 'extras' ? intervalToMin(r.extras) > 0
-        : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
-          : true
+    quickReg === 'aberto' ? r.dias_em_aberto > 0
+      : quickReg === 'fora_horario' ? r.dias_fora_horario > 0
+        : quickReg === 'extras' ? intervalToMin(r.extras) > 0
+          : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
+            : true
   ))
 
   if (isLoading) return <Painel><Loading /></Painel>
@@ -138,7 +140,13 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
           </tr></thead>
           <tbody>{lista.map(r => (
             <tr key={r.colaborador_id ?? r.colaborador_nome} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
-              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}<div className={`text-[10px] ${c.sub}`}>{r.cargo}</div></td>
+              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}
+                <div className={`text-[10px] flex items-center gap-1.5 flex-wrap ${c.sub}`}>
+                  <span>{r.cargo}</span>
+                  {r.dias_em_aberto > 0 && <span className="px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold">{r.dias_em_aberto} em aberto</span>}
+                  {r.dias_fora_horario > 0 && <span className="px-1 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">{r.dias_fora_horario} fora horário</span>}
+                </div>
+              </td>
               <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
               <td className={`${TD} ${c.txt}`}>{r.dias_batidos}/{r.dias}</td>
               <td className={`${TD} hidden sm:table-cell ${c.txt}`}>{fmtHoras(r.hh_trabalhada)}</td>
@@ -174,11 +182,13 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
             const ex = intervalToMin(d.ex50) + intervalToMin(d.ex70) + intervalToMin(d.ex100)
             const falta = intervalToMin(d.faltas) > 0
             const dt = new Date(d.data + 'T00:00:00')
+            const fora = batidasForaHorario({ data: d.data, cargo: colab.cargo, entrada1: d.entrada1, saida1: d.saida1, saida2: d.saida2 })
+            const hc = (bad: boolean) => bad ? 'text-rose-500 font-bold' : c.txt
             return (
               <tr key={d.data} className={`border-t ${c.row}`}>
                 <td className={`${TD} ${c.txt}`}>{dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} <span className={c.sub}>{['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dt.getDay()]}</span></td>
-                <td className={`${TD} ${c.txt}`}>{fmtHora(d.entrada1)}</td><td className={`${TD} ${c.txt}`}>{fmtHora(d.saida1)}</td>
-                <td className={`${TD} ${c.txt}`}>{fmtHora(d.entrada2)}</td><td className={`${TD} ${c.txt}`}>{fmtHora(d.saida2)}</td>
+                <td className={`${TD} ${hc(fora.entrada1)}`}>{fmtHora(d.entrada1)}</td><td className={`${TD} ${hc(fora.saida1)}`}>{fmtHora(d.saida1)}</td>
+                <td className={`${TD} ${c.txt}`}>{fmtHora(d.entrada2)}</td><td className={`${TD} ${hc(fora.saida2)}`}>{fmtHora(d.saida2)}</td>
                 <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{fmtHoras(d.normais)}</td>
                 <td className={`${TD} ${falta ? 'text-rose-500 font-semibold' : c.sub}`}>{fmtHoras(d.faltas)}</td>
                 <td className={`${TD} hidden md:table-cell ${ex > 0 ? 'text-orange-500 font-semibold' : c.sub}`}>{ex > 0 ? minToHoras(ex) : '—'}</td>
@@ -196,16 +206,20 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
   const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
   const c = useThemeCls()
-  const lista = data
-    .filter(r => matchPessoa(r.colaborador?.nome, pessoa) && (
-      quickReg === 'aberto' ? intervalToMin(r.faltas) > 0
-        : quickReg === 'extras' ? (intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)) > 0
-          : quickReg === 'ausencias' ? !r.entrada1
-            : true
+  const horaCls = (fora: boolean) => fora ? 'text-rose-500 font-bold' : c.txt
+  const rows = data
+    .filter(r => matchPessoa(r.colaborador?.nome, pessoa))
+    .map(r => ({ r, fora: batidasForaHorario({ data: r.data, cargo: r.cargo, entrada1: r.entrada1, saida1: r.saida1, saida2: r.saida2 }) }))
+    .filter(({ r, fora }) => (
+      quickReg === 'aberto' ? pontoEmAberto(r)
+        : quickReg === 'fora_horario' ? fora.algum
+          : quickReg === 'extras' ? (intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)) > 0
+            : quickReg === 'ausencias' ? !r.entrada1
+              : true
     ))
-    .sort((a, b) => (a.colaborador?.nome || '').localeCompare(b.colaborador?.nome || ''))
+    .sort((a, b) => (a.r.colaborador?.nome || '').localeCompare(b.r.colaborador?.nome || ''))
   if (isLoading) return <Painel><Loading /></Painel>
-  if (!lista.length) return <Painel><Vazio msg={`Sem registros em ${new Date(diaData + 'T00:00:00').toLocaleDateString('pt-BR')}.`} /></Painel>
+  if (!rows.length) return <Painel><Vazio msg={`Sem registros em ${new Date(diaData + 'T00:00:00').toLocaleDateString('pt-BR')}.`} /></Painel>
   return (
     <Painel>
       <table className="w-full">
@@ -214,17 +228,18 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
           <th className={TH}>E1</th><th className={TH}>S1</th><th className={TH}>E2</th><th className={TH}>S2</th>
           <th className={`${TH} hidden sm:table-cell`}>Normais</th><th className={TH}>Faltas</th><th className={TH}>Extras</th>
         </tr></thead>
-        <tbody>{lista.map((r, i) => {
+        <tbody>{rows.map(({ r, fora }, i) => {
           const ex = intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)
           const falta = intervalToMin(r.faltas) > 0
+          const aberto = pontoEmAberto(r)
           return (
             <tr key={i} className={`border-t ${c.row}`}>
-              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
+              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}{aberto && <span className="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold uppercase">em aberto</span>}</td>
               <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base?.nome ?? '—'}</td>
-              <td className={`${TD} ${c.txt}`}>{fmtHora(r.entrada1)}</td>
-              <td className={`${TD} ${c.txt}`}>{fmtHora(r.saida1)}</td>
+              <td className={`${TD} ${horaCls(fora.entrada1)}`}>{fmtHora(r.entrada1)}</td>
+              <td className={`${TD} ${horaCls(fora.saida1)}`}>{fmtHora(r.saida1)}</td>
               <td className={`${TD} ${c.txt}`}>{fmtHora(r.entrada2)}</td>
-              <td className={`${TD} ${c.txt}`}>{fmtHora(r.saida2)}</td>
+              <td className={`${TD} ${horaCls(fora.saida2)}`}>{fmtHora(r.saida2)}</td>
               <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{fmtHoras(r.normais)}</td>
               <td className={`${TD} ${falta ? 'text-rose-500 font-semibold' : c.sub}`}>{fmtHoras(r.faltas)}</td>
               <td className={`${TD} ${ex > 0 ? 'text-orange-500 font-semibold' : c.sub}`}>{ex > 0 ? minToHoras(ex) : '—'}</td>
@@ -232,6 +247,9 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
           )
         })}</tbody>
       </table>
+      <div className={`px-3 py-2 text-[10px] border-t ${c.isLight ? 'border-slate-100 text-slate-400' : 'border-white/[0.05] text-slate-500'}`}>
+        <span className="text-rose-500 font-semibold">Vermelho</span> = batida fora da jornada (entrada 7h · saída 17h seg–qui / 16h sex · tolerância ±10 min · exceto motoristas).
+      </div>
     </Painel>
   )
 }
