@@ -3,7 +3,7 @@
 // Alimentado pelo espelho do Ponto (Secullum). Indicadores em HORAS — valores em
 // R$ (folha/custo-hora) ainda não integrados, então NÃO são exibidos (nada fake).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Timer, Fingerprint, TrendingUp, ChevronRight, Zap, Clock, AlertTriangle,
   AlarmClock, Activity, Loader2,
@@ -11,11 +11,39 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePontoResumoMes, usePontoHorasExtras, usePontoColabAtivos } from '../../hooks/usePonto'
-import { intervalToMin, minToHoras, mesAtual, labelMes } from '../../lib/ponto'
+import { usePontoResumoPeriodo, usePontoHorasExtrasPeriodo, usePontoColabAtivos } from '../../hooks/usePonto'
+import { intervalToMin, minToHoras } from '../../lib/ponto'
 
 // horas compactas p/ destaque: "28.080h"
 const hAbbr = (min: number) => `${Math.round(min / 60).toLocaleString('pt-BR')}h`
+
+function ymHoje() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []
+  for (let a = 2021; a <= anoAtual; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${
+    isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+  }`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">
+        {MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">
+        {anos.map(a => <option key={a} value={a}>{a}</option>)}
+      </select>
+    </span>
+  )
+}
 
 function SpotlightMetric({ label, value, tone, note, isDark }: {
   label: string; value: string | number; tone: string; note?: string; isDark: boolean
@@ -52,22 +80,24 @@ export default function DPPainel() {
   const { isDark } = useTheme()
   const nav = useNavigate()
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
-  const anoMes = mesAtual()
 
-  const { data: resumo = [], isLoading } = usePontoResumoMes(anoMes)
-  const { data: he = [] } = usePontoHorasExtras(anoMes)
+  const [de, setDe] = useState(ymHoje())
+  const [ate, setAte] = useState(ymHoje())
+
+  const { data: resumo = [], isLoading } = usePontoResumoPeriodo(de, ate)
+  const { data: he = [] } = usePontoHorasExtrasPeriodo(de, ate)
   const { data: ativos } = usePontoColabAtivos()
   const pico = ativos?.pico ?? 0
   const headcount = ativos?.headcount ?? 0
 
   const agg = useMemo(() => {
-    let hhMin = 0, exMin = 0, vol = 0, emAberto = 0, foraHorario = 0
+    let hhMin = 0, exMin = 0, emAberto = 0, foraHorario = 0
     const ccMap = new Map<string, { nome: string; min: number }>()
+    const abertoMap = new Map<string, { nome: string; base: string; dias: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
       hhMin += intervalToMin(r.hh_trabalhada)
       exMin += intervalToMin(r.extras)
-      vol += r.dias_batidos || 0
       emAberto += r.dias_em_aberto || 0
       foraHorario += r.dias_fora_horario || 0
       if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
@@ -76,11 +106,17 @@ export default function DPPainel() {
       const cur = ccMap.get(k) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
       cur.min += intervalToMin(r.hh_trabalhada)
       ccMap.set(k, cur)
+      if ((r.dias_em_aberto || 0) > 0) {
+        const ak = r.colaborador_id ?? r.colaborador_nome ?? '—'
+        const a = abertoMap.get(ak) || { nome: r.colaborador_nome ?? '—', base: r.base_nome ?? '—', dias: 0 }
+        a.dias += r.dias_em_aberto || 0
+        abertoMap.set(ak, a)
+      }
     }
     const porCC = [...ccMap.values()].filter(c => c.min > 0).sort((a, b) => b.min - a.min)
-    const listaAberto = resumo.filter(r => r.dias_em_aberto > 0)
-      .sort((a, b) => b.dias_em_aberto - a.dias_em_aberto).slice(0, 8)
-    return { hhMin, exMin, vol, emAberto, foraHorario, porCC, listaAberto, comBatida: comBatida.size, comApur: comApur.size }
+    const listaAberto = [...abertoMap.entries()].map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.dias - a.dias).slice(0, 8)
+    return { hhMin, exMin, emAberto, foraHorario, porCC, listaAberto, comBatida: comBatida.size, comApur: comApur.size }
   }, [resumo])
 
   const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
@@ -89,15 +125,22 @@ export default function DPPainel() {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header + filtro de período (topo direito) */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto do mês · {labelMes(anoMes)}</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto — horas, em aberto e fora do horário</p>
         </div>
-        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+            <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+          </div>
+          <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado
+          </span>
+        </div>
       </div>
 
       {/* Hero: Indicadores do mês + Janela Crítica */}
@@ -107,7 +150,7 @@ export default function DPPainel() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Núcleo do Ponto</p>
-                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do mês</h2>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do período</h2>
               </div>
               <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
                 <Fingerprint size={18} className="text-violet-500" />
@@ -144,17 +187,17 @@ export default function DPPainel() {
         </section>
       </div>
 
-      {/* Pulso: horas de ponto por centro de custo */}
+      {/* Pulso: HHt por centro de custo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <TrendingUp size={14} className="text-violet-500" /> Horas de Ponto por Centro de Custo
+            <TrendingUp size={14} className="text-violet-500" /> HHt por Centro de Custo
           </h2>
         </div>
         <div className="px-4 py-3">
           {agg.porCC.length === 0 ? (
             <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-              Sem horas de ponto no mês
+              Sem horas de ponto no período
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -191,13 +234,13 @@ export default function DPPainel() {
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-white/[0.05]">
               {agg.listaAberto.map(r => (
-                <li key={r.colaborador_id ?? r.colaborador_nome} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                <li key={r.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.colaborador_nome ?? '—'}</p>
-                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.base_nome ?? '—'}</p>
+                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.nome}</p>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.base}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-                    {r.dias_em_aberto} {r.dias_em_aberto === 1 ? 'dia' : 'dias'}
+                    {r.dias} {r.dias === 1 ? 'dia' : 'dias'}
                   </span>
                 </li>
               ))}

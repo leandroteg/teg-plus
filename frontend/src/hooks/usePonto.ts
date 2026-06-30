@@ -61,6 +61,33 @@ export function usePontoResumoMes(anoMes: string, baseId?: string) {
   })
 }
 
+// Resumo por PERÍODO (de..ate em 'YYYY-MM') — agrega vários meses (Painel DP)
+export function usePontoResumoPeriodo(de: string, ate: string) {
+  return useQuery<PontoResumoMes[]>({
+    queryKey: ['ponto-resumo-periodo', de, ate],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_resumo_mes').select('*')
+        .gte('ano_mes', `${de}-01`).lte('ano_mes', `${ate}-01`).order('colaborador_nome')
+      if (error) { console.error('usePontoResumoPeriodo:', error); return [] }
+      return (data ?? []) as PontoResumoMes[]
+    },
+  })
+}
+
+// Horas extras por PERÍODO (de..ate em 'YYYY-MM')
+export function usePontoHorasExtrasPeriodo(de: string, ate: string) {
+  return useQuery<HoraExtraItem[]>({
+    queryKey: ['ponto-he-periodo', de, ate],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_hora_extra').select('*')
+        .gte('data', `${de}-01`).lt('data', proximoMes(`${ate}-01`))
+        .order('data', { ascending: false }).limit(3000)
+      if (error) { console.error('usePontoHorasExtrasPeriodo:', error); return [] }
+      return (data ?? []) as HoraExtraItem[]
+    },
+  })
+}
+
 // Cartão (dia a dia) de um colaborador no mês
 export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
   return useQuery<PontoDia[]>({
