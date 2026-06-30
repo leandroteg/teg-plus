@@ -9,7 +9,7 @@ import { usePontoRetificacoes } from '../../hooks/usePonto'
 import { ultimosMeses, labelMes, mesAtual } from '../../lib/ponto'
 import {
   RegistrosPontoTab, RetificacoesTab, HorasExtrasTab, AtestadosTab, AprovacaoTab, ConsolidacaoTab,
-  MultiSelectJustif, RUIDO_MIGRACAO,
+  MultiSelectJustif, RUIDO_MIGRACAO, REG_CHIPS,
 } from '../../components/rh/ponto/PontoTabs'
 import type { PontoTabProps } from '../../types/ponto'
 
@@ -29,6 +29,7 @@ export default function DPPonto() {
   const [pessoa, setPessoa] = useState('')
   const [status, setStatus] = useState('')
   const [ocultosJustif, setOcultosJustif] = useState<Set<string>>(new Set(['Mudança de ponto']))
+  const [quickReg, setQuickReg] = useState('todos')
   const { data: basesRaw = [] } = useBases()
   const bases = basesRaw.map(b => ({ id: b.id, nome: b.nome, codigo: b.codigo }))
 
@@ -43,7 +44,7 @@ export default function DPPonto() {
   const selCls = `px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
 
   function renderPanel(key: string) {
-    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, bases }
+    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, bases }
     const temStatus = key === 'retificacoes' || key === 'horas_extras' || key === 'atestados'
     return (
       <div className="space-y-4">
@@ -74,6 +75,25 @@ export default function DPPonto() {
             <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
               className={`${selCls} w-[180px]`} />
           )}
+          {key === 'registros' && (<>
+            {/* chips quando cabe (lg+); dropdown quando aperta */}
+            <div className="hidden lg:flex items-center gap-1.5">
+              {REG_CHIPS.map(ch => {
+                const on = quickReg === ch.k
+                return (
+                  <button key={ch.k} onClick={() => setQuickReg(ch.k)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${on
+                      ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')
+                      : (isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`}>
+                    <ch.icon size={13} /> {ch.label}
+                  </button>
+                )
+              })}
+            </div>
+            <select value={quickReg} onChange={e => setQuickReg(e.target.value)} className={`${selCls} lg:hidden`}>
+              {REG_CHIPS.map(ch => <option key={ch.k} value={ch.k}>{ch.label}</option>)}
+            </select>
+          </>)}
         </div>
 
         {key === 'registros' && <RegistrosPontoTab {...props} />}

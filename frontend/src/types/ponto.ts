@@ -95,6 +95,7 @@ export interface PontoTabProps {
   pessoa: string
   status: string
   ocultosJustif: Set<string>
+  quickReg: string
   bases: { id: string; nome: string; codigo: string }[]
 }
 

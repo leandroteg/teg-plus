@@ -102,47 +102,29 @@ function ThCheck({ all, none, onToggle }: { all: boolean; none: boolean; onToggl
 // ════════════════════════════════════════════════════════════════════════════
 // 1) REGISTROS PONTO
 // ════════════════════════════════════════════════════════════════════════════
-const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
+export const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
   { k: 'todos', label: 'Todos', icon: Users },
   { k: 'aberto', label: 'Pontos em aberto', icon: Clock },
   { k: 'extras', label: 'Horas extras', icon: Timer },
   { k: 'ausencias', label: 'Ausências', icon: UserX },
 ]
 
-export function RegistrosPontoTab({ anoMes, baseId, pessoa }: PontoTabProps) {
+export function RegistrosPontoTab({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const { data: atestados = [] } = usePontoAtestados(anoMes)
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
-  const [quick, setQuick] = useState('todos')
   const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
   const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (
-    quick === 'aberto' ? (intervalToMin(r.faltas) > 0 || intervalToMin(r.atrasos) > 0)
-      : quick === 'extras' ? intervalToMin(r.extras) > 0
-        : quick === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
+    quickReg === 'aberto' ? (intervalToMin(r.faltas) > 0 || intervalToMin(r.atrasos) > 0)
+      : quickReg === 'extras' ? intervalToMin(r.extras) > 0
+        : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
           : true
   ))
 
-  const chips = (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {REG_CHIPS.map(ch => {
-        const on = quick === ch.k
-        return (
-          <button key={ch.k} onClick={() => setQuick(ch.k)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${on
-              ? (c.isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')
-              : (c.isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`}>
-            <ch.icon size={13} /> {ch.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-
-  if (isLoading) return <div className="space-y-3">{chips}<Painel><Loading /></Painel></div>
+  if (isLoading) return <Painel><Loading /></Painel>
   return (
-    <div className="space-y-3">
-      {chips}
+    <div className="space-y-4">
       {!lista.length ? <Painel><Vazio msg={`Nenhum registro nesse filtro em ${labelMes(anoMes)}.`} /></Painel> : (
       <Painel>
         <table className="w-full">
