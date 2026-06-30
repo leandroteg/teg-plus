@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import type { RHAdmissao } from '../types/rh'
+import type { RHAdmissao, RHAdmissaoCandidato } from '../types/rh'
 
 const BUCKET = 'rh-admissao-docs'
 const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
@@ -83,6 +83,45 @@ export async function parseDocumentoAdmissao(file: File, tipo?: string): Promise
     return (await resp.json()) as CandidatoExtraido
   } catch (e) {
     console.warn('parseDocumentoAdmissao:', e)
+    return null
+  }
+}
+
+// ── IA: preenche a Ficha de Registro inteira lendo os anexos do candidato ──────
+// Gera URLs assinadas dos documentos do candidato e manda ao SuperTEG via n8n;
+// ele lê tudo e devolve os campos da ficha. Síncrono do ponto de vista da UI.
+export async function preencherFichaRegistroAuto(
+  cand: RHAdmissaoCandidato,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const anexos = cand.anexos ?? []
+    const documentos: { tipo: string; nome: string; url: string }[] = []
+    for (const a of anexos) {
+      const url = await getAnexoSignedUrl(a.arquivo_path)
+      if (url) documentos.push({ tipo: a.tipo, nome: a.arquivo_nome, url })
+    }
+    if (!documentos.length) return null
+    const resp = await fetch(`${N8N_URL}/rh/admissao/preencher-ficha-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'analise os documentos anexos desse colaborador e preencha automaticamente a ficha de registro',
+        candidato: {
+          id: cand.id,
+          nome: cand.nome,
+          cpf: cand.cpf,
+          data_nascimento: cand.data_nascimento,
+          cargo: cand.cargo,
+          salario: cand.salario,
+        },
+        documentos,
+      }),
+    })
+    if (!resp.ok) return null
+    const json = (await resp.json()) as Record<string, unknown>
+    return (json?.dados ?? json) as Record<string, unknown>
+  } catch (e) {
+    console.warn('preencherFichaRegistroAuto:', e)
     return null
   }
 }
