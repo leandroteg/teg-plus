@@ -45,6 +45,7 @@ export function usePontoRetificacoes(anoMes: string) {
       const { data, error } = await supabase
         .from('rh_ponto_marcacao')
         .select('nsr, data_hora, origem, motivo, aprov_status, aprov_por, aprov_em, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
+        .eq('origem', '2')   // Origem 2 = inclusão/edição MANUAL no cartão (= retificação); 3=REP físico, 16=app
         .not('motivo', 'is', null)
         .gte('data', anoMes).lt('data', proximoMes(anoMes))
         .order('data_hora', { ascending: false }).limit(2000)
