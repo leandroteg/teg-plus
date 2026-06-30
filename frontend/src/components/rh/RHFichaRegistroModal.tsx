@@ -20,6 +20,34 @@ const REGIMES = [
 ]
 const ETNIAS = ['', 'Branco(a)', 'Preto(a)', 'Pardo(a)', 'Amarelo(a)', 'Indígena']
 
+// ── sub-componentes fora do pai para não perder foco a cada render ────────────
+function Sec({ t }: { t: string }) {
+  return <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 border-b border-slate-100 pb-1 mt-1">{t}</p>
+}
+
+type ChangeEvt = React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+function Campo({ label, type = 'text', span = 1, placeholder, value, onChange }: {
+  label: string; type?: string; span?: number; placeholder?: string
+  value: string; onChange: (e: ChangeEvt) => void
+}) {
+  return (
+    <div style={{ gridColumn: `span ${span}` }}>
+      <label className={LBL}>{label}</label>
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} className={IN} />
+    </div>
+  )
+}
+
+function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="accent-indigo-600" />
+      {label}
+    </label>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto, gerando, onGerar, onClose }: {
   cand: RHAdmissaoCandidato
   adm: RHAdmissao
@@ -84,23 +112,9 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
       .concat(Array.from({ length: 4 }, () => ({ nome: '', nascimento: '', cpf: '' }))).slice(0, 4),
   )
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setF(p => ({ ...p, [k]: e.target.value }))
-  const Campo = ({ k, label, type = 'text', span = 1, placeholder }: { k: string; label: string; type?: string; span?: number; placeholder?: string }) => (
-    <div style={{ gridColumn: `span ${span}` }}>
-      <label className={LBL}>{label}</label>
-      <input type={type} value={f[k]} onChange={set(k)} placeholder={placeholder} className={IN} />
-    </div>
-  )
-  const Check = ({ k, label }: { k: string; label: string }) => (
-    <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
-      <input type="checkbox" checked={!!b[k]} onChange={e => setB(p => ({ ...p, [k]: e.target.checked }))} className="accent-indigo-600" />
-      {label}
-    </label>
-  )
-  const Sec = ({ t }: { t: string }) => (
-    <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 border-b border-slate-100 pb-1 mt-1">{t}</p>
-  )
+  const set = (k: string) => (e: ChangeEvt) => setF(p => ({ ...p, [k]: e.target.value }))
+  const fld = (k: string) => ({ value: f[k] ?? '', onChange: set(k) })
+  const chk = (k: string) => ({ checked: !!b[k], onChange: (v: boolean) => setB(p => ({ ...p, [k]: v })) })
 
   function gerar() {
     const dados: FichaDados = { ...f, ...b, filhos: filhos.filter(x => x.nome.trim()) }
@@ -127,26 +141,26 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
         <div className="p-5 space-y-3">
           <Sec t="Identificação" />
           <div className="grid grid-cols-4 gap-2">
-            <Campo k="nome" label="Nome completo" span={3} />
-            <Campo k="cpf" label="CPF" />
-            <Campo k="rg" label="Nº Identidade" />
-            <Campo k="rg_orgao" label="Órgão emissor" />
-            <Campo k="rg_uf" label="UF (RG)" />
-            <Campo k="rg_emissao" label="Emissão (RG)" type="date" />
-            <Campo k="naturalidade" label="Cidade de nascimento" span={2} />
-            <Campo k="naturalidade_uf" label="UF (nasc.)" />
-            <Campo k="data_nascimento" label="Data de nascimento" type="date" />
-            <Campo k="nome_mae" label="Nome da mãe" span={2} />
-            <Campo k="nome_pai" label="Nome do pai" span={2} />
-            <Campo k="estado_civil" label="Estado civil" />
-            <Campo k="conjuge" label="Cônjuge (se casado)" span={2} />
+            <Campo label="Nome completo" span={3} {...fld('nome')} />
+            <Campo label="CPF" {...fld('cpf')} />
+            <Campo label="Nº Identidade" {...fld('rg')} />
+            <Campo label="Órgão emissor" {...fld('rg_orgao')} />
+            <Campo label="UF (RG)" {...fld('rg_uf')} />
+            <Campo label="Emissão (RG)" type="date" {...fld('rg_emissao')} />
+            <Campo label="Cidade de nascimento" span={2} {...fld('naturalidade')} />
+            <Campo label="UF (nasc.)" {...fld('naturalidade_uf')} />
+            <Campo label="Data de nascimento" type="date" {...fld('data_nascimento')} />
+            <Campo label="Nome da mãe" span={2} {...fld('nome_mae')} />
+            <Campo label="Nome do pai" span={2} {...fld('nome_pai')} />
+            <Campo label="Estado civil" {...fld('estado_civil')} />
+            <Campo label="Cônjuge (se casado)" span={2} {...fld('conjuge')} />
             <div>
               <label className={LBL}>Raça/Cor</label>
               <select value={f.raca_cor} onChange={set('raca_cor')} className={IN}>
                 {ETNIAS.map(e => <option key={e} value={e}>{e || 'Autodeclaração…'}</option>)}
               </select>
             </div>
-            <Campo k="escolaridade" label="Escolaridade" span={2} />
+            <Campo label="Escolaridade" span={2} {...fld('escolaridade')} />
             <div>
               <label className={LBL}>Situação</label>
               <select value={f.escolaridade_status} onChange={set('escolaridade_status')} className={IN}>
@@ -157,35 +171,35 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
 
           <Sec t="Endereço e contato" />
           <div className="grid grid-cols-4 gap-2">
-            <Campo k="endereco" label="Rua" span={3} />
-            <Campo k="numero" label="Nº" />
-            <Campo k="bairro" label="Bairro" span={2} />
-            <Campo k="cep" label="CEP" />
-            <Campo k="uf" label="UF" />
-            <Campo k="cidade" label="Cidade" span={2} />
-            <Campo k="telefone" label="Telefone" />
-            <Campo k="email" label="E-mail" />
+            <Campo label="Rua" span={3} {...fld('endereco')} />
+            <Campo label="Nº" {...fld('numero')} />
+            <Campo label="Bairro" span={2} {...fld('bairro')} />
+            <Campo label="CEP" {...fld('cep')} />
+            <Campo label="UF" {...fld('uf')} />
+            <Campo label="Cidade" span={2} {...fld('cidade')} />
+            <Campo label="Telefone" {...fld('telefone')} />
+            <Campo label="E-mail" {...fld('email')} />
           </div>
 
           <Sec t="Dados contratuais" />
           <div className="grid grid-cols-4 gap-2">
-            <Campo k="data_admissao" label="Data de admissão" type="date" />
-            <Campo k="cargo" label="Cargo" span={2} />
-            <Campo k="salario" label="Salário (R$)" />
+            <Campo label="Data de admissão" type="date" {...fld('data_admissao')} />
+            <Campo label="Cargo" span={2} {...fld('cargo')} />
+            <Campo label="Salário (R$)" {...fld('salario')} />
             <div>
               <label className={LBL}>Contrato experiência</label>
               <select value={f.experiencia} onChange={set('experiencia')} className={IN}>
                 <option value="45_45">45 + 45</option><option value="30_30">30 + 30</option><option value="outro">Outro</option>
               </select>
             </div>
-            {f.experiencia === 'outro' && <Campo k="experiencia_outro" label="Qual?" span={2} />}
+            {f.experiencia === 'outro' && <Campo label="Qual?" span={2} {...fld('experiencia_outro')} />}
             <div>
               <label className={LBL}>Regime</label>
               <select value={f.regime} onChange={set('regime')} className={IN}>
                 {REGIMES.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}
               </select>
             </div>
-            <Campo k="horas_semana" label="Horas/semana" />
+            <Campo label="Horas/semana" {...fld('horas_semana')} />
             <div>
               <label className={LBL}>Sindicalizar-se?</label>
               <select value={f.sindicalizar} onChange={set('sindicalizar')} className={IN}>
@@ -194,18 +208,18 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
             </div>
           </div>
           <div className="flex items-center gap-4 flex-wrap pt-1">
-            <Check k="vale_transporte" label="Vale transporte" />
-            <Check k="ajuda_custo" label="Ajuda de custo" />
+            <Check label="Vale transporte" {...chk('vale_transporte')} />
+            <Check label="Ajuda de custo" {...chk('ajuda_custo')} />
             {b.ajuda_custo && <input value={f.ajuda_custo_valor} onChange={set('ajuda_custo_valor')} placeholder="Valor R$" className={`${IN} w-24`} />}
-            <Check k="periculosidade" label="Periculosidade" />
+            <Check label="Periculosidade" {...chk('periculosidade')} />
             {b.periculosidade && <input value={f.periculosidade_valor} onChange={set('periculosidade_valor')} placeholder="Valor R$" className={`${IN} w-24`} />}
-            <Check k="insalubridade" label="Insalubridade" />
+            <Check label="Insalubridade" {...chk('insalubridade')} />
             {b.insalubridade && <input value={f.insalubridade_pct} onChange={set('insalubridade_pct')} placeholder="%" className={`${IN} w-16`} />}
-            <Check k="horario_escala" label="Horário por escala" />
+            <Check label="Horário por escala" {...chk('horario_escala')} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Campo k="obs_contrato" label="OBS (contrato)" />
-            <Campo k="observacoes" label="Observações adicionais" />
+            <Campo label="OBS (contrato)" {...fld('obs_contrato')} />
+            <Campo label="Observações adicionais" {...fld('observacoes')} />
           </div>
 
           <Sec t="Filhos (até 4)" />
