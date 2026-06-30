@@ -125,11 +125,34 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
   const { data = [], isLoading } = usePontoRetificacoes(anoMes)
   const c = useThemeCls()
-  const lista = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
+  const [pessoa, setPessoa] = useState('')
+  // por padrão, "Mudança de ponto" começa oculta
+  const [ocultos, setOcultos] = useState<Set<string>>(new Set(['Mudança de ponto']))
+
+  const base = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
+  const motivos = [...new Set(base.map(r => r.motivo!).filter(Boolean))].sort()
+  const lista = base.filter(r =>
+    !ocultos.has(r.motivo!) &&
+    (!pessoa.trim() || (r.colaborador?.nome ?? '').toLowerCase().includes(pessoa.trim().toLowerCase()))
+  )
+  const toggle = (m: string) => setOcultos(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
+
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções de marcação com justificativa. Pendentes vão para a aba Aprovação.</div>
+      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções manuais de marcação (Origem: cartão). Pendentes vão para a aba Aprovação.</div>
+      {/* filtros: pessoa (texto) + justificativa (checkboxes) */}
+      <div className="flex items-start gap-3 flex-wrap">
+        <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
+          className={`px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${c.input}`} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {motivos.map(m => (
+            <label key={m} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${ocultos.has(m) ? (c.isLight ? 'border-slate-200 text-slate-400' : 'border-white/10 text-slate-500') : (c.isLight ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-violet-500/30 bg-violet-500/10 text-violet-300')}`}>
+              <input type="checkbox" checked={!ocultos.has(m)} onChange={() => toggle(m)} className="accent-violet-500" /> {m}
+            </label>
+          ))}
+        </div>
+      </div>
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma retificação no mês." /> : (
           <table className="w-full">
