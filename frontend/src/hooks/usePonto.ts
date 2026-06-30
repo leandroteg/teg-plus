@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { proximoMes } from '../lib/ponto'
 import type {
-  PontoResumoMes, PontoDia, PontoAfastamento, PontoPendencia, PontoAprovacao, PontoRetificacao,
+  PontoResumoMes, PontoDia, PontoAfastamento, PontoRetificacao, HoraExtraItem, AprovKey, AprovStatus,
 } from '../types/ponto'
 
-// Resumo mensal por colaborador (1 linha/pessoa) — base das abas Registros/Horas Extras/Consolidação
+// Resumo mensal por colaborador (Registros / Consolidação)
 export function usePontoResumoMes(anoMes: string, baseId?: string) {
   return useQuery<PontoResumoMes[]>({
     queryKey: ['ponto-resumo', anoMes, baseId || 'all'],
@@ -37,93 +37,72 @@ export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
   })
 }
 
-// Retificações = marcações (FonteDados) com motivo/justificativa no mês
+// Retificações = marcações (FonteDados) com motivo
 export function usePontoRetificacoes(anoMes: string) {
   return useQuery<PontoRetificacao[]>({
     queryKey: ['ponto-retificacoes', anoMes],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rh_ponto_marcacao')
-        .select('data_hora, origem, motivo, nsr, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
+        .select('nsr, data_hora, origem, motivo, aprov_status, aprov_por, aprov_em, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
         .not('motivo', 'is', null)
         .gte('data', anoMes).lt('data', proximoMes(anoMes))
-        .order('data_hora', { ascending: false }).limit(1000)
+        .order('data_hora', { ascending: false }).limit(2000)
       if (error) { console.error('usePontoRetificacoes:', error); return [] }
       return (data ?? []) as unknown as PontoRetificacao[]
     },
   })
 }
 
-export function usePontoAfastamentos(anoMes: string) {
+// Horas extras = dias com extra > 0 (view)
+export function usePontoHorasExtras(anoMes: string, baseId?: string) {
+  return useQuery<HoraExtraItem[]>({
+    queryKey: ['ponto-horas-extras', anoMes, baseId || 'all'],
+    queryFn: async () => {
+      let q = supabase.from('vw_rh_ponto_hora_extra').select('*')
+        .gte('data', anoMes).lt('data', proximoMes(anoMes))
+      if (baseId) q = q.eq('base_id', baseId)
+      const { data, error } = await q.order('data', { ascending: false }).limit(3000)
+      if (error) { console.error('usePontoHorasExtras:', error); return [] }
+      return (data ?? []) as HoraExtraItem[]
+    },
+  })
+}
+
+// Atestados / afastamentos
+export function usePontoAtestados(anoMes: string) {
   return useQuery<PontoAfastamento[]>({
-    queryKey: ['ponto-afastamentos', anoMes],
+    queryKey: ['ponto-atestados', anoMes],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rh_ponto_afastamento')
-        .select('*, colaborador:rh_colaboradores!colaborador_id(nome)')
+        .select('*, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
         .lt('inicio', proximoMes(anoMes))
         .or(`fim.gte.${anoMes},fim.is.null`)
         .order('inicio', { ascending: false })
-      if (error) { console.error('usePontoAfastamentos:', error); return [] }
-      return (data ?? []) as PontoAfastamento[]
+      if (error) { console.error('usePontoAtestados:', error); return [] }
+      return (data ?? []) as unknown as PontoAfastamento[]
     },
   })
 }
 
-export function usePontoPendencias() {
-  return useQuery<PontoPendencia[]>({
-    queryKey: ['ponto-pendencias'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('rh_ponto_pendencia')
-        .select('*, colaborador:rh_colaboradores!colaborador_id(nome)')
-        .order('data_hora', { ascending: false }).limit(500)
-      if (error) { console.error('usePontoPendencias:', error); return [] }
-      return (data ?? []) as PontoPendencia[]
-    },
-  })
-}
-
-export function usePontoAprovacoes(anoMes: string) {
-  return useQuery<PontoAprovacao[]>({
-    queryKey: ['ponto-aprovacoes', anoMes],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('rh_ponto_aprovacao').select('*').eq('ano_mes', anoMes)
-      if (error) { console.error('usePontoAprovacoes:', error); return [] }
-      return (data ?? []) as PontoAprovacao[]
-    },
-  })
-}
-
-// Enviar ponto da base p/ aprovação (status enviado)
-export function useEnviarAprovacao() {
+// Aprovar / reprovar um item (status no próprio registro)
+export function useAprovarItem() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { anoMes: string; baseId: string }) => {
-      const { error } = await supabase.from('rh_ponto_aprovacao').upsert({
-        ano_mes: v.anoMes, base_id: v.baseId, status: 'enviado',
-        enviado_em: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }, { onConflict: 'ano_mes,base_id' })
-      if (error) throw error
+    mutationFn: async (v: { key: AprovKey; status: AprovStatus; aprovador: string }) => {
+      const patch = { aprov_status: v.status, aprov_por: v.aprovador, aprov_em: new Date().toISOString() }
+      const k = v.key
+      let res
+      if (k.tipo === 'retificacao') res = await supabase.from('rh_ponto_marcacao').update(patch).eq('nsr', k.nsr!)
+      else if (k.tipo === 'hora_extra') res = await supabase.from('rh_ponto_dia').update(patch).eq('data', k.data!).eq('secullum_func_id', k.secullum_func_id!)
+      else res = await supabase.from('rh_ponto_afastamento').update(patch).eq('id', k.id!)
+      if (res.error) throw res.error
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['ponto-aprovacoes', v.anoMes] }),
-  })
-}
-
-// Aprovar / reprovar
-export function useDecidirAprovacao() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (v: { anoMes: string; baseId: string; aprovar: boolean; aprovador: string; observacao?: string }) => {
-      const { error } = await supabase.from('rh_ponto_aprovacao').upsert({
-        ano_mes: v.anoMes, base_id: v.baseId,
-        status: v.aprovar ? 'aprovado' : 'reprovado',
-        aprovado_em: new Date().toISOString(), aprovador_nome: v.aprovador,
-        observacao: v.observacao ?? null, updated_at: new Date().toISOString(),
-      }, { onConflict: 'ano_mes,base_id' })
-      if (error) throw error
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ponto-retificacoes'] })
+      qc.invalidateQueries({ queryKey: ['ponto-horas-extras'] })
+      qc.invalidateQueries({ queryKey: ['ponto-atestados'] })
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['ponto-aprovacoes', v.anoMes] }),
   })
 }
