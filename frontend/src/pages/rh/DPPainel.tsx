@@ -12,10 +12,11 @@ import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePontoResumoPeriodo, usePontoHorasExtrasPeriodo, usePontoColabAtivos } from '../../hooks/usePonto'
-import { intervalToMin, minToHoras } from '../../lib/ponto'
+import { intervalToMin } from '../../lib/ponto'
 
 // horas compactas p/ destaque: "28.080h"
 const hAbbr = (min: number) => `${Math.round(min / 60).toLocaleString('pt-BR')}h`
+const fmtPct = (p: number) => `${p < 10 ? p.toFixed(1) : Math.round(p)}%`
 
 function ymHoje() {
   const d = new Date()
@@ -96,35 +97,41 @@ export default function DPPainel() {
   const agg = useMemo(() => {
     let hhMin = 0, exMin = 0, emAberto = 0, foraHorario = 0
     const ccMap = new Map<string, { nome: string; min: number }>()
-    const abertoMap = new Map<string, { nome: string; base: string; dias: number }>()
+    const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
-      hhMin += intervalToMin(r.hh_trabalhada)
-      exMin += intervalToMin(r.extras)
+      const hh = intervalToMin(r.hh_trabalhada), ex = intervalToMin(r.extras)
+      hhMin += hh; exMin += ex
       emAberto += r.dias_em_aberto || 0
       foraHorario += r.dias_fora_horario || 0
       if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
-      if (r.colaborador_id && intervalToMin(r.hh_trabalhada) > 0) comApur.add(r.colaborador_id)
-      const k = r.cc_codigo || r.cc_nome || '—'
-      const cur = ccMap.get(k) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
-      cur.min += intervalToMin(r.hh_trabalhada)
-      ccMap.set(k, cur)
-      if ((r.dias_em_aberto || 0) > 0) {
-        const ak = r.colaborador_id ?? r.colaborador_nome ?? '—'
-        const a = abertoMap.get(ak) || { nome: r.colaborador_nome ?? '—', base: r.base_nome ?? '—', dias: 0 }
-        a.dias += r.dias_em_aberto || 0
-        abertoMap.set(ak, a)
-      }
+      if (r.colaborador_id && hh > 0) comApur.add(r.colaborador_id)
+      const ck = r.cc_codigo || r.cc_nome || '—'
+      const cc = ccMap.get(ck) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
+      cc.min += hh; ccMap.set(ck, cc)
+      const bk = r.base_id ?? r.base_nome ?? '—'
+      const b = baseMap.get(bk) || { nome: r.base_nome ?? 'Sem base', emAberto: 0, diasBatidos: 0, exMin: 0, hhMin: 0 }
+      b.emAberto += r.dias_em_aberto || 0
+      b.diasBatidos += r.dias_batidos || 0
+      b.exMin += ex
+      b.hhMin += hh
+      baseMap.set(bk, b)
     }
     const porCC = [...ccMap.values()].filter(c => c.min > 0).sort((a, b) => b.min - a.min)
-    const listaAberto = [...abertoMap.entries()].map(([id, v]) => ({ id, ...v }))
-      .sort((a, b) => b.dias - a.dias).slice(0, 8)
-    return { hhMin, exMin, emAberto, foraHorario, porCC, listaAberto, comBatida: comBatida.size, comApur: comApur.size }
+    const bases = [...baseMap.values()]
+    const abertoPorBase = bases
+      .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
+      .filter(b => b.abs > 0).sort((a, b) => b.pct - a.pct)
+    const extraPorBase = bases
+      .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
+      .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
+    return { hhMin, exMin, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase, comBatida: comBatida.size, comApur: comApur.size }
   }, [resumo])
 
   const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
-  const listaHE = he.slice(0, 8)
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
+  const maxAbertoPct = Math.max(...agg.abertoPorBase.map(b => b.pct), 1)
+  const maxExtraPct = Math.max(...agg.extraPorBase.map(b => b.pct), 1)
   const pctExtra = agg.hhMin > 0 ? Math.round((agg.exMin / agg.hhMin) * 100) : null
 
   return (
@@ -224,31 +231,33 @@ export default function DPPainel() {
         </div>
       </section>
 
-      {/* Listas: Pontos em aberto + Apontamentos de HE */}
+      {/* Por base: pontos em aberto + horas extras (absoluto + %, ordenado por % desc) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Fingerprint size={14} className="text-blue-500" /> Pontos em Aberto
-            </h2>
-            <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">Ir para Ponto <ChevronRight size={11} /></button>
+            <div>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                <Fingerprint size={14} className="text-blue-500" /> Pontos em Aberto por Base
+              </h2>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>abs · % sobre dias batidos · ordenado por %</p>
+            </div>
+            <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
           </div>
-          {agg.listaAberto.length === 0 ? (
+          {agg.abertoPorBase.length === 0 ? (
             <div className="py-10 text-center">
               <Clock size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
               <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem pontos em aberto</p>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100 dark:divide-white/[0.05]">
-              {agg.listaAberto.map(r => (
-                <li key={r.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.nome}</p>
-                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.base}</p>
+            <ul className="px-2 py-1.5">
+              {agg.abertoPorBase.map(b => (
+                <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
+                  <span className={`w-[92px] shrink-0 truncate text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
+                  <div className={`flex-1 h-5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500" style={{ width: `${Math.max((b.pct / maxAbertoPct) * 100, 4)}%` }} />
                   </div>
-                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-                    {r.dias} {r.dias === 1 ? 'dia' : 'dias'}
-                  </span>
+                  <span className={`w-[36px] text-right text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{b.abs}</span>
+                  <span className="w-[46px] text-right text-[11px] font-extrabold text-amber-600">{fmtPct(b.pct)}</span>
                 </li>
               ))}
             </ul>
@@ -257,25 +266,29 @@ export default function DPPainel() {
 
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Timer size={14} className="text-orange-500" /> Apontamentos de Hora Extra
-            </h2>
-            <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">Ver todos <ChevronRight size={11} /></button>
+            <div>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                <Timer size={14} className="text-orange-500" /> Horas Extras por Base
+              </h2>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>abs · % sobre HH apurado · ordenado por %</p>
+            </div>
+            <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
           </div>
-          {listaHE.length === 0 ? (
+          {agg.extraPorBase.length === 0 ? (
             <div className="py-10 text-center">
               <Timer size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
-              <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum apontamento recente</p>
+              <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem horas extras no período</p>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100 dark:divide-white/[0.05]">
-              {listaHE.map((h, i) => (
-                <li key={`${h.data}-${h.secullum_func_id}-${i}`} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{h.colaborador_nome ?? '—'}</p>
-                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(h.data + 'T00:00:00').toLocaleDateString('pt-BR')} · {h.base_nome ?? '—'}</p>
+            <ul className="px-2 py-1.5">
+              {agg.extraPorBase.map(b => (
+                <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
+                  <span className={`w-[92px] shrink-0 truncate text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
+                  <div className={`flex-1 h-5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500" style={{ width: `${Math.max((b.pct / maxExtraPct) * 100, 4)}%` }} />
                   </div>
-                  <span className="shrink-0 text-[11px] font-extrabold text-orange-500">{minToHoras(intervalToMin(h.extras_total))}</span>
+                  <span className={`w-[46px] text-right text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{hAbbr(b.absMin)}</span>
+                  <span className="w-[46px] text-right text-[11px] font-extrabold text-orange-500">{fmtPct(b.pct)}</span>
                 </li>
               ))}
             </ul>
