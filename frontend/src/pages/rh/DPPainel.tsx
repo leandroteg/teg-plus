@@ -45,8 +45,8 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
-function SpotlightMetric({ label, value, tone, note, isDark }: {
-  label: string; value: string | number; tone: string; note?: string; isDark: boolean
+function SpotlightMetric({ label, value, tone, note, isDark, aside, asideTitle }: {
+  label: string; value: string | number; tone: string; note?: string; isDark: boolean; aside?: string; asideTitle?: string
 }) {
   const tones: Record<string, string> = {
     amber: isDark ? 'text-amber-400' : 'text-amber-600',
@@ -57,7 +57,10 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
   return (
     <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+      <p className={`text-[1.85rem] font-extrabold leading-none flex items-baseline gap-1.5 ${tones[tone] || tones.slate}`}>
+        <span>{value}</span>
+        {aside && <span title={asideTitle} className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{aside}</span>}
+      </p>
       {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
     </div>
   )
@@ -122,6 +125,7 @@ export default function DPPainel() {
   const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
   const listaHE = he.slice(0, 8)
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
+  const pctExtra = agg.hhMin > 0 ? Math.round((agg.exMin / agg.hhMin) * 100) : null
 
   return (
     <div className="space-y-3">
@@ -159,7 +163,10 @@ export default function DPPainel() {
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric label="Colaboradores Ativos" value={headcount ? `${pico}/${headcount}` : pico} tone="amber" isDark={isDark} note="pico 7 dias · vs headcount" />
               <SpotlightMetric label="HH Trabalhada" value={hAbbr(agg.hhMin)} tone="violet" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
-              <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
+              <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark}
+                aside={pctExtra != null ? `${pctExtra}%` : undefined}
+                asideTitle="% de horas extras sobre o HH trabalhado (base apurada)"
+                note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
             </div>
           </div>
         </section>
