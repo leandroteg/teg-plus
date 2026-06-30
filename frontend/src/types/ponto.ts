@@ -67,6 +67,14 @@ export interface PontoPendencia {
   colaborador?: { nome: string | null } | null
 }
 
+export interface PontoRetificacao {
+  data_hora: string
+  origem: string | null
+  motivo: string | null
+  nsr: number | null
+  colaborador?: { nome: string | null; base_id: string | null; base?: { nome: string | null } | null } | null
+}
+
 export interface PontoAprovacao {
   id: string
   ano_mes: string
