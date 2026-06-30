@@ -81,7 +81,7 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
           const proj = projetos.find(p => p.id === f.projeto_id)
           const path = `${f.projeto_id}/${slug(f.numero_os)}_${slug(f.file.name)}`
           await supabase.storage.from('egp-osc-abertura').upload(path, f.file, { upsert: true })
-          const { error } = await supabase.from('pmo_fluxo_os').insert({ portfolio_id: proj?.portfolio_id ?? null, projeto_id: f.projeto_id, numero_os: f.numero_os.trim(), tipo: f.tipo, abertura_path: path, etapa_atual: 'aberta', data_osc: new Date().toISOString().slice(0, 10) })
+          const { error } = await supabase.from('pmo_fluxo_os').insert({ portfolio_id: proj?.portfolio_id ?? null, projeto_id: f.projeto_id, numero_os: f.numero_os.trim(), tipo: f.tipo, abertura_path: path, etapa_atual: 'recebida', data_osc: new Date().toISOString().slice(0, 10) })
           if (error) throw error
           await dispararParse('egp-osc-abertura', path, 'osc', { numero_os: f.numero_os.trim(), projeto_id: f.projeto_id, portfolio_id: proj?.portfolio_id ?? null, tipo: f.tipo })
         }
