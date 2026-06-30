@@ -94,6 +94,7 @@ export interface PontoTabProps {
   baseId: string
   pessoa: string
   status: string
+  ocultosJustif: Set<string>
   bases: { id: string; nome: string; codigo: string }[]
 }
 

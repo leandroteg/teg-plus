@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, AlertTriangle, FileText, Lock, Filter, Send } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -42,7 +42,7 @@ function useAprovador() {
   const { user } = useAuth()
   return (user as { nome?: string; email?: string } | null)?.nome || (user as { email?: string } | null)?.email || 'RH'
 }
-const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
+export const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
 const tipoLabel: Record<AprovTipo, string> = { retificacao: 'Retificação', hora_extra: 'Hora extra', atestado: 'Atestado' }
 const tipoCor: Record<AprovTipo, string> = { retificacao: 'text-amber-500', hora_extra: 'text-orange-500', atestado: 'text-rose-500' }
 function matchPessoa(nome: string | null | undefined, q: string) {
@@ -69,7 +69,7 @@ function SelecaoBar({ n, onEnviar, pending }: { n: number; onEnviar: () => void;
     </div>
   )
 }
-function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: string[]; ocultos: Set<string>; toggle: (m: string) => void }) {
+export function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: string[]; ocultos: Set<string>; toggle: (m: string) => void }) {
   const c = useThemeCls()
   const [open, setOpen] = useState(false)
   const sel = motivos.filter(m => !ocultos.has(m)).length
@@ -174,17 +174,14 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 // ════════════════════════════════════════════════════════════════════════════
 // 2) RETIFICAÇÕES — selecionável + enviar p/ aprovação
 // ════════════════════════════════════════════════════════════════════════════
-export function RetificacoesTab({ anoMes, baseId, pessoa, status }: PontoTabProps) {
+export function RetificacoesTab({ anoMes, baseId, pessoa, status, ocultosJustif }: PontoTabProps) {
   const { data = [], isLoading } = usePontoRetificacoes(anoMes)
   const c = useThemeCls()
   const aprovador = useAprovador()
   const enviar = useEnviarItens()
   const { sel, toggle, setAll, clear } = useSelecao()
-  const [ocultos, setOcultos] = useState<Set<string>>(new Set(['Mudança de ponto']))
   const semNoise = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
-  const motivos = [...new Set(semNoise.map(r => r.motivo!).filter(Boolean))].sort()
-  const lista = semNoise.filter(r => !ocultos.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa) && (!status || r.aprov_status === status))
-  const toggleMot = (m: string) => setOcultos(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
+  const lista = semNoise.filter(r => !ocultosJustif.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa) && (!status || r.aprov_status === status))
   const idOf = (r: PontoRetificacao) => String(r.nsr)
   const pend = lista.filter(r => r.aprov_status === 'pendente')
   const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
@@ -193,11 +190,7 @@ export function RetificacoesTab({ anoMes, baseId, pessoa, status }: PontoTabProp
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções manuais de marcação (Origem: cartão). Selecione e envie para aprovação.</div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <MultiSelectJustif motivos={motivos} ocultos={ocultos} toggle={toggleMot} />
-        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
-      </div>
+      <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma retificação no filtro." /> : (
           <table className="w-full">
