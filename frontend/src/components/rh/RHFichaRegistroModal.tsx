@@ -4,8 +4,9 @@
 // faltantes editáveis. Ao confirmar, gera o PDF no layout da contabilidade.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
-import { X, FileText, Loader2 } from 'lucide-react'
+import { X, FileText, Loader2, Sparkles } from 'lucide-react'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
+import { preencherFichaRegistroAuto } from '../../hooks/useRHAdmissaoFluxo'
 
 const IN = 'w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-indigo-300 outline-none'
 const LBL = 'text-[9px] font-bold uppercase tracking-wide text-slate-400'
@@ -116,6 +117,48 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
   const fld = (k: string) => ({ value: f[k] ?? '', onChange: set(k) })
   const chk = (k: string) => ({ checked: !!b[k], onChange: (v: boolean) => setB(p => ({ ...p, [k]: v })) })
 
+  // ── Preencher automaticamente (IA lê os anexos do candidato) ────────────────
+  const nAnexos = cand.anexos?.length ?? 0
+  const [auto, setAuto] = useState(false)
+  const [autoMsg, setAutoMsg] = useState<{ tone: 'ok' | 'err'; txt: string } | null>(null)
+
+  async function preencherAuto() {
+    setAuto(true); setAutoMsg(null)
+    try {
+      const dados = await preencherFichaRegistroAuto(cand)
+      if (!dados) {
+        setAutoMsg({ tone: 'err', txt: nAnexos ? 'Não consegui ler os documentos. Tente novamente.' : 'Nenhum documento anexado para analisar.' })
+        return
+      }
+      // texto → f (só preenche o que veio preenchido, não apaga o existente)
+      setF(prev => {
+        const next = { ...prev }
+        for (const k of Object.keys(prev)) {
+          const v = dados[k]
+          if (v != null && typeof v !== 'object' && typeof v !== 'boolean' && String(v).trim() !== '') next[k] = String(v)
+        }
+        return next
+      })
+      // booleanos → b
+      setB(prev => {
+        const next = { ...prev }
+        for (const k of Object.keys(prev)) if (typeof dados[k] === 'boolean') next[k] = dados[k] as boolean
+        return next
+      })
+      // filhos → filhos (mantém 4 linhas)
+      if (Array.isArray(dados.filhos)) {
+        const fl = (dados.filhos as { nome?: string; nascimento?: string; cpf?: string }[])
+          .slice(0, 4).map(x => ({ nome: x?.nome ?? '', nascimento: x?.nascimento ?? '', cpf: x?.cpf ?? '' }))
+        setFilhos(fl.concat(Array.from({ length: 4 }, () => ({ nome: '', nascimento: '', cpf: '' }))).slice(0, 4))
+      }
+      setAutoMsg({ tone: 'ok', txt: 'Campos preenchidos pela IA — revise antes de gerar o PDF.' })
+    } catch (e) {
+      setAutoMsg({ tone: 'err', txt: 'Erro: ' + (e instanceof Error ? e.message : String(e)) })
+    } finally {
+      setAuto(false)
+    }
+  }
+
   function gerar() {
     const dados: FichaDados = { ...f, ...b, filhos: filhos.filter(x => x.nome.trim()) }
     onGerar(dados)
@@ -139,6 +182,30 @@ export default function RHFichaRegistroModal({ cand, adm, fichaDados, etniaAuto,
         </div>
 
         <div className="p-5 space-y-3">
+          {/* Preencher automaticamente via IA (lê os anexos do candidato) */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-slate-700">Preenchimento automático</p>
+              <p className="text-[10px] text-slate-500">
+                {nAnexos
+                  ? `A IA lê os ${nAnexos} documento(s) anexado(s) e completa os campos.`
+                  : 'Anexe os documentos do candidato para a IA poder ler.'}
+              </p>
+            </div>
+            <button
+              type="button" onClick={preencherAuto} disabled={auto || nAnexos === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap
+                bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+              {auto ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              {auto ? 'Lendo documentos…' : 'Preencher automaticamente'}
+            </button>
+          </div>
+          {autoMsg && (
+            <p className={`text-[11px] font-medium px-1 ${autoMsg.tone === 'ok' ? 'text-emerald-600' : 'text-red-500'}`}>
+              {autoMsg.txt}
+            </p>
+          )}
+
           <Sec t="Identificação" />
           <div className="grid grid-cols-4 gap-2">
             <Campo label="Nome completo" span={3} {...fld('nome')} />
