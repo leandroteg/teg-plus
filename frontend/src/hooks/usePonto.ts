@@ -23,6 +23,30 @@ export function usePontoDia(dataISO: string, baseId?: string) {
   })
 }
 
+// Colaboradores ativos no ponto: pico diário de batedores nos últimos 7 dias vs headcount (ativos)
+export function usePontoColabAtivos() {
+  return useQuery<{ pico: number; headcount: number }>({
+    queryKey: ['ponto-colab-ativos-7d'],
+    queryFn: async () => {
+      const d = new Date(); d.setDate(d.getDate() - 6)
+      const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const [pontos, head] = await Promise.all([
+        supabase.from('rh_ponto_dia').select('colaborador_id, data').gte('data', desde).not('entrada1', 'is', null).limit(5000),
+        supabase.from('rh_colaboradores').select('id', { count: 'exact', head: true }).eq('ativo', true),
+      ])
+      if (pontos.error) console.error('usePontoColabAtivos:', pontos.error)
+      const porDia = new Map<string, Set<string>>()
+      for (const r of (pontos.data ?? []) as { colaborador_id: string | null; data: string }[]) {
+        if (!r.colaborador_id) continue
+        const set = porDia.get(r.data) ?? new Set<string>()
+        set.add(r.colaborador_id); porDia.set(r.data, set)
+      }
+      const pico = porDia.size ? Math.max(...[...porDia.values()].map(s => s.size)) : 0
+      return { pico, headcount: head.count ?? 0 }
+    },
+  })
+}
+
 // Resumo mensal por colaborador (Registros / Consolidação)
 export function usePontoResumoMes(anoMes: string, baseId?: string) {
   return useQuery<PontoResumoMes[]>({

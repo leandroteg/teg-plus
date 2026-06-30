@@ -11,7 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePontoResumoMes, usePontoHorasExtras } from '../../hooks/usePonto'
+import { usePontoResumoMes, usePontoHorasExtras, usePontoColabAtivos } from '../../hooks/usePonto'
 import { intervalToMin, minToHoras, mesAtual, labelMes } from '../../lib/ponto'
 
 // horas compactas p/ destaque: "28.080h"
@@ -56,6 +56,9 @@ export default function DPPainel() {
 
   const { data: resumo = [], isLoading } = usePontoResumoMes(anoMes)
   const { data: he = [] } = usePontoHorasExtras(anoMes)
+  const { data: ativos } = usePontoColabAtivos()
+  const pico = ativos?.pico ?? 0
+  const headcount = ativos?.headcount ?? 0
 
   const agg = useMemo(() => {
     let hhMin = 0, exMin = 0, vol = 0, emAberto = 0, foraHorario = 0
@@ -97,15 +100,6 @@ export default function DPPainel() {
         </span>
       </div>
 
-      {/* Nota de escopo (honesta): apuração parcial + R$ ainda não integrado */}
-      <div className={`rounded-xl border border-dashed px-4 py-2.5 flex items-start gap-2 text-xs ${isDark ? 'border-white/[0.10] text-slate-400' : 'border-slate-300 text-slate-500'}`}>
-        <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-        <span>
-          <strong>HH e Horas Extras são parciais</strong> — a apuração de horas do Secullum está em andamento ({agg.comApur}/{agg.comBatida} colaboradores).
-          Volume, em aberto e fora do horário vêm das batidas (completos). Valores em R$ (folha/custo-hora) entram quando a folha for integrada.
-        </span>
-      </div>
-
       {/* Hero: Indicadores do mês + Janela Crítica */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
@@ -120,9 +114,9 @@ export default function DPPainel() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric label="Colaboradores Ativos" value={headcount ? `${pico}/${headcount}` : pico} tone="amber" isDark={isDark} note="pico 7 dias · vs headcount" />
               <SpotlightMetric label="HH Trabalhada" value={hAbbr(agg.hhMin)} tone="violet" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
               <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
-              <SpotlightMetric label="Volume de Ponto" value={agg.vol.toLocaleString('pt-BR')} tone="amber" isDark={isDark} note="dias-pessoa batidos · completo" />
             </div>
           </div>
         </section>
