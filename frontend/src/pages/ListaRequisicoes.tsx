@@ -13,6 +13,7 @@ import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
+import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -687,7 +688,8 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
-  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
+  const { data: categorias = [] } = useCategorias()
 
   // Suporta ?tab=em_triagem|em_validacao|aprovada|pendente via URL
   // (usado p/ links de outros módulos, ex: Estoque -> Janela Crítica)
@@ -709,6 +711,13 @@ export default function ListaRequisicoes() {
     resourceId: detailReqId,
     enabled: Boolean(detailReqId),
   })
+
+  // Validação técnica é por CATEGORIA (mesma regra do AprovAi/podeVerAprovacao):
+  // só o validador técnico configurado na categoria da RC — ou admin — decide.
+  // Antes usava canTechnicalApprove('compras'), que liberava qualquer diretor/admin
+  // (ex.: um diretor aprovava hardware de TI sem ser o validador técnico da categoria).
+  const ehValidadorTecnicoDetail = !!detail && !!perfil?.id
+    && categorias.find(c => c.codigo === detail.categoria)?.validador_tecnico_id === perfil.id
 
   const obras = useLookupObras()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
@@ -1089,7 +1098,7 @@ export default function ListaRequisicoes() {
             podeAprovarCompras(perfil?.email) && (
               (
                 ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
-                && canTechnicalApprove('compras')
+                && (isAdmin || ehValidadorTecnicoDetail)
               )
               || (detail.status === 'cotacao_enviada' && isAdmin)
             )

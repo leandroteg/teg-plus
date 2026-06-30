@@ -13,6 +13,7 @@ import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento, useRenegocia
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useBases } from '../hooks/useEstoque'
+import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import AuditoriaCard from '../components/AuditoriaCard'
@@ -150,7 +151,8 @@ export default function RequisicaoDetalhe() {
   const enviarParaAprovacao = useEnviarParaAprovacao()
   const [enviarMsg, setEnviarMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { data: bases = [] } = useBases()
-  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
+  const { data: categorias = [] } = useCategorias()
 
   // Cotação vinculada à RC
   const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_em_esclarecimento', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
@@ -180,9 +182,15 @@ export default function RequisicaoDetalhe() {
   // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada).
   // Compras exige tambem allowlist de aprovadores (mesma regra do AprovAi).
   const isAprovadorCompras = podeAprovarCompras(perfil?.email)
+  // Validação técnica é por CATEGORIA (mesma regra do AprovAi/podeVerAprovacao):
+  // só o validador técnico configurado na categoria da RC — ou admin — decide.
+  // Antes usava canTechnicalApprove('compras'), que liberava qualquer diretor/admin
+  // (ex.: um diretor aprovava hardware de TI sem ser o validador técnico da categoria).
+  const catPolitica = categorias.find(c => c.codigo === req?.categoria)
+  const ehValidadorTecnico = !!perfil?.id && catPolitica?.validador_tecnico_id === perfil.id
   const canDecideTechnical = !!req
     && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status)
-    && canTechnicalApprove('compras')
+    && (isAdmin || ehValidadorTecnico)
   const canDecideFinancial = !!req
     && req.status === 'cotacao_enviada'
     && isAdmin
