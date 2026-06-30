@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, Check, X, AlertTriangle, FileText, Lock, Filter } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, AlertTriangle, FileText, Lock, Filter } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -50,12 +50,17 @@ const tipoCor: Record<AprovTipo, string> = { retificacao: 'text-amber-500', hora
 // ════════════════════════════════════════════════════════════════════════════
 // 1) REGISTROS PONTO
 // ════════════════════════════════════════════════════════════════════════════
-export function RegistrosPontoTab({ anoMes, baseId }: PontoTabProps) {
+function matchPessoa(nome: string | null | undefined, q: string) {
+  return !q.trim() || (nome ?? '').toLowerCase().includes(q.trim().toLowerCase())
+}
+
+export function RegistrosPontoTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
+  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa))
   if (isLoading) return <Painel><Loading /></Painel>
-  if (!data.length) return <Painel><Vazio msg={`Sem registros de ponto em ${labelMes(anoMes)}.`} /></Painel>
+  if (!lista.length) return <Painel><Vazio msg={`Sem registros de ponto em ${labelMes(anoMes)}${pessoa ? ' para esse filtro' : ''}.`} /></Painel>
   return (
     <div className="space-y-4">
       <Painel>
@@ -64,7 +69,7 @@ export function RegistrosPontoTab({ anoMes, baseId }: PontoTabProps) {
             <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Dias</th>
             <th className={`${TH} hidden sm:table-cell`}>HH Trab.</th><th className={TH}>Extras</th><th className={TH}>Faltas</th><th className={TH}></th>
           </tr></thead>
-          <tbody>{data.map(r => (
+          <tbody>{lista.map(r => (
             <tr key={r.colaborador_id ?? r.colaborador_nome} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
               <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}<div className={`text-[10px] ${c.sub}`}>{r.cargo}</div></td>
               <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
@@ -122,36 +127,47 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 // ════════════════════════════════════════════════════════════════════════════
 // 2) RETIFICAÇÕES
 // ════════════════════════════════════════════════════════════════════════════
-export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
+function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: string[]; ocultos: Set<string>; toggle: (m: string) => void }) {
+  const c = useThemeCls()
+  const [open, setOpen] = useState(false)
+  const sel = motivos.filter(m => !ocultos.has(m)).length
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${c.input}`}>
+        Justificativas <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-500">{sel}/{motivos.length}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+        <div className={`absolute z-20 mt-1 min-w-[230px] max-h-64 overflow-y-auto rounded-xl border shadow-xl p-1.5 ${c.isLight ? 'bg-white border-slate-200' : 'bg-slate-800 border-white/10'}`}>
+          {!motivos.length && <div className={`text-xs px-2 py-1.5 ${c.sub}`}>Nenhuma justificativa</div>}
+          {motivos.map(m => (
+            <label key={m} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg cursor-pointer ${c.isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'} ${c.txt}`}>
+              <input type="checkbox" checked={!ocultos.has(m)} onChange={() => toggle(m)} className="accent-violet-500" /> {m}
+            </label>
+          ))}
+        </div>
+      </>)}
+    </div>
+  )
+}
+
+export function RetificacoesTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoRetificacoes(anoMes)
   const c = useThemeCls()
-  const [pessoa, setPessoa] = useState('')
   // por padrão, "Mudança de ponto" começa oculta
   const [ocultos, setOcultos] = useState<Set<string>>(new Set(['Mudança de ponto']))
-
-  const base = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
-  const motivos = [...new Set(base.map(r => r.motivo!).filter(Boolean))].sort()
-  const lista = base.filter(r =>
-    !ocultos.has(r.motivo!) &&
-    (!pessoa.trim() || (r.colaborador?.nome ?? '').toLowerCase().includes(pessoa.trim().toLowerCase()))
-  )
+  const semNoise = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
+  const motivos = [...new Set(semNoise.map(r => r.motivo!).filter(Boolean))].sort()
+  const lista = semNoise.filter(r => !ocultos.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa))
   const toggle = (m: string) => setOcultos(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
 
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções manuais de marcação (Origem: cartão). Pendentes vão para a aba Aprovação.</div>
-      {/* filtros: pessoa (texto) + justificativa (checkboxes) */}
-      <div className="flex items-start gap-3 flex-wrap">
-        <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
-          className={`px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${c.input}`} />
-        <div className="flex items-center gap-2 flex-wrap">
-          {motivos.map(m => (
-            <label key={m} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${ocultos.has(m) ? (c.isLight ? 'border-slate-200 text-slate-400' : 'border-white/10 text-slate-500') : (c.isLight ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-violet-500/30 bg-violet-500/10 text-violet-300')}`}>
-              <input type="checkbox" checked={!ocultos.has(m)} onChange={() => toggle(m)} className="accent-violet-500" /> {m}
-            </label>
-          ))}
-        </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <MultiSelectJustif motivos={motivos} ocultos={ocultos} toggle={toggle} />
       </div>
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma retificação no mês." /> : (
@@ -176,22 +192,23 @@ export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
 // ════════════════════════════════════════════════════════════════════════════
 // 3) HORAS EXTRAS
 // ════════════════════════════════════════════════════════════════════════════
-export function HorasExtrasTab({ anoMes, baseId }: PontoTabProps) {
+export function HorasExtrasTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoHorasExtras(anoMes, baseId || undefined)
   const c = useThemeCls()
-  const total = data.reduce((s, r) => s + intervalToMin(r.extras_total), 0)
+  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa))
+  const total = lista.reduce((s, r) => s + intervalToMin(r.extras_total), 0)
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
       <div className={`rounded-2xl border px-4 py-3 ${c.isLight ? 'bg-orange-50 border-orange-100' : 'bg-orange-500/10 border-orange-500/20'}`}>
         <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras · {labelMes(anoMes)}</span>
-        <p className={`text-xl font-extrabold ${c.txt}`}>{minToHoras(total)} <span className={`text-xs font-normal ${c.sub}`}>· {data.length} lançamentos</span></p>
+        <p className={`text-xl font-extrabold ${c.txt}`}>{minToHoras(total)} <span className={`text-xs font-normal ${c.sub}`}>· {lista.length} lançamentos</span></p>
       </div>
       <Painel>
-        {!data.length ? <Vazio msg="Nenhuma hora extra no mês." /> : (
+        {!lista.length ? <Vazio msg="Nenhuma hora extra no mês." /> : (
           <table className="w-full">
             <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data</th><th className={`${TH} hidden sm:table-cell`}>50%</th><th className={`${TH} hidden sm:table-cell`}>100%</th><th className={TH}>Total</th><th className={TH}>Status</th></tr></thead>
-            <tbody>{data.map((r, i) => (
+            <tbody>{lista.map((r, i) => (
               <tr key={i} className={`border-t ${c.row}`}>
                 <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}</td>
                 <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
@@ -212,10 +229,10 @@ export function HorasExtrasTab({ anoMes, baseId }: PontoTabProps) {
 // ════════════════════════════════════════════════════════════════════════════
 // 4) ATESTADOS
 // ════════════════════════════════════════════════════════════════════════════
-export function AtestadosTab({ anoMes, baseId }: PontoTabProps) {
+export function AtestadosTab({ anoMes, baseId, pessoa }: PontoTabProps) {
   const { data = [], isLoading } = usePontoAtestados(anoMes)
   const c = useThemeCls()
-  const lista = data.filter(a => !baseId || a.colaborador?.base_id === baseId)
+  const lista = data.filter(a => (!baseId || a.colaborador?.base_id === baseId) && matchPessoa(a.colaborador?.nome, pessoa))
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <Painel>

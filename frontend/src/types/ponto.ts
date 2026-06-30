@@ -92,6 +92,7 @@ export interface PontoRetificacao {
 export interface PontoTabProps {
   anoMes: string
   baseId: string
+  pessoa: string
   bases: { id: string; nome: string; codigo: string }[]
 }
 

@@ -24,6 +24,7 @@ export default function DPPonto() {
   const { isLightSidebar: isLight } = useTheme()
   const [anoMes, setAnoMes] = useState(mesAtual())
   const [baseId, setBaseId] = useState('')
+  const [pessoa, setPessoa] = useState('')
   const { data: basesRaw = [] } = useBases()
   const bases = basesRaw.map(b => ({ id: b.id, nome: b.nome, codigo: b.codigo }))
 
@@ -33,10 +34,10 @@ export default function DPPonto() {
   const selCls = `px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
 
   function renderPanel(key: string) {
-    const props: PontoTabProps = { anoMes, baseId, bases }
+    const props: PontoTabProps = { anoMes, baseId, pessoa, bases }
     return (
       <div className="space-y-4">
-        {/* Filtro mês + base */}
+        {/* Filtro mês + base + pessoa (primeira linha) */}
         <div className="flex items-center gap-2 flex-wrap">
           <select value={anoMes} onChange={e => setAnoMes(e.target.value)} className={selCls}>
             {ultimosMeses(12).map(m => <option key={m} value={m}>{labelMes(m)}</option>)}
@@ -46,6 +47,10 @@ export default function DPPonto() {
               <option value="">Todas as bases</option>
               {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
+          )}
+          {!semFiltroBase(key) && (
+            <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
+              className={`${selCls} min-w-[200px] flex-1`} />
           )}
         </div>
 
