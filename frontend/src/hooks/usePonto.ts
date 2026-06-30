@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { proximoMes } from '../lib/ponto'
 import type {
-  PontoResumoMes, PontoDia, PontoAfastamento, PontoPendencia, PontoAprovacao,
+  PontoResumoMes, PontoDia, PontoAfastamento, PontoPendencia, PontoAprovacao, PontoRetificacao,
 } from '../types/ponto'
 
 // Resumo mensal por colaborador (1 linha/pessoa) — base das abas Registros/Horas Extras/Consolidação
@@ -33,6 +33,23 @@ export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
         .order('data')
       if (error) { console.error('usePontoCartao:', error); return [] }
       return (data ?? []) as PontoDia[]
+    },
+  })
+}
+
+// Retificações = marcações (FonteDados) com motivo/justificativa no mês
+export function usePontoRetificacoes(anoMes: string) {
+  return useQuery<PontoRetificacao[]>({
+    queryKey: ['ponto-retificacoes', anoMes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rh_ponto_marcacao')
+        .select('data_hora, origem, motivo, nsr, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
+        .not('motivo', 'is', null)
+        .gte('data', anoMes).lt('data', proximoMes(anoMes))
+        .order('data_hora', { ascending: false }).limit(1000)
+      if (error) { console.error('usePontoRetificacoes:', error); return [] }
+      return (data ?? []) as unknown as PontoRetificacao[]
     },
   })
 }
