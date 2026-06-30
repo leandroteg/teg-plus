@@ -193,11 +193,16 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 }
 
 // visão diária — registros de UM dia (todos os colaboradores)
-function RegistrosDia({ baseId, pessoa, diaData }: PontoTabProps) {
+function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
   const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
   const c = useThemeCls()
   const lista = data
-    .filter(r => matchPessoa(r.colaborador?.nome, pessoa))
+    .filter(r => matchPessoa(r.colaborador?.nome, pessoa) && (
+      quickReg === 'aberto' ? intervalToMin(r.faltas) > 0
+        : quickReg === 'extras' ? (intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)) > 0
+          : quickReg === 'ausencias' ? !r.entrada1
+            : true
+    ))
     .sort((a, b) => (a.colaborador?.nome || '').localeCompare(b.colaborador?.nome || ''))
   if (isLoading) return <Painel><Loading /></Painel>
   if (!lista.length) return <Painel><Vazio msg={`Sem registros em ${new Date(diaData + 'T00:00:00').toLocaleDateString('pt-BR')}.`} /></Painel>

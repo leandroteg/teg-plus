@@ -87,23 +87,24 @@ export default function DPPonto() {
               <button onClick={() => setVista('dia')} className={segCls(vista === 'dia')}><CalendarDays size={13} /> Dia</button>
             </div>
           )}
-          {key === 'registros' && vista === 'mes' && (<>
-            <div className="hidden lg:flex items-center gap-1.5">
-              {REG_CHIPS.map(ch => (
-                <button key={ch.k} onClick={() => setQuickReg(ch.k)} className={chipCls(quickReg === ch.k)}>
-                  <ch.icon size={13} /> {ch.label}
-                </button>
-              ))}
-            </div>
-            <select value={quickReg} onChange={e => setQuickReg(e.target.value)} className={`${selCls} lg:hidden`}>
-              {REG_CHIPS.map(ch => <option key={ch.k} value={ch.k}>{ch.label}</option>)}
-            </select>
-          </>)}
           {key === 'registros' && vista === 'dia' && (<>
             <button onClick={() => setDiaData(hojeISO())} className={chipCls(diaData === hojeISO())}>Hoje</button>
             <button onClick={() => setDiaData(ontemISO())} className={chipCls(diaData === ontemISO())}>Ontem</button>
-            <input type="date" value={diaData} onChange={e => setDiaData(e.target.value)} className={selCls} />
+            <input type="date" value={diaData} onChange={e => setDiaData(e.target.value)} className={`${selCls} w-[150px]`} />
           </>)}
+          {/* filtros pré-prontos (só ícone p/ caber) — valem nos 2 modos */}
+          {key === 'registros' && (
+            <div className="flex items-center gap-1.5">
+              {REG_CHIPS.map(ch => (
+                <button key={ch.k} onClick={() => setQuickReg(ch.k)} title={ch.label}
+                  className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border transition-colors ${quickReg === ch.k
+                    ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')
+                    : (isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`}>
+                  <ch.icon size={15} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {key === 'registros' && <RegistrosPontoTab {...props} />}
