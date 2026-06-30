@@ -17,6 +17,8 @@ import { intervalToMin } from '../../lib/ponto'
 // horas compactas p/ destaque: "28.080h"
 const hAbbr = (min: number) => `${Math.round(min / 60).toLocaleString('pt-BR')}h`
 const fmtPct = (p: number) => `${p < 10 ? p.toFixed(1) : Math.round(p)}%`
+// banco de horas (não paga hora extra) — hoje só Escritório Central
+const ehBanco = (nome?: string | null) => /escrit[óo]rio\s*central/i.test(nome ?? '')
 
 function ymHoje() {
   const d = new Date()
@@ -95,13 +97,16 @@ export default function DPPainel() {
   const headcount = ativos?.headcount ?? 0
 
   const agg = useMemo(() => {
-    let hhMin = 0, exMin = 0, emAberto = 0, foraHorario = 0
+    let hhMin = 0, exMin = 0, hhPagavel = 0, emAberto = 0, foraHorario = 0
     const ccMap = new Map<string, { nome: string; min: number }>()
     const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
-      const hh = intervalToMin(r.hh_trabalhada), ex = intervalToMin(r.extras)
-      hhMin += hh; exMin += ex
+      const hh = intervalToMin(r.hh_trabalhada)
+      const exV = intervalToMin(r.extras_validos)  // extras já sem dias em aberto
+      const banco = ehBanco(r.base_nome)            // banco de horas não paga extra
+      hhMin += hh
+      if (!banco) { exMin += exV; hhPagavel += hh } // hora extra A PAGAR + base do %
       emAberto += r.dias_em_aberto || 0
       foraHorario += r.dias_fora_horario || 0
       if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
@@ -113,26 +118,29 @@ export default function DPPainel() {
       const b = baseMap.get(bk) || { nome: r.base_nome ?? 'Sem base', emAberto: 0, diasBatidos: 0, exMin: 0, hhMin: 0 }
       b.emAberto += r.dias_em_aberto || 0
       b.diasBatidos += r.dias_batidos || 0
-      b.exMin += ex
+      b.exMin += exV
       b.hhMin += hh
       baseMap.set(bk, b)
     }
     const porCC = [...ccMap.values()].filter(c => c.min > 0).sort((a, b) => b.min - a.min)
     const bases = [...baseMap.values()]
+    // em aberto: todas as bases (independe de banco de horas)
     const abertoPorBase = bases
       .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
       .filter(b => b.abs > 0).sort((a, b) => b.pct - a.pct)
+    // horas extras a pagar: exclui banco de horas
     const extraPorBase = bases
+      .filter(b => !ehBanco(b.nome))
       .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
       .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
-    return { hhMin, exMin, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase, comBatida: comBatida.size, comApur: comApur.size }
+    return { hhMin, exMin, hhPagavel, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase, comBatida: comBatida.size, comApur: comApur.size }
   }, [resumo])
 
   const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
   const maxAbertoPct = Math.max(...agg.abertoPorBase.map(b => b.pct), 1)
   const maxExtraPct = Math.max(...agg.extraPorBase.map(b => b.pct), 1)
-  const pctExtra = agg.hhMin > 0 ? Math.round((agg.exMin / agg.hhMin) * 100) : null
+  const pctExtra = agg.hhPagavel > 0 ? Math.round((agg.exMin / agg.hhPagavel) * 100) : null
 
   return (
     <div className="space-y-3">
@@ -172,8 +180,8 @@ export default function DPPainel() {
               <SpotlightMetric label="HH Trabalhada" value={hAbbr(agg.hhMin)} tone="violet" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
               <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark}
                 aside={pctExtra != null ? `${pctExtra}%` : undefined}
-                asideTitle="% de horas extras sobre o HH trabalhado (base apurada)"
-                note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
+                asideTitle="Horas extras a pagar (exclui dias em aberto e banco de horas) ÷ HH apurado"
+                note={`a pagar · parcial ${agg.comApur}/${agg.comBatida}`} />
             </div>
           </div>
         </section>
@@ -270,7 +278,7 @@ export default function DPPainel() {
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 <Timer size={14} className="text-orange-500" /> Horas Extras por Base
               </h2>
-              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>abs · % sobre HH apurado · ordenado por %</p>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>a pagar · exclui dia em aberto e banco de horas · ord. por %</p>
             </div>
             <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
           </div>

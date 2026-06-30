@@ -27,6 +27,7 @@ export interface PontoResumoMes {
   banco_saldo: string | null
   dias_em_aberto: number
   dias_fora_horario: number
+  extras_validos: string | null
 }
 
 export interface PontoDia {
