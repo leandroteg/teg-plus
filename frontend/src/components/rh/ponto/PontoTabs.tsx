@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, Check, X, AlertTriangle, FileText, Lock } from 'lucide-react'
+import { Loader2, ChevronRight, Check, X, AlertTriangle, FileText, Lock, Filter } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -8,7 +8,7 @@ import {
   usePontoAtestados, useAprovarItem,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes } from '../../../lib/ponto'
-import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey } from '../../../types/ponto'
+import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo } from '../../../types/ponto'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -30,6 +30,7 @@ function useThemeCls() {
     row: isLight ? 'border-slate-100 hover:bg-slate-50/70' : 'border-white/[0.05] hover:bg-white/[0.03]',
     txt: isLight ? 'text-slate-700' : 'text-slate-200',
     sub: isLight ? 'text-slate-400' : 'text-slate-500',
+    input: isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white',
   }
 }
 function Status({ s }: { s: AprovStatus }) {
@@ -42,11 +43,12 @@ function useAprovador() {
   const { user } = useAuth()
   return (user as { nome?: string; email?: string } | null)?.nome || (user as { email?: string } | null)?.email || 'RH'
 }
-
 const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
+const tipoLabel: Record<AprovTipo, string> = { retificacao: 'Retificação', hora_extra: 'Hora extra', atestado: 'Atestado' }
+const tipoCor: Record<AprovTipo, string> = { retificacao: 'text-amber-500', hora_extra: 'text-orange-500', atestado: 'text-rose-500' }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 1) REGISTROS PONTO — resumo por colaborador + cartão diário
+// 1) REGISTROS PONTO
 // ════════════════════════════════════════════════════════════════════════════
 export function RegistrosPontoTab({ anoMes, baseId }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
@@ -118,7 +120,7 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 2) RETIFICAÇÕES — lista de marcações com motivo + status
+// 2) RETIFICAÇÕES
 // ════════════════════════════════════════════════════════════════════════════
 export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
   const { data = [], isLoading } = usePontoRetificacoes(anoMes)
@@ -127,7 +129,7 @@ export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções de marcação com justificativa. Itens pendentes vão para a aba Aprovação.</div>
+      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Inclusões/correções de marcação com justificativa. Pendentes vão para a aba Aprovação.</div>
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma retificação no mês." /> : (
           <table className="w-full">
@@ -149,7 +151,7 @@ export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 3) HORAS EXTRAS — lista de dias com extra + status
+// 3) HORAS EXTRAS
 // ════════════════════════════════════════════════════════════════════════════
 export function HorasExtrasTab({ anoMes, baseId }: PontoTabProps) {
   const { data = [], isLoading } = usePontoHorasExtras(anoMes, baseId || undefined)
@@ -185,7 +187,7 @@ export function HorasExtrasTab({ anoMes, baseId }: PontoTabProps) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 4) ATESTADOS / AFASTAMENTOS — lista + status
+// 4) ATESTADOS
 // ════════════════════════════════════════════════════════════════════════════
 export function AtestadosTab({ anoMes, baseId }: PontoTabProps) {
   const { data = [], isLoading } = usePontoAtestados(anoMes)
@@ -212,90 +214,155 @@ export function AtestadosTab({ anoMes, baseId }: PontoTabProps) {
   )
 }
 
+// ── modelo unificado da fila de aprovação ────────────────────────────────────
+interface FilaItem { tipo: AprovTipo; key: AprovKey; nome: string; baseId: string; baseNome: string; quando: string; desc: string }
+
 // ════════════════════════════════════════════════════════════════════════════
-// 5) APROVAÇÃO — fila de pendentes (retificações + horas extras + atestados)
+// 5) APROVAÇÃO — grupos colapsáveis por base + modal com filtro de data/pessoa
 // ════════════════════════════════════════════════════════════════════════════
 export function AprovacaoTab({ anoMes }: PontoTabProps) {
   const ret = usePontoRetificacoes(anoMes)
   const he = usePontoHorasExtras(anoMes)
   const at = usePontoAtestados(anoMes)
-  const aprovar = useAprovarItem()
-  const aprovador = useAprovador()
   const c = useThemeCls()
+  const [aberta, setAberta] = useState<string | null>(null)
+  const [modal, setModal] = useState<{ base: string; itens: FilaItem[] } | null>(null)
 
-  const pendRet = (ret.data ?? []).filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && r.aprov_status === 'pendente')
-  const pendHE = (he.data ?? []).filter(r => r.aprov_status === 'pendente')
-  const pendAt = (at.data ?? []).filter(a => a.aprov_status === 'pendente')
-  const totalPend = pendRet.length + pendHE.length + pendAt.length
-  const loading = ret.isLoading || he.isLoading || at.isLoading
+  const itens: FilaItem[] = useMemo(() => {
+    const out: FilaItem[] = []
+    for (const r of (ret.data ?? [])) if (r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && r.aprov_status === 'pendente')
+      out.push({ tipo: 'retificacao', key: { tipo: 'retificacao', nsr: r.nsr }, nome: r.colaborador?.nome ?? '—', baseId: r.colaborador?.base_id ?? '', baseNome: r.colaborador?.base?.nome ?? '(sem base)', quando: r.data_hora, desc: r.motivo ?? '' })
+    for (const r of (he.data ?? [])) if (r.aprov_status === 'pendente')
+      out.push({ tipo: 'hora_extra', key: { tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: fmtHoras(r.extras_total) })
+    for (const a of (at.data ?? [])) if (a.aprov_status === 'pendente')
+      out.push({ tipo: 'atestado', key: { tipo: 'atestado', id: a.id }, nome: a.colaborador?.nome ?? '—', baseId: a.colaborador?.base_id ?? '', baseNome: a.colaborador?.base?.nome ?? '(sem base)', quando: a.inicio, desc: a.justificativa ?? a.motivo ?? '' })
+    return out
+  }, [ret.data, he.data, at.data])
 
-  const act = (key: AprovKey, status: AprovStatus) => aprovar.mutate({ key, status, aprovador })
+  const grupos = useMemo(() => {
+    const m = new Map<string, FilaItem[]>()
+    for (const it of itens) { if (!m.has(it.baseNome)) m.set(it.baseNome, []); m.get(it.baseNome)!.push(it) }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length)
+  }, [itens])
 
-  if (loading) return <Painel><Loading /></Painel>
-  if (!totalPend) return <Painel><div className="text-center py-16"><Check className="mx-auto mb-3 text-emerald-500" size={26} /><p className={`text-sm ${c.sub}`}>Nada pendente em {labelMes(anoMes)}. Tudo aprovado. 🎉</p></div></Painel>
+  if (ret.isLoading || he.isLoading || at.isLoading) return <Painel><Loading /></Painel>
+  if (!itens.length) return <Painel><div className="text-center py-16"><Check className="mx-auto mb-3 text-emerald-500" size={26} /><p className={`text-sm ${c.sub}`}>Nada pendente em {labelMes(anoMes)}. Tudo aprovado. 🎉</p></div></Painel>
 
-  const Botoes = ({ k }: { k: AprovKey }) => (
-    <div className="flex gap-1.5 justify-end">
-      <button disabled={aprovar.isPending} onClick={() => act(k, 'aprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"><Check size={12} /> Aprovar</button>
-      <button disabled={aprovar.isPending} onClick={() => act(k, 'reprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500/25"><X size={12} /></button>
-    </div>
-  )
-  const Secao = ({ titulo, cor, children, n }: { titulo: string; cor: string; n: number; children: React.ReactNode }) => (
-    <Painel>
-      <div className={`px-4 py-2.5 border-b text-xs font-bold flex items-center gap-2 ${c.isLight ? 'border-slate-200' : 'border-white/10'} ${cor}`}>{titulo} <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">{n}</span></div>
-      {children}
-    </Painel>
-  )
+  const cont = (its: FilaItem[]) => {
+    const r = its.filter(i => i.tipo === 'retificacao').length, h = its.filter(i => i.tipo === 'hora_extra').length, a = its.filter(i => i.tipo === 'atestado').length
+    return [r && `${r} retif.`, h && `${h} extra`, a && `${a} atest.`].filter(Boolean).join(' · ')
+  }
 
   return (
-    <div className="space-y-3">
-      <div className={`text-xs ${c.sub}`}><b className={c.txt}>{totalPend}</b> item(s) pendente(s) de aprovação em {labelMes(anoMes)}.</div>
+    <div className="space-y-2">
+      <div className={`text-xs ${c.sub}`}><b className={c.txt}>{itens.length}</b> pendente(s) em {labelMes(anoMes)}, em {grupos.length} área(s).</div>
+      {grupos.map(([base, its]) => {
+        const open = aberta === base
+        return (
+          <Painel key={base}>
+            <div className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${c.row}`} onClick={() => setAberta(open ? null : base)}>
+              <ChevronRight size={15} className={`${c.sub} transition-transform ${open ? 'rotate-90' : ''}`} />
+              <div className="flex-1 min-w-0"><p className={`text-sm font-bold ${c.txt}`}>{base}</p><p className={`text-[10px] ${c.sub}`}>{its.length} itens · {cont(its)}</p></div>
+              <button onClick={e => { e.stopPropagation(); setModal({ base, itens: its }) }}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500/15 text-violet-500 hover:bg-violet-500/25"><Filter size={12} /> Filtrar / aprovar</button>
+            </div>
+            {open && <ListaFila itens={its.slice(0, 30)} />}
+            {open && its.length > 30 && <div className={`px-4 py-2 text-[11px] ${c.sub}`}>+{its.length - 30} itens — use “Filtrar / aprovar”.</div>}
+          </Painel>
+        )
+      })}
+      {modal && <FilaModal base={modal.base} itens={modal.itens} onClose={() => setModal(null)} />}
+    </div>
+  )
+}
 
-      {pendRet.length > 0 && <Secao titulo="Retificações" cor="text-amber-500" n={pendRet.length}>
-        <table className="w-full"><tbody>{pendRet.map((r, i) => (
-          <tr key={i} className={`border-t ${c.row}`}>
-            <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
-            <td className={`${TD} ${c.sub} hidden md:table-cell`}>{new Date(r.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-            <td className={`${TD} ${c.txt}`}>{r.motivo}</td>
-            <td className={`${TD} w-px`}><Botoes k={{ tipo: 'retificacao', nsr: r.nsr }} /></td>
-          </tr>
-        ))}</tbody></table>
-      </Secao>}
+// lista simples (inline, sem botão) — visão rápida do grupo expandido
+function ListaFila({ itens }: { itens: FilaItem[] }) {
+  const c = useThemeCls()
+  return (
+    <table className="w-full border-t border-dashed">
+      <tbody>{itens.map((it, i) => (
+        <tr key={i} className={`border-t ${c.row}`}>
+          <td className={`${TD} font-semibold ${c.txt}`}>{it.nome}</td>
+          <td className={`${TD} ${tipoCor[it.tipo]} hidden sm:table-cell`}>{tipoLabel[it.tipo]}</td>
+          <td className={`${TD} ${c.sub}`}>{new Date(it.quando).toLocaleDateString('pt-BR')}</td>
+          <td className={`${TD} ${c.txt}`}>{it.desc}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+  )
+}
 
-      {pendHE.length > 0 && <Secao titulo="Horas Extras" cor="text-orange-500" n={pendHE.length}>
-        <table className="w-full"><tbody>{pendHE.map((r, i) => (
-          <tr key={i} className={`border-t ${c.row}`}>
-            <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}</td>
-            <td className={`${TD} ${c.sub} hidden md:table-cell`}>{new Date(r.data + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-            <td className={`${TD} font-bold text-orange-500`}>{fmtHoras(r.extras_total)}</td>
-            <td className={`${TD} w-px`}><Botoes k={{ tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id }} /></td>
-          </tr>
-        ))}</tbody></table>
-      </Secao>}
+// modal com filtro de datas + pessoa + aprovar/reprovar (individual e em lote)
+function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; onClose: () => void }) {
+  const c = useThemeCls()
+  const aprovar = useAprovarItem()
+  const aprovador = useAprovador()
+  const [de, setDe] = useState(''); const [ate, setAte] = useState(''); const [pessoa, setPessoa] = useState('')
+  const pessoas = useMemo(() => [...new Set(itens.map(i => i.nome))].sort(), [itens])
+  const filtrados = itens.filter(it => {
+    const d = it.quando.slice(0, 10)
+    if (de && d < de) return false
+    if (ate && d > ate) return false
+    if (pessoa && it.nome !== pessoa) return false
+    return true
+  })
+  const act = (key: AprovKey, status: AprovStatus) => aprovar.mutate({ key, status, aprovador })
+  const aprovarTodos = () => filtrados.forEach(it => aprovar.mutate({ key: it.key, status: 'aprovado', aprovador }))
 
-      {pendAt.length > 0 && <Secao titulo="Atestados" cor="text-rose-500" n={pendAt.length}>
-        <table className="w-full"><tbody>{pendAt.map(a => (
-          <tr key={a.id} className={`border-t ${c.row}`}>
-            <td className={`${TD} font-semibold ${c.txt}`}>{a.colaborador?.nome ?? '—'}</td>
-            <td className={`${TD} ${c.txt}`}>{a.justificativa ?? a.motivo ?? '—'}</td>
-            <td className={`${TD} ${c.sub} hidden md:table-cell`}>{new Date(a.inicio + 'T00:00:00').toLocaleDateString('pt-BR')}{a.fim ? ' a ' + new Date(a.fim + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</td>
-            <td className={`${TD} w-px`}><Botoes k={{ tipo: 'atestado', id: a.id }} /></td>
-          </tr>
-        ))}</tbody></table>
-      </Secao>}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className={`w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border shadow-2xl ${c.isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-4 py-3 border-b ${c.isLight ? 'border-slate-200' : 'border-white/10'}`}>
+          <div><p className={`text-sm font-bold ${c.txt}`}>Aprovação · {base}</p><p className={`text-[10px] ${c.sub}`}>{filtrados.length} de {itens.length} itens</p></div>
+          <button onClick={onClose} className={`p-1.5 rounded-lg ${c.isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}><X size={16} className={c.sub} /></button>
+        </div>
+        {/* filtros */}
+        <div className={`flex items-center gap-2 flex-wrap px-4 py-3 border-b ${c.isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <label className={`text-[10px] ${c.sub}`}>De</label>
+          <input type="date" value={de} onChange={e => setDe(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`} />
+          <label className={`text-[10px] ${c.sub}`}>Até</label>
+          <input type="date" value={ate} onChange={e => setAte(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`} />
+          <select value={pessoa} onChange={e => setPessoa(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`}>
+            <option value="">Todas as pessoas</option>
+            {pessoas.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <div className="flex-1" />
+          <button disabled={aprovar.isPending || !filtrados.length} onClick={aprovarTodos}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 disabled:opacity-40"><Check size={12} /> Aprovar filtrados ({filtrados.length})</button>
+        </div>
+        {/* lista */}
+        <div className="overflow-y-auto">
+          <table className="w-full">
+            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden sm:table-cell`}>Tipo</th><th className={TH}>Data</th><th className={TH}>Detalhe</th><th className={TH}></th></tr></thead>
+            <tbody>{filtrados.map((it, i) => (
+              <tr key={i} className={`border-t ${c.row}`}>
+                <td className={`${TD} font-semibold ${c.txt}`}>{it.nome}</td>
+                <td className={`${TD} ${tipoCor[it.tipo]} hidden sm:table-cell`}>{tipoLabel[it.tipo]}</td>
+                <td className={`${TD} ${c.sub}`}>{new Date(it.quando).toLocaleDateString('pt-BR')}</td>
+                <td className={`${TD} ${c.txt}`}>{it.desc}</td>
+                <td className={`${TD} w-px`}><div className="flex gap-1.5 justify-end">
+                  <button disabled={aprovar.isPending} onClick={() => act(it.key, 'aprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"><Check size={12} /></button>
+                  <button disabled={aprovar.isPending} onClick={() => act(it.key, 'reprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500/25"><X size={12} /></button>
+                </div></td>
+              </tr>
+            ))}</tbody>
+          </table>
+          {!filtrados.length && <Vazio msg="Nenhum item no filtro." />}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 6) CONSOLIDAÇÃO — só itens APROVADOS (ponto fechado)
+// 6) CONSOLIDAÇÃO — só aprovados
 // ════════════════════════════════════════════════════════════════════════════
 export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
   const he = usePontoHorasExtras(anoMes)
   const ret = usePontoRetificacoes(anoMes)
   const at = usePontoAtestados(anoMes)
   const c = useThemeCls()
-
   const heAprov = (he.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const retAprov = (ret.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const atAprov = (at.data ?? []).filter(a => a.aprov_status === 'aprovado')
@@ -311,8 +378,8 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
   }, [he.data])
 
   if (he.isLoading || ret.isLoading || at.isLoading) return <Painel><Loading /></Painel>
-  const nada = !heAprov.length && !retAprov.length && !atAprov.length
-  if (nada) return <Painel><div className="text-center py-16"><Lock className="mx-auto mb-3 text-slate-400" size={26} /><p className={`text-sm ${c.sub}`}>Nada aprovado em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>A consolidação mostra só o que foi aprovado.</p></div></Painel>
+  if (!heAprov.length && !retAprov.length && !atAprov.length)
+    return <Painel><div className="text-center py-16"><Lock className="mx-auto mb-3 text-slate-400" size={26} /><p className={`text-sm ${c.sub}`}>Nada aprovado em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>A consolidação mostra só o que foi aprovado.</p></div></Painel>
 
   return (
     <div className="space-y-3">
