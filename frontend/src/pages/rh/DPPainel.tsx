@@ -1,19 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/rh/DPPainel.tsx — Painel do DP (padrão dos dashboards TEG+)
-// Estrutura pronta; dados serão preenchidos pela integração com o Seculum.
+// Alimentado pelo espelho do Ponto (Secullum). Indicadores em HORAS — valores em
+// R$ (folha/custo-hora) ainda não integrados, então NÃO são exibidos (nada fake).
 // ─────────────────────────────────────────────────────────────────────────────
+import { useMemo } from 'react'
 import {
-  Calculator, Receipt, Timer, Fingerprint, TrendingUp, ChevronRight,
-  Zap, Clock, AlertTriangle, PlugZap,
+  Timer, Fingerprint, TrendingUp, ChevronRight, Zap, Clock, AlertTriangle,
+  AlarmClock, Activity, Loader2,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
+import { usePontoResumoMes, usePontoHorasExtras } from '../../hooks/usePonto'
+import { intervalToMin, minToHoras, mesAtual, labelMes } from '../../lib/ponto'
 
-const fmtBRL = (v: number) => {
-  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (Math.abs(v) >= 10_000) return `R$ ${(v / 1_000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}k`
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
-}
+// horas compactas p/ destaque: "28.080h"
+const hAbbr = (min: number) => `${Math.round(min / 60).toLocaleString('pt-BR')}h`
 
 function SpotlightMetric({ label, value, tone, note, isDark }: {
   label: string; value: string | number; tone: string; note?: string; isDark: boolean
@@ -34,7 +36,7 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
 }
 
 function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
-  label: string; value: string | number; note?: string; icon: typeof Receipt; iconTone: string; isDark: boolean
+  label: string; value: string | number; note?: string; icon: LucideIcon; iconTone: string; isDark: boolean
 }) {
   return (
     <div className={`rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 flex-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
@@ -50,15 +52,37 @@ export default function DPPainel() {
   const { isDark } = useTheme()
   const nav = useNavigate()
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
+  const anoMes = mesAtual()
 
-  // Placeholders — serão preenchidos pela integração com o Seculum
-  const folhaMensal = 0
-  const horaExtra = 0
-  const volumePonto = 0
-  const pontosAberto = 0
-  const heAprovar = 0
-  const porCC: { centro_custo: string; valor: number }[] = []
-  const maxCC = Math.max(...porCC.map(c => c.valor), 1)
+  const { data: resumo = [], isLoading } = usePontoResumoMes(anoMes)
+  const { data: he = [] } = usePontoHorasExtras(anoMes)
+
+  const agg = useMemo(() => {
+    let hhMin = 0, exMin = 0, vol = 0, emAberto = 0, foraHorario = 0
+    const ccMap = new Map<string, { nome: string; min: number }>()
+    const comBatida = new Set<string>(), comApur = new Set<string>()
+    for (const r of resumo) {
+      hhMin += intervalToMin(r.hh_trabalhada)
+      exMin += intervalToMin(r.extras)
+      vol += r.dias_batidos || 0
+      emAberto += r.dias_em_aberto || 0
+      foraHorario += r.dias_fora_horario || 0
+      if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
+      if (r.colaborador_id && intervalToMin(r.hh_trabalhada) > 0) comApur.add(r.colaborador_id)
+      const k = r.cc_codigo || r.cc_nome || '—'
+      const cur = ccMap.get(k) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
+      cur.min += intervalToMin(r.hh_trabalhada)
+      ccMap.set(k, cur)
+    }
+    const porCC = [...ccMap.values()].filter(c => c.min > 0).sort((a, b) => b.min - a.min)
+    const listaAberto = resumo.filter(r => r.dias_em_aberto > 0)
+      .sort((a, b) => b.dias_em_aberto - a.dias_em_aberto).slice(0, 8)
+    return { hhMin, exMin, vol, emAberto, foraHorario, porCC, listaAberto, comBatida: comBatida.size, comApur: comApur.size }
+  }, [resumo])
+
+  const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
+  const listaHE = he.slice(0, 8)
+  const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
 
   return (
     <div className="space-y-3">
@@ -66,36 +90,39 @@ export default function DPPainel() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Folha, ponto e horas extras</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto do mês · {labelMes(anoMes)}</p>
         </div>
-        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-          <PlugZap size={12} /> Aguardando Seculum
+        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado
         </span>
       </div>
 
-      {/* Aviso de integração */}
-      <div className={`rounded-xl border border-dashed px-4 py-2.5 flex items-center gap-2 text-xs ${isDark ? 'border-white/[0.10] text-slate-400' : 'border-slate-300 text-slate-500'}`}>
-        <PlugZap size={14} className="text-amber-500 shrink-0" />
-        Estrutura pronta — os indicadores serão preenchidos automaticamente quando a integração com o <strong className="mx-1">Seculum</strong> for ativada.
+      {/* Nota de escopo (honesta): apuração parcial + R$ ainda não integrado */}
+      <div className={`rounded-xl border border-dashed px-4 py-2.5 flex items-start gap-2 text-xs ${isDark ? 'border-white/[0.10] text-slate-400' : 'border-slate-300 text-slate-500'}`}>
+        <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+        <span>
+          <strong>HH e Horas Extras são parciais</strong> — a apuração de horas do Secullum está em andamento ({agg.comApur}/{agg.comBatida} colaboradores).
+          Volume, em aberto e fora do horário vêm das batidas (completos). Valores em R$ (folha/custo-hora) entram quando a folha for integrada.
+        </span>
       </div>
 
-      {/* Hero: Indicadores + Janela Crítica */}
+      {/* Hero: Indicadores do mês + Janela Crítica */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Núcleo da Folha</p>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Núcleo do Ponto</p>
                 <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do mês</h2>
               </div>
-              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-                <Calculator size={18} className="text-amber-500" />
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
+                <Fingerprint size={18} className="text-violet-500" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric label="Folha do Mês" value={fmtBRL(folhaMensal)} tone="amber" isDark={isDark} note="total bruto" />
-              <SpotlightMetric label="Hora Extra" value={fmtBRL(horaExtra)} tone="blue" isDark={isDark} note="no mês" />
-              <SpotlightMetric label="Volume de Ponto" value={volumePonto} tone="violet" isDark={isDark} note="registros" />
+              <SpotlightMetric label="HH Trabalhada" value={hAbbr(agg.hhMin)} tone="violet" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
+              <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
+              <SpotlightMetric label="Volume de Ponto" value={agg.vol.toLocaleString('pt-BR')} tone="amber" isDark={isDark} note="dias-pessoa batidos · completo" />
             </div>
           </div>
         </section>
@@ -107,13 +134,15 @@ export default function DPPainel() {
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Janela Crítica</p>
                 <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>O que exige ação agora</h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${pontosAberto > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <Zap size={14} className={pontosAberto > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${agg.emAberto > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <Zap size={14} className={agg.emAberto > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard label="Pontos em Aberto" value={pontosAberto} icon={Clock}
-                iconTone={pontosAberto > 0 ? 'text-red-500' : 'text-slate-400'} note={pontosAberto > 0 ? 'regularizar' : 'tudo ok'} isDark={isDark} />
+            <div className="grid grid-cols-3 gap-2">
+              <MiniInfoCard label="Em Aberto" value={agg.emAberto} icon={Clock}
+                iconTone={agg.emAberto > 0 ? 'text-red-500' : 'text-slate-400'} note={agg.emAberto > 0 ? 'regularizar' : 'tudo ok'} isDark={isDark} />
+              <MiniInfoCard label="Fora do Horário" value={agg.foraHorario} icon={AlarmClock}
+                iconTone={agg.foraHorario > 0 ? 'text-rose-500' : 'text-slate-400'} note="dias-pessoa" isDark={isDark} />
               <MiniInfoCard label="HE a Aprovar" value={heAprovar} icon={AlertTriangle}
                 iconTone={heAprovar > 0 ? 'text-amber-500' : 'text-slate-400'} note="pendentes" isDark={isDark} />
             </div>
@@ -121,29 +150,29 @@ export default function DPPainel() {
         </section>
       </div>
 
-      {/* Pulso: custo da folha por centro de custo */}
+      {/* Pulso: horas de ponto por centro de custo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <TrendingUp size={14} className="text-amber-500" /> Custo da Folha por Centro de Custo
+            <TrendingUp size={14} className="text-violet-500" /> Horas de Ponto por Centro de Custo
           </h2>
         </div>
         <div className="px-4 py-3">
-          {porCC.length === 0 ? (
+          {agg.porCC.length === 0 ? (
             <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-              Aguardando dados da folha (Seculum)
+              Sem horas de ponto no mês
             </div>
           ) : (
             <div className="space-y-2.5">
-              {porCC.slice(0, 8).map(cc => (
-                <div key={cc.centro_custo} className="flex items-center gap-3">
-                  <p className={`text-[11px] font-semibold text-right shrink-0 w-[90px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.centro_custo}</p>
+              {agg.porCC.slice(0, 8).map(cc => (
+                <div key={cc.nome} className="flex items-center gap-3">
+                  <p className={`text-[11px] font-semibold text-right shrink-0 w-[110px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.nome}</p>
                   <div className="flex-1 relative">
                     <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-                      <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-600 transition-all duration-500" style={{ width: `${Math.max((cc.valor / maxCC) * 100, 4)}%` }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600 transition-all duration-500" style={{ width: `${Math.max((cc.min / maxCC) * 100, 4)}%` }} />
                     </div>
                   </div>
-                  <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{fmtBRL(cc.valor)}</p>
+                  <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{hAbbr(cc.min)}</p>
                 </div>
               ))}
             </div>
@@ -160,11 +189,26 @@ export default function DPPainel() {
             </h2>
             <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">Ir para Ponto <ChevronRight size={11} /></button>
           </div>
-          <div className="py-10 text-center">
-            <Clock size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
-            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem pontos em aberto</p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Dados virão do Seculum</p>
-          </div>
+          {agg.listaAberto.length === 0 ? (
+            <div className="py-10 text-center">
+              <Clock size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
+              <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem pontos em aberto</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-white/[0.05]">
+              {agg.listaAberto.map(r => (
+                <li key={r.colaborador_id ?? r.colaborador_nome} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.colaborador_nome ?? '—'}</p>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.base_nome ?? '—'}</p>
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                    {r.dias_em_aberto} {r.dias_em_aberto === 1 ? 'dia' : 'dias'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
@@ -174,11 +218,24 @@ export default function DPPainel() {
             </h2>
             <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">Ver todos <ChevronRight size={11} /></button>
           </div>
-          <div className="py-10 text-center">
-            <Timer size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
-            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum apontamento recente</p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Dados virão do Seculum</p>
-          </div>
+          {listaHE.length === 0 ? (
+            <div className="py-10 text-center">
+              <Timer size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
+              <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum apontamento recente</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-white/[0.05]">
+              {listaHE.map((h, i) => (
+                <li key={`${h.data}-${h.secullum_func_id}-${i}`} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{h.colaborador_nome ?? '—'}</p>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(h.data + 'T00:00:00').toLocaleDateString('pt-BR')} · {h.base_nome ?? '—'}</p>
+                  </div>
+                  <span className="shrink-0 text-[11px] font-extrabold text-orange-500">{minToHoras(intervalToMin(h.extras_total))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </div>
