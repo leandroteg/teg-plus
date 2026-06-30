@@ -141,6 +141,7 @@ export default function DPPainel() {
   const maxAbertoPct = Math.max(...agg.abertoPorBase.map(b => b.pct), 1)
   const maxExtraPct = Math.max(...agg.extraPorBase.map(b => b.pct), 1)
   const pctExtra = agg.hhPagavel > 0 ? Math.round((agg.exMin / agg.hhPagavel) * 100) : null
+  const pctAtivos = headcount > 0 ? Math.round((pico / headcount) * 100) : 0
 
   return (
     <div className="space-y-3">
@@ -176,7 +177,7 @@ export default function DPPainel() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric label="Colaboradores Ativos" value={headcount ? `${pico}/${headcount}` : pico} tone="amber" isDark={isDark} note="pico 7 dias · vs headcount" />
+              <SpotlightMetric label="Colaboradores Ativos" value={headcount ? `${pctAtivos}%` : pico} tone="amber" isDark={isDark} note={`${pico}/${headcount} ativos · pico 7d`} />
               <SpotlightMetric label="HH Trabalhada" value={hAbbr(agg.hhMin)} tone="violet" isDark={isDark} note={`parcial · ${agg.comApur}/${agg.comBatida} apurados`} />
               <SpotlightMetric label="Horas Extras" value={hAbbr(agg.exMin)} tone="blue" isDark={isDark}
                 aside={pctExtra != null ? `${pctExtra}%` : undefined}
