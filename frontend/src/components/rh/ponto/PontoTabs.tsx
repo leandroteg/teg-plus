@@ -5,7 +5,7 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoAfastamentos, usePontoPendencias,
-  usePontoAprovacoes, useEnviarAprovacao, useDecidirAprovacao,
+  usePontoAprovacoes, useEnviarAprovacao, useDecidirAprovacao, usePontoRetificacoes,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps } from '../../../types/ponto'
@@ -127,24 +127,26 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 // ════════════════════════════════════════════════════════════════════════════
 // 2) RETIFICAÇÕES — dias com ajuste/falta (correção é feita no Secullum)
 // ════════════════════════════════════════════════════════════════════════════
+const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
+
 export function RetificacoesTab({ anoMes, baseId }: PontoTabProps) {
-  const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
+  const { data = [], isLoading } = usePontoRetificacoes(anoMes)
   const c = useThemeCls()
-  const comPendencia = data.filter(r => intervalToMin(r.faltas) > 0 || intervalToMin(r.atrasos) > 0)
+  const lista = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Correções de marcação são feitas no Secullum; aqui ficam os pontos que precisam de atenção no mês.</div>
+      <div className="flex items-center gap-2 text-xs text-amber-500"><AlertTriangle size={14} /> Marcações com justificativa (inclusões/correções) no Secullum. Exclui o ruído de migração de aplicativo.</div>
       <Painel>
-        {!comPendencia.length ? <Vazio msg="Nenhum colaborador com faltas/atrasos no mês." /> : (
+        {!lista.length ? <Vazio msg="Nenhuma retificação no mês." /> : (
           <table className="w-full">
-            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Faltas</th><th className={TH}>Atrasos</th></tr></thead>
-            <tbody>{comPendencia.map(r => (
-              <tr key={r.colaborador_id} className={`border-t ${c.row}`}>
-                <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome}</td>
-                <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
-                <td className={`${TD} font-semibold text-rose-500`}>{fmtHoras(r.faltas)}</td>
-                <td className={`${TD} ${c.sub}`}>{fmtHoras(r.atrasos)}</td>
+            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data/Hora</th><th className={TH}>Motivo</th></tr></thead>
+            <tbody>{lista.map((r, i) => (
+              <tr key={i} className={`border-t ${c.row}`}>
+                <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
+                <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.colaborador?.base?.nome ?? '—'}</td>
+                <td className={`${TD} ${c.sub}`}>{new Date(r.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                <td className={`${TD} ${c.txt}`}>{r.motivo}</td>
               </tr>
             ))}</tbody>
           </table>
