@@ -129,6 +129,49 @@ export function useEstoqueItem(id: string | undefined) {
   })
 }
 
+// Ficha pública do item (QR /e/:codigo): item + saldo por base + últimas movimentações.
+export interface FichaItemEstoque {
+  item: EstItem
+  saldos: EstSaldo[]
+  movimentacoes: EstMovimentacao[]
+}
+export function useFichaItemEstoque(codigo: string | undefined) {
+  return useQuery<FichaItemEstoque | null>({
+    queryKey: ['est-ficha-item', codigo],
+    enabled: !!codigo,
+    queryFn: async () => {
+      const { data: itemData } = await supabase
+        .from('est_itens')
+        .select('*')
+        .ilike('codigo', codigo!)   // match exato case-insensitive (sem wildcards)
+        .limit(1)
+        .maybeSingle()
+      if (!itemData) return null
+      const item = itemData as EstItem
+
+      const [{ data: saldosData }, { data: movsData }] = await Promise.all([
+        supabase
+          .from('est_saldos')
+          .select('*, base:est_bases(codigo, nome)')
+          .eq('item_id', item.id)
+          .order('saldo', { ascending: false }),
+        supabase
+          .from('est_movimentacoes')
+          .select('*, base:est_bases!est_movimentacoes_base_id_fkey(codigo, nome)')
+          .eq('item_id', item.id)
+          .order('criado_em', { ascending: false })
+          .limit(15),
+      ])
+
+      return {
+        item,
+        saldos: (saldosData ?? []) as EstSaldo[],
+        movimentacoes: (movsData ?? []) as EstMovimentacao[],
+      }
+    },
+  })
+}
+
 export function useSalvarItem() {
   const qc = useQueryClient()
   return useMutation({

@@ -221,6 +221,7 @@ const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Moviment
 const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
 const ScannerQR = lazy(() => import('./pages/patrimonial/ScannerQR'))
 const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
+const FichaItemEstoque = lazy(() => import('./pages/estoque/FichaItemEstoque'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
@@ -291,6 +292,7 @@ export default function App() {
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
+          <Route path="/e/:codigo" element={<Lazy><FichaItemEstoque /></Lazy>} />
 
           {/* TI / Help Desk — aberto a qualquer autenticado */}
           <Route path="/ti"              element={<Lazy><TIHome /></Lazy>} />

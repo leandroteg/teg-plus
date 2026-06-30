@@ -2,8 +2,10 @@ import { useState, useMemo, lazy, Suspense } from 'react'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
-  CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
+  CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight, QrCode,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { gerarEtiquetasItensLotePDF } from '../../utils/etiqueta-item-pdf'
 
 const Movimentacoes = lazy(() => import('./Movimentacoes'))
 import {
@@ -78,6 +80,8 @@ function fmtCurrency(v: number) {
 export default function Itens() {
   const { isDark } = useTheme()
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
+  const [gerandoEtiquetas, setGerandoEtiquetas] = useState(false)
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
@@ -101,6 +105,28 @@ export default function Itens() {
     if (!confirm(`Cancelar ${ids.length} entrada(s)? Esta ação não pode ser desfeita.`)) return
     cancelarEntrada.mutate(ids)
   }
+
+  // Etiquetas QR em lote dos itens atualmente filtrados (deduplicados por código).
+  const handleEtiquetasLote = async () => {
+    const seen = new Set<string>()
+    const itens = saldosFiltrados
+      .map(s => s.item)
+      .filter((it): it is NonNullable<typeof it> => !!it?.codigo)
+      .filter(it => { const k = it.codigo.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true })
+      .map(it => ({ codigo: it.codigo, descricao: it.descricao, unidade: it.unidade }))
+    if (itens.length === 0) return
+    if (itens.length > 60 && !confirm(`Gerar PDF com ${itens.length} etiquetas QR?`)) return
+    setGerandoEtiquetas(true)
+    try {
+      const blob = await gerarEtiquetasItensLotePDF(itens)
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch {
+      alert('Falha ao gerar as etiquetas.')
+    } finally {
+      setGerandoEtiquetas(false)
+    }
+  }
+  const abrirFichaItem = (codigo: string) => navigate(`/e/${encodeURIComponent(codigo)}`)
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
@@ -348,6 +374,15 @@ export default function Itens() {
             <Download size={14} />
           </button>
 
+          {activeTab === 'em_estoque' && (
+            <button onClick={handleEtiquetasLote} disabled={gerandoEtiquetas || saldosFiltrados.length === 0}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-40`}
+              title="Gerar etiquetas QR (PDF) dos itens filtrados">
+              {gerandoEtiquetas ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+              Etiquetas QR
+            </button>
+          )}
+
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             <span>{counts[activeTab]} item(ns)</span>
             {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length > 0 && (
@@ -367,8 +402,8 @@ export default function Itens() {
           <>
             {activeTab === 'em_estoque' && (
               viewMode === 'list'
-                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} />
-                : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} />
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} onQR={abrirFichaItem} />
+                : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} onQR={abrirFichaItem} />
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
@@ -417,7 +452,7 @@ export default function Itens() {
 // Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void }) {
+function SaldosList({ data, isDark, onEdit, onClickItem, onQR }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void; onQR: (codigo: string) => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <>
@@ -430,7 +465,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
         <span className="w-[80px] shrink-0 text-right">Saldo</span>
         <span className="w-[60px] shrink-0 text-right">Reserv.</span>
         <span className="w-[80px] shrink-0 text-right">Disp.</span>
-        <span className="w-[40px] shrink-0" />
+        <span className="w-[76px] shrink-0" />
       </div>
       {/* Rows */}
       {data.map(s => {
@@ -470,7 +505,16 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
             }`}>
               {disponivel} {s.item?.unidade}
             </span>
-            <span className="w-[40px] shrink-0 text-right">
+            <span className="w-[76px] shrink-0 flex items-center justify-end gap-2">
+              {s.item?.codigo && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onQR(s.item!.codigo) }}
+                  className={`${isDark ? 'text-slate-400 hover:text-indigo-300' : 'text-slate-400 hover:text-indigo-600'}`}
+                  title="Ver ficha / etiqueta QR"
+                >
+                  <QrCode size={13} />
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
                 className="text-[10px] text-blue-600 font-semibold hover:underline"
@@ -485,7 +529,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
   )
 }
 
-function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: boolean; onClickItem: (itemId: string) => void }) {
+function SaldosCards({ data, isDark, onClickItem, onQR }: { data: EstSaldo[]; isDark: boolean; onClickItem: (itemId: string) => void; onQR: (codigo: string) => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
@@ -506,12 +550,23 @@ function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: 
                   {s.item?.descricao}
                 </p>
               </div>
-              {s.item?.curva_abc && (
-                <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-                  ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
-                  Curva {s.item.curva_abc}
-                </span>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {s.item?.codigo && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onQR(s.item!.codigo) }}
+                    className={`${isDark ? 'text-slate-500 hover:text-indigo-300' : 'text-slate-400 hover:text-indigo-600'}`}
+                    title="Ver ficha / etiqueta QR"
+                  >
+                    <QrCode size={14} />
+                  </button>
+                )}
+                {s.item?.curva_abc && (
+                  <span className={`rounded-full text-[10px] font-bold px-2 py-0.5
+                    ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
+                    Curva {s.item.curva_abc}
+                  </span>
+                )}
+              </div>
             </div>
             <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
             <div className="flex items-center justify-between text-xs">
