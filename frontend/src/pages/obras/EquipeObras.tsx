@@ -51,7 +51,7 @@ type TabKey = 'lista' | 'programacao' | 'kanban'
 
 const STEPS: FlowStep[] = [
   {
-    key: 'lista', label: 'Lista',
+    key: 'lista', label: 'Equipes',
     description: 'Monte os times: lideranças por obra, cada encarregado com sua tropa, e o apoio.',
     icon: List,
     accent: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
