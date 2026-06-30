@@ -1,5 +1,7 @@
 // types/ponto.ts — módulo Ponto (DP)
 
+export type AprovStatus = 'pendente' | 'aprovado' | 'reprovado'
+
 export interface PontoResumoMes {
   ano_mes: string
   colaborador_id: string | null
@@ -43,6 +45,24 @@ export interface PontoDia {
   t_mais_menos: string | null; banco_saldo: string | null; hh_trabalhada: string | null
   base_id: string | null; centro_custo_id: string | null; projeto_id: string | null
   departamento: string | null; cargo: string | null
+  aprov_status: AprovStatus
+}
+
+// item de hora extra (1 dia/colaborador com extra > 0) — vem da view
+export interface HoraExtraItem {
+  data: string
+  secullum_func_id: number
+  colaborador_id: string | null
+  colaborador_nome: string | null
+  cargo: string | null
+  base_id: string | null
+  base_nome: string | null
+  cc_codigo: string | null
+  ex50: string | null; ex70: string | null; ex100: string | null
+  extras_total: string | null
+  aprov_status: AprovStatus
+  aprov_por: string | null
+  aprov_em: string | null
 }
 
 export interface PontoAfastamento {
@@ -52,54 +72,35 @@ export interface PontoAfastamento {
   fim: string | null
   motivo: string | null
   justificativa: string | null
-  colaborador?: { nome: string | null } | null
-}
-
-export interface PontoPendencia {
-  id: string
-  colaborador_id: string | null
-  data_hora: string
-  endereco: string | null
-  latitude: number | null
-  longitude: number | null
-  precisao: number | null
-  status: number | null
-  colaborador?: { nome: string | null } | null
-}
-
-export interface PontoRetificacao {
-  data_hora: string
-  origem: string | null
-  motivo: string | null
-  nsr: number | null
+  aprov_status: AprovStatus
+  aprov_por: string | null
+  aprov_em: string | null
   colaborador?: { nome: string | null; base_id: string | null; base?: { nome: string | null } | null } | null
 }
 
-export interface PontoAprovacao {
-  id: string
-  ano_mes: string
-  base_id: string | null
-  status: 'pendente' | 'enviado' | 'aprovado' | 'reprovado'
-  enviado_em: string | null
-  enviado_por_nome: string | null
-  aprovado_em: string | null
-  aprovador_nome: string | null
-  observacao: string | null
-}
-
-// agregado por base (área) p/ a aba Aprovação
-export interface PontoAreaResumo {
-  base_id: string | null
-  base_nome: string
-  pessoas: number
-  hh_trabalhada_min: number
-  extras_min: number
-  faltas_min: number
-  aprovacao?: PontoAprovacao
+export interface PontoRetificacao {
+  nsr: number | null
+  data_hora: string
+  origem: string | null
+  motivo: string | null
+  aprov_status: AprovStatus
+  aprov_por: string | null
+  aprov_em: string | null
+  colaborador?: { nome: string | null; base_id: string | null; base?: { nome: string | null } | null } | null
 }
 
 export interface PontoTabProps {
   anoMes: string
   baseId: string
   bases: { id: string; nome: string; codigo: string }[]
+}
+
+// item genérico p/ a fila de aprovação
+export type AprovTipo = 'retificacao' | 'hora_extra' | 'atestado'
+export interface AprovKey {
+  tipo: AprovTipo
+  nsr?: number | null
+  data?: string
+  secullum_func_id?: number
+  id?: string
 }
