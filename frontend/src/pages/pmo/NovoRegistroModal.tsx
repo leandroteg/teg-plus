@@ -19,13 +19,19 @@ const META: Record<NovoTipo, { label: string; icon: any; cor: string }> = {
 }
 const slug = (s: string) => (s || 'doc').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
 const N8N_PARSE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/egp-parse-cadastro'
-// dispara o parse+cadastro pelo SuperTEG (via n8n) — assíncrono, fire-and-forget
-async function dispararParse(bucket: string, path: string, tipo: 'osc' | 'medicao', contexto: any) {
+// Dispara o parse+cadastro pelo SuperTEG (via n8n). O front manda só bucket+path+contexto;
+// o n8n assina a URL no servidor (service role) e aciona o SuperTEG. O webhook responde
+// rápido (202) — o cadastro do SuperTEG roda assíncrono. Retorna false se o disparo falhar
+// (não engole o erro silenciosamente como antes).
+async function dispararParse(bucket: string, path: string, tipo: 'osc' | 'medicao', contexto: any): Promise<boolean> {
   try {
-    const { data: signed } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
-    if (!signed?.signedUrl) return
-    await fetch(N8N_PARSE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, doc_url: signed.signedUrl, contexto, run_id: crypto.randomUUID() }) })
-  } catch { /* não bloqueia o cadastro da casca */ }
+    const resp = await fetch(N8N_PARSE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo, bucket, path, contexto, run_id: crypto.randomUUID() }),
+    })
+    if (!resp.ok) { console.error('dispararParse n8n', resp.status, await resp.text().catch(() => '')); return false }
+    return true
+  } catch (e) { console.error('dispararParse erro de rede', e); return false }
 }
 
 export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; onClose: () => void }) {
@@ -77,24 +83,39 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
         const { error } = await supabase.from('pmo_projetos').insert(ins); if (error) throw error
         setOk('Projeto cadastrado.'); qc.invalidateQueries({ queryKey: ['nr-projetos'] }); qc.invalidateQueries({ queryKey: ['pmo-projetos'] })
       } else if (tipo === 'osc') {
+        let falhas = 0
         for (const f of oscFiles) {
           const proj = projetos.find(p => p.id === f.projeto_id)
           const path = `${f.projeto_id}/${slug(f.numero_os)}_${slug(f.file.name)}`
-          await supabase.storage.from('egp-osc-abertura').upload(path, f.file, { upsert: true })
-          const { error } = await supabase.from('pmo_fluxo_os').insert({ portfolio_id: proj?.portfolio_id ?? null, projeto_id: f.projeto_id, numero_os: f.numero_os.trim(), tipo: f.tipo, abertura_path: path, etapa_atual: 'recebida', data_osc: new Date().toISOString().slice(0, 10) })
+          const { error: upErr } = await supabase.storage.from('egp-osc-abertura').upload(path, f.file, { upsert: true })
+          if (upErr) throw upErr   // sem o anexo no storage o SuperTEG não tem o que ler
+          const { data: casca, error } = await supabase.from('pmo_fluxo_os')
+            .insert({ portfolio_id: proj?.portfolio_id ?? null, projeto_id: f.projeto_id, numero_os: f.numero_os.trim(), tipo: f.tipo, abertura_path: path, etapa_atual: 'recebida', data_osc: new Date().toISOString().slice(0, 10) })
+            .select('id').single()
           if (error) throw error
-          await dispararParse('egp-osc-abertura', path, 'osc', { numero_os: f.numero_os.trim(), projeto_id: f.projeto_id, portfolio_id: proj?.portfolio_id ?? null, tipo: f.tipo })
+          const okFire = await dispararParse('egp-osc-abertura', path, 'osc', { casca_id: casca.id, numero_os: f.numero_os.trim(), projeto_id: f.projeto_id, projeto_nome: proj?.nome ?? null, portfolio_id: proj?.portfolio_id ?? null, tipo: f.tipo, arquivo_nome: f.file.name })
+          if (!okFire) falhas++
         }
-        setOk(`${oscFiles.length} OSC(s) cadastrada(s) — SuperTEG está lendo os documentos…`); qc.invalidateQueries({ queryKey: ['nr-oscs'] }); qc.invalidateQueries({ queryKey: ['eap-final'] })
+        qc.invalidateQueries({ queryKey: ['nr-oscs'] }); qc.invalidateQueries({ queryKey: ['eap-final'] })
+        setOk(falhas
+          ? `OSC(s) cadastradas, mas ${falhas} disparo(s) ao SuperTEG falharam — veja o console (F12).`
+          : `${oscFiles.length} OSC(s) cadastrada(s) — SuperTEG está lendo os documentos e vai identificar a obra…`)
       } else if (tipo === 'medicao') {
+        let falhas = 0
         for (const f of medFiles) {
           const path = `${slug(f.numero_os)}/${f.competencia}/${slug(f.file.name)}`
-          await supabase.storage.from('egp-medicoes').upload(path, f.file, { upsert: true })
-          const { error } = await supabase.from('pmo_medicoes').insert({ numero_os: f.numero_os.trim(), competencia: f.competencia + '-01', arquivo_nome: f.file.name, storage_path: path, tamanho: f.file.size })
+          const { error: upErr } = await supabase.storage.from('egp-medicoes').upload(path, f.file, { upsert: true })
+          if (upErr) throw upErr
+          const { data: casca, error } = await supabase.from('pmo_medicoes')
+            .insert({ numero_os: f.numero_os.trim(), competencia: f.competencia + '-01', arquivo_nome: f.file.name, storage_path: path, tamanho: f.file.size })
+            .select('id').single()
           if (error) throw error
-          await dispararParse('egp-medicoes', path, 'medicao', { numero_os: f.numero_os.trim(), competencia: f.competencia + '-01' })
+          const okFire = await dispararParse('egp-medicoes', path, 'medicao', { casca_id: casca.id, numero_os: f.numero_os.trim(), competencia: f.competencia + '-01' })
+          if (!okFire) falhas++
         }
-        setOk(`${medFiles.length} medição(ões) cadastrada(s) — SuperTEG está lendo os documentos…`)
+        setOk(falhas
+          ? `Medição(ões) cadastradas, mas ${falhas} disparo(s) falharam — veja o console (F12).`
+          : `${medFiles.length} medição(ões) cadastrada(s) — SuperTEG está lendo os documentos…`)
       }
       setTimeout(onClose, 900)
     } catch (e: any) { setErro(e?.message || String(e)) }
