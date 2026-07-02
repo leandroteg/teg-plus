@@ -159,9 +159,12 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
         const prontos = await aguardarMedicao(cascaIds)
         setProc(null)
         qc.invalidateQueries({ queryKey: ['egp-medicao-mensal'] }); qc.invalidateQueries({ queryKey: ['egp-medicao-secao'] }); qc.invalidateQueries({ queryKey: ['egp-eap-final'] })
+        // mostra a(s) OSC detectada(s) no doc, p/ conferir se caiu na OSC certa
+        const { data: det } = await supabase.from('pmo_medicoes').select('numero_os').in('id', cascaIds)
+        const oscsDet = [...new Set((det ?? []).map(d => (d as { numero_os: string | null }).numero_os).filter(Boolean))]
         const restantes = cascaIds.length - prontos
         setOk([
-          `${prontos}/${medFiles.length} medição(ões) cadastrada(s).`,
+          `${prontos}/${medFiles.length} medição(ões) cadastrada(s)${oscsDet.length ? ` — OSC ${oscsDet.join(', ')}` : ''}.`,
           restantes ? `${restantes} ainda processando — aparecem em instantes.` : '',
           falhas ? `${falhas} disparo(s) falharam (F12).` : '',
         ].filter(Boolean).join(' '))
