@@ -45,6 +45,17 @@ const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof Clipbo
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
 
+// Admin override: status em que um administrador pode cancelar a RC direto pela
+// modal (ex.: rascunho parado, RC duplicada). Exclui etapas pós-pedido para não
+// orfanar pedidos/financeiro, e 'cotacao_aprovada' (que já tem Cancelar próprio).
+const ADMIN_CANCELAVEL_STATUSES = [
+  'rascunho', 'aguardando_catalogo', 'devolvida_solicitante',
+  'em_triagem_cd', 'atendida_cd',
+  'pendente', 'em_aprovacao', 'em_esclarecimento',
+  'aprovada', 'em_cotacao', 'cotacao_enviada',
+  'cotacao_em_esclarecimento', 'cotacao_rejeitada', 'rejeitada',
+]
+
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
   pendente:     { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',    textActive: 'text-amber-800',    dot: 'bg-amber-400',    border: 'border-amber-400' },
   em_triagem:   { bg: 'hover:bg-sky-50',      bgActive: 'bg-sky-50',       text: 'text-sky-600',      textActive: 'text-sky-800',      dot: 'bg-sky-500',      border: 'border-sky-500' },
@@ -667,6 +678,25 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
                   {isEmitting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Emitir Pedido
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Admin: cancelar RC em qualquer etapa (RC duplicada/parada) */}
+          {isAdmin && ADMIN_CANCELAVEL_STATUSES.includes(r.status) && (
+            <div className={`pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+              <button
+                disabled={isCancelling}
+                onClick={onCancelar}
+                className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] disabled:opacity-50 ${
+                  isDark ? 'text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20'
+                    : 'text-red-500 bg-red-50 border-red-200 hover:bg-red-100'
+                }`}>
+                {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
+                Cancelar RC (Admin)
+              </button>
+              <p className={`mt-1.5 text-center text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Ação de administrador — encerra a requisição (ex.: duplicada ou parada).
+              </p>
             </div>
           )}
 
