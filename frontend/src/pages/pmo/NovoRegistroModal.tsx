@@ -62,7 +62,7 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
   const aguardarMedicao = async (ids: string[]): Promise<number> => {
     if (!ids.length) return 0
     const pend = new Set(ids)
-    for (let i = 0; i < 48 && pend.size; i++) {
+    for (let i = 0; i < 72 && pend.size; i++) {   // ~6min: extração de medição é mais lenta (~5min)
       setProc(`Lendo a medição e cadastrando… ${ids.length - pend.size}/${ids.length}`)
       await new Promise(r => setTimeout(r, 5000))
       const { data } = await supabase.from('pmo_medicoes').select('id, numero_os').in('id', [...pend])
