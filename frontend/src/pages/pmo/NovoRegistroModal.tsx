@@ -58,6 +58,21 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
     return ids.length - pend.size
   }
 
+  // Medição: espera o SuperTEG ler o doc e gravar (a casca pmo_medicoes recebe o numero_os lido).
+  const aguardarMedicao = async (ids: string[]): Promise<number> => {
+    if (!ids.length) return 0
+    const pend = new Set(ids)
+    for (let i = 0; i < 48 && pend.size; i++) {
+      setProc(`Lendo a medição e cadastrando… ${ids.length - pend.size}/${ids.length}`)
+      await new Promise(r => setTimeout(r, 5000))
+      const { data } = await supabase.from('pmo_medicoes').select('id, numero_os').in('id', [...pend])
+      for (const row of (data ?? []) as { id: string; numero_os: string | null }[]) {
+        if (row.numero_os && row.numero_os.trim()) pend.delete(row.id)
+      }
+    }
+    return ids.length - pend.size
+  }
+
   // lookups
   const { data: contratos = [] } = useQuery({ queryKey: ['nr-contratos'], queryFn: async () => { const { data } = await supabase.from('pmo_portfolio').select('id, nome_obra, numero_osc').order('nome_obra'); return (data ?? []) as any[] } })
   const { data: centros = [] } = useQuery({ queryKey: ['nr-centros'], queryFn: async () => { const { data } = await supabase.from('sys_centros_custo').select('id, codigo, descricao').order('codigo'); return (data ?? []) as any[] } })
@@ -70,20 +85,20 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
   const [projeto, setProjeto] = useState<any>({ nome: '', codigo: '', descricao: '', portfolio_id: '', centro_custo_id: '', qtd_torres: '' })
   // OSC/Medição: lista de arquivos com metadados por linha
   const [oscFiles, setOscFiles] = useState<{ file: File; projeto_id: string; numero_os: string; tipo: string }[]>([])
-  const [medFiles, setMedFiles] = useState<{ file: File; numero_os: string; competencia: string }[]>([])
+  const [medFiles, setMedFiles] = useState<{ file: File; competencia: string; subcontratada: boolean }[]>([])
 
   const inp = `w-full text-sm rounded-lg border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`
   const lbl = `text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`
   const meta = META[tipo]; const Icon = meta.icon
 
   const addOscFiles = (files: FileList | null) => { if (!files) return; setOscFiles(s => [...s, ...Array.from(files).map(file => ({ file, projeto_id: '', numero_os: file.name.replace(/\.[^.]+$/, ''), tipo: 'construcao' }))]) }
-  const addMedFiles = (files: FileList | null) => { if (!files) return; setMedFiles(s => [...s, ...Array.from(files).map(file => ({ file, numero_os: '', competencia: '' }))]) }
+  const addMedFiles = (files: FileList | null) => { if (!files) return; setMedFiles(s => [...s, ...Array.from(files).map(file => ({ file, competencia: '', subcontratada: false }))]) }
 
   const podeSalvar = () => {
     if (tipo === 'contrato') return !!contrato.nome_obra.trim()
     if (tipo === 'projeto') return !!projeto.nome.trim() && !!projeto.portfolio_id
     if (tipo === 'osc') return oscFiles.length > 0 && oscFiles.every(f => f.projeto_id && f.numero_os.trim())
-    if (tipo === 'medicao') return medFiles.length > 0 && medFiles.every(f => f.numero_os.trim() && f.competencia)
+    if (tipo === 'medicao') return medFiles.length > 0 && medFiles.every(f => f.competencia)
     return false
   }
 
@@ -128,20 +143,28 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
         ].filter(Boolean).join(' '))
       } else if (tipo === 'medicao') {
         let falhas = 0
+        const cascaIds: string[] = []
         for (const f of medFiles) {
-          const path = `${slug(f.numero_os)}/${f.competencia}/${slug(f.file.name)}`
+          const path = `${f.competencia}/${crypto.randomUUID().slice(0, 8)}_${slug(f.file.name)}`
           const { error: upErr } = await supabase.storage.from('egp-medicoes').upload(path, f.file, { upsert: true })
           if (upErr) throw upErr
           const { data: casca, error } = await supabase.from('pmo_medicoes')
-            .insert({ numero_os: f.numero_os.trim(), competencia: f.competencia + '-01', arquivo_nome: f.file.name, storage_path: path, tamanho: f.file.size })
+            .insert({ numero_os: '', competencia: f.competencia + '-01', arquivo_nome: f.file.name, storage_path: path, tamanho: f.file.size })
             .select('id').single()
           if (error) throw error
-          const okFire = await dispararParse('egp-medicoes', path, 'medicao', { casca_id: casca.id, numero_os: f.numero_os.trim(), competencia: f.competencia + '-01' })
-          if (!okFire) falhas++
+          const okFire = await dispararParse('egp-medicoes', path, 'medicao', { casca_id: casca.id, competencia: f.competencia + '-01', subcontratada: f.subcontratada })
+          if (okFire) cascaIds.push(casca.id); else falhas++
         }
-        setOk(falhas
-          ? `Medição(ões) cadastradas, mas ${falhas} disparo(s) falharam — veja o console (F12).`
-          : `${medFiles.length} medição(ões) cadastrada(s) — SuperTEG está lendo os documentos…`)
+        setProc(`Lendo a medição e cadastrando… 0/${cascaIds.length}`)
+        const prontos = await aguardarMedicao(cascaIds)
+        setProc(null)
+        qc.invalidateQueries({ queryKey: ['egp-medicao-mensal'] }); qc.invalidateQueries({ queryKey: ['egp-medicao-secao'] }); qc.invalidateQueries({ queryKey: ['egp-eap-final'] })
+        const restantes = cascaIds.length - prontos
+        setOk([
+          `${prontos}/${medFiles.length} medição(ões) cadastrada(s).`,
+          restantes ? `${restantes} ainda processando — aparecem em instantes.` : '',
+          falhas ? `${falhas} disparo(s) falharam (F12).` : '',
+        ].filter(Boolean).join(' '))
       }
       setTimeout(onClose, 900)
     } catch (e: any) { setErro(e?.message || String(e)) }
@@ -200,19 +223,24 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
 
           {tipo === 'medicao' && (<>
             <FileBox label="Anexar documento(s) de medição" multiple onPick={addMedFiles} isDark={isDark} />
-            <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Indique a <b>OSC</b> e a <b>competência</b> de cada documento.</p>
+            <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Informe o <b>mês de faturamento</b> de cada documento. O <b>nº da OSC</b> é lido do próprio arquivo pelo SuperTEG.</p>
             <div className="space-y-2">
               {medFiles.map((f, i) => (
                 <div key={i} className={`rounded-xl border p-2.5 ${isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-center gap-2 mb-2"><span className="text-[11px] font-semibold truncate flex-1" title={f.file.name}>{f.file.name}</span><button onClick={() => setMedFiles(s => s.filter((_, j) => j !== i))} className="text-slate-400 hover:text-rose-500"><Trash2 size={13} /></button></div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input value={f.numero_os} onChange={e => setMedFiles(s => s.map((x, j) => j === i ? { ...x, numero_os: e.target.value } : x))} placeholder="Nº OSC *" list="nr-osc-list" className={inp} />
-                    <input type="month" value={f.competencia} onChange={e => setMedFiles(s => s.map((x, j) => j === i ? { ...x, competencia: e.target.value } : x))} className={inp} />
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className={lbl}>Mês faturamento *</p>
+                      <input type="month" value={f.competencia} onChange={e => setMedFiles(s => s.map((x, j) => j === i ? { ...x, competencia: e.target.value } : x))} className={inp} />
+                    </div>
+                    <label className={`flex items-center gap-1.5 text-[11px] font-medium cursor-pointer whitespace-nowrap pt-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <input type="checkbox" checked={f.subcontratada} onChange={e => setMedFiles(s => s.map((x, j) => j === i ? { ...x, subcontratada: e.target.checked } : x))} className="accent-sky-600" />
+                      Subcontratada
+                    </label>
                   </div>
                 </div>
               ))}
             </div>
-            <datalist id="nr-osc-list">{[...new Set(oscs.map(o => o.numero_os))].map(n => <option key={n} value={n} />)}</datalist>
           </>)}
 
           {proc && <p className="text-[12px] text-indigo-500 flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> {proc}</p>}
