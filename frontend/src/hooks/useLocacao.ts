@@ -687,15 +687,26 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
+const MAX_DOC_BYTES = 10 * 1024 * 1024   // anexo individual > 10MB não passa
+const MAX_TOTAL_B64 = 14 * 1024 * 1024   // limite do payload do n8n (~16MB)
+
 export async function parseFaturasAnexos(
   files: File[],
   contexto: { competencia?: string; imovel?: string },
 ): Promise<FaturaParseada[]> {
-  const documentos = await Promise.all(files.map(async f => ({
-    nome: f.name,
-    mime_type: f.type || 'application/pdf',
-    base64: await fileToBase64(f),
-  })))
+  let totalB64 = 0
+  const documentos: { nome: string; mime_type: string; base64: string }[] = []
+  for (const f of files) {
+    if (f.size > MAX_DOC_BYTES) {
+      throw new Error(`"${f.name}" tem mais de 10MB — reduza o arquivo (foto menor ou PDF compactado)`)
+    }
+    const base64 = await fileToBase64(f)
+    totalB64 += base64.length
+    if (totalB64 > MAX_TOTAL_B64) {
+      throw new Error('Os anexos juntos passam de ~14MB — envie em lotes menores')
+    }
+    documentos.push({ nome: f.name, mime_type: f.type || 'application/pdf', base64 })
+  }
   const resp = await fetch(`${N8N_URL}/locacao/faturas/parse-ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
