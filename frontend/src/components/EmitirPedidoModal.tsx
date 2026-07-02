@@ -109,7 +109,7 @@ export default function EmitirPedidoModal({
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
   const { data: cartoes = [] } = useCartoesCredito()
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: requisicaoId,
     enabled: open && Boolean(requisicaoId),
@@ -481,6 +481,14 @@ export default function EmitirPedidoModal({
               <div>
                 <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
                 <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+                {canOverride && (
+                  <button
+                    type="button"
+                    onClick={assumeControl}
+                    className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                    Assumir edição (Admin)
+                  </button>
+                )}
               </div>
             </div>
           )}

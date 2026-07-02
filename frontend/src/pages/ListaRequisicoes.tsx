@@ -278,7 +278,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe, isLocked, blockedByName, canOverrideLock, onAssumeControl }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
@@ -289,6 +289,8 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
   onDevolver: (motivo: string) => void; isDevolvendoEdicao: boolean
   onAbrirDetalhe: () => void
+  isLocked?: boolean; blockedByName?: string | null
+  canOverrideLock?: boolean; onAssumeControl?: () => void
 }) {
   const { perfil, isAdmin } = useAuth()
   const [observacao, setObservacao] = useState('')
@@ -332,6 +334,29 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Bloqueio de edição (presença) — com override de Admin */}
+          {isLocked && (
+            <div className={`rounded-xl p-3.5 flex items-start gap-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <AlertTriangle size={16} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+              <div>
+                <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                  {blockedByName ?? 'Outro usuário'} está editando
+                </p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                  A RC fica bloqueada para evitar conflito até a finalização da edição.
+                </p>
+                {canOverrideLock && (
+                  <button
+                    type="button"
+                    onClick={onAssumeControl}
+                    className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                    Assumir edição (Admin)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Resumo */}
           <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</p>
 
@@ -736,7 +761,7 @@ export default function ListaRequisicoes() {
   const [detail, setDetail] = useState<Requisicao | null>(null)
   const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
   const detailReqId = detail?.id
-  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName, canOverride: canOverrideDetailLock, assumeControl: assumeDetailControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: detailReqId,
     enabled: Boolean(detailReqId),
@@ -1124,6 +1149,10 @@ export default function ListaRequisicoes() {
           apr={aprovacaoMap.get(detail.id)}
           isDark={isDark}
           onClose={() => setDetail(null)}
+          isLocked={isDetailLocked}
+          blockedByName={detailBlockedByName}
+          canOverrideLock={canOverrideDetailLock}
+          onAssumeControl={assumeDetailControl}
           canDecide={
             podeAprovarCompras(perfil?.email) && (
               (

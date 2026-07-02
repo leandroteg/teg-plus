@@ -215,7 +215,7 @@ export default function RequisicaoDetalhe() {
   const canMutateComprasReq = canDecide || canEmitPedido
     || canResponderEsteEsclarecimento
     || req?.status === 'devolvida_solicitante'
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: id,
     enabled: Boolean(id) && canMutateComprasReq,
@@ -314,6 +314,14 @@ export default function RequisicaoDetalhe() {
             <p className="text-xs text-amber-600 mt-1">
               Esta requisição fica bloqueada para evitar conflito até a finalização da edição.
             </p>
+            {canOverride && (
+              <button
+                type="button"
+                onClick={assumeControl}
+                className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                Assumir edição (Admin)
+              </button>
+            )}
           </div>
         </div>
       )}

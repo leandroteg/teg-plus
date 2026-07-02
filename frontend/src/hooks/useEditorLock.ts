@@ -25,10 +25,18 @@ export function useEditorLock({
   resourceId?: string
   enabled?: boolean
 }) {
-  const { perfil } = useAuth()
+  const { perfil, isAdmin } = useAuth()
   const [presences, setPresences] = useState<EditorPresence[]>([])
+  // Admin override: quando o cadeado de presença fica travado/fantasma
+  // (ex.: usuário deixou a aba aberta), um admin pode "assumir" a edição.
+  const [overridden, setOverridden] = useState(false)
   const sessionKeyRef = useRef(`lock-${Math.random().toString(36).slice(2, 10)}`)
   const openedAtRef = useRef(new Date().toISOString())
+
+  // Ao trocar de recurso, zera o override para não vazar para outra RC.
+  useEffect(() => {
+    setOverridden(false)
+  }, [resourceType, resourceId])
 
   useEffect(() => {
     if (!enabled || !perfil?.id || !resourceId) {
@@ -89,9 +97,13 @@ export function useEditorLock({
   }, [presences])
 
   const blockedBy = owner && owner.userId !== perfil?.id ? owner : null
+  const rawLocked = Boolean(blockedBy)
 
   return {
-    isLocked: Boolean(blockedBy),
+    isLocked: rawLocked && !overridden,
     blockedByName: blockedBy?.userName ?? null,
+    // Admin pode assumir a edição quando há bloqueio de outro usuário.
+    canOverride: isAdmin && rawLocked && !overridden,
+    assumeControl: () => setOverridden(true),
   }
 }

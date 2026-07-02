@@ -887,7 +887,7 @@ export default function CotacaoForm() {
   // Modal devolver ao solicitante
   const [showDevolverModal, setShowDevolverModal] = useState(false)
   const [motivoDevolucao, setMotivoDevolucao] = useState('')
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: cotacao?.requisicao_id ?? id,
     enabled: Boolean(cotacao?.requisicao_id ?? id),
@@ -1676,6 +1676,14 @@ export default function CotacaoForm() {
             <p className="text-xs text-amber-600 mt-1">
               Esta cotação está bloqueada temporariamente para evitar conflito de alterações.
             </p>
+            {canOverride && (
+              <button
+                type="button"
+                onClick={assumeControl}
+                className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                Assumir edição (Admin)
+              </button>
+            )}
           </div>
         </div>
       )}
