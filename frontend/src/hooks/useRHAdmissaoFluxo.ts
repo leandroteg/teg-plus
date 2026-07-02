@@ -852,17 +852,48 @@ export function useRegistro() {
       if (!resp.ok || !r.ok) throw new Error(r.message || 'Falha ao enviar o e-mail')
     },
   })
-  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, enviarEmail }
+  const setLotacao = useMutation({
+    mutationFn: async (i: { colaboradorId: string; candidatoId: string; lotacao: string }) => {
+      const { error } = await supabase.from('rh_colaboradores')
+        .update({ secullum_lotacao: i.lotacao || null }).eq('id', i.colaboradorId)
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  // Finaliza o registro: efetiva o colaborador (RPC passos 1-2: ativo/headcount) e
+  // dispara OneDrive (pasta + anexos) + Secullum (cadastro) via SuperTEG (n8n, passos 3-4, assíncrono).
+  const finalizarRegistro = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorId?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_finalizar_registro', {
+        p_candidato_id: i.candidatoId, p_autor_id: i.autorId ?? null, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; colaborador_id?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao finalizar o registro')
+      // SuperTEG cuida de OneDrive + Secullum (não bloqueia; roda no worker da VPS)
+      fetch(`${N8N_URL}/rh/admissao/finalizar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidato_id: i.candidatoId, colaborador_id: r.colaborador_id }),
+      }).catch(() => { /* best-effort */ })
+      return r
+    },
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
+  })
+  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro }
 }
 
-// Matrícula atual do colaborador vinculado (etapa Registro)
+// Matrícula + lotação Secullum do colaborador vinculado (etapa Registro)
 export function useMatriculaColaborador(colaboradorId?: string) {
-  return useQuery<string | null>({
+  return useQuery<{ matricula: string | null; lotacao: string | null }>({
     queryKey: ['rh-colab-matricula', colaboradorId],
     enabled: !!colaboradorId,
     queryFn: async () => {
-      const { data } = await supabase.from('rh_colaboradores').select('matricula').eq('id', colaboradorId).maybeSingle()
-      return (data?.matricula ?? null) as string | null
+      const { data } = await supabase.from('rh_colaboradores').select('matricula, secullum_lotacao').eq('id', colaboradorId).maybeSingle()
+      return { matricula: (data?.matricula ?? null) as string | null, lotacao: (data?.secullum_lotacao ?? null) as string | null }
     },
   })
 }

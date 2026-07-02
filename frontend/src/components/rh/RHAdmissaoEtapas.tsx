@@ -363,8 +363,10 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 }) {
   const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, enviarEmail } = useRegistro()
-  const { data: matricula } = useMatriculaColaborador(cand.colaborador_id)
+  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro } = useRegistro()
+  const { data: colabReg } = useMatriculaColaborador(cand.colaborador_id)
+  const matricula = colabReg?.matricula ?? null
+  const lotacao = colabReg?.lotacao ?? null
   const uploadAnexo = useUploadAnexoCandidato()
   const contratoRef = useRef<HTMLInputElement>(null)
   const docRef = useRef<HTMLInputElement>(null)
@@ -531,16 +533,49 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
         )}
       </Passo>
 
-      {/* 3 · Matrícula */}
-      <Passo n={3} titulo="Matrícula" icon={User} isDark={isDark}>
-        <div className="flex items-center gap-2">
-          <CampoTexto valor={matricula} onSave={v => {
-            if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
-          }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[240px]`} />
-          {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
-          {matricula && !setMatricula.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
+      {/* 3 · Matrícula e lotação */}
+      <Passo n={3} titulo="Matrícula e lotação" icon={User} isDark={isDark}>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <CampoTexto valor={matricula} onSave={v => {
+              if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
+            }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[260px]`} />
+            {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
+            {matricula && !setMatricula.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <CampoTexto valor={lotacao} onSave={v => {
+              if (cand.colaborador_id) setLotacao.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, lotacao: v.trim() })
+            }} placeholder="Lotação no Secullum (ex.: base / obra)" className={`${IN} max-w-[260px]`} />
+            {setLotacao.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
+            {lotacao && !setLotacao.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
+          </div>
         </div>
       </Passo>
+
+      {/* Finalizar registro — efetiva colaborador (ativo/headcount) + OneDrive + Secullum via SuperTEG */}
+      <div className={`rounded-xl border px-3 py-2.5 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/60'}`}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="min-w-0">
+            <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar registro</p>
+            <p className="text-[10px] text-slate-400">Efetiva o colaborador (ativo/headcount), cria a pasta no OneDrive e cadastra no Secullum.</p>
+          </div>
+          {finalizarRegistro.isSuccess ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600"><CheckCircle2 size={14} /> Registro finalizado</span>
+          ) : (
+            <button
+              onClick={() => { if (cand.colaborador_id) finalizarRegistro.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome }) }}
+              disabled={!todosAssinados || !matricula || !lotacao || finalizarRegistro.isPending}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              {finalizarRegistro.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar registro</>}
+            </button>
+          )}
+        </div>
+        {(!todosAssinados || !matricula || !lotacao) && !finalizarRegistro.isSuccess && (
+          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os documentos estiverem assinados e a matrícula + lotação preenchidas.</p>
+        )}
+        {finalizarRegistro.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(finalizarRegistro.error as Error)?.message}</p>}
+      </div>
 
       {erro && <p className="text-[10px] text-red-600 font-semibold">{erro}</p>}
     </div>
