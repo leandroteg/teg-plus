@@ -6,7 +6,7 @@ import { supabase } from '../../services/supabase'
 
 type Verif = {
   ok: boolean; titulo?: string; signatario?: string; cpf?: string
-  assinado_em?: string; doc_hash?: string; registro_hash?: string; metodo?: string; integro?: boolean
+  assinado_em?: string; doc_hash?: string; registro_hash?: string; metodo?: string; integro?: boolean; pdf_assinado_url?: string | null
 }
 
 export default function VerificarAssinatura() {
@@ -60,6 +60,12 @@ export default function VerificarAssinatura() {
             <Linha k="Hash do documento (SHA-256)" v={d.doc_hash} mono />
             <Linha k="Selo do registro" v={d.registro_hash} mono />
           </div>
+          {d.pdf_assinado_url && (
+            <a href={d.pdf_assinado_url} target="_blank" rel="noreferrer"
+              className="block text-center bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl py-2.5 text-sm">
+              Baixar PDF assinado (com carimbo + QR)
+            </a>
+          )}
           <p className="text-[10px] text-slate-400 leading-relaxed">
             Assinatura eletrônica avançada registrada em trilha imutável (append-only). O hash do documento comprova que o arquivo não foi alterado desde a assinatura.
           </p>
