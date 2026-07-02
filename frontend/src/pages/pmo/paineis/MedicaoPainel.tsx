@@ -78,13 +78,14 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
   // KPIs (último mês × penúltimo, TEG/Sub do período)
   const kpi = useMemo(() => {
     const ult = meses[meses.length - 1]; const pen = meses[meses.length - 2]
-    const somaMes = (c?: string) => c ? (mensal ?? []).filter(r => r.competencia === c).reduce((s, r) => s + Number(r.realizado ?? 0), 0) : 0
+    // KPIs de valor = execução própria (desconta subcontratadas)
+    const somaMes = (c?: string) => c ? (mensal ?? []).filter(r => r.competencia === c && !r.subcontratada).reduce((s, r) => s + Number(r.realizado ?? 0), 0) : 0
     const fUlt = somaMes(ult); const fPen = somaMes(pen)
-    const nOscUlt = ult ? new Set((mensal ?? []).filter(r => r.competencia === ult && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
+    const nOscUlt = ult ? new Set((mensal ?? []).filter(r => r.competencia === ult && !r.subcontratada && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
     let teg = 0, sub = 0
     for (const r of (mensal ?? [])) { const c = r.competencia; const v = Number(r.realizado ?? 0); if (v <= 0 || c < de || c > ateF) continue; if (r.subcontratada) sub += v; else teg += v }
     const tot = teg + sub
-    return { ult, fUlt, nOscUlt, varPct: fPen > 0 ? (fUlt - fPen) / fPen * 100 : null, total: tot, pctTeg: tot ? Math.round(teg / tot * 100) : 0, pctSub: tot ? Math.round(sub / tot * 100) : 0 }
+    return { ult, fUlt, nOscUlt, varPct: fPen > 0 ? (fUlt - fPen) / fPen * 100 : null, total: teg, pctTeg: tot ? Math.round(teg / tot * 100) : 0, pctSub: tot ? Math.round(sub / tot * 100) : 0 }
   }, [mensal, meses, de, ateF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
