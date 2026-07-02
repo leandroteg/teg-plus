@@ -1252,14 +1252,18 @@ export function useDecisaoGenerica() {
               .eq('id', entidadeId)
           }
         } else if (tipoAprovacao === 'cotacao') {
-          // Aprovação financeira da cotação — atualiza RC para cotacao_aprovada/rejeitada
+          // Aprovação financeira da cotação — atualiza RC para cotacao_aprovada, ou
+          // volta pra em_cotacao quando rejeitada. Antes ia pra 'cotacao_rejeitada',
+          // um status morto: some da Fila de Cotações (só mostra em_andamento/
+          // concluida) e o CotacaoForm fica read-only (cmp_cotacoes continuava
+          // 'concluida') — o comprador não tinha como localizar nem refazer.
           const now = new Date().toISOString()
           const updates: Record<string, unknown> = {}
           if (decisao === 'aprovada') {
             updates.status = 'cotacao_aprovada'
             updates.data_aprovacao = now
           } else if (decisao === 'rejeitada') {
-            updates.status = 'cotacao_rejeitada'
+            updates.status = 'em_cotacao'
           } else if (decisao === 'esclarecimento') {
             // Devolve ao comprador para esclarecer a cotação — fica na fila de cotações
             updates.status = 'cotacao_em_esclarecimento'
@@ -1272,6 +1276,23 @@ export function useDecisaoGenerica() {
               .from(TABLE_REQ)
               .update(updates)
               .eq('id', entidadeId)
+          }
+          if (decisao === 'rejeitada') {
+            // Reabre a cotação mais recente pra edição (senão CotacaoForm continua
+            // mostrando a tela read-only de "concluída" mesmo com a RC em_cotacao).
+            const { data: cot } = await supabase
+              .from('cmp_cotacoes')
+              .select('id')
+              .eq('requisicao_id', entidadeId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (cot?.id) {
+              await supabase
+                .from('cmp_cotacoes')
+                .update({ status: 'em_andamento' })
+                .eq('id', cot.id)
+            }
           }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
@@ -1398,7 +1419,9 @@ export function useDecisaoRequisicao() {
           updates.status = 'aprovada'
         }
       } else if (decisao === 'rejeitada') {
-        updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
+        // Rejeição financeira volta pra em_cotacao (não 'cotacao_rejeitada' — status
+        // morto: some da Fila de Cotações e o comprador não localiza pra refazer).
+        updates.status = isFinancialApproval ? 'em_cotacao' : 'rejeitada'
       } else if (decisao === 'esclarecimento') {
         updates.status = isFinancialApproval ? 'cotacao_em_esclarecimento' : 'em_esclarecimento'
         updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
@@ -1412,6 +1435,24 @@ export function useDecisaoRequisicao() {
         .eq('id', requisicaoId)
 
       if (reqError) throw reqError
+
+      if (decisao === 'rejeitada' && isFinancialApproval) {
+        // Reabre a cotação mais recente pra edição (senão CotacaoForm continua
+        // mostrando a tela read-only de "concluída" mesmo com a RC em_cotacao).
+        const { data: cot } = await supabase
+          .from('cmp_cotacoes')
+          .select('id')
+          .eq('requisicao_id', requisicaoId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (cot?.id) {
+          await supabase
+            .from('cmp_cotacoes')
+            .update({ status: 'em_andamento' })
+            .eq('id', cot.id)
+        }
+      }
 
       // 2. Create apr_aprovacoes record (audit trail + feeds AprovAi)
       // tipo_aprovacao reflete a etapa em que a decisão foi tomada:
