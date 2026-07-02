@@ -40,6 +40,23 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  const [proc, setProc] = useState<string | null>(null)
+
+  // Espera o SuperTEG ler os PDFs e enriquecer as cascas (valor gravado) — mantém o modal em loading.
+  // Poll a cada 5s por até ~4min; retorna quantas ficaram prontas.
+  const aguardarProcessamento = async (ids: string[]): Promise<number> => {
+    if (!ids.length) return 0
+    const pend = new Set(ids)
+    for (let i = 0; i < 48 && pend.size; i++) {
+      setProc(`Lendo o documento e cadastrando… ${ids.length - pend.size}/${ids.length}`)
+      await new Promise(r => setTimeout(r, 5000))
+      const { data } = await supabase.from('pmo_fluxo_os').select('id, valor').in('id', [...pend])
+      for (const row of (data ?? []) as { id: string; valor: number | null }[]) {
+        if (row.valor != null) pend.delete(row.id)
+      }
+    }
+    return ids.length - pend.size
+  }
 
   // lookups
   const { data: contratos = [] } = useQuery({ queryKey: ['nr-contratos'], queryFn: async () => { const { data } = await supabase.from('pmo_portfolio').select('id, nome_obra, numero_osc').order('nome_obra'); return (data ?? []) as any[] } })
@@ -84,6 +101,7 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
         setOk('Projeto cadastrado.'); qc.invalidateQueries({ queryKey: ['nr-projetos'] }); qc.invalidateQueries({ queryKey: ['pmo-projetos'] })
       } else if (tipo === 'osc') {
         let falhas = 0
+        const cascaIds: string[] = []
         for (const f of oscFiles) {
           const proj = projetos.find(p => p.id === f.projeto_id)
           const path = `${f.projeto_id}/${slug(f.numero_os)}_${slug(f.file.name)}`
@@ -94,12 +112,20 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
             .select('id').single()
           if (error) throw error
           const okFire = await dispararParse('egp-osc-abertura', path, 'osc', { casca_id: casca.id, numero_os: f.numero_os.trim(), projeto_id: f.projeto_id, projeto_nome: proj?.nome ?? null, portfolio_id: proj?.portfolio_id ?? null, tipo: f.tipo, arquivo_nome: f.file.name })
-          if (!okFire) falhas++
+          if (okFire) cascaIds.push(casca.id); else falhas++
         }
-        qc.invalidateQueries({ queryKey: ['nr-oscs'] }); qc.invalidateQueries({ queryKey: ['eap-final'] })
-        setOk(falhas
-          ? `OSC(s) cadastradas, mas ${falhas} disparo(s) ao SuperTEG falharam — veja o console (F12).`
-          : `${oscFiles.length} OSC(s) cadastrada(s) — SuperTEG está lendo os documentos e vai identificar a obra…`)
+        qc.invalidateQueries({ queryKey: ['nr-oscs'] })
+        // fica em loading até o SuperTEG ler + cadastrar (obra, valor, US, itens)
+        setProc(`Lendo o documento e cadastrando… 0/${cascaIds.length}`)
+        const prontos = await aguardarProcessamento(cascaIds)
+        setProc(null)
+        qc.invalidateQueries({ queryKey: ['eap-final'] })
+        const restantes = cascaIds.length - prontos
+        setOk([
+          `${prontos}/${oscFiles.length} OSC(s) cadastrada(s) com obra, valor e itens.`,
+          restantes ? `${restantes} ainda processando — aparecem em instantes.` : '',
+          falhas ? `${falhas} disparo(s) ao SuperTEG falharam (F12).` : '',
+        ].filter(Boolean).join(' '))
       } else if (tipo === 'medicao') {
         let falhas = 0
         for (const f of medFiles) {
@@ -189,6 +215,7 @@ export default function NovoRegistroModal({ tipo, onClose }: { tipo: NovoTipo; o
             <datalist id="nr-osc-list">{[...new Set(oscs.map(o => o.numero_os))].map(n => <option key={n} value={n} />)}</datalist>
           </>)}
 
+          {proc && <p className="text-[12px] text-indigo-500 flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> {proc}</p>}
           {erro && <p className="text-[12px] text-rose-500">⚠ {erro}</p>}
           {ok && <p className="text-[12px] text-emerald-500 flex items-center gap-1"><Check size={14} /> {ok}</p>}
         </div>
