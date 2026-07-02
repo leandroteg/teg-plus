@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
-  Sparkles, Paperclip, Trash2, AlertTriangle,
+  Sparkles, Paperclip, AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -213,129 +213,123 @@ function ImovelFaturasModal({
   const criarFatura = useCriarFatura()
   const atualizarFatura = useAtualizarFatura()
 
-  // ── Lançar contas por anexo (IA) ────────────────────────────────────────────
-  type ParseRow = {
-    file: File
+  // ── Lançar contas por anexo (IA) — salva AUTOMATICAMENTE ao anexar ──────────
+  // Fluxo em 2 etapas do processo: a lançadora só anexa (grava na hora, mesmo
+  // incompleto) e fecha; a validadora depois revisa/edita (lápis ou vencimento
+  // em lote) e envia ao Financeiro (faturamento).
+  type ResultadoItem = {
+    nome: string
     tipo: TipoFatura
-    valor: string
-    vencimento: string
-    competencia: string   // YYYY-MM
-    fornecedor: string
-    confianca: number
+    valor: number | null
+    vencimento: string | null
+    acao: 'criada' | 'atualizada' | 'pulada'
+    obs: string[]
   }
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [parsing, setParsing] = useState(false)
-  const [parseRows, setParseRows] = useState<ParseRow[] | null>(null)
-  const [lancando, setLancando] = useState(false)
+  const [resultado, setResultado] = useState<ResultadoItem[] | null>(null)
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return
     const arr = Array.from(files)
     setParsing(true)
+    setResultado(null)
     try {
       const parsed = await parseFaturasAnexos(arr, {
         competencia: modalCompetencia,
         imovel: endereco || imovel.descricao,
       })
-      const rows: ParseRow[] = arr.map((file, i) => {
+      // snapshot local (tipo|competência → fatura) p/ decidir criar/atualizar dentro do lote
+      const locais = new Map<string, { id: string; status: StatusFatura; temAnexo: boolean }>()
+      allFaturas.filter(f => f.imovel_id === imovel.id).forEach(f => {
+        locais.set(`${f.tipo}|${(f.competencia ?? '').slice(0, 7)}`, {
+          id: f.id, status: f.status, temAnexo: !!f.boleto_url,
+        })
+      })
+      const out: ResultadoItem[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const file = arr[i]
         const p = parsed.find(x => x.doc === i) ?? parsed[i]
         const tipoRaw = p?.tipo === 'aluguel' ? 'outro' : (p?.tipo ?? 'outro')
         const tipo = (TIPOS as string[]).includes(tipoRaw) ? (tipoRaw as TipoFatura) : 'outro'
-        return {
-          file,
-          tipo,
-          valor: p?.valor != null ? String(p.valor) : '',
-          vencimento: p?.vencimento || '',
-          competencia: p?.competencia || modalCompetencia,
-          fornecedor: p?.fornecedor || '',
-          confianca: p?.confianca ?? 0,
+        const comp = /^\d{4}-\d{2}$/.test(p?.competencia ?? '') ? p!.competencia : modalCompetencia
+        const valor = p?.valor != null && p.valor > 0 ? p.valor : null
+        const venc = p?.vencimento && !isNaN(new Date(p.vencimento + 'T00:00:00').getTime())
+          ? p.vencimento : null
+        const obs: string[] = []
+        if (!valor) obs.push('sem valor — complete no lápis')
+        if (!venc) obs.push('sem vencimento — complete no lápis')
+        if ((p?.confianca ?? 0) < 0.6) obs.push('confiança baixa da IA — confira')
+
+        const key = `${tipo}|${comp}`
+        const exist = locais.get(key)
+        // já existe fatura do mesmo tipo+mês COM anexo → não sobrescreve (pode ser 2ª via)
+        if (exist?.temAnexo) {
+          out.push({
+            nome: file.name, tipo, valor, vencimento: venc, acao: 'pulada',
+            obs: [`já existe ${TIPO_FATURA_LABEL[tipo]} de ${comp} com anexo — edite manualmente se for o caso`],
+          })
+          continue
         }
-      })
-      setParseRows(rows)
+        const path = await uploadFaturaAnexo(imovel.id, comp, file)
+        if (exist) {
+          await atualizarFatura.mutateAsync({
+            id: exist.id,
+            vencimento: venc ?? undefined,
+            valor_previsto: valor ?? undefined,
+            boleto_url: path,
+            descricao: p?.fornecedor || undefined,
+            status: exist.status === 'previsto' ? 'lancado' : exist.status,
+          })
+          locais.set(key, { ...exist, temAnexo: true })
+          out.push({ nome: file.name, tipo, valor, vencimento: venc, acao: 'atualizada', obs })
+        } else {
+          await criarFatura.mutateAsync({
+            imovel_id: imovel.id,
+            tipo,
+            competencia: comp + '-01',
+            vencimento: venc ?? undefined,
+            valor_previsto: valor ?? undefined,
+            boleto_url: path,
+            descricao: p?.fornecedor || undefined,
+            status: 'lancado',
+          })
+          locais.set(key, { id: 'nova', status: 'lancado', temAnexo: true })
+          out.push({ nome: file.name, tipo, valor, vencimento: venc, acao: 'criada', obs })
+        }
+      }
+      setResultado(out)
     } catch (err: any) {
-      alert(`Erro ao analisar anexos: ${err?.message ?? 'desconhecido'}`)
+      alert(`Erro ao processar anexos: ${err?.message ?? 'desconhecido'}`)
     } finally {
       setParsing(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
-  // erros bloqueiam o lançamento; avisos só sinalizam
-  function rowErros(r: ParseRow): string[] {
-    const e: string[] = []
-    if (!(parseFloat(r.valor) > 0)) e.push('informe o valor')
-    if (!r.vencimento || isNaN(new Date(r.vencimento + 'T00:00:00').getTime())) e.push('vencimento inválido')
-    if (!/^\d{4}-\d{2}$/.test(r.competencia)) e.push('competência inválida')
-    return e
-  }
-  function rowAvisos(r: ParseRow): string[] {
-    const w: string[] = []
-    if (r.confianca > 0 && r.confianca < 0.6) w.push('confiança baixa da IA — confira')
-    if (r.vencimento && /^\d{4}-\d{2}$/.test(r.competencia)) {
-      const [y, m] = r.competencia.split('-').map(Number)
-      const venc = new Date(r.vencimento + 'T00:00:00')
-      const min = new Date(y, m - 1, 1)
-      const max = new Date(y, m - 1 + 3, 0)
-      if (venc < min || venc > max) w.push('vencimento fora da competência')
-    }
-    return w
-  }
-  const duplicados = useMemo(() => {
-    if (!parseRows) return new Set<number>()
-    const seen = new Map<string, number>()
-    const dup = new Set<number>()
-    parseRows.forEach((r, i) => {
-      const k = `${r.tipo}|${r.competencia}`
-      if (seen.has(k)) { dup.add(i); dup.add(seen.get(k)!) }
-      else seen.set(k, i)
-    })
-    return dup
-  }, [parseRows])
-  const podeConfirmar = !!parseRows?.length
-    && parseRows.every(r => rowErros(r).length === 0)
-    && duplicados.size === 0
+  // ── Vencimento em lote (etapa de validação/faturamento) ─────────────────────
+  const [bulkVenc, setBulkVenc] = useState('')
+  const [aplicandoVenc, setAplicandoVenc] = useState(false)
 
-  async function confirmarLancamentos() {
-    if (!parseRows?.length) return
-    setLancando(true)
+  async function aplicarVencLote() {
+    const alvo = mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status))
+    if (!alvo.length) {
+      alert('Nenhuma fatura editável neste mês (só "previsto" ou "lançado" podem ser alteradas).')
+      return
+    }
+    const label = new Date(bulkVenc + 'T12:00:00').toLocaleDateString('pt-BR')
+    if (!confirm(`Alterar o vencimento de ${alvo.length} fatura(s) de ${competenciaLabel(modalCompetencia)} para ${label}?`)) return
+    setAplicandoVenc(true)
     try {
-      let criadas = 0, atualizadas = 0
-      for (const row of parseRows) {
-        const comp = row.competencia
-        const path = await uploadFaturaAnexo(imovel.id, comp, row.file)
-        const valorNum = parseFloat(row.valor)
-        const existing = allFaturas.find(f =>
-          f.imovel_id === imovel.id && f.tipo === row.tipo && f.competencia?.startsWith(comp))
-        if (existing) {
-          await atualizarFatura.mutateAsync({
-            id: existing.id,
-            vencimento: row.vencimento,
-            valor_previsto: valorNum,
-            boleto_url: path,
-            descricao: row.fornecedor || existing.descricao,
-            status: existing.status === 'previsto' ? 'lancado' : existing.status,
-          })
-          atualizadas++
-        } else {
-          await criarFatura.mutateAsync({
-            imovel_id: imovel.id,
-            tipo: row.tipo,
-            competencia: comp + '-01',
-            vencimento: row.vencimento,
-            valor_previsto: valorNum,
-            boleto_url: path,
-            descricao: row.fornecedor || undefined,
-            status: 'lancado',
-          })
-          criadas++
-        }
+      for (const f of alvo) {
+        await atualizarFatura.mutateAsync({ id: f.id, vencimento: bulkVenc })
       }
-      alert(`✓ ${criadas} conta(s) lançada(s)${atualizadas ? `, ${atualizadas} atualizada(s)` : ''} com anexo.`)
-      setParseRows(null)
+      alert(`✓ Vencimento de ${alvo.length} fatura(s) alterado para ${label}.`)
+      setBulkVenc('')
     } catch (err: any) {
-      alert(`Erro ao lançar: ${err?.message ?? 'desconhecido'}`)
+      alert(`Erro: ${err?.message ?? 'desconhecido'}`)
     } finally {
-      setLancando(false)
+      setAplicandoVenc(false)
     }
   }
 
@@ -385,7 +379,7 @@ function ImovelFaturasModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${border} ${bg} rounded-t-2xl`}>
           <div className="min-w-0">
@@ -420,7 +414,7 @@ function ImovelFaturasModal({
             </button>
           </div>
 
-          {/* Lançar contas por anexo (IA) */}
+          {/* Lançar contas por anexo (IA) — salva automaticamente */}
           <div className={`rounded-xl border p-3 ${isDark ? 'border-indigo-500/20 bg-indigo-500/[0.04]' : 'border-indigo-200 bg-indigo-50/40'}`}>
             <input
               ref={fileInputRef}
@@ -436,115 +430,54 @@ function ImovelFaturasModal({
               </span>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={parsing || lancando}
+                disabled={parsing}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
                 {parsing ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
-                {parsing ? 'Lendo anexos…' : 'Enviar anexos'}
+                {parsing ? 'Lendo e salvando…' : 'Enviar anexos'}
               </button>
             </div>
             <p className={`text-[10px] mt-1 ${txtMuted}`}>
-              Envie 1 ou mais contas (PDF/foto) — a IA identifica o tipo (luz, água…), valor e vencimento de cada uma.
+              Envie 1 ou mais contas (PDF/foto) — a IA identifica tipo, valor e vencimento e <b>salva na hora</b> como "Lançado". O que faltar, complete depois pelo lápis ✏️.
             </p>
 
-            {parseRows && parseRows.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {parseRows.map((r, i) => {
-                  const erros = rowErros(r)
-                  const avisos = rowAvisos(r)
-                  const isDup = duplicados.has(i)
-                  const inputCls = `w-full rounded-lg border px-2 py-1.5 text-[11px] outline-none ${
-                    isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
-                  }`
+            {resultado && resultado.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {resultado.map((r, i) => {
+                  const pulada = r.acao === 'pulada'
                   return (
-                    <div key={i} className={`rounded-lg border p-2.5 ${
-                      erros.length || isDup
+                    <div key={i} className={`rounded-lg border px-2.5 py-2 ${
+                      pulada
                         ? isDark ? 'border-red-500/30 bg-red-500/[0.04]' : 'border-red-200 bg-red-50/40'
-                        : isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-white'
+                        : isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/40'
                     }`}>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className={`text-[10px] font-semibold truncate ${txtMain}`} title={r.file.name}>
-                          📄 {r.file.name}
-                          {r.fornecedor && <span className={`font-normal ${txtMuted}`}> — {r.fornecedor}</span>}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[11px] font-semibold truncate ${txtMain}`}>
+                          {pulada ? '✗' : '✓'} {TIPO_FATURA_LABEL[r.tipo]} — {r.valor != null ? fmtCurrency(r.valor) : 'sem valor'} · venc. {r.vencimento ? fmtDate(r.vencimento) : '—'}
                         </span>
-                        <button
-                          onClick={() => setParseRows(rows => rows!.filter((_, j) => j !== i))}
-                          className={`shrink-0 p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}
-                          title="Remover"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <div>
-                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Tipo</label>
-                          <select
-                            value={r.tipo}
-                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, tipo: e.target.value as TipoFatura } : x))}
-                            className={inputCls}
-                          >
-                            {TIPOS.map(t => <option key={t} value={t}>{TIPO_FATURA_LABEL[t]}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Valor (R$)</label>
-                          <input
-                            type="number" step="0.01" value={r.valor} placeholder="0,00"
-                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, valor: e.target.value } : x))}
-                            className={inputCls}
-                          />
-                        </div>
-                        <div>
-                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Vencimento</label>
-                          <input
-                            type="date" value={r.vencimento}
-                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, vencimento: e.target.value } : x))}
-                            className={inputCls}
-                          />
-                        </div>
-                        <div>
-                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Competência</label>
-                          <input
-                            type="month" value={r.competencia}
-                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, competencia: e.target.value } : x))}
-                            className={inputCls}
-                          />
-                        </div>
-                      </div>
-                      {(erros.length > 0 || avisos.length > 0 || isDup) && (
-                        <p className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium ${
-                          erros.length || isDup ? 'text-red-500' : 'text-amber-500'
+                        <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider ${
+                          pulada ? 'text-red-500' : isDark ? 'text-emerald-400' : 'text-emerald-600'
                         }`}>
-                          <AlertTriangle size={10} />
-                          {[
-                            ...erros,
-                            ...(isDup ? ['tipo + competência repetidos em outro anexo'] : []),
-                            ...avisos,
-                          ].join(' · ')}
+                          {r.acao}
+                        </span>
+                      </div>
+                      <p className={`text-[10px] truncate ${txtMuted}`} title={r.nome}>📄 {r.nome}</p>
+                      {r.obs.length > 0 && (
+                        <p className={`mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium ${pulada ? 'text-red-500' : 'text-amber-500'}`}>
+                          <AlertTriangle size={10} /> {r.obs.join(' · ')}
                         </p>
                       )}
                     </div>
                   )
                 })}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setParseRows(null)}
-                    disabled={lancando}
-                    className={`flex-1 py-2 rounded-lg border text-[11px] font-semibold transition-colors ${
-                      isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={confirmarLancamentos}
-                    disabled={!podeConfirmar || lancando}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {lancando ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                    {lancando ? 'Lançando…' : `Lançar ${parseRows.length} conta(s)`}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setResultado(null)}
+                  className={`w-full py-1.5 rounded-lg border text-[10px] font-semibold transition-colors ${
+                    isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Ocultar resultado
+                </button>
               </div>
             )}
           </div>
@@ -660,6 +593,28 @@ function ImovelFaturasModal({
           <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${cardBg}`}>
             <span className={`text-xs font-bold uppercase tracking-wider ${txtMuted}`}>Total</span>
             <span className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtCurrency(totalMes)}</span>
+          </div>
+
+          {/* Vencimento em lote (validação/faturamento) */}
+          <div className={`flex flex-wrap items-center gap-2 rounded-xl px-4 py-3 ${cardBg}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Vencimento em lote</span>
+            <input
+              type="date"
+              value={bulkVenc}
+              onChange={e => setBulkVenc(e.target.value)}
+              className={`rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
+                isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+              }`}
+            />
+            <button
+              onClick={aplicarVencLote}
+              disabled={!bulkVenc || aplicandoVenc}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {aplicandoVenc ? <Loader2 size={11} className="animate-spin" /> : <Pencil size={11} />}
+              Aplicar às faturas do mês
+            </button>
+            <span className={`text-[10px] ${txtMuted}`}>só altera "previsto" e "lançado"</span>
           </div>
 
           {/* Historico */}
