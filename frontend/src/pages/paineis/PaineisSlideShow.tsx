@@ -144,6 +144,18 @@ export default function PaineisSlideShow() {
   const [cfg, setCfg] = useState<Cfg>(loadCfg)
   const [playing, setPlaying] = useState(() => new URLSearchParams(window.location.search).get('autoplay') === '1')
   const [adding, setAdding] = useState(false)
+  const [enviarPara, setEnviarPara] = useState('diretoria@teguniao.com.br')
+  const [enviando, setEnviando] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  const WEBHOOK_ENVIAR = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/paineis-enviar-agora'
+  const enviarAgora = async () => {
+    setEnviando('sending')
+    try {
+      const r = await fetch(WEBHOOK_ENVIAR, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ para: enviarPara.trim() }) })
+      setEnviando(r.ok ? 'sent' : 'error')
+    } catch { setEnviando('error') }
+    setTimeout(() => setEnviando('idle'), 8000)
+  }
 
   useEffect(() => { localStorage.setItem(LS_KEY, JSON.stringify(cfg)) }, [cfg])
 
@@ -241,13 +253,28 @@ export default function PaineisSlideShow() {
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
             <Mail size={17} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className={`text-sm font-bold ${txt}`}>Envio automático à diretoria</p>
             <p className={`text-xs mt-0.5 ${muted}`}>
-              Agendado para <b className={txt}>toda segunda-feira às 08h (horário de Brasília)</b>.
-              Os painéis selecionados são exportados num PDF único e enviados por e-mail.
-              <span className="block mt-1 text-amber-500 font-semibold">Pendente de ativação do envio no servidor.</span>
+              Todo <b className={txt}>dia 20, às 08h (Brasília)</b>, os painéis são exportados num PDF único e enviados para <b className={txt}>diretoria@teguniao.com.br</b>.
             </p>
+            {/* Enviar agora — escolhe destinatário (@teguniao), sempre com cópia p/ leandro.mallet */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                type="email" value={enviarPara} onChange={e => setEnviarPara(e.target.value)}
+                placeholder="destinatario@teguniao.com.br"
+                className={`text-xs rounded-lg px-2.5 py-1.5 border outline-none w-full sm:w-72 ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              />
+              <button
+                onClick={enviarAgora} disabled={enviando === 'sending'}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 shrink-0"
+              >
+                {enviando === 'sending' ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} Enviar agora
+              </button>
+              {enviando === 'sent' && <span className="text-[11px] font-semibold text-emerald-500">✓ Enviando — chega em ~2 min</span>}
+              {enviando === 'error' && <span className="text-[11px] font-semibold text-red-500">Falhou — tente de novo</span>}
+            </div>
+            <p className={`text-[10px] mt-1.5 ${muted}`}>Somente e-mails <b>@teguniao.com.br</b> · sempre com cópia para <b>leandro.mallet@teguniao.com.br</b></p>
           </div>
         </div>
       </div>
