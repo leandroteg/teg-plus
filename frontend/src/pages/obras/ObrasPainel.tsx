@@ -120,8 +120,8 @@ export default function ObrasPainel() {
       </div>
 
       {/* Frota: matriz categoria × canteiro (66%) + top canteiros empilhado (33%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <Bloco isDark={isDark} className={`${card} lg:col-span-2`} titulo="Frota · categoria por canteiro" icon={Grid3x3}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Bloco isDark={isDark} className={card} titulo="Frota · categoria por canteiro" icon={Grid3x3}>
           <MatrizFrota isDark={isDark} canteiros={d.canteiros} grupos={d.gruposFrota} grupoTotais={d.grupoTotais} />
         </Bloco>
         <Bloco isDark={isDark} className={card} titulo="Top veículos por canteiro" icon={BarChart3}>
@@ -196,28 +196,30 @@ function MatrizFrota({ isDark, canteiros, grupos, grupoTotais }: { isDark: boole
       <table className="border-separate" style={{ borderSpacing: '3px', minWidth: '100%' }}>
         <thead>
           <tr>
-            <th className={`text-left ${th} pb-1 pr-2`}>Categoria</th>
-            {canteiros.map(c => <th key={c.id} className={`text-[10px] font-semibold ${txtMuted} px-1 pb-1 whitespace-nowrap`} title={c.nome}>{c.nome}</th>)}
+            <th className={`text-left ${th} pb-1 pr-2`}>Canteiro</th>
+            {grupos.map(g => (
+              <th key={g} className={`text-[10px] font-semibold ${txtMuted} px-1 pb-1 whitespace-nowrap`}>
+                <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ backgroundColor: GRUPO_HEX[g] }} />
+                {CATEGORIA_GRUPO_LABEL[g]}
+              </th>
+            ))}
             <th className={`${th} pl-1 pb-1 text-center`}>Total</th>
           </tr>
         </thead>
         <tbody>
-          {grupos.map(g => (
-            <tr key={g}>
-              <td className={`text-[11px] font-medium whitespace-nowrap pr-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ backgroundColor: GRUPO_HEX[g] }} />
-                {CATEGORIA_GRUPO_LABEL[g]}
-              </td>
-              {canteiros.map(c => {
+          {canteiros.map(c => (
+            <tr key={c.id}>
+              <td className="pr-2"><div className={`text-[11px] font-medium truncate max-w-[170px] ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={c.nome}>{c.nome}</div></td>
+              {grupos.map(g => {
                 const v = c.porGrupo[g] ?? 0
-                return <td key={c.id} className="text-center text-[11px] font-bold rounded-md h-7 min-w-[40px]" style={heat(v)}>{v || ''}</td>
+                return <td key={g} className="text-center text-[11px] font-bold rounded-md h-7 min-w-[46px]" style={heat(v)}>{v || ''}</td>
               })}
-              <td className={`text-center text-[11px] font-black px-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{grupoTotais[g] ?? 0}</td>
+              <td className={`text-center text-[11px] font-black px-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{c.total}</td>
             </tr>
           ))}
           <tr>
             <td className={`${th} pr-2`}>Total</td>
-            {canteiros.map(c => <td key={c.id} className={`text-center text-[11px] font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{c.total}</td>)}
+            {grupos.map(g => <td key={g} className={`text-center text-[11px] font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{grupoTotais[g] ?? 0}</td>)}
             <td className={`text-center text-[11px] font-black ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>{totalGeral}</td>
           </tr>
         </tbody>
