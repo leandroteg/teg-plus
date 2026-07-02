@@ -9,6 +9,7 @@ import {
   useImoveis, useFaturas, useCriarFatura, useAtualizarFatura,
   useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura,
   parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
+  removerFaturaAnexoStorage, useExcluirFatura,
 } from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
@@ -101,7 +102,9 @@ function InlineEditForm({
 }) {
   const criarFatura = useCriarFatura()
   const atualizarFatura = useAtualizarFatura()
+  const excluirFatura = useExcluirFatura()
   const isEdit = !!fatura?.id
+  const podeExcluir = isEdit && ['previsto', 'lancado'].includes(fatura!.status)
 
   const [vencimento, setVencimento] = useState(fatura?.vencimento ?? '')
   const [valor, setValor] = useState<string>(
@@ -186,6 +189,23 @@ function InlineEditForm({
             >
               Cancelar
             </button>
+            {podeExcluir && (
+              <button
+                onClick={() => {
+                  if (!confirm('Excluir esta fatura? O anexo (se houver) também será apagado.')) return
+                  excluirFatura.mutate(
+                    { id: fatura!.id, boleto_url: fatura!.boleto_url },
+                    { onSuccess: onClose },
+                  )
+                }}
+                disabled={excluirFatura.isPending}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${
+                  isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                {excluirFatura.isPending ? 'Excluindo…' : 'Excluir'}
+              </button>
+            )}
           </div>
         </div>
       </td>
@@ -338,6 +358,16 @@ function ImovelFaturasModal({
     if (url) window.open(url, '_blank')
   }
 
+  async function removerAnexo(fat: LocFatura) {
+    if (!confirm('Remover o anexo desta fatura? O arquivo será apagado do sistema (os valores lançados permanecem).')) return
+    try {
+      await removerFaturaAnexoStorage(fat.boleto_url)
+      await atualizarFatura.mutateAsync({ id: fat.id, boleto_url: null } as never)
+    } catch (err: any) {
+      alert(`Erro ao remover anexo: ${err?.message ?? 'desconhecido'}`)
+    }
+  }
+
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-100'
@@ -470,14 +500,16 @@ function ImovelFaturasModal({
                     </div>
                   )
                 })}
-                <button
-                  onClick={() => setResultado(null)}
-                  className={`w-full py-1.5 rounded-lg border text-[10px] font-semibold transition-colors ${
-                    isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  Ocultar resultado
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setResultado(null)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                      isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    Ocultar
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -508,13 +540,24 @@ function ImovelFaturasModal({
                           <td className="text-right px-4 py-2.5">
                             <div className="flex items-center justify-end gap-2">
                               {fat.boleto_url && (
-                                <button
-                                  onClick={() => abrirAnexo(fat.boleto_url)}
-                                  className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}
-                                  title="Abrir anexo da fatura"
-                                >
-                                  <Paperclip size={12} />
-                                </button>
+                                <span className="inline-flex items-center">
+                                  <button
+                                    onClick={() => abrirAnexo(fat.boleto_url)}
+                                    className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}
+                                    title="Abrir anexo da fatura"
+                                  >
+                                    <Paperclip size={12} />
+                                  </button>
+                                  {['previsto', 'lancado'].includes(fat.status) && (
+                                    <button
+                                      onClick={() => removerAnexo(fat)}
+                                      className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-red-500/10 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}
+                                      title="Remover anexo (arquivo errado)"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  )}
+                                </span>
                               )}
                               <span className="inline-flex items-center gap-1">
                                 <span className={`w-1.5 h-1.5 rounded-full ${isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'}`} />
@@ -596,25 +639,27 @@ function ImovelFaturasModal({
           </div>
 
           {/* Vencimento em lote (validação/faturamento) */}
-          <div className={`flex flex-wrap items-center gap-2 rounded-xl px-4 py-3 ${cardBg}`}>
+          <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 ${cardBg}`}>
             <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Vencimento em lote</span>
-            <input
-              type="date"
-              value={bulkVenc}
-              onChange={e => setBulkVenc(e.target.value)}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
-                isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
-              }`}
-            />
-            <button
-              onClick={aplicarVencLote}
-              disabled={!bulkVenc || aplicandoVenc}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {aplicandoVenc ? <Loader2 size={11} className="animate-spin" /> : <Pencil size={11} />}
-              Aplicar às faturas do mês
-            </button>
-            <span className={`text-[10px] ${txtMuted}`}>só altera "previsto" e "lançado"</span>
+            <div className="ml-auto flex items-center gap-2">
+              <input
+                type="date"
+                value={bulkVenc}
+                onChange={e => setBulkVenc(e.target.value)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
+                  isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              />
+              <button
+                onClick={aplicarVencLote}
+                disabled={!bulkVenc || aplicandoVenc}
+                title={'Altera o vencimento de todas as faturas "previsto"/"lançado" deste mês'}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {aplicandoVenc ? <Loader2 size={11} className="animate-spin" /> : <Pencil size={11} />}
+                Aplicar ao mês
+              </button>
+            </div>
           </div>
 
           {/* Historico */}
@@ -645,10 +690,10 @@ function ImovelFaturasModal({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
             <button
               onClick={() => alert('Exportar PDF — em breve!')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
                 isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
@@ -680,7 +725,7 @@ function ImovelFaturasModal({
                 }
               }}
               disabled={enviarFinanceiro.isPending}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send size={13} /> {enviarFinanceiro.isPending ? 'Enviando...' : 'Enviar p/ Financeiro'}
             </button>
