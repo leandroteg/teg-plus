@@ -102,22 +102,22 @@ export default function DPPainel() {
     const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
-      const hh = intervalToMin(r.hh_trabalhada)
-      const exV = intervalToMin(r.extras_validos)  // extras já sem dias em aberto
+      const hh = intervalToMin(r.hh_real)            // só batida real (exclui import/manual)
+      const exV = intervalToMin(r.extras_validos_real) // real, sem dias em aberto
       const banco = ehBanco(r.base_nome)            // banco de horas não paga extra
       hhMin += hh
       if (!banco) { exMin += exV; hhPagavel += hh } // hora extra A PAGAR + base do %
-      emAberto += r.dias_em_aberto || 0
-      foraHorario += r.dias_fora_horario || 0
-      if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
+      emAberto += r.dias_em_aberto_real || 0
+      foraHorario += r.dias_fora_horario_real || 0
+      if (r.colaborador_id && (r.dias_batidos_real || 0) > 0) comBatida.add(r.colaborador_id)
       if (r.colaborador_id && hh > 0) comApur.add(r.colaborador_id)
       const ck = r.cc_codigo || r.cc_nome || '—'
       const cc = ccMap.get(ck) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
       cc.min += hh; ccMap.set(ck, cc)
       const bk = r.base_id ?? r.base_nome ?? '—'
       const b = baseMap.get(bk) || { nome: r.base_nome ?? 'Sem base', emAberto: 0, diasBatidos: 0, exMin: 0, hhMin: 0 }
-      b.emAberto += r.dias_em_aberto || 0
-      b.diasBatidos += r.dias_batidos || 0
+      b.emAberto += r.dias_em_aberto_real || 0
+      b.diasBatidos += r.dias_batidos_real || 0
       b.exMin += exV
       b.hhMin += hh
       baseMap.set(bk, b)
@@ -149,7 +149,7 @@ export default function DPPainel() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto — horas, em aberto e fora do horário</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto · <span className="font-semibold">batida real</span> (sem inclusão manual/import)</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">

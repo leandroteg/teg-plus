@@ -31,7 +31,9 @@ export function usePontoColabAtivos() {
       const d = new Date(); d.setDate(d.getDate() - 6)
       const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const [pontos, head] = await Promise.all([
-        supabase.from('rh_ponto_dia').select('colaborador_id, data').gte('data', desde).not('entrada1', 'is', null).limit(5000),
+        // só batida real: Origem <> 2 (exclui inclusão manual/import)
+        supabase.from('rh_ponto_dia').select('colaborador_id, data').gte('data', desde).not('entrada1', 'is', null)
+          .neq('raw->FonteDadosEntrada1->>Origem', '2').limit(5000),
         // denominador = ATIVOS no Secullum (de-para), que é quem bate ponto (CLT não-confiança), não todo o cadastro
         supabase.from('rh_ponto_linkcolab').select('secullum_func_id', { count: 'exact', head: true }).eq('status', 'ativo'),
       ])

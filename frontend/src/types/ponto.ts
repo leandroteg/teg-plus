@@ -28,6 +28,12 @@ export interface PontoResumoMes {
   dias_em_aberto: number
   dias_fora_horario: number
   extras_validos: string | null
+  // versões só batida real (Origem <> 2 = exclui inclusão manual/import)
+  dias_batidos_real: number
+  hh_real: string | null
+  extras_validos_real: string | null
+  dias_em_aberto_real: number
+  dias_fora_horario_real: number
 }
 
 export interface PontoDia {
