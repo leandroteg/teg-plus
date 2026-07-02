@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, DollarSign, AlertCircle, Wrench, Calendar, ArrowRight,
-  AlertTriangle, RefreshCw, KeySquare, TrendingUp, Zap, CalendarClock,
+  AlertTriangle, RefreshCw, KeySquare, TrendingUp, CalendarClock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -223,29 +223,17 @@ export default function LocacaoHome() {
                   O que exige ação agora
                 </h2>
               </div>
-              <div
-                className="text-right shrink-0"
-                title={`${contratosVencidos.length} contrato(s) vencido(s) · ${contratosVencendo30.length} a vencer nos próximos 30 dias`}
-              >
-                <p className={`text-2xl leading-none font-black ${
-                  contratosVencidos.length + contratosVencendo30.length > 0
-                    ? 'text-red-500'
-                    : isDark ? 'text-slate-600' : 'text-slate-300'
-                }`}>
-                  {contratosVencidos.length + contratosVencendo30.length}
-                </p>
-                <p className={`text-[9px] font-semibold mt-0.5 leading-tight ${txtMuted}`}>
-                  contratos vencidos<br />/ a vencer (30d)
-                </p>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${contratosVencidos.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={contratosVencidos.length > 0 || contratosVencendo30.length > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 flex-1">
               <MiniInfoCard
-                label="Faturas vencendo"
-                value={kpis?.faturasVencendo ?? 0}
-                note="próximos 7 dias"
-                icon={Zap}
-                iconTone={(kpis?.faturasVencendo ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
+                label="Contratos"
+                value={contratosVencidos.length + contratosVencendo30.length}
+                note="vencidos / a vencer (30 dias)"
+                icon={CalendarClock}
+                iconTone={contratosVencidos.length + contratosVencendo30.length > 0 ? 'text-red-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
