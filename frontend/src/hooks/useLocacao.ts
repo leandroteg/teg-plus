@@ -656,6 +656,76 @@ export function useAtualizarStatusAditivo() {
   })
 }
 
+// ── Lançamento de faturas por anexo (IA via n8n) ──────────────────────────────
+// Envia os arquivos (base64) ao webhook n8n "Locacao - Parse Faturas AI" (Gemini),
+// que identifica tipo (energia/água/...), valor, vencimento e competência de cada
+// documento — 1 arquivo = 1 fatura. O arquivo fica no bucket privado
+// locacao-faturas e o path é gravado em loc_faturas.boleto_url.
+
+const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+const FATURAS_BUCKET = 'locacao-faturas'
+
+export interface FaturaParseada {
+  doc: number
+  tipo: string
+  valor: number | null
+  vencimento: string
+  competencia: string
+  fornecedor: string
+  confianca: number
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      resolve(res.includes(',') ? res.split(',')[1] : res)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function parseFaturasAnexos(
+  files: File[],
+  contexto: { competencia?: string; imovel?: string },
+): Promise<FaturaParseada[]> {
+  const documentos = await Promise.all(files.map(async f => ({
+    nome: f.name,
+    mime_type: f.type || 'application/pdf',
+    base64: await fileToBase64(f),
+  })))
+  const resp = await fetch(`${N8N_URL}/locacao/faturas/parse-ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentos, contexto }),
+  })
+  if (!resp.ok) throw new Error('IA indisponível no momento — tente novamente')
+  const json = await resp.json() as { success?: boolean; error?: string; faturas?: FaturaParseada[] }
+  if (!json?.success) throw new Error(json?.error || 'Falha ao analisar os anexos')
+  return json.faturas ?? []
+}
+
+export async function uploadFaturaAnexo(imovelId: string, competencia: string, file: File): Promise<string> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${imovelId}/${competencia}/${Date.now()}_${safe}`
+  const { error } = await supabase.storage.from(FATURAS_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: file.type || undefined,
+  })
+  if (error) throw error
+  return path
+}
+
+// URL p/ abrir o anexo: path do bucket privado (signed 1h) ou URL http legada
+export async function faturaAnexoUrl(pathOrUrl?: string): Promise<string | null> {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl
+  const { data } = await supabase.storage.from(FATURAS_BUCKET).createSignedUrl(pathOrUrl, 3600)
+  return data?.signedUrl ?? null
+}
+
 // ── KPIs / Dashboard ──────────────────────────────────────────────────────────
 
 export function useLocacaoKPIs() {
