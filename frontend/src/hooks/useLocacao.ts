@@ -737,6 +737,26 @@ export async function faturaAnexoUrl(pathOrUrl?: string): Promise<string | null>
   return data?.signedUrl ?? null
 }
 
+// Apaga o arquivo do bucket (ignora URLs http legadas de fora do bucket)
+export async function removerFaturaAnexoStorage(path?: string) {
+  if (path && !/^https?:\/\//.test(path)) {
+    await supabase.storage.from(FATURAS_BUCKET).remove([path])
+  }
+}
+
+// Exclui a fatura (e o anexo dela no bucket, se houver)
+export function useExcluirFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, boleto_url }: { id: string; boleto_url?: string }) => {
+      await removerFaturaAnexoStorage(boleto_url)
+      const { error } = await supabase.from('loc_faturas').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_faturas'] }),
+  })
+}
+
 // ── KPIs / Dashboard ──────────────────────────────────────────────────────────
 
 export function useLocacaoKPIs() {
