@@ -1,16 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
+  Sparkles, Paperclip, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura, useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura } from '../../hooks/useLocacao'
+import {
+  useImoveis, useFaturas, useCriarFatura, useAtualizarFatura,
+  useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura,
+  parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
+} from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TIPOS: TipoFatura[] = ['energia', 'agua', 'internet', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao']
+const TIPOS: TipoFatura[] = ['energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
 
 const STATUS_FILTERS = [
   { value: 'todos',     label: 'Todos' },
@@ -205,6 +210,139 @@ function ImovelFaturasModal({
   const [editingRow, setEditingRow] = useState<{ tipo: TipoFatura; fatura: LocFatura | null } | null>(null)
   const enviarFinanceiro = useEnviarFaturasFinanceiro()
   const cancelarEnvio = useCancelarEnvioFatura()
+  const criarFatura = useCriarFatura()
+  const atualizarFatura = useAtualizarFatura()
+
+  // ── Lançar contas por anexo (IA) ────────────────────────────────────────────
+  type ParseRow = {
+    file: File
+    tipo: TipoFatura
+    valor: string
+    vencimento: string
+    competencia: string   // YYYY-MM
+    fornecedor: string
+    confianca: number
+  }
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [parsing, setParsing] = useState(false)
+  const [parseRows, setParseRows] = useState<ParseRow[] | null>(null)
+  const [lancando, setLancando] = useState(false)
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return
+    const arr = Array.from(files)
+    setParsing(true)
+    try {
+      const parsed = await parseFaturasAnexos(arr, {
+        competencia: modalCompetencia,
+        imovel: endereco || imovel.descricao,
+      })
+      const rows: ParseRow[] = arr.map((file, i) => {
+        const p = parsed.find(x => x.doc === i) ?? parsed[i]
+        const tipoRaw = p?.tipo === 'aluguel' ? 'outro' : (p?.tipo ?? 'outro')
+        const tipo = (TIPOS as string[]).includes(tipoRaw) ? (tipoRaw as TipoFatura) : 'outro'
+        return {
+          file,
+          tipo,
+          valor: p?.valor != null ? String(p.valor) : '',
+          vencimento: p?.vencimento || '',
+          competencia: p?.competencia || modalCompetencia,
+          fornecedor: p?.fornecedor || '',
+          confianca: p?.confianca ?? 0,
+        }
+      })
+      setParseRows(rows)
+    } catch (err: any) {
+      alert(`Erro ao analisar anexos: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setParsing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // erros bloqueiam o lançamento; avisos só sinalizam
+  function rowErros(r: ParseRow): string[] {
+    const e: string[] = []
+    if (!(parseFloat(r.valor) > 0)) e.push('informe o valor')
+    if (!r.vencimento || isNaN(new Date(r.vencimento + 'T00:00:00').getTime())) e.push('vencimento inválido')
+    if (!/^\d{4}-\d{2}$/.test(r.competencia)) e.push('competência inválida')
+    return e
+  }
+  function rowAvisos(r: ParseRow): string[] {
+    const w: string[] = []
+    if (r.confianca > 0 && r.confianca < 0.6) w.push('confiança baixa da IA — confira')
+    if (r.vencimento && /^\d{4}-\d{2}$/.test(r.competencia)) {
+      const [y, m] = r.competencia.split('-').map(Number)
+      const venc = new Date(r.vencimento + 'T00:00:00')
+      const min = new Date(y, m - 1, 1)
+      const max = new Date(y, m - 1 + 3, 0)
+      if (venc < min || venc > max) w.push('vencimento fora da competência')
+    }
+    return w
+  }
+  const duplicados = useMemo(() => {
+    if (!parseRows) return new Set<number>()
+    const seen = new Map<string, number>()
+    const dup = new Set<number>()
+    parseRows.forEach((r, i) => {
+      const k = `${r.tipo}|${r.competencia}`
+      if (seen.has(k)) { dup.add(i); dup.add(seen.get(k)!) }
+      else seen.set(k, i)
+    })
+    return dup
+  }, [parseRows])
+  const podeConfirmar = !!parseRows?.length
+    && parseRows.every(r => rowErros(r).length === 0)
+    && duplicados.size === 0
+
+  async function confirmarLancamentos() {
+    if (!parseRows?.length) return
+    setLancando(true)
+    try {
+      let criadas = 0, atualizadas = 0
+      for (const row of parseRows) {
+        const comp = row.competencia
+        const path = await uploadFaturaAnexo(imovel.id, comp, row.file)
+        const valorNum = parseFloat(row.valor)
+        const existing = allFaturas.find(f =>
+          f.imovel_id === imovel.id && f.tipo === row.tipo && f.competencia?.startsWith(comp))
+        if (existing) {
+          await atualizarFatura.mutateAsync({
+            id: existing.id,
+            vencimento: row.vencimento,
+            valor_previsto: valorNum,
+            boleto_url: path,
+            descricao: row.fornecedor || existing.descricao,
+            status: existing.status === 'previsto' ? 'lancado' : existing.status,
+          })
+          atualizadas++
+        } else {
+          await criarFatura.mutateAsync({
+            imovel_id: imovel.id,
+            tipo: row.tipo,
+            competencia: comp + '-01',
+            vencimento: row.vencimento,
+            valor_previsto: valorNum,
+            boleto_url: path,
+            descricao: row.fornecedor || undefined,
+            status: 'lancado',
+          })
+          criadas++
+        }
+      }
+      alert(`✓ ${criadas} conta(s) lançada(s)${atualizadas ? `, ${atualizadas} atualizada(s)` : ''} com anexo.`)
+      setParseRows(null)
+    } catch (err: any) {
+      alert(`Erro ao lançar: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setLancando(false)
+    }
+  }
+
+  async function abrirAnexo(pathOrUrl?: string) {
+    const url = await faturaAnexoUrl(pathOrUrl)
+    if (url) window.open(url, '_blank')
+  }
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -282,6 +420,135 @@ function ImovelFaturasModal({
             </button>
           </div>
 
+          {/* Lançar contas por anexo (IA) */}
+          <div className={`rounded-xl border p-3 ${isDark ? 'border-indigo-500/20 bg-indigo-500/[0.04]' : 'border-indigo-200 bg-indigo-50/40'}`}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="application/pdf,image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={e => handleFiles(e.target.files)}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                <Sparkles size={13} /> Lançar contas por anexo
+              </span>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={parsing || lancando}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {parsing ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                {parsing ? 'Lendo anexos…' : 'Enviar anexos'}
+              </button>
+            </div>
+            <p className={`text-[10px] mt-1 ${txtMuted}`}>
+              Envie 1 ou mais contas (PDF/foto) — a IA identifica o tipo (luz, água…), valor e vencimento de cada uma.
+            </p>
+
+            {parseRows && parseRows.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {parseRows.map((r, i) => {
+                  const erros = rowErros(r)
+                  const avisos = rowAvisos(r)
+                  const isDup = duplicados.has(i)
+                  const inputCls = `w-full rounded-lg border px-2 py-1.5 text-[11px] outline-none ${
+                    isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+                  }`
+                  return (
+                    <div key={i} className={`rounded-lg border p-2.5 ${
+                      erros.length || isDup
+                        ? isDark ? 'border-red-500/30 bg-red-500/[0.04]' : 'border-red-200 bg-red-50/40'
+                        : isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-white'
+                    }`}>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`text-[10px] font-semibold truncate ${txtMain}`} title={r.file.name}>
+                          📄 {r.file.name}
+                          {r.fornecedor && <span className={`font-normal ${txtMuted}`}> — {r.fornecedor}</span>}
+                        </span>
+                        <button
+                          onClick={() => setParseRows(rows => rows!.filter((_, j) => j !== i))}
+                          className={`shrink-0 p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}
+                          title="Remover"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Tipo</label>
+                          <select
+                            value={r.tipo}
+                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, tipo: e.target.value as TipoFatura } : x))}
+                            className={inputCls}
+                          >
+                            {TIPOS.map(t => <option key={t} value={t}>{TIPO_FATURA_LABEL[t]}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Valor (R$)</label>
+                          <input
+                            type="number" step="0.01" value={r.valor} placeholder="0,00"
+                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, valor: e.target.value } : x))}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Vencimento</label>
+                          <input
+                            type="date" value={r.vencimento}
+                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, vencimento: e.target.value } : x))}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className={`text-[9px] font-semibold block mb-0.5 ${txtMuted}`}>Competência</label>
+                          <input
+                            type="month" value={r.competencia}
+                            onChange={e => setParseRows(rows => rows!.map((x, j) => j === i ? { ...x, competencia: e.target.value } : x))}
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                      {(erros.length > 0 || avisos.length > 0 || isDup) && (
+                        <p className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium ${
+                          erros.length || isDup ? 'text-red-500' : 'text-amber-500'
+                        }`}>
+                          <AlertTriangle size={10} />
+                          {[
+                            ...erros,
+                            ...(isDup ? ['tipo + competência repetidos em outro anexo'] : []),
+                            ...avisos,
+                          ].join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setParseRows(null)}
+                    disabled={lancando}
+                    className={`flex-1 py-2 rounded-lg border text-[11px] font-semibold transition-colors ${
+                      isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmarLancamentos}
+                    disabled={!podeConfirmar || lancando}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {lancando ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                    {lancando ? 'Lançando…' : `Lançar ${parseRows.length} conta(s)`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Faturas Table */}
           <div className={`rounded-xl border overflow-hidden ${border}`}>
             <table className="w-full text-xs">
@@ -307,6 +574,15 @@ function ImovelFaturasModal({
                           <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>{fmtCurrency(getFaturaValor(fat))}</td>
                           <td className="text-right px-4 py-2.5">
                             <div className="flex items-center justify-end gap-2">
+                              {fat.boleto_url && (
+                                <button
+                                  onClick={() => abrirAnexo(fat.boleto_url)}
+                                  className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}
+                                  title="Abrir anexo da fatura"
+                                >
+                                  <Paperclip size={12} />
+                                </button>
+                              )}
                               <span className="inline-flex items-center gap-1">
                                 <span className={`w-1.5 h-1.5 rounded-full ${isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'}`} />
                                 <span className={`text-[10px] font-semibold ${isOverdue(fat) ? 'text-red-500' : STATUS_FATURA_LABEL[fat.status]?.text || txtMuted}`}>
