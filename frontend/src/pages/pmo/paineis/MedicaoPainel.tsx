@@ -48,10 +48,13 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
     return [...s].sort()
   }, [mensal, de, ateF])
 
-  // frente(EAP) × mês
+  // frente(EAP) × mês — desconta subcontratadas (execução própria)
   const frente = useMemo(() => {
+    const subKeys = new Set<string>()
+    for (const r of (mensal ?? [])) { if (r.subcontratada) subKeys.add(`${r.numero_os}|${r.competencia}`) }
     const mp = new Map<string, Map<string, number>>()
     for (const r of (secao ?? [])) { const c = r.competencia; const v = Number(r.realizado ?? 0); if (v <= 0 || c < de || c > ateF) continue
+      if (subKeys.has(`${r.numero_os}|${c}`)) continue
       let m = mp.get(r.pacote); if (!m) { m = new Map(); mp.set(r.pacote, m) }; m.set(c, (m.get(c) ?? 0) + v) }
     const rows = PAC_ORD.filter(p => mp.has(p)).map(p => {
       const mm = mp.get(p)!; const vals = meses.map(c => mm.get(c) ?? 0); const total = vals.reduce((s, x) => s + x, 0)
@@ -59,7 +62,7 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
     })
     const totMes = meses.map(c => rows.reduce((s, r) => s + (r.vals[meses.indexOf(c)] ?? 0), 0))
     return { rows, totMes, total: totMes.reduce((s, x) => s + x, 0) }
-  }, [secao, meses, de, ateF])
+  }, [secao, mensal, meses, de, ateF])
 
   // OSC × mês (+ acum, TEG/Sub)
   const oscTab = useMemo(() => {
@@ -102,8 +105,8 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
       </div>
 
       {/* Comparativo por frente (EAP) mês a mês */}
-      <PanelCard title="Comparativo por frente (EAP) — mês a mês" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
-        right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Var = penúlt → último mês</span>} pad={false} bodyClassName="overflow-x-auto">
+      <PanelCard title="Comparativo por frente (EAP) — mês a mês (execução própria)" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
+        right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>exclui subcontratadas · Var = penúlt → último mês</span>} pad={false} bodyClassName="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
