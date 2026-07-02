@@ -581,7 +581,8 @@ export interface AssinaturaMissaoDoc {
   titulo: string
   status: string
   concluida_em: string | null
-  metadata: { anexo_id?: string } | null
+  metadata: { anexo_id?: string; documento_id?: string } | null
+  arquivo_assinado_path?: string | null
 }
 
 export interface RHProposta {
@@ -617,6 +618,18 @@ export function useEtapaCandidato(candidatoId?: string) {
           .eq('categoria', 'assinaturas').eq('metadata->>candidato_id', candidatoId),
       ])
       const assRow = (Array.isArray(ass.data) ? ass.data[0] : ass.data) as { status?: string; concluida_em?: string } | undefined
+      // enriquece cada missão de assinatura com o PDF carimbado (mora em sig_documento)
+      const assDocsRows = (assDocs.data ?? []) as AssinaturaMissaoDoc[]
+      const docIds = assDocsRows.map(m => m.metadata?.documento_id).filter(Boolean) as string[]
+      const assinadoByDoc: Record<string, string | null> = {}
+      if (docIds.length) {
+        const sig = await supabase.from('sig_documento').select('id, arquivo_assinado_path').in('id', docIds)
+        for (const d of (sig.data ?? []) as { id: string; arquivo_assinado_path: string | null }[]) assinadoByDoc[d.id] = d.arquivo_assinado_path
+      }
+      const assinaturasDocs = assDocsRows.map(m => ({
+        ...m,
+        arquivo_assinado_path: m.metadata?.documento_id ? (assinadoByDoc[m.metadata.documento_id] ?? null) : null,
+      }))
       return {
         proposta: (prop.data ?? null) as RHProposta | null,
         exame: (ex.data ?? null) as RHExame | null,
@@ -626,7 +639,7 @@ export function useEtapaCandidato(candidatoId?: string) {
         aceites: (ace.data ?? []) as AceiteStatus[],
         registro: (reg.data ?? null) as RHRegistro | null,
         assinatura: assRow ? { status: assRow.status ?? 'pendente', concluida_em: assRow.concluida_em ?? null } : null,
-        assinaturasDocs: (assDocs.data ?? []) as AssinaturaMissaoDoc[],
+        assinaturasDocs,
       }
     },
   })

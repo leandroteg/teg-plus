@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine, Handshake, Upload, FileText,
+  Briefcase, User, PenLine, Handshake, Upload, FileText, Download,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -411,6 +411,12 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  // baixa o PDF já assinado (com carimbo/QR) do documento
+  async function abrirAssinado(path: string) {
+    const url = await anexoSignedUrl(path)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   async function handleEnviarDoc(a: typeof signaveis[number]) {
     setErro(null)
     try {
@@ -501,9 +507,16 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
                     {a.tipo === 'contrato' && <p className="text-[9px] text-slate-400 truncate">{a.arquivo_nome}</p>}
                   </div>
                   {docAssinado ? (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 shrink-0">
-                      <CheckCircle2 size={12} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                        <CheckCircle2 size={12} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
+                      </span>
+                      {miss?.arquivo_assinado_path && (
+                        <button onClick={() => abrirAssinado(miss.arquivo_assinado_path!)} className={btnGhost(isDark)} title="Baixar documento assinado (com carimbo)">
+                          <Download size={12} /> Assinado
+                        </button>
+                      )}
+                    </div>
                   ) : (<>
                     {enviado && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">aguardando</span>}
                     <button onClick={() => handleEnviarDoc(a)} disabled={enviarAssinaturaAnexo.isPending} className={BTN_PRI}>
