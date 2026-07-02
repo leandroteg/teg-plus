@@ -375,7 +375,7 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
   renderMeta: (obj: ObjFull, meta: MetaFull) => ReactNode
   areaFooter?: (obj: ObjFull, trimestre: number) => ReactNode
   /** Saúde por meta (verde/amarelo/vermelho/cinza) → flag + barra no cabeçalho de área/trimestre. */
-  metaHealth?: (m: MetaFull) => 'verde' | 'amarelo' | 'vermelho' | 'cinza'
+  metaHealth?: (m: MetaFull) => 'verde' | 'azul' | 'amarelo' | 'vermelho' | 'cinza'
 }) {
   const [openTri, setOpenTri] = useState<Record<number, boolean>>({})
   const [openArea, setOpenArea] = useState<Record<string, boolean>>({})
@@ -396,11 +396,11 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
   const hov = isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
 
   // Saúde (flag + barra) por grupo/área — só quando metaHealth é fornecido
-  const HEALTH_BG: Record<string, string> = { verde: 'bg-emerald-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: isDark ? 'bg-white/[0.15]' : 'bg-slate-300' }
-  const ORDER = ['verde', 'amarelo', 'vermelho', 'cinza'] as const
-  const pior = (ms: MetaFull[]) => { const s = new Set(ms.map(m => metaHealth!(m))); return s.has('vermelho') ? 'vermelho' : s.has('amarelo') ? 'amarelo' : s.has('verde') ? 'verde' : 'cinza' }
+  const HEALTH_BG: Record<string, string> = { verde: 'bg-emerald-500', azul: 'bg-blue-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: isDark ? 'bg-white/[0.15]' : 'bg-slate-300' }
+  const ORDER = ['verde', 'azul', 'amarelo', 'vermelho', 'cinza'] as const
+  const pior = (ms: MetaFull[]) => { const s = new Set(ms.map(m => metaHealth!(m))); return s.has('vermelho') ? 'vermelho' : s.has('amarelo') ? 'amarelo' : s.has('azul') ? 'azul' : s.has('verde') ? 'verde' : 'cinza' }
   const Barra = ({ ms, w }: { ms: MetaFull[]; w: string }) => {
-    const counts: Record<string, number> = { verde: 0, amarelo: 0, vermelho: 0, cinza: 0 }
+    const counts: Record<string, number> = { verde: 0, azul: 0, amarelo: 0, vermelho: 0, cinza: 0 }
     ms.forEach(m => { counts[metaHealth!(m)]++ })
     const total = ms.length || 1
     return (
@@ -683,7 +683,7 @@ export default function SgiObjetivos() {
         ) : (
           /* Revisão */
           <MetasAgrupadas itens={metasFiltradas} isDark={isDark} txt={txt} muted={muted} card={card} accentText="text-amber-500"
-            metaHealth={m => m.status_revisao === 'atingida' ? 'verde' : m.status_revisao === 'parcial' ? 'amarelo' : m.status_revisao === 'nao_atingida' ? 'vermelho' : 'cinza'}
+            metaHealth={m => m.status_revisao === 'atingida' ? 'verde' : m.status_revisao === 'atingida_atraso' ? 'azul' : m.status_revisao === 'parcial' ? 'amarelo' : m.status_revisao === 'nao_atingida' ? 'vermelho' : 'cinza'}
             renderMeta={(obj, m) => {
               const u = ultimoCheckin(m); const f = FAROL_CFG[(u?.farol as Farol) || 'cinza']; const jaEnviado = enviados[m.id]
               return (
