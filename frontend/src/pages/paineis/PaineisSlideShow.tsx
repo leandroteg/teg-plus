@@ -144,7 +144,7 @@ export default function PaineisSlideShow() {
   const [cfg, setCfg] = useState<Cfg>(loadCfg)
   const [playing, setPlaying] = useState(() => new URLSearchParams(window.location.search).get('autoplay') === '1')
   const [adding, setAdding] = useState(false)
-  const [enviarPara, setEnviarPara] = useState('diretoria@teguniao.com.br')
+  const [enviarPara, setEnviarPara] = useState('leandro.mallet@teguniao.com.br')
   const [enviando, setEnviando] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
   const WEBHOOK_ENVIAR = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/paineis-enviar-agora'
@@ -274,7 +274,7 @@ export default function PaineisSlideShow() {
               {enviando === 'sent' && <span className="text-[11px] font-semibold text-emerald-500">✓ Enviando — chega em ~2 min</span>}
               {enviando === 'error' && <span className="text-[11px] font-semibold text-red-500">Falhou — tente de novo</span>}
             </div>
-            <p className={`text-[10px] mt-1.5 ${muted}`}>Somente e-mails <b>@teguniao.com.br</b> · sempre com cópia para <b>leandro.mallet@teguniao.com.br</b></p>
+            <p className={`text-[10px] mt-1.5 ${muted}`}>Escolha o destinatário (digite <b>diretoria@teguniao.com.br</b> p/ enviar à diretoria) · sempre com cópia para <b>leandro.mallet@teguniao.com.br</b></p>
           </div>
         </div>
       </div>
