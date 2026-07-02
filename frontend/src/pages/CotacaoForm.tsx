@@ -906,42 +906,62 @@ export default function CotacaoForm() {
       return prev.filter((_, i) => i !== idx)
     })
   }, [])
+  // Itens da RC ainda pendentes (não atendidos por pedido anterior), prontos pra
+  // virar linhas de um card de fornecedor — qtd da RC, preço zerado. Usado sempre
+  // que um card "em branco" é criado (1º acesso, Adicionar Fornecedor, Recomeçar),
+  // pra o comprador só descer preenchendo preço em vez de buscar item por item.
+  const itensPendentesDaRC = useCallback((): ItemPreco[] => {
+    const rcItens = (cotacao?.requisicao?.itens ?? []) as any[]
+    return rcItens
+      .filter(item => !item.atendido_em_pedido_id)
+      .map(item => ({
+        descricao: toUpperNorm(item.descricao),
+        qtd: item.quantidade,
+        valor_unitario: 0,
+        valor_total: 0,
+      }))
+  }, [cotacao?.requisicao])
   // Recomeça a cotação do zero: remove TODOS os fornecedores já salvos (marcados
-  // pra deletar no submit) e volta pra 1 card em branco. Os itens da RC continuam
-  // disponíveis normalmente — só o que já foi digitado/lido de cotação some.
+  // pra deletar no submit) e volta pra 1 card em branco com os itens da RC
+  // pré-listados. Só o que já foi digitado/lido de cotação anterior some.
   const resetFornecedores = useCallback(() => {
     setFornecedores(prev => {
       const idsExistentes = prev.filter(f => f.id).map(f => f.id as string)
       if (idsExistentes.length > 0) setFornecedoresRemovidosIds(ids => [...ids, ...idsExistentes])
-      return [emptyFornecedor()]
+      return [{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }]
     })
     setSelecaoPorItem(new Map())
     setSelecaoTocada(false)
-  }, [])
-  // Hidrata o formulário com fornecedores já salvos quando uma cotação em
-  // andamento é reaberta (ex.: cotação parcial revertida para completar depois).
-  // Só roda 1x — não pode sobrescrever edições em curso em refetches seguintes.
+  }, [itensPendentesDaRC])
+  // Hidrata o formulário quando a cotação carrega: reaproveita fornecedores já
+  // salvos (cotação em andamento reaberta) ou, se ainda não há nenhum, pré-lista
+  // os itens da RC no card 1 — em vez de começar totalmente em branco. Só roda 1x
+  // — não pode sobrescrever edições em curso em refetches seguintes.
   const hydratedRef = useRef(false)
   useEffect(() => {
     if (hydratedRef.current) return
-    if (!cotacao?.fornecedores || cotacao.fornecedores.length === 0) return
+    if (!cotacao) return
     hydratedRef.current = true
-    setFornecedores(cotacao.fornecedores.map(f => ({
-      id:                 f.id,
-      fornecedor_nome:    f.fornecedor_nome ?? '',
-      fornecedor_contato: f.fornecedor_contato ?? '',
-      fornecedor_telefone: f.fornecedor_telefone ?? '',
-      fornecedor_email:   f.fornecedor_email ?? '',
-      fornecedor_cnpj:    f.fornecedor_cnpj ?? '',
-      valor_total:        f.valor_total ?? 0,
-      valor_frete:        (f as any).valor_frete ?? 0,
-      prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
-      condicao_pagamento: f.condicao_pagamento ?? '',
-      observacao:         f.observacao ?? '',
-      arquivo_url:        f.arquivo_url ?? '',
-      itens_precos:       f.itens_precos ?? [],
-    })))
-  }, [cotacao?.fornecedores])
+    if (cotacao.fornecedores && cotacao.fornecedores.length > 0) {
+      setFornecedores(cotacao.fornecedores.map(f => ({
+        id:                 f.id,
+        fornecedor_nome:    f.fornecedor_nome ?? '',
+        fornecedor_contato: f.fornecedor_contato ?? '',
+        fornecedor_telefone: f.fornecedor_telefone ?? '',
+        fornecedor_email:   f.fornecedor_email ?? '',
+        fornecedor_cnpj:    f.fornecedor_cnpj ?? '',
+        valor_total:        f.valor_total ?? 0,
+        valor_frete:        (f as any).valor_frete ?? 0,
+        prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
+        condicao_pagamento: f.condicao_pagamento ?? '',
+        observacao:         f.observacao ?? '',
+        arquivo_url:        f.arquivo_url ?? '',
+        itens_precos:       f.itens_precos ?? [],
+      })))
+    } else {
+      setFornecedores([{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])
+    }
+  }, [cotacao, itensPendentesDaRC])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1320,6 +1340,106 @@ export default function CotacaoForm() {
       setToast({ type: 'error', msg: msgs.join(' ') })
     }
   }, [id, cotacao?.requisicao])
+
+  // Leitura de IA escopada a UM card de fornecedor já existente (em vez de criar
+  // fornecedor novo, como o upload global no topo faz). Usa só o 1º fornecedor
+  // detectado no documento. Preenche campo em branco; nunca sobrescreve o que o
+  // comprador já digitou manualmente — nem nome/CNPJ/condição, nem preço de item.
+  const handleFornecedorParsed = useCallback(async (idx: number, parsed: {
+    fornecedor_nome: string
+    fornecedor_cnpj?: string
+    fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
+    prazo_entrega_dias?: number
+    condicao_pagamento?: string
+    observacao?: string
+    itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+  }[], file: File) => {
+    const p = parsed[0]
+    if (!p) return
+
+    let uploadedPath = ''
+    if (id && file) {
+      try {
+        const safeName = 'cotacao_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${id}/${Date.now()}_${safeName}`
+        const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
+        if (!error) uploadedPath = path
+      } catch { /* upload falhou, segue sem anexo */ }
+    }
+
+    const tokenize = (s: string) =>
+      toUpperNorm(String(s ?? ''))
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length >= 3)
+
+    setFornecedores(prev => prev.map((f, i) => {
+      if (i !== idx) return f
+
+      // Fuzzy match (mesma regra do upload global) contra as linhas JÁ LISTADAS
+      // neste card — pré-carregadas com os itens da RC.
+      const rowTokens = f.itens_precos.map(row => ({
+        descricao: toUpperNorm(row.descricao).trim(),
+        tokens: new Set(tokenize(row.descricao)),
+      }))
+      const rowUsed = new Set<string>()
+      const matchRow = (desc: string): string | null => {
+        const norm = toUpperNorm(desc).trim()
+        if (!norm) return null
+        for (const r of rowTokens) {
+          if (!rowUsed.has(r.descricao) && r.descricao === norm) { rowUsed.add(r.descricao); return r.descricao }
+        }
+        const pdfTokens = new Set(tokenize(norm))
+        if (pdfTokens.size === 0) return null
+        let best: { desc: string; score: number } | null = null
+        for (const r of rowTokens) {
+          if (rowUsed.has(r.descricao) || r.tokens.size === 0) continue
+          let overlap = 0
+          for (const t of pdfTokens) if (r.tokens.has(t)) overlap++
+          const score = overlap / Math.min(pdfTokens.size, r.tokens.size)
+          if (overlap >= 2 && score >= 0.4 && (!best || score > best.score)) best = { desc: r.descricao, score }
+        }
+        if (best) { rowUsed.add(best.desc); return best.desc }
+        return null
+      }
+
+      const itensAtualizados = f.itens_precos.map(item => ({ ...item }))
+      for (const it of (p.itens ?? [])) {
+        if (!(it.valor_unitario > 0)) continue
+        const matched = matchRow(it.descricao)
+        if (!matched) continue
+        const rowIdx = itensAtualizados.findIndex(row => toUpperNorm(row.descricao).trim() === matched)
+        if (rowIdx === -1 || itensAtualizados[rowIdx].valor_unitario > 0) continue // preço já preenchido — preserva
+        const qtd = itensAtualizados[rowIdx].qtd || it.qtd
+        itensAtualizados[rowIdx] = {
+          ...itensAtualizados[rowIdx],
+          valor_unitario: it.valor_unitario,
+          valor_total: Math.round(qtd * it.valor_unitario * 100) / 100,
+        }
+      }
+
+      const contatoSeparado = splitFornecedorContato(p.fornecedor_contato)
+      const telefone = p.fornecedor_telefone || contatoSeparado.telefone
+      const email = p.fornecedor_email || contatoSeparado.email
+
+      return {
+        ...f,
+        fornecedor_nome:     f.fornecedor_nome.trim() || toUpperNorm(p.fornecedor_nome || ''),
+        fornecedor_cnpj:     f.fornecedor_cnpj.trim() || (p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : ''),
+        fornecedor_telefone: f.fornecedor_telefone.trim() || telefone,
+        fornecedor_email:    f.fornecedor_email.trim() || email,
+        fornecedor_contato:  f.fornecedor_contato.trim() || joinFornecedorContato(telefone, email, p.fornecedor_contato),
+        prazo_entrega_dias:  f.prazo_entrega_dias || (p.prazo_entrega_dias || 0),
+        condicao_pagamento:  f.condicao_pagamento.trim() || toUpperNorm(p.condicao_pagamento || ''),
+        observacao:          f.observacao.trim() || toUpperNorm(p.observacao || ''),
+        arquivo_url:         f.arquivo_url || uploadedPath,
+        itens_precos:        itensAtualizados,
+        valor_total:         calcTotalItems(itensAtualizados),
+      }
+    }))
+  }, [id])
 
   // ── Upload de arquivo por fornecedor ──────────────────────────────────────
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
@@ -1790,6 +1910,16 @@ export default function CotacaoForm() {
               />
             </div>
 
+            {/* ── Leitura de IA escopada a este fornecedor ──────────────────────
+                Preenche só o que estiver em branco (nome/CNPJ/condição) e o preço
+                dos itens ainda zerados — não mexe no que já foi digitado à mão. */}
+            <UploadCotacao
+              onParsed={(parsed, file) => handleFornecedorParsed(idx, parsed, file)}
+              disabled={cotacao?.status === 'concluida' || isLocked}
+              cotacaoId={id}
+              requisicaoId={cotacao?.requisicao_id}
+            />
+
             {/* ── Itens e Preços ─────────────────────────────────────────────── */}
             <ItemPricingTable
               items={forn.itens_precos}
@@ -1953,18 +2083,7 @@ export default function CotacaoForm() {
       {/* Adicionar fornecedor */}
       <button
         type="button"
-        onClick={() => {
-          const rcItens = cotacao?.requisicao?.itens ?? []
-          // Filtra itens já atendidos por pedido anterior — não devem entrar em nova cotação.
-          const itensPendentes = rcItens.filter((item: any) => !item.atendido_em_pedido_id)
-          const itensPrecos: ItemPreco[] = itensPendentes.map(item => ({
-            descricao: toUpperNorm(item.descricao),
-            qtd: item.quantidade,
-            valor_unitario: 0,
-            valor_total: 0,
-          }))
-          setFornecedores(p => [...p, { ...emptyFornecedor(), itens_precos: itensPrecos }])
-        }}
+        onClick={() => setFornecedores(p => [...p, { ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])}
         className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-teal-600 border-2 border-dashed border-teal-300 rounded-2xl hover:bg-teal-50 transition"
       >
         <PlusCircle size={14} /> Adicionar Fornecedor
