@@ -613,23 +613,12 @@ export function useEtapaCandidato(candidatoId?: string) {
         supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
         supabase.from('rh_admissao_registro').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.rpc('rh_admissao_assinatura_status', { p_candidato_id: candidatoId }),
-        // missões de assinatura por documento (1 por anexo)
-        supabase.from('portalteg_missoes').select('id, titulo, status, concluida_em, metadata')
-          .eq('categoria', 'assinaturas').eq('metadata->>candidato_id', candidatoId),
+        // status de assinatura por anexo — via RPC (sig_documento/sig_assinatura),
+        // porque portalteg_missoes tem RLS só de service_role (o RH não enxerga direto).
+        supabase.rpc('rh_admissao_assinatura_docs', { p_candidato_id: candidatoId }),
       ])
       const assRow = (Array.isArray(ass.data) ? ass.data[0] : ass.data) as { status?: string; concluida_em?: string } | undefined
-      // enriquece cada missão de assinatura com o PDF carimbado (mora em sig_documento)
-      const assDocsRows = (assDocs.data ?? []) as AssinaturaMissaoDoc[]
-      const docIds = assDocsRows.map(m => m.metadata?.documento_id).filter(Boolean) as string[]
-      const assinadoByDoc: Record<string, string | null> = {}
-      if (docIds.length) {
-        const sig = await supabase.from('sig_documento').select('id, arquivo_assinado_path').in('id', docIds)
-        for (const d of (sig.data ?? []) as { id: string; arquivo_assinado_path: string | null }[]) assinadoByDoc[d.id] = d.arquivo_assinado_path
-      }
-      const assinaturasDocs = assDocsRows.map(m => ({
-        ...m,
-        arquivo_assinado_path: m.metadata?.documento_id ? (assinadoByDoc[m.metadata.documento_id] ?? null) : null,
-      }))
+      const assinaturasDocs = (assDocs.data ?? []) as AssinaturaMissaoDoc[]
       return {
         proposta: (prop.data ?? null) as RHProposta | null,
         exame: (ex.data ?? null) as RHExame | null,
