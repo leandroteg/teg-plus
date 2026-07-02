@@ -127,6 +127,9 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
           : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
             : true
   ))
+  const mHH = lista.reduce((s, r) => s + intervalToMin(r.hh_trabalhada), 0)
+  const mExtras = lista.reduce((s, r) => s + intervalToMin(r.extras), 0)
+  const mFaltas = lista.reduce((s, r) => s + intervalToMin(r.faltas), 0)
 
   if (isLoading) return <Painel><Loading /></Painel>
   return (
@@ -138,7 +141,17 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
             <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Dias</th>
             <th className={`${TH} hidden sm:table-cell`}>HH Trab.</th><th className={TH}>Extras</th><th className={TH}>Faltas</th><th className={TH}></th>
           </tr></thead>
-          <tbody>{lista.map(r => (
+          <tbody>
+            <tr className={`border-t font-extrabold ${c.isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-100'}`}>
+              <td className={TD}>Total · {lista.length}</td>
+              <td className={`${TD} hidden md:table-cell`} />
+              <td className={TD} />
+              <td className={`${TD} hidden sm:table-cell`}>{mHH > 0 ? minToHoras(mHH) : '—'}</td>
+              <td className={`${TD} text-orange-500`}>{mExtras > 0 ? minToHoras(mExtras) : '—'}</td>
+              <td className={`${TD} text-rose-500`}>{mFaltas > 0 ? minToHoras(mFaltas) : '—'}</td>
+              <td className={TD} />
+            </tr>
+            {lista.map(r => (
             <tr key={r.colaborador_id ?? r.colaborador_nome} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
               <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}
                 <div className={`text-[10px] flex items-center gap-1.5 flex-wrap ${c.sub}`}>
@@ -218,6 +231,9 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
               : true
     ))
     .sort((a, b) => (a.r.colaborador?.nome || '').localeCompare(b.r.colaborador?.nome || ''))
+  const tNormais = rows.reduce((s, { r }) => s + intervalToMin(r.normais), 0)
+  const tFaltas = rows.reduce((s, { r }) => s + intervalToMin(r.faltas), 0)
+  const tExtras = rows.reduce((s, { r }) => s + intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100), 0)
   if (isLoading) return <Painel><Loading /></Painel>
   if (!rows.length) return <Painel><Vazio msg={`Sem registros em ${new Date(diaData + 'T00:00:00').toLocaleDateString('pt-BR')}.`} /></Painel>
   return (
@@ -228,7 +244,16 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
           <th className={TH}>E1</th><th className={TH}>S1</th><th className={TH}>E2</th><th className={TH}>S2</th>
           <th className={`${TH} hidden sm:table-cell`}>Normais</th><th className={TH}>Faltas</th><th className={TH}>Extras</th>
         </tr></thead>
-        <tbody>{rows.map(({ r, fora }, i) => {
+        <tbody>
+          <tr className={`border-t font-extrabold ${c.isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-100'}`}>
+            <td className={TD}>Total · {rows.length}</td>
+            <td className={`${TD} hidden md:table-cell`} />
+            <td className={TD} /><td className={TD} /><td className={TD} /><td className={TD} />
+            <td className={`${TD} hidden sm:table-cell`}>{tNormais > 0 ? minToHoras(tNormais) : '—'}</td>
+            <td className={`${TD} text-rose-500`}>{tFaltas > 0 ? minToHoras(tFaltas) : '—'}</td>
+            <td className={`${TD} text-orange-500`}>{tExtras > 0 ? minToHoras(tExtras) : '—'}</td>
+          </tr>
+          {rows.map(({ r, fora }, i) => {
           const ex = intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)
           const falta = intervalToMin(r.faltas) > 0
           const aberto = pontoEmAberto(r)
