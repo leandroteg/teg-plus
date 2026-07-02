@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato,
-  useRegistro, useMatriculaColaborador,
+  useRegistro, useMatriculaColaborador, anexoSignedUrl,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
@@ -398,9 +398,17 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
     setErro(null)
     setEmailOk(false)
     try {
-      await enviarEmail.mutateAsync({ candidatoId: cand.id, destinatario: destinatario.trim() })
+      // sempre copia (CC) quem está executando o envio
+      await enviarEmail.mutateAsync({ candidatoId: cand.id, destinatario: destinatario.trim(), cc: perfil?.email })
       setEmailOk(true)
     } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao enviar e-mail') }
+  }
+
+  async function abrirFicha() {
+    const ficha = [...fichas].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]
+    if (!ficha) return
+    const url = await anexoSignedUrl(ficha.arquivo_path)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   async function handleEnviarDoc(a: typeof signaveis[number]) {
@@ -433,13 +441,22 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
         </button>
       }>
         {registro?.ficha_gerada_em ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] text-slate-400 mr-auto">Gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-            <input value={destinatario} onChange={e => setDestinatario(e.target.value)} placeholder="E-mail da contabilidade" className={`${IN} w-[200px]`} />
-            <button onClick={handleEnviarEmail} disabled={enviarEmail.isPending || !destinatario.trim()} className={btnGhost(isDark)}>
-              {enviarEmail.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />} Enviar e-mail
-            </button>
-            {emailOk && <span className="text-[10px] font-bold text-emerald-600">✓ enviado</span>}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[10px] text-slate-400">Gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+              {fichas.length > 0 && (
+                <button onClick={abrirFicha} className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-600 hover:underline">
+                  <FileText size={11} /> Baixar ficha (PDF)
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input value={destinatario} onChange={e => setDestinatario(e.target.value)} placeholder="E-mail da contabilidade" className={`${IN} w-[220px]`} />
+              <button onClick={handleEnviarEmail} disabled={enviarEmail.isPending || !destinatario.trim()} className={btnGhost(isDark)}>
+                {enviarEmail.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />} Enviar e-mail
+              </button>
+              {emailOk && <span className="text-[10px] font-bold text-emerald-600">✓ enviado (cópia p/ você)</span>}
+            </div>
           </div>
         ) : (
           <p className="text-[10px] text-slate-400">Gere a ficha para enviar à contabilidade.</p>

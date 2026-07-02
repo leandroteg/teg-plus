@@ -9,6 +9,12 @@ import { supabase } from '../services/supabase'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../types/rh'
 
 const BUCKET = 'rh-admissao-docs'
+
+// URL assinada (1h) de um anexo no bucket privado — p/ baixar/abrir na tela
+export async function anexoSignedUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
+}
 const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
 const SELECT =
@@ -834,11 +840,11 @@ export function useRegistro() {
   })
   // Envia a ficha + documentos do candidato por e-mail (caixa do RH via n8n)
   const enviarEmail = useMutation({
-    mutationFn: async (i: { candidatoId: string; destinatario: string }) => {
+    mutationFn: async (i: { candidatoId: string; destinatario: string; cc?: string }) => {
       const resp = await fetch(`${N8N_URL}/rh/ficha/enviar-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidato_id: i.candidatoId, destinatario: i.destinatario }),
+        body: JSON.stringify({ candidato_id: i.candidatoId, destinatario: i.destinatario, cc: i.cc || null }),
       })
       const r = (await resp.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!resp.ok || !r.ok) throw new Error(r.message || 'Falha ao enviar o e-mail')
