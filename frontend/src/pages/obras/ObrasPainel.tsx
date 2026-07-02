@@ -1,14 +1,23 @@
 import { useMemo } from 'react'
-import { HardHat, Users2, Truck, Building2, Layers } from 'lucide-react'
+import { HardHat, Users2, Building2, Layers, Grid3x3, BarChart3 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePlanejamentoEquipe, useObrasComProjeto } from '../../hooks/useObras'
 import { useAlocacoes, useVeiculos } from '../../hooks/useFrotas'
-import { CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
+import { CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL, type CategoriaGrupo } from '../../constants/categoriaVeiculo'
 
 const STATUS_ATIVO = ['planejado', 'mobilizado', 'ativo']
 const poloNm = (s?: string) => (s ?? '').replace(/^F[\d.\/]+\s*-\s*/, '') || (s ?? '—')
 
-// Painel do módulo Obras — foco em mobilização (equipes alocadas) + frota por obra.
+// Ordem e cor dos grupos de frota (mesma paleta do cadastro de veículos)
+const GRUPOS_FROTA = ['leve', 'onibus_van', 'pesados', 'guindauto', 'maquinas'] as const
+const GRUPO_HEX: Record<CategoriaGrupo, string> = {
+  leve: '#10b981', onibus_van: '#0ea5e9', pesados: '#f59e0b', guindauto: '#8b5cf6', maquinas: '#f43f5e',
+}
+// Nome curto do canteiro a partir do nome da obra ("LD NOVA PONTE 2 - PERDIZES 2, 138 KV" → "NOVA PONTE 2 - PERDIZES 2")
+const canteiroNm = (nome?: string) =>
+  (nome ?? '—').replace(/^LD\s+/i, '').replace(/\s*[-,]?\s*138\s*kv\.?$/i, '').trim() || '—'
+
+// Painel do módulo Obras — foco em mobilização (equipes alocadas) + frota por canteiro.
 // Padrão EGP: cards de KPI + barras horizontais, tema claro/escuro, dados reais.
 export default function ObrasPainel() {
   const { isLightSidebar: isLight } = useTheme()
@@ -58,22 +67,25 @@ export default function ObrasPainel() {
     })
     const porFrente = [...frenteCount.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
 
-    // frota
+    // frota — matriz categoria(grupo) × canteiro(obra)
     const veicById = new Map(veiculos.map(v => [v.id, v]))
     const frotaAtiva = alocFrota.filter(a => a.status === 'ativa' && a.obra_id && veicById.get(a.veiculo_id))
-    const frotaPorObra = new Map<string, number>()
-    const frotaPorGrupo = new Map<string, number>()
-    frotaAtiva.forEach(a => {
-      frotaPorObra.set(a.obra_id!, (frotaPorObra.get(a.obra_id!) ?? 0) + 1)
-      const veic = veicById.get(a.veiculo_id)!
-      const g = CATEGORIA_GRUPO[veic.categoria]; const gl = g ? CATEGORIA_GRUPO_LABEL[g] : 'Outros'
-      frotaPorGrupo.set(gl, (frotaPorGrupo.get(gl) ?? 0) + 1)
-    })
     const maquinas = frotaAtiva.length
-    const porFrotaObra = [...frotaPorObra.entries()].map(([id, n]) => ({ label: obraById.get(id)?.nome ?? '—', value: n })).sort((a, b) => b.value - a.value)
-    const porFrotaGrupo = [...frotaPorGrupo.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+    const canteiroMap = new Map<string, { id: string; nome: string; total: number; porGrupo: Partial<Record<CategoriaGrupo, number>> }>()
+    const grupoTotais: Partial<Record<CategoriaGrupo, number>> = {}
+    frotaAtiva.forEach(a => {
+      const veic = veicById.get(a.veiculo_id)!
+      const grp: CategoriaGrupo = CATEGORIA_GRUPO[veic.categoria] ?? 'maquinas'
+      const oid = a.obra_id!
+      let c = canteiroMap.get(oid)
+      if (!c) { c = { id: oid, nome: canteiroNm(obraById.get(oid)?.nome), total: 0, porGrupo: {} }; canteiroMap.set(oid, c) }
+      c.total++; c.porGrupo[grp] = (c.porGrupo[grp] ?? 0) + 1
+      grupoTotais[grp] = (grupoTotais[grp] ?? 0) + 1
+    })
+    const canteiros = [...canteiroMap.values()].sort((a, b) => b.total - a.total)
+    const gruposFrota = GRUPOS_FROTA.filter(g => (grupoTotais[g] ?? 0) > 0)
 
-    return { kpi, maquinas, porPapel, porObra, porPolo, porFrente, porFrotaObra, porFrotaGrupo }
+    return { kpi, maquinas, porPapel, porObra, porPolo, porFrente, canteiros, gruposFrota, grupoTotais }
   }, [equipe, obras, alocFrota, veiculos])
 
   return (
@@ -105,11 +117,15 @@ export default function ObrasPainel() {
         <Bloco isDark={isDark} className={card} titulo="Efetivo por frente de trabalho" icon={HardHat}>
           <Barras isDark={isDark} dados={d.porFrente} cor="#8b5cf6" />
         </Bloco>
-        <Bloco isDark={isDark} className={card} titulo="Frota por obra" icon={Truck}>
-          <Barras isDark={isDark} dados={d.porFrotaObra} cor="#10b981" vazio="Nenhuma máquina alocada" />
+      </div>
+
+      {/* Frota: matriz categoria × canteiro (66%) + top canteiros empilhado (33%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <Bloco isDark={isDark} className={`${card} lg:col-span-2`} titulo="Frota · categoria por canteiro" icon={Grid3x3}>
+          <MatrizFrota isDark={isDark} canteiros={d.canteiros} grupos={d.gruposFrota} grupoTotais={d.grupoTotais} />
         </Bloco>
-        <Bloco isDark={isDark} className={card} titulo="Frota por tipo" icon={Truck}>
-          <Barras isDark={isDark} dados={d.porFrotaGrupo} cor="#10b981" vazio="Nenhuma máquina alocada" />
+        <Bloco isDark={isDark} className={card} titulo="Top veículos por canteiro" icon={BarChart3}>
+          <StackedCanteiros isDark={isDark} canteiros={d.canteiros} grupos={d.gruposFrota} />
         </Bloco>
       </div>
     </div>
@@ -154,6 +170,92 @@ function Barras({ isDark, dados, cor, vazio }: { isDark: boolean; dados: { label
           <span className={`text-[11px] font-bold w-7 text-right shrink-0 ${txtMain}`}>{x.value}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+type CanteiroFrota = { id: string; nome: string; total: number; porGrupo: Partial<Record<CategoriaGrupo, number>> }
+
+// Matriz heatmap: linhas = grupo de veículo, colunas = canteiro, célula = qtd alocada.
+function MatrizFrota({ isDark, canteiros, grupos, grupoTotais }: { isDark: boolean; canteiros: CanteiroFrota[]; grupos: CategoriaGrupo[]; grupoTotais: Partial<Record<CategoriaGrupo, number>> }) {
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  if (!canteiros.length) return <p className={`text-[11px] italic ${txtMuted} py-2`}>Nenhuma máquina alocada</p>
+  const maxCell = Math.max(1, ...canteiros.flatMap(c => grupos.map(g => c.porGrupo[g] ?? 0)))
+  const totalGeral = canteiros.reduce((s, c) => s + c.total, 0)
+  const th = `text-[10px] font-bold uppercase tracking-wider ${txtMuted}`
+  const heat = (v: number): React.CSSProperties => {
+    if (!v) return { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }
+    const t = 0.16 + 0.84 * (v / maxCell)
+    return {
+      backgroundColor: isDark ? `rgba(45,212,191,${(t * 0.42).toFixed(3)})` : `rgba(20,184,166,${t.toFixed(3)})`,
+      color: !isDark && t > 0.6 ? '#fff' : isDark ? '#99f6e4' : '#0f766e',
+    }
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="border-separate" style={{ borderSpacing: '3px', minWidth: '100%' }}>
+        <thead>
+          <tr>
+            <th className={`text-left ${th} pb-1 pr-2`}>Categoria</th>
+            {canteiros.map(c => <th key={c.id} className={`text-[10px] font-semibold ${txtMuted} px-1 pb-1 whitespace-nowrap`} title={c.nome}>{c.nome}</th>)}
+            <th className={`${th} pl-1 pb-1 text-center`}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {grupos.map(g => (
+            <tr key={g}>
+              <td className={`text-[11px] font-medium whitespace-nowrap pr-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ backgroundColor: GRUPO_HEX[g] }} />
+                {CATEGORIA_GRUPO_LABEL[g]}
+              </td>
+              {canteiros.map(c => {
+                const v = c.porGrupo[g] ?? 0
+                return <td key={c.id} className="text-center text-[11px] font-bold rounded-md h-7 min-w-[40px]" style={heat(v)}>{v || ''}</td>
+              })}
+              <td className={`text-center text-[11px] font-black px-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{grupoTotais[g] ?? 0}</td>
+            </tr>
+          ))}
+          <tr>
+            <td className={`${th} pr-2`}>Total</td>
+            {canteiros.map(c => <td key={c.id} className={`text-center text-[11px] font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>{c.total}</td>)}
+            <td className={`text-center text-[11px] font-black ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>{totalGeral}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// Barras horizontais empilhadas: 1 barra por canteiro, segmentos = grupo de veículo.
+function StackedCanteiros({ isDark, canteiros, grupos }: { isDark: boolean; canteiros: CanteiroFrota[]; grupos: CategoriaGrupo[] }) {
+  const txtMain = isDark ? 'text-white' : 'text-slate-700'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  if (!canteiros.length) return <p className={`text-[11px] italic ${txtMuted} py-2`}>Nenhuma máquina alocada</p>
+  return (
+    <div>
+      <div className="space-y-1.5">
+        {canteiros.slice(0, 10).map(c => (
+          <div key={c.id} className="flex items-center gap-2">
+            <span className={`text-[11px] truncate w-[42%] shrink-0 ${txtMain}`} title={c.nome}>{c.nome}</span>
+            <div className={`flex-1 h-3.5 rounded-full overflow-hidden flex ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
+              {grupos.map(g => {
+                const v = c.porGrupo[g] ?? 0
+                if (!v) return null
+                return <div key={g} className="h-full" style={{ width: `${(v / c.total) * 100}%`, backgroundColor: GRUPO_HEX[g] }} title={`${CATEGORIA_GRUPO_LABEL[g]}: ${v}`} />
+              })}
+            </div>
+            <span className={`text-[11px] font-bold w-6 text-right shrink-0 ${txtMain}`}>{c.total}</span>
+          </div>
+        ))}
+      </div>
+      <div className={`flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        {grupos.map(g => (
+          <span key={g} className={`inline-flex items-center gap-1 text-[9px] ${txtMuted}`}>
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GRUPO_HEX[g] }} />
+            {CATEGORIA_GRUPO_LABEL[g]}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
