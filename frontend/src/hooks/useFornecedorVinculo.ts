@@ -41,7 +41,7 @@ export function formatCNPJ(value?: string | null) {
 }
 
 export function getFornecedorPaymentMissingFields(fornecedor?: Partial<Fornecedor> | null) {
-  if (fornecedor?.boleto) return []
+  if (fornecedor?.boleto || fornecedor?.cartao) return []
 
   const banco = fornecedor?.banco_nome?.trim()
   const agencia = fornecedor?.agencia?.trim()

@@ -57,6 +57,7 @@ export interface Fornecedor {
   agencia?: string
   conta?: string
   boleto?: boolean
+  cartao?: boolean
   pix_chave?: string
   pix_tipo?: string
   omie_id?: number
@@ -88,6 +89,7 @@ export interface ContaPagar {
   cartao_id?: string
   fatura_id?: string
   loc_fatura_id?: string
+  medicao_id?: string
   numero_documento?: string
   status: StatusCP
   aprovado_por?: string
@@ -158,6 +160,7 @@ export interface ContaReceber {
   classe_financeira?: string
   projeto_id?: string
   natureza?: string
+  medicao_id?: string
   status: StatusCR
   autorizado_por?: string
   autorizado_em?: string
