@@ -21,7 +21,6 @@ const DEFAULT_SLIDES: Slide[] = [
   { key: 'egp' },
   { key: 'egp', tab: 'faturamento', label: 'EGP · Faturamento' },
   { key: 'egp', tab: 'medicao', label: 'EGP · Medição' },
-  { key: 'obras' },
   { key: 'rh' },
   { key: 'patrimonial' },
 ]
