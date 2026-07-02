@@ -336,6 +336,28 @@ export function RegistroCard({ adm, isDark, onClick, autorNome }: {
   )
 }
 
+const BTN_PRI = 'inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50 shrink-0'
+const btnGhost = (isDark: boolean) => `inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border disabled:opacity-50 shrink-0 ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`
+
+// Cartão de etapa: número + título à esquerda, ações à direita, conteúdo embaixo
+function Passo({ n, titulo, icon: Icon, isDark, right, children }: {
+  n: number; titulo: string; icon: React.ElementType; isDark: boolean; right?: React.ReactNode; children?: React.ReactNode
+}) {
+  return (
+    <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`w-5 h-5 shrink-0 rounded-lg text-[10px] font-extrabold flex items-center justify-center ${isDark ? 'bg-white/10 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{n}</span>
+          <Icon size={12} className="text-slate-400 shrink-0" />
+          <span className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{titulo}</span>
+        </div>
+        {right && <div className="flex items-center gap-1.5 shrink-0">{right}</div>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 function RegistroCandidato({ cand, adm, isDark, autorNome }: {
   cand: RHAdmissaoCandidato; adm: RHAdmissao; isDark: boolean; autorNome?: string
 }) {
@@ -403,34 +425,26 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
               : null
       } />
 
-      {/* 1 · Ficha p/ contabilidade */}
-      <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><FileText size={11} /> 1 · Ficha de registro (contabilidade)</span>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setModalFicha(true)} disabled={gerarFicha.isPending}
-            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">
-            {gerarFicha.isPending ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}
-            {fichas.length ? 'Revisar e gerar nova ficha' : 'Preencher e gerar ficha'}
-          </button>
-          {registro?.ficha_gerada_em && (
-            <span className="text-[10px] text-slate-500">
-              gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-        </div>
-        {registro?.ficha_gerada_em && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <input value={destinatario} onChange={e => setDestinatario(e.target.value)}
-              placeholder="E-mail da contabilidade" className={`${IN} max-w-[240px]`} />
-            <button onClick={handleEnviarEmail} disabled={enviarEmail.isPending || !destinatario.trim()}
-              className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50">
-              {enviarEmail.isPending ? <Loader2 size={11} className="animate-spin" /> : <Smartphone size={11} />}
-              Enviar por e-mail (ficha + documentos)
+      {/* 1 · Ficha */}
+      <Passo n={1} titulo="Ficha de registro (contabilidade)" icon={FileText} isDark={isDark} right={
+        <button onClick={() => setModalFicha(true)} disabled={gerarFicha.isPending} className={BTN_PRI}>
+          {gerarFicha.isPending ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+          {fichas.length ? 'Revisar ficha' : 'Gerar ficha'}
+        </button>
+      }>
+        {registro?.ficha_gerada_em ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-slate-400 mr-auto">Gerada em {new Date(registro.ficha_gerada_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+            <input value={destinatario} onChange={e => setDestinatario(e.target.value)} placeholder="E-mail da contabilidade" className={`${IN} w-[200px]`} />
+            <button onClick={handleEnviarEmail} disabled={enviarEmail.isPending || !destinatario.trim()} className={btnGhost(isDark)}>
+              {enviarEmail.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />} Enviar e-mail
             </button>
-            {emailOk && <span className="text-[10px] font-bold text-emerald-600">✓ E-mail enviado</span>}
+            {emailOk && <span className="text-[10px] font-bold text-emerald-600">✓ enviado</span>}
           </div>
+        ) : (
+          <p className="text-[10px] text-slate-400">Gere a ficha para enviar à contabilidade.</p>
         )}
-      </div>
+      </Passo>
       {modalFicha && (
         <RHFichaRegistroModal
           cand={cand} adm={adm}
@@ -441,49 +455,42 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
         />
       )}
 
-      {/* 2 · Documentos para assinatura — 1 missão por documento no Portal */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><PenLine size={11} /> 2 · Documentos para assinatura</span>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => contratoRef.current?.click()} disabled={uploadAnexo.isPending}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50">
-              {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} Anexar contrato
-            </button>
-            <button onClick={() => docRef.current?.click()} disabled={uploadAnexo.isPending}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 disabled:opacity-50">
-              <Plus size={10} /> Outro documento
-            </button>
-          </div>
-        </div>
+      {/* 2 · Documentos para assinatura */}
+      <Passo n={2} titulo="Documentos para assinatura" icon={PenLine} isDark={isDark} right={<>
+        <button onClick={() => contratoRef.current?.click()} disabled={uploadAnexo.isPending} className={btnGhost(isDark)}>
+          {uploadAnexo.isPending ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Contrato
+        </button>
+        <button onClick={() => docRef.current?.click()} disabled={uploadAnexo.isPending} className={btnGhost(isDark)}>
+          <Plus size={12} /> Outro
+        </button>
+      </>}>
         <input ref={contratoRef} type="file" className="hidden" accept=".pdf"
           onChange={e => { const f = e.target.files?.[0]; if (f) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file: f, tipo: 'contrato', autorId: perfil?.id }); e.currentTarget.value = '' }} />
         <input ref={docRef} type="file" className="hidden" accept=".pdf"
           onChange={e => { const f = e.target.files?.[0]; if (f) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file: f, tipo: 'assinatura', autorId: perfil?.id }); e.currentTarget.value = '' }} />
         {signaveis.length === 0 ? (
-          <p className="text-[10px] text-slate-400">Nenhum documento anexado. Anexe o contrato e outros documentos que o colaborador precisa assinar.</p>
+          <p className="text-[10px] text-slate-400">Anexe o contrato e outros documentos que o colaborador precisa assinar.</p>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {signaveis.map(a => {
               const miss = assinaturasByAnexo.get(a.id)
               const docAssinado = miss?.status === 'concluida'
               const enviado = !!miss
               return (
-                <div key={a.id} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
-                  <FileText size={12} className="text-slate-400 shrink-0" />
+                <div key={a.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/70'}`}>
+                  <FileText size={13} className="text-slate-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className={`text-[11px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tituloDoc(a)}</p>
                     {a.tipo === 'contrato' && <p className="text-[9px] text-slate-400 truncate">{a.arquivo_nome}</p>}
                   </div>
                   {docAssinado ? (
                     <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 shrink-0">
-                      <CheckCircle2 size={11} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
+                      <CheckCircle2 size={12} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
                     </span>
                   ) : (<>
                     {enviado && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">aguardando</span>}
-                    <button onClick={() => handleEnviarDoc(a)} disabled={enviarAssinaturaAnexo.isPending}
-                      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 shrink-0">
-                      {enviarAssinaturaAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Smartphone size={10} />}
+                    <button onClick={() => handleEnviarDoc(a)} disabled={enviarAssinaturaAnexo.isPending} className={BTN_PRI}>
+                      {enviarAssinaturaAnexo.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />}
                       {enviado ? 'Reenviar' : 'Enviar p/ assinatura'}
                     </button>
                   </>)}
@@ -492,19 +499,18 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
             })}
           </div>
         )}
-      </div>
+      </Passo>
 
       {/* 3 · Matrícula */}
-      <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><User size={11} /> 3 · Matrícula</span>
+      <Passo n={3} titulo="Matrícula" icon={User} isDark={isDark}>
         <div className="flex items-center gap-2">
           <CampoTexto valor={matricula} onSave={v => {
             if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
-          }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[260px]`} />
+          }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[240px]`} />
           {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
-          {matricula && !setMatricula.isPending && <CheckCircle2 size={13} className="text-emerald-500" />}
+          {matricula && !setMatricula.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
         </div>
-      </div>
+      </Passo>
 
       {erro && <p className="text-[10px] text-red-600 font-semibold">{erro}</p>}
     </div>
