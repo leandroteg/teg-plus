@@ -34,6 +34,7 @@ const FILE_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
 const FILE_MAX_SIZE = 50 * 1024 * 1024
 
 interface FornecedorForm {
+  id?:                string   // presente quando já existe em cmp_cotacao_fornecedores (cotação reaberta)
   fornecedor_nome:    string
   fornecedor_contato: string
   fornecedor_telefone: string
@@ -895,6 +896,40 @@ export default function CotacaoForm() {
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(),
   ])
+  // IDs de fornecedores já salvos (cmp_cotacao_fornecedores) removidos da tela nesta
+  // sessão — precisam ser deletados no banco no submit, senão ficam órfãos.
+  const [fornecedoresRemovidosIds, setFornecedoresRemovidosIds] = useState<string[]>([])
+  const removeFornecedor = useCallback((idx: number) => {
+    setFornecedores(prev => {
+      const alvo = prev[idx]
+      if (alvo?.id) setFornecedoresRemovidosIds(ids => [...ids, alvo.id as string])
+      return prev.filter((_, i) => i !== idx)
+    })
+  }, [])
+  // Hidrata o formulário com fornecedores já salvos quando uma cotação em
+  // andamento é reaberta (ex.: cotação parcial revertida para completar depois).
+  // Só roda 1x — não pode sobrescrever edições em curso em refetches seguintes.
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (hydratedRef.current) return
+    if (!cotacao?.fornecedores || cotacao.fornecedores.length === 0) return
+    hydratedRef.current = true
+    setFornecedores(cotacao.fornecedores.map(f => ({
+      id:                 f.id,
+      fornecedor_nome:    f.fornecedor_nome ?? '',
+      fornecedor_contato: f.fornecedor_contato ?? '',
+      fornecedor_telefone: f.fornecedor_telefone ?? '',
+      fornecedor_email:   f.fornecedor_email ?? '',
+      fornecedor_cnpj:    f.fornecedor_cnpj ?? '',
+      valor_total:        f.valor_total ?? 0,
+      valor_frete:        (f as any).valor_frete ?? 0,
+      prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
+      condicao_pagamento: f.condicao_pagamento ?? '',
+      observacao:         f.observacao ?? '',
+      arquivo_url:        f.arquivo_url ?? '',
+      itens_precos:       f.itens_precos ?? [],
+    })))
+  }, [cotacao?.fornecedores])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1152,6 +1187,7 @@ export default function CotacaoForm() {
 
     let itensForaEscopo = 0
     let fornecedoresDescartados = 0
+    let rcNaoCotados: string[] = []
 
     setFornecedores(prev => {
       const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
@@ -1220,6 +1256,17 @@ export default function CotacaoForm() {
         result.push(novo)
       }
       result.push(...restantes)
+
+      // Itens da RC que nenhum fornecedor (incluindo os já cadastrados antes
+      // deste upload) cotou ainda — fica visível pro comprador decidir, em vez
+      // de sumir silenciosamente da tela (ex.: kit lido como itens avulsos).
+      const descricoesCotadas = new Set(
+        result.flatMap(f => f.itens_precos.map(it => toUpperNorm(it.descricao).trim()).filter(Boolean))
+      )
+      rcNaoCotados = rcTokensList
+        .map(rc => rc.descricao)
+        .filter(desc => !descricoesCotadas.has(desc))
+
       return result
     })
 
@@ -1247,16 +1294,18 @@ export default function CotacaoForm() {
       } catch { /* silencioso: chip deixa de aparecer, mas o form segue */ }
     }
 
+    const msgs: string[] = []
     if (fornecedoresDescartados > 0) {
-      setToast({
-        type: 'error',
-        msg: `${fornecedoresDescartados} fornecedor(es) do PDF ficaram sem nenhum item com preço legível.`,
-      })
-    } else if (itensForaEscopo > 0) {
-      setToast({
-        type: 'error',
-        msg: `${itensForaEscopo} item(ns) do PDF não bateram automaticamente com a RC — ficaram na lista sem descrição. Escolha o item correto no dropdown de cada linha (não precisa devolver ao solicitante).`,
-      })
+      msgs.push(`${fornecedoresDescartados} fornecedor(es) do PDF ficaram sem nenhum item com preço legível.`)
+    }
+    if (itensForaEscopo > 0) {
+      msgs.push(`${itensForaEscopo} item(ns) do PDF não bateram automaticamente com a RC — ficaram na lista sem descrição. Escolha o item correto no dropdown de cada linha (não precisa devolver ao solicitante).`)
+    }
+    if (rcNaoCotados.length > 0) {
+      msgs.push(`${rcNaoCotados.length} item(ns) da RC ainda sem cotação de nenhum fornecedor: ${rcNaoCotados.join(', ')}.`)
+    }
+    if (msgs.length > 0) {
+      setToast({ type: 'error', msg: msgs.join(' ') })
     }
   }, [id, cotacao?.requisicao])
 
@@ -1333,6 +1382,14 @@ export default function CotacaoForm() {
   const itensEscolhidos = Array.from(itensParaEscolher).filter(k => selecaoPorItem.has(k)).length
   const itensPendentes = itensParaEscolher.size - itensEscolhidos
   const precisaEscolherFornecedores = validos.length >= 2 && itensParaEscolher.size > 0 && itensPendentes > 0
+
+  // Itens da RC (ainda não atendidos por um pedido anterior) que nenhum fornecedor
+  // válido cotou — aviso não bloqueante: o comprador pode enviar assim mesmo, mas
+  // fica ciente de que vai precisar reabrir cotação pra esses itens depois.
+  const rcItensNaoCotados = (((cotacao?.requisicao as any)?.itens ?? []) as any[])
+    .filter(it => !it.atendido_em_pedido_id)
+    .map(it => String(it.descricao ?? '').trim())
+    .filter(desc => desc && !itensParaEscolher.has(desc.toLowerCase()))
 
   const fornecedoresComCondicaoInvalida = validos
     .map((f, i) => ({ idx: i + 1, nome: f.fornecedor_nome, cond: f.condicao_pagamento }))
@@ -1431,6 +1488,7 @@ export default function CotacaoForm() {
             }
           })
           return {
+            id:                 f.id,
             fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
             fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
             fornecedor_telefone: f.fornecedor_telefone || undefined,
@@ -1447,6 +1505,7 @@ export default function CotacaoForm() {
         }),
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
+        fornecedores_removidos_ids: fornecedoresRemovidosIds,
       })
       setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
       setTimeout(() => nav('/cotacoes'), 800)
@@ -1595,7 +1654,7 @@ export default function CotacaoForm() {
               )}
             </div>
             {fornecedores.length > 1 && (
-              <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}
+              <button type="button" onClick={() => removeFornecedor(idx)}
                 className="p-1 rounded-lg hover:bg-red-50 transition">
                 <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
               </button>
@@ -2019,6 +2078,16 @@ export default function CotacaoForm() {
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-2 text-sm font-semibold text-rose-700">
           <CheckCircle size={16} className="text-rose-500" />
           Requisição devolvida ao solicitante. As aprovações anteriores foram invalidadas.
+        </div>
+      )}
+
+      {rcItensNaoCotados.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2 text-xs text-amber-700">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span>
+            <strong>{rcItensNaoCotados.length} item{rcItensNaoCotados.length > 1 ? 's' : ''} da RC sem cotação de nenhum fornecedor:</strong>{' '}
+            {rcItensNaoCotados.join(', ')}. Pode enviar assim mesmo — depois será preciso reabrir uma cotação pra esses itens.
+          </span>
         </div>
       )}
 
