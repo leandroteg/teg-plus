@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
-  ScrollText, Undo2, Printer,
+  ScrollText, Undo2, Printer, RotateCcw,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao, useDevolverRequisicaoCotacao } from '../hooks/useCotacoes'
 import { condicaoPagamentoInterpretavel } from '../utils/pagamentos'
@@ -906,6 +906,18 @@ export default function CotacaoForm() {
       return prev.filter((_, i) => i !== idx)
     })
   }, [])
+  // Recomeça a cotação do zero: remove TODOS os fornecedores já salvos (marcados
+  // pra deletar no submit) e volta pra 1 card em branco. Os itens da RC continuam
+  // disponíveis normalmente — só o que já foi digitado/lido de cotação some.
+  const resetFornecedores = useCallback(() => {
+    setFornecedores(prev => {
+      const idsExistentes = prev.filter(f => f.id).map(f => f.id as string)
+      if (idsExistentes.length > 0) setFornecedoresRemovidosIds(ids => [...ids, ...idsExistentes])
+      return [emptyFornecedor()]
+    })
+    setSelecaoPorItem(new Map())
+    setSelecaoTocada(false)
+  }, [])
   // Hidrata o formulário com fornecedores já salvos quando uma cotação em
   // andamento é reaberta (ex.: cotação parcial revertida para completar depois).
   // Só roda 1x — não pode sobrescrever edições em curso em refetches seguintes.
@@ -1554,16 +1566,32 @@ export default function CotacaoForm() {
           </button>
           <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
         </div>
-        {cotacao && (
-          <button
-            type="button"
-            onClick={() => gerarSolicitacaoCotacao(cotacao)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
-          >
-            <Printer size={13} />
-            Solicitar Cotação
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {fornecedores.some(f => f.id) && (
+            <button
+              type="button"
+              title="Remove os fornecedores já salvos nesta cotação e volta pra 1 card em branco. Os itens da RC continuam disponíveis normalmente."
+              onClick={() => {
+                if (!confirm('Recomeçar a cotação? Os fornecedores já salvos nesta cotação serão removidos ao enviar. Os itens da RC continuam disponíveis pra escolher de novo.')) return
+                resetFornecedores()
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors"
+            >
+              <RotateCcw size={13} />
+              Recomeçar
+            </button>
+          )}
+          {cotacao && (
+            <button
+              type="button"
+              onClick={() => gerarSolicitacaoCotacao(cotacao)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
+            >
+              <Printer size={13} />
+              Solicitar Cotação
+            </button>
+          )}
+        </div>
       </div>
 
       <fieldset disabled={isLocked} className={isLocked ? 'space-y-4 opacity-60' : 'space-y-4'}>
