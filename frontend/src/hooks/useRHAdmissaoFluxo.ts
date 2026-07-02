@@ -570,6 +570,14 @@ export interface RHRegistro {
   ficha_dados: Record<string, unknown> | null
 }
 
+export interface AssinaturaMissaoDoc {
+  id: string
+  titulo: string
+  status: string
+  concluida_em: string | null
+  metadata: { anexo_id?: string } | null
+}
+
 export interface RHProposta {
   candidato_id: string
   proposta_enviada: boolean
@@ -589,7 +597,7 @@ export function useEtapaCandidato(candidatoId?: string) {
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,   // não recarregar enquanto o RH preenche
     queryFn: async () => {
-      const [prop, ex, tr, mob, integ, ace, reg, ass] = await Promise.all([
+      const [prop, ex, tr, mob, integ, ace, reg, ass, assDocs] = await Promise.all([
         supabase.from('rh_admissao_proposta').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_exame').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_treinamentos').select('*').eq('candidato_id', candidatoId).order('created_at'),
@@ -598,6 +606,9 @@ export function useEtapaCandidato(candidatoId?: string) {
         supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
         supabase.from('rh_admissao_registro').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.rpc('rh_admissao_assinatura_status', { p_candidato_id: candidatoId }),
+        // missões de assinatura por documento (1 por anexo)
+        supabase.from('portalteg_missoes').select('id, titulo, status, concluida_em, metadata')
+          .eq('categoria', 'assinaturas').eq('metadata->>candidato_id', candidatoId),
       ])
       const assRow = (Array.isArray(ass.data) ? ass.data[0] : ass.data) as { status?: string; concluida_em?: string } | undefined
       return {
@@ -609,6 +620,7 @@ export function useEtapaCandidato(candidatoId?: string) {
         aceites: (ace.data ?? []) as AceiteStatus[],
         registro: (reg.data ?? null) as RHRegistro | null,
         assinatura: assRow ? { status: assRow.status ?? 'pendente', concluida_em: assRow.concluida_em ?? null } : null,
+        assinaturasDocs: (assDocs.data ?? []) as AssinaturaMissaoDoc[],
       }
     },
   })
@@ -796,6 +808,22 @@ export function useRegistro() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
+  // Envia UM documento específico para assinatura (1 missão por documento)
+  const enviarAssinaturaAnexo = useMutation({
+    mutationFn: async (i: { candidatoId: string; anexoId: string; anexoPath: string; titulo: string; autorNome?: string }) => {
+      const { data: signed, error: sErr } = await supabase.storage
+        .from(BUCKET).createSignedUrl(i.anexoPath, 7 * 24 * 3600)
+      if (sErr || !signed?.signedUrl) throw new Error('Falha ao gerar o link do documento')
+      const { data, error } = await supabase.rpc('rh_admissao_reg_enviar_assinatura_anexo', {
+        p_candidato_id: i.candidatoId, p_anexo_id: i.anexoId, p_acao_url: signed.signedUrl,
+        p_titulo: i.titulo, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar para assinatura')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
   const setMatricula = useMutation({
     mutationFn: async (i: { colaboradorId: string; candidatoId: string; matricula: string }) => {
       const { error } = await supabase.from('rh_colaboradores')
@@ -816,7 +844,7 @@ export function useRegistro() {
       if (!resp.ok || !r.ok) throw new Error(r.message || 'Falha ao enviar o e-mail')
     },
   })
-  return { gerarFicha, enviarAssinatura, setMatricula, enviarEmail }
+  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, enviarEmail }
 }
 
 // Matrícula atual do colaborador vinculado (etapa Registro)

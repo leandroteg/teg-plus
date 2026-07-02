@@ -341,21 +341,27 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 }) {
   const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { gerarFicha, enviarAssinatura, setMatricula, enviarEmail } = useRegistro()
+  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, enviarEmail } = useRegistro()
   const { data: matricula } = useMatriculaColaborador(cand.colaborador_id)
   const uploadAnexo = useUploadAnexoCandidato()
   const contratoRef = useRef<HTMLInputElement>(null)
+  const docRef = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
   const [destinatario, setDestinatario] = useState('dp@eloocontabilidade.com.br')
   const [emailOk, setEmailOk] = useState(false)
 
   const registro = data?.registro ?? null
-  const assinatura = data?.assinatura ?? null
   const fichas = (cand.anexos ?? []).filter(a => a.tipo === 'ficha_registro')
-  const contratos = (cand.anexos ?? []).filter(a => a.tipo === 'contrato')
-  const ultimoContrato = contratos[contratos.length - 1]
-  const assinado = assinatura?.status === 'concluida'
+  // documentos para assinatura = contrato + anexos marcados p/ assinar
+  const signaveis = (cand.anexos ?? []).filter(a => a.tipo === 'contrato' || a.tipo === 'assinatura')
+  const assinaturasByAnexo = new Map(
+    (data?.assinaturasDocs ?? []).filter(m => m.metadata?.anexo_id).map(m => [m.metadata!.anexo_id!, m])
+  )
+  const tituloDoc = (a: typeof signaveis[number]) => a.tipo === 'contrato' ? 'Contrato de Trabalho' : a.arquivo_nome
+  const assinados = signaveis.filter(a => assinaturasByAnexo.get(a.id)?.status === 'concluida').length
+  const todosAssinados = signaveis.length > 0 && assinados === signaveis.length
+  const algumEnviado = signaveis.some(a => assinaturasByAnexo.has(a.id))
 
   async function handleGerarFicha(dados: FichaDados) {
     setErro(null)
@@ -375,11 +381,12 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
     } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao enviar e-mail') }
   }
 
-  async function handleEnviarAssinatura() {
-    if (!ultimoContrato) return
+  async function handleEnviarDoc(a: typeof signaveis[number]) {
     setErro(null)
     try {
-      await enviarAssinatura.mutateAsync({ candidatoId: cand.id, contratoPath: ultimoContrato.arquivo_path, autorNome })
+      await enviarAssinaturaAnexo.mutateAsync({
+        candidatoId: cand.id, anexoId: a.id, anexoPath: a.arquivo_path, titulo: tituloDoc(a), autorNome,
+      })
     } catch (e) { setErro(e instanceof Error ? e.message : 'Erro ao enviar para assinatura') }
   }
 
@@ -387,12 +394,12 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
     <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
       <CandHeader nome={cand.nome} isDark={isDark} right={
         isLoading ? <Loader2 size={12} className="animate-spin text-slate-400" /> :
-        assinado && matricula
+        todosAssinados && matricula
           ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Registro completo ✓</span>
-          : assinado
-            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Contrato assinado ✓</span>
-            : registro?.missao_assinatura_id
-              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Aguardando assinatura</span>
+          : todosAssinados
+            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Documentos assinados ✓</span>
+            : algumEnviado
+              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">{assinados}/{signaveis.length} assinados</span>
               : null
       } />
 
@@ -434,35 +441,57 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
         />
       )}
 
-      {/* 2 · Contrato + assinatura */}
-      <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><PenLine size={11} /> 2 · Contrato de trabalho</span>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => contratoRef.current?.click()} disabled={uploadAnexo.isPending}
-            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50">
-            {uploadAnexo.isPending ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-            {ultimoContrato ? 'Substituir contrato' : 'Anexar contrato recebido'}
-          </button>
-          <input ref={contratoRef} type="file" className="hidden" accept=".pdf"
-            onChange={e => {
-              const file = e.target.files?.[0]
-              if (file) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file, tipo: 'contrato', autorId: perfil?.id })
-              e.currentTarget.value = ''
-            }} />
-          {ultimoContrato && !assinado && (
-            <button onClick={handleEnviarAssinatura} disabled={enviarAssinatura.isPending}
-              className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
-              {enviarAssinatura.isPending ? <Loader2 size={11} className="animate-spin" /> : <Smartphone size={11} />}
-              {registro?.missao_assinatura_id ? 'Reenviar p/ assinatura' : 'Enviar p/ assinatura no Portal'}
+      {/* 2 · Documentos para assinatura — 1 missão por documento no Portal */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><PenLine size={11} /> 2 · Documentos para assinatura</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => contratoRef.current?.click()} disabled={uploadAnexo.isPending}
+              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50">
+              {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} Anexar contrato
             </button>
-          )}
-          {assinado && assinatura?.concluida_em && (
-            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-              <CheckCircle2 size={11} /> assinado em {new Date(assinatura.concluida_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
+            <button onClick={() => docRef.current?.click()} disabled={uploadAnexo.isPending}
+              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 disabled:opacity-50">
+              <Plus size={10} /> Outro documento
+            </button>
+          </div>
         </div>
-        {ultimoContrato && <p className="text-[10px] text-slate-400 truncate">{ultimoContrato.arquivo_nome}</p>}
+        <input ref={contratoRef} type="file" className="hidden" accept=".pdf"
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file: f, tipo: 'contrato', autorId: perfil?.id }); e.currentTarget.value = '' }} />
+        <input ref={docRef} type="file" className="hidden" accept=".pdf"
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadAnexo.mutate({ admissaoId: adm.id, candidatoId: cand.id, file: f, tipo: 'assinatura', autorId: perfil?.id }); e.currentTarget.value = '' }} />
+        {signaveis.length === 0 ? (
+          <p className="text-[10px] text-slate-400">Nenhum documento anexado. Anexe o contrato e outros documentos que o colaborador precisa assinar.</p>
+        ) : (
+          <div className="space-y-1">
+            {signaveis.map(a => {
+              const miss = assinaturasByAnexo.get(a.id)
+              const docAssinado = miss?.status === 'concluida'
+              const enviado = !!miss
+              return (
+                <div key={a.id} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                  <FileText size={12} className="text-slate-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[11px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tituloDoc(a)}</p>
+                    {a.tipo === 'contrato' && <p className="text-[9px] text-slate-400 truncate">{a.arquivo_nome}</p>}
+                  </div>
+                  {docAssinado ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 shrink-0">
+                      <CheckCircle2 size={11} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
+                    </span>
+                  ) : (<>
+                    {enviado && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">aguardando</span>}
+                    <button onClick={() => handleEnviarDoc(a)} disabled={enviarAssinaturaAnexo.isPending}
+                      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 shrink-0">
+                      {enviarAssinaturaAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Smartphone size={10} />}
+                      {enviado ? 'Reenviar' : 'Enviar p/ assinatura'}
+                    </button>
+                  </>)}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* 3 · Matrícula */}

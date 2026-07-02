@@ -160,6 +160,7 @@ export interface RHAdmissaoAnexo {
   mime_type?: string
   uploaded_por?: string
   created_at: string
+  missao_assinatura_id?: string | null   // missão de assinatura no Portal (docs assináveis)
 }
 
 // Candidato individual dentro de uma requisição de admissão (RH-only)
