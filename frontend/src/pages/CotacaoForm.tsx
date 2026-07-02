@@ -83,6 +83,23 @@ function ItemPricingTable({
   const [itemQuery, setItemQuery] = useState<Record<number, string>>({})
   const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
+  // Itens que vieram do parse de PDF sem bater automaticamente com a RC (descricao
+  // vazia + sugestao com o texto original) chegam aqui pra o comprador escolher o
+  // item certo — pre-preenche a busca com a sugestao pra já mostrar candidatos.
+  useEffect(() => {
+    setItemQuery(prev => {
+      let changed = false
+      const next = { ...prev }
+      items.forEach((it, idx) => {
+        if (!it.descricao && it.sugestao && next[idx] === undefined) {
+          next[idx] = toUpperNorm(it.sugestao)
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [items])
+
   // Itens da requisição que ainda não foram adicionados
   const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()).filter(Boolean))
   const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
@@ -205,9 +222,14 @@ function ItemPricingTable({
               <div className="relative flex items-center gap-1">
                 <input
                   className={`text-[11px] border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full ${
-                    item.descricao ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default' : 'bg-white border-slate-200'
+                    item.descricao
+                      ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default'
+                      : item.sugestao
+                        ? 'bg-amber-50 border-amber-300'
+                        : 'bg-white border-slate-200'
                   }`}
                   placeholder="Selecione um item da RC..."
+                  title={!item.descricao && item.sugestao ? `Não bateu automaticamente com a RC — texto original: "${item.sugestao}". Escolha o item correto abaixo.` : undefined}
                   autoComplete="off"
                   readOnly={!!item.descricao}
                   value={item.descricao || (itemQuery[i] ?? '')}
@@ -1142,26 +1164,25 @@ export default function CotacaoForm() {
         // o 1º fornecedor "consome" todos os itens e os demais ficam sem match →
         // descartados (apareciam zerados, sem nem carregar nome/CNPJ).
         rcUsed.clear()
-        // Só inclui itens que têm preço E batem com algum item da RC.
-        // Itens fora do escopo são descartados (contagem vai para toast de aviso).
+        // Inclui todo item com preço. Quando não bate com nenhum item da RC
+        // (sigla/tamanho abreviado, marca no meio da descrição, etc.), mantém a
+        // linha com descrição vazia + sugestão do texto original — o comprador
+        // resolve na hora escolhendo o item certo no dropdown (mesma UI de
+        // "Adicionar item"), sem precisar devolver a requisição ao solicitante.
         const itensComValor: ItemPreco[] = (p.itens ?? [])
           .filter(it => it.valor_unitario > 0)
           .map(it => {
             const rcMatch = matchesRcItem(it.descricao)
-            if (!rcMatch) {
-              itensForaEscopo++
-              return null
-            }
+            if (!rcMatch) itensForaEscopo++
             return {
-              descricao:      rcMatch, // usa a descrição canônica da RC
+              descricao:      rcMatch ?? '', // vazio = comprador escolhe manualmente
               qtd:            it.qtd,
               valor_unitario: it.valor_unitario,
               valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+              sugestao:       rcMatch ? undefined : (it.descricao || undefined),
             }
           })
-          .filter((x): x is ItemPreco => x !== null)
-        // Se nenhum item bateu com a RC, descarta o fornecedor inteiro
-        // (não preenche nome, CNPJ, contato nem valor do documento).
+        // Fornecedor sem nenhum item com preço (documento vazio/ilegível) é descartado.
         if (itensComValor.length === 0) {
           fornecedoresDescartados++
           return null
@@ -1229,12 +1250,12 @@ export default function CotacaoForm() {
     if (fornecedoresDescartados > 0) {
       setToast({
         type: 'error',
-        msg: `${fornecedoresDescartados} fornecedor(es) do PDF foram ignorados porque nenhum item bateu com a RC. Para incluí-los, devolva a requisição ao solicitante.`,
+        msg: `${fornecedoresDescartados} fornecedor(es) do PDF ficaram sem nenhum item com preço legível.`,
       })
     } else if (itensForaEscopo > 0) {
       setToast({
         type: 'error',
-        msg: `${itensForaEscopo} item(ns) do PDF foram ignorados por não pertencerem à RC. Para incluí-los, devolva a requisição ao solicitante.`,
+        msg: `${itensForaEscopo} item(ns) do PDF não bateram automaticamente com a RC — ficaram na lista sem descrição. Escolha o item correto no dropdown de cada linha (não precisa devolver ao solicitante).`,
       })
     }
   }, [id, cotacao?.requisicao])
@@ -1402,8 +1423,9 @@ export default function CotacaoForm() {
             const fornIdxOriginal = selecaoPorItem.get(key)
             const fornIdxEmValidos = fornIdxOriginal !== undefined ? validosIdxMap.get(fornIdxOriginal) : undefined
             const selecionado = fornIdxEmValidos === validosIdx
+            const { sugestao: _sugestao, ...itemSemSugestao } = item
             return {
-              ...item,
+              ...itemSemSugestao,
               descricao: toUpperNorm(item.descricao),
               selecionado,
             }

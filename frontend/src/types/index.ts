@@ -314,6 +314,9 @@ export interface ItemPreco {
   /** Quando true, este item será comprado deste fornecedor.
    *  Permite split (vários fornecedores com itens selecionados na mesma cotação). */
   selecionado?: boolean
+  /** Texto original extraído do PDF quando o matching automático com a RC falhou.
+   *  Client-side apenas — usado para sugerir a busca no dropdown; nunca enviado ao backend. */
+  sugestao?: string
 }
 
 export interface ItemSelecionado {
