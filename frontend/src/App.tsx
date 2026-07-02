@@ -131,6 +131,8 @@ const RHHolerites = lazy(() => import('./pages/rh/RHHolerites'))
 const DPPainel = lazy(() => import('./pages/rh/DPPainel'))
 const DPBeneficios = lazy(() => import('./pages/rh/DPBeneficios'))
 const DPPonto = lazy(() => import('./pages/rh/DPPonto'))
+const AssinarDocumento = lazy(() => import('./pages/publico/AssinarDocumento'))
+const VerificarAssinatura = lazy(() => import('./pages/publico/VerificarAssinatura'))
 const DPFolha = lazy(() => import('./pages/rh/DPFolha'))
 const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
 const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
@@ -221,7 +223,6 @@ const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Moviment
 const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
 const ScannerQR = lazy(() => import('./pages/patrimonial/ScannerQR'))
 const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
-const FichaItemEstoque = lazy(() => import('./pages/estoque/FichaItemEstoque'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
@@ -280,6 +281,10 @@ export default function App() {
         <Route path="/aprovaai"         element={<Lazy><AprovAi /></Lazy>} />
         <Route path="/portal-teg"       element={<Lazy><PortalTEG /></Lazy>} />
 
+        {/* Assinatura eletrônica: públicas (colaborador via missão do Portal) */}
+        <Route path="/assinar/:id"   element={<Lazy><AssinarDocumento /></Lazy>} />
+        <Route path="/verificar/:id" element={<Lazy><VerificarAssinatura /></Lazy>} />
+
         {/* ── Privadas ──────────────────────────────────────── */}
         <Route element={<PrivateRoute />}>
 
@@ -292,7 +297,6 @@ export default function App() {
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
-          <Route path="/e/:codigo" element={<Lazy><FichaItemEstoque /></Lazy>} />
 
           {/* TI / Help Desk — aberto a qualquer autenticado */}
           <Route path="/ti"              element={<Lazy><TIHome /></Lazy>} />
