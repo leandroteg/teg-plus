@@ -931,8 +931,10 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
-      {/* Aguardando catalogo — comprador vincula itens livres antes da aprovacao */}
-      {req?.status === 'aguardando_catalogo' && (isAdmin || isAprovadorCompras) && (() => {
+      {/* Aguardando catalogo — comprador vincula itens livres antes da aprovacao.
+          isAprovadorCompras é allowlist de aprovadores (financeiro/tecnico), nao de
+          compradores — usa tambem a flag sys_perfis.comprador p/ quem so cadastra. */}
+      {req?.status === 'aguardando_catalogo' && (isAdmin || isAprovadorCompras || perfil?.comprador) && (() => {
         const orfaos = (req.itens ?? []).filter(i => !(i as any).est_item_id)
         const podeEnviar = orfaos.length === 0
         return (
