@@ -21,7 +21,7 @@ export default function AssinarDocumento() {
   const [nasc, setNasc] = useState('')
   const [aceito, setAceito] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const [feito, setFeito] = useState<{ assinatura_id: string; registro_hash: string } | null>(null)
+  const [feito, setFeito] = useState<{ assinatura_id: string; registro_hash: string; pdf_assinado_url?: string | null } | null>(null)
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -40,7 +40,7 @@ export default function AssinarDocumento() {
     })
     setEnviando(false)
     if (error || !data?.ok) { setErro(data?.erro || 'Falha ao assinar. Confira o CPF e a data de nascimento.'); return }
-    setFeito({ assinatura_id: data.assinatura_id, registro_hash: data.registro_hash })
+    setFeito({ assinatura_id: data.assinatura_id, registro_hash: data.registro_hash, pdf_assinado_url: data.pdf_assinado_url ?? null })
   }
 
   const box = 'w-full max-w-2xl mx-auto'
@@ -64,6 +64,10 @@ export default function AssinarDocumento() {
           <p className="text-xs text-slate-500">{info?.titulo}</p>
           {feito.registro_hash && (
             <p className="text-[10px] text-slate-400 break-all">Selo: {feito.registro_hash.slice(0, 24)}…</p>
+          )}
+          {feito.pdf_assinado_url && (
+            <a href={feito.pdf_assinado_url} target="_blank" rel="noreferrer"
+              className="block bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl py-2.5 text-sm">Baixar PDF assinado (com carimbo)</a>
           )}
           <a href={`/verificar/${feito.assinatura_id}`} className="inline-block text-xs font-bold text-teal-700 underline">Ver comprovante de verificação</a>
         </div>
@@ -104,8 +108,12 @@ export default function AssinarDocumento() {
             <button onClick={assinar}
               disabled={enviando || !aceito || cpf.replace(/\D/g, '').length !== 11 || !nasc}
               className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white font-bold rounded-xl py-3 text-sm">
-              {enviando ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />} Assinar eletronicamente
+              {enviando ? <><Loader2 className="animate-spin" size={16} /> Assinando e gerando o carimbo…</> : <><ShieldCheck size={16} /> Assinar eletronicamente</>}
             </button>
+            {!enviando && (!aceito || cpf.replace(/\D/g, '').length !== 11 || !nasc) && (
+              <p className="text-[10px] text-slate-400 text-center">Preencha CPF, data de nascimento e marque o aceite para liberar a assinatura.</p>
+            )}
+            {enviando && <p className="text-[10px] text-slate-500 text-center">Não feche a página — pode levar alguns segundos.</p>}
           </div>
         </div>
       )}
