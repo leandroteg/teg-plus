@@ -144,12 +144,12 @@ function Kpi({ isDark, label, value, note, tone }: { isDark: boolean; label: str
 
 function Bloco({ isDark, className, titulo, icon: Icon, children }: { isDark: boolean; className: string; titulo: string; icon: typeof Users2; children: React.ReactNode }) {
   return (
-    <div className={className}>
+    <div className={`${className} flex flex-col`}>
       <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         <Icon size={14} className={isDark ? 'text-slate-300' : 'text-slate-500'} />
         <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{titulo}</span>
       </div>
-      <div className="p-3">{children}</div>
+      <div className="p-3 flex-1">{children}</div>
     </div>
   )
 }
@@ -234,12 +234,12 @@ function StackedCanteiros({ isDark, canteiros, grupos }: { isDark: boolean; cant
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   if (!canteiros.length) return <p className={`text-[11px] italic ${txtMuted} py-2`}>Nenhuma máquina alocada</p>
   return (
-    <div>
-      <div className="space-y-1.5">
+    <div className="h-full flex flex-col">
+      <div className="flex-1 flex flex-col">
         {canteiros.slice(0, 10).map(c => (
-          <div key={c.id} className="flex items-center gap-2">
+          <div key={c.id} className="flex-1 flex items-center gap-2 min-h-[24px]">
             <span className={`text-[11px] truncate w-[42%] shrink-0 ${txtMain}`} title={c.nome}>{c.nome}</span>
-            <div className={`flex-1 h-3.5 rounded-full overflow-hidden flex ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
+            <div className={`flex-1 h-5 rounded-full overflow-hidden flex ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
               {grupos.map(g => {
                 const v = c.porGrupo[g] ?? 0
                 if (!v) return null
@@ -250,7 +250,7 @@ function StackedCanteiros({ isDark, canteiros, grupos }: { isDark: boolean; cant
           </div>
         ))}
       </div>
-      <div className={`flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+      <div className={`flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-2 border-t shrink-0 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         {grupos.map(g => (
           <span key={g} className={`inline-flex items-center gap-1 text-[9px] ${txtMuted}`}>
             <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GRUPO_HEX[g] }} />
