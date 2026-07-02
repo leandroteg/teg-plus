@@ -73,6 +73,11 @@ function ItemPricingTable({
   onChange: (items: ItemPreco[]) => void
   reqItens?: ReqItem[]
 }) {
+  // Qtd trancada por padrao (alterar exige devolver a RC). Excecao temporaria:
+  // comprador (flag sys_perfis.comprador) ou admin podem ajustar direto aqui,
+  // ate organizarmos o fluxo de alteracao de quantidade na cotacao.
+  const { isAdmin, perfil } = useAuth()
+  const podeEditarQtd = isAdmin || !!perfil?.comprador
   const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
   const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
   const [itemQuery, setItemQuery] = useState<Record<number, string>>({})
@@ -252,11 +257,16 @@ function ItemPricingTable({
                 )}
               </div>
               <input
-                type="number"
-                readOnly
-                className="text-[11px] bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center outline-none text-slate-600 cursor-not-allowed w-full"
+                type="number" min="0" step="0.01"
+                readOnly={!podeEditarQtd}
+                className={`text-[11px] rounded px-1 py-1 text-center outline-none w-full ${
+                  podeEditarQtd
+                    ? 'bg-white border border-slate-200 focus:ring-1 focus:ring-teal-300'
+                    : 'bg-slate-50 border border-slate-200 text-slate-600 cursor-not-allowed'
+                }`}
                 value={item.qtd || ''}
-                title="Quantidade definida pela RC. Para alterar, devolva a requisição ao solicitante."
+                onChange={podeEditarQtd ? e => updateItem(i, 'qtd', e.target.value) : undefined}
+                title={podeEditarQtd ? 'Quantidade da cotação (comprador pode ajustar)' : 'Quantidade definida pela RC. Para alterar, devolva a requisição ao solicitante.'}
               />
               <input
                 type="number" min="0" step="0.01"
