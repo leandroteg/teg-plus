@@ -767,10 +767,10 @@ function UploadOSCModal({ open, onClose, isDark }: { open: boolean; onClose: () 
 }
 
 // ── Dashboard principal ───────────────────────────────────────────────────────
-export default function EGPPainel() {
+export default function EGPPainel({ initialPainel }: { initialPainel?: EGPPainelKey } = {}) {
   const nav = useNavigate()
   const { isDark } = useTheme()
-  const [painel, setPainel] = useState<EGPPainelKey>('geral')
+  const [painel, setPainel] = useState<EGPPainelKey>(initialPainel ?? 'geral')
   const [de, setDe] = useState('2026-01') // padrão: jan/26 → mês atual (todos os painéis)
   const [ate, setAte] = useState(ymHoje())
   const [visaoFat, setVisaoFat] = useState<'producao' | 'faturamento'>('producao')
