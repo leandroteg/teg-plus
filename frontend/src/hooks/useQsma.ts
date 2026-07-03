@@ -180,6 +180,50 @@ export function useCriarAcaoOcorrencia() {
   })
 }
 
+// Envia a ocorrência para TRATAMENTO no módulo Gestão (SGI): cria um registro
+// no kanban PDCA da Melhoria Contínua e vincula. A execução das etapas
+// (investigação → plano de ação → verificação → encerramento) acontece LÁ;
+// o trigger qsma_espelha_status_ocorrencia devolve o andamento pra cá.
+export function useEnviarOcorrenciaSgi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      ocorrencia: QsmaOcorrencia
+      obraNome?: string
+      criado_por_nome?: string
+    }) => {
+      const o = p.ocorrencia
+      const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_registro')
+      const tipoSgi = o.tipo === 'quase_acidente' ? 'quase_acidente' : 'desvio'
+      const { data, error } = await supabase.from('sgi_registros').insert({
+        codigo: codigo ?? null,
+        tipo: tipoSgi,
+        origem: 'campo',
+        gravidade: o.gravidade,
+        obra_id: o.obra_id ?? null,
+        area_processo: 'QSMA',
+        titulo: `[${o.codigo ?? 'OCO'}] ${o.descricao.slice(0, 120)}`,
+        descricao: `Ocorrência QSMA ${o.codigo ?? ''} — ${o.descricao}${o.local_descricao ? `\nLocal: ${o.local_descricao}` : ''}${p.obraNome ? `\nObra: ${p.obraNome}` : ''}`,
+        status_pdca: 'pendente',
+        classificacao: 'pendente',
+        criado_por_nome: p.criado_por_nome ?? null,
+      }).select('id, codigo').single()
+      if (error) throw error
+      const reg = data as { id: string; codigo?: string }
+      const { error: e2 } = await supabase.from('qsma_ocorrencias')
+        .update({ sgi_registro_id: reg.id, status: 'investigacao', updated_at: new Date().toISOString() })
+        .eq('id', o.id)
+      if (e2) throw e2
+      return reg
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_ocorrencias'] })
+      qc.invalidateQueries({ queryKey: ['sgi_registros'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
 // Ações SGI vinculadas a ocorrências QSMA
 export function useAcoesQsma() {
   return useQuery({
