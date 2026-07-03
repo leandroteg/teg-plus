@@ -192,6 +192,48 @@ export function useSalvarAnaliseCausa() {
   })
 }
 
+// ── Verificação de eficácia (ISO 9001 §10.2.1.d) ──────────────────────────────
+export interface SgiVerificacao {
+  id: string
+  registro_id: string
+  eficaz: boolean | null
+  evidencia?: string | null
+  observacao?: string | null
+  verificado_por_id?: string | null
+  criado_por_nome?: string | null
+  created_at: string
+}
+
+export function useVerificacao(registroId?: string) {
+  return useQuery({
+    queryKey: ['sgi_verificacao', registroId],
+    enabled: !!registroId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('sgi_verificacao').select('*').eq('registro_id', registroId!).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return (data ?? null) as SgiVerificacao | null
+    },
+  })
+}
+
+export function useSalvarVerificacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, registro_id, eficaz, evidencia, observacao, criado_por_nome }: Partial<SgiVerificacao> & { registro_id: string }) => {
+      const payload = { eficaz: eficaz ?? null, evidencia: evidencia ?? null, observacao: observacao ?? null, criado_por_nome: criado_por_nome ?? null }
+      if (id) {
+        const { data, error } = await supabase.from('sgi_verificacao').update(payload).eq('id', id).select().single()
+        if (error) throw error
+        return data as SgiVerificacao
+      }
+      const { data, error } = await supabase.from('sgi_verificacao').insert({ registro_id, ...payload }).select().single()
+      if (error) throw error
+      return data as SgiVerificacao
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['sgi_verificacao', v.registro_id] }),
+  })
+}
+
 // ── Objetivos e Metas ─────────────────────────────────────────────────────────
 export function useObjetivos(filtros?: { ano?: number }) {
   return useQuery({
