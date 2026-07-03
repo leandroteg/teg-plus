@@ -25,6 +25,8 @@ export interface QsmaModeloChecklist {
   nome: string
   tipo: TipoModelo
   escopo: EscopoModelo
+  /** Tipo de guia (agrupador) — ex.: Inspeção Trabalho (Distribuição) */
+  grupo?: string
   exige_veredito: boolean
   itens: ItemChecklist[]
   ativo: boolean
