@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2,
@@ -12,12 +12,12 @@ import {
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
-  useCriarAcaoOcorrencia, useAcoesQsma,
+  useAcoesQsma, useEnviarOcorrenciaSgi,
 } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips } from '../../components/qsma/Toolbar'
-import { Timer, FileSignature } from 'lucide-react'
+import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type {
@@ -100,6 +100,7 @@ export default function QsmaSeguranca() {
   const [tipoOcoF, setTipoOcoF] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
   const [quickFicha, setQuickFicha] = useState('todos')
+  const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
   const q = busca.trim().toLowerCase()
   const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
 
@@ -372,43 +373,95 @@ export default function QsmaSeguranca() {
               isDark={isDark} value={tipoOcoF} onChange={setTipoOcoF} allLabel="Todos os tipos"
               options={(Object.keys(TIPO_OCORRENCIA_LABEL) as TipoOcorrencia[]).map(t => ({ value: t, label: TIPO_OCORRENCIA_LABEL[t] }))}
             />
+            {/* toggle Lista/Kanban (só acompanhamento — o tratamento é no Gestão) */}
+            <div className={`inline-flex rounded-xl border overflow-hidden shrink-0 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+              {([['lista', List], ['kanban', LayoutGrid]] as const).map(([v, Icon]) => (
+                <button key={v} onClick={() => setVistaOco(v)} title={v === 'lista' ? 'Lista' : 'Quadro por etapa'}
+                  className={`px-2.5 py-2 transition-all ${vistaOco === v
+                    ? isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-50 text-red-700'
+                    : isDark ? 'bg-transparent text-slate-400 hover:bg-white/[0.05]' : 'bg-white text-slate-500 hover:bg-slate-50'
+                  }`}>
+                  <Icon size={14} />
+                </button>
+              ))}
+            </div>
           </QsmaToolbar>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {KANBAN.map(st => {
-              const cfg = STATUS_OCORRENCIA_LABEL[st]
-              const itens = ocorrenciasF.filter(o => o.status === st)
-              return (
-                <div key={st} className={`rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-200'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>
-                    {cfg.label} <span className="font-mono">({itens.length})</span>
-                  </p>
-                  <div className="space-y-2">
-                    {itens.map(o => {
-                      const g = GRAVIDADE_LABEL[o.gravidade]
-                      const nAcoes = acoes.filter(a => a.origem_id === o.id).length
-                      return (
-                        <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left rounded-xl border p-2.5 transition-all ${
-                          isDark ? 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.07]' : 'bg-white border-slate-200 hover:shadow-md'
-                        }`}>
-                          <div className="flex items-center justify-between gap-1 mb-1">
-                            <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
-                            <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
-                          </div>
-                          <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</p>
-                          <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
-                          <p className={`text-[9px] mt-1 ${txtMuted}`}>
-                            {obraNome(o.obra_id)} · {fmtData(o.data_ocorrencia)}
-                            {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{nAcoes} ação(ões) SGI</span>}
-                          </p>
-                        </button>
-                      )
-                    })}
-                    {itens.length === 0 && <p className={`text-[10px] italic ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</p>}
+
+          {/* Vista Lista (padrão) */}
+          {vistaOco === 'lista' && (
+            ocorrenciasF.length === 0 ? (
+              <Vazio isDark={isDark} texto="Nenhuma ocorrência registrada" />
+            ) : (
+              <div className="space-y-2">
+                {ocorrenciasF.map(o => {
+                  const g = GRAVIDADE_LABEL[o.gravidade]
+                  const st = STATUS_OCORRENCIA_LABEL[o.status]
+                  const nAcoes = acoes.filter(a => a.origem_id === o.id).length
+                  return (
+                    <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left ${card} p-3.5 flex items-center gap-3 flex-wrap hover:shadow-md transition-all`}>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-bold ${txtMain}`}>
+                          <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{o.codigo}</span>
+                          {TIPO_OCORRENCIA_LABEL[o.tipo]}
+                        </p>
+                        <p className={`text-[11px] truncate ${txtMuted}`}>
+                          {o.descricao} · {obraNome(o.obra_id)} · {fmtData(o.data_ocorrencia)}
+                          {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={9} />{nAcoes} ação(ões)</span>}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                      {o.sgi_registro_id && (
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold ${isDark ? 'text-violet-400' : 'text-violet-600'}`} title="Em tratamento no módulo Gestão (SGI)">
+                          <ExternalLink size={9} /> Gestão
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          )}
+
+          {/* Vista Kanban (acompanhamento por etapa) */}
+          {vistaOco === 'kanban' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {KANBAN.map(st => {
+                const cfg = STATUS_OCORRENCIA_LABEL[st]
+                const itens = ocorrenciasF.filter(o => o.status === st)
+                return (
+                  <div key={st} className={`rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-200'}`}>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>
+                      {cfg.label} <span className="font-mono">({itens.length})</span>
+                    </p>
+                    <div className="space-y-2">
+                      {itens.map(o => {
+                        const g = GRAVIDADE_LABEL[o.gravidade]
+                        const nAcoes = acoes.filter(a => a.origem_id === o.id).length
+                        return (
+                          <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left rounded-xl border p-2.5 transition-all ${
+                            isDark ? 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.07]' : 'bg-white border-slate-200 hover:shadow-md'
+                          }`}>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                            </div>
+                            <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</p>
+                            <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
+                            <p className={`text-[9px] mt-1 ${txtMuted}`}>
+                              {obraNome(o.obra_id)} · {fmtData(o.data_ocorrencia)}
+                              {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{nAcoes} ação(ões)</span>}
+                            </p>
+                          </button>
+                        )
+                      })}
+                      {itens.length === 0 && <p className={`text-[10px] italic ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</p>}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -900,9 +953,11 @@ function TreinamentoModal({ isDark, treinamento, onClose }: { isDark: boolean; t
 
 function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; ocorrencia: QsmaOcorrencia | null; onClose: () => void }) {
   const salvar = useSalvarOcorrencia()
-  const criarAcao = useCriarAcaoOcorrencia()
+  const enviarSgi = useEnviarOcorrenciaSgi()
   const { data: acoes = [] } = useAcoesQsma()
+  const { data: obras = [] } = useObrasComProjeto()
   const { perfil } = useAuth()
+  const nav = useNavigate()
   const isEdit = !!ocorrencia?.id
 
   const [tipo, setTipo] = useState<TipoOcorrencia>(ocorrencia?.tipo ?? 'desvio')
@@ -919,29 +974,19 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
   const [veiculoId, setVeiculoId] = useState(ocorrencia?.veiculo_id ?? '')
   const [fotos, setFotos] = useState<string[]>(ocorrencia?.fotos ?? [])
   const [diasAfast, setDiasAfast] = useState<string>(ocorrencia?.dias_afastamento?.toString() ?? '')
-  const [status, setStatus] = useState<StatusOcorrencia>(ocorrencia?.status ?? 'registro')
-  const [causa, setCausa] = useState(ocorrencia?.causa_raiz?.causa ?? '')
-  const [porques, setPorques] = useState<string[]>(
-    (Array.isArray(ocorrencia?.causa_raiz?.analise) ? ocorrencia?.causa_raiz?.analise as string[] : null) ?? ['', '', '', '', ''],
-  )
-  // nova ação corretiva
-  const [acaoTitulo, setAcaoTitulo] = useState('')
-  const [acaoPrazo, setAcaoPrazo] = useState('')
-  const [acaoRespId, setAcaoRespId] = useState('')
 
   const minhasAcoes = acoes.filter(a => a.origem_id === ocorrencia?.id)
+  const emTratamento = !!ocorrencia?.sgi_registro_id
+  const stAtual = ocorrencia ? STATUS_OCORRENCIA_LABEL[ocorrencia.status] : null
 
   const erros: string[] = []
   if (!descricao.trim()) erros.push('descreva a ocorrência')
   if (!obraId) erros.push('selecione a obra')
   if ((tipo === 'acidente_cpt') && !diasAfast) erros.push('acidente c/ afastamento pede os dias')
-  const avisos: string[] = []
-  if (status !== 'registro' && !causa.trim() && porques.every(p => !p.trim())) avisos.push('investigação sem causa raiz preenchida')
 
   async function handleSave() {
     try {
-      const analisePreenchida = porques.some(p => p.trim())
-      const id = await salvar.mutateAsync({
+      await salvar.mutateAsync({
         id: ocorrencia?.id,
         tipo, gravidade, obra_id: obraId, frente: frente || undefined,
         data_ocorrencia: new Date(dataOco).toISOString(),
@@ -949,24 +994,28 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
         descricao: descricao.trim(),
         envolvidos, veiculo_id: veiculoId || undefined,
         fotos, dias_afastamento: diasAfast ? Number(diasAfast) : undefined,
-        status,
-        causa_raiz: (causa.trim() || analisePreenchida)
-          ? { metodo: '5porques', analise: porques, causa: causa.trim() || undefined }
-          : ocorrencia?.causa_raiz ?? null,
         registrado_por_id: ocorrencia?.registrado_por_id ?? perfil?.id,
         registrado_por_nome: ocorrencia?.registrado_por_nome ?? perfil?.nome,
       })
-      // ação corretiva opcional → SGI
-      if (acaoTitulo.trim() && id) {
-        await criarAcao.mutateAsync({
-          ocorrencia_id: id as string, titulo: acaoTitulo.trim(),
-          prazo: acaoPrazo || undefined, responsavel_id: acaoRespId || undefined,
-          criado_por_nome: perfil?.nome,
-        })
-      }
       onClose()
     } catch (e: any) {
       alert(`Erro: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
+  async function handleEnviarSgi() {
+    if (!ocorrencia) return
+    if (!confirm('Enviar para tratamento no módulo Gestão (SGI)? A investigação, plano de ação e encerramento acontecem lá — aqui a ocorrência passa a só acompanhar o andamento.')) return
+    try {
+      const reg = await enviarSgi.mutateAsync({
+        ocorrencia,
+        obraNome: obras.find(o => o.id === ocorrencia.obra_id)?.nome,
+        criado_por_nome: perfil?.nome,
+      })
+      alert(`✓ Registro ${reg.codigo ?? ''} criado na Melhoria Contínua do Gestão.`)
+      onClose()
+    } catch (e: any) {
+      alert(`Erro ao enviar: ${e?.message ?? 'desconhecido'}`)
     }
   }
 
@@ -1045,73 +1094,61 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
 
       <FotosUpload isDark={isDark} pasta={`ocorrencias/${ocorrencia?.id ?? 'nova'}`} paths={fotos} onChange={setFotos} />
 
-      {/* Etapa / investigação — só na edição */}
+      {/* Tratamento — a execução acontece no módulo Gestão (SGI); aqui só acompanha */}
       {isEdit && (
-        <>
-          <div>
-            <label className={pickerLabelCls(isDark)}>Etapa</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {(Object.keys(STATUS_OCORRENCIA_LABEL) as StatusOcorrencia[]).map(st => {
-                const cfg = STATUS_OCORRENCIA_LABEL[st]
-                return (
-                  <button key={st} onClick={() => setStatus(st)} className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
-                    status === st ? 'bg-red-600 border-red-600 text-white'
-                      : isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.05]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}>
-                    {cfg.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {status !== 'registro' && (
-            <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Investigação — 5 porquês</span>
-              {porques.map((p, i) => (
-                <input
-                  key={i} value={p}
-                  onChange={e => setPorques(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                  placeholder={`${i + 1}º porquê…`}
-                  className={pickerInputCls(isDark)}
-                />
-              ))}
-              <div>
-                <label className={pickerLabelCls(isDark)}>Causa raiz</label>
-                <input value={causa} onChange={e => setCausa(e.target.value)} className={pickerInputCls(isDark)} />
-              </div>
-            </div>
-          )}
-
-          {/* Ações SGI vinculadas */}
-          <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-violet-500/20 bg-violet-500/[0.04]' : 'border-violet-200 bg-violet-50/40'}`}>
+        <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-violet-500/20 bg-violet-500/[0.04]' : 'border-violet-200 bg-violet-50/40'}`}>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-violet-300' : 'text-violet-700'}`}>
-              <Link2 size={10} /> Ações corretivas (plano de ação SGI)
+              <Link2 size={10} /> Tratamento — módulo Gestão (SGI)
             </span>
-            {minhasAcoes.length > 0 && (
-              <div className="space-y-1">
-                {minhasAcoes.map(a => (
-                  <div key={a.id} className="flex items-center justify-between gap-2 text-[11px]">
-                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{a.titulo}</span>
-                    <span className={`shrink-0 text-[9px] font-bold uppercase ${a.status === 'concluida' ? 'text-emerald-500' : 'text-amber-500'}`}>{a.status}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-              <input value={acaoTitulo} onChange={e => setAcaoTitulo(e.target.value)} placeholder="Nova ação corretiva… (opcional)" className={pickerInputCls(isDark)} />
-              <input type="date" value={acaoPrazo} onChange={e => setAcaoPrazo(e.target.value)} className={pickerInputCls(isDark)} title="Prazo" />
-            </div>
-            {acaoTitulo.trim() && (
-              <ColaboradorPicker isDark={isDark} value={acaoRespId} onChange={setAcaoRespId} label="Responsável pela ação" />
+            {stAtual && (
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? stAtual.dark : stAtual.light}`}>{stAtual.label}</span>
             )}
           </div>
-        </>
+          {emTratamento ? (
+            <>
+              <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Em tratamento na Melhoria Contínua — investigação, plano de ação e encerramento acontecem lá; o andamento se reflete aqui automaticamente.
+              </p>
+              {minhasAcoes.length > 0 && (
+                <div className="space-y-1">
+                  {minhasAcoes.map(a => (
+                    <div key={a.id} className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{a.titulo}</span>
+                      <span className={`shrink-0 text-[9px] font-bold uppercase ${a.status === 'concluida' ? 'text-emerald-500' : 'text-amber-500'}`}>{a.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => nav('/sgi/melhoria')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  isDark ? 'border-violet-500/30 text-violet-300 hover:bg-violet-500/10' : 'border-violet-200 text-violet-700 hover:bg-violet-50'
+                }`}
+              >
+                <ExternalLink size={11} /> Abrir no Gestão
+              </button>
+            </>
+          ) : (
+            <>
+              <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Esta ocorrência ainda não foi enviada para tratamento. O QSMA registra e acompanha; a execução das etapas é no Gestão.
+              </p>
+              <button
+                onClick={handleEnviarSgi}
+                disabled={enviarSgi.isPending}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+              >
+                <Send size={11} /> {enviarSgi.isPending ? 'Enviando…' : 'Enviar para tratamento (Gestão)'}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       <ModalFooter
-        isDark={isDark} erros={erros} avisos={avisos}
-        salvando={salvar.isPending || criarAcao.isPending}
+        isDark={isDark} erros={erros}
+        salvando={salvar.isPending}
         onCancel={onClose}
         saveLabel={isEdit ? 'Salvar' : 'Registrar'}
         onSave={handleSave}
