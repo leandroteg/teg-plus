@@ -96,6 +96,8 @@ export interface QsmaOcorrencia {
   status: StatusOcorrencia
   causa_raiz?: { metodo: '5porques' | 'ishikawa'; analise: unknown; causa?: string } | null
   riia?: unknown
+  /** Registro vinculado no SGI (Melhoria Contínua) — o tratamento acontece lá */
+  sgi_registro_id?: string
   registrado_por_id?: string
   registrado_por_nome?: string
   created_at: string
