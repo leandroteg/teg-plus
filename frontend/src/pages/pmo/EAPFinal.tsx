@@ -1,6 +1,17 @@
 import { useState, useMemo } from 'react'
 import { Printer, Check, ChevronDown } from 'lucide-react'
-import { useEAPFinal, aggregatePolos, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useMedicaoSecao, fmtQtd, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
+
+// Faturado por período (das medições): `${numero_os}|${pacote}` → Σ realizado em [de, ate].
+function buildSecaoFat(secao: { numero_os: string; competencia: string; pacote: string; realizado: number | null }[] | undefined, de: string, ate: string) {
+  const m = new Map<string, number>()
+  for (const r of (secao ?? [])) {
+    if (!r.competencia || r.competencia < de || r.competencia > ate) continue
+    const k = `${r.numero_os}|${r.pacote}`
+    m.set(k, (m.get(k) ?? 0) + Number(r.realizado ?? 0))
+  }
+  return m
+}
 
 const SEC_COLOR: Record<string, string> = {
   'Serv. Preliminares': '#0284c7',
@@ -55,9 +66,11 @@ function buildGeral(polos: EAPPolo[]): EAPPolo {
   }
 }
 
-export default function EAPFinal({ portfolioId, excluded, excludedOscs, setExcludedOscs, isLight }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; setExcludedOscs: React.Dispatch<React.SetStateAction<Set<string>>>; isLight: boolean }) {
+export default function EAPFinal({ portfolioId, excluded, excludedOscs, setExcludedOscs, isLight, de = '2024-01', ate = '2099-12' }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; setExcludedOscs: React.Dispatch<React.SetStateAction<Set<string>>>; isLight: boolean; de?: string; ate?: string }) {
   const { data, isLoading } = useEAPFinal(portfolioId)
-  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded])
+  const { data: secao } = useMedicaoSecao()
+  const secaoFat = useMemo(() => buildSecaoFat(secao, de, ate), [secao, de, ate])
+  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs, secaoFat).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded, secaoFat])
 
   if (isLoading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" /></div>
   if (!polos.length) return <div className={`rounded-2xl border p-12 text-center text-sm ${isLight ? 'bg-white border-slate-200 text-slate-400' : 'bg-white/[0.03] border-white/[0.06] text-slate-500'}`}>Nenhum projeto selecionado.</div>
@@ -73,9 +86,11 @@ export default function EAPFinal({ portfolioId, excluded, excludedOscs, setExclu
 }
 
 // KPIs compactos (Contratado · Faturado · OSCs·Polos · Imprimir) — entram na linha do filtro
-export function EAPKpis({ portfolioId, excluded, excludedOscs, isLight }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; isLight: boolean }) {
+export function EAPKpis({ portfolioId, excluded, excludedOscs, isLight, de = '2024-01', ate = '2099-12' }: { portfolioId?: string; excluded?: Set<string>; excludedOscs: Set<string>; isLight: boolean; de?: string; ate?: string }) {
   const { data } = useEAPFinal(portfolioId)
-  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded])
+  const { data: secao } = useMedicaoSecao()
+  const secaoFat = useMemo(() => buildSecaoFat(secao, de, ate), [secao, de, ate])
+  const polos = useMemo(() => aggregatePolos(data ?? [], excludedOscs, secaoFat).filter(p => !excluded?.has(p.id)), [data, excludedOscs, excluded, secaoFat])
   if (!polos.length) return null
   const totContr = polos.reduce((s, p) => s + p.contr, 0)
   const totFat = polos.reduce((s, p) => s + p.fat, 0)
