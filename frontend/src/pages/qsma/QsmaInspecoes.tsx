@@ -1,8 +1,8 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
-  Trash2, Ban, ShieldCheck, Play, Loader2, HardHat,
+  Trash2, Ban, ShieldCheck, Play, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -42,7 +42,7 @@ export default function QsmaInspecoes() {
   const [params, setParams] = useSearchParams()
   const [aba, setAba] = useState<string>(params.get('aba') ?? 'modelos')
   const [modalModelo, setModalModelo] = useState<QsmaModeloChecklist | 'novo' | null>(null)
-  const [modalProgramar, setModalProgramar] = useState<{ obraId?: string } | null>(null)
+  const [modalProgramar, setModalProgramar] = useState<{ obraId?: string; data?: string } | null>(null)
   const [executar, setExecutar] = useState<QsmaInspecao | null>(null)
 
   // deep-link do Novo Registro: /qsma/inspecoes?novo=programar
@@ -59,18 +59,105 @@ export default function QsmaInspecoes() {
   const { data: equipeObras = [] } = usePlanejamentoEquipe()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
 
-  // TSTs alocados na programação do módulo Obras (vínculo pedido: só segurança)
-  const tsts = useMemo(() => equipeObras.filter(r =>
-    ['planejado', 'mobilizado', 'ativo'].includes(r.status)
-    && /seguran|tst|sesmt/i.test(r.funcao ?? '')
-  ), [equipeObras])
-
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
   const [tipoF, setTipoF] = useState('')
   const [grupoF, setGrupoF] = useState('')
   const [exObras, setExObras] = useState<Set<string>>(new Set())
   const [veredF, setVeredF] = useState('todos')
+
+  // TSTs alocados na programação do módulo Obras (vínculo pedido: só segurança)
+  const tsts = useMemo(() => equipeObras.filter(r =>
+    ['planejado', 'mobilizado', 'ativo'].includes(r.status)
+    && /seguran|tst|sesmt/i.test(r.funcao ?? '')
+  ), [equipeObras])
+
+  // ── Gantt semanal (mesmo template da Programação de Obras) ─────────────────
+  const addDays = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
+  const mondayOf = (d: Date) => { const x = new Date(d); const day = x.getDay(); return addDays(x, day === 0 ? -6 : 1 - day) }
+  const ddmm = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const [minimizados, setMinimizados] = useState<Set<string>>(new Set())
+  const toggleMin = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const mainScrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const top = topScrollRef.current, main = mainScrollRef.current
+    if (!top || !main) return
+    let lock = false
+    const sync = (from: HTMLElement, to: HTMLElement) => () => {
+      if (lock) return; lock = true; to.scrollLeft = from.scrollLeft; lock = false
+    }
+    const a = sync(top, main), b = sync(main, top)
+    top.addEventListener('scroll', a); main.addEventListener('scroll', b)
+    return () => { top.removeEventListener('scroll', a); main.removeEventListener('scroll', b) }
+  }, [aba])
+
+  const weeks = useMemo(() => {
+    const hoje = new Date()
+    const startMon = mondayOf(hoje)
+    const ends: number[] = [
+      ...tsts.map(t => new Date(t.data_fim || addDays(new Date(t.data_inicio), 30).toISOString()).getTime()),
+      ...inspecoes.filter(i => i.data_prevista).map(i => new Date(i.data_prevista! + 'T12:00:00').getTime()),
+    ]
+    let endDate = ends.length ? new Date(Math.max(...ends)) : addDays(hoje, 56)
+    const minEnd = addDays(startMon, 7 * 8)
+    if (endDate < minEnd) endDate = minEnd
+    const list: { mon: Date; sat: Date; label: string }[] = []
+    let cur = startMon, guard = 0
+    while (cur <= endDate && guard < 40) {
+      const sat = addDays(cur, 5)
+      list.push({ mon: cur, sat, label: `${ddmm(cur)} - ${ddmm(sat)}` })
+      cur = addDays(cur, 7); guard++
+    }
+    return list
+  }, [tsts, inspecoes]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // inspeções por obra × semana (contadores p/ os chips do Gantt)
+  const inspSemana = useMemo(() => {
+    const m = new Map<string, { prog: number; exec: number; bloq: number }>()
+    inspecoes.forEach(i => {
+      const dt = i.status === 'executada' ? (i.data_execucao ?? i.data_prevista) : i.data_prevista
+      if (!dt || !i.obra_id) return
+      const d = new Date(dt.includes('T') ? dt : dt + 'T12:00:00')
+      const idx = weeks.findIndex(w => d >= w.mon && d < addDays(w.mon, 7))
+      if (idx < 0) return
+      const k = `${i.obra_id}|${idx}`
+      const cur = m.get(k) ?? { prog: 0, exec: 0, bloq: 0 }
+      if (i.status === 'executada') { cur.exec++; if (i.veredito === 'bloqueado') cur.bloq++ }
+      else if (i.status === 'programada') cur.prog++
+      m.set(k, cur)
+    })
+    return m
+  }, [inspecoes, weeks])
+
+  // grupos Projeto › Obra (obras com TST alocado OU com inspeção)
+  const gruposGantt = useMemo(() => {
+    const q2 = busca.trim().toLowerCase()
+    const obraIds = new Set<string>([
+      ...tsts.map(t => t.obra_id).filter(Boolean),
+      ...inspecoes.map(i => i.obra_id).filter(Boolean) as string[],
+    ])
+    const projMap = new Map<string, { id: string; nome: string; obras: { id: string; nome: string; tsts: typeof tsts }[] }>()
+    for (const oid of obraIds) {
+      if (exObras.has(oid)) continue
+      const o = obras.find(x => x.id === oid)
+      if (!o) continue
+      const doTst = tsts.filter(t => t.obra_id === oid && (!q2 || t.nome.toLowerCase().includes(q2)))
+      if (q2 && doTst.length === 0 && !o.nome.toLowerCase().includes(q2)) continue
+      const pid = o.projeto_id ?? '__sem__'
+      if (!projMap.has(pid)) projMap.set(pid, { id: pid, nome: o.projeto_nome ?? 'Sem projeto', obras: [] })
+      projMap.get(pid)!.obras.push({ id: oid, nome: o.nome, tsts: doTst })
+    }
+    return [...projMap.values()]
+      .map(p => ({ ...p, obras: p.obras.sort((a, b) => a.nome.localeCompare(b.nome)) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [tsts, inspecoes, obras, exObras, busca])
+
+  const COL_W = { esq: 340, semana: 96 }
+  const totalW = COL_W.esq + weeks.length * COL_W.semana
+  const hojeGantt = new Date()
+  const borderG = isDark ? 'border-white/[0.06]' : 'border-slate-200'
+
   const obrasComRegistro = useMemo(() => {
     const ids = new Set(inspecoes.map(i => i.obra_id).filter(Boolean))
     return obras.filter(o => ids.has(o.id)).map(o => ({ value: o.id, label: o.nome }))
@@ -182,40 +269,131 @@ export default function QsmaInspecoes() {
             <MultiCheck isDark={isDark} label="Obras" options={obrasComRegistro} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
 
-          {/* TSTs em campo — vínculo com a programação do módulo Obras */}
-          <div className={`rounded-2xl border p-4 ${isDark ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-amber-200 bg-amber-50/40'}`}>
-            <p className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-2.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-              <HardHat size={11} /> TSTs em campo · programação de Obras ({tsts.length})
-            </p>
-            {tsts.length === 0 ? (
-              <p className={`text-[11px] italic ${txtMuted}`}>
-                Nenhum Técnico de Segurança alocado na programação de Obras — aloque em Obras › Alocação de Equipes.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {tsts.map(t => (
-                  <div key={t.id} className={`rounded-xl border p-3 flex items-center gap-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-bold truncate ${txtMain}`}>{t.nome}</p>
-                      <p className={`text-[10px] truncate ${txtMuted}`}>
-                        {obraNome(t.obra_id)} · desde {fmtData(t.data_inicio)}{t.data_fim ? ` até ${fmtData(t.data_fim)}` : ''}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setModalProgramar({ obraId: t.obra_id })}
-                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors"
-                      title={`Programar inspeção na obra ${obraNome(t.obra_id)}`}
-                    >
-                      <Plus size={10} /> Programar
-                    </button>
+          {/* linha info (mesmo template da Programação de Obras) */}
+          <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
+            <CalendarRange size={12} /> {tsts.length} TST(s) em campo · {inspecoes.filter(i => i.status !== 'cancelada').length} inspeção(ões) · {weeks.length} semanas · clique numa célula da obra p/ programar naquela semana
+          </div>
+
+          {/* Barra de rolagem horizontal fixa (sticky) — sincronizada com a tabela */}
+          <div ref={topScrollRef} className={`sticky top-0 z-20 overflow-x-scroll overflow-y-hidden h-3.5 rounded-lg border ${isDark ? 'bg-white/[0.03] border-white/[0.08]' : 'bg-slate-100 border-slate-200'}`}>
+            <div style={{ width: `${totalW}px`, height: 1 }} />
+          </div>
+
+          <div ref={mainScrollRef} className={`rounded-xl border overflow-x-auto ${borderG}`}>
+            {/* Header */}
+            <div className={`flex items-stretch border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`shrink-0 px-3 py-2 border-r ${borderG} flex items-center text-[10px] font-bold uppercase tracking-wider ${txtMuted}`} style={{ width: `${COL_W.esq}px` }}>Projeto › Obra › TST</div>
+              {weeks.map((w, i) => {
+                const atual = hojeGantt >= w.mon && hojeGantt <= addDays(w.sat, 1)
+                return (
+                  <div key={i} className={`shrink-0 border-r px-1 py-1 text-center ${borderG} ${atual ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : ''}`} style={{ width: `${COL_W.semana}px` }}>
+                    <div className={`text-[8px] font-bold uppercase ${atual ? 'text-red-500' : txtMuted}`}>Sem.{atual ? ' • atual' : ''}</div>
+                    <div className={`text-[9px] font-semibold leading-tight ${txtMain}`}>{w.label}</div>
                   </div>
-                ))}
+                )
+              })}
+            </div>
+
+            {gruposGantt.length === 0 ? (
+              <div className={`text-center py-12 ${txtMuted}`}>
+                <CalendarRange size={36} className="mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Nenhum TST alocado — aloque em Obras › Alocação de Equipes</p>
               </div>
-            )}
+            ) : gruposGantt.map(proj => {
+              const pmin = minimizados.has(proj.id)
+              const total = proj.obras.reduce((a, ob) => a + ob.tsts.length, 0)
+              return (
+                <div key={proj.id}>
+                  {/* Projeto */}
+                  <button onClick={() => toggleMin(proj.id)} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.06] hover:bg-white/[0.08]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
+                    <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${COL_W.esq}px` }}>
+                      {pmin ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
+                      <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMain}`}>{proj.nome}</span>
+                      <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{total}</span>
+                    </div>
+                  </button>
+
+                  {!pmin && proj.obras.map(ob => {
+                    const omin = minimizados.has(`${proj.id}:${ob.id}`)
+                    return (
+                      <div key={ob.id}>
+                        {/* Obra: células clicáveis com chips de inspeção da semana */}
+                        <div className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`} style={{ minWidth: `${totalW}px` }}>
+                          <button onClick={() => toggleMin(`${proj.id}:${ob.id}`)} className="flex items-center gap-1.5 py-1.5 shrink-0 text-left" style={{ width: `${COL_W.esq}px`, paddingLeft: 24, paddingRight: 8 }}>
+                            {omin ? <ChevronDown size={12} className={txtMuted} /> : <ChevronUp size={12} className={txtMuted} />}
+                            <ShieldCheck size={11} className="text-red-500" />
+                            <span className={`text-[11px] font-bold truncate ${txtMain}`}>{ob.nome}</span>
+                            <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-white text-slate-500 border border-slate-200'}`}>{ob.tsts.length} TST</span>
+                          </button>
+                          {weeks.map((w, i) => {
+                            const c = inspSemana.get(`${ob.id}|${i}`)
+                            const passada = addDays(w.sat, 1) < hojeGantt
+                            const dataClick = (w.mon < hojeGantt ? hojeGantt : w.mon).toISOString().split('T')[0]
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => !passada && setModalProgramar({ obraId: ob.id, data: dataClick })}
+                                disabled={passada && !c}
+                                title={passada ? undefined : `Programar inspeção em ${ob.nome} — semana ${w.label}`}
+                                className={`shrink-0 border-r ${borderG} flex items-center justify-center gap-1 py-1.5 transition-colors ${passada ? '' : (isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50')}`}
+                                style={{ width: `${COL_W.semana}px` }}
+                              >
+                                {c?.exec ? (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${c.bloq ? (isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700') : (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700')}`} title={`${c.exec} executada(s)${c.bloq ? ` · ${c.bloq} bloqueio(s)` : ''}`}>
+                                    ✓{c.exec}
+                                  </span>
+                                ) : null}
+                                {c?.prog ? (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`} title={`${c.prog} programada(s)`}>
+                                    {c.prog}
+                                  </span>
+                                ) : null}
+                                {!c && !passada && <Plus size={10} className={`opacity-0 hover:opacity-100 ${txtMuted}`} />}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* TSTs da obra: barra de alocação (programação de Obras) */}
+                        {!omin && ob.tsts.map(t => {
+                          const start = new Date(t.data_inicio)
+                          const end = new Date(t.data_fim || addDays(start, 60).toISOString())
+                          return (
+                            <div key={t.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`} style={{ minWidth: `${totalW}px` }}>
+                              <div className={`shrink-0 py-1.5 border-r ${borderG} flex items-center gap-1.5`} style={{ width: `${COL_W.esq}px`, paddingLeft: 40, paddingRight: 8 }}>
+                                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain}`} title={t.nome}>{t.nome}</span>
+                                <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>TST</span>
+                              </div>
+                              {weeks.map((w, i) => {
+                                const ativo = start <= addDays(w.sat, 1) && end >= w.mon
+                                return (
+                                  <div key={i} className={`shrink-0 border-r ${borderG} flex items-center justify-center py-1.5`} style={{ width: `${COL_W.semana}px` }}>
+                                    {ativo && <div className="h-3.5 w-full mx-1 rounded bg-amber-500 shadow-sm" title={`${t.nome} — Sem. ${w.label}`} />}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Legenda */}
+          <div className={`flex flex-wrap gap-3 text-[10px] ${txtMuted}`}>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-amber-500" /> TST alocado (Obras)</span>
+            <span className="inline-flex items-center gap-1"><span className={`px-1 rounded-full font-bold ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>n</span> inspeções programadas</span>
+            <span className="inline-flex items-center gap-1"><span className={`px-1 rounded-full font-bold ${isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>✓n</span> executadas</span>
+            <span className="inline-flex items-center gap-1"><span className={`w-3 h-2 rounded ${isDark ? 'bg-red-500/30' : 'bg-red-100'}`} /> Semana atual</span>
           </div>
 
           {programadas.length === 0 ? (
-            <Vazio isDark={isDark} texto="Nenhuma inspeção programada" />
+            <p className={`text-[11px] italic text-center py-2 ${txtMuted}`}>Nenhuma inspeção programada — clique numa célula do quadro acima</p>
           ) : (
             <div className="space-y-2">
               {programadas.map(i => (
@@ -296,7 +474,7 @@ export default function QsmaInspecoes() {
         />
       )}
       {modalProgramar && (
-        <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} defaultObraId={modalProgramar.obraId} onClose={() => setModalProgramar(null)} />
+        <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} defaultObraId={modalProgramar.obraId} defaultData={modalProgramar.data} onClose={() => setModalProgramar(null)} />
       )}
       {executar && (
         <ExecutarInspecaoModal isDark={isDark} inspecao={executar} onClose={() => setExecutar(null)} />
@@ -443,21 +621,61 @@ function ModeloChecklistModal({ isDark, modelo, grupos, onClose }: { isDark: boo
 
 // ── Modal: programar inspeção ────────────────────────────────────────────────
 
-function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, onClose }: { isDark: boolean; modelos: QsmaModeloChecklist[]; defaultObraId?: string; onClose: () => void }) {
+function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, defaultData, onClose }: { isDark: boolean; modelos: QsmaModeloChecklist[]; defaultObraId?: string; defaultData?: string; onClose: () => void }) {
   const salvar = useSalvarInspecao()
   const [modeloId, setModeloId] = useState('')
   const [obraId, setObraId] = useState(defaultObraId ?? '')
   const [frente, setFrente] = useState('')
   const [liderId, setLiderId] = useState('')
   const [veiculoId, setVeiculoId] = useState('')
-  const [dataPrevista, setDataPrevista] = useState(new Date().toISOString().split('T')[0])
+  const [dataPrevista, setDataPrevista] = useState(defaultData ?? new Date().toISOString().split('T')[0])
+  // série: gera a agenda inteira de uma vez (única, diária em dias úteis ou semanal)
+  const [recorrencia, setRecorrencia] = useState<'unica' | 'diaria' | 'semanal'>('unica')
+  const [dataFim, setDataFim] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 28); return d.toISOString().split('T')[0]
+  })
+  const [gerando, setGerando] = useState(false)
+
+  // datas da série (diária = seg-sex; semanal = a cada 7 dias)
+  const datasSerie = useMemo(() => {
+    if (recorrencia === 'unica') return [dataPrevista].filter(Boolean)
+    if (!dataPrevista || !dataFim || dataFim < dataPrevista) return []
+    const out: string[] = []
+    const d = new Date(dataPrevista + 'T12:00:00')
+    const fim = new Date(dataFim + 'T12:00:00')
+    while (d <= fim && out.length < 60) {
+      const dow = d.getDay()
+      if (recorrencia === 'semanal' || (dow >= 1 && dow <= 5)) out.push(d.toISOString().split('T')[0])
+      d.setDate(d.getDate() + (recorrencia === 'semanal' ? 7 : 1))
+    }
+    return out
+  }, [recorrencia, dataPrevista, dataFim])
 
   const modelo = modelos.find(m => m.id === modeloId)
   const erros: string[] = []
   if (!modeloId) erros.push('escolha o modelo')
   if (!obraId) erros.push('escolha a obra')
   if (!dataPrevista) erros.push('informe a data prevista')
+  if (recorrencia !== 'unica' && datasSerie.length === 0) erros.push('período da série inválido')
   if (modelo?.escopo === 'veiculo' && !veiculoId) erros.push('escopo do modelo é veículo — selecione o veículo')
+
+  async function programar() {
+    setGerando(true)
+    try {
+      for (const dt of datasSerie) {
+        await salvar.mutateAsync({
+          modelo_id: modeloId, obra_id: obraId, frente: frente || undefined,
+          equipe_lider_id: liderId || undefined, veiculo_id: veiculoId || undefined,
+          data_prevista: dt, status: 'programada',
+        })
+      }
+      onClose()
+    } catch (e: any) {
+      alert(`Erro: ${e?.message ?? 'desconhecido'}`)
+    } finally {
+      setGerando(false)
+    }
+  }
 
   return (
     <QsmaModal isDark={isDark} titulo="Programar inspeção" subtitulo="Gera uma pendência para execução em campo" onClose={onClose}>
@@ -481,9 +699,39 @@ function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, onClose }: { i
           <input value={frente} onChange={e => setFrente(e.target.value)} placeholder="Opcional" className={pickerInputCls(isDark)} />
         </div>
         <div>
-          <label className={pickerLabelCls(isDark)}>Data prevista *</label>
+          <label className={pickerLabelCls(isDark)}>{recorrencia === 'unica' ? 'Data prevista *' : 'Início da série *'}</label>
           <input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className={pickerInputCls(isDark)} />
         </div>
+      </div>
+
+      {/* Recorrência — gera a agenda inteira de uma vez */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <label className={pickerLabelCls(isDark)}>Frequência</label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`inline-flex rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            {([['unica', 'Única'], ['diaria', 'Diária (dias úteis)'], ['semanal', 'Semanal']] as const).map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setRecorrencia(v)}
+                className={`px-3 py-2 text-[11px] font-semibold transition-all ${
+                  recorrencia === v
+                    ? isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-50 text-red-700'
+                    : isDark ? 'bg-transparent text-slate-400 hover:bg-white/[0.05]' : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {recorrencia !== 'unica' && (
+            <>
+              <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>até</span>
+              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={`${pickerInputCls(isDark)} w-36`} />
+            </>
+          )}
+        </div>
+        {recorrencia !== 'unica' && datasSerie.length > 0 && (
+          <p className={`mt-2 text-[10px] font-semibold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
+            Vai gerar {datasSerie.length} inspeção(ões) programada(s) — {new Date(datasSerie[0] + 'T12:00:00').toLocaleDateString('pt-BR')} a {new Date(datasSerie[datasSerie.length - 1] + 'T12:00:00').toLocaleDateString('pt-BR')}{datasSerie.length === 60 ? ' (limite de 60)' : ''}
+          </p>
+        )}
       </div>
       <ColaboradorPicker isDark={isDark} value={liderId} onChange={setLiderId} label="Líder da equipe inspecionada" />
       {(modelo?.escopo === 'veiculo' || veiculoId) && (
@@ -492,17 +740,10 @@ function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, onClose }: { i
       <ModalFooter
         isDark={isDark}
         erros={erros}
-        salvando={salvar.isPending}
+        salvando={gerando}
         onCancel={onClose}
-        saveLabel="Programar"
-        onSave={() => salvar.mutate(
-          {
-            modelo_id: modeloId, obra_id: obraId, frente: frente || undefined,
-            equipe_lider_id: liderId || undefined, veiculo_id: veiculoId || undefined,
-            data_prevista: dataPrevista, status: 'programada',
-          },
-          { onSuccess: onClose, onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
-        )}
+        saveLabel={datasSerie.length > 1 ? `Programar ${datasSerie.length} inspeções` : 'Programar'}
+        onSave={programar}
       />
     </QsmaModal>
   )
