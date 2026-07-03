@@ -11,7 +11,8 @@ import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao }
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
-import { useObrasComProjeto, usePlanejamentoEquipe, useColaboradoresAtivos } from '../../hooks/useObras'
+import { useObrasComProjeto, usePlanejamentoEquipe, useColaboradoresAtivos, useAtualizarPlanEquipe } from '../../hooks/useObras'
+import type { ObraPlanejamentoEquipe } from '../../types/obras'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
 import { TIPO_MODELO_LABEL, ESCOPO_MODELO_LABEL, STATUS_INSPECAO_LABEL } from '../../types/qsma'
 
@@ -58,6 +59,12 @@ export default function QsmaInspecoes() {
   const { data: obras = [] } = useObrasComProjeto()
   const { data: equipeObras = [] } = usePlanejamentoEquipe()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
+
+  // supervisor/admin podem realocar o TST clicando no nome (padrão de Obras)
+  const { isAdmin, atLeast } = useAuth()
+  const podeRealocar = isAdmin || atLeast('supervisor')
+  const atualizarAloc = useAtualizarPlanEquipe()
+  const [editAloc, setEditAloc] = useState<ObraPlanejamentoEquipe | null>(null)
 
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
@@ -373,9 +380,14 @@ export default function QsmaInspecoes() {
                           const end = new Date(t.data_fim || addDays(start, 60).toISOString())
                           return (
                             <div key={t.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`} style={{ minWidth: `${totalW}px` }}>
-                              <div className={`shrink-0 py-1.5 border-r ${borderG} flex items-center gap-1.5`} style={{ width: `${COL_W.esq}px`, paddingLeft: 40, paddingRight: 8 }}>
+                              <div
+                                onClick={podeRealocar ? () => setEditAloc(t) : undefined}
+                                className={`shrink-0 py-1.5 border-r ${borderG} flex items-center gap-1.5 ${podeRealocar ? 'cursor-pointer' : ''}`}
+                                style={{ width: `${COL_W.esq}px`, paddingLeft: 40, paddingRight: 8 }}
+                                title={podeRealocar ? 'Clique para alterar a alocação' : t.nome}
+                              >
                                 <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain}`} title={t.nome}>{t.nome}</span>
+                                <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain} ${podeRealocar ? 'hover:underline' : ''}`} title={t.nome}>{t.nome}</span>
                                 <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>TST</span>
                               </div>
                               {weeks.map((w, i) => {
@@ -522,6 +534,19 @@ export default function QsmaInspecoes() {
       )}
       {modalProgramar && (
         <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} defaultObraId={modalProgramar.obraId} defaultData={modalProgramar.data} onClose={() => setModalProgramar(null)} />
+      )}
+      {editAloc && (
+        <EditAlocacaoTstModal
+          isDark={isDark}
+          aloc={editAloc}
+          obras={obras}
+          saving={atualizarAloc.isPending}
+          onClose={() => setEditAloc(null)}
+          onSave={(v) => atualizarAloc.mutate(
+            { id: editAloc.id, obra_id: v.obraId || undefined, data_inicio: v.dataInicio, data_fim: v.dataFim || undefined },
+            { onSuccess: () => setEditAloc(null), onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
+          )}
+        />
       )}
       {executar && (
         <ExecutarInspecaoModal isDark={isDark} inspecao={executar} onClose={() => setExecutar(null)} />
@@ -791,6 +816,63 @@ function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, defaultData, o
         onCancel={onClose}
         saveLabel={datasSerie.length > 1 ? `Programar ${datasSerie.length} inspeções` : 'Programar'}
         onSave={programar}
+      />
+    </QsmaModal>
+  )
+}
+
+// ── Modal: alterar alocação do TST (supervisor/admin) — espelha Obras ────────
+
+function EditAlocacaoTstModal({ isDark, aloc, obras, saving, onClose, onSave }: {
+  isDark: boolean
+  aloc: ObraPlanejamentoEquipe
+  obras: { id: string; nome: string; projeto_id?: string; projeto_nome?: string }[]
+  saving: boolean
+  onClose: () => void
+  onSave: (v: { obraId: string; dataInicio: string; dataFim: string }) => void
+}) {
+  const [obraId, setObraId] = useState(aloc.obra_id ?? '')
+  const [dataInicio, setDataInicio] = useState((aloc.data_inicio ?? '').slice(0, 10) || new Date().toISOString().split('T')[0])
+  const [dataFim, setDataFim] = useState((aloc.data_fim ?? '').slice(0, 10))
+  const obrasPorProjeto = useMemo(() => {
+    const m = new Map<string, { nome: string; obras: typeof obras }>()
+    obras.forEach(o => { const k = o.projeto_id ?? '__sem__'; const g = m.get(k) ?? { nome: o.projeto_nome ?? 'Sem projeto', obras: [] }; g.obras.push(o); m.set(k, g) })
+    return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [obras])
+
+  const erros: string[] = []
+  if (!obraId) erros.push('selecione a obra')
+  if (!dataInicio) erros.push('informe a data de início')
+
+  return (
+    <QsmaModal isDark={isDark} titulo={aloc.nome} subtitulo="Alteração de alocação · Técnico de Segurança" onClose={onClose}>
+      <div>
+        <label className={pickerLabelCls(isDark)}>Obra (Projeto › Obra) *</label>
+        <select value={obraId} onChange={e => setObraId(e.target.value)} className={pickerInputCls(isDark)}>
+          <option value="">— sem obra —</option>
+          {obrasPorProjeto.map(g => (
+            <optgroup key={g.nome} label={g.nome}>
+              {g.obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={pickerLabelCls(isDark)}>Data início *</label>
+          <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={pickerInputCls(isDark)} />
+        </div>
+        <div>
+          <label className={pickerLabelCls(isDark)}>Data fim</label>
+          <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={pickerInputCls(isDark)} />
+        </div>
+      </div>
+      <p className={`text-[10px] italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        A alteração reflete na programação do módulo Obras (mesma alocação).
+      </p>
+      <ModalFooter
+        isDark={isDark} erros={erros} salvando={saving} onCancel={onClose} saveLabel="Salvar alocação"
+        onSave={() => onSave({ obraId, dataInicio, dataFim })}
       />
     </QsmaModal>
   )
