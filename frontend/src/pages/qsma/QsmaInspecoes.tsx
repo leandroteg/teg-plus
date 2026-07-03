@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao } from '../../hooks/useQsma'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
-import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, Contagem } from '../../components/qsma/Toolbar'
+import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
@@ -61,7 +61,7 @@ export default function QsmaInspecoes() {
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
   const [tipoF, setTipoF] = useState('')
-  const [obraF, setObraF] = useState('')
+  const [exObras, setExObras] = useState<Set<string>>(new Set())
   const [veredF, setVeredF] = useState('todos')
   const obrasComRegistro = useMemo(() => {
     const ids = new Set(inspecoes.map(i => i.obra_id).filter(Boolean))
@@ -74,15 +74,15 @@ export default function QsmaInspecoes() {
   ), [modelos, q, tipoF])
   const programadas = useMemo(() => inspecoes.filter(i =>
     i.status === 'programada'
-    && (!obraF || i.obra_id === obraF)
+    && !exObras.has(i.obra_id ?? '')
     && (!q || (i.modelo?.nome ?? '').toLowerCase().includes(q) || (i.codigo ?? '').toLowerCase().includes(q))
-  ), [inspecoes, obraF, q])
+  ), [inspecoes, exObras, q])
   const executadas = useMemo(() => inspecoes.filter(i =>
     i.status === 'executada'
-    && (!obraF || i.obra_id === obraF)
+    && !exObras.has(i.obra_id ?? '')
     && (!q || (i.modelo?.nome ?? '').toLowerCase().includes(q) || (i.codigo ?? '').toLowerCase().includes(q) || (i.executor_nome ?? '').toLowerCase().includes(q))
     && (veredF === 'todos' || (veredF === 'bloqueado' ? i.veredito === 'bloqueado' : veredF === 'liberado' ? i.veredito === 'liberado' : true))
-  ), [inspecoes, obraF, q, veredF])
+  ), [inspecoes, exObras, q, veredF])
 
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
@@ -101,6 +101,7 @@ export default function QsmaInspecoes() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${modelosF.length} modelo${modelosF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar modelo…"
             acoes={<BotaoNovo label="Novo Modelo" onClick={() => setModalModelo('novo')} />}
           >
@@ -109,7 +110,6 @@ export default function QsmaInspecoes() {
               options={(Object.keys(TIPO_MODELO_LABEL) as (keyof typeof TIPO_MODELO_LABEL)[]).map(t => ({ value: t, label: TIPO_MODELO_LABEL[t] }))}
             />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={modelosF.length} singular="modelo" plural="modelos" />
           {modelosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum modelo de checklist — crie o primeiro" />
           ) : (
@@ -140,12 +140,12 @@ export default function QsmaInspecoes() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${programadas.length} programada${programadas.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar inspeção…"
             acoes={<BotaoNovo label="Programar Inspeção" onClick={() => setModalProgramar(true)} />}
           >
-            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasComRegistro} />
+            <MultiCheck isDark={isDark} label="Obras" options={obrasComRegistro} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={programadas.length} singular="inspeção programada" plural="inspeções programadas" />
           {programadas.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhuma inspeção programada" />
           ) : (
@@ -177,15 +177,15 @@ export default function QsmaInspecoes() {
         <div className="space-y-2">
           <QsmaToolbar
             isDark={isDark}
-            busca={busca} onBusca={setBusca} placeholder="Buscar por código, modelo ou executor…"
+            contagem={`${executadas.length} executada${executadas.length !== 1 ? 's' : ''}`}
+            busca={busca} onBusca={setBusca} placeholder="Buscar código, modelo, executor…"
           >
-            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasComRegistro} />
+            <MultiCheck isDark={isDark} label="Obras" options={obrasComRegistro} excluded={exObras} setExcluded={setExObras} />
             <ToolbarPills
               isDark={isDark} value={veredF} onChange={setVeredF}
               options={[{ value: 'todos', label: 'Todas' }, { value: 'liberado', label: 'Liberadas' }, { value: 'bloqueado', label: 'Bloqueadas' }]}
             />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={executadas.length} singular="inspeção executada" plural="inspeções executadas" />
           {executadas.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhuma inspeção executada ainda" />
           ) : executadas.map(i => {
