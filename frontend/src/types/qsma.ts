@@ -131,20 +131,57 @@ export interface QsmaEpi {
   validade_ca?: string
   fabricante?: string
   vida_util_dias?: number
+  especificacoes?: string
+  possui_devolucao?: boolean
+  tamanho_por_funcionario?: boolean
   ativo: boolean
   created_at: string
 }
 
+// Espelho local da base oficial de CAs do MTE (CAEPI) — consulta instantânea
+export interface QsmaCaepi {
+  ca: string
+  equipamento?: string
+  descricao?: string
+  fabricante?: string
+  fabricante_cnpj?: string
+  validade?: string
+  situacao?: string
+}
+
 export type MotivoEntregaEpi = 'entrega' | 'troca' | 'devolucao'
+export type StatusFichaEpi = 'aguardando_assinatura' | 'arquivada' | 'cancelada'
+
+// Ficha de entrega (padrão NR-06): 1 ficha → N itens; gera PDF, colhe
+// assinatura e arquiva o documento assinado no bucket.
+export interface QsmaEpiFicha {
+  id: string
+  codigo?: string
+  colaborador_id: string
+  colaborador_nome?: string
+  obra_id?: string
+  data_entrega: string
+  motivo?: MotivoEntregaEpi
+  observacoes?: string
+  status: StatusFichaEpi
+  arquivo_assinado_path?: string
+  missao_id?: string
+  entregue_por_nome?: string
+  itens?: QsmaEpiEntrega[]
+  created_at: string
+  updated_at: string
+}
 
 export interface QsmaEpiEntrega {
   id: string
+  ficha_id?: string
   epi_id?: string
   epi?: QsmaEpi
   colaborador_id: string
   colaborador_nome?: string
   obra_id?: string
   quantidade: number
+  tamanho?: string
   data_entrega: string
   data_troca_prevista?: string
   motivo: MotivoEntregaEpi
@@ -152,6 +189,12 @@ export interface QsmaEpiEntrega {
   assinado: boolean
   entregue_por_nome?: string
   created_at: string
+}
+
+export const STATUS_FICHA_EPI_LABEL: Record<StatusFichaEpi, { label: string; light: string; dark: string }> = {
+  aguardando_assinatura: { label: 'Aguard. assinatura', light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-400' },
+  arquivada:             { label: 'Arquivada',          light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
+  cancelada:             { label: 'Cancelada',          light: 'bg-red-100 text-red-600',         dark: 'bg-red-500/15 text-red-400' },
 }
 
 export interface QsmaTreinamento {
