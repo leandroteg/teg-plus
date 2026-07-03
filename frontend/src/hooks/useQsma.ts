@@ -1,0 +1,499 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// hooks/useQsma.ts — Módulo QSMA (Qualidade, Segurança e Meio Ambiente)
+// Tabelas qsma_* + integração SGI: ações corretivas em sgi_acoes com
+// origem_tipo='qsma_ocorrencia'. Evidências no bucket privado qsma-evidencias.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../services/supabase'
+import type {
+  QsmaModeloChecklist, QsmaInspecao, QsmaOcorrencia, QsmaRisco,
+  QsmaEpi, QsmaEpiEntrega, QsmaTreinamento,
+  QsmaLicenca, QsmaCondicionante, QsmaEventoAmbiental, QsmaAspecto,
+  StatusInspecao, StatusOcorrencia,
+} from '../types/qsma'
+
+const BUCKET = 'qsma-evidencias'
+
+// ── Evidências (bucket privado) ──────────────────────────────────────────────
+
+export async function uploadEvidencia(pasta: string, file: File): Promise<string> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${pasta}/${Date.now()}_${safe}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    upsert: true, contentType: file.type || undefined,
+  })
+  if (error) throw error
+  return path
+}
+
+export async function evidenciaUrl(path?: string): Promise<string | null> {
+  if (!path) return null
+  if (/^https?:\/\//.test(path)) return path
+  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
+}
+
+async function proximoCodigo(tipo: string): Promise<string | null> {
+  const { data } = await supabase.rpc('qsma_proximo_codigo', { p_tipo: tipo })
+  return (data as string) ?? null
+}
+
+// ── Modelos de Checklist ─────────────────────────────────────────────────────
+
+export function useModelosChecklist() {
+  return useQuery({
+    queryKey: ['qsma_modelos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('qsma_modelos_checklist').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaModeloChecklist[]
+    },
+  })
+}
+
+export function useSalvarModelo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaModeloChecklist>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_modelos_checklist')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      } else {
+        const codigo = await proximoCodigo('CHK')
+        const { error } = await supabase.from('qsma_modelos_checklist').insert({ ...payload, codigo })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_modelos'] }),
+  })
+}
+
+// ── Inspeções ────────────────────────────────────────────────────────────────
+
+export function useInspecoes(filtros?: { status?: StatusInspecao; obra_id?: string }) {
+  return useQuery({
+    queryKey: ['qsma_inspecoes', filtros],
+    queryFn: async () => {
+      let q = supabase.from('qsma_inspecoes')
+        .select('*, modelo:qsma_modelos_checklist(id, nome, tipo, escopo, exige_veredito, itens)')
+        .order('created_at', { ascending: false })
+      if (filtros?.status) q = q.eq('status', filtros.status)
+      if (filtros?.obra_id) q = q.eq('obra_id', filtros.obra_id)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as QsmaInspecao[]
+    },
+  })
+}
+
+export function useSalvarInspecao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaInspecao>) => {
+      if (payload.id) {
+        const { id, modelo: _m, ...rest } = payload as Partial<QsmaInspecao> & { modelo?: unknown }
+        const { error } = await supabase.from('qsma_inspecoes')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      } else {
+        const codigo = await proximoCodigo('INS')
+        const { modelo: _m, ...rest } = payload as Partial<QsmaInspecao> & { modelo?: unknown }
+        const { error } = await supabase.from('qsma_inspecoes').insert({ ...rest, codigo })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_inspecoes'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+// ── Ocorrências ──────────────────────────────────────────────────────────────
+
+export function useOcorrencias(filtros?: { status?: StatusOcorrencia }) {
+  return useQuery({
+    queryKey: ['qsma_ocorrencias', filtros],
+    queryFn: async () => {
+      let q = supabase.from('qsma_ocorrencias').select('*').order('data_ocorrencia', { ascending: false })
+      if (filtros?.status) q = q.eq('status', filtros.status)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as QsmaOcorrencia[]
+    },
+  })
+}
+
+export function useSalvarOcorrencia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaOcorrencia>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_ocorrencias')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+        return id
+      }
+      const codigo = await proximoCodigo('OCO')
+      const { data, error } = await supabase.from('qsma_ocorrencias')
+        .insert({ ...payload, codigo }).select('id').single()
+      if (error) throw error
+      return (data as { id: string }).id
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_ocorrencias'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+// Ação corretiva da ocorrência → sgi_acoes (plano de ação único da empresa)
+export function useCriarAcaoOcorrencia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      ocorrencia_id: string; titulo: string; descricao?: string
+      responsavel_id?: string; prazo?: string; sla_horas?: number; criado_por_nome?: string
+    }) => {
+      const { error } = await supabase.from('sgi_acoes').insert({
+        origem_tipo: 'qsma_ocorrencia',
+        origem_id: p.ocorrencia_id,
+        titulo: p.titulo,
+        descricao: p.descricao ?? null,
+        responsavel_id: p.responsavel_id ?? null,
+        prazo: p.prazo ?? null,
+        sla_horas: p.sla_horas ?? null,
+        status: 'pendente',
+        escalonado: false,
+        criado_por_nome: p.criado_por_nome ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_acoes'] })
+      qc.invalidateQueries({ queryKey: ['sgi_acoes'] })
+    },
+  })
+}
+
+// Ações SGI vinculadas a ocorrências QSMA
+export function useAcoesQsma() {
+  return useQuery({
+    queryKey: ['qsma_acoes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sgi_acoes').select('*')
+        .eq('origem_tipo', 'qsma_ocorrencia')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as {
+        id: string; origem_id: string; titulo: string; descricao?: string
+        responsavel_id?: string; prazo?: string; sla_horas?: number
+        status: string; escalonado: boolean; created_at: string
+      }[]
+    },
+  })
+}
+
+// ── Riscos (PGR / APR) ───────────────────────────────────────────────────────
+
+export function useRiscos() {
+  return useQuery({
+    queryKey: ['qsma_riscos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_riscos').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaRisco[]
+    },
+  })
+}
+
+export function useSalvarRisco() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaRisco>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_riscos')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      } else {
+        const codigo = await proximoCodigo(payload.escopo === 'pgr' ? 'PGR' : 'APR')
+        const { error } = await supabase.from('qsma_riscos').insert({ ...payload, codigo })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_riscos'] }),
+  })
+}
+
+// ── EPIs ─────────────────────────────────────────────────────────────────────
+
+export function useEpis() {
+  return useQuery({
+    queryKey: ['qsma_epis'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_epis').select('*').order('nome')
+      if (error) throw error
+      return (data ?? []) as QsmaEpi[]
+    },
+  })
+}
+
+export function useSalvarEpi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaEpi>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_epis').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_epis').insert(payload)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_epis'] }),
+  })
+}
+
+export function useEpiEntregas() {
+  return useQuery({
+    queryKey: ['qsma_epi_entregas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('qsma_epi_entregas')
+        .select('*, epi:qsma_epis(id, nome, ca, vida_util_dias)')
+        .order('data_entrega', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaEpiEntrega[]
+    },
+  })
+}
+
+export function useRegistrarEntregaEpi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaEpiEntrega>) => {
+      const { epi: _e, ...rest } = payload as Partial<QsmaEpiEntrega> & { epi?: unknown }
+      const { error } = await supabase.from('qsma_epi_entregas').insert(rest)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+// ── Treinamentos ─────────────────────────────────────────────────────────────
+
+export function useTreinamentos() {
+  return useQuery({
+    queryKey: ['qsma_treinamentos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_treinamentos').select('*').order('vencimento', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as QsmaTreinamento[]
+    },
+  })
+}
+
+export function useSalvarTreinamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaTreinamento>) => {
+      // vencimento = realização + validade_meses
+      let vencimento = payload.vencimento
+      if (!vencimento && payload.data_realizacao && payload.validade_meses) {
+        const d = new Date(payload.data_realizacao + 'T12:00:00')
+        d.setMonth(d.getMonth() + payload.validade_meses)
+        vencimento = d.toISOString().split('T')[0]
+      }
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_treinamentos')
+          .update({ ...rest, vencimento, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_treinamentos').insert({ ...payload, vencimento })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_treinamentos'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+// ── Meio Ambiente ────────────────────────────────────────────────────────────
+
+export function useLicencas() {
+  return useQuery({
+    queryKey: ['qsma_licencas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('qsma_licencas')
+        .select('*, condicionantes:qsma_condicionantes(*)')
+        .order('validade', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as QsmaLicenca[]
+    },
+  })
+}
+
+export function useSalvarLicenca() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ condicionantes, ...payload }: Omit<Partial<QsmaLicenca>, 'condicionantes'> & { condicionantes?: Partial<QsmaCondicionante>[] }) => {
+      let licencaId = payload.id
+      if (licencaId) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_licencas')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', licencaId)
+        if (error) throw error
+      } else {
+        const codigo = await proximoCodigo('LIC')
+        const { data, error } = await supabase.from('qsma_licencas')
+          .insert({ ...payload, codigo }).select('id').single()
+        if (error) throw error
+        licencaId = (data as { id: string }).id
+      }
+      // condicionantes novas (sem id) são inseridas; existentes atualizadas
+      for (const c of condicionantes ?? []) {
+        if (c.id) {
+          const { id, ...rest } = c
+          await supabase.from('qsma_condicionantes')
+            .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        } else if (c.descricao) {
+          await supabase.from('qsma_condicionantes').insert({ ...c, licenca_id: licencaId })
+        }
+      }
+      return licencaId
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_licencas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+export function useAtualizarCondicionante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<QsmaCondicionante> & { id: string }) => {
+      const { error } = await supabase.from('qsma_condicionantes')
+        .update({ ...payload, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_licencas'] }),
+  })
+}
+
+export function useEventosAmbientais() {
+  return useQuery({
+    queryKey: ['qsma_eventos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_eventos_ambientais').select('*').order('data')
+      if (error) throw error
+      return (data ?? []) as QsmaEventoAmbiental[]
+    },
+  })
+}
+
+export function useSalvarEvento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaEventoAmbiental>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_eventos_ambientais').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_eventos_ambientais').insert(payload)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_eventos'] }),
+  })
+}
+
+export function useAspectos() {
+  return useQuery({
+    queryKey: ['qsma_aspectos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_aspectos').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaAspecto[]
+    },
+  })
+}
+
+export function useSalvarAspecto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<QsmaAspecto>) => {
+      if (payload.id) {
+        const { id, ...rest } = payload
+        const { error } = await supabase.from('qsma_aspectos')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_aspectos').insert(payload)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_aspectos'] }),
+  })
+}
+
+// ── KPIs do Painel ───────────────────────────────────────────────────────────
+
+export function useQsmaKPIs() {
+  return useQuery({
+    queryKey: ['qsma_kpis'],
+    queryFn: async () => {
+      const hoje = new Date().toISOString().split('T')[0]
+      const ini30 = new Date(Date.now() - 30 * 86400000).toISOString()
+      const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
+      const [inspR, ocoR, entR, treR, licR, accR] = await Promise.all([
+        supabase.from('qsma_inspecoes').select('id, status, veredito, data_execucao, created_at'),
+        supabase.from('qsma_ocorrencias').select('id, tipo, status, data_ocorrencia'),
+        supabase.from('qsma_epi_entregas').select('id, data_troca_prevista, assinado'),
+        supabase.from('qsma_treinamentos').select('id, vencimento'),
+        supabase.from('qsma_licencas').select('id, status, validade'),
+        supabase.from('sgi_acoes').select('id, status, prazo').eq('origem_tipo', 'qsma_ocorrencia'),
+      ])
+      const insp = inspR.data ?? []
+      const oco = ocoR.data ?? []
+      const ent = entR.data ?? []
+      const tre = treR.data ?? []
+      const lic = licR.data ?? []
+      const acoes = accR.data ?? []
+
+      const insp30 = insp.filter(i => i.status === 'executada' && (i.data_execucao ?? i.created_at) >= ini30)
+      return {
+        inspecoes30: insp30.length,
+        inspecoesProgramadas: insp.filter(i => i.status === 'programada').length,
+        bloqueios: insp.filter(i => i.veredito === 'bloqueado').length,
+        ocorrenciasAbertas: oco.filter(o => o.status !== 'encerrada').length,
+        piramide: {
+          desvios: oco.filter(o => o.tipo === 'desvio').length,
+          quaseAcidentes: oco.filter(o => o.tipo === 'quase_acidente').length,
+          acidentes: oco.filter(o => o.tipo === 'acidente_spt' || o.tipo === 'acidente_cpt').length,
+        },
+        episVencendo: ent.filter(e => e.data_troca_prevista && e.data_troca_prevista <= lim60 && e.data_troca_prevista >= hoje).length,
+        episNaoAssinados: ent.filter(e => !e.assinado).length,
+        treinamentosVencendo: tre.filter(t => t.vencimento && t.vencimento <= lim60).length,
+        licencasCriticas: lic.filter(l => l.status === 'vencida' || (l.validade && l.validade <= lim60)).length,
+        acoesAbertas: acoes.filter(a => a.status !== 'concluida' && a.status !== 'cancelada').length,
+        acoesAtrasadas: acoes.filter(a => a.status !== 'concluida' && a.status !== 'cancelada' && a.prazo && a.prazo < hoje).length,
+      }
+    },
+  })
+}
