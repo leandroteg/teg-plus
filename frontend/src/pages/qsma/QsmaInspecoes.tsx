@@ -603,6 +603,8 @@ function ModeloChecklistModal({ isDark, modelo, grupos, onClose }: { isDark: boo
   const [exigeVeredito, setExigeVeredito] = useState(modelo?.exige_veredito ?? false)
   const [ativo, setAtivo] = useState(modelo?.ativo ?? true)
   const [itens, setItens] = useState<ItemChecklist[]>(modelo?.itens ?? [])
+  // classe sem w-full (o pickerInputCls tem w-full, que conflita com flex-1/w-28 na linha do item)
+  const cellCls = `rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-red-500/25 ${isDark ? 'bg-white/[0.04] border-white/10 text-white placeholder:text-slate-500 [&>option]:bg-slate-900' : 'bg-white border-slate-200 text-slate-800'}`
 
   const erros: string[] = []
   if (!nome.trim()) erros.push('informe o nome')
@@ -681,12 +683,12 @@ function ModeloChecklistModal({ isDark, modelo, grupos, onClose }: { isDark: boo
               value={item.texto}
               onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, texto: e.target.value } : x))}
               placeholder="O que verificar?"
-              className={`${pickerInputCls(isDark)} flex-1`}
+              className={`${cellCls} flex-1 min-w-0`}
             />
             <select
               value={item.tipo_resposta}
               onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tipo_resposta: e.target.value as TipoResposta } : x))}
-              className={`${pickerInputCls(isDark)} w-28 shrink-0`}
+              className={`${cellCls} w-28 shrink-0`}
             >
               <option value="cna">C / NC / NA</option>
               <option value="texto">Texto</option>
