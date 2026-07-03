@@ -864,17 +864,13 @@ export function useRegistro() {
   // dispara OneDrive (pasta + anexos) + Secullum (cadastro) via SuperTEG (n8n, passos 3-4, assíncrono).
   const finalizarRegistro = useMutation({
     mutationFn: async (i: { candidatoId: string; autorId?: string; autorNome?: string }) => {
-      const { data, error } = await supabase.rpc('rh_admissao_finalizar_registro', {
-        p_candidato_id: i.candidatoId, p_autor_id: i.autorId ?? null, p_autor_nome: i.autorNome ?? null,
+      // Edge orquestra: efetiva o colaborador (RPC 1-2) + dispara OneDrive/Secullum no SuperTEG (3-4).
+      const { data, error } = await supabase.functions.invoke('rh-admissao-finalizar', {
+        body: { candidato_id: i.candidatoId, autor_id: i.autorId ?? null, autor_nome: i.autorNome ?? null },
       })
       if (error) throw error
-      const r = data as { ok: boolean; erro?: string; colaborador_id?: string }
+      const r = data as { ok: boolean; erro?: string; colaborador_id?: string; job_id?: string }
       if (!r.ok) throw new Error(r.erro || 'Falha ao finalizar o registro')
-      // SuperTEG cuida de OneDrive + Secullum (não bloqueia; roda no worker da VPS)
-      fetch(`${N8N_URL}/rh/admissao/finalizar`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidato_id: i.candidatoId, colaborador_id: r.colaborador_id }),
-      }).catch(() => { /* best-effort */ })
       return r
     },
     onSuccess: (_, v) => {
