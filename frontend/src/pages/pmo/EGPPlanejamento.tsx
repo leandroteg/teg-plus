@@ -52,6 +52,22 @@ const fmtBRL = (v: number) =>
 
 const fmtPct = (v: number) => `${v.toFixed(1)}%`
 
+// Seletor de período (mês/ano) — mesmo padrão do Painel EGP
+function ymHojeEGP() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+const MESES_OPT_EGP: Array<[string, string]> = [['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'], ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez']]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []; for (let a = 2024; a <= anoAtual + 1; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">{MESES_OPT_EGP.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">{anos.map(a => <option key={a} value={a}>{a}</option>)}</select>
+    </span>
+  )
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
 export default function EGPPlanejamento() {
@@ -63,6 +79,8 @@ export default function EGPPlanejamento() {
   const [excludedOscs, setExcludedOscs] = useState<Set<string>>(new Set())
   const [criando, setCriando] = useState(false)
   const [novoProjeto, setNovoProjeto] = useState({ nome: '', centro_custo_id: '' })
+  const [de, setDe] = useState('2024-01')       // EAP: período do faturado (das medições)
+  const [ate, setAte] = useState(ymHojeEGP())
 
   const { data: portfolio } = usePortfolio(portfolioId)
   const { data: projetos, isLoading: loadingProjetos } = useProjetos(portfolioId)
@@ -140,12 +158,21 @@ export default function EGPPlanejamento() {
           accentText={isLight ? TAB_ACCENT[tab].text : TAB_ACCENT[tab].textDark}
           accentBg={isLight ? TAB_ACCENT[tab].bg : TAB_ACCENT[tab].bgDark}
           isLight={isLight}
-          rightSlot={tab === 'eap' ? <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} /> : undefined}
+          rightSlot={tab === 'eap' ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1" title="Faturado por período (das medições) — contratado/torres não mudam">
+                <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+                <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+                <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+              </span>
+              <EAPKpis portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} isLight={isLight} de={de} ate={ate} />
+            </div>
+          ) : undefined}
         />
       )}
 
       {/* Tab content */}
-      {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} />}
+      {tab === 'eap' && <EAPFinal portfolioId={portfolioId} excluded={excluded} excludedOscs={excludedOscs} setExcludedOscs={setExcludedOscs} isLight={isLight} de={de} ate={ate} />}
       {tab === 'cronograma' && <CronogramaPainel portfolioId={portfolioId} />}
       {tab === 'histograma' && <HistogramaRecursos portfolioId={portfolioId} />}
       {tab === 'custos' && <CustosPainel portfolioId={portfolioId} />}
