@@ -37,6 +37,7 @@ import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
 import LocacaoLayout from './components/LocacaoLayout'
 import SgiLayout from './components/SgiLayout'
+import QsmaLayout from './components/QsmaLayout'
 import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 import PaineisLayout from './components/PaineisLayout'
 import ResponsivePainel from './components/paineis-mobile/ResponsivePainel'
@@ -195,6 +196,13 @@ const SgiNovoRegistro = lazy(() => import('./pages/sgi/SgiNovoRegistro'))
 const SgiObjetivos = lazy(() => import('./pages/sgi/SgiObjetivos'))
 const SgiMelhoriaContinua = lazy(() => import('./pages/sgi/SgiMelhoriaContinua'))
 const SgiPadronizacao = lazy(() => import('./pages/sgi/SgiPadronizacao'))
+
+// QSMA (Projetos › Qualidade, Segurança e Meio Ambiente)
+const QsmaPainel = lazy(() => import('./pages/qsma/QsmaPainel'))
+const QsmaNovoRegistro = lazy(() => import('./pages/qsma/QsmaNovoRegistro'))
+const QsmaInspecoes = lazy(() => import('./pages/qsma/QsmaInspecoes'))
+const QsmaSeguranca = lazy(() => import('./pages/qsma/QsmaSeguranca'))
+const QsmaMeioAmbiente = lazy(() => import('./pages/qsma/QsmaMeioAmbiente'))
 
 // Painéis (hub que reúne os painéis de todos os módulos)
 const PaineisOverview = lazy(() => import('./pages/paineis/PaineisOverview'))
@@ -401,6 +409,17 @@ export default function App() {
               <Route path="/sgi/objetivos"     element={<Lazy><SgiObjetivos /></Lazy>} />
               <Route path="/sgi/melhoria"      element={<Lazy><SgiMelhoriaContinua /></Lazy>} />
               <Route path="/sgi/padronizacao"  element={<Lazy><SgiPadronizacao /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo QSMA (Projetos › Qualidade, Segurança e Meio Ambiente) */}
+          <Route element={<ModuleRoute moduleKey="qsma" />}>
+            <Route element={<QsmaLayout />}>
+              <Route path="/qsma"               element={<LazyDash><QsmaPainel /></LazyDash>} />
+              <Route path="/qsma/novo"          element={<Lazy><QsmaNovoRegistro /></Lazy>} />
+              <Route path="/qsma/inspecoes"     element={<Lazy><QsmaInspecoes /></Lazy>} />
+              <Route path="/qsma/seguranca"     element={<Lazy><QsmaSeguranca /></Lazy>} />
+              <Route path="/qsma/meio-ambiente" element={<Lazy><QsmaMeioAmbiente /></Lazy>} />
             </Route>
           </Route>
 
