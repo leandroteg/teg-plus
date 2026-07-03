@@ -8,6 +8,7 @@ import { useTiAuth } from './data/auth'
 import type { Status, Priority } from './data/shapes'
 import { STATUS_LIST, PRIORITY_LIST, STATUS_META, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner, EmptyState } from './components/ui'
+import { TiTabs } from './components/TiTabs'
 import { StatusBadge, PriorityBadge, CategoryBadge, EscaladoBadge } from './components/Badges'
 import { SlaBadge } from './components/SlaBadge'
 import { Avatar } from './components/Avatar'
@@ -45,8 +46,10 @@ export default function Chamados() {
       <PageHeader
         title="Chamados"
         subtitle="Todos os chamados da T.I."
-        action={<Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Novo chamado</Link>}
+        action={<Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>}
       />
+
+      <TiTabs />
 
       <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-[180px] flex-1">

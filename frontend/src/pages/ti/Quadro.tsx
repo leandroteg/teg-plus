@@ -5,6 +5,7 @@ import { listTickets, patchTicket } from './data/tickets'
 import type { Ticket, Status } from './data/shapes'
 import { STATUS_META, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner } from './components/ui'
+import { TiTabs } from './components/TiTabs'
 import { Avatar } from './components/Avatar'
 import { SlaBadge } from './components/SlaBadge'
 
@@ -102,6 +103,7 @@ export default function Quadro() {
   return (
     <div className="ti-scope">
       <PageHeader title="Quadro de atendimento" subtitle="Arraste para mudar o status" />
+      <TiTabs />
       {isLoading ? (
         <Spinner />
       ) : (

@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { listAllCanned, createCanned, updateCanned } from './data/canned'
 import type { CannedResponse } from './data/shapes'
 import { PageHeader, Spinner } from './components/ui'
+import { TiTabs } from './components/TiTabs'
 
 function Editor({ item }: { item: CannedResponse }) {
   const qc = useQueryClient()
@@ -57,6 +58,7 @@ export default function Respostas() {
   return (
     <div className="ti-scope">
       <PageHeader title="Respostas prontas" subtitle="Modelos para agilizar o atendimento" />
+      <TiTabs />
       <div className="card mb-6 space-y-2 p-4">
         <h2 className="text-sm font-semibold text-slate-700">Novo modelo</h2>
         <input className="input" placeholder="Título (ex.: Pedir mais informações)" value={title} onChange={(e) => setTitle(e.target.value)} />

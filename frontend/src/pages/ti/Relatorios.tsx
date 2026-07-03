@@ -32,7 +32,9 @@ function Kpi({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-export default function Relatorios() {
+/** Corpo dos relatórios (filtros + KPIs + gráficos) — reutilizado pelo Painel
+ *  (visão "Relatório" do seletor) e pela página /ti/relatorios. */
+export function RelatoriosPanel() {
   const [from, setFrom] = useState(() => isoDaysAgo(30))
   const [to, setTo] = useState(() => isoDaysAgo(0))
 
@@ -56,25 +58,19 @@ export default function Relatorios() {
   }
 
   return (
-    <div className="ti-scope">
-      <PageHeader
-        title="Relatórios"
-        subtitle="Indicadores dos chamados de T.I."
-        action={
-          <div className="flex flex-wrap items-end gap-2 print:hidden">
-            <div>
-              <label className="mb-0.5 block text-xs text-slate-500">De</label>
-              <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-xs text-slate-500">Até</label>
-              <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <button className="btn-outline" onClick={exportCSV}><Download className="h-4 w-4" /> CSV</button>
-            <button className="btn-outline" onClick={() => window.print()}><Printer className="h-4 w-4" /> Imprimir</button>
-          </div>
-        }
-      />
+    <div>
+      <div className="mb-4 flex flex-wrap items-end justify-end gap-2 print:hidden">
+        <div>
+          <label className="mb-0.5 block text-xs text-slate-500">De</label>
+          <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-slate-500">Até</label>
+          <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <button className="btn-outline" onClick={exportCSV}><Download className="h-4 w-4" /> CSV</button>
+        <button className="btn-outline" onClick={() => window.print()}><Printer className="h-4 w-4" /> Imprimir</button>
+      </div>
 
       {isLoading || !data ? (
         <Spinner />
@@ -139,6 +135,17 @@ export default function Relatorios() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Página /ti/relatorios — mantida para acesso direto; o mesmo conteúdo também
+ *  aparece no Painel via seletor de visão (Resumo/Relatório). */
+export default function Relatorios() {
+  return (
+    <div className="ti-scope">
+      <PageHeader title="Relatórios" subtitle="Indicadores dos chamados de T.I." />
+      <RelatoriosPanel />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Search, Plus, BookOpen, FileText } from 'lucide-react'
 import { listArticles } from './data/articles'
 import { useTiAuth } from './data/auth'
 import { PageHeader, Spinner, EmptyState } from './components/ui'
+import { TiTabs } from './components/TiTabs'
 import { timeAgo } from './lib/format'
 
 export default function Base() {
@@ -20,6 +21,8 @@ export default function Base() {
         subtitle="Tutoriais e respostas frequentes da T.I."
         action={staff ? <Link to="/ti/base/novo" className="btn-primary"><Plus className="h-4 w-4" /> Novo artigo</Link> : undefined}
       />
+
+      <TiTabs />
 
       <div className="card mb-4 p-3">
         <div className="relative">

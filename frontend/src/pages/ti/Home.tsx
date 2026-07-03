@@ -1,12 +1,13 @@
 // Painel do módulo TI — port fiel do Dashboard do helpdesk (versão admin/equipe).
 // KPIs operacionais, destaques de 30 dias, 5 gráficos, fila "Precisam de atenção"
 // e chamados recentes. (Banner de WhatsApp omitido — depende do worker, fase 11.)
+import { useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX, Plus,
-  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight,
+  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -14,6 +15,7 @@ import {
 } from 'recharts'
 import { getDashboardStats, listTickets } from './data/tickets'
 import { getReportSummary } from './data/reports'
+import { RelatoriosPanel } from './Relatorios'
 import { useTiAuth } from './data/auth'
 import type { Ticket, Status, Priority } from './data/shapes'
 import { STATUS_LIST, STATUS_META, PRIORITY_LIST, PRIORITY_META } from './lib/constants'
@@ -130,8 +132,20 @@ function AttentionQueue({ tickets }: { tickets: Ticket[] }) {
   )
 }
 
+type Visao = 'resumo' | 'relatorio'
+
 export default function TiHome() {
   const { user } = useTiAuth()
+  // Visão do painel: 'resumo' (dashboard) | 'relatorio' (indicadores/CSV) — num
+  // seletor colado ao título, padrão do Painel-Compras. Persiste em localStorage.
+  const [visao, setVisao] = useState<Visao>(() => {
+    if (typeof window === 'undefined') return 'resumo'
+    return (localStorage.getItem('ti-painel-visao') as Visao) || 'resumo'
+  })
+  const trocarVisao = (v: Visao) => {
+    setVisao(v)
+    try { localStorage.setItem('ti-painel-visao', v) } catch { /* ignore */ }
+  }
   const statsQ = useQuery({ queryKey: ['ti', 'stats'], queryFn: getDashboardStats })
   const ticketsQ = useQuery({ queryKey: ['ti', 'tickets', 'all'], queryFn: () => listTickets({}) })
   const summaryQ = useQuery({
@@ -170,15 +184,32 @@ export default function TiHome() {
     <div className="ti-scope">
       <PageHeader
         title={`Olá, ${firstName} 👋`}
-        subtitle="Visão geral dos chamados de T.I."
+        subtitle={visao === 'resumo' ? 'Visão geral dos chamados de T.I.' : 'Indicadores dos chamados de T.I.'}
+        titleExtra={
+          /* Seletor de visão (dropdown) — colado ao título, padrão do Painel-Compras */
+          <div className="relative print:hidden">
+            <select
+              value={visao}
+              onChange={(e) => trocarVisao(e.target.value as Visao)}
+              className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-3 pr-7 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100"
+            >
+              <option value="resumo">Resumo</option>
+              <option value="relatorio">Relatório</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
+          </div>
+        }
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to="/ti/relatorios" className="btn-outline"><BarChart3 className="h-4 w-4" /> Relatórios</Link>
-            <Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Novo chamado</Link>
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>
           </div>
         }
       />
 
+      {/* Visão Relatório — mesmo conteúdo da página /ti/relatorios */}
+      {visao === 'relatorio' && <RelatoriosPanel />}
+
+      {visao === 'resumo' && (<>
       {/* KPIs operacionais */}
       {statsQ.isLoading || !stats ? (
         <Spinner />
@@ -293,6 +324,7 @@ export default function TiHome() {
           </div>
         )}
       </section>
+      </>)}
     </div>
   )
 }
