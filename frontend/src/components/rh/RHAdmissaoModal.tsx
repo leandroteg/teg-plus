@@ -436,6 +436,8 @@ function CandidatoBloco({ cand, idx, abrindo, onAbrir, etapa, autorId, autorNome
           ))}
         </div>
       )}
+      {/* Parecer de Qualificação (SuperTEG × Matriz CEMIG) — em qualquer etapa, se já gerado (CTPS pode chegar na requisição ou na documentação) */}
+      <ParecerQualificacaoBloco candidatoId={cand.id} />
       {etapa === 'documentacao' && (
         <MissaoDocsSection cand={cand} autorId={autorId} autorNome={autorNome} />
       )}
@@ -534,8 +536,6 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
         )}
       </div>
 
-      {/* Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP */}
-      <ParecerQualificacaoBloco candidatoId={cand.id} />
     </div>
   )
 }
