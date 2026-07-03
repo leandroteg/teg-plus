@@ -8,6 +8,7 @@ import {
   useEventosAmbientais, useSalvarEvento, useAspectos, useSalvarAspecto,
 } from '../../hooks/useQsma'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
+import { QsmaToolbar, ToolbarSelect, BotaoNovo, Contagem } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type { QsmaLicenca, QsmaCondicionante, QsmaEventoAmbiental, QsmaAspecto, TipoLicenca, StatusLicenca, Recorrencia } from '../../types/qsma'
@@ -64,6 +65,24 @@ export default function QsmaMeioAmbiente() {
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const hoje = new Date().toISOString().split('T')[0]
 
+  // filtros compactos na primeira linha (padrão do sistema)
+  const [busca, setBusca] = useState('')
+  const [obraF, setObraF] = useState('')
+  const q = busca.trim().toLowerCase()
+  const obrasOpts = useMemo(
+    () => obras.map(o => ({ value: o.id, label: o.nome })),
+    [obras],
+  )
+
+  const licencasF = useMemo(() => licencas.filter(l =>
+    (!obraF || l.obra_id === obraF)
+    && (!q || (l.numero ?? '').toLowerCase().includes(q) || (l.orgao ?? '').toLowerCase().includes(q) || (l.descricao ?? '').toLowerCase().includes(q))
+  ), [licencas, obraF, q])
+  const aspectosF = useMemo(() => aspectos.filter(a =>
+    (!obraF || a.obra_id === obraF)
+    && (!q || a.atividade.toLowerCase().includes(q) || a.aspecto.toLowerCase().includes(q) || a.impacto.toLowerCase().includes(q))
+  ), [aspectos, obraF, q])
+
   const eventosDoMes = useMemo(() => eventos.filter(e => e.data?.startsWith(mesCal)), [eventos, mesCal])
   const mesLabel = useMemo(() => {
     const [y, m] = mesCal.split('-').map(Number)
@@ -76,12 +95,6 @@ export default function QsmaMeioAmbiente() {
     setMesCal(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  const btnNovo = (label: string, onClick: () => void) => (
-    <button onClick={onClick} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
-      <Plus size={13} /> {label}
-    </button>
-  )
-
   return (
     <ControladoriaFlow
       title="Meio Ambiente"
@@ -93,12 +106,19 @@ export default function QsmaMeioAmbiente() {
       {/* ── Licenças ── */}
       {aba === 'licencas' && (
         <div className="space-y-3">
-          <div className="flex justify-end">{btnNovo('Nova Licença', () => setModalLicenca('novo'))}</div>
-          {licencas.length === 0 ? (
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar nº, órgão ou descrição…"
+            acoes={<BotaoNovo label="Nova Licença" onClick={() => setModalLicenca('novo')} />}
+          >
+            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasOpts} />
+          </QsmaToolbar>
+          <Contagem isDark={isDark} n={licencasF.length} singular="licença" plural="licenças" />
+          {licencasF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhuma licença ambiental cadastrada" />
           ) : (
             <div className="space-y-3">
-              {licencas.map(l => {
+              {licencasF.map(l => {
                 const st = STATUS_LICENCA_LABEL[l.status]
                 const vencendo = l.validade && l.status === 'vigente' && l.validade <= new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
                 const conds = l.condicionantes ?? []
@@ -156,14 +176,17 @@ export default function QsmaMeioAmbiente() {
       {/* ── Calendário ── */}
       {aba === 'calendario' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className={`flex items-center gap-3 rounded-xl px-3 py-2 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className={`flex items-center gap-3 rounded-xl px-3 py-1.5 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
               <button onClick={() => shiftMes(-1)} className={isDark ? 'text-emerald-400' : 'text-emerald-600'}><ChevronLeft size={15} /></button>
               <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{mesLabel}</span>
               <button onClick={() => shiftMes(1)} className={isDark ? 'text-emerald-400' : 'text-emerald-600'}><ChevronRight size={15} /></button>
             </div>
-            {btnNovo('Novo Evento', () => setModalEvento('novo'))}
+            <div className="ml-auto">
+              <BotaoNovo label="Novo Evento" onClick={() => setModalEvento('novo')} />
+            </div>
           </div>
+          <Contagem isDark={isDark} n={eventosDoMes.length} singular="evento no mês" plural="eventos no mês" />
           {eventosDoMes.length === 0 ? (
             <Vazio isDark={isDark} texto={`Nenhum evento ambiental em ${mesLabel}`} />
           ) : (
@@ -193,12 +216,19 @@ export default function QsmaMeioAmbiente() {
       {/* ── Aspectos ── */}
       {aba === 'aspectos' && (
         <div className="space-y-3">
-          <div className="flex justify-end">{btnNovo('Novo Aspecto', () => setModalAspecto('novo'))}</div>
-          {aspectos.length === 0 ? (
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar atividade, aspecto ou impacto…"
+            acoes={<BotaoNovo label="Novo Aspecto" onClick={() => setModalAspecto('novo')} />}
+          >
+            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasOpts} />
+          </QsmaToolbar>
+          <Contagem isDark={isDark} n={aspectosF.length} singular="aspecto" plural="aspectos" />
+          {aspectosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum aspecto/impacto levantado" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {aspectos.map(a => {
+              {aspectosF.map(a => {
                 const nv = nivelRisco(a.severidade, a.severidade)
                 return (
                   <button key={a.id} onClick={() => setModalAspecto(a)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
