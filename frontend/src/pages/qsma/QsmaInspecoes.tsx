@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
   Trash2, Ban, ShieldCheck, Play, Loader2,
@@ -7,12 +7,15 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
-import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao } from '../../hooks/useQsma'
+import {
+  useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao,
+  useTstAlocacoes, useSalvarTstAlocacao, useEncerrarTstAlocacao,
+  type QsmaTstAlocacao, type TipoInspecaoMarcado,
+} from '../../hooks/useQsma'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
-import { useObrasComProjeto, usePlanejamentoEquipe, useColaboradoresAtivos, useAtualizarPlanEquipe } from '../../hooks/useObras'
-import type { ObraPlanejamentoEquipe } from '../../types/obras'
+import { useObrasComProjeto, useColaboradoresAtivos } from '../../hooks/useObras'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
 import { TIPO_MODELO_LABEL, ESCOPO_MODELO_LABEL, STATUS_INSPECAO_LABEL } from '../../types/qsma'
 
@@ -57,14 +60,15 @@ export default function QsmaInspecoes() {
   const { data: modelos = [] } = useModelosChecklist()
   const { data: inspecoes = [] } = useInspecoes()
   const { data: obras = [] } = useObrasComProjeto()
-  const { data: equipeObras = [] } = usePlanejamentoEquipe()
+  const { data: alocacoes = [] } = useTstAlocacoes()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
 
-  // supervisor/admin podem realocar o TST clicando no nome (padrão de Obras)
+  // supervisor/admin podem alterar a alocação clicando no nome
   const { isAdmin, atLeast } = useAuth()
   const podeRealocar = isAdmin || atLeast('supervisor')
-  const atualizarAloc = useAtualizarPlanEquipe()
-  const [editAloc, setEditAloc] = useState<ObraPlanejamentoEquipe | null>(null)
+  const encerrarAloc = useEncerrarTstAlocacao()
+  // modal de alocação: 'novo' (a partir de um colaborador), edição, ou null
+  const [modalAloc, setModalAloc] = useState<QsmaTstAlocacao | { colaborador_id?: string } | null>(null)
 
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
@@ -73,14 +77,10 @@ export default function QsmaInspecoes() {
   const [exObras, setExObras] = useState<Set<string>>(new Set())
   const [veredF, setVeredF] = useState('todos')
 
-  // TSTs alocados na programação do módulo Obras (vínculo pedido: só segurança)
-  const tsts = useMemo(() => equipeObras.filter(r =>
-    ['planejado', 'mobilizado', 'ativo'].includes(r.status)
-    && /seguran|tst|sesmt/i.test(r.funcao ?? '')
-  ), [equipeObras])
+  // TSTs alocados NO QSMA (fonte própria, independente de Obras)
+  const tsts = useMemo(() => alocacoes, [alocacoes])
 
-  // TSTs do RH SEM alocação em Obras — precisam aparecer no quadro mesmo assim
-  const nav = useNavigate()
+  // TSTs do RH ainda SEM alocação no QSMA — aparecem p/ serem alocados
   const { data: colabsAtivos = [] } = useColaboradoresAtivos()
   const tstsSemAlocacao = useMemo(() => {
     const alocados = new Set(tsts.map(t => t.colaborador_id).filter(Boolean))
@@ -154,7 +154,7 @@ export default function QsmaInspecoes() {
   const gruposGantt = useMemo(() => {
     const q2 = busca.trim().toLowerCase()
     const obraIds = new Set<string>([
-      ...tsts.map(t => t.obra_id).filter(Boolean),
+      ...tsts.map(t => t.obra_id).filter(Boolean) as string[],
       ...inspecoes.map(i => i.obra_id).filter(Boolean) as string[],
     ])
     const projMap = new Map<string, { id: string; nome: string; obras: { id: string; nome: string; tsts: typeof tsts }[] }>()
@@ -162,7 +162,7 @@ export default function QsmaInspecoes() {
       if (exObras.has(oid)) continue
       const o = obras.find(x => x.id === oid)
       if (!o) continue
-      const doTst = tsts.filter(t => t.obra_id === oid && (!q2 || t.nome.toLowerCase().includes(q2)))
+      const doTst = tsts.filter(t => t.obra_id === oid && (!q2 || (t.colaborador_nome ?? '').toLowerCase().includes(q2)))
       if (q2 && doTst.length === 0 && !o.nome.toLowerCase().includes(q2)) continue
       const pid = o.projeto_id ?? '__sem__'
       if (!projMap.has(pid)) projMap.set(pid, { id: pid, nome: o.projeto_nome ?? 'Sem projeto', obras: [] })
@@ -284,14 +284,19 @@ export default function QsmaInspecoes() {
             isDark={isDark}
             contagem={`${programadas.length} programada${programadas.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar inspeção…"
-            acoes={<BotaoNovo label="Programar Inspeção" onClick={() => setModalProgramar({})} />}
+            acoes={
+              <>
+                <BotaoNovo label="Programar Inspeção" onClick={() => setModalProgramar({})} secundario isDark={isDark} />
+                {podeRealocar && <BotaoNovo label="Alocar TST" onClick={() => setModalAloc({})} />}
+              </>
+            }
           >
             <MultiCheck isDark={isDark} label="Obras" options={obrasComRegistro} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
 
-          {/* linha info (mesmo template da Programação de Obras) */}
+          {/* linha info */}
           <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-            <CalendarRange size={12} /> {tsts.length} TST(s) em campo · {inspecoes.filter(i => i.status !== 'cancelada').length} inspeção(ões) · {weeks.length} semanas · clique numa célula da obra p/ programar naquela semana
+            <CalendarRange size={12} /> {tsts.length} TST(s) alocado(s) no QSMA · {inspecoes.filter(i => i.status !== 'cancelada').length} inspeção(ões) · {weeks.length} semanas · clique numa célula da obra p/ programar naquela semana
           </div>
 
           {/* Barra de rolagem horizontal fixa (sticky) — sincronizada com a tabela */}
@@ -374,27 +379,38 @@ export default function QsmaInspecoes() {
                           })}
                         </div>
 
-                        {/* TSTs da obra: barra de alocação (programação de Obras) */}
+                        {/* TSTs da obra: barra de alocação QSMA + tipos marcados */}
                         {!omin && ob.tsts.map(t => {
                           const start = new Date(t.data_inicio)
                           const end = new Date(t.data_fim || addDays(start, 60).toISOString())
+                          const nomeT = t.colaborador_nome ?? '—'
                           return (
                             <div key={t.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`} style={{ minWidth: `${totalW}px` }}>
                               <div
-                                onClick={podeRealocar ? () => setEditAloc(t) : undefined}
-                                className={`shrink-0 py-1.5 border-r ${borderG} flex items-center gap-1.5 ${podeRealocar ? 'cursor-pointer' : ''}`}
+                                onClick={podeRealocar ? () => setModalAloc(t) : undefined}
+                                className={`shrink-0 py-1.5 border-r ${borderG} flex flex-col justify-center gap-0.5 ${podeRealocar ? 'cursor-pointer' : ''}`}
                                 style={{ width: `${COL_W.esq}px`, paddingLeft: 40, paddingRight: 8 }}
-                                title={podeRealocar ? 'Clique para alterar a alocação' : t.nome}
+                                title={podeRealocar ? 'Clique para alterar a alocação e os tipos de inspeção' : nomeT}
                               >
-                                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain} ${podeRealocar ? 'hover:underline' : ''}`} title={t.nome}>{t.nome}</span>
-                                <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>TST</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain} ${podeRealocar ? 'hover:underline' : ''}`} title={nomeT}>{nomeT}</span>
+                                  <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>TST</span>
+                                </div>
+                                {t.tipos.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 pl-3">
+                                    {t.tipos.slice(0, 4).map(tp => (
+                                      <span key={tp.modelo_id} className={`text-[8px] font-bold px-1 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`} title={tp.nome}>{tp.codigo ?? tp.nome.slice(0, 8)}</span>
+                                    ))}
+                                    {t.tipos.length > 4 && <span className={`text-[8px] ${txtMuted}`}>+{t.tipos.length - 4}</span>}
+                                  </div>
+                                )}
                               </div>
                               {weeks.map((w, i) => {
                                 const ativo = start <= addDays(w.sat, 1) && end >= w.mon
                                 return (
                                   <div key={i} className={`shrink-0 border-r ${borderG} flex items-center justify-center py-1.5`} style={{ width: `${COL_W.semana}px` }}>
-                                    {ativo && <div className="h-3.5 w-full mx-1 rounded bg-amber-500 shadow-sm" title={`${t.nome} — Sem. ${w.label}`} />}
+                                    {ativo && <div className="h-3.5 w-full mx-1 rounded bg-amber-500 shadow-sm" title={`${nomeT} — Sem. ${w.label}`} />}
                                   </div>
                                 )
                               })}
@@ -426,16 +442,18 @@ export default function QsmaInspecoes() {
                       {c.base_nome && (
                         <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`} title="Base de lotação (RH)">{c.base_nome}</span>
                       )}
-                      <button
-                        onClick={() => nav('/obras/equipe')}
-                        className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
-                        title="Alocar em Obras › Alocação de Equipes"
-                      >
-                        Alocar
-                      </button>
+                      {podeRealocar && (
+                        <button
+                          onClick={() => setModalAloc({ colaborador_id: c.id })}
+                          className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
+                          title="Alocar este TST no QSMA"
+                        >
+                          <Plus size={9} /> Alocar
+                        </button>
+                      )}
                     </div>
                     <div className={`flex-1 flex items-center px-3 py-1.5 text-[10px] italic ${isDark ? 'text-slate-600' : 'text-slate-400'}`} style={{ minWidth: `${weeks.length * COL_W.semana}px` }}>
-                      sem alocação na programação de Obras
+                      ainda sem alocação no QSMA
                     </div>
                   </div>
                 ))}
@@ -445,7 +463,7 @@ export default function QsmaInspecoes() {
 
           {/* Legenda */}
           <div className={`flex flex-wrap gap-3 text-[10px] ${txtMuted}`}>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-amber-500" /> TST alocado (Obras)</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-amber-500" /> TST alocado</span>
             <span className="inline-flex items-center gap-1"><span className={`px-1 rounded-full font-bold ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>n</span> inspeções programadas</span>
             <span className="inline-flex items-center gap-1"><span className={`px-1 rounded-full font-bold ${isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>✓n</span> executadas</span>
             <span className="inline-flex items-center gap-1"><span className={`w-3 h-2 rounded ${isDark ? 'bg-red-500/30' : 'bg-red-100'}`} /> Semana atual</span>
@@ -535,17 +553,19 @@ export default function QsmaInspecoes() {
       {modalProgramar && (
         <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} defaultObraId={modalProgramar.obraId} defaultData={modalProgramar.data} onClose={() => setModalProgramar(null)} />
       )}
-      {editAloc && (
-        <EditAlocacaoTstModal
+      {modalAloc && (
+        <AlocarTstModal
           isDark={isDark}
-          aloc={editAloc}
-          obras={obras}
-          saving={atualizarAloc.isPending}
-          onClose={() => setEditAloc(null)}
-          onSave={(v) => atualizarAloc.mutate(
-            { id: editAloc.id, obra_id: v.obraId || undefined, data_inicio: v.dataInicio, data_fim: v.dataFim || undefined },
-            { onSuccess: () => setEditAloc(null), onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
-          )}
+          aloc={'id' in modalAloc ? modalAloc : null}
+          colaboradorIdInicial={'id' in modalAloc ? undefined : modalAloc.colaborador_id}
+          tstsRh={colabsAtivos.filter(c => /seguran|tst|sesmt/i.test(c.cargo ?? ''))}
+          modelos={modelos.filter(m => m.ativo)}
+          onEncerrar={('id' in modalAloc) ? () => {
+            if (confirm('Encerrar a alocação deste TST? As inspeções já geradas permanecem.')) {
+              encerrarAloc.mutate((modalAloc as QsmaTstAlocacao).id, { onSuccess: () => setModalAloc(null) })
+            }
+          } : undefined}
+          onClose={() => setModalAloc(null)}
         />
       )}
       {executar && (
@@ -821,59 +841,190 @@ function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, defaultData, o
   )
 }
 
-// ── Modal: alterar alocação do TST (supervisor/admin) — espelha Obras ────────
+// ── Modal: Alocar TST no QSMA + marcar tipos de inspeção (gera as programadas) ─
 
-function EditAlocacaoTstModal({ isDark, aloc, obras, saving, onClose, onSave }: {
+function AlocarTstModal({ isDark, aloc, colaboradorIdInicial, tstsRh, modelos, onEncerrar, onClose }: {
   isDark: boolean
-  aloc: ObraPlanejamentoEquipe
-  obras: { id: string; nome: string; projeto_id?: string; projeto_nome?: string }[]
-  saving: boolean
+  aloc: QsmaTstAlocacao | null
+  colaboradorIdInicial?: string
+  tstsRh: { id: string; nome: string; cargo?: string; base_id?: string; base_nome?: string }[]
+  modelos: QsmaModeloChecklist[]
+  onEncerrar?: () => void
   onClose: () => void
-  onSave: (v: { obraId: string; dataInicio: string; dataFim: string }) => void
 }) {
-  const [obraId, setObraId] = useState(aloc.obra_id ?? '')
-  const [dataInicio, setDataInicio] = useState((aloc.data_inicio ?? '').slice(0, 10) || new Date().toISOString().split('T')[0])
-  const [dataFim, setDataFim] = useState((aloc.data_fim ?? '').slice(0, 10))
+  const salvar = useSalvarTstAlocacao()
+  const { perfil } = useAuth()
+  const { data: obras = [] } = useObrasComProjeto()
+  const isEdit = !!aloc
+
+  const [colabId, setColabId] = useState(aloc?.colaborador_id ?? colaboradorIdInicial ?? '')
+  const [obraId, setObraId] = useState(aloc?.obra_id ?? '')
+  const [frente, setFrente] = useState(aloc?.frente ?? '')
+  const [dataInicio, setDataInicio] = useState((aloc?.data_inicio ?? '').slice(0, 10) || new Date().toISOString().split('T')[0])
+  const [dataFim, setDataFim] = useState((aloc?.data_fim ?? '').slice(0, 10))
+  const [tipos, setTipos] = useState<Set<string>>(new Set(aloc?.tipos.map(t => t.modelo_id) ?? []))
+  // frequência p/ gerar as inspeções (padrão do modal Programar Inspeção)
+  const [recorrencia, setRecorrencia] = useState<'unica' | 'diaria' | 'semanal'>(isEdit ? 'unica' : 'semanal')
+  const [gerar, setGerar] = useState(!isEdit)
+
+  const addDays = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
+  const datasSerie = useMemo(() => {
+    if (!gerar || tipos.size === 0) return []
+    const ini = dataInicio, fim = dataFim || dataInicio
+    if (recorrencia === 'unica') return [ini]
+    if (!ini || !fim || fim < ini) return []
+    const out: string[] = []
+    const d = new Date(ini + 'T12:00:00'); const end = new Date(fim + 'T12:00:00')
+    while (d <= end && out.length < 60) {
+      const dow = d.getDay()
+      if (recorrencia === 'semanal' || (dow >= 1 && dow <= 5)) out.push(d.toISOString().split('T')[0])
+      d.setDate(d.getDate() + (recorrencia === 'semanal' ? 7 : 1))
+    }
+    return out
+  }, [gerar, tipos, dataInicio, dataFim, recorrencia])
+
   const obrasPorProjeto = useMemo(() => {
     const m = new Map<string, { nome: string; obras: typeof obras }>()
     obras.forEach(o => { const k = o.projeto_id ?? '__sem__'; const g = m.get(k) ?? { nome: o.projeto_nome ?? 'Sem projeto', obras: [] }; g.obras.push(o); m.set(k, g) })
     return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome))
   }, [obras])
+  const modelosPorGrupo = useMemo(() => {
+    const m = new Map<string, QsmaModeloChecklist[]>()
+    modelos.forEach(mod => { const g = mod.grupo || 'Outros'; m.set(g, [...(m.get(g) ?? []), mod]) })
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [modelos])
 
+  const colab = tstsRh.find(c => c.id === colabId)
   const erros: string[] = []
+  if (!colabId) erros.push('selecione o TST')
   if (!obraId) erros.push('selecione a obra')
   if (!dataInicio) erros.push('informe a data de início')
 
+  function toggleTipo(id: string) {
+    setTipos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function handleSave() {
+    const tiposArr: TipoInspecaoMarcado[] = [...tipos].map(id => {
+      const m = modelos.find(x => x.id === id)!
+      return { modelo_id: id, codigo: m.codigo, nome: m.nome }
+    })
+    try {
+      const r = await salvar.mutateAsync({
+        id: aloc?.id,
+        colaborador_id: colabId,
+        colaborador_nome: colab?.nome,
+        cargo: colab?.cargo,
+        base_id: colab?.base_id,
+        obra_id: obraId || undefined,
+        frente: frente || undefined,
+        data_inicio: dataInicio,
+        data_fim: dataFim || undefined,
+        tipos: tiposArr,
+        criado_por_nome: perfil?.nome,
+        datasGerar: datasSerie,
+      })
+      if (r.geradas > 0) alert(`✓ TST alocado. ${r.geradas} inspeção(ões) programada(s).`)
+      onClose()
+    } catch (e: any) {
+      alert(`Erro: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
   return (
-    <QsmaModal isDark={isDark} titulo={aloc.nome} subtitulo="Alteração de alocação · Técnico de Segurança" onClose={onClose}>
+    <QsmaModal isDark={isDark} wide titulo={isEdit ? `Alocação · ${aloc?.colaborador_nome ?? ''}` : 'Alocar TST'} subtitulo="Aloca o técnico no QSMA e marca as inspeções que ele fará" onClose={onClose}>
       <div>
-        <label className={pickerLabelCls(isDark)}>Obra (Projeto › Obra) *</label>
-        <select value={obraId} onChange={e => setObraId(e.target.value)} className={pickerInputCls(isDark)}>
-          <option value="">— sem obra —</option>
-          {obrasPorProjeto.map(g => (
-            <optgroup key={g.nome} label={g.nome}>
-              {g.obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-            </optgroup>
-          ))}
+        <label className={pickerLabelCls(isDark)}>Técnico de Segurança *</label>
+        <select value={colabId} onChange={e => setColabId(e.target.value)} disabled={isEdit} className={`${pickerInputCls(isDark)} ${isEdit ? 'opacity-70' : ''}`}>
+          <option value="">Selecione…</option>
+          {tstsRh.map(c => <option key={c.id} value={c.id}>{c.nome}{c.base_nome ? ` · ${c.base_nome}` : ''}</option>)}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
-          <label className={pickerLabelCls(isDark)}>Data início *</label>
+          <label className={pickerLabelCls(isDark)}>Obra (Projeto › Obra) *</label>
+          <select value={obraId} onChange={e => setObraId(e.target.value)} className={pickerInputCls(isDark)}>
+            <option value="">Selecione…</option>
+            {obrasPorProjeto.map(g => (
+              <optgroup key={g.nome} label={g.nome}>{g.obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}</optgroup>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={pickerLabelCls(isDark)}>Frente</label>
+          <input value={frente} onChange={e => setFrente(e.target.value)} placeholder="Opcional" className={pickerInputCls(isDark)} />
+        </div>
+        <div>
+          <label className={pickerLabelCls(isDark)}>Início da alocação *</label>
           <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={pickerInputCls(isDark)} />
         </div>
         <div>
-          <label className={pickerLabelCls(isDark)}>Data fim</label>
+          <label className={pickerLabelCls(isDark)}>Fim da alocação</label>
           <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={pickerInputCls(isDark)} />
         </div>
       </div>
-      <p className={`text-[10px] italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        A alteração reflete na programação do módulo Obras (mesma alocação).
-      </p>
-      <ModalFooter
-        isDark={isDark} erros={erros} salvando={saving} onCancel={onClose} saveLabel="Salvar alocação"
-        onSave={() => onSave({ obraId, dataInicio, dataFim })}
-      />
+
+      {/* Tipos de inspeção a serem feitos (marcação por guia) */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <label className={pickerLabelCls(isDark)}>Tipos de inspeção a serem feitos ({tipos.size})</label>
+        <div className="max-h-52 overflow-y-auto space-y-2 mt-1">
+          {modelosPorGrupo.map(([grupo, lista]) => (
+            <div key={grupo}>
+              <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{grupo}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {lista.map(m => (
+                  <label key={m.id} className={`flex items-center gap-1.5 text-[11px] cursor-pointer px-1.5 py-1 rounded-lg ${tipos.has(m.id) ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : ''} ${isDark ? 'text-slate-300 hover:bg-white/[0.03]' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    <input type="checkbox" checked={tipos.has(m.id)} onChange={() => toggleTipo(m.id)} className="accent-red-600 shrink-0" />
+                    <span className="truncate">{m.codigo ? `${m.codigo} · ` : ''}{m.nome}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Frequência de geração das inspeções */}
+      {tipos.size > 0 && (
+        <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+          <label className={`flex items-center gap-1.5 text-xs cursor-pointer mb-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <input type="checkbox" checked={gerar} onChange={e => setGerar(e.target.checked)} className="accent-red-600" />
+            Gerar as inspeções programadas agora
+          </label>
+          {gerar && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className={`inline-flex rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+                {([['unica', 'Única'], ['diaria', 'Diária (dias úteis)'], ['semanal', 'Semanal']] as const).map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setRecorrencia(v)}
+                    className={`px-3 py-2 text-[11px] font-semibold transition-all ${recorrencia === v ? (isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-50 text-red-700') : (isDark ? 'bg-transparent text-slate-400 hover:bg-white/[0.05]' : 'bg-white text-slate-500 hover:bg-slate-50')}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {datasSerie.length > 0 && (
+                <span className={`text-[10px] font-semibold ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
+                  gera {tipos.size * datasSerie.length} inspeção(ões) · {datasSerie.length} data(s) × {tipos.size} tipo(s)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        {isEdit && onEncerrar ? (
+          <button onClick={onEncerrar} className={`text-[11px] font-semibold px-3 py-2 rounded-xl border transition-colors ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+            Encerrar alocação
+          </button>
+        ) : <span />}
+        <div className="flex-1">
+          <ModalFooter
+            isDark={isDark} erros={erros} salvando={salvar.isPending} onCancel={onClose}
+            saveLabel={datasSerie.length > 1 ? `Alocar + ${tipos.size * datasSerie.length} inspeções` : (isEdit ? 'Salvar' : 'Alocar')}
+            onSave={handleSave}
+          />
+        </div>
+      </div>
     </QsmaModal>
   )
 }
