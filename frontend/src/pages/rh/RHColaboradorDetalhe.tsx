@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, Clock, TrendingUp,
   Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
   Sparkles, FileBarChart, X, Paperclip, AlertCircle,
-  PenLine, Send, CheckCircle2,
+  PenLine, Send, CheckCircle2, ShieldCheck, RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -408,6 +408,9 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         sectionCls={sectionCls}
         isLight={isLight}
       />
+
+      {/* Acesso ao Portal (PIN) */}
+      <AcessoPortalPin colaboradorId={id} ativo={!!colab.ativo} sectionCls={sectionCls} isLight={isLight} />
 
       {/* Documentos (OneDrive) */}
       <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
@@ -1006,6 +1009,58 @@ function MissoesColaborador({ colaboradorId, nome, ativo, podeAssinar, sectionCl
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Acesso ao Portal: status do PIN + reset (RH) ─────────────────────────────
+function AcessoPortalPin({ colaboradorId, ativo, sectionCls, isLight }: {
+  colaboradorId: string; ativo: boolean; sectionCls: string; isLight: boolean
+}) {
+  const [temPin, setTemPin] = useState<boolean | null>(null)
+  const [resetando, setResetando] = useState(false)
+
+  async function carregar() {
+    const { data } = await supabase.rpc('portalteg_pin_status', { p_colaborador_id: colaboradorId })
+    setTemPin(((data as { tem_pin?: boolean } | null)?.tem_pin) ?? false)
+  }
+  useEffect(() => { carregar() // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colaboradorId])
+
+  async function resetar() {
+    if (!window.confirm('Resetar o PIN deste colaborador? No próximo acesso ele entra só com CPF + data de nascimento e poderá criar um novo PIN.')) return
+    setResetando(true)
+    try {
+      await supabase.rpc('rh_portalteg_pin_resetar', { p_colaborador_id: colaboradorId, p_autor_nome: null })
+      await carregar()
+    } finally { setResetando(false) }
+  }
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+
+  return (
+    <div className={sectionCls}>
+      <div className="px-5 py-3 flex items-center justify-between gap-3">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <ShieldCheck size={14} className={temPin ? 'text-emerald-500' : 'text-slate-400'} /> Acesso ao Portal
+        </h3>
+        <div className="flex items-center gap-2">
+          {temPin === null ? (
+            <Loader2 size={14} className="animate-spin text-slate-400" />
+          ) : temPin ? (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-400'}`}>PIN ativo</span>
+          ) : (
+            <span className={`text-[10px] ${muted}`}>Sem PIN{ativo ? '' : ' · inativo'}</span>
+          )}
+          {temPin && (
+            <button onClick={resetar} disabled={resetando}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold disabled:opacity-50 ${isLight ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-amber-300 bg-amber-500/15 hover:bg-amber-500/25'}`}>
+              {resetando ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Resetar PIN
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
