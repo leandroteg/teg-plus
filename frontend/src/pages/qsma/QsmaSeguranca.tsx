@@ -16,7 +16,8 @@ import {
 } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
-import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, Contagem } from '../../components/qsma/Toolbar'
+import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips } from '../../components/qsma/Toolbar'
+import { Timer, FileSignature } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type {
@@ -97,18 +98,25 @@ export default function QsmaSeguranca() {
   const [escopoF, setEscopoF] = useState('todos')
   const [normaF, setNormaF] = useState('')
   const [tipoOcoF, setTipoOcoF] = useState('')
+  const [quickTre, setQuickTre] = useState('todos')
+  const [quickFicha, setQuickFicha] = useState('todos')
   const q = busca.trim().toLowerCase()
+  const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
 
   const riscosF = riscos.filter(r =>
     (escopoF === 'todos' || r.escopo === escopoF)
     && (!q || r.perigo.toLowerCase().includes(q) || r.risco.toLowerCase().includes(q) || (r.tarefa ?? '').toLowerCase().includes(q) || (r.ghe ?? '').toLowerCase().includes(q))
   )
   const fichasF = fichas.filter(f =>
-    !q || (f.colaborador_nome ?? '').toLowerCase().includes(q) || (f.codigo ?? '').toLowerCase().includes(q)
-    || (f.itens ?? []).some(it => (it.epi?.nome ?? '').toLowerCase().includes(q))
+    (quickFicha === 'todos' || (quickFicha === 'aguardando' && f.status === 'aguardando_assinatura'))
+    && (!q || (f.colaborador_nome ?? '').toLowerCase().includes(q) || (f.codigo ?? '').toLowerCase().includes(q)
+      || (f.itens ?? []).some(it => (it.epi?.nome ?? '').toLowerCase().includes(q)))
   )
   const treinamentosF = treinamentos.filter(t =>
     (!normaF || t.norma === normaF)
+    && (quickTre === 'todos'
+      || (quickTre === 'vencido' && !!t.vencimento && t.vencimento < hoje)
+      || (quickTre === 'vencendo' && !!t.vencimento && t.vencimento >= hoje && t.vencimento <= lim60))
     && (!q || (t.colaborador_nome ?? '').toLowerCase().includes(q) || (t.curso ?? '').toLowerCase().includes(q))
   )
   const ocorrenciasF = ocorrencias.filter(o =>
@@ -129,6 +137,7 @@ export default function QsmaSeguranca() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${riscosF.length} risco${riscosF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar perigo, risco, tarefa…"
             acoes={<BotaoNovo label="Novo Risco / APR" onClick={() => setModalRisco('novo')} />}
           >
@@ -137,7 +146,6 @@ export default function QsmaSeguranca() {
               options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]}
             />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={riscosF.length} singular="risco" plural="riscos" />
           {riscosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum risco cadastrado — comece pelo inventário PGR ou uma APR" />
           ) : (
@@ -168,6 +176,7 @@ export default function QsmaSeguranca() {
         <div className="space-y-4">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${fichasF.length} ficha${fichasF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar colaborador, ficha ou EPI…"
             acoes={
               <>
@@ -175,8 +184,12 @@ export default function QsmaSeguranca() {
                 <BotaoNovo label="Nova Ficha de Entrega" onClick={() => setModalFicha(true)} />
               </>
             }
-          />
-          <Contagem isDark={isDark} n={fichasF.length} singular="ficha de entrega" plural="fichas de entrega" />
+          >
+            <QuickChips
+              isDark={isDark} value={quickFicha} onChange={setQuickFicha}
+              chips={[{ k: 'aguardando', label: 'Só aguardando assinatura', icon: FileSignature }]}
+            />
+          </QsmaToolbar>
 
           {/* Catálogo */}
           <div className={card}>
@@ -297,6 +310,7 @@ export default function QsmaSeguranca() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${treinamentosF.length} treinamento${treinamentosF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar colaborador ou curso…"
             acoes={<BotaoNovo label="Novo Treinamento" onClick={() => setModalTreinamento('novo')} />}
           >
@@ -304,8 +318,14 @@ export default function QsmaSeguranca() {
               isDark={isDark} value={normaF} onChange={setNormaF} allLabel="Todas as normas"
               options={NORMAS_TREINAMENTO.map(n => ({ value: n, label: n }))}
             />
+            <QuickChips
+              isDark={isDark} value={quickTre} onChange={setQuickTre}
+              chips={[
+                { k: 'vencendo', label: 'Vencendo em 60 dias', icon: Timer },
+                { k: 'vencido', label: 'Vencidos', icon: AlertTriangle },
+              ]}
+            />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={treinamentosF.length} singular="treinamento" plural="treinamentos" />
           {treinamentosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum treinamento registrado" />
           ) : (
@@ -344,6 +364,7 @@ export default function QsmaSeguranca() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${ocorrenciasF.length} ocorrência${ocorrenciasF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar ocorrência, código ou obra…"
             acoes={<BotaoNovo label="Registrar Ocorrência" onClick={() => setModalOcorrencia('novo')} />}
           >
@@ -352,7 +373,6 @@ export default function QsmaSeguranca() {
               options={(Object.keys(TIPO_OCORRENCIA_LABEL) as TipoOcorrencia[]).map(t => ({ value: t, label: TIPO_OCORRENCIA_LABEL[t] }))}
             />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={ocorrenciasF.length} singular="ocorrência" plural="ocorrências" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {KANBAN.map(st => {
               const cfg = STATUS_OCORRENCIA_LABEL[st]
