@@ -62,7 +62,7 @@ const PILLARS: Pillar[] = [
     subs: [
       { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: true, route: '/egp' },
       { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: true, route: '/obras' },
-      { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
+      { key: 'qsma', label: 'QSMA', desc: 'Qualidade, segurança e meio ambiente', Icon: ShieldCheck, active: true, route: '/qsma' },
     ],
   },
   {
