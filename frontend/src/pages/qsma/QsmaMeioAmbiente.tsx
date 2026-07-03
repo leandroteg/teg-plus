@@ -8,7 +8,7 @@ import {
   useEventosAmbientais, useSalvarEvento, useAspectos, useSalvarAspecto,
 } from '../../hooks/useQsma'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
-import { QsmaToolbar, ToolbarSelect, BotaoNovo, Contagem } from '../../components/qsma/Toolbar'
+import { QsmaToolbar, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type { QsmaLicenca, QsmaCondicionante, QsmaEventoAmbiental, QsmaAspecto, TipoLicenca, StatusLicenca, Recorrencia } from '../../types/qsma'
@@ -67,21 +67,21 @@ export default function QsmaMeioAmbiente() {
 
   // filtros compactos na primeira linha (padrão do sistema)
   const [busca, setBusca] = useState('')
-  const [obraF, setObraF] = useState('')
+  const [exObras, setExObras] = useState<Set<string>>(new Set())
   const q = busca.trim().toLowerCase()
-  const obrasOpts = useMemo(
-    () => obras.map(o => ({ value: o.id, label: o.nome })),
-    [obras],
-  )
+  const obrasOpts = useMemo(() => {
+    const ids = new Set([...licencas.map(l => l.obra_id), ...aspectos.map(a => a.obra_id)].filter(Boolean))
+    return obras.filter(o => ids.has(o.id)).map(o => ({ value: o.id, label: o.nome }))
+  }, [obras, licencas, aspectos])
 
   const licencasF = useMemo(() => licencas.filter(l =>
-    (!obraF || l.obra_id === obraF)
+    !exObras.has(l.obra_id ?? '')
     && (!q || (l.numero ?? '').toLowerCase().includes(q) || (l.orgao ?? '').toLowerCase().includes(q) || (l.descricao ?? '').toLowerCase().includes(q))
-  ), [licencas, obraF, q])
+  ), [licencas, exObras, q])
   const aspectosF = useMemo(() => aspectos.filter(a =>
-    (!obraF || a.obra_id === obraF)
+    !exObras.has(a.obra_id ?? '')
     && (!q || a.atividade.toLowerCase().includes(q) || a.aspecto.toLowerCase().includes(q) || a.impacto.toLowerCase().includes(q))
-  ), [aspectos, obraF, q])
+  ), [aspectos, exObras, q])
 
   const eventosDoMes = useMemo(() => eventos.filter(e => e.data?.startsWith(mesCal)), [eventos, mesCal])
   const mesLabel = useMemo(() => {
@@ -108,12 +108,12 @@ export default function QsmaMeioAmbiente() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${licencasF.length} licença${licencasF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar nº, órgão ou descrição…"
             acoes={<BotaoNovo label="Nova Licença" onClick={() => setModalLicenca('novo')} />}
           >
-            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasOpts} />
+            <MultiCheck isDark={isDark} label="Obras" options={obrasOpts} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={licencasF.length} singular="licença" plural="licenças" />
           {licencasF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhuma licença ambiental cadastrada" />
           ) : (
@@ -182,11 +182,13 @@ export default function QsmaMeioAmbiente() {
               <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{mesLabel}</span>
               <button onClick={() => shiftMes(1)} className={isDark ? 'text-emerald-400' : 'text-emerald-600'}><ChevronRight size={15} /></button>
             </div>
+            <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              {eventosDoMes.length} evento{eventosDoMes.length !== 1 ? 's' : ''} no mês
+            </p>
             <div className="ml-auto">
               <BotaoNovo label="Novo Evento" onClick={() => setModalEvento('novo')} />
             </div>
           </div>
-          <Contagem isDark={isDark} n={eventosDoMes.length} singular="evento no mês" plural="eventos no mês" />
           {eventosDoMes.length === 0 ? (
             <Vazio isDark={isDark} texto={`Nenhum evento ambiental em ${mesLabel}`} />
           ) : (
@@ -218,12 +220,12 @@ export default function QsmaMeioAmbiente() {
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
+            contagem={`${aspectosF.length} aspecto${aspectosF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar atividade, aspecto ou impacto…"
             acoes={<BotaoNovo label="Novo Aspecto" onClick={() => setModalAspecto('novo')} />}
           >
-            <ToolbarSelect isDark={isDark} value={obraF} onChange={setObraF} allLabel="Todas as obras" options={obrasOpts} />
+            <MultiCheck isDark={isDark} label="Obras" options={obrasOpts} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
-          <Contagem isDark={isDark} n={aspectosF.length} singular="aspecto" plural="aspectos" />
           {aspectosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum aspecto/impacto levantado" />
           ) : (
