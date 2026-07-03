@@ -7,9 +7,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   QsmaModeloChecklist, QsmaInspecao, QsmaOcorrencia, QsmaRisco,
-  QsmaEpi, QsmaEpiEntrega, QsmaTreinamento,
+  QsmaEpi, QsmaEpiEntrega, QsmaEpiFicha, QsmaCaepi, QsmaTreinamento,
   QsmaLicenca, QsmaCondicionante, QsmaEventoAmbiental, QsmaAspecto,
-  StatusInspecao, StatusOcorrencia,
+  StatusInspecao, StatusOcorrencia, MotivoEntregaEpi,
 } from '../types/qsma'
 
 const BUCKET = 'qsma-evidencias'
@@ -261,6 +261,96 @@ export function useSalvarEpi() {
   })
 }
 
+// Consulta local da base oficial de CAs (qsma_caepi, importada do dump do MTE)
+export async function consultarCA(ca: string): Promise<QsmaCaepi | null> {
+  const limpo = ca.replace(/\D/g, '')
+  if (!limpo) return null
+  const { data } = await supabase.from('qsma_caepi').select('*').eq('ca', limpo).maybeSingle()
+  return (data as QsmaCaepi) ?? null
+}
+
+// ── Fichas de entrega de EPI (1 ficha → N itens, padrão NR-06) ───────────────
+
+export function useFichasEpi() {
+  return useQuery({
+    queryKey: ['qsma_epi_fichas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('qsma_epi_fichas')
+        .select('*, itens:qsma_epi_entregas(*, epi:qsma_epis(id, nome, ca, vida_util_dias))')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaEpiFicha[]
+    },
+  })
+}
+
+export interface ItemFichaEpi {
+  epi_id: string
+  quantidade: number
+  tamanho?: string
+  data_troca_prevista?: string
+}
+
+export function useCriarFichaEpi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      colaborador_id: string; colaborador_nome?: string; obra_id?: string
+      data_entrega: string; motivo?: MotivoEntregaEpi; observacoes?: string
+      entregue_por_nome?: string; itens: ItemFichaEpi[]
+    }) => {
+      const codigo = await proximoCodigo('FEPI')
+      const { itens, ...ficha } = p
+      const { data, error } = await supabase.from('qsma_epi_fichas')
+        .insert({ ...ficha, codigo, status: 'aguardando_assinatura' })
+        .select('id, codigo').single()
+      if (error) throw error
+      const fichaId = (data as { id: string }).id
+      const rows = itens.map(it => ({
+        ficha_id: fichaId,
+        epi_id: it.epi_id,
+        colaborador_id: p.colaborador_id,
+        colaborador_nome: p.colaborador_nome,
+        obra_id: p.obra_id,
+        quantidade: it.quantidade,
+        tamanho: it.tamanho,
+        data_entrega: p.data_entrega,
+        data_troca_prevista: it.data_troca_prevista,
+        motivo: p.motivo ?? 'entrega',
+        entregue_por_nome: p.entregue_por_nome,
+      }))
+      const { error: e2 } = await supabase.from('qsma_epi_entregas').insert(rows)
+      if (e2) throw e2
+      return data as { id: string; codigo: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+// Arquiva a ficha assinada: grava o path do documento e marca itens assinados
+export function useArquivarFichaEpi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ fichaId, arquivoPath }: { fichaId: string; arquivoPath: string }) => {
+      const { error } = await supabase.from('qsma_epi_fichas')
+        .update({ status: 'arquivada', arquivo_assinado_path: arquivoPath, updated_at: new Date().toISOString() })
+        .eq('id', fichaId)
+      if (error) throw error
+      await supabase.from('qsma_epi_entregas').update({ assinado: true }).eq('ficha_id', fichaId)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
 export function useEpiEntregas() {
   return useQuery({
     queryKey: ['qsma_epi_entregas'],
@@ -271,21 +361,6 @@ export function useEpiEntregas() {
         .order('data_entrega', { ascending: false })
       if (error) throw error
       return (data ?? []) as QsmaEpiEntrega[]
-    },
-  })
-}
-
-export function useRegistrarEntregaEpi() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (payload: Partial<QsmaEpiEntrega>) => {
-      const { epi: _e, ...rest } = payload as Partial<QsmaEpiEntrega> & { epi?: unknown }
-      const { error } = await supabase.from('qsma_epi_entregas').insert(rest)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
-      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
     },
   })
 }
