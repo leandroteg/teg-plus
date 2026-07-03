@@ -182,7 +182,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
     modulos: [
       { key: 'egp', label: 'EGP', icon: '📊' },
       { key: 'obras', label: 'Obras', icon: '🏗️' },
-      { key: 'ssma', label: 'SSMA', icon: '⛑️' },
+      { key: 'qsma', label: 'QSMA', icon: '🦺' },
     ],
   },
   {
