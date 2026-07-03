@@ -3,6 +3,7 @@ import type { LazyExoticComponent, ComponentType } from 'react'
 import {
   Banknote, BarChart3, FileText, Receipt, HardHat, FolderKanban, Truck, Car,
   KeySquare, Building2, Package, Calculator, ShoppingCart, ClipboardCheck, Users,
+  ShieldAlert,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +48,7 @@ export const PAINEIS: PainelDef[] = [
   // Projetos
   { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Projetos',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')) },
   { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Projetos',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainelMobile')) },
+  { key: 'qsma',          label: 'QSMA',           desc: 'Inspeções, ocorrências, EPIs e ambiental', emoji: '🦺', Icon: ShieldAlert,   accent: '#818CF8', route: '/qsma',          pilar: 'Projetos',    Painel: lazy(() => import('../qsma/QsmaPainel')),                 Mobile: lazy(() => import('../qsma/QsmaPainel')) },
   // Suprimentos
   { key: 'compras',       label: 'Compras',        desc: 'Requisições, cotações e pedidos',         emoji: '🛒', Icon: ShoppingCart,   accent: '#2DD4BF', route: '/compras',       pilar: 'Suprimentos', Painel: lazy(() => import('../Dashboard')),                       Mobile: lazy(() => import('../DashboardMobile')) },
   { key: 'logistica',     label: 'Logística',      desc: 'Transportes e expedição',                 emoji: '🚚', Icon: Truck,          accent: '#2DD4BF', route: '/logistica',     pilar: 'Suprimentos', Painel: lazy(() => import('../logistica/LogisticaHome')),         Mobile: lazy(() => import('../logistica/LogisticaHomeMobile')) },
