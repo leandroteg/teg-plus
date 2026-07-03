@@ -112,6 +112,98 @@ export function useSalvarInspecao() {
   })
 }
 
+// ── Alocação de TST (QSMA-owned, independente do módulo Obras) ───────────────
+
+export interface TipoInspecaoMarcado { modelo_id: string; codigo?: string; nome: string }
+
+export interface QsmaTstAlocacao {
+  id: string
+  colaborador_id: string
+  colaborador_nome?: string
+  cargo?: string
+  base_id?: string
+  obra_id?: string
+  frente?: string
+  data_inicio: string
+  data_fim?: string
+  status: 'ativa' | 'encerrada'
+  tipos: TipoInspecaoMarcado[]
+  criado_por_nome?: string
+  created_at: string
+  updated_at: string
+}
+
+export function useTstAlocacoes() {
+  return useQuery({
+    queryKey: ['qsma_tst_alocacoes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_tst_alocacoes')
+        .select('*').eq('status', 'ativa').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaTstAlocacao[]
+    },
+  })
+}
+
+// Salva a alocação e, para cada tipo marcado × data da série, gera a inspeção
+// programada vinculada (lider = TST). NÃO escreve em obr_planejamento_equipe.
+export function useSalvarTstAlocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      id?: string
+      colaborador_id: string; colaborador_nome?: string; cargo?: string; base_id?: string
+      obra_id?: string; frente?: string; data_inicio: string; data_fim?: string
+      tipos: TipoInspecaoMarcado[]
+      criado_por_nome?: string
+      datasGerar?: string[]          // datas p/ gerar inspeções programadas (vazio = não gera)
+    }) => {
+      const { datasGerar = [], ...aloc } = p
+      let alocId = aloc.id
+      if (alocId) {
+        const { id, ...rest } = aloc
+        const { error } = await supabase.from('qsma_tst_alocacoes')
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', alocId)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from('qsma_tst_alocacoes')
+          .insert(aloc).select('id').single()
+        if (error) throw error
+        alocId = (data as { id: string }).id
+      }
+      // gera as inspeções programadas dos tipos marcados
+      for (const tipo of aloc.tipos) {
+        for (const dt of datasGerar) {
+          const codigo = await proximoCodigo('INS')
+          await supabase.from('qsma_inspecoes').insert({
+            codigo, modelo_id: tipo.modelo_id, obra_id: aloc.obra_id ?? null,
+            frente: aloc.frente ?? null, equipe_lider_id: aloc.colaborador_id,
+            data_prevista: dt, status: 'programada', tst_alocacao_id: alocId,
+          })
+        }
+      }
+      return { id: alocId, geradas: aloc.tipos.length * datasGerar.length }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_tst_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['qsma_inspecoes'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
+export function useEncerrarTstAlocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('qsma_tst_alocacoes')
+        .update({ status: 'encerrada', updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_tst_alocacoes'] }),
+  })
+}
+
 // ── Ocorrências ──────────────────────────────────────────────────────────────
 
 export function useOcorrencias(filtros?: { status?: StatusOcorrencia }) {
