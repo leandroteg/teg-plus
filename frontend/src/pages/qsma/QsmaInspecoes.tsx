@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
-  Trash2, Ban, ShieldCheck, Play, Loader2,
+  Trash2, Ban, ShieldCheck, Play, Loader2, HardHat,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -11,7 +11,7 @@ import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao }
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
-import { useObrasComProjeto } from '../../hooks/useObras'
+import { useObrasComProjeto, usePlanejamentoEquipe } from '../../hooks/useObras'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
 import { TIPO_MODELO_LABEL, ESCOPO_MODELO_LABEL, STATUS_INSPECAO_LABEL } from '../../types/qsma'
 
@@ -42,13 +42,13 @@ export default function QsmaInspecoes() {
   const [params, setParams] = useSearchParams()
   const [aba, setAba] = useState<string>(params.get('aba') ?? 'modelos')
   const [modalModelo, setModalModelo] = useState<QsmaModeloChecklist | 'novo' | null>(null)
-  const [modalProgramar, setModalProgramar] = useState(false)
+  const [modalProgramar, setModalProgramar] = useState<{ obraId?: string } | null>(null)
   const [executar, setExecutar] = useState<QsmaInspecao | null>(null)
 
   // deep-link do Novo Registro: /qsma/inspecoes?novo=programar
   useEffect(() => {
     const novo = params.get('novo')
-    if (novo === 'programar') { setAba('programacao'); setModalProgramar(true) }
+    if (novo === 'programar') { setAba('programacao'); setModalProgramar({}) }
     if (novo === 'modelo') { setAba('modelos'); setModalModelo('novo') }
     if (novo) setParams({}, { replace: true })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -56,7 +56,14 @@ export default function QsmaInspecoes() {
   const { data: modelos = [] } = useModelosChecklist()
   const { data: inspecoes = [] } = useInspecoes()
   const { data: obras = [] } = useObrasComProjeto()
+  const { data: equipeObras = [] } = usePlanejamentoEquipe()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
+
+  // TSTs alocados na programação do módulo Obras (vínculo pedido: só segurança)
+  const tsts = useMemo(() => equipeObras.filter(r =>
+    ['planejado', 'mobilizado', 'ativo'].includes(r.status)
+    && /seguran|tst|sesmt/i.test(r.funcao ?? '')
+  ), [equipeObras])
 
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
@@ -170,10 +177,43 @@ export default function QsmaInspecoes() {
             isDark={isDark}
             contagem={`${programadas.length} programada${programadas.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar inspeção…"
-            acoes={<BotaoNovo label="Programar Inspeção" onClick={() => setModalProgramar(true)} />}
+            acoes={<BotaoNovo label="Programar Inspeção" onClick={() => setModalProgramar({})} />}
           >
             <MultiCheck isDark={isDark} label="Obras" options={obrasComRegistro} excluded={exObras} setExcluded={setExObras} />
           </QsmaToolbar>
+
+          {/* TSTs em campo — vínculo com a programação do módulo Obras */}
+          <div className={`rounded-2xl border p-4 ${isDark ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-amber-200 bg-amber-50/40'}`}>
+            <p className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-2.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+              <HardHat size={11} /> TSTs em campo · programação de Obras ({tsts.length})
+            </p>
+            {tsts.length === 0 ? (
+              <p className={`text-[11px] italic ${txtMuted}`}>
+                Nenhum Técnico de Segurança alocado na programação de Obras — aloque em Obras › Alocação de Equipes.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {tsts.map(t => (
+                  <div key={t.id} className={`rounded-xl border p-3 flex items-center gap-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-bold truncate ${txtMain}`}>{t.nome}</p>
+                      <p className={`text-[10px] truncate ${txtMuted}`}>
+                        {obraNome(t.obra_id)} · desde {fmtData(t.data_inicio)}{t.data_fim ? ` até ${fmtData(t.data_fim)}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setModalProgramar({ obraId: t.obra_id })}
+                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors"
+                      title={`Programar inspeção na obra ${obraNome(t.obra_id)}`}
+                    >
+                      <Plus size={10} /> Programar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {programadas.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhuma inspeção programada" />
           ) : (
@@ -256,7 +296,7 @@ export default function QsmaInspecoes() {
         />
       )}
       {modalProgramar && (
-        <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} onClose={() => setModalProgramar(false)} />
+        <ProgramarInspecaoModal isDark={isDark} modelos={modelos.filter(m => m.ativo)} defaultObraId={modalProgramar.obraId} onClose={() => setModalProgramar(null)} />
       )}
       {executar && (
         <ExecutarInspecaoModal isDark={isDark} inspecao={executar} onClose={() => setExecutar(null)} />
@@ -403,10 +443,10 @@ function ModeloChecklistModal({ isDark, modelo, grupos, onClose }: { isDark: boo
 
 // ── Modal: programar inspeção ────────────────────────────────────────────────
 
-function ProgramarInspecaoModal({ isDark, modelos, onClose }: { isDark: boolean; modelos: QsmaModeloChecklist[]; onClose: () => void }) {
+function ProgramarInspecaoModal({ isDark, modelos, defaultObraId, onClose }: { isDark: boolean; modelos: QsmaModeloChecklist[]; defaultObraId?: string; onClose: () => void }) {
   const salvar = useSalvarInspecao()
   const [modeloId, setModeloId] = useState('')
-  const [obraId, setObraId] = useState('')
+  const [obraId, setObraId] = useState(defaultObraId ?? '')
   const [frente, setFrente] = useState('')
   const [liderId, setLiderId] = useState('')
   const [veiculoId, setVeiculoId] = useState('')
