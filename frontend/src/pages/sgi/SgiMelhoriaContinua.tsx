@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
-  RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle, Save,
+  RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle,
   Check, Target, FlaskConical, ListChecks, ClipboardCheck, Lock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -55,14 +55,22 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
   const [novaPrazo, setNovaPrazo] = useState('')
 
   // Análise de causa (Ishikawa + 5 Porquês) → sgi_analise_causa
-  const { data: analise } = useAnaliseCausa(registro.id)
+  // AUTO-SAVE: popula o form UMA vez (guard), depois salva com debounce a cada
+  // digitação — o refetch da query nunca sobrescreve o que está sendo digitado.
+  const { data: analise, isFetched: analiseFetched } = useAnaliseCausa(registro.id)
   const salvarAnalise = useSalvarAnaliseCausa()
   const [metodoCausa, setMetodoCausa] = useState<'5porques' | 'ishikawa'>('5porques')
   const [porques, setPorques] = useState<string[]>(['', '', '', '', ''])
   const [ishikawa, setIshikawa] = useState<Record<Ishikawa6M, string>>({ metodo: '', maquina: '', mao_obra: '', material: '', medicao: '', meio_ambiente: '' })
   const [causaRaiz, setCausaRaiz] = useState('')
+  const [causaSave, setCausaSave] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const causaLoaded = useRef(false)
+  const analiseIdRef = useRef<string | undefined>(undefined)
   useEffect(() => {
+    if (!analiseFetched || causaLoaded.current) return
+    causaLoaded.current = true
     if (!analise) return
+    analiseIdRef.current = analise.id
     const c = analise.conteudo || {}
     setPorques([...(c.porques ?? []), '', '', '', '', ''].slice(0, 5))
     const ish = c.ishikawa
@@ -72,27 +80,70 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
     })
     if (analise.metodo === 'ishikawa' || analise.metodo === '5porques') setMetodoCausa(analise.metodo)
     setCausaRaiz(analise.causa_raiz ?? '')
-  }, [analise])
-  const salvarCausa = async () => {
-    const ish = Object.fromEntries(ISHIKAWA_6M.map(k => [k, ishikawa[k].split('\n').map(s => s.trim()).filter(Boolean)])) as Record<Ishikawa6M, string[]>
-    await salvarAnalise.mutateAsync({ id: analise?.id, registro_id: registro.id, metodo: metodoCausa, conteudo: { porques: porques.map(p => p.trim()), ishikawa: ish }, causa_raiz: causaRaiz.trim() || null })
-  }
+  }, [analiseFetched, analise])
+  // debounce de 1,5s após a última digitação
+  useEffect(() => {
+    if (!causaLoaded.current) return
+    setCausaSave('saving')
+    const t = setTimeout(async () => {
+      try {
+        const ish = Object.fromEntries(ISHIKAWA_6M.map(k => [k, ishikawa[k].split('\n').map(s => s.trim()).filter(Boolean)])) as Record<Ishikawa6M, string[]>
+        const r = await salvarAnalise.mutateAsync({
+          id: analiseIdRef.current, registro_id: registro.id, metodo: metodoCausa,
+          conteudo: { porques: porques.map(p => p.trim()), ishikawa: ish },
+          causa_raiz: causaRaiz.trim() || null,
+        })
+        analiseIdRef.current = r.id
+        setCausaSave('saved')
+      } catch { setCausaSave('idle') }
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [porques, ishikawa, causaRaiz, metodoCausa]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Verificação de eficácia → sgi_verificacao (ISO 10.2.1.d)
-  const { data: verif } = useVerificacao(registro.id)
+  // Verificação de eficácia → sgi_verificacao (ISO 10.2.1.d) — mesmo auto-save
+  const { data: verif, isFetched: verifFetched } = useVerificacao(registro.id)
   const salvarVerif = useSalvarVerificacao()
   const [eficaz, setEficaz] = useState<boolean | null>(null)
   const [evidencia, setEvidencia] = useState('')
   const [obsVerif, setObsVerif] = useState('')
+  const [verifSave, setVerifSave] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const verifLoaded = useRef(false)
+  const verifIdRef = useRef<string | undefined>(undefined)
   useEffect(() => {
+    if (!verifFetched || verifLoaded.current) return
+    verifLoaded.current = true
     if (!verif) return
+    verifIdRef.current = verif.id
     setEficaz(verif.eficaz)
     setEvidencia(verif.evidencia ?? '')
     setObsVerif(verif.observacao ?? '')
-  }, [verif])
-  const salvarEficacia = async () => {
-    await salvarVerif.mutateAsync({ id: verif?.id, registro_id: registro.id, eficaz, evidencia: evidencia.trim() || null, observacao: obsVerif.trim() || null, criado_por_nome: perfil?.nome ?? null })
-  }
+  }, [verifFetched, verif])
+  useEffect(() => {
+    if (!verifLoaded.current || eficaz == null) return
+    setVerifSave('saving')
+    const t = setTimeout(async () => {
+      try {
+        const r = await salvarVerif.mutateAsync({
+          id: verifIdRef.current, registro_id: registro.id, eficaz,
+          evidencia: evidencia.trim() || null, observacao: obsVerif.trim() || null,
+          criado_por_nome: perfil?.nome ?? null,
+        })
+        verifIdRef.current = r.id
+        setVerifSave('saved')
+      } catch { setVerifSave('idle') }
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [eficaz, evidencia, obsVerif]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // indicador discreto de auto-save (substitui os botões "Salvar")
+  const SaveDot = ({ st }: { st: 'idle' | 'saving' | 'saved' }) => (
+    st === 'idle' ? null : (
+      <span className={`inline-flex items-center gap-1 text-[9px] font-semibold ${st === 'saving' ? (isDark ? 'text-slate-500' : 'text-slate-400') : 'text-emerald-500'}`}>
+        {st === 'saving' ? <Loader2 size={9} className="animate-spin" /> : <Check size={9} />}
+        {st === 'saving' ? 'Salvando…' : 'Salvo'}
+      </span>
+    )
+  )
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBorder = isDark ? 'border-white/[0.07]' : 'border-slate-200'
@@ -246,6 +297,7 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
               titulo="Análise de Causa" sub="Determinar a causa raiz — §10.2.1.b"
               extra={
                 <div className="flex items-center gap-2">
+                  <SaveDot st={causaSave} />
                   {okBadge(temCausa, 'Causa raiz definida', 'Sem causa raiz')}
                   <div className={`inline-flex items-center gap-0.5 p-0.5 rounded-lg border ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-100'}`}>
                     {(['5porques', 'ishikawa'] as const).map(mt => (
@@ -271,16 +323,38 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {ISHIKAWA_6M.map(k => (
-                  <div key={k} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+              /* espinha de peixe: 3M em cima, espinha central com diagonais, 3M embaixo */
+              (() => {
+                const bone = isDark ? 'rgba(147,197,253,0.28)' : 'rgba(96,165,250,0.45)'
+                const caixa = (k: Ishikawa6M) => (
+                  <div key={k} className={`rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.08] bg-[#1e293b]' : 'border-slate-200 bg-white'}`}>
                     <p className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 ${isDark ? 'bg-blue-500/10 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>{ISHIKAWA_LABEL[k]}</p>
                     <textarea rows={2} value={ishikawa[k]} onChange={e => setIshikawa(prev => ({ ...prev, [k]: e.target.value }))}
                       placeholder="uma causa por linha"
                       className={`w-full text-[11px] px-2 py-1.5 outline-none resize-none border-0 ${isDark ? 'bg-transparent text-white placeholder-slate-600' : 'bg-white'}`} />
                   </div>
-                ))}
-              </div>
+                )
+                return (
+                  <div>
+                    <div className="grid grid-cols-3 gap-2">{(['metodo', 'maquina', 'mao_obra'] as Ishikawa6M[]).map(caixa)}</div>
+                    <svg className="w-full h-9 -my-0.5" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden>
+                      {/* espinha central */}
+                      <line x1="1.5" y1="12" x2="95.5" y2="12" stroke={bone} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      {/* cabeça (seta → efeito/causa raiz) */}
+                      <path d="M95.5 12 L92.5 8.5 M95.5 12 L92.5 15.5" stroke={bone} strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+                      {/* diagonais das categorias de cima (desembocam na espinha) */}
+                      {[16.6, 50, 83.3].map(x => (
+                        <line key={`t${x}`} x1={x} y1="0" x2={x + 5.5} y2="12" stroke={bone} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      ))}
+                      {/* diagonais das categorias de baixo */}
+                      {[16.6, 50, 83.3].map(x => (
+                        <line key={`b${x}`} x1={x} y1="24" x2={x + 5.5} y2="12" stroke={bone} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      ))}
+                    </svg>
+                    <div className="grid grid-cols-3 gap-2">{(['material', 'medicao', 'meio_ambiente'] as Ishikawa6M[]).map(caixa)}</div>
+                  </div>
+                )
+              })()
             )}
             <div className={`mt-3 rounded-xl border-2 border-dashed p-3 ${temCausa ? (isDark ? 'border-blue-500/40 bg-blue-500/[0.06]' : 'border-blue-300 bg-blue-50/60') : (isDark ? 'border-white/10' : 'border-slate-200')}`}>
               <p className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
@@ -288,10 +362,6 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
               </p>
               <input value={causaRaiz} onChange={e => setCausaRaiz(e.target.value)} placeholder="Conclusão da análise…" className={inputCls} />
             </div>
-            <button onClick={salvarCausa} disabled={salvarAnalise.isPending}
-              className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
-              {salvarAnalise.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar análise
-            </button>
           </div>
 
           {/* ── 3 · Plano de Ação ── */}
@@ -350,7 +420,12 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
           <div className={`rounded-xl border p-4 ${isDark ? 'border-cyan-500/20' : 'border-cyan-200'}`}>
             <Secao n={4} cor="text-cyan-500" corBg={isDark ? 'bg-cyan-500/15' : 'bg-cyan-50'} icon={FlaskConical}
               titulo="Verificação de Eficácia" sub="As ações eliminaram a causa raiz? — §10.2.1.d"
-              extra={okBadge(eficaciaAvaliada, verif?.eficaz ? 'Eficaz' : 'Avaliada', 'Não avaliada')}
+              extra={
+                <div className="flex items-center gap-2">
+                  <SaveDot st={verifSave} />
+                  {okBadge(eficaciaAvaliada, verif?.eficaz ? 'Eficaz' : 'Avaliada', 'Não avaliada')}
+                </div>
+              }
             />
             <div className="flex gap-2 mb-3">
               {([[true, 'Eficaz — problema não recorreu', 'emerald'], [false, 'Não eficaz — recorreu / persiste', 'red']] as const).map(([v, lbl, tone]) => (
@@ -374,10 +449,9 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
                 <input value={obsVerif} onChange={e => setObsVerif(e.target.value)} className={inputCls} />
               </div>
             </div>
-            <button onClick={salvarEficacia} disabled={salvarVerif.isPending || eficaz == null}
-              className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700 disabled:opacity-50">
-              {salvarVerif.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar verificação
-            </button>
+            {eficaz == null && (
+              <p className={`mt-2 text-[10px] italic ${muted}`}>Escolha Eficaz/Não eficaz — o restante salva automaticamente.</p>
+            )}
           </div>
 
           {/* ── 5 · Encerramento ── */}
