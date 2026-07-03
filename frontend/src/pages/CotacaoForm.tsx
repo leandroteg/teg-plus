@@ -1764,13 +1764,16 @@ export default function CotacaoForm() {
         </div>
       )}
 
-      {/* Upload inteligente com IA */}
+      {/* Upload inteligente com IA — OCULTADO 2026-07-03: gerava muita divergência
+          na cotação (IA lê PDF/imagem e preenche preços errados). Reativar: trocar false por true. */}
+      {false && (
       <UploadCotacao
         onParsed={handleAiParsed}
         disabled={cotacao?.status === 'concluida' || isLocked}
         cotacaoId={id}
         requisicaoId={cotacao?.requisicao_id}
       />
+      )}
 
       {/* Progresso de fornecedores */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
@@ -1920,13 +1923,17 @@ export default function CotacaoForm() {
 
             {/* ── Leitura de IA escopada a este fornecedor ──────────────────────
                 Preenche só o que estiver em branco (nome/CNPJ/condição) e o preço
-                dos itens ainda zerados — não mexe no que já foi digitado à mão. */}
+                dos itens ainda zerados — não mexe no que já foi digitado à mão.
+                OCULTADO 2026-07-03: mesma decisão do upload global (muita divergência).
+                Reativar: trocar false por true. */}
+            {false && (
             <UploadCotacao
               onParsed={(parsed, file) => handleFornecedorParsed(idx, parsed, file)}
               disabled={cotacao?.status === 'concluida' || isLocked}
               cotacaoId={id}
               requisicaoId={cotacao?.requisicao_id}
             />
+            )}
 
             {/* ── Itens e Preços ─────────────────────────────────────────────── */}
             <ItemPricingTable
