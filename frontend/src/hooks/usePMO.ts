@@ -535,17 +535,30 @@ export function useEAPFinal(portfolioId?: string) {
   })
 }
 
-// agrega os polos crus respeitando a seleção de OSCs (excludedOscs = ids ocultados)
-export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>): EAPPolo[] {
+// agrega os polos crus respeitando a seleção de OSCs (excludedOscs = ids ocultados).
+// secaoFat (opcional): `${numero_os}|${pacote}` → faturado no período escolhido (das medições).
+// Quando presente, o faturado (polo e pacote) vem do período; senão, do acumulado dos itens/saldo.
+export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>, secaoFat?: Map<string, number>): EAPPolo[] {
   return raws.map(r => {
     const oscs = r.oscs.filter(o => o.etapa_atual !== 'cancelada' && !excludedOscs.has(o.id))
     const contr = oscs.reduce((s, o) => s + o.valor, 0)
-    const fat = oscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0), 0)
     const m = new Map<string, PacAcc>()
     for (const o of oscs) for (const [pac, a] of Object.entries(o.pacotes)) {
       let x = m.get(pac); if (!x) { x = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, x) }
-      x.valor += a.valor; x.fat += a.fat; x.qC += a.qC; x.qR += a.qR; if (a.uni) x.uni = a.uni
+      x.valor += a.valor; x.qC += a.qC; x.qR += a.qR; if (a.uni) x.uni = a.uni
+      if (!secaoFat) x.fat += a.fat
     }
+    if (secaoFat) {
+      // faturado por período das medições — inclui pacote que só existe na medição (ex.: Outros)
+      for (const o of oscs) for (const pac of PACOTES_ORD) {
+        const v = secaoFat.get(`${o.numero_os}|${pac}`); if (!v) continue
+        let x = m.get(pac); if (!x) { x = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, x) }
+        x.fat += v
+      }
+    }
+    const fat = secaoFat
+      ? [...m.values()].reduce((s, x) => s + x.fat, 0)
+      : oscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0), 0)
     let montTon = 0
     const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
       const a = m.get(n)!
