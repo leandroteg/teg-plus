@@ -61,6 +61,7 @@ export default function QsmaInspecoes() {
   // filtros por aba (busca + selects na primeira linha, padrão do sistema)
   const [busca, setBusca] = useState('')
   const [tipoF, setTipoF] = useState('')
+  const [grupoF, setGrupoF] = useState('')
   const [exObras, setExObras] = useState<Set<string>>(new Set())
   const [veredF, setVeredF] = useState('todos')
   const obrasComRegistro = useMemo(() => {
@@ -69,9 +70,21 @@ export default function QsmaInspecoes() {
   }, [inspecoes, obras])
 
   const q = busca.trim().toLowerCase()
+  const grupos = useMemo(() => [...new Set(modelos.map(m => m.grupo).filter(Boolean))].sort() as string[], [modelos])
   const modelosF = useMemo(() => modelos.filter(m =>
-    (!q || m.nome.toLowerCase().includes(q)) && (!tipoF || m.tipo === tipoF)
-  ), [modelos, q, tipoF])
+    (!q || m.nome.toLowerCase().includes(q) || (m.codigo ?? '').toLowerCase().includes(q))
+    && (!tipoF || m.tipo === tipoF)
+    && (!grupoF || m.grupo === grupoF)
+  ), [modelos, q, tipoF, grupoF])
+  // agrupado por "tipo de guia" (grupo) p/ renderização com headers
+  const modelosPorGrupo = useMemo(() => {
+    const map = new Map<string, typeof modelos>()
+    for (const m of modelosF) {
+      const g = m.grupo || 'Sem grupo'
+      map.set(g, [...(map.get(g) ?? []), m])
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [modelosF])
   const programadas = useMemo(() => inspecoes.filter(i =>
     i.status === 'programada'
     && !exObras.has(i.obra_id ?? '')
@@ -102,9 +115,13 @@ export default function QsmaInspecoes() {
           <QsmaToolbar
             isDark={isDark}
             contagem={`${modelosF.length} modelo${modelosF.length !== 1 ? 's' : ''}`}
-            busca={busca} onBusca={setBusca} placeholder="Buscar modelo…"
+            busca={busca} onBusca={setBusca} placeholder="Buscar modelo ou código…"
             acoes={<BotaoNovo label="Novo Modelo" onClick={() => setModalModelo('novo')} />}
           >
+            <ToolbarSelect
+              isDark={isDark} value={grupoF} onChange={setGrupoF} allLabel="Todos os tipos de guia"
+              options={grupos.map(g => ({ value: g, label: g }))}
+            />
             <ToolbarSelect
               isDark={isDark} value={tipoF} onChange={setTipoF} allLabel="Todos os tipos"
               options={(Object.keys(TIPO_MODELO_LABEL) as (keyof typeof TIPO_MODELO_LABEL)[]).map(t => ({ value: t, label: TIPO_MODELO_LABEL[t] }))}
@@ -113,22 +130,33 @@ export default function QsmaInspecoes() {
           {modelosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum modelo de checklist — crie o primeiro" />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {modelosF.map(m => (
-                <button key={m.id} onClick={() => setModalModelo(m)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-[10px] font-mono font-bold ${txtMuted}`}>{m.codigo}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${m.ativo
-                      ? isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
-                      : isDark ? 'bg-slate-500/15 text-slate-400' : 'bg-slate-100 text-slate-500'
-                    }`}>{m.ativo ? 'Ativo' : 'Inativo'}</span>
+            <div className="space-y-4">
+              {modelosPorGrupo.map(([grupo, lista]) => (
+                <div key={grupo}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${txtMuted}`}>{grupo}</p>
+                    <span className={`text-[9px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>({lista.length})</span>
+                    <div className={`flex-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`} />
                   </div>
-                  <p className={`text-sm font-bold ${txtMain}`}>{m.nome}</p>
-                  <p className={`text-[10px] mt-1 ${txtMuted}`}>
-                    {TIPO_MODELO_LABEL[m.tipo]} · {ESCOPO_MODELO_LABEL[m.escopo]} · {m.itens.length} item(ns)
-                    {m.exige_veredito && ' · com veredito'}
-                  </p>
-                </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {lista.map(m => (
+                      <button key={m.id} onClick={() => setModalModelo(m)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-red-500/10 text-red-300' : 'bg-red-50 text-red-700'}`}>{m.codigo ?? '—'}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${m.ativo
+                            ? isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                            : isDark ? 'bg-slate-500/15 text-slate-400' : 'bg-slate-100 text-slate-500'
+                          }`}>{m.ativo ? 'Ativo' : 'Inativo'}</span>
+                        </div>
+                        <p className={`text-sm font-bold leading-snug ${txtMain}`}>{m.nome}</p>
+                        <p className={`text-[10px] mt-1 ${txtMuted}`}>
+                          {TIPO_MODELO_LABEL[m.tipo]} · {ESCOPO_MODELO_LABEL[m.escopo]} · {m.itens.length} item(ns)
+                          {m.exige_veredito && ' · com veredito'}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -223,6 +251,7 @@ export default function QsmaInspecoes() {
         <ModeloChecklistModal
           isDark={isDark}
           modelo={modalModelo === 'novo' ? null : modalModelo}
+          grupos={grupos}
           onClose={() => setModalModelo(null)}
         />
       )}
@@ -247,10 +276,11 @@ function Vazio({ isDark, texto }: { isDark: boolean; texto: string }) {
 
 // ── Modal: builder de modelo de checklist ────────────────────────────────────
 
-function ModeloChecklistModal({ isDark, modelo, onClose }: { isDark: boolean; modelo: QsmaModeloChecklist | null; onClose: () => void }) {
+function ModeloChecklistModal({ isDark, modelo, grupos, onClose }: { isDark: boolean; modelo: QsmaModeloChecklist | null; grupos: string[]; onClose: () => void }) {
   const salvar = useSalvarModelo()
   const { perfil } = useAuth()
   const [nome, setNome] = useState(modelo?.nome ?? '')
+  const [grupo, setGrupo] = useState(modelo?.grupo ?? '')
   const [tipo, setTipo] = useState<TipoModelo>(modelo?.tipo ?? 'inspecao')
   const [escopo, setEscopo] = useState<EscopoModelo>(modelo?.escopo ?? 'equipe')
   const [exigeVeredito, setExigeVeredito] = useState(modelo?.exige_veredito ?? false)
@@ -293,6 +323,16 @@ function ModeloChecklistModal({ isDark, modelo, onClose }: { isDark: boolean; mo
           <select value={escopo} onChange={e => setEscopo(e.target.value as EscopoModelo)} className={pickerInputCls(isDark)}>
             {(Object.keys(ESCOPO_MODELO_LABEL) as EscopoModelo[]).map(t => <option key={t} value={t}>{ESCOPO_MODELO_LABEL[t]}</option>)}
           </select>
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <label className={pickerLabelCls(isDark)}>Grupo (tipo de guia)</label>
+          <input
+            value={grupo} onChange={e => setGrupo(e.target.value)} list="qsma-grupos-guia"
+            placeholder="Ex.: Inspeção Trabalho (Distribuição)" className={pickerInputCls(isDark)}
+          />
+          <datalist id="qsma-grupos-guia">
+            {grupos.map(g => <option key={g} value={g} />)}
+          </datalist>
         </div>
       </div>
 
@@ -353,7 +393,7 @@ function ModeloChecklistModal({ isDark, modelo, onClose }: { isDark: boolean; mo
         salvando={salvar.isPending}
         onCancel={onClose}
         onSave={() => salvar.mutate(
-          { id: modelo?.id, nome: nome.trim(), tipo, escopo, exige_veredito: exigeVeredito, ativo, itens, criado_por_nome: perfil?.nome },
+          { id: modelo?.id, nome: nome.trim(), grupo: grupo.trim() || undefined, tipo, escopo, exige_veredito: exigeVeredito, ativo, itens, criado_por_nome: perfil?.nome },
           { onSuccess: onClose, onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
         )}
       />
@@ -385,7 +425,13 @@ function ProgramarInspecaoModal({ isDark, modelos, onClose }: { isDark: boolean;
         <label className={pickerLabelCls(isDark)}>Modelo de checklist *</label>
         <select value={modeloId} onChange={e => setModeloId(e.target.value)} className={pickerInputCls(isDark)}>
           <option value="">Selecione…</option>
-          {modelos.map(m => <option key={m.id} value={m.id}>{m.nome} ({ESCOPO_MODELO_LABEL[m.escopo]})</option>)}
+          {[...new Set(modelos.map(m => m.grupo || 'Outros'))].sort().map(g => (
+            <optgroup key={g} label={g}>
+              {modelos.filter(m => (m.grupo || 'Outros') === g).map(m => (
+                <option key={m.id} value={m.id}>{m.codigo ? `${m.codigo} · ` : ''}{m.nome}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </div>
       <ObraPicker isDark={isDark} value={obraId} onChange={id => { setObraId(id); setVeiculoId('') }} required />
