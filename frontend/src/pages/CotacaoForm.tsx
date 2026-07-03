@@ -921,6 +921,32 @@ export default function CotacaoForm() {
         valor_total: 0,
       }))
   }, [cotacao?.requisicao])
+  // REGRA: todo fornecedor sempre exibe a lista COMPLETA dos itens em escopo da
+  // RC, mesmo que ele cote só uma parte (itens não cotados ficam em branco,
+  // preço 0). Parte da lista completa e sobrepõe os preços/qtd já salvos daquele
+  // fornecedor, casando por descrição normalizada. Usado ao reabrir uma cotação
+  // salva — sem isso, cada fornecedor voltaria só com o subconjunto que foi salvo
+  // e a lista divergiria entre fornecedores.
+  const comEscopoCompletoDaRC = useCallback((salvos: ItemPreco[] = []): ItemPreco[] => {
+    const base = itensPendentesDaRC()
+    if (base.length === 0) return salvos ?? []
+    const porDescricao = new Map(
+      (salvos ?? [])
+        .filter(it => it.descricao?.trim())
+        .map(it => [toUpperNorm(it.descricao).trim(), it]),
+    )
+    return base.map(item => {
+      const salvo = porDescricao.get(toUpperNorm(item.descricao).trim())
+      return salvo
+        ? {
+            descricao: item.descricao,
+            qtd: salvo.qtd ?? item.qtd,
+            valor_unitario: salvo.valor_unitario ?? 0,
+            valor_total: salvo.valor_total ?? 0,
+          }
+        : item
+    })
+  }, [itensPendentesDaRC])
   // Recomeça a cotação do zero: remove TODOS os fornecedores já salvos (marcados
   // pra deletar no submit) e volta pra 1 card em branco com os itens da RC
   // pré-listados. Só o que já foi digitado/lido de cotação anterior some.
@@ -956,12 +982,12 @@ export default function CotacaoForm() {
         condicao_pagamento: f.condicao_pagamento ?? '',
         observacao:         f.observacao ?? '',
         arquivo_url:        f.arquivo_url ?? '',
-        itens_precos:       f.itens_precos ?? [],
+        itens_precos:       comEscopoCompletoDaRC(f.itens_precos),
       })))
     } else {
       setFornecedores([{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])
     }
-  }, [cotacao, itensPendentesDaRC])
+  }, [cotacao, itensPendentesDaRC, comEscopoCompletoDaRC])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
