@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
   Trash2, Ban, ShieldCheck, Play, Loader2,
@@ -11,7 +11,7 @@ import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao }
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
-import { useObrasComProjeto, usePlanejamentoEquipe } from '../../hooks/useObras'
+import { useObrasComProjeto, usePlanejamentoEquipe, useColaboradoresAtivos } from '../../hooks/useObras'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
 import { TIPO_MODELO_LABEL, ESCOPO_MODELO_LABEL, STATUS_INSPECAO_LABEL } from '../../types/qsma'
 
@@ -71,6 +71,19 @@ export default function QsmaInspecoes() {
     ['planejado', 'mobilizado', 'ativo'].includes(r.status)
     && /seguran|tst|sesmt/i.test(r.funcao ?? '')
   ), [equipeObras])
+
+  // TSTs do RH SEM alocação em Obras — precisam aparecer no quadro mesmo assim
+  const nav = useNavigate()
+  const { data: colabsAtivos = [] } = useColaboradoresAtivos()
+  const tstsSemAlocacao = useMemo(() => {
+    const alocados = new Set(tsts.map(t => t.colaborador_id).filter(Boolean))
+    const q2 = busca.trim().toLowerCase()
+    return colabsAtivos.filter(c =>
+      /seguran|tst|sesmt/i.test(c.cargo ?? '')
+      && !alocados.has(c.id)
+      && (!q2 || c.nome.toLowerCase().includes(q2))
+    )
+  }, [colabsAtivos, tsts, busca])
 
   // ── Gantt semanal (mesmo template da Programação de Obras) ─────────────────
   const addDays = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
@@ -382,6 +395,40 @@ export default function QsmaInspecoes() {
                 </div>
               )
             })}
+
+            {/* TSTs do RH sem alocação em Obras — visíveis p/ não sumir ninguém */}
+            {tstsSemAlocacao.length > 0 && (
+              <div>
+                <button onClick={() => toggleMin('__sem_aloc__')} className={`flex items-center w-full text-left border-b transition-colors ${isDark ? 'border-white/[0.04] bg-white/[0.06] hover:bg-white/[0.08]' : 'border-slate-200 bg-slate-100 hover:bg-slate-200/60'}`} style={{ minWidth: `${totalW}px` }}>
+                  <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ width: `${COL_W.esq}px` }}>
+                    {minimizados.has('__sem_aloc__') ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
+                    <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${txtMuted}`}>Sem alocação</span>
+                    <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/[0.08] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>{tstsSemAlocacao.length}</span>
+                  </div>
+                </button>
+                {!minimizados.has('__sem_aloc__') && tstsSemAlocacao.map(c => (
+                  <div key={c.id} className={`flex items-stretch border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`} style={{ minWidth: `${totalW}px` }}>
+                    <div className={`shrink-0 py-1.5 border-r ${borderG} flex items-center gap-1.5`} style={{ width: `${COL_W.esq}px`, paddingLeft: 24, paddingRight: 8 }}>
+                      <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-slate-500' : 'bg-slate-300'}`} />
+                      <span className={`flex-1 min-w-0 text-[11px] font-semibold truncate ${txtMain}`} title={`${c.nome}${c.cargo ? ` · ${c.cargo}` : ''}`}>{c.nome}</span>
+                      {c.base_nome && (
+                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`} title="Base de lotação (RH)">{c.base_nome}</span>
+                      )}
+                      <button
+                        onClick={() => nav('/obras/equipe')}
+                        className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
+                        title="Alocar em Obras › Alocação de Equipes"
+                      >
+                        Alocar
+                      </button>
+                    </div>
+                    <div className={`flex-1 flex items-center px-3 py-1.5 text-[10px] italic ${isDark ? 'text-slate-600' : 'text-slate-400'}`} style={{ minWidth: `${weeks.length * COL_W.semana}px` }}>
+                      sem alocação na programação de Obras
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Legenda */}
