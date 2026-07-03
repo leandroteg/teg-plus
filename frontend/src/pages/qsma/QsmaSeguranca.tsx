@@ -1,25 +1,30 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
+  Search, Loader2, FileDown, Paperclip, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
-  useRiscos, useSalvarRisco, useEpis, useSalvarEpi, useEpiEntregas, useRegistrarEntregaEpi,
+  useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
+  useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
+  uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useCriarAcaoOcorrencia, useAcoesQsma,
 } from '../../hooks/useQsma'
+import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type {
-  QsmaRisco, QsmaEpi, QsmaTreinamento, QsmaOcorrencia,
-  EscopoRisco, TipoOcorrencia, Gravidade, Envolvido, StatusOcorrencia,
+  QsmaRisco, QsmaEpi, QsmaEpiFicha, QsmaTreinamento, QsmaOcorrencia,
+  EscopoRisco, TipoOcorrencia, Gravidade, Envolvido, StatusOcorrencia, MotivoEntregaEpi,
 } from '../../types/qsma'
 import {
   nivelRisco, NORMAS_TREINAMENTO, TIPO_OCORRENCIA_LABEL, GRAVIDADE_LABEL, STATUS_OCORRENCIA_LABEL,
+  STATUS_FICHA_EPI_LABEL,
 } from '../../types/qsma'
 
 const STEPS: FlowStep[] = [
@@ -58,14 +63,14 @@ export default function QsmaSeguranca() {
   const [aba, setAba] = useState<string>(params.get('aba') ?? 'riscos')
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
-  const [modalEntrega, setModalEntrega] = useState(false)
+  const [modalFicha, setModalFicha] = useState(false)
   const [modalTreinamento, setModalTreinamento] = useState<QsmaTreinamento | 'novo' | null>(null)
   const [modalOcorrencia, setModalOcorrencia] = useState<QsmaOcorrencia | 'novo' | null>(null)
 
   useEffect(() => {
     const novo = params.get('novo')
     if (novo === 'ocorrencia') { setAba('ocorrencias'); setModalOcorrencia('novo') }
-    if (novo === 'epi') { setAba('epis'); setModalEntrega(true) }
+    if (novo === 'epi') { setAba('epis'); setModalFicha(true) }
     if (novo === 'treinamento') { setAba('treinamentos'); setModalTreinamento('novo') }
     if (novo === 'risco') { setAba('riscos'); setModalRisco('novo') }
     if (novo) setParams({}, { replace: true })
@@ -73,7 +78,8 @@ export default function QsmaSeguranca() {
 
   const { data: riscos = [] } = useRiscos()
   const { data: epis = [] } = useEpis()
-  const { data: entregas = [] } = useEpiEntregas()
+  const { data: fichas = [] } = useFichasEpi()
+  const arquivarFicha = useArquivarFichaEpi()
   const { data: treinamentos = [] } = useTreinamentos()
   const { data: ocorrencias = [] } = useOcorrencias()
   const { data: acoes = [] } = useAcoesQsma()
@@ -139,8 +145,8 @@ export default function QsmaSeguranca() {
             }`}>
               <Plus size={13} /> EPI no catálogo
             </button>
-            <button onClick={() => setModalEntrega(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
-              <Plus size={13} /> Registrar Entrega
+            <button onClick={() => setModalFicha(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
+              <Plus size={13} /> Nova Ficha de Entrega
             </button>
           </div>
 
@@ -150,7 +156,7 @@ export default function QsmaSeguranca() {
               Catálogo ({epis.length})
             </p>
             {epis.length === 0 ? (
-              <p className={`px-4 py-4 text-xs italic ${txtMuted}`}>Nenhum EPI cadastrado</p>
+              <p className={`px-4 py-4 text-xs italic ${txtMuted}`}>Nenhum EPI cadastrado — cadastre pelo nº do CA</p>
             ) : (
               <div className="p-3 flex flex-wrap gap-1.5">
                 {epis.map(e => {
@@ -169,27 +175,91 @@ export default function QsmaSeguranca() {
             )}
           </div>
 
-          {/* Entregas */}
+          {/* Fichas de entrega (1 ficha → N EPIs) */}
           <div className="space-y-2">
-            {entregas.length === 0 ? (
-              <Vazio isDark={isDark} texto="Nenhuma entrega de EPI registrada" />
-            ) : entregas.map(en => (
-              <div key={en.id} className={`${card} p-3.5 flex items-center gap-3 flex-wrap`}>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-bold ${txtMain}`}>{en.colaborador_nome ?? '—'}</p>
-                  <p className={`text-[11px] ${txtMuted}`}>
-                    {en.epi?.nome ?? 'EPI'}{en.epi?.ca ? ` (CA ${en.epi.ca})` : ''} · {en.quantidade}un · {fmtData(en.data_entrega)}
-                    {en.data_troca_prevista && ` · troca ${fmtData(en.data_troca_prevista)}`}
-                  </p>
+            {fichas.length === 0 ? (
+              <Vazio isDark={isDark} texto="Nenhuma ficha de entrega — crie a primeira" />
+            ) : fichas.map(f => {
+              const st = STATUS_FICHA_EPI_LABEL[f.status]
+              const itens = f.itens ?? []
+              return (
+                <div key={f.id} className={`${card} p-3.5`}>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold ${txtMain}`}>
+                        <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{f.codigo}</span>
+                        {f.colaborador_nome ?? '—'}
+                      </p>
+                      <p className={`text-[11px] ${txtMuted}`}>
+                        {itens.length} item(ns) · {fmtData(f.data_entrega)} · {obraNome(f.obra_id)}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                    <button
+                      onClick={() => gerarFichaEpiPdf({
+                        codigo: f.codigo,
+                        colaboradorNome: f.colaborador_nome ?? '—',
+                        obraNome: obraNome(f.obra_id),
+                        dataEntrega: f.data_entrega,
+                        motivo: f.motivo,
+                        observacoes: f.observacoes,
+                        entreguePorNome: f.entregue_por_nome,
+                        itens: itens.map(it => ({
+                          nome: it.epi?.nome ?? 'EPI',
+                          ca: it.epi?.ca,
+                          quantidade: it.quantidade,
+                          tamanho: it.tamanho,
+                          trocaPrevista: it.data_troca_prevista,
+                        })),
+                      })}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${
+                        isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      title="Gerar a ficha em PDF para colher a assinatura"
+                    >
+                      <FileDown size={11} /> PDF
+                    </button>
+                    {f.status === 'aguardando_assinatura' && (
+                      <label className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors ${
+                        isDark ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`} title="Anexar a ficha assinada (foto/scan) e arquivar">
+                        <Paperclip size={11} /> Arquivar assinada
+                        <input
+                          type="file" className="hidden" accept="application/pdf,image/png,image/jpeg,image/webp"
+                          onChange={async ev => {
+                            const file = ev.target.files?.[0]
+                            if (!file) return
+                            try {
+                              const path = await uploadEvidencia(`fichas-epi/${f.id}`, file)
+                              await arquivarFicha.mutateAsync({ fichaId: f.id, arquivoPath: path })
+                            } catch (err: any) {
+                              alert(`Erro ao arquivar: ${err?.message ?? 'desconhecido'}`)
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    {f.arquivo_assinado_path && (
+                      <button
+                        onClick={async () => {
+                          const url = await evidenciaUrl(f.arquivo_assinado_path)
+                          if (url) window.open(url, '_blank')
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
+                        title="Abrir ficha assinada arquivada"
+                      >
+                        <ShieldCheck size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {itens.length > 0 && (
+                    <p className={`mt-1.5 text-[10px] ${txtMuted}`}>
+                      {itens.map(it => `${it.quantidade}× ${it.epi?.nome ?? 'EPI'}${it.epi?.ca ? ` (CA ${it.epi.ca})` : ''}`).join(' · ')}
+                    </p>
+                  )}
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${en.assinado
-                  ? isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
-                  : isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {en.assinado ? 'Assinado' : 'Aguard. assinatura'}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -277,7 +347,7 @@ export default function QsmaSeguranca() {
       {/* ── Modais ── */}
       {modalRisco && <RiscoModal isDark={isDark} risco={modalRisco === 'novo' ? null : modalRisco} onClose={() => setModalRisco(null)} />}
       {modalEpi && <EpiCatalogoModal isDark={isDark} epi={modalEpi === 'novo' ? null : modalEpi} onClose={() => setModalEpi(null)} />}
-      {modalEntrega && <EntregaEpiModal isDark={isDark} epis={epis.filter(e => e.ativo)} onClose={() => setModalEntrega(false)} />}
+      {modalFicha && <FichaEpiModal isDark={isDark} epis={epis.filter(e => e.ativo)} onClose={() => setModalFicha(false)} />}
       {modalTreinamento && <TreinamentoModal isDark={isDark} treinamento={modalTreinamento === 'novo' ? null : modalTreinamento} onClose={() => setModalTreinamento(null)} />}
       {modalOcorrencia && <OcorrenciaModal isDark={isDark} ocorrencia={modalOcorrencia === 'novo' ? null : modalOcorrencia} onClose={() => setModalOcorrencia(null)} />}
     </ControladoriaFlow>
@@ -403,7 +473,7 @@ function RiscoModal({ isDark, risco, onClose }: { isDark: boolean; risco: QsmaRi
   )
 }
 
-// ── Modal: EPI no catálogo ───────────────────────────────────────────────────
+// ── Modal: EPI no catálogo (com busca na base oficial de CAs) ────────────────
 
 function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: QsmaEpi | null; onClose: () => void }) {
   const salvar = useSalvarEpi()
@@ -411,25 +481,77 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
   const [ca, setCa] = useState(epi?.ca ?? '')
   const [validadeCa, setValidadeCa] = useState(epi?.validade_ca ?? '')
   const [fabricante, setFabricante] = useState(epi?.fabricante ?? '')
+  const [especificacoes, setEspecificacoes] = useState(epi?.especificacoes ?? '')
   const [vidaUtil, setVidaUtil] = useState<string>(epi?.vida_util_dias?.toString() ?? '')
+  const [possuiDevolucao, setPossuiDevolucao] = useState(epi?.possui_devolucao ?? false)
+  const [tamanhoPorFunc, setTamanhoPorFunc] = useState(epi?.tamanho_por_funcionario ?? false)
   const [ativo, setAtivo] = useState(epi?.ativo ?? true)
+  const [buscandoCa, setBuscandoCa] = useState(false)
+  const [caMsg, setCaMsg] = useState<string | null>(null)
+
+  // Busca na base oficial espelhada (qsma_caepi) e preenche tudo — padrão SOC
+  async function buscarCA() {
+    if (!ca.trim()) return
+    setBuscandoCa(true)
+    setCaMsg(null)
+    try {
+      const r = await consultarCA(ca)
+      if (!r) {
+        setCaMsg('CA não encontrado na base local — confira o número ou preencha manualmente')
+        return
+      }
+      if (r.equipamento && !nome.trim()) setNome(r.equipamento)
+      else if (r.equipamento) setNome(r.equipamento)
+      if (r.fabricante) setFabricante(r.fabricante)
+      if (r.validade) setValidadeCa(r.validade)
+      if (r.descricao) setEspecificacoes(r.descricao)
+      setCaMsg(`✓ ${r.equipamento ?? 'EPI'} — ${r.fabricante ?? ''} (validade CA ${r.validade ? new Date(r.validade + 'T12:00:00').toLocaleDateString('pt-BR') : '—'})`)
+    } catch (err: any) {
+      setCaMsg(`Erro na consulta: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setBuscandoCa(false)
+    }
+  }
 
   const erros: string[] = []
-  if (!nome.trim()) erros.push('informe o nome')
+  if (!nome.trim()) erros.push('informe o nome (ou busque pelo CA)')
   const avisos: string[] = []
   if (!ca.trim()) avisos.push('EPI sem CA — verifique se é isento')
   if (validadeCa && validadeCa < new Date().toISOString().split('T')[0]) avisos.push('CA vencido')
 
   return (
-    <QsmaModal isDark={isDark} titulo={epi ? 'Editar EPI' : 'Novo EPI no catálogo'} subtitulo="Certificado de Aprovação (CA) validado na entrega" onClose={onClose}>
+    <QsmaModal isDark={isDark} titulo={epi ? 'Editar EPI' : 'Novo EPI no catálogo'} subtitulo="Digite o nº do CA e busque — nome, fabricante e validade vêm da base oficial do MTE" onClose={onClose}>
+      {/* Busca por CA */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'border-red-500/20 bg-red-500/[0.04]' : 'border-red-200 bg-red-50/40'}`}>
+        <label className={pickerLabelCls(isDark)}>Nº do CA</label>
+        <div className="flex gap-2">
+          <input
+            value={ca}
+            onChange={e => setCa(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={e => { if (e.key === 'Enter') buscarCA() }}
+            placeholder="Ex.: 31469"
+            className={`${pickerInputCls(isDark)} flex-1`}
+          />
+          <button
+            onClick={buscarCA}
+            disabled={buscandoCa || !ca.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[11px] font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {buscandoCa ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+            Buscar CA
+          </button>
+        </div>
+        {caMsg && (
+          <p className={`mt-1.5 text-[10px] font-medium ${caMsg.startsWith('✓') ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : 'text-amber-500'}`}>
+            {caMsg}
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className={pickerLabelCls(isDark)}>Nome *</label>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex.: Luva isolante classe 2" className={pickerInputCls(isDark)} />
-        </div>
-        <div>
-          <label className={pickerLabelCls(isDark)}>CA</label>
-          <input value={ca} onChange={e => setCa(e.target.value)} placeholder="Nº do CA" className={pickerInputCls(isDark)} />
         </div>
         <div>
           <label className={pickerLabelCls(isDark)}>Validade do CA</label>
@@ -440,18 +562,37 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
           <input value={fabricante} onChange={e => setFabricante(e.target.value)} className={pickerInputCls(isDark)} />
         </div>
         <div>
-          <label className={pickerLabelCls(isDark)}>Vida útil (dias)</label>
+          <label className={pickerLabelCls(isDark)}>Vida útil / reposição (dias)</label>
           <input type="number" value={vidaUtil} onChange={e => setVidaUtil(e.target.value)} placeholder="Ex.: 180" className={pickerInputCls(isDark)} />
         </div>
       </div>
-      <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-        <input type="checkbox" checked={ativo} onChange={e => setAtivo(e.target.checked)} className="accent-red-600" />
-        Ativo no catálogo
-      </label>
+      <div>
+        <label className={pickerLabelCls(isDark)}>Especificações</label>
+        <textarea value={especificacoes} onChange={e => setEspecificacoes(e.target.value)} rows={2} placeholder="Descrição técnica (vem da base do CA)" className={pickerInputCls(isDark)} />
+      </div>
+      <div className="flex items-center gap-4 flex-wrap">
+        <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <input type="checkbox" checked={possuiDevolucao} onChange={e => setPossuiDevolucao(e.target.checked)} className="accent-red-600" />
+          Possui devolução
+        </label>
+        <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <input type="checkbox" checked={tamanhoPorFunc} onChange={e => setTamanhoPorFunc(e.target.checked)} className="accent-red-600" />
+          Tamanho por funcionário
+        </label>
+        <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <input type="checkbox" checked={ativo} onChange={e => setAtivo(e.target.checked)} className="accent-red-600" />
+          Ativo no catálogo
+        </label>
+      </div>
       <ModalFooter
         isDark={isDark} erros={erros} avisos={avisos} salvando={salvar.isPending} onCancel={onClose}
         onSave={() => salvar.mutate(
-          { id: epi?.id, nome: nome.trim(), ca: ca || undefined, validade_ca: validadeCa || undefined, fabricante: fabricante || undefined, vida_util_dias: vidaUtil ? Number(vidaUtil) : undefined, ativo },
+          {
+            id: epi?.id, nome: nome.trim(), ca: ca || undefined, validade_ca: validadeCa || undefined,
+            fabricante: fabricante || undefined, especificacoes: especificacoes || undefined,
+            vida_util_dias: vidaUtil ? Number(vidaUtil) : undefined,
+            possui_devolucao: possuiDevolucao, tamanho_por_funcionario: tamanhoPorFunc, ativo,
+          },
           { onSuccess: onClose, onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
         )}
       />
@@ -459,80 +600,167 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
   )
 }
 
-// ── Modal: Entrega de EPI ────────────────────────────────────────────────────
+// ── Modal: Ficha de Entrega de EPI (multi-item, padrão SOC/NR-06) ────────────
 
-function EntregaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
-  const registrar = useRegistrarEntregaEpi()
+function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
+  const criar = useCriarFichaEpi()
   const { perfil } = useAuth()
+  const hoje = new Date().toISOString().split('T')[0]
   const [colabId, setColabId] = useState('')
   const [colabNome, setColabNome] = useState('')
   const [obraId, setObraId] = useState('')
-  const [epiId, setEpiId] = useState('')
-  const [qtd, setQtd] = useState('1')
-  const [dataEntrega, setDataEntrega] = useState(new Date().toISOString().split('T')[0])
-  const [motivo, setMotivo] = useState<'entrega' | 'troca' | 'devolucao'>('entrega')
+  const [dataEntrega, setDataEntrega] = useState(hoje)
+  const [motivo, setMotivo] = useState<MotivoEntregaEpi>('entrega')
+  const [obs, setObs] = useState('')
+  const [itens, setItens] = useState<{ epi_id: string; quantidade: string; tamanho: string }[]>([
+    { epi_id: '', quantidade: '1', tamanho: '' },
+  ])
+  const [gerarPdfAoSalvar, setGerarPdfAoSalvar] = useState(true)
 
-  const epi = epis.find(e => e.id === epiId)
-  const hoje = new Date().toISOString().split('T')[0]
-  const trocaPrevista = useMemo(() => {
-    if (!epi?.vida_util_dias || !dataEntrega) return undefined
+  const trocaPrevista = (epiId: string): string | undefined => {
+    const epi = epis.find(e => e.id === epiId)
+    if (!epi?.vida_util_dias) return undefined
     const d = new Date(dataEntrega + 'T12:00:00')
     d.setDate(d.getDate() + epi.vida_util_dias)
     return d.toISOString().split('T')[0]
-  }, [epi, dataEntrega])
+  }
 
+  const itensValidos = itens.filter(it => it.epi_id && Number(it.quantidade) > 0)
   const erros: string[] = []
   if (!colabId) erros.push('selecione o colaborador')
-  if (!epiId) erros.push('selecione o EPI')
-  if (!(Number(qtd) > 0)) erros.push('quantidade inválida')
+  if (itensValidos.length === 0) erros.push('adicione ao menos 1 EPI')
   const avisos: string[] = []
-  if (epi?.validade_ca && epi.validade_ca < hoje) avisos.push(`CA ${epi.ca} está VENCIDO — não entregue este EPI`)
+  for (const it of itensValidos) {
+    const epi = epis.find(e => e.id === it.epi_id)
+    if (epi?.validade_ca && epi.validade_ca < hoje) avisos.push(`CA ${epi.ca} (${epi.nome}) VENCIDO`)
+    if (epi?.tamanho_por_funcionario && !it.tamanho.trim()) avisos.push(`${epi.nome}: informe o tamanho`)
+  }
+
+  async function salvar() {
+    try {
+      const payload = {
+        colaborador_id: colabId,
+        colaborador_nome: colabNome,
+        obra_id: obraId || undefined,
+        data_entrega: dataEntrega,
+        motivo,
+        observacoes: obs || undefined,
+        entregue_por_nome: perfil?.nome,
+        itens: itensValidos.map(it => ({
+          epi_id: it.epi_id,
+          quantidade: Number(it.quantidade),
+          tamanho: it.tamanho || undefined,
+          data_troca_prevista: trocaPrevista(it.epi_id),
+        })) as ItemFichaEpi[],
+      }
+      const r = await criar.mutateAsync(payload)
+      if (gerarPdfAoSalvar) {
+        await gerarFichaEpiPdf({
+          codigo: r.codigo,
+          colaboradorNome: colabNome,
+          dataEntrega,
+          motivo,
+          observacoes: obs || undefined,
+          entreguePorNome: perfil?.nome,
+          itens: itensValidos.map(it => {
+            const epi = epis.find(e => e.id === it.epi_id)
+            return {
+              nome: epi?.nome ?? 'EPI',
+              ca: epi?.ca,
+              quantidade: Number(it.quantidade),
+              tamanho: it.tamanho || undefined,
+              trocaPrevista: trocaPrevista(it.epi_id),
+            }
+          }),
+        })
+      }
+      onClose()
+    } catch (err: any) {
+      alert(`Erro ao criar ficha: ${err?.message ?? 'desconhecido'}`)
+    }
+  }
 
   return (
-    <QsmaModal isDark={isDark} titulo="Registrar entrega de EPI" subtitulo="A ficha de entrega vai para assinatura do colaborador no PortalTEG" onClose={onClose}>
+    <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — gere o PDF, colha a assinatura e arquive" onClose={onClose}>
       <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => { setColabId(id); setColabNome(c?.nome ?? '') }} required />
       <ObraPicker isDark={isDark} value={obraId} onChange={setObraId} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="col-span-2">
-          <label className={pickerLabelCls(isDark)}>EPI *</label>
-          <select value={epiId} onChange={e => setEpiId(e.target.value)} className={pickerInputCls(isDark)}>
-            <option value="">Selecione…</option>
-            {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={pickerLabelCls(isDark)}>Qtd *</label>
-          <input type="number" min={1} value={qtd} onChange={e => setQtd(e.target.value)} className={pickerInputCls(isDark)} />
-        </div>
-        <div>
-          <label className={pickerLabelCls(isDark)}>Motivo</label>
-          <select value={motivo} onChange={e => setMotivo(e.target.value as never)} className={pickerInputCls(isDark)}>
-            <option value="entrega">Entrega</option>
-            <option value="troca">Troca</option>
-            <option value="devolucao">Devolução</option>
-          </select>
-        </div>
-      </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={pickerLabelCls(isDark)}>Data da entrega</label>
           <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className={pickerInputCls(isDark)} />
         </div>
         <div>
-          <label className={pickerLabelCls(isDark)}>Troca prevista</label>
-          <input type="date" value={trocaPrevista ?? ''} readOnly disabled className={`${pickerInputCls(isDark)} opacity-60`} />
+          <label className={pickerLabelCls(isDark)}>Motivo</label>
+          <select value={motivo} onChange={e => setMotivo(e.target.value as MotivoEntregaEpi)} className={pickerInputCls(isDark)}>
+            <option value="entrega">Entrega</option>
+            <option value="troca">Troca</option>
+            <option value="devolucao">Devolução</option>
+          </select>
         </div>
       </div>
+
+      {/* Itens da ficha */}
+      <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <div className="flex items-center justify-between">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>EPIs da ficha ({itensValidos.length})</span>
+          <button
+            onClick={() => setItens(prev => [...prev, { epi_id: '', quantidade: '1', tamanho: '' }])}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-colors ${
+              isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Plus size={10} /> EPI
+          </button>
+        </div>
+        {itens.map((it, i) => {
+          const epi = epis.find(e => e.id === it.epi_id)
+          return (
+            <div key={i} className="flex items-center gap-1.5">
+              <select
+                value={it.epi_id}
+                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, epi_id: e.target.value } : x))}
+                className={`${pickerInputCls(isDark)} flex-1`}
+              >
+                <option value="">Selecione o EPI…</option>
+                {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
+              </select>
+              <input
+                type="number" min={1} value={it.quantidade} title="Quantidade"
+                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, quantidade: e.target.value } : x))}
+                className={`${pickerInputCls(isDark)} w-16 shrink-0`}
+              />
+              <input
+                value={it.tamanho} placeholder="Tam." title="Tamanho"
+                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
+                className={`${pickerInputCls(isDark)} w-16 shrink-0`}
+              />
+              <span className={`text-[9px] w-20 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} title="Troca prevista (vida útil do EPI)">
+                {trocaPrevista(it.epi_id) ? `troca ${new Date(trocaPrevista(it.epi_id)! + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}` : ''}
+              </span>
+              <button
+                onClick={() => setItens(prev => prev.filter((_, j) => j !== i))}
+                className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      <div>
+        <label className={pickerLabelCls(isDark)}>Observações</label>
+        <input value={obs} onChange={e => setObs(e.target.value)} className={pickerInputCls(isDark)} />
+      </div>
+
+      <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+        <input type="checkbox" checked={gerarPdfAoSalvar} onChange={e => setGerarPdfAoSalvar(e.target.checked)} className="accent-red-600" />
+        Gerar a ficha em PDF ao salvar (para colher a assinatura)
+      </label>
+
       <ModalFooter
-        isDark={isDark} erros={erros} avisos={avisos} salvando={registrar.isPending} onCancel={onClose} saveLabel="Registrar"
-        onSave={() => registrar.mutate(
-          {
-            epi_id: epiId, colaborador_id: colabId, colaborador_nome: colabNome, obra_id: obraId || undefined,
-            quantidade: Number(qtd), data_entrega: dataEntrega, data_troca_prevista: trocaPrevista,
-            motivo, entregue_por_nome: perfil?.nome,
-          },
-          { onSuccess: onClose, onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
-        )}
+        isDark={isDark} erros={erros} avisos={avisos} salvando={criar.isPending}
+        onCancel={onClose} saveLabel="Criar ficha" onSave={salvar}
       />
     </QsmaModal>
   )
