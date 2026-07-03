@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronUp, Clock, TrendingUp,
   Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
   Sparkles, FileBarChart, X, Paperclip, AlertCircle,
+  PenLine, Send, CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -398,6 +399,16 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      {/* Missões & Assinaturas (Portal TEG) */}
+      <MissoesColaborador
+        colaboradorId={id}
+        nome={colab.nome}
+        ativo={!!colab.ativo}
+        podeAssinar={!!(colab.ativo && colab.cpf && colab.data_nascimento)}
+        sectionCls={sectionCls}
+        isLight={isLight}
+      />
+
       {/* Documentos (OneDrive) */}
       <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
 
@@ -768,6 +779,228 @@ function RelatorioHistorico({ colaboradorId, sectionCls, isLight }: { colaborado
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60">
                 {gerando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                 {gerando ? 'Iniciando…' : 'Gerar agora'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Missões & Assinaturas do colaborador (Portal TEG) ────────────────────────
+interface MissaoRow {
+  id: string; categoria: string; titulo: string; descricao: string | null
+  status: string; prazo: string | null; acao_url: string | null; acao_label: string | null
+  created_at: string; concluida_em: string | null
+  documento_id: string | null; assinado_em: string | null; arquivo_assinado_path: string | null
+  origem: string | null
+}
+
+function MissoesColaborador({ colaboradorId, nome, ativo, podeAssinar, sectionCls, isLight }: {
+  colaboradorId: string; nome: string; ativo: boolean; podeAssinar: boolean; sectionCls: string; isLight: boolean
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [lista, setLista] = useState<MissaoRow[]>([])
+  const [carregado, setCarregado] = useState(false)
+  const [carregando, setCarregando] = useState(false)
+  const [modal, setModal] = useState(false)
+  const [titulo, setTitulo] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [prazo, setPrazo] = useState('')
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState<string | null>(null)
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+
+  async function carregar() {
+    setCarregando(true)
+    const { data } = await supabase.rpc('rh_colaborador_missoes', { p_colaborador_id: colaboradorId })
+    setLista((data ?? []) as MissaoRow[])
+    setCarregado(true); setCarregando(false)
+  }
+  function abrir() { setAberto(true); if (!carregado) carregar() }
+
+  // Poll enquanto houver missão pendente (colaborador pode assinar a qualquer momento)
+  const temPendente = lista.some(m => m.status === 'pendente')
+  useEffect(() => {
+    if (!aberto || !temPendente) return
+    const t = setInterval(() => { carregar() }, 10000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, temPendente])
+
+  async function enviar() {
+    if (!titulo.trim() || !arquivo) { setErro('Informe o título e selecione o PDF.'); return }
+    setEnviando(true); setErro(null)
+    try {
+      const safe = arquivo.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\- ]/g, '').replace(/\s+/g, '_')
+      const path = `rh-doc/${colaboradorId}/${Date.now()}-${safe}`
+      const up = await supabase.storage.from('rh-admissao-docs').upload(path, arquivo, {
+        contentType: arquivo.type || 'application/pdf', upsert: false,
+      })
+      if (up.error) throw up.error
+      const { data, error } = await supabase.rpc('rh_missao_enviar', {
+        p_colaborador_id: colaboradorId,
+        p_titulo: titulo.trim(),
+        p_arquivo_path: path,
+        p_tipo: 'assinatura',
+        p_descricao: descricao.trim() || null,
+        p_prazo: prazo || null,
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar')
+      setModal(false); setTitulo(''); setDescricao(''); setPrazo(''); setArquivo(null)
+      await carregar()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao enviar documento')
+    } finally { setEnviando(false) }
+  }
+
+  async function verAssinado(m: MissaoRow) {
+    if (!m.arquivo_assinado_path) return
+    const win = window.open('', '_blank')
+    try {
+      const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(m.arquivo_assinado_path, 3600)
+      const url = data?.signedUrl
+      if (url && win) win.location.href = url
+      else if (url) window.location.href = url
+      else win?.close()
+    } catch { win?.close() }
+  }
+
+  async function copiar(m: MissaoRow) {
+    if (!m.acao_url) return
+    try { await navigator.clipboard.writeText(m.acao_url); setCopiado(m.id); setTimeout(() => setCopiado(null), 2000) } catch { /* */ }
+  }
+
+  const pendentes = lista.filter(m => m.status === 'pendente').length
+
+  return (
+    <div className={sectionCls}>
+      <div className={`flex items-center justify-between px-5 py-3 cursor-pointer ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => (aberto ? setAberto(false) : abrir())}>
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <PenLine size={14} className="text-teal-500" /> Missões & Assinaturas
+          {pendentes > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-300'}`}>{pendentes} pendente{pendentes > 1 ? 's' : ''}</span>
+          )}
+        </h3>
+        {aberto ? <ChevronUp size={16} className={muted} /> : <ChevronDown size={16} className={muted} />}
+      </div>
+
+      {aberto && (
+        <div className="px-5 pb-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className={`text-[11px] ${muted}`}>Envie um documento para o colaborador assinar no Portal TEG. Ao assinar, ele volta aqui como “Assinado”.</p>
+            <button onClick={() => { setModal(true); setErro(null) }} disabled={!podeAssinar}
+              title={!podeAssinar ? 'Colaborador precisa estar ativo e ter CPF + data de nascimento para assinar no Portal.' : ''}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Send size={13} /> Enviar p/ assinatura
+            </button>
+          </div>
+
+          {!podeAssinar && (
+            <p className="text-[11px] text-amber-600 flex items-center gap-1.5">
+              <AlertCircle size={12} />
+              {ativo ? 'Sem CPF ou data de nascimento — necessário para acessar/assinar no Portal.' : 'Colaborador inativo não acessa o Portal.'}
+            </p>
+          )}
+
+          {carregando && lista.length === 0 ? (
+            <div className="flex items-center justify-center py-8"><Loader2 size={22} className="animate-spin text-teal-500" /></div>
+          ) : lista.length === 0 ? (
+            <p className={`text-xs ${muted} py-2 text-center`}>Nenhuma missão enviada ainda.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {lista.map(m => {
+                const assinado = !!m.assinado_em
+                const concluida = m.status === 'concluida' || assinado
+                return (
+                  <div key={m.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border ${isLight ? 'border-slate-100 bg-slate-50/60' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                    {concluida
+                      ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                      : <PenLine size={15} className="text-amber-500 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${txt}`}>{m.titulo}</p>
+                      <p className={`text-[10px] ${muted}`}>
+                        {m.categoria === 'assinaturas' ? 'Assinatura' : m.categoria}
+                        {' · '}{new Date(m.created_at).toLocaleDateString('pt-BR')}
+                        {assinado && ` · assinado ${new Date(m.assinado_em!).toLocaleDateString('pt-BR')}`}
+                        {!concluida && m.prazo && ` · prazo ${new Date(m.prazo).toLocaleDateString('pt-BR')}`}
+                      </p>
+                    </div>
+                    {concluida ? (
+                      m.arquivo_assinado_path ? (
+                        <button onClick={() => verAssinado(m)} title="Baixar assinado"
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isLight ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25'}`}>
+                          <Download size={12} /> Assinado
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-emerald-500">Concluída</span>
+                      )
+                    ) : (
+                      <button onClick={() => copiar(m)} title="Copiar link para enviar ao colaborador"
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${copiado === m.id ? 'text-emerald-600' : isLight ? 'text-teal-700 bg-teal-50 hover:bg-teal-100' : 'text-teal-300 bg-teal-500/15 hover:bg-teal-500/25'}`}>
+                        {copiado === m.id ? <Check size={12} /> : <Copy size={12} />} {copiado === m.id ? 'Copiado' : 'Link'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal enviar */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setModal(false)}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><PenLine size={18} className="text-teal-600" /> Enviar para assinatura</h2>
+              <button onClick={() => setModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-[11px] text-slate-500">Para <span className="font-semibold text-slate-700">{nome}</span> assinar no Portal TEG.</p>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Título do documento</label>
+                <input value={titulo} onChange={e => setTitulo(e.target.value)}
+                  placeholder="Ex.: Contrato de trabalho, Advertência, Termo…"
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Instrução (opcional)</label>
+                <textarea rows={2} value={descricao} onChange={e => setDescricao(e.target.value)}
+                  placeholder="Mensagem que o colaborador verá antes de assinar."
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Prazo (opcional)</label>
+                <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)}
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Documento (PDF)</label>
+                <label className="mt-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 cursor-pointer hover:border-teal-300">
+                  <Paperclip size={14} /> {arquivo ? arquivo.name : 'Selecionar PDF'}
+                  <input type="file" className="hidden" accept="application/pdf,.pdf"
+                    onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+                </label>
+                <p className="text-[10px] text-slate-400 mt-1">Dica: onde houver o campo de assinatura (linha com o nome do colaborador), o carimbo digital cai exatamente ali; o resto das páginas recebe rubrica.</p>
+              </div>
+              {erro && <p className="text-xs text-red-600 font-semibold flex items-center gap-1.5"><AlertCircle size={13} /> {erro}</p>}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancelar</button>
+              <button onClick={enviar} disabled={enviando || !titulo.trim() || !arquivo}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-60">
+                {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                {enviando ? 'Enviando…' : 'Enviar'}
               </button>
             </div>
           </div>
