@@ -16,6 +16,7 @@ import {
 } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
+import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, Contagem } from '../../components/qsma/Toolbar'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import type {
@@ -91,12 +92,28 @@ export default function QsmaSeguranca() {
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const hoje = new Date().toISOString().split('T')[0]
 
-  const btnNovo = (label: string, onClick: () => void) => (
-    <div className="flex justify-end">
-      <button onClick={onClick} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
-        <Plus size={13} /> {label}
-      </button>
-    </div>
+  // filtros compactos na primeira linha (padrão do sistema)
+  const [busca, setBusca] = useState('')
+  const [escopoF, setEscopoF] = useState('todos')
+  const [normaF, setNormaF] = useState('')
+  const [tipoOcoF, setTipoOcoF] = useState('')
+  const q = busca.trim().toLowerCase()
+
+  const riscosF = riscos.filter(r =>
+    (escopoF === 'todos' || r.escopo === escopoF)
+    && (!q || r.perigo.toLowerCase().includes(q) || r.risco.toLowerCase().includes(q) || (r.tarefa ?? '').toLowerCase().includes(q) || (r.ghe ?? '').toLowerCase().includes(q))
+  )
+  const fichasF = fichas.filter(f =>
+    !q || (f.colaborador_nome ?? '').toLowerCase().includes(q) || (f.codigo ?? '').toLowerCase().includes(q)
+    || (f.itens ?? []).some(it => (it.epi?.nome ?? '').toLowerCase().includes(q))
+  )
+  const treinamentosF = treinamentos.filter(t =>
+    (!normaF || t.norma === normaF)
+    && (!q || (t.colaborador_nome ?? '').toLowerCase().includes(q) || (t.curso ?? '').toLowerCase().includes(q))
+  )
+  const ocorrenciasF = ocorrencias.filter(o =>
+    (!tipoOcoF || o.tipo === tipoOcoF)
+    && (!q || o.descricao.toLowerCase().includes(q) || (o.codigo ?? '').toLowerCase().includes(q) || obraNome(o.obra_id).toLowerCase().includes(q))
   )
 
   return (
@@ -110,12 +127,22 @@ export default function QsmaSeguranca() {
       {/* ── Riscos ── */}
       {aba === 'riscos' && (
         <div className="space-y-3">
-          {btnNovo('Novo Risco / APR', () => setModalRisco('novo'))}
-          {riscos.length === 0 ? (
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar perigo, risco, tarefa…"
+            acoes={<BotaoNovo label="Novo Risco / APR" onClick={() => setModalRisco('novo')} />}
+          >
+            <ToolbarPills
+              isDark={isDark} value={escopoF} onChange={setEscopoF}
+              options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]}
+            />
+          </QsmaToolbar>
+          <Contagem isDark={isDark} n={riscosF.length} singular="risco" plural="riscos" />
+          {riscosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum risco cadastrado — comece pelo inventário PGR ou uma APR" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {riscos.map(r => {
+              {riscosF.map(r => {
                 const nv = nivelRisco(r.probabilidade, r.severidade)
                 return (
                   <button key={r.id} onClick={() => setModalRisco(r)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
@@ -139,16 +166,17 @@ export default function QsmaSeguranca() {
       {/* ── EPIs ── */}
       {aba === 'epis' && (
         <div className="space-y-4">
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setModalEpi('novo')} className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
-              isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}>
-              <Plus size={13} /> EPI no catálogo
-            </button>
-            <button onClick={() => setModalFicha(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
-              <Plus size={13} /> Nova Ficha de Entrega
-            </button>
-          </div>
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar colaborador, ficha ou EPI…"
+            acoes={
+              <>
+                <BotaoNovo label="EPI no catálogo" onClick={() => setModalEpi('novo')} secundario isDark={isDark} />
+                <BotaoNovo label="Nova Ficha de Entrega" onClick={() => setModalFicha(true)} />
+              </>
+            }
+          />
+          <Contagem isDark={isDark} n={fichasF.length} singular="ficha de entrega" plural="fichas de entrega" />
 
           {/* Catálogo */}
           <div className={card}>
@@ -177,9 +205,9 @@ export default function QsmaSeguranca() {
 
           {/* Fichas de entrega (1 ficha → N EPIs) */}
           <div className="space-y-2">
-            {fichas.length === 0 ? (
+            {fichasF.length === 0 ? (
               <Vazio isDark={isDark} texto="Nenhuma ficha de entrega — crie a primeira" />
-            ) : fichas.map(f => {
+            ) : fichasF.map(f => {
               const st = STATUS_FICHA_EPI_LABEL[f.status]
               const itens = f.itens ?? []
               return (
@@ -267,12 +295,22 @@ export default function QsmaSeguranca() {
       {/* ── Treinamentos ── */}
       {aba === 'treinamentos' && (
         <div className="space-y-3">
-          {btnNovo('Novo Treinamento', () => setModalTreinamento('novo'))}
-          {treinamentos.length === 0 ? (
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar colaborador ou curso…"
+            acoes={<BotaoNovo label="Novo Treinamento" onClick={() => setModalTreinamento('novo')} />}
+          >
+            <ToolbarSelect
+              isDark={isDark} value={normaF} onChange={setNormaF} allLabel="Todas as normas"
+              options={NORMAS_TREINAMENTO.map(n => ({ value: n, label: n }))}
+            />
+          </QsmaToolbar>
+          <Contagem isDark={isDark} n={treinamentosF.length} singular="treinamento" plural="treinamentos" />
+          {treinamentosF.length === 0 ? (
             <Vazio isDark={isDark} texto="Nenhum treinamento registrado" />
           ) : (
             <div className="space-y-2">
-              {treinamentos.map(t => {
+              {treinamentosF.map(t => {
                 const vencido = t.vencimento && t.vencimento < hoje
                 const vencendo = !vencido && t.vencimento && t.vencimento <= new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
                 return (
@@ -304,11 +342,21 @@ export default function QsmaSeguranca() {
       {/* ── Ocorrências (kanban) ── */}
       {aba === 'ocorrencias' && (
         <div className="space-y-3">
-          {btnNovo('Registrar Ocorrência', () => setModalOcorrencia('novo'))}
+          <QsmaToolbar
+            isDark={isDark}
+            busca={busca} onBusca={setBusca} placeholder="Buscar ocorrência, código ou obra…"
+            acoes={<BotaoNovo label="Registrar Ocorrência" onClick={() => setModalOcorrencia('novo')} />}
+          >
+            <ToolbarSelect
+              isDark={isDark} value={tipoOcoF} onChange={setTipoOcoF} allLabel="Todos os tipos"
+              options={(Object.keys(TIPO_OCORRENCIA_LABEL) as TipoOcorrencia[]).map(t => ({ value: t, label: TIPO_OCORRENCIA_LABEL[t] }))}
+            />
+          </QsmaToolbar>
+          <Contagem isDark={isDark} n={ocorrenciasF.length} singular="ocorrência" plural="ocorrências" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {KANBAN.map(st => {
               const cfg = STATUS_OCORRENCIA_LABEL[st]
-              const itens = ocorrencias.filter(o => o.status === st)
+              const itens = ocorrenciasF.filter(o => o.status === st)
               return (
                 <div key={st} className={`rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50/60 border-slate-200'}`}>
                   <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>
