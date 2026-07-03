@@ -8,7 +8,7 @@ import {
   ToggleLeft, ToggleRight, XCircle, Upload, Link,
   AlertTriangle, Eye, EyeOff, GripVertical, CheckCircle2,
 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
+import { RequireAdmin } from '../../components/PrivateRoute'
 import {
   useBannersAdmin, useSalvarBanner, useExcluirBanner,
   useToggleBanner, useUploadBannerImagem,
@@ -419,26 +419,16 @@ const TABS: { key: TabKey; label: string }[] = [
 ]
 
 export default function MuralAdmin() {
-  const { isAdmin }  = useAuth()
   const { data: banners = [], isLoading } = useBannersAdmin()
 
   const [tab, setTab]     = useState<TabKey>('todos')
   const [modal, setModal] = useState<Partial<MuralBanner> | null>(null)
 
-  if (!isAdmin) {
-    return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <AlertTriangle size={40} className="text-amber-400" />
-        <p className="text-white font-bold text-lg">Acesso restrito</p>
-        <p className="text-slate-400 text-sm">Esta área é exclusiva para administradores.</p>
-      </div>
-    )
-  }
-
   const filtered = tab === 'todos' ? banners : banners.filter(b => b.tipo === tab)
   const ativos   = banners.filter(isVigente).length
 
   return (
+    <RequireAdmin>
     <div className="p-4 sm:p-6 space-y-5">
 
       {/* Header */}
@@ -527,5 +517,6 @@ export default function MuralAdmin() {
         />
       )}
     </div>
+    </RequireAdmin>
   )
 }

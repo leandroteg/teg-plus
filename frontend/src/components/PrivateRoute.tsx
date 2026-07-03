@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import LogoTeg from './LogoTeg'
 import SetPasswordModal from './SetPasswordModal'
@@ -92,4 +94,25 @@ export function AdminRoute() {
       <Outlet />
     </>
   )
+}
+
+// ── Guard: bloqueia conteúdo para não-admins ──────────────────────────────────
+// Uso: páginas admin embutidas dentro de um layout de módulo (ex.: /ti/admin,
+// /rh/mural), onde envolver a rota inteira em <AdminRoute> quebraria o
+// aninhamento do layout. Centraliza a checagem de isAdmin num único lugar.
+export function RequireAdmin({ children, redirectTo }: { children: ReactNode; redirectTo?: string }) {
+  const { isAdmin } = useAuth()
+
+  if (!isAdmin) {
+    if (redirectTo) return <Navigate to={redirectTo} replace />
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertTriangle size={40} className="text-amber-400" />
+        <p className="text-white font-bold text-lg">Acesso restrito</p>
+        <p className="text-slate-400 text-sm">Esta área é exclusiva para administradores.</p>
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }

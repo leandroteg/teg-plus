@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ArrowLeft, Loader2, UserPlus, X, Search, Headset } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { RequireAdmin } from '../../components/PrivateRoute'
 import { UpperInput } from '../../components/UpperInput'
 import { useAtendentes, adicionarAtendente, removerAtendente } from './hooks'
 
@@ -13,7 +14,7 @@ interface PerfilLite {
 }
 
 export default function AdminAtendentes() {
-  const { perfil, isAdmin } = useAuth()
+  const { perfil } = useAuth()
   const { items, loading, erro, reload } = useAtendentes()
   const [busca, setBusca] = useState('')
   const [candidatos, setCandidatos] = useState<PerfilLite[]>([])
@@ -41,8 +42,6 @@ export default function AdminAtendentes() {
       })
     return () => { cancelado = true }
   }, [busca, jaAtendentes])
-
-  if (!isAdmin) return <Navigate to="/ti" replace />
 
   async function handleAdd(id: string) {
     if (!perfil?.id) return
@@ -73,6 +72,7 @@ export default function AdminAtendentes() {
   }
 
   return (
+    <RequireAdmin redirectTo="/ti">
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <Link to="/ti" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-sky-500 mb-6">
@@ -166,5 +166,6 @@ export default function AdminAtendentes() {
         </p>
       </div>
     </div>
+    </RequireAdmin>
   )
 }
