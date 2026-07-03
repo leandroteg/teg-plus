@@ -1906,6 +1906,18 @@ export default function CotacaoForm() {
               )}
             </div>
 
+            {/* Atalho: cadastrar fornecedor que não está na base (fluxo manual).
+                Abre o mesmo modal pré-preenchido com o que já foi digitado. */}
+            {!precisaCadastrar && (
+              <button
+                type="button"
+                onClick={() => setCadastroModalIdx(idx)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition"
+              >
+                <PlusCircle size={12} /> Não encontrou? Cadastrar novo fornecedor
+              </button>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="relative">
                 <input
@@ -2411,12 +2423,12 @@ export default function CotacaoForm() {
         </div>
       )}
 
-      {/* Modal: cadastrar novo fornecedor identificado pelo upload */}
+      {/* Modal: cadastrar novo fornecedor direto da cotação (fluxo manual ou banner) */}
       {cadastroModalIdx !== null && fornecedores[cadastroModalIdx] && (
         <FornecedorCadastroModal
           open
           title="Cadastrar fornecedor"
-          description="Fornecedor identificado no upload ainda não está cadastrado."
+          description="Cadastre o fornecedor para usá-lo nesta cotação e no Financeiro."
           initialData={{
             razao_social: fornecedores[cadastroModalIdx].fornecedor_nome,
             nome_fantasia: fornecedores[cadastroModalIdx].fornecedor_nome,
