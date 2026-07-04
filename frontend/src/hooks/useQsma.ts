@@ -78,7 +78,7 @@ export function useInspecoes(filtros?: { status?: StatusInspecao; obra_id?: stri
     queryKey: ['qsma_inspecoes', filtros],
     queryFn: async () => {
       let q = supabase.from('qsma_inspecoes')
-        .select('*, modelo:qsma_modelos_checklist(id, nome, tipo, escopo, exige_veredito, itens)')
+        .select('*, modelo:qsma_modelos_checklist(id, nome, grupo, tipo, escopo, exige_veredito, itens)')
         .order('created_at', { ascending: false })
       if (filtros?.status) q = q.eq('status', filtros.status)
       if (filtros?.obra_id) q = q.eq('obra_id', filtros.obra_id)
