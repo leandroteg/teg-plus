@@ -541,10 +541,10 @@ export default function ModuleLayout({
                   return
                 }
                 const rect = event.currentTarget.getBoundingClientRect()
-                const menuH = 60 + actionMenu.items.length * 66
+                // sobe o menu o suficiente p/ sobrar espaço; o resto scrolla internamente
                 setOpenNavMenu({
                   id: to,
-                  top: Math.max(12, Math.min(rect.top, window.innerHeight - menuH - 16)),
+                  top: Math.max(12, Math.min(rect.top, window.innerHeight - 340)),
                   left: rect.right + 12,
                 })
               }}
@@ -556,8 +556,8 @@ export default function ModuleLayout({
             {isOpen && (
               <div
                 data-nav-action-menu
-                className={`fixed z-[70] w-[340px] max-h-[calc(100vh-24px)] overflow-y-auto styled-scrollbar rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
-                style={{ top: openNavMenu.top, left: openNavMenu.left }}
+                className={`fixed z-[70] w-[340px] overflow-y-auto styled-scrollbar rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
+                style={{ top: openNavMenu.top, left: openNavMenu.left, maxHeight: `calc(100vh - ${openNavMenu.top + 12}px)` }}
               >
                 {actionMenu.title && (
                   <p className={`px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
