@@ -36,6 +36,8 @@ export interface CriarDocumentoPayload {
   area_processo?: string
   requer_ciencia?: boolean
   periodicidade_revisao_meses?: number
+  arquivo_url?: string | null
+  arquivo_nome?: string | null
 }
 
 // ── Label maps (mesma forma dos demais módulos) ───────────────────────────────
