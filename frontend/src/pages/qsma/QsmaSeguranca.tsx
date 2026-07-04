@@ -69,14 +69,15 @@ export default function QsmaSeguranca() {
   const [modalTreinamento, setModalTreinamento] = useState<QsmaTreinamento | 'novo' | null>(null)
   const [modalOcorrencia, setModalOcorrencia] = useState<QsmaOcorrencia | 'novo' | null>(null)
 
+  const novoParam = params.get('novo')
   useEffect(() => {
-    const novo = params.get('novo')
-    if (novo === 'ocorrencia') { setAba('ocorrencias'); setModalOcorrencia('novo') }
-    if (novo === 'epi') { setAba('epis'); setModalFicha(true) }
-    if (novo === 'treinamento') { setAba('treinamentos'); setModalTreinamento('novo') }
-    if (novo === 'risco') { setAba('riscos'); setModalRisco('novo') }
-    if (novo) setParams({}, { replace: true })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!novoParam) return
+    if (novoParam === 'ocorrencia') { setAba('ocorrencias'); setModalOcorrencia('novo') }
+    if (novoParam === 'epi') { setAba('epis'); setModalFicha(true) }
+    if (novoParam === 'treinamento') { setAba('treinamentos'); setModalTreinamento('novo') }
+    if (novoParam === 'risco') { setAba('riscos'); setModalRisco('novo') }
+    setParams({}, { replace: true })
+  }, [novoParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: riscos = [] } = useRiscos()
   const { data: epis = [] } = useEpis()
