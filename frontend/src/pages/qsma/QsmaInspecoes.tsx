@@ -581,6 +581,8 @@ export default function QsmaInspecoes() {
         <ExecutarPickerModal
           isDark={isDark}
           programadas={programadas}
+          modelos={modelos.filter(m => m.ativo)}
+          obras={obras}
           obraNome={obraNome}
           onPick={(i) => { setPickerExec(false); setExecutar(i) }}
           onClose={() => setPickerExec(false)}
@@ -593,53 +595,121 @@ export default function QsmaInspecoes() {
   )
 }
 
-// ── Modal: escolher qual inspeção programada executar ─────────────────────────
-function ExecutarPickerModal({ isDark, programadas, obraNome, onPick, onClose }: {
+// ── Modal: executar (avulsa preenchendo os dados OU escolher uma programada) ──
+function ExecutarPickerModal({ isDark, programadas, modelos, obras, obraNome, onPick, onClose }: {
   isDark: boolean
   programadas: QsmaInspecao[]
+  modelos: QsmaModeloChecklist[]
+  obras: { id: string; nome: string; projeto_id?: string; projeto_nome?: string }[]
   obraNome: (id?: string) => string
   onPick: (i: QsmaInspecao) => void
   onClose: () => void
 }) {
   const [q, setQ] = useState('')
+  // avulsa
+  const [modeloId, setModeloId] = useState('')
+  const [obraId, setObraId] = useState('')
+  const [frente, setFrente] = useState('')
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const obrasPorProjeto = useMemo(() => {
+    const m = new Map<string, { nome: string; obras: typeof obras }>()
+    obras.forEach(o => { const k = o.projeto_id ?? '__sem__'; const g = m.get(k) ?? { nome: o.projeto_nome ?? 'Sem projeto', obras: [] }; g.obras.push(o); m.set(k, g) })
+    return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [obras])
+
   const filtradas = programadas.filter(i => {
     const s = q.trim().toLowerCase()
     return !s || (i.codigo ?? '').toLowerCase().includes(s) || (i.modelo?.nome ?? '').toLowerCase().includes(s) || obraNome(i.obra_id).toLowerCase().includes(s)
   })
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  function iniciarAvulsa() {
+    const mod = modelos.find(m => m.id === modeloId)
+    if (!mod || !obraId) return
+    // inspeção avulsa sem id → salva ao concluir a execução
+    onPick({
+      id: undefined as unknown as string,
+      modelo_id: modeloId, modelo: mod, obra_id: obraId, frente: frente || undefined,
+      respostas: [], fotos: [], status: 'programada',
+      data_prevista: new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    } as QsmaInspecao)
+  }
+
   return (
-    <QsmaModal isDark={isDark} titulo="Executar inspeção" subtitulo="Escolha a inspeção programada para realizar em campo" onClose={onClose}>
-      <input
-        value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar código, checklist ou obra…"
-        className={pickerInputCls(isDark)}
-      />
-      {filtradas.length === 0 ? (
-        <p className={`text-[11px] italic text-center py-6 ${txtMuted}`}>
-          {programadas.length === 0 ? 'Nenhuma inspeção programada — programe uma primeiro (clique numa célula do Gantt).' : 'Nada encontrado na busca.'}
+    <QsmaModal isDark={isDark} wide titulo="Executar inspeção" subtitulo="Inicie uma inspeção avulsa preenchendo os dados, ou escolha uma programada" onClose={onClose}>
+      {/* Iniciar avulsa */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/40'}`}>
+        <p className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+          <Play size={11} /> Iniciar inspeção avulsa
         </p>
-      ) : (
-        <div className="max-h-96 overflow-y-auto space-y-2">
-          {filtradas.map(i => (
-            <button
-              key={i.id}
-              onClick={() => onPick(i)}
-              className={`w-full text-left rounded-xl border p-3 flex items-center gap-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-bold truncate ${txtMain}`}>
-                  <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{i.codigo}</span>
-                  {i.modelo?.nome ?? 'Checklist'}
-                </p>
-                <p className={`text-[11px] truncate ${txtMuted}`}>{obraNome(i.obra_id)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
-              </div>
-              <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-600 text-white">
-                <Play size={11} /> Executar
-              </span>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="sm:col-span-2">
+            <label className={pickerLabelCls(isDark)}>Checklist *</label>
+            <select value={modeloId} onChange={e => setModeloId(e.target.value)} className={pickerInputCls(isDark)}>
+              <option value="">Selecione…</option>
+              {[...new Set(modelos.map(m => m.grupo || 'Outros'))].sort().map(g => (
+                <optgroup key={g} label={g}>
+                  {modelos.filter(m => (m.grupo || 'Outros') === g).map(m => (
+                    <option key={m.id} value={m.id}>{m.codigo ? `${m.codigo} · ` : ''}{m.nome}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={pickerLabelCls(isDark)}>Obra *</label>
+            <select value={obraId} onChange={e => setObraId(e.target.value)} className={pickerInputCls(isDark)}>
+              <option value="">Selecione…</option>
+              {obrasPorProjeto.map(g => <optgroup key={g.nome} label={g.nome}>{g.obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}</optgroup>)}
+            </select>
+          </div>
+          <div>
+            <label className={pickerLabelCls(isDark)}>Frente</label>
+            <input value={frente} onChange={e => setFrente(e.target.value)} placeholder="Opcional" className={pickerInputCls(isDark)} />
+          </div>
         </div>
-      )}
+        <button
+          onClick={iniciarAvulsa}
+          disabled={!modeloId || !obraId}
+          className="mt-2.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        >
+          <Play size={13} /> Iniciar agora
+        </button>
+      </div>
+
+      {/* Ou escolher uma programada */}
+      <div>
+        <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${txtMuted}`}>Ou escolha uma inspeção programada</p>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar código, checklist ou obra…" className={pickerInputCls(isDark)} />
+        {filtradas.length === 0 ? (
+          <p className={`text-[11px] italic text-center py-4 ${txtMuted}`}>
+            {programadas.length === 0 ? 'Nenhuma inspeção programada.' : 'Nada encontrado na busca.'}
+          </p>
+        ) : (
+          <div className="max-h-72 overflow-y-auto space-y-2 mt-2">
+            {filtradas.map(i => (
+              <button
+                key={i.id}
+                onClick={() => onPick(i)}
+                className={`w-full text-left rounded-xl border p-3 flex items-center gap-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-bold truncate ${txtMain}`}>
+                    <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{i.codigo}</span>
+                    {i.modelo?.nome ?? 'Checklist'}
+                  </p>
+                  <p className={`text-[11px] truncate ${txtMuted}`}>{obraNome(i.obra_id)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
+                </div>
+                <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-600 text-white">
+                  <Play size={11} /> Executar
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </QsmaModal>
   )
 }
@@ -1136,6 +1206,11 @@ function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean;
         onSave={() => salvar.mutate(
           {
             id: inspecao.id,
+            // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo/obra
+            ...(inspecao.id ? {} : {
+              modelo_id: inspecao.modelo_id, obra_id: inspecao.obra_id,
+              frente: inspecao.frente, equipe_lider_id: inspecao.equipe_lider_id,
+            }),
             respostas,
             observacoes: obs || undefined,
             veredito: (veredito || null) as never,
