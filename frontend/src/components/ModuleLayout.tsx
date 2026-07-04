@@ -541,9 +541,10 @@ export default function ModuleLayout({
                   return
                 }
                 const rect = event.currentTarget.getBoundingClientRect()
+                const menuH = 60 + actionMenu.items.length * 66
                 setOpenNavMenu({
                   id: to,
-                  top: Math.min(rect.top, window.innerHeight - 260),
+                  top: Math.max(12, Math.min(rect.top, window.innerHeight - menuH - 16)),
                   left: rect.right + 12,
                 })
               }}
@@ -555,7 +556,7 @@ export default function ModuleLayout({
             {isOpen && (
               <div
                 data-nav-action-menu
-                className={`fixed z-[70] w-[340px] rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
+                className={`fixed z-[70] w-[340px] max-h-[calc(100vh-24px)] overflow-y-auto styled-scrollbar rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
                 style={{ top: openNavMenu.top, left: openNavMenu.left }}
               >
                 {actionMenu.title && (
