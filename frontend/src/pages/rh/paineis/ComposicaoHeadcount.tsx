@@ -18,9 +18,9 @@ export default function ComposicaoHeadcount({ de = '2026-01', ate }: { de?: stri
 
   // Total da folha (só agregado — RPC não expõe valor individual)
   const { data: folha } = useQuery({
-    queryKey: ['rh_folha_total'],
+    queryKey: ['rh_folha_total', ate],
     queryFn: async () => {
-      const { data } = await supabase.rpc('rh_folha_total')
+      const { data } = await supabase.rpc('rh_folha_total', { p_ate: `${ate}-01` })
       return (data ?? null) as { competencia: string; bruto: number; liquido: number; holerites: number } | null
     },
     staleTime: 5 * 60 * 1000,
@@ -62,7 +62,7 @@ export default function ComposicaoHeadcount({ de = '2026-01', ate }: { de?: stri
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-        <Kpi label="Folha" value={folha ? fmtFolha(Number(folha.bruto)) : '—'} note={folha ? `bruta · ${folhaMes}` : '—'} tone="teal" isDark={isDark} />
+        <Kpi label="Última Folha" value={folha?.competencia ? fmtFolha(Number(folha.bruto)) : '—'} note={folha?.competencia ? `bruta · ${folhaMes}` : 'sem folha no período'} tone="teal" isDark={isDark} />
         <Kpi label="Total" value={contratos.total} tone="violet" note="ativos" isDark={isDark} />
         <Kpi label="CLT" value={contratos.clt} tone="emerald" note={pctC(contratos.clt)} isDark={isDark} />
         <Kpi label="PJ" value={contratos.pj} tone="amber" note={pctC(contratos.pj)} isDark={isDark} />
