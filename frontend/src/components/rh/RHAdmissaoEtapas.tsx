@@ -363,7 +363,7 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 }) {
   const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro } = useRegistro()
+  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro, assinarPelaEmpresa } = useRegistro()
   const { data: colabReg } = useMatriculaColaborador(cand.colaborador_id)
   const matricula = colabReg?.matricula ?? null
   const lotacao = colabReg?.lotacao ?? null
@@ -386,6 +386,10 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
   const assinados = signaveis.filter(a => assinaturasByAnexo.get(a.id)?.status === 'concluida').length
   const todosAssinados = signaveis.length > 0 && assinados === signaveis.length
   const algumEnviado = signaveis.some(a => assinaturasByAnexo.has(a.id))
+  // contra-assinatura da empresa (obrigatória antes de finalizar o registro)
+  const empresaAssinados = signaveis.filter(a => assinaturasByAnexo.get(a.id)?.empresa_status === 'concluida').length
+  const todaEmpresaAssinada = signaveis.length > 0 && empresaAssinados === signaveis.length
+  const empresaNome = signaveis.map(a => assinaturasByAnexo.get(a.id)?.empresa_nome).find(Boolean) ?? null
 
   async function handleGerarFicha(dados: FichaDados) {
     setErro(null)
@@ -513,6 +517,11 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
                       <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
                         <CheckCircle2 size={12} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
                       </span>
+                      {miss?.empresa_status === 'concluida' ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0" title={miss?.empresa_nome ?? undefined}>empresa ✓</span>
+                      ) : (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>empresa pendente</span>
+                      )}
                       {miss?.arquivo_assinado_path && (
                         <button onClick={() => abrirAssinado(miss.arquivo_assinado_path!)} className={btnGhost(isDark)} title="Baixar documento assinado (com carimbo)">
                           <Download size={12} /> Assinado
@@ -553,6 +562,34 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
         </div>
       </Passo>
 
+      {/* 4 · Assinatura pela empresa (supervisão RH) — obrigatória antes de finalizar */}
+      <Passo n={4} titulo="Assinatura pela empresa" icon={Building2} isDark={isDark} right={
+        todaEmpresaAssinada ? (
+          <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600">
+            <CheckCircle2 size={13} /> assinado{empresaNome ? ` por ${empresaNome.split(' ')[0]}` : ''}
+          </span>
+        ) : (
+          <button
+            onClick={() => assinarPelaEmpresa.mutate({ candidatoId: cand.id })}
+            disabled={!todosAssinados || assinarPelaEmpresa.isPending}
+            className={BTN_PRI}
+            title={!todosAssinados ? 'Aguarde o colaborador assinar todos os documentos primeiro.' : 'Assina todos os documentos em nome da empresa (requer supervisão do RH)'}
+          >
+            {assinarPelaEmpresa.isPending ? <Loader2 size={12} className="animate-spin" /> : <PenLine size={12} />}
+            Assinar documentos ({empresaAssinados}/{signaveis.length})
+          </button>
+        )
+      }>
+        {todaEmpresaAssinada ? (
+          <p className="text-[10px] text-slate-400">Todos os documentos contra-assinados em nome da TEG União{empresaNome ? ` por ${empresaNome}` : ''}. O carimbo "Pela empresa" foi aplicado nos PDFs.</p>
+        ) : (
+          <p className="text-[10px] text-slate-400">
+            Após o colaborador assinar, a supervisão do RH assina em nome da empresa (contrato bilateral). Requer papel supervisor do módulo RH.
+          </p>
+        )}
+        {assinarPelaEmpresa.isError && <p className="text-[10px] text-red-600 font-semibold mt-1">{(assinarPelaEmpresa.error as Error)?.message}</p>}
+      </Passo>
+
       {/* Finalizar registro — efetiva colaborador (ativo/headcount) + OneDrive + Secullum via SuperTEG */}
       <div className={`rounded-xl border px-3 py-2.5 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/60'}`}>
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -565,14 +602,14 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
           ) : (
             <button
               onClick={() => { if (cand.colaborador_id) finalizarRegistro.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome }) }}
-              disabled={!todosAssinados || !matricula || !lotacao || finalizarRegistro.isPending}
+              disabled={!todosAssinados || !todaEmpresaAssinada || !matricula || !lotacao || finalizarRegistro.isPending}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {finalizarRegistro.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar registro</>}
             </button>
           )}
         </div>
-        {(!todosAssinados || !matricula || !lotacao) && !finalizarRegistro.isSuccess && (
-          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os documentos estiverem assinados e a matrícula + lotação preenchidas.</p>
+        {(!todosAssinados || !todaEmpresaAssinada || !matricula || !lotacao) && !finalizarRegistro.isSuccess && (
+          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os documentos estiverem assinados (colaborador e empresa) e a matrícula + lotação preenchidas.</p>
         )}
         {finalizarRegistro.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(finalizarRegistro.error as Error)?.message}</p>}
       </div>
