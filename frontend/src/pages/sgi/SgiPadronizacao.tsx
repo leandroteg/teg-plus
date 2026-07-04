@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
-  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink,
+  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink, Paperclip,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useDocumentos, useCriarDocumento, usePublicarDocumento, useAdesaoDocumento } from '../../hooks/useSgi'
+import { useDocumentos, useCriarDocumento, useAtualizarDocumento, usePublicarDocumento, useAdesaoDocumento, uploadSgiArquivo, abrirSgiArquivo } from '../../hooks/useSgi'
 import { STATUS_DOC_LABEL, TIPO_DOC_LABEL } from '../../types/sgi'
 import type { SgiDocumento, StatusDocumento, TipoDocumento } from '../../types/sgi'
 
@@ -50,6 +50,16 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
     const r = await publicar.mutateAsync(doc.id)
     if (r.ok) alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).')
     else alert('Erro ao publicar: ' + (r.erro || ''))
+  }
+  const atualizar = useAtualizarDocumento()
+  const [subindo, setSubindo] = useState(false)
+  async function anexar(f: File) {
+    setSubindo(true)
+    try {
+      const up = await uploadSgiArquivo(f, doc.id)
+      await atualizar.mutateAsync({ id: doc.id, arquivo_url: up.path, arquivo_nome: up.nome })
+    } catch (e) { alert('Erro ao anexar: ' + (e instanceof Error ? e.message : String(e))) }
+    setSubindo(false)
   }
 
   return (
@@ -134,11 +144,16 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
 
           <div className="space-y-2 pt-1">
             {doc.arquivo_url && (
-              <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
+              <button onClick={() => abrirSgiArquivo(doc.arquivo_url!).catch(err => alert('Erro ao abrir: ' + (err instanceof Error ? err.message : String(err))))}
                 className={`w-full py-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-violet-500/30 text-violet-300 hover:bg-violet-500/10' : 'border-violet-200 text-violet-700 hover:bg-violet-50'}`}>
-                <ExternalLink size={15} /> Abrir documento
-              </a>
+                <ExternalLink size={15} /> Abrir documento{doc.arquivo_nome ? ` · ${doc.arquivo_nome}` : ''}
+              </button>
             )}
+            <label className={`w-full py-2.5 rounded-xl border border-dashed text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${isDark ? 'border-white/15 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'} ${subindo ? 'opacity-60 pointer-events-none' : ''}`}>
+              {subindo ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+              {doc.arquivo_url ? 'Trocar arquivo' : 'Anexar documento'}
+              <input type="file" className="hidden" disabled={subindo} onChange={e => { const f = e.target.files?.[0]; if (f) anexar(f); e.target.value = '' }} />
+            </label>
             <div className="flex gap-2">
               {doc.status !== 'obsoleto' && (
                 <button onClick={handlePublicar} disabled={publicar.isPending} className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60">
@@ -163,6 +178,8 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
   const [descricao, setDescricao] = useState('')
   const [requerCiencia, setRequerCiencia] = useState(false)
   const [periodicidade, setPeriodicidade] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [subindo, setSubindo] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -172,6 +189,13 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!titulo.trim()) return
+    let arquivo_url: string | undefined, arquivo_nome: string | undefined
+    if (file) {
+      setSubindo(true)
+      try { const up = await uploadSgiArquivo(file); arquivo_url = up.path; arquivo_nome = up.nome }
+      catch (err) { setSubindo(false); alert('Erro ao subir arquivo: ' + (err instanceof Error ? err.message : String(err))); return }
+      setSubindo(false)
+    }
     await criar.mutateAsync({
       titulo: titulo.trim(),
       tipo,
@@ -179,6 +203,8 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
       descricao: descricao || undefined,
       requer_ciencia: requerCiencia,
       periodicidade_revisao_meses: periodicidade ? Number(periodicidade) : undefined,
+      arquivo_url,
+      arquivo_nome,
     })
     onClose()
   }
@@ -221,11 +247,20 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
               Exige ciência (Portal TEG)
             </label>
           </div>
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Arquivo (opcional)</label>
+            <label className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 border cursor-pointer ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              <Paperclip size={14} className="text-violet-500 shrink-0" />
+              <span className="truncate flex-1">{file ? file.name : 'Selecionar arquivo (PDF, DOCX, imagem...)'}</span>
+              {file && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); setFile(null) }} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={13} /></button>}
+              <input type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
-            <button type="submit" disabled={criar.isPending || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2">
-              {criar.isPending && <Loader2 size={14} className="animate-spin" />}
-              Criar Documento
+            <button type="submit" disabled={criar.isPending || subindo || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {(criar.isPending || subindo) && <Loader2 size={14} className="animate-spin" />}
+              {subindo ? 'Enviando arquivo…' : 'Criar Documento'}
             </button>
           </div>
         </form>
