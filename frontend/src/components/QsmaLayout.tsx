@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Plus, ClipboardCheck, HardHat, Leaf,
-  CalendarClock, ClipboardList, Siren, ShieldCheck, GraduationCap, AlertTriangle, FileBadge,
+  CalendarClock, ClipboardList, Siren, ShieldCheck, GraduationCap, AlertTriangle, FileBadge, Play,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -16,6 +16,7 @@ export default function QsmaLayout() {
         title: 'Novo Registro',
         items: [
           { icon: CalendarClock, label: 'Programar Inspeção', description: 'Agendar checklist de equipe, veículo ou área', tone: 'sky',     action: () => nav('/qsma/inspecoes?novo=programar') },
+          { icon: Play,          label: 'Executar Inspeção', description: 'Realizar uma inspeção programada em campo', tone: 'emerald',  action: () => nav('/qsma/inspecoes?novo=executar') },
           { icon: ClipboardList, label: 'Novo Modelo de Checklist', description: 'Montar um checklist configurável', tone: 'blue',        action: () => nav('/qsma/inspecoes?novo=modelo') },
           { icon: Siren,         label: 'Registrar Ocorrência', description: 'Desvio, quase-acidente, acidente ou ambiental', tone: 'rose', action: () => nav('/qsma/seguranca?novo=ocorrencia') },
           { icon: ShieldCheck,   label: 'Entrega de EPI', description: 'Ficha assinada via PortalTEG', tone: 'violet',                     action: () => nav('/qsma/seguranca?novo=epi') },
