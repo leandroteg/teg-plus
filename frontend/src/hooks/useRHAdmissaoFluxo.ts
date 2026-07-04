@@ -583,6 +583,10 @@ export interface AssinaturaMissaoDoc {
   concluida_em: string | null
   metadata: { anexo_id?: string; documento_id?: string } | null
   arquivo_assinado_path?: string | null
+  // contra-assinatura da empresa (supervisão RH assina no TEG+)
+  empresa_status?: string
+  empresa_assinado_em?: string | null
+  empresa_nome?: string | null
 }
 
 export interface RHProposta {
@@ -879,7 +883,21 @@ export function useRegistro() {
       qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
     },
   })
-  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro }
+  // Contra-assinatura da EMPRESA (supervisão RH logada no TEG+) em todos os docs do candidato.
+  // A edge valida a sessão (JWT) e o papel (rh: supervisor/diretor/ceo ou administrador).
+  const assinarPelaEmpresa = useMutation({
+    mutationFn: async (i: { candidatoId: string }) => {
+      const { data, error } = await supabase.functions.invoke('sig-assinatura', {
+        body: { action: 'assinar-empresa', candidato_id: i.candidatoId },
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; assinados?: number; aguardando_colaborador?: number; falhas?: string[] }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao assinar pela empresa')
+      return r
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro, assinarPelaEmpresa }
 }
 
 // Matrícula + lotação Secullum do colaborador vinculado (etapa Registro)
