@@ -2,12 +2,13 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
-  Trash2, Ban, ShieldCheck, Play, Loader2,
+  Trash2, Ban, ShieldCheck, Play, Loader2, FileDown, User, Clock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
-import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao } from '../../hooks/useQsma'
+import { useModelosChecklist, useSalvarModelo, useInspecoes, useSalvarInspecao, evidenciaUrl } from '../../hooks/useQsma'
+import { gerarInspecaoPdf } from '../../utils/inspecao-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, MultiCheck } from '../../components/qsma/Toolbar'
 import { ObraPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
@@ -549,6 +550,13 @@ export default function QsmaInspecoes() {
                     {i.veredito === 'liberado' ? 'LIBERADO' : 'BLOQUEADO'}
                   </span>
                 )}
+                <button
+                  onClick={() => exportarInspecaoPdf(i, obraNome(i.obra_id)).catch(e => alert(`Erro no PDF: ${e?.message ?? 'desconhecido'}`))}
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  title="Gerar relatório em PDF (papel timbrado)"
+                >
+                  <FileDown size={11} /> PDF
+                </button>
               </div>
             )
           })}
@@ -589,10 +597,34 @@ export default function QsmaInspecoes() {
         />
       )}
       {executar && (
-        <ExecutarInspecaoModal isDark={isDark} inspecao={executar} onClose={() => setExecutar(null)} />
+        <ExecutarInspecaoModal isDark={isDark} inspecao={executar} obraNomeStr={obraNome(executar.obra_id)} onClose={() => setExecutar(null)} />
       )}
     </ControladoriaFlow>
   )
+}
+
+// Monta e baixa o PDF da inspeção (resolve as fotos das NCs para signed URLs)
+async function exportarInspecaoPdf(inspecao: QsmaInspecao, obraNomeStr: string) {
+  const itensModelo = inspecao.modelo?.itens ?? []
+  const respByOrdem = new Map((inspecao.respostas ?? []).map(r => [r.ordem, r]))
+  const itens = await Promise.all(itensModelo.map(async it => {
+    const r = respByOrdem.get(it.ordem)
+    const fotoUrls = (await Promise.all((r?.foto_paths ?? []).map(p => evidenciaUrl(p)))).filter(Boolean) as string[]
+    return { ordem: it.ordem, texto: it.texto, resposta: r?.resposta, obs: r?.obs, fotoUrls }
+  }))
+  await gerarInspecaoPdf({
+    codigo: inspecao.codigo,
+    checklistNome: inspecao.modelo?.nome,
+    grupo: inspecao.modelo?.grupo,
+    obraNome: obraNomeStr,
+    frente: inspecao.frente,
+    executorNome: inspecao.executor_nome,
+    dataExecucao: inspecao.data_execucao,
+    gps: (inspecao.latitude != null && inspecao.longitude != null) ? { lat: inspecao.latitude, lng: inspecao.longitude } : null,
+    veredito: inspecao.veredito ?? null,
+    observacoes: inspecao.observacoes,
+    itens,
+  })
 }
 
 // ── Modal: executar (avulsa preenchendo os dados OU escolher uma programada) ──
@@ -1059,7 +1091,7 @@ function ProgramarInspecaoModal({ isDark, modelos, tstsRh, inspecoesExistentes, 
 
 // ── Modal: executar inspeção (wizard item a item) ────────────────────────────
 
-function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean; inspecao: QsmaInspecao; onClose: () => void }) {
+function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }: { isDark: boolean; inspecao: QsmaInspecao; obraNomeStr?: string; onClose: () => void }) {
   const salvar = useSalvarInspecao()
   const { perfil } = useAuth()
   const itens = inspecao.modelo?.itens ?? []
@@ -1067,9 +1099,14 @@ function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean;
     itens.map(it => ({ ordem: it.ordem, resposta: undefined, obs: '', foto_paths: [] })),
   )
   const [obs, setObs] = useState('')
+  const [fotosGerais, setFotosGerais] = useState<string[]>(inspecao.fotos ?? [])
   const [veredito, setVeredito] = useState<'liberado' | 'bloqueado' | ''>('')
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null)
   const [pedindoGps, setPedindoGps] = useState(false)
+  const [gerarPdf, setGerarPdf] = useState(true)
+  const [salvandoTudo, setSalvandoTudo] = useState(false)
+  const execData = new Date().toISOString()
+  const pastaFotos = inspecao.id ? `inspecoes/${inspecao.id}` : `inspecoes/avulsa-${execData.slice(0, 10)}`
 
   useEffect(() => {
     if (!navigator.geolocation) return
@@ -1151,7 +1188,7 @@ function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean;
                   />
                   <FotosUpload
                     isDark={isDark}
-                    pasta={`inspecoes/${inspecao.id}/item-${i + 1}`}
+                    pasta={`${pastaFotos}/item-${i + 1}`}
                     paths={r?.foto_paths ?? []}
                     onChange={p => responder(i, { foto_paths: p })}
                     label="Foto da NC"
@@ -1166,6 +1203,23 @@ function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean;
       <div>
         <label className={pickerLabelCls(isDark)}>Observações gerais</label>
         <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} className={pickerInputCls(isDark)} />
+      </div>
+
+      {/* Fotos gerais da inspeção (evidências além das NCs) */}
+      <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <FotosUpload
+          isDark={isDark}
+          pasta={`${pastaFotos}/gerais`}
+          paths={fotosGerais}
+          onChange={setFotosGerais}
+          label="Fotos / evidências da inspeção"
+        />
+      </div>
+
+      {/* Executor e data/hora (registrados automaticamente) */}
+      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-3 py-2 text-[11px] ${isDark ? 'bg-white/[0.03] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>
+        <span className="inline-flex items-center gap-1.5"><User size={12} className="text-slate-400" /> Executor: <b>{perfil?.nome ?? '—'}</b></span>
+        <span className="inline-flex items-center gap-1.5"><Clock size={12} className="text-slate-400" /> {new Date(execData).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
       </div>
 
       {inspecao.modelo?.exige_veredito && (
@@ -1196,31 +1250,57 @@ function ExecutarInspecaoModal({ isDark, inspecao, onClose }: { isDark: boolean;
           : gps ? `📍 ${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : '📍 GPS indisponível'}
       </p>
 
+      <label className={`flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+        <input type="checkbox" checked={gerarPdf} onChange={e => setGerarPdf(e.target.checked)} className="accent-red-600" />
+        Gerar o relatório em PDF (papel timbrado TEG) ao concluir
+      </label>
+
       <ModalFooter
         isDark={isDark}
         erros={erros}
         avisos={avisos}
-        salvando={salvar.isPending}
+        salvando={salvandoTudo || salvar.isPending}
         onCancel={onClose}
         saveLabel="Concluir inspeção"
-        onSave={() => salvar.mutate(
-          {
-            id: inspecao.id,
-            // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo/obra
-            ...(inspecao.id ? {} : {
-              modelo_id: inspecao.modelo_id, obra_id: inspecao.obra_id,
-              frente: inspecao.frente, equipe_lider_id: inspecao.equipe_lider_id,
-            }),
-            respostas,
-            observacoes: obs || undefined,
-            veredito: (veredito || null) as never,
-            latitude: gps?.lat, longitude: gps?.lng,
-            data_execucao: new Date().toISOString(),
-            executor_id: perfil?.id, executor_nome: perfil?.nome,
-            status: 'executada',
-          },
-          { onSuccess: onClose, onError: (e: any) => alert(`Erro: ${e?.message ?? 'desconhecido'}`) },
-        )}
+        onSave={async () => {
+          setSalvandoTudo(true)
+          try {
+            await salvar.mutateAsync({
+              id: inspecao.id,
+              // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo/obra
+              ...(inspecao.id ? {} : {
+                modelo_id: inspecao.modelo_id, obra_id: inspecao.obra_id,
+                frente: inspecao.frente, equipe_lider_id: inspecao.equipe_lider_id,
+              }),
+              respostas,
+              observacoes: obs || undefined,
+              fotos: fotosGerais,
+              veredito: (veredito || null) as never,
+              latitude: gps?.lat, longitude: gps?.lng,
+              data_execucao: execData,
+              executor_id: perfil?.id, executor_nome: perfil?.nome,
+              status: 'executada',
+            })
+            if (gerarPdf) {
+              const itensPdf = await Promise.all(itens.map(async it => {
+                const r = respostas.find(x => x.ordem === it.ordem)
+                const fotoUrls = (await Promise.all((r?.foto_paths ?? []).map(p => evidenciaUrl(p)))).filter(Boolean) as string[]
+                return { ordem: it.ordem, texto: it.texto, resposta: r?.resposta, obs: r?.obs, fotoUrls }
+              }))
+              await gerarInspecaoPdf({
+                codigo: inspecao.codigo, checklistNome: inspecao.modelo?.nome, grupo: inspecao.modelo?.grupo,
+                obraNome: obraNomeStr, frente: inspecao.frente, executorNome: perfil?.nome,
+                dataExecucao: execData, gps, veredito: (veredito || null) as never,
+                observacoes: obs || undefined, itens: itensPdf,
+              })
+            }
+            onClose()
+          } catch (e: any) {
+            alert(`Erro: ${e?.message ?? 'desconhecido'}`)
+          } finally {
+            setSalvandoTudo(false)
+          }
+        }}
       />
     </QsmaModal>
   )
