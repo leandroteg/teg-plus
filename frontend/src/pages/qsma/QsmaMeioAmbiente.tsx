@@ -45,13 +45,14 @@ export default function QsmaMeioAmbiente() {
   const [modalAspecto, setModalAspecto] = useState<QsmaAspecto | 'novo' | null>(null)
   const [mesCal, setMesCal] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })
 
+  const novoParam = params.get('novo')
   useEffect(() => {
-    const novo = params.get('novo')
-    if (novo === 'licenca') { setAba('licencas'); setModalLicenca('novo') }
-    if (novo === 'evento') { setAba('calendario'); setModalEvento('novo') }
-    if (novo === 'aspecto') { setAba('aspectos'); setModalAspecto('novo') }
-    if (novo) setParams({}, { replace: true })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!novoParam) return
+    if (novoParam === 'licenca') { setAba('licencas'); setModalLicenca('novo') }
+    if (novoParam === 'evento') { setAba('calendario'); setModalEvento('novo') }
+    if (novoParam === 'aspecto') { setAba('aspectos'); setModalAspecto('novo') }
+    setParams({}, { replace: true })
+  }, [novoParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: licencas = [] } = useLicencas()
   const { data: eventos = [] } = useEventosAmbientais()
