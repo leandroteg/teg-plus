@@ -49,11 +49,13 @@ export default function QsmaInspecoes() {
   // modal único "Programar Inspeção" — também aloca o TST e marca os tipos
   const [modalProg, setModalProg] = useState<null | { aloc?: ObraPlanejamentoEquipe; obraId?: string; data?: string; tstId?: string }>(null)
   const [executar, setExecutar] = useState<QsmaInspecao | null>(null)
+  const [pickerExec, setPickerExec] = useState(false)
 
   // deep-link do Novo Registro: /qsma/inspecoes?novo=programar
   useEffect(() => {
     const novo = params.get('novo')
     if (novo === 'programar') { setAba('programacao'); setModalProg({}) }
+    if (novo === 'executar') { setAba('programacao'); setPickerExec(true) }
     if (novo === 'modelo') { setAba('modelos'); setModalModelo('novo') }
     if (novo) setParams({}, { replace: true })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -575,10 +577,70 @@ export default function QsmaInspecoes() {
           onClose={() => setModalProg(null)}
         />
       )}
+      {pickerExec && (
+        <ExecutarPickerModal
+          isDark={isDark}
+          programadas={programadas}
+          obraNome={obraNome}
+          onPick={(i) => { setPickerExec(false); setExecutar(i) }}
+          onClose={() => setPickerExec(false)}
+        />
+      )}
       {executar && (
         <ExecutarInspecaoModal isDark={isDark} inspecao={executar} onClose={() => setExecutar(null)} />
       )}
     </ControladoriaFlow>
+  )
+}
+
+// ── Modal: escolher qual inspeção programada executar ─────────────────────────
+function ExecutarPickerModal({ isDark, programadas, obraNome, onPick, onClose }: {
+  isDark: boolean
+  programadas: QsmaInspecao[]
+  obraNome: (id?: string) => string
+  onPick: (i: QsmaInspecao) => void
+  onClose: () => void
+}) {
+  const [q, setQ] = useState('')
+  const filtradas = programadas.filter(i => {
+    const s = q.trim().toLowerCase()
+    return !s || (i.codigo ?? '').toLowerCase().includes(s) || (i.modelo?.nome ?? '').toLowerCase().includes(s) || obraNome(i.obra_id).toLowerCase().includes(s)
+  })
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  return (
+    <QsmaModal isDark={isDark} titulo="Executar inspeção" subtitulo="Escolha a inspeção programada para realizar em campo" onClose={onClose}>
+      <input
+        value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar código, checklist ou obra…"
+        className={pickerInputCls(isDark)}
+      />
+      {filtradas.length === 0 ? (
+        <p className={`text-[11px] italic text-center py-6 ${txtMuted}`}>
+          {programadas.length === 0 ? 'Nenhuma inspeção programada — programe uma primeiro (clique numa célula do Gantt).' : 'Nada encontrado na busca.'}
+        </p>
+      ) : (
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {filtradas.map(i => (
+            <button
+              key={i.id}
+              onClick={() => onPick(i)}
+              className={`w-full text-left rounded-xl border p-3 flex items-center gap-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold truncate ${txtMain}`}>
+                  <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{i.codigo}</span>
+                  {i.modelo?.nome ?? 'Checklist'}
+                </p>
+                <p className={`text-[11px] truncate ${txtMuted}`}>{obraNome(i.obra_id)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-600 text-white">
+                <Play size={11} /> Executar
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </QsmaModal>
   )
 }
 
