@@ -52,14 +52,15 @@ export default function QsmaInspecoes() {
   const [executar, setExecutar] = useState<QsmaInspecao | null>(null)
   const [pickerExec, setPickerExec] = useState(false)
 
-  // deep-link do Novo Registro: /qsma/inspecoes?novo=programar
+  // deep-link do Novo Registro (reage à mudança do parâmetro, mesmo já na tela)
+  const novoParam = params.get('novo')
   useEffect(() => {
-    const novo = params.get('novo')
-    if (novo === 'programar') { setAba('programacao'); setModalProg({}) }
-    if (novo === 'executar') { setAba('programacao'); setPickerExec(true) }
-    if (novo === 'modelo') { setAba('modelos'); setModalModelo('novo') }
-    if (novo) setParams({}, { replace: true })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!novoParam) return
+    if (novoParam === 'programar') { setAba('programacao'); setModalProg({}) }
+    if (novoParam === 'executar') { setAba('programacao'); setPickerExec(true) }
+    if (novoParam === 'modelo') { setAba('modelos'); setModalModelo('novo') }
+    setParams({}, { replace: true })
+  }, [novoParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: modelos = [] } = useModelosChecklist()
   const { data: inspecoes = [] } = useInspecoes()
