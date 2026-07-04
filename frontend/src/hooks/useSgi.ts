@@ -10,6 +10,21 @@ const QK = {
   documento:  (id: string)  => ['sgi_documento', id],
 }
 
+// ── Anexo (bucket privado sgi-documentos): guarda o PATH, abre via URL assinada ──
+export async function uploadSgiArquivo(file: File, docId?: string): Promise<{ path: string; nome: string }> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${docId ?? 'novo'}/${Date.now()}-${safe}`
+  const { error } = await supabase.storage.from('sgi-documentos').upload(path, file, { upsert: true, contentType: file.type || undefined })
+  if (error) throw error
+  return { path, nome: file.name }
+}
+
+export async function abrirSgiArquivo(path: string): Promise<void> {
+  const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(path, 3600)
+  if (error) throw error
+  window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+}
+
 // ── Documentos (Padronização) ─────────────────────────────────────────────────
 export function useDocumentos(filtros?: { status?: StatusDocumento; tipo?: TipoDocumento }) {
   return useQuery({
