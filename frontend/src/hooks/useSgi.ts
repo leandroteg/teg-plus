@@ -21,21 +21,27 @@ export async function uploadSgiArquivo(file: File, docId?: string): Promise<{ pa
 
 export async function abrirSgiArquivo(pathOrUrl: string, nome?: string | null): Promise<void> {
   const ehHtml = /\.html?(\?|$)/i.test(nome || pathOrUrl)
-  const abrir = async (url: string) => {
+  // Abre a aba já no clique (evita bloqueio de pop-up) e navega depois do assinar/fetch.
+  const win = window.open('about:blank', '_blank')
+  try {
+    // Docs importados guardam URL pública completa; uploads novos guardam o path no bucket privado.
+    let url = pathOrUrl
+    if (!/^https?:\/\//i.test(pathOrUrl)) {
+      const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(pathOrUrl, 3600)
+      if (error) throw error
+      url = data.signedUrl
+    }
     if (ehHtml) {
       // Supabase serve HTML como text/plain (anti-XSS); busca e abre como blob text/html pra renderizar.
       const resp = await fetch(url)
-      const blobUrl = URL.createObjectURL(new Blob([await resp.text()], { type: 'text/html' }))
-      window.open(blobUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer')
+      url = URL.createObjectURL(new Blob([await resp.text()], { type: 'text/html' }))
     }
+    if (win) win.location.href = url
+    else window.open(url, '_blank', 'noopener,noreferrer')
+  } catch (e) {
+    win?.close()
+    throw e
   }
-  // Docs importados guardam URL pública completa; uploads novos guardam o path no bucket privado.
-  if (/^https?:\/\//i.test(pathOrUrl)) { await abrir(pathOrUrl); return }
-  const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(pathOrUrl, 3600)
-  if (error) throw error
-  await abrir(data.signedUrl)
 }
 
 // ── Documentos (Padronização) ─────────────────────────────────────────────────
