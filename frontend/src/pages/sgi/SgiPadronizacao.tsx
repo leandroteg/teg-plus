@@ -179,7 +179,7 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
 
           <div className="space-y-2 pt-1">
             {doc.arquivo_url && (
-              <button onClick={() => abrirSgiArquivo(doc.arquivo_url!).catch(err => alert('Erro ao abrir: ' + (err instanceof Error ? err.message : String(err))))}
+              <button onClick={() => abrirSgiArquivo(doc.arquivo_url!, doc.arquivo_nome).catch(err => alert('Erro ao abrir: ' + (err instanceof Error ? err.message : String(err))))}
                 className={`w-full py-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-violet-500/30 text-violet-300 hover:bg-violet-500/10' : 'border-violet-200 text-violet-700 hover:bg-violet-50'}`}>
                 <ExternalLink size={15} /> Abrir documento{doc.arquivo_nome ? ` · ${doc.arquivo_nome}` : ''}
               </button>
