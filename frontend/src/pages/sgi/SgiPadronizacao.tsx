@@ -217,7 +217,7 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
                 <p className={`text-[10px] ${txtMuted}`}>Esclarecer devolve p/ revisão · Rejeitar volta p/ rascunho · Aprovar publica. O motivo fica registrado.</p>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2 justify-end">
+              <div className="flex gap-2 [&>button]:flex-1">
                 {doc.status === 'rascunho' && (
                   <button onClick={() => mover('em_revisao')} disabled={pend} className={btnViolet}>
                     {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
