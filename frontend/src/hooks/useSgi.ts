@@ -44,7 +44,7 @@ export function useCriarDocumento() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: CriarDocumentoPayload) => {
-      const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_documento', { p_tipo: payload.tipo })
+      const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_documento', { p_tipo: payload.tipo, p_setor: payload.area_processo ?? null })
       const { data, error } = await supabase
         .from('sgi_documentos')
         .insert({ ...payload, codigo: codigo ?? null })
