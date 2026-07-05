@@ -5,6 +5,7 @@ import {
   HelpCircle, XCircle, CheckCircle2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useDocumentos, useCriarDocumento, useAtualizarDocumento, usePublicarDocumento, useAdesaoDocumento, uploadSgiArquivo, abrirSgiArquivo } from '../../hooks/useSgi'
 import { STATUS_DOC_LABEL, TIPO_DOC_LABEL } from '../../types/sgi'
 import type { SgiDocumento, StatusDocumento, TipoDocumento } from '../../types/sgi'
@@ -74,6 +75,15 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   const btnRed = `${btnBase} ${isDark ? 'bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'}`
   const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
   const pend = atualizar.isPending || publicar.isPending
+  const { perfil } = useAuth()
+  const autorNome = perfil?.nome || perfil?.email || 'Usuário'
+  const [pedindo, setPedindo] = useState<'rejeitar' | 'esclarecer' | null>(null)
+  const [coment, setComent] = useState('')
+  async function confirmarAcao() {
+    if (!pedindo || !coment.trim()) return
+    const novo = { acao: pedindo, texto: coment.trim(), autor: autorNome, data: new Date().toISOString() }
+    await mover(pedindo === 'rejeitar' ? 'rascunho' : 'em_revisao', { comentarios: [...(doc.comentarios ?? []), novo] })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -167,36 +177,65 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
               {doc.arquivo_url ? 'Trocar arquivo' : 'Anexar documento'}
               <input type="file" className="hidden" disabled={subindo} onChange={e => { const f = e.target.files?.[0]; if (f) anexar(f); e.target.value = '' }} />
             </label>
-            <div className="flex flex-wrap gap-2 justify-end">
-              {doc.status === 'rascunho' && (
-                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnViolet}>
-                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
-                </button>
-              )}
-              {doc.status === 'em_revisao' && (<>
-                <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
-                <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnViolet}>
-                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
-                </button>
-              </>)}
-              {doc.status === 'em_aprovacao' && (<>
-                <button onClick={() => mover('rascunho')} disabled={pend} className={btnRed}><XCircle size={15} /> Rejeitar</button>
-                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnAmber}><HelpCircle size={15} /> Esclarecer</button>
-                <button onClick={handlePublicar} disabled={pend} className={btnEmerald}>
-                  {pend ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Aprovar
-                </button>
-              </>)}
-              {doc.status === 'vigente' && (<>
-                <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
-                <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
-                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.requer_ciencia ? 'Republicar ciência' : 'Republicar'}
-                </button>
-              </>)}
-              {doc.status === 'obsoleto' && (
-                <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar</button>
-              )}
-              <button onClick={onClose} className={btnGhost}>Fechar</button>
-            </div>
+            {/* Esclarecimentos / comentários registrados */}
+            {(doc.comentarios ?? []).length > 0 && (
+              <div className={`rounded-xl p-3 ${cardBg} space-y-2`}>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Esclarecimentos / Comentários</p>
+                {(doc.comentarios ?? []).slice().reverse().map((c, i) => (
+                  <div key={i} className="text-xs">
+                    <span className={`font-bold ${c.acao === 'rejeitar' ? 'text-red-500' : c.acao === 'esclarecer' ? 'text-amber-500' : txtMain}`}>{c.acao === 'rejeitar' ? 'Rejeição' : c.acao === 'esclarecer' ? 'Esclarecimento' : 'Comentário'}</span>
+                    <span className={txtMuted}> · {c.autor || '—'} · {fmtDate((c.data || '').split('T')[0])}</span>
+                    <p className={`mt-0.5 ${txtMain}`}>{c.texto}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pedindo ? (
+              <div className={`rounded-xl p-3 border space-y-2 ${pedindo === 'rejeitar' ? (isDark ? 'border-red-500/30' : 'border-red-200') : (isDark ? 'border-amber-500/30' : 'border-amber-200')}`}>
+                <label className={`block text-xs font-semibold ${txtMuted}`}>{pedindo === 'rejeitar' ? 'Motivo da rejeição' : 'O que precisa esclarecer'}</label>
+                <textarea rows={3} autoFocus value={coment} onChange={e => setComent(e.target.value)} placeholder="Escreva o comentário…"
+                  className={`w-full text-sm rounded-lg px-3 py-2 border outline-none resize-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'}`} />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => { setPedindo(null); setComent('') }} className={btnGhost}>Cancelar</button>
+                  <button onClick={confirmarAcao} disabled={!coment.trim() || pend} className={pedindo === 'rejeitar' ? btnRed : btnAmber}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : (pedindo === 'rejeitar' ? <XCircle size={15} /> : <HelpCircle size={15} />)}
+                    Confirmar {pedindo === 'rejeitar' ? 'rejeição' : 'esclarecimento'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 justify-end">
+                {doc.status === 'rascunho' && (
+                  <button onClick={() => mover('em_revisao')} disabled={pend} className={btnViolet}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
+                  </button>
+                )}
+                {doc.status === 'em_revisao' && (<>
+                  <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
+                  <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnViolet}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
+                  </button>
+                </>)}
+                {doc.status === 'em_aprovacao' && (<>
+                  <button onClick={() => setPedindo('rejeitar')} disabled={pend} className={btnRed}><XCircle size={15} /> Rejeitar</button>
+                  <button onClick={() => setPedindo('esclarecer')} disabled={pend} className={btnAmber}><HelpCircle size={15} /> Esclarecer</button>
+                  <button onClick={handlePublicar} disabled={pend} className={btnEmerald}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Aprovar
+                  </button>
+                </>)}
+                {doc.status === 'vigente' && (<>
+                  <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
+                  <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.requer_ciencia ? 'Republicar ciência' : 'Republicar'}
+                  </button>
+                </>)}
+                {doc.status === 'obsoleto' && (
+                  <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar</button>
+                )}
+              </div>
+            )}
+            <button onClick={onClose} className={`${btnGhost} w-full`}>Fechar</button>
           </div>
         </div>
       </div>
