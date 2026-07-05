@@ -19,12 +19,23 @@ export async function uploadSgiArquivo(file: File, docId?: string): Promise<{ pa
   return { path, nome: file.name }
 }
 
-export async function abrirSgiArquivo(pathOrUrl: string): Promise<void> {
+export async function abrirSgiArquivo(pathOrUrl: string, nome?: string | null): Promise<void> {
+  const ehHtml = /\.html?(\?|$)/i.test(nome || pathOrUrl)
+  const abrir = async (url: string) => {
+    if (ehHtml) {
+      // Supabase serve HTML como text/plain (anti-XSS); busca e abre como blob text/html pra renderizar.
+      const resp = await fetch(url)
+      const blobUrl = URL.createObjectURL(new Blob([await resp.text()], { type: 'text/html' }))
+      window.open(blobUrl, '_blank', 'noopener,noreferrer')
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
   // Docs importados guardam URL pública completa; uploads novos guardam o path no bucket privado.
-  if (/^https?:\/\//i.test(pathOrUrl)) { window.open(pathOrUrl, '_blank', 'noopener,noreferrer'); return }
+  if (/^https?:\/\//i.test(pathOrUrl)) { await abrir(pathOrUrl); return }
   const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(pathOrUrl, 3600)
   if (error) throw error
-  window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  await abrir(data.signedUrl)
 }
 
 // ── Documentos (Padronização) ─────────────────────────────────────────────────
