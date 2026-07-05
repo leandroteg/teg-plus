@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
   FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink, Paperclip,
-  HelpCircle, XCircle, CheckCircle2,
+  XCircle, CheckCircle2, MessageSquare,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDocumentos, useCriarDocumento, useAtualizarDocumento, usePublicarDocumento, useAdesaoDocumento, uploadSgiArquivo, abrirSgiArquivo } from '../../hooks/useSgi'
 import { STATUS_DOC_LABEL, TIPO_DOC_LABEL } from '../../types/sgi'
-import type { SgiDocumento, StatusDocumento, TipoDocumento } from '../../types/sgi'
+import type { SgiDocumento, StatusDocumento, TipoDocumento, SgiComentario } from '../../types/sgi'
 
 const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—')
 
@@ -70,20 +70,30 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   }
   const btnBase = 'flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all disabled:opacity-60'
   const btnViolet = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white shadow-sm`
-  const btnEmerald = `${btnBase} bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm`
-  const btnAmber = `${btnBase} ${isDark ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'}`
-  const btnRed = `${btnBase} ${isDark ? 'bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'}`
   const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
   const pend = atualizar.isPending || publicar.isPending
   const { perfil } = useAuth()
   const autorNome = perfil?.nome || perfil?.email || 'Usuário'
-  const [pedindo, setPedindo] = useState<'rejeitar' | 'esclarecer' | null>(null)
   const [coment, setComent] = useState('')
-  async function confirmarAcao() {
-    if (!pedindo || !coment.trim()) return
-    const novo = { acao: pedindo, texto: coment.trim(), autor: autorNome, data: new Date().toISOString() }
-    await mover(pedindo === 'rejeitar' ? 'rascunho' : 'em_revisao', { comentarios: [...(doc.comentarios ?? []), novo] })
+  async function decidir(decisao: 'rejeitar' | 'esclarecer' | 'aprovar') {
+    const texto = coment.trim()
+    if (decisao === 'esclarecer' && !texto) return
+    let comentarios: SgiComentario[] | undefined
+    if (texto) {
+      const novo: SgiComentario = { acao: decisao === 'aprovar' ? 'comentario' : decisao, texto, autor: autorNome, data: new Date().toISOString() }
+      comentarios = [...(doc.comentarios ?? []), novo]
+    }
+    if (decisao === 'aprovar') {
+      if (comentarios) { try { await atualizar.mutateAsync({ id: doc.id, comentarios }) } catch { /* segue publicando */ } }
+      await handlePublicar()
+    } else {
+      await mover(decisao === 'rejeitar' ? 'rascunho' : 'em_revisao', comentarios ? { comentarios } : undefined)
+    }
   }
+  const softBase = 'flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold active:scale-[0.98] transition-all disabled:opacity-50'
+  const softRed = `${softBase} ${isDark ? 'text-red-300 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20' : 'text-red-500 bg-red-50 border border-red-200 hover:bg-red-100'}`
+  const softAmber = `${softBase} ${isDark ? 'text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20' : 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'}`
+  const softEmerald = `${softBase} ${isDark ? 'text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' : 'text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -191,18 +201,18 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
               </div>
             )}
 
-            {pedindo ? (
-              <div className={`rounded-xl p-3 border space-y-2 ${pedindo === 'rejeitar' ? (isDark ? 'border-red-500/30' : 'border-red-200') : (isDark ? 'border-amber-500/30' : 'border-amber-200')}`}>
-                <label className={`block text-xs font-semibold ${txtMuted}`}>{pedindo === 'rejeitar' ? 'Motivo da rejeição' : 'O que precisa esclarecer'}</label>
-                <textarea rows={3} autoFocus value={coment} onChange={e => setComent(e.target.value)} placeholder="Escreva o comentário…"
-                  className={`w-full text-sm rounded-lg px-3 py-2 border outline-none resize-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'}`} />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => { setPedindo(null); setComent('') }} className={btnGhost}>Cancelar</button>
-                  <button onClick={confirmarAcao} disabled={!coment.trim() || pend} className={pedindo === 'rejeitar' ? btnRed : btnAmber}>
-                    {pend ? <Loader2 size={15} className="animate-spin" /> : (pedindo === 'rejeitar' ? <XCircle size={15} /> : <HelpCircle size={15} />)}
-                    Confirmar {pedindo === 'rejeitar' ? 'rejeição' : 'esclarecimento'}
+            {doc.status === 'em_aprovacao' ? (
+              <div className={`pt-3 space-y-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                <textarea rows={2} value={coment} onChange={e => setComent(e.target.value)} placeholder="Observação / motivo…"
+                  className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:ring-2 focus:ring-violet-500/30' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-violet-400/30'}`} />
+                <div className="flex gap-2">
+                  <button onClick={() => decidir('rejeitar')} disabled={pend} className={softRed}><XCircle size={14} /> Rejeitar</button>
+                  <button onClick={() => decidir('esclarecer')} disabled={pend || !coment.trim()} className={softAmber}><MessageSquare size={14} /> Esclarecer</button>
+                  <button onClick={() => decidir('aprovar')} disabled={pend} className={softEmerald}>
+                    {pend ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Aprovar
                   </button>
                 </div>
+                <p className={`text-[10px] ${txtMuted}`}>Esclarecer devolve p/ revisão · Rejeitar volta p/ rascunho · Aprovar publica. O motivo fica registrado.</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2 justify-end">
@@ -215,13 +225,6 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
                   <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
                   <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnViolet}>
                     {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
-                  </button>
-                </>)}
-                {doc.status === 'em_aprovacao' && (<>
-                  <button onClick={() => setPedindo('rejeitar')} disabled={pend} className={btnRed}><XCircle size={15} /> Rejeitar</button>
-                  <button onClick={() => setPedindo('esclarecer')} disabled={pend} className={btnAmber}><HelpCircle size={15} /> Esclarecer</button>
-                  <button onClick={handlePublicar} disabled={pend} className={btnEmerald}>
-                    {pend ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Aprovar
                   </button>
                 </>)}
                 {doc.status === 'vigente' && (<>
