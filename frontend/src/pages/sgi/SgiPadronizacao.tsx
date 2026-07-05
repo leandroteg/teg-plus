@@ -48,7 +48,7 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   const concl = adesao.filter(a => a.status === 'concluida').length
   const handlePublicar = async () => {
     const r = await publicar.mutateAsync(doc.id)
-    if (r.ok) alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).')
+    if (r.ok) { alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).'); onClose() }
     else alert('Erro ao publicar: ' + (r.erro || ''))
   }
   const atualizar = useAtualizarDocumento()
@@ -61,6 +61,15 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
     } catch (e) { alert('Erro ao anexar: ' + (e instanceof Error ? e.message : String(e))) }
     setSubindo(false)
   }
+  // Fluxo documental: rascunho → em_revisao → em_aprovacao → vigente → obsoleto
+  async function mover(novo: StatusDocumento, extra?: Partial<SgiDocumento>) {
+    try { await atualizar.mutateAsync({ id: doc.id, status: novo, ...(extra ?? {}) }); onClose() }
+    catch (e) { alert('Erro na transição: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+  const btnBase = 'flex-1 min-w-[120px] py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60'
+  const btnPrimary = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white`
+  const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
+  const pend = atualizar.isPending || publicar.isPending
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -154,13 +163,34 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
               {doc.arquivo_url ? 'Trocar arquivo' : 'Anexar documento'}
               <input type="file" className="hidden" disabled={subindo} onChange={e => { const f = e.target.files?.[0]; if (f) anexar(f); e.target.value = '' }} />
             </label>
-            <div className="flex gap-2">
-              {doc.status !== 'obsoleto' && (
-                <button onClick={handlePublicar} disabled={publicar.isPending} className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60">
-                  {publicar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.status === 'vigente' ? (doc.requer_ciencia ? 'Republicar ciência' : 'Republicar') : 'Publicar'}
+            <div className="flex flex-wrap gap-2">
+              {doc.status === 'rascunho' && (
+                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnPrimary}>
+                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
                 </button>
               )}
-              <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
+              {doc.status === 'em_revisao' && (<>
+                <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
+                <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnPrimary}>
+                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
+                </button>
+              </>)}
+              {doc.status === 'em_aprovacao' && (<>
+                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnGhost}>Devolver</button>
+                <button onClick={handlePublicar} disabled={pend} className={btnPrimary}>
+                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Aprovar e publicar
+                </button>
+              </>)}
+              {doc.status === 'vigente' && (<>
+                <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
+                <button onClick={handlePublicar} disabled={pend} className={btnPrimary}>
+                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.requer_ciencia ? 'Republicar ciência' : 'Republicar'}
+                </button>
+              </>)}
+              {doc.status === 'obsoleto' && (
+                <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar (rascunho)</button>
+              )}
+              <button onClick={onClose} className={btnGhost}>Fechar</button>
             </div>
           </div>
         </div>
