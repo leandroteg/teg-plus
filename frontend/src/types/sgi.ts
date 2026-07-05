@@ -3,6 +3,13 @@ export type StatusDocumento = 'rascunho' | 'em_revisao' | 'em_aprovacao' | 'vige
 export type TipoDocumento = 'politica' | 'procedimento' | 'instrucao' | 'formulario' | 'manual' | 'outro'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
+export interface SgiComentario {
+  acao: 'rejeitar' | 'esclarecer' | 'comentario'
+  texto: string
+  autor?: string | null
+  data: string
+}
+
 export interface SgiDocumento {
   id: string
   codigo?: string | null
@@ -16,6 +23,7 @@ export interface SgiDocumento {
   publico_alvo?: Record<string, unknown>
   arquivo_url?: string | null
   arquivo_nome?: string | null
+  comentarios?: SgiComentario[]
   proxima_revisao?: string | null
   periodicidade_revisao_meses?: number | null
   responsavel_id?: string | null
