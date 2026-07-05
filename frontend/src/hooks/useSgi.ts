@@ -19,8 +19,10 @@ export async function uploadSgiArquivo(file: File, docId?: string): Promise<{ pa
   return { path, nome: file.name }
 }
 
-export async function abrirSgiArquivo(path: string): Promise<void> {
-  const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(path, 3600)
+export async function abrirSgiArquivo(pathOrUrl: string): Promise<void> {
+  // Docs importados guardam URL pública completa; uploads novos guardam o path no bucket privado.
+  if (/^https?:\/\//i.test(pathOrUrl)) { window.open(pathOrUrl, '_blank', 'noopener,noreferrer'); return }
+  const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(pathOrUrl, 3600)
   if (error) throw error
   window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
 }
