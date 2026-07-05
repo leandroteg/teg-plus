@@ -49,9 +49,11 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   const { data: adesao = [] } = useAdesaoDocumento(doc.requer_ciencia ? doc.id : undefined)
   const concl = adesao.filter(a => a.status === 'concluida').length
   const handlePublicar = async () => {
-    const r = await publicar.mutateAsync(doc.id)
-    if (r.ok) { alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).'); onClose() }
-    else alert('Erro ao publicar: ' + (r.erro || ''))
+    try {
+      const r = await publicar.mutateAsync(doc.id)
+      if (r.ok) { alert(`Ciência publicada: ${r.missoes_criadas ?? 0} missão(ões) enviada(s) no Portal TEG.`); onClose() }
+      else alert('Erro ao publicar ciência: ' + (r.erro || ''))
+    } catch (e) { alert('Erro ao publicar ciência: ' + (e instanceof Error ? e.message : String(e))) }
   }
   const atualizar = useAtualizarDocumento()
   const [subindo, setSubindo] = useState(false)
@@ -84,8 +86,8 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
       comentarios = [...(doc.comentarios ?? []), novo]
     }
     if (decisao === 'aprovar') {
-      if (comentarios) { try { await atualizar.mutateAsync({ id: doc.id, comentarios }) } catch { /* segue publicando */ } }
-      await handlePublicar()
+      // Aprovar apenas torna vigente (Políticas e Processos). A ciência é um passo à parte (botão Publicar no doc vigente).
+      await mover('vigente', { vigente_em: new Date().toISOString(), ...(comentarios ? { comentarios } : {}) })
     } else {
       await mover(decisao === 'rejeitar' ? 'rascunho' : 'em_revisao', comentarios ? { comentarios } : undefined)
     }
@@ -229,9 +231,11 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
                 </>)}
                 {doc.status === 'vigente' && (<>
                   <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
-                  <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
-                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.requer_ciencia ? 'Republicar ciência' : 'Republicar'}
-                  </button>
+                  {doc.requer_ciencia && (
+                    <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
+                      {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {adesao.length > 0 ? 'Republicar ciência' : 'Publicar para ciência'}
+                    </button>
+                  )}
                 </>)}
                 {doc.status === 'obsoleto' && (
                   <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar</button>
