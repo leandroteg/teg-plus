@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
   FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink, Paperclip,
+  HelpCircle, XCircle, CheckCircle2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDocumentos, useCriarDocumento, useAtualizarDocumento, usePublicarDocumento, useAdesaoDocumento, uploadSgiArquivo, abrirSgiArquivo } from '../../hooks/useSgi'
@@ -66,9 +67,12 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
     try { await atualizar.mutateAsync({ id: doc.id, status: novo, ...(extra ?? {}) }); onClose() }
     catch (e) { alert('Erro na transição: ' + (e instanceof Error ? e.message : String(e))) }
   }
-  const btnBase = 'flex-1 min-w-[120px] py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60'
-  const btnPrimary = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white`
-  const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
+  const btnBase = 'flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all disabled:opacity-60'
+  const btnViolet = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white shadow-sm`
+  const btnEmerald = `${btnBase} bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm`
+  const btnAmber = `${btnBase} ${isDark ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'}`
+  const btnRed = `${btnBase} ${isDark ? 'bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'}`
+  const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
   const pend = atualizar.isPending || publicar.isPending
 
   return (
@@ -163,32 +167,33 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
               {doc.arquivo_url ? 'Trocar arquivo' : 'Anexar documento'}
               <input type="file" className="hidden" disabled={subindo} onChange={e => { const f = e.target.files?.[0]; if (f) anexar(f); e.target.value = '' }} />
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-end">
               {doc.status === 'rascunho' && (
-                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnPrimary}>
+                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnViolet}>
                   {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
                 </button>
               )}
               {doc.status === 'em_revisao' && (<>
                 <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
-                <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnPrimary}>
+                <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnViolet}>
                   {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
                 </button>
               </>)}
               {doc.status === 'em_aprovacao' && (<>
-                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnGhost}>Devolver</button>
-                <button onClick={handlePublicar} disabled={pend} className={btnPrimary}>
-                  {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Aprovar e publicar
+                <button onClick={() => mover('rascunho')} disabled={pend} className={btnRed}><XCircle size={15} /> Rejeitar</button>
+                <button onClick={() => mover('em_revisao')} disabled={pend} className={btnAmber}><HelpCircle size={15} /> Esclarecer</button>
+                <button onClick={handlePublicar} disabled={pend} className={btnEmerald}>
+                  {pend ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Aprovar
                 </button>
               </>)}
               {doc.status === 'vigente' && (<>
                 <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
-                <button onClick={handlePublicar} disabled={pend} className={btnPrimary}>
+                <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
                   {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.requer_ciencia ? 'Republicar ciência' : 'Republicar'}
                 </button>
               </>)}
               {doc.status === 'obsoleto' && (
-                <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar (rascunho)</button>
+                <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar</button>
               )}
               <button onClick={onClose} className={btnGhost}>Fechar</button>
             </div>
