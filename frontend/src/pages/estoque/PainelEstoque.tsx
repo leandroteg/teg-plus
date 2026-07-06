@@ -288,7 +288,7 @@ function GerarOcModal({ abaixoMinimo, bases, isDark, onClose }: {
   const fmtM = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v || 0)
 
   async function handleConfirmar() {
-    const res = await gerar.mutateAsync(baseId || undefined)
+    const res = await gerar.mutateAsync({ baseId: baseId || undefined })
     setResult(res)
   }
 

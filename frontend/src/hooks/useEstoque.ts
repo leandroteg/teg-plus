@@ -778,9 +778,11 @@ export interface OcMinimoResult {
 export function useGerarOcMinimo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (baseId?: string): Promise<OcMinimoResult> => {
+    // itemId (mig 183) restringe a um item só — botão "Enviar RC" por item.
+    mutationFn: async ({ baseId, itemId }: { baseId?: string; itemId?: string } = {}): Promise<OcMinimoResult> => {
       const { data, error } = await supabase.rpc('est_gerar_oc_minimo', {
         p_base_id: baseId ?? null,
+        p_item_id: itemId ?? null,
       })
       if (error) throw error
       return data as OcMinimoResult
@@ -789,6 +791,47 @@ export function useGerarOcMinimo() {
       qc.invalidateQueries({ queryKey: ['est-saldos-alerta'] })
       qc.invalidateQueries({ queryKey: ['est-kpis'] })
       qc.invalidateQueries({ queryKey: ['cmp-requisicoes'] })
+    },
+  })
+}
+
+// ── De/Para de itens duplicados ───────────────────────────────────────────────
+// RPC est_mesclar_itens (mig 182): funde itens de origem num item canônico —
+// reaponta movimentações/solicitações/inventários/cautelas/RCs/recebimentos,
+// soma saldos por base no destino e desativa as origens. Admin ou comprador.
+export interface MesclarItensResult {
+  ok: boolean
+  mesclados: number
+  para_codigo: string
+  para_descricao: string
+  movimentacoes: number
+  solicitacao_itens: number
+  inventario_itens: number
+  cautela_itens: number
+  favoritos: number
+  requisicao_itens: number
+  recebimento_itens: number
+  saldos_transferidos: number
+}
+
+export function useMesclarItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ deIds, paraId }: { deIds: string[]; paraId: string }): Promise<MesclarItensResult> => {
+      const { data, error } = await supabase.rpc('est_mesclar_itens', {
+        p_de: deIds,
+        p_para: paraId,
+      })
+      if (error) throw error
+      return data as MesclarItensResult
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos-alerta'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-conta-corrente'] })
+      qc.invalidateQueries({ queryKey: ['est-kpis'] })
     },
   })
 }
