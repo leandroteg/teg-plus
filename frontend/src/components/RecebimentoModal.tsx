@@ -28,6 +28,19 @@ function derivarDestinoPadrao(
   return 'consumo'
 }
 
+/**
+ * Pedido Direto não tem vínculo de catálogo — usamos a classe financeira do
+ * pedido (plano de contas) para decidir o destino padrão:
+ *   01.* = produto  → Estoque
+ *   02.* = serviço  → não gera estoque (Nenhum)
+ * Sem classe definida também não gera estoque (mais seguro que criar entrada
+ * indevida). O recebedor sempre pode trocar o destino por item.
+ */
+function derivarDestinoDireto(classeFinanceira?: string | null): TipoDestino {
+  const raiz = (classeFinanceira ?? '').replace(/^CLS-/i, '').slice(0, 2)
+  return raiz === '01' ? 'consumo' : 'nenhum'
+}
+
 const DESTINO_OPTIONS: { value: TipoDestino; label: string; icon: typeof Package; color: string; activeColor: string }[] = [
   { value: 'consumo',     label: 'Estoque',     icon: ArchiveRestore, color: 'teal',   activeColor: 'bg-teal-100 text-teal-700 border-teal-300 ring-1 ring-teal-200' },
   { value: 'patrimonial', label: 'Patrimonio', icon: Gem,            color: 'violet', activeColor: 'bg-violet-100 text-violet-700 border-violet-300 ring-1 ring-violet-200' },
@@ -61,6 +74,20 @@ export default function RecebimentoModal({
     return map
   }, [recebimentosAnteriores])
 
+  // qty already received for Pedido Direto items — matched by descricao (sem requisicao_item_id)
+  const jaRecebidoPorDesc = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of recebimentosAnteriores ?? []) {
+      for (const it of (r.itens ?? []) as any[]) {
+        if (it.requisicao_item_id) continue // já contabilizado por id
+        const key = (it.descricao ?? '').trim().toUpperCase()
+        if (!key) continue
+        map.set(key, (map.get(key) ?? 0) + Number(it.quantidade_recebida ?? 0))
+      }
+    }
+    return map
+  }, [recebimentosAnteriores])
+
   const temRecebimentoAnterior = (recebimentosAnteriores?.length ?? 0) > 0
 
   // Form state
@@ -76,27 +103,45 @@ export default function RecebimentoModal({
   const [itens, setItens] = useState<RecebimentoItemForm[]>([])
   const [initialized, setInitialized]       = useState(false)
 
-  // Initialize items when RC items load — pre-fill with REMAINING qty (suporta multiplas NFs)
-  if (itensRC && !loadingRecebs && !initialized) {
-    setItens(
-      itensRC.map(item => {
-        const destino = derivarDestinoPadrao(item.destino_operacional)
-        const jaRecebido = jaRecebidoPorItem.get(item.id) ?? 0
-        const saldo = Math.max(0, item.quantidade - jaRecebido)
-        return {
-          requisicao_item_id: item.id,
-          item_estoque_id: item.est_item_id,
-          descricao: item.descricao,
-          quantidade_esperada: saldo,
-          quantidade_recebida: saldo,
-          valor_unitario: item.valor_unitario_estimado,
-          tipo_destino: destino,
-          destino_padrao: item.est_item_id ? destino : undefined,
-        }
-      })
-        // Esconde itens 100% recebidos
-        .filter(it => it.quantidade_esperada > 0)
-    )
+  // Initialize items — pre-fill with REMAINING qty (suporta multiplas NFs).
+  // Pedido Direto (sem RC) guarda os itens em pedido.itens_direto, sem vínculo
+  // de requisição nem de catálogo; usamos esses como fallback quando não há RC.
+  const temRcVinculada = !!pedido.requisicao_id
+  if (!loadingRecebs && !initialized && (!temRcVinculada || itensRC !== undefined)) {
+    const rcItens = itensRC ?? []
+    const base: RecebimentoItemForm[] = rcItens.length > 0
+      ? rcItens.map(item => {
+          const destino = derivarDestinoPadrao(item.destino_operacional)
+          const jaRecebido = jaRecebidoPorItem.get(item.id) ?? 0
+          const saldo = Math.max(0, item.quantidade - jaRecebido)
+          return {
+            requisicao_item_id: item.id,
+            item_estoque_id: item.est_item_id,
+            descricao: item.descricao,
+            quantidade_esperada: saldo,
+            quantidade_recebida: saldo,
+            valor_unitario: item.valor_unitario_estimado,
+            tipo_destino: destino,
+            destino_padrao: item.est_item_id ? destino : undefined,
+          }
+        })
+      : (pedido.itens_direto ?? []).map(it => {
+          const jaRecebido = jaRecebidoPorDesc.get(it.descricao.trim().toUpperCase()) ?? 0
+          const saldo = Math.max(0, it.quantidade - jaRecebido)
+          return {
+            requisicao_item_id: undefined,
+            item_estoque_id: undefined,
+            descricao: it.descricao,
+            quantidade_esperada: saldo,
+            quantidade_recebida: saldo,
+            valor_unitario: it.valor_unitario,
+            // Serviço não gera estoque; produto (01.*) entra como consumo.
+            tipo_destino: derivarDestinoDireto(pedido.classe_financeira),
+            destino_padrao: undefined,
+          }
+        })
+    // Esconde itens 100% recebidos
+    setItens(base.filter(it => it.quantidade_esperada > 0))
     setInitialized(true)
   }
 
@@ -275,15 +320,25 @@ export default function RecebimentoModal({
                   <Package size={12} />
                   Itens ({itens.length})
                 </p>
-                <div className="space-y-2">
-                  {itens.map((item, idx) => (
-                    <ItemRow
-                      key={idx}
-                      item={item}
-                      onChange={patch => updateItem(idx, patch)}
-                    />
-                  ))}
-                </div>
+                {itens.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-center">
+                    <p className="text-xs text-slate-500">
+                      {temRecebimentoAnterior
+                        ? 'Todos os itens deste pedido ja foram recebidos.'
+                        : 'Este pedido nao possui itens para receber. Verifique com o Compras se os itens foram cadastrados no pedido.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {itens.map((item, idx) => (
+                      <ItemRow
+                        key={idx}
+                        item={item}
+                        onChange={patch => updateItem(idx, patch)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* ── Advanced: obs ─────────────────────────────────── */}
