@@ -6,7 +6,7 @@ import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
   ChevronRight, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
-  LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle,
+  LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle, Hourglass,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaboradores } from '../../hooks/useRH'
@@ -28,6 +28,14 @@ function getInitials(nome: string) {
   return nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
 }
 
+// Contrato de experiência vencendo: admissão há 35–45 dias (1ª renovação, 45d)
+// ou há 80–90 dias (efetivação, 90d).
+function experienciaVencendo(dataAdmissao?: string | null): boolean {
+  if (!dataAdmissao) return false
+  const dias = Math.floor((Date.now() - new Date(dataAdmissao + 'T00:00:00').getTime()) / 86_400_000)
+  return (dias >= 35 && dias <= 45) || (dias >= 80 && dias <= 90)
+}
+
 export default function RHColaboradores() {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
@@ -37,6 +45,7 @@ export default function RHColaboradores() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [comProcesso, setComProcesso] = useState(false)
   const [semDados, setSemDados] = useState(false)
+  const [expVencendo, setExpVencendo] = useState(false)
 
   const { data: todos = [], isLoading } = useRHColaboradores()
   const { data: bases = [] } = useBases()
@@ -54,6 +63,8 @@ export default function RHColaboradores() {
       if (comProcesso && !c.tem_processo_trabalhista) return false
       // Sem CPF ou Data de Nascimento
       if (semDados && c.cpf && c.data_nascimento) return false
+      // Contrato de experiência vencendo (35–45 ou 80–90 dias de admissão)
+      if (expVencendo && !experienciaVencendo(c.data_admissao)) return false
       // Tipo contrato
       if (filtros.tipo_contrato && (c.tipo_contrato || 'CLT') !== filtros.tipo_contrato) return false
       // Departamento
@@ -91,7 +102,7 @@ export default function RHColaboradores() {
       }
       return true
     })
-  }, [todos, filtros, busca, comProcesso, semDados])
+  }, [todos, filtros, busca, comProcesso, semDados, expVencendo])
 
   // KPI calculations
   const kpis = useMemo(() => {
@@ -220,6 +231,22 @@ export default function RHColaboradores() {
               ? isLight ? 'bg-rose-200 text-rose-700' : 'bg-rose-500/30 text-rose-200'
               : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
           }`}>{todos.filter(c => (filtros.ativo === undefined ? true : c.ativo === filtros.ativo) && (!c.cpf || !c.data_nascimento)).length}</span>
+        </button>
+
+        {/* Experiência vencendo (35–45 ou 80–90 dias de admissão) */}
+        <button onClick={() => setExpVencendo(v => !v)}
+          title="Contrato de experiência vencendo: admissão há 35–45 dias (renovação dos 45d) ou 80–90 dias (efetivação dos 90d)"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            expVencendo
+              ? isLight ? 'bg-sky-100 text-sky-700 border border-sky-200' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+              : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
+          }`}>
+          <Hourglass size={13} /> Experiência vencendo
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+            expVencendo
+              ? isLight ? 'bg-sky-200 text-sky-700' : 'bg-sky-500/30 text-sky-200'
+              : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
+          }`}>{todos.filter(c => (filtros.ativo === undefined ? true : c.ativo === filtros.ativo) && experienciaVencendo(c.data_admissao)).length}</span>
         </button>
 
         {/* Busca (encolhe pra caber) */}
