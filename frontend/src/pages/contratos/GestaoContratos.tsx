@@ -7,8 +7,9 @@ import {
   ArrowDownRight, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
   LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
+  Paperclip, ExternalLink, Upload,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao, useUploadMedicaoArquivo } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { Contrato, ContratoMedicao } from '../../types/contratos'
@@ -1497,6 +1498,141 @@ export function NovaMedicaoModal({
   )
 }
 
+// ── Enviar Medição ao Financeiro (com opção de anexar documento) ─────────────
+function EnviarMedicaoModal({
+  medicao, contrato, onClose, onToast,
+}: {
+  medicao: ContratoMedicao
+  contrato?: Contrato
+  onClose: () => void
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const upload = useUploadMedicaoArquivo()
+  const faturar = useFaturarMedicao()
+  const [file, setFile] = useState<File | null>(null)
+  const busy = upload.isPending || faturar.isPending
+
+  const cp = contrato?.fornecedor?.razao_social || contrato?.fornecedor?.nome_fantasia || contrato?.cliente?.nome || ''
+  const destinoTipo = contrato?.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+
+  const submit = async () => {
+    try {
+      if (file) await upload.mutateAsync({ medicaoId: medicao.id, file })
+      const res = await faturar.mutateAsync(medicao.id)
+      if (res.ok) {
+        const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+        onToast('success', `Enviada ao ${destino}${res.data_vencimento ? ` • Vence ${fmtData(res.data_vencimento)}` : ''}`)
+        onClose()
+      } else {
+        onToast('error', (res as any).mensagem ?? `Não enviada: ${res.motivo ?? 'desconhecido'}`)
+      }
+    } catch (e: any) {
+      onToast('error', `Erro ao enviar: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Send size={16} className="text-fuchsia-600" />
+            <h2 className="text-sm font-bold text-slate-800">Enviar Medição ao Financeiro</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
+            <div className="flex justify-between"><span className="text-slate-400">Contrato</span><span className="font-semibold text-slate-700">{contrato?.numero ?? '—'}{cp ? ` · ${cp}` : ''}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">BM</span><span className="font-mono font-semibold text-slate-700">{medicao.numero_bm}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Valor líquido</span><span className="font-bold text-fuchsia-700">{fmtFull(medicao.valor_liquido)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Destino</span><span className="font-semibold text-slate-700">{destinoTipo}</span></div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Documento (opcional)</label>
+            <p className="text-[11px] text-slate-400 mb-1.5">Planilha de medição, boletim (BM) ou nota — fica anexado e visível no Financeiro.</p>
+            {file ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-fuchsia-700 truncate">
+                  <Paperclip size={12} /> {file.name}
+                </span>
+                <button onClick={() => setFile(null)} disabled={busy} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={14} /></button>
+              </div>
+            ) : medicao.arquivo_url ? (
+              <div className="flex items-center justify-between gap-2">
+                <a href={medicao.arquivo_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-fuchsia-700 hover:underline truncate">
+                  <ExternalLink size={12} /> {medicao.arquivo_nome || 'Documento já anexado'}
+                </a>
+                <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer shrink-0">
+                  <Upload size={12} /> Trocar
+                  <input type="file" className="hidden" disabled={busy} onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+                </label>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer">
+                <Upload size={14} /> Selecionar arquivo
+                <input type="file" className="hidden" disabled={busy} onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-all disabled:opacity-50">Cancelar</button>
+          <button onClick={submit} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all disabled:opacity-50">
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            {file ? 'Anexar e Enviar' : 'Enviar ao Financeiro'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Anexar/trocar documento de uma medição já enviada (ex.: envio automático na aprovação).
+function MedicaoAnexoInline({ medicao, onToast }: {
+  medicao: ContratoMedicao
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const upload = useUploadMedicaoArquivo()
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      {medicao.arquivo_url && (
+        <a href={medicao.arquivo_url} target="_blank" rel="noopener noreferrer"
+          title={medicao.arquivo_nome || 'Abrir documento'}
+          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700 hover:bg-fuchsia-100 transition-all">
+          <ExternalLink size={11} /> Documento
+        </a>
+      )}
+      <label
+        title={medicao.arquivo_url ? 'Trocar documento' : 'Anexar documento'}
+        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
+        {upload.isPending ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />}
+        {medicao.arquivo_url ? 'Trocar' : 'Anexar'}
+        <input
+          type="file"
+          className="hidden"
+          disabled={upload.isPending}
+          onChange={async e => {
+            const f = e.currentTarget.files?.[0]
+            e.currentTarget.value = ''
+            if (!f) return
+            try {
+              await upload.mutateAsync({ medicaoId: medicao.id, file: f })
+              onToast('success', 'Documento anexado à medição')
+            } catch (err: any) {
+              onToast('error', `Falha ao anexar: ${err?.message ?? 'desconhecido'}`)
+            }
+          }}
+        />
+      </label>
+    </div>
+  )
+}
+
 function TabMedicoes() {
   const { perfil, isAdmin, hasSetorPapel } = useAuth()
   const podeAprovar = isAdmin || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
@@ -1504,6 +1640,7 @@ function TabMedicoes() {
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
+  const [enviarMedicao, setEnviarMedicao] = useState<ContratoMedicao | null>(null)
 
   const { data: medicoes = [], isLoading } = useMedicoes()
   const { data: contratos = [] } = useContratos()
@@ -1535,20 +1672,8 @@ function TabMedicoes() {
     setTimeout(() => setToast(null), 4000)
   }
 
-  const handleEnviar = (medicaoId: string) => {
-    if (!confirm('Enviar esta medição ao Financeiro?\n\nIsso cria automaticamente uma conta a pagar/receber a partir do valor líquido e do prazo do contrato.')) return
-    faturar.mutate(medicaoId, {
-      onSuccess: (res) => {
-        if (res.ok) {
-          const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
-          showToast('success', `Enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
-        } else {
-          showToast('error', (res as any).mensagem ?? `Não enviada: ${res.motivo ?? 'desconhecido'}`)
-        }
-      },
-      onError: () => showToast('error', 'Erro ao enviar medição'),
-    })
-  }
+  // O envio ao Financeiro passa pelo EnviarMedicaoModal (permite anexar documento).
+  // O reenvio manual (status 'aprovado') abre o modal via setEnviarMedicao.
 
   const handleSubmeter = (medicaoId: string) => {
     atualizar.mutate({ id: medicaoId, status: 'em_aprovacao' }, {
@@ -1668,6 +1793,16 @@ function TabMedicoes() {
         onToast={showToast}
       />
 
+      {enviarMedicao && (
+        <EnviarMedicaoModal
+          key={enviarMedicao.id}
+          medicao={enviarMedicao}
+          contrato={contratoMap.get(enviarMedicao.contrato_id)}
+          onClose={() => setEnviarMedicao(null)}
+          onToast={showToast}
+        />
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
@@ -1778,21 +1913,23 @@ function TabMedicoes() {
                           )}
                           {podeEnviar && (
                             <button
-                              onClick={() => handleEnviar(m.id)}
-                              disabled={faturar.isPending}
+                              onClick={() => setEnviarMedicao(m)}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
                                 bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
                                 hover:bg-fuchsia-100 transition-all disabled:opacity-50"
-                              title="Reenviar ao Financeiro"
+                              title="Enviar ao Financeiro (com opção de anexar documento)"
                             >
-                              {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                              <Send size={11} />
                               Enviar ao Financeiro
                             </button>
                           )}
                           {jaEnviada && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
-                              <CheckCircle2 size={11} /> No Financeiro
-                            </span>
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
+                                <CheckCircle2 size={11} /> No Financeiro
+                              </span>
+                              <MedicaoAnexoInline medicao={m} onToast={showToast} />
+                            </div>
                           )}
                           {m.status === 'rejeitado' && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500">

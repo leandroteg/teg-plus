@@ -17,6 +17,7 @@ import {
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import { MedicaoDocLink } from '../../components/MedicaoDocLink'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { supabase } from '../../services/supabase'
 import type { ContaReceber, StatusCR } from '../../types/financeiro'
@@ -415,6 +416,9 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
             </div>
             {cr.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cr.descricao}</p>}
           </div>
+
+          {/* Documento da medição (contas geradas por con_faturar_medicao via medicao_id) */}
+          {cr.medicao_id && <MedicaoDocLink medicaoId={cr.medicao_id} />}
 
           {cr.chave_nfe && (
             <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>

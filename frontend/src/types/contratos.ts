@@ -232,6 +232,9 @@ export interface ContratoMedicao {
   aprovado_por?: string
   aprovado_em?: string
   observacoes?: string
+  // Documento da medição (planilha/BM/NF) anexado no envio ao Financeiro.
+  arquivo_url?: string | null
+  arquivo_nome?: string | null
   created_at: string
   updated_at: string
   criado_por_nome?: string | null
