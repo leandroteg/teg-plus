@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX, Plus,
-  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown,
+  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown, BookOpen,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -20,6 +20,7 @@ import { useTiAuth } from './data/auth'
 import type { Ticket, Status, Priority } from './data/shapes'
 import { STATUS_LIST, STATUS_META, PRIORITY_LIST, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner } from './components/ui'
+import { TiTabs } from './components/TiTabs'
 import { StatusBadge, PriorityBadge } from './components/Badges'
 import { SlaBadge } from './components/SlaBadge'
 import { Avatar } from './components/Avatar'
@@ -93,6 +94,46 @@ function SectionTitle({ icon: Icon, title, to, toLabel }: { icon: ComponentType<
   )
 }
 
+function Shortcut({ to, icon: Icon, title, desc }: { to: string; icon: ComponentType<{ className?: string }>; title: string; desc: string }) {
+  return (
+    <Link to={to} className="card flex items-center gap-3 p-4 transition hover:border-sky-300 hover:shadow">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-sm font-semibold text-slate-700">{title}</div>
+        <div className="text-xs text-slate-500">{desc}</div>
+      </div>
+    </Link>
+  )
+}
+
+function RecentList({ tickets, loading }: { tickets: Ticket[]; loading: boolean }) {
+  if (loading) return <Spinner />
+  if (tickets.length === 0) {
+    return (
+      <div className="card p-6 text-center text-sm text-slate-500">
+        Nenhum chamado ainda — <Link to="/ti/chamados/novo" className="font-medium text-sky-600 hover:underline">abra o primeiro</Link>
+      </div>
+    )
+  }
+  return (
+    <div className="card divide-y divide-slate-100">
+      {tickets.map((t) => (
+        <Link key={t.id} to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-4 hover:bg-slate-50">
+          <span className="font-mono text-xs text-slate-400">{t.code}</span>
+          <span className="flex-1 truncate font-medium text-slate-700">{t.title}</span>
+          {t.assignee && <Avatar name={t.assignee.name} size="sm" />}
+          <SlaBadge dueAt={t.dueAt} status={t.status} size="sm" />
+          <PriorityBadge priority={t.priority} />
+          <StatusBadge status={t.status} />
+          <span className="hidden w-24 text-right text-xs text-slate-400 sm:block">{timeAgo(t.createdAt)}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 function AttentionQueue({ tickets }: { tickets: Ticket[] }) {
   const now = Date.now()
   const isOpen = (t: Ticket) => OPEN_STATUSES.includes(t.status)
@@ -135,7 +176,7 @@ function AttentionQueue({ tickets }: { tickets: Ticket[] }) {
 type Visao = 'resumo' | 'relatorio'
 
 export default function TiHome() {
-  const { user } = useTiAuth()
+  const { user, isStaff: staff } = useTiAuth()
   // Visão do painel: 'resumo' (dashboard) | 'relatorio' (indicadores/CSV) — num
   // seletor colado ao título, padrão do Painel-Compras. Persiste em localStorage.
   const [visao, setVisao] = useState<Visao>(() => {
@@ -151,6 +192,7 @@ export default function TiHome() {
   const summaryQ = useQuery({
     queryKey: ['ti', 'dashboard-summary'],
     queryFn: () => getReportSummary(isoDaysAgo(30), isoDaysAgo(0)),
+    enabled: staff, // colaborador não vê gráficos/indicadores (fiel ao original)
   })
 
   const stats = statsQ.data
@@ -184,8 +226,8 @@ export default function TiHome() {
     <div className="ti-scope">
       <PageHeader
         title={`Olá, ${firstName} 👋`}
-        subtitle={visao === 'resumo' ? 'Visão geral dos chamados de T.I.' : 'Indicadores dos chamados de T.I.'}
-        titleExtra={
+        subtitle={!staff ? 'Acompanhe seus chamados' : visao === 'resumo' ? 'Visão geral dos chamados de T.I.' : 'Indicadores dos chamados de T.I.'}
+        titleExtra={staff ? (
           /* Seletor de visão (dropdown) — colado ao título, padrão do Painel-Compras */
           <div className="relative print:hidden">
             <select
@@ -198,7 +240,7 @@ export default function TiHome() {
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
           </div>
-        }
+        ) : undefined}
         action={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>
@@ -206,10 +248,35 @@ export default function TiHome() {
         }
       />
 
-      {/* Visão Relatório — mesmo conteúdo da página /ti/relatorios */}
-      {visao === 'relatorio' && <RelatoriosPanel />}
+      {/* ── Visão do COLABORADOR: fita Painel → Meus Chamados → Base + KPIs dos
+           próprios chamados (RLS escopa) + atalhos + recentes ── */}
+      {!staff && (<>
+        <TiTabs />
+        {statsQ.isLoading || !stats ? (
+          <Spinner />
+        ) : (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Kpi label="Abertos" value={stats.abertos} icon={Inbox} color="bg-blue-100 text-blue-600" />
+            <Kpi label="Em andamento" value={stats.emAndamento} icon={Clock} color="bg-amber-100 text-amber-600" />
+            <Kpi label="Aguardando" value={stats.aguardando} icon={PauseCircle} color="bg-violet-100 text-violet-600" />
+            <Kpi label="Resolvidos" value={stats.resolvidos} icon={CheckCircle2} color="bg-emerald-100 text-emerald-600" />
+          </div>
+        )}
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <Shortcut to="/ti/chamados/novo" icon={Plus} title="Abrir chamado" desc="Descreva o problema para a T.I." />
+          <Shortcut to="/ti/chamados" icon={Inbox} title="Meus chamados" desc="Acompanhe suas solicitações" />
+          <Shortcut to="/ti/base" icon={BookOpen} title="Base de conhecimento" desc="Tutoriais e soluções rápidas" />
+        </div>
+        <section className="mt-8">
+          <SectionTitle icon={Inbox} title="Meus chamados recentes" to="/ti/chamados" />
+          <RecentList tickets={recent} loading={ticketsQ.isLoading} />
+        </section>
+      </>)}
 
-      {visao === 'resumo' && (<>
+      {/* Visão Relatório — mesmo conteúdo da página /ti/relatorios */}
+      {staff && visao === 'relatorio' && <RelatoriosPanel />}
+
+      {staff && visao === 'resumo' && (<>
       {/* KPIs operacionais */}
       {statsQ.isLoading || !stats ? (
         <Spinner />
@@ -302,27 +369,7 @@ export default function TiHome() {
 
       <section className="mt-8">
         <SectionTitle icon={Inbox} title="Chamados recentes" to="/ti/chamados" />
-        {ticketsQ.isLoading ? (
-          <Spinner />
-        ) : recent.length === 0 ? (
-          <div className="card p-6 text-center text-sm text-slate-500">
-            Nenhum chamado ainda — <Link to="/ti/chamados/novo" className="font-medium text-sky-600 hover:underline">abra o primeiro</Link>
-          </div>
-        ) : (
-          <div className="card divide-y divide-slate-100">
-            {recent.map((t) => (
-              <Link key={t.id} to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-4 hover:bg-slate-50">
-                <span className="font-mono text-xs text-slate-400">{t.code}</span>
-                <span className="flex-1 truncate font-medium text-slate-700">{t.title}</span>
-                {t.assignee && <Avatar name={t.assignee.name} size="sm" />}
-                <SlaBadge dueAt={t.dueAt} status={t.status} size="sm" />
-                <PriorityBadge priority={t.priority} />
-                <StatusBadge status={t.status} />
-                <span className="hidden w-24 text-right text-xs text-slate-400 sm:block">{timeAgo(t.createdAt)}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        <RecentList tickets={recent} loading={ticketsQ.isLoading} />
       </section>
       </>)}
     </div>

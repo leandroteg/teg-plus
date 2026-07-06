@@ -14,7 +14,7 @@ import { FileUpload } from './components/FileUpload'
 export default function NovoChamado() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useTiAuth()
+  const { user, isStaff: staff } = useTiAuth()
 
   const catQ = useQuery({ queryKey: ['ti', 'categories'], queryFn: listCategories })
   const secQ = useQuery({ queryKey: ['ti', 'sectors'], queryFn: listSectors })
@@ -35,6 +35,11 @@ export default function NovoChamado() {
     queryFn: () => listCustomFields(categoryId),
     enabled: !!categoryId,
   })
+
+  // Colaborador: apenas equipamentos no nome dele (match por e-mail do responsável).
+  const myAssets = staff ? [] : (assetsQ.data ?? []).filter(
+    (a) => a.holderEmail && user?.email && a.holderEmail.toLowerCase() === user.email.toLowerCase(),
+  )
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -102,17 +107,31 @@ export default function NovoChamado() {
             </select>
           </div>
         </div>
-        <div>
-          <label className="label">Equipamento relacionado (opcional)</label>
-          <select className="input" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-            <option value="">— Nenhum</option>
-            {(assetsQ.data ?? []).map((a) => (
-              <option key={a.id} value={a.id}>
-                {(a.tag ? `${a.tag} · ` : '') + (a.model ?? a.type) + (a.holderName ? ` — ${a.holderName}` : '')}
-              </option>
-            ))}
-          </select>
-        </div>
+        {staff ? (
+          <div>
+            <label className="label">Equipamento relacionado (opcional)</label>
+            <select className="input" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+              <option value="">— Nenhum</option>
+              {(assetsQ.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {(a.tag ? `${a.tag} · ` : '') + (a.model ?? a.type) + (a.holderName ? ` — ${a.holderName}` : '')}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : myAssets.length > 0 ? (
+          /* Colaborador: só os equipamentos que estão no nome dele (fiel ao original) */
+          <div>
+            <label className="label">É sobre um equipamento seu? (conserto/reparo)</label>
+            <select className="input" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+              <option value="">— Não / outro assunto</option>
+              {myAssets.map((a) => (
+                <option key={a.id} value={a.id}>{(a.tag ? `${a.tag} · ` : '') + (a.model ?? a.type)}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">Selecione seu equipamento para registrar o histórico de manutenção dele</p>
+          </div>
+        ) : null}
         {(fieldsQ.data?.length ?? 0) > 0 && (
           <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
             <div className="text-sm font-medium text-slate-600">Informações adicionais</div>

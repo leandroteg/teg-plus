@@ -30,6 +30,7 @@ import FiscalLayout from './components/FiscalLayout'
 import EstoqueLayout from './components/EstoqueLayout'
 import LogisticaLayout from './components/LogisticaLayout'
 import TiLayout from './pages/ti/TiLayout'
+import { TiStaffRoute, TiAdminRoute } from './pages/ti/components/TiGuards'
 import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
@@ -289,25 +290,33 @@ export default function App() {
         <Route path="/aprovaai"         element={<Lazy><AprovAi /></Lazy>} />
         <Route path="/portal-teg"       element={<Lazy><PortalTEG /></Lazy>} />
 
-        {/* ── TI / Help Desk: admin-only, layout próprio ──────── */}
-        <Route element={<AdminRoute />}>
-          <Route element={<TiLayout />}>
-            <Route path="/ti" element={<Lazy><TiHome /></Lazy>} />
-            <Route path="/ti/chamados" element={<Lazy><TiChamados /></Lazy>} />
-            <Route path="/ti/chamados/novo" element={<Lazy><TiNovoChamado /></Lazy>} />
-            <Route path="/ti/chamados/:id" element={<Lazy><TiChamadoDetalhe /></Lazy>} />
-            <Route path="/ti/quadro" element={<Lazy><TiQuadro /></Lazy>} />
-            <Route path="/ti/ativos" element={<Lazy><TiAtivos /></Lazy>} />
-            <Route path="/ti/ativos/:id" element={<Lazy><TiAtivoDetalhe /></Lazy>} />
-            <Route path="/ti/termos" element={<Lazy><TiTermos /></Lazy>} />
-            <Route path="/ti/relatorios" element={<Lazy><TiRelatorios /></Lazy>} />
-            <Route path="/ti/configuracoes" element={<Lazy><TiConfiguracoes /></Lazy>} />
-            <Route path="/ti/base" element={<Lazy><TiBase /></Lazy>} />
-            <Route path="/ti/base/novo" element={<Lazy><TiArtigoEditor /></Lazy>} />
-            <Route path="/ti/base/:id" element={<Lazy><TiArtigo /></Lazy>} />
-            <Route path="/ti/base/:id/editar" element={<Lazy><TiArtigoEditor /></Lazy>} />
-            <Route path="/ti/respostas" element={<Lazy><TiRespostas /></Lazy>} />
-            <Route path="/ti/usuarios" element={<Lazy><TiUsuarios /></Lazy>} />
+        {/* ── TI / Help Desk: exige o módulo 'ti' liberado ao usuário (admin sempre
+             entra). Papéis internos: colaborador abre/acompanha chamados e lê a base;
+             TiStaffRoute = equipe (atendentes/admin); TiAdminRoute = só admin. ── */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<ModuleRoute moduleKey="ti" />}>
+            <Route element={<TiLayout />}>
+              <Route path="/ti" element={<Lazy><TiHome /></Lazy>} />
+              <Route path="/ti/chamados" element={<Lazy><TiChamados /></Lazy>} />
+              <Route path="/ti/chamados/novo" element={<Lazy><TiNovoChamado /></Lazy>} />
+              <Route path="/ti/chamados/:id" element={<Lazy><TiChamadoDetalhe /></Lazy>} />
+              <Route path="/ti/base" element={<Lazy><TiBase /></Lazy>} />
+              <Route path="/ti/base/:id" element={<Lazy><TiArtigo /></Lazy>} />
+              <Route element={<TiStaffRoute />}>
+                <Route path="/ti/quadro" element={<Lazy><TiQuadro /></Lazy>} />
+                <Route path="/ti/respostas" element={<Lazy><TiRespostas /></Lazy>} />
+                <Route path="/ti/ativos" element={<Lazy><TiAtivos /></Lazy>} />
+                <Route path="/ti/ativos/:id" element={<Lazy><TiAtivoDetalhe /></Lazy>} />
+                <Route path="/ti/termos" element={<Lazy><TiTermos /></Lazy>} />
+                <Route path="/ti/relatorios" element={<Lazy><TiRelatorios /></Lazy>} />
+                <Route path="/ti/base/novo" element={<Lazy><TiArtigoEditor /></Lazy>} />
+                <Route path="/ti/base/:id/editar" element={<Lazy><TiArtigoEditor /></Lazy>} />
+              </Route>
+              <Route element={<TiAdminRoute />}>
+                <Route path="/ti/usuarios" element={<Lazy><TiUsuarios /></Lazy>} />
+                <Route path="/ti/configuracoes" element={<Lazy><TiConfiguracoes /></Lazy>} />
+              </Route>
+            </Route>
           </Route>
         </Route>
 

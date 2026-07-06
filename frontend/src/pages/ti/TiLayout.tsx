@@ -10,6 +10,7 @@ import {
 import ModuleLayout from '../../components/ModuleLayout'
 import type { NavItem, NavGroup } from '../../components/ModuleLayout'
 import { TiNotificationBell } from './components/TiNotificationBell'
+import { useTiAuth } from './data/auth'
 import './ti.css'
 
 // Topo fixo (sempre visível). "Chamados" usa end:true para não ficar destacado
@@ -46,15 +47,24 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
+// Visão do COLABORADOR (não é equipe de TI): menu enxuto — a navegação do fluxo
+// (Painel → Meus Chamados → Base de Conhecimento) acontece pela fita TiTabs.
+const NAV_COLABORADOR: NavItem[] = [
+  { to: '/ti', icon: LayoutDashboard, label: 'Painel', end: true },
+  { to: '/ti/chamados', icon: Inbox, label: 'Meus Chamados', end: true },
+  { to: '/ti/chamados/novo', icon: Plus, label: 'Nova Solicitação', end: false },
+]
+
 export default function TiLayout() {
+  const { isStaff } = useTiAuth()
   return (
     <ModuleLayout
       moduleKey="ti"
       moduleName="Helpdesk TEG"
       moduleEmoji="🖥️"
       accent="blue"
-      nav={NAV}
-      navGroups={NAV_GROUPS}
+      nav={isStaff ? NAV : NAV_COLABORADOR}
+      navGroups={isStaff ? NAV_GROUPS : undefined}
       moduleSubtitle="Suporte de T.I."
       maxWidth="max-w-6xl"
       bottomNavMaxItems={6}

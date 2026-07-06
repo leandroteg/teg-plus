@@ -44,8 +44,8 @@ export default function Chamados() {
   return (
     <div className="ti-scope">
       <PageHeader
-        title="Chamados"
-        subtitle="Todos os chamados da T.I."
+        title={staff ? 'Chamados' : 'Meus Chamados'}
+        subtitle={staff ? 'Todos os chamados da T.I.' : 'Chamados que você abriu'}
         action={<Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>}
       />
 
@@ -100,7 +100,7 @@ export default function Chamados() {
                 <tr>
                   <th className="px-4 py-3">Chamado</th>
                   <th className="px-4 py-3">Categoria</th>
-                  <th className="px-4 py-3">Setor</th>
+                  {staff && <th className="px-4 py-3">Setor</th>}
                   <th className="px-4 py-3">Prioridade</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Responsável</th>
@@ -114,11 +114,11 @@ export default function Chamados() {
                       <Link to={`/ti/chamados/${t.id}`} className="block">
                         <div className="font-mono text-xs text-slate-400">{t.code}</div>
                         <div className="font-medium text-slate-700">{t.title}</div>
-                        <div className="text-xs text-slate-400">por {t.requester.name}</div>
+                        {staff && <div className="text-xs text-slate-400">por {t.requester.name}</div>}
                       </Link>
                     </td>
                     <td className="px-4 py-3"><CategoryBadge name={t.category.name} /></td>
-                    <td className="px-4 py-3 text-slate-600">{t.sector?.name ?? '—'}</td>
+                    {staff && <td className="px-4 py-3 text-slate-600">{t.sector?.name ?? '—'}</td>}
                     <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">

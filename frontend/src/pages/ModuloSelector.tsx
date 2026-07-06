@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -143,7 +143,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(14,165,233,0.16)',
     accent: '#38BDF8',
     subs: [
-      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti', adminOnly: true },
+      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti' },
       { key: 'ai', label: 'AI Agents', desc: 'Agentes inteligentes TEG+', Icon: Bot, active: false, route: '' },
     ],
   },
@@ -839,20 +839,27 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
   isLight: boolean
   onNavigate: (path: string) => void
 }) {
+  const { isAdmin, hasModule } = useAuth()
   if (!open) return null
 
-  const tiles = [
+  type Tile = { label: string; icon: LucideIcon; path: string; tone: string; desc: string; span?: boolean }
+  const tiles: Tile[] = [
     { label: 'Minhas Tarefas',       icon: CheckSquare,    path: '/minhas-tarefas',       tone: 'teal',    desc: 'Pendencias em todos os modulos' },
     { label: 'Minhas Solicitacoes',  icon: ClipboardList,  path: '/minhas-solicitacoes',  tone: 'indigo',  desc: 'Requisicoes e pedidos abertos' },
     { label: 'Minhas Despesas',      icon: Receipt,        path: '/despesas',             tone: 'rose',    desc: 'Adiantamentos e reembolsos' },
     { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
-  ] as const
+    // Helpdesk: chamados pessoais do usuário no módulo TI (some p/ quem não tem o módulo)
+    ...(isAdmin || hasModule('ti')
+      ? [{ label: 'Meus Chamados', icon: Headset, path: '/ti/chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.', span: true } as Tile]
+      : []),
+  ]
 
   const toneMap: Record<string, { bg: string; text: string; bgDark: string; textDark: string; ring: string; ringDark: string }> = {
     teal:   { bg: 'bg-teal-50',   text: 'text-teal-600',   bgDark: 'bg-teal-500/10',   textDark: 'text-teal-300',   ring: 'hover:ring-teal-300',   ringDark: 'hover:ring-teal-400/40' },
     indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', bgDark: 'bg-indigo-500/10', textDark: 'text-indigo-300', ring: 'hover:ring-indigo-300', ringDark: 'hover:ring-indigo-400/40' },
     rose:   { bg: 'bg-rose-50',   text: 'text-rose-600',   bgDark: 'bg-rose-500/10',   textDark: 'text-rose-300',   ring: 'hover:ring-rose-300',   ringDark: 'hover:ring-rose-400/40' },
     amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  bgDark: 'bg-amber-500/10',  textDark: 'text-amber-300',  ring: 'hover:ring-amber-300',  ringDark: 'hover:ring-amber-400/40' },
+    sky:    { bg: 'bg-sky-50',    text: 'text-sky-600',    bgDark: 'bg-sky-500/10',    textDark: 'text-sky-300',    ring: 'hover:ring-sky-300',    ringDark: 'hover:ring-sky-400/40' },
   }
 
   return (
@@ -897,17 +904,19 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
               <button
                 key={t.path}
                 onClick={() => onNavigate(t.path)}
-                className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
+                className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${t.span ? 'col-span-2 flex items-center gap-4' : ''} ${
                   isLight
                     ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
                     : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
                 }`}
               >
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${isLight ? clr.bg : clr.bgDark}`}>
+                <div className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${t.span ? '' : 'mb-3'} ${isLight ? clr.bg : clr.bgDark}`}>
                   <Icon size={20} strokeWidth={2.2} className={isLight ? clr.text : clr.textDark} />
                 </div>
-                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
-                <p className={`text-[10px] mt-1 leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
+                <div>
+                  <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
+                  <p className={`text-[10px] mt-1 leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
+                </div>
               </button>
             )
           })}

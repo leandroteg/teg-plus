@@ -1,12 +1,14 @@
-// Fita de abas horizontal do fluxo de atendimento — mesmo padrão visual do
-// pipeline do Financeiro (CPPipeline/PipelineRail): card arredondado com abas-
-// pílula (ícone + rótulo + chip de contagem), a ativa com fundo/borda coloridos.
-// Navega entre rotas (Chamados / Quadro / Respostas / Base) numa mesma "tela".
+// Fita de abas horizontal — mesmo padrão visual do pipeline do Financeiro
+// (CPPipeline/PipelineRail): card arredondado com abas-pílula (ícone + rótulo +
+// chip de contagem), a ativa com fundo/borda coloridos.
+// EQUIPE: Chamados → Quadro → Respostas → Base. COLABORADOR: Painel → Meus
+// Chamados → Base de Conhecimento (contagens escopadas pela RLS aos dele).
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Inbox, Columns3, MessageSquareText, BookOpen } from 'lucide-react'
+import { LayoutDashboard, Inbox, Columns3, MessageSquareText, BookOpen } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { getDashboardStats } from '../data/tickets'
+import { useTiAuth } from '../data/auth'
 
 type Accent = 'sky' | 'violet' | 'teal' | 'emerald'
 
@@ -28,16 +30,25 @@ interface Tab {
 }
 
 export function TiTabs() {
-  // Mesmo queryKey/fn da Home — cache compartilhado do react-query.
+  const { isStaff } = useTiAuth()
+  // Mesmo queryKey/fn da Home — cache compartilhado do react-query (a RLS já
+  // escopa as contagens do colaborador aos próprios chamados).
   const { data: stats } = useQuery({ queryKey: ['ti', 'stats'], queryFn: getDashboardStats })
+
   const emAberto = stats ? stats.abertos + stats.emAndamento + stats.aguardando : undefined
 
-  const TABS: Tab[] = [
-    { to: '/ti/chamados', end: true, label: 'Chamados', icon: Inbox, accent: 'sky', count: stats?.total },
-    { to: '/ti/quadro', label: 'Quadro de Chamados', icon: Columns3, accent: 'violet', count: emAberto },
-    { to: '/ti/respostas', label: 'Respostas Prontas', icon: MessageSquareText, accent: 'teal' },
-    { to: '/ti/base', label: 'Base de Conhecimento', icon: BookOpen, accent: 'emerald' },
-  ]
+  const TABS: Tab[] = isStaff
+    ? [
+        { to: '/ti/chamados', end: true, label: 'Chamados', icon: Inbox, accent: 'sky', count: stats?.total },
+        { to: '/ti/quadro', label: 'Quadro de Chamados', icon: Columns3, accent: 'violet', count: emAberto },
+        { to: '/ti/respostas', label: 'Respostas Prontas', icon: MessageSquareText, accent: 'teal' },
+        { to: '/ti/base', label: 'Base de Conhecimento', icon: BookOpen, accent: 'emerald' },
+      ]
+    : [
+        { to: '/ti', end: true, label: 'Painel', icon: LayoutDashboard, accent: 'sky' },
+        { to: '/ti/chamados', end: true, label: 'Meus Chamados', icon: Inbox, accent: 'violet', count: stats?.total },
+        { to: '/ti/base', label: 'Base de Conhecimento', icon: BookOpen, accent: 'emerald' },
+      ]
 
   return (
     <div className="mb-4 min-w-0 rounded-2xl border border-slate-200 bg-white p-1.5">
