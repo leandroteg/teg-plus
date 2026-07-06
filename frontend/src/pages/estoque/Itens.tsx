@@ -68,6 +68,13 @@ const EMPTY_FORM: Partial<EstItem> = {
 
 type ViewMode = 'list' | 'cards'
 
+// Limite que dispara "abaixo do mínimo": ponto de reposição, caindo pro estoque
+// mínimo quando não configurado. Usa || de propósito — 0 no cadastro significa
+// "não configurado" e deve cair pro mínimo (?? só cobre null).
+function limiteReposicao(item?: { ponto_reposicao?: number | null; estoque_minimo?: number | null } | null) {
+  return item?.ponto_reposicao || item?.estoque_minimo || 0
+}
+
 function fmtDate(iso?: string) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -99,6 +106,9 @@ export default function Itens() {
   // Data
   const { data: bases = [] } = useBases()
   const { data: saldos = [], isLoading: loadingSaldos } = useSaldos(baseFilter || undefined)
+  // Catálogo completo: usado pelo filtro "abaixo do mínimo" pra incluir itens
+  // com mínimo configurado que nunca movimentaram (sem linha em est_saldos).
+  const { data: itensCatalogo = [] } = useEstoqueItens()
   const { data: entradas = [], isLoading: loadingEntradas } = useAguardandoEntrada()
   const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
@@ -116,7 +126,9 @@ export default function Itens() {
     const desc = s.item?.descricao ?? 'este item'
     if (!confirm(`Gerar RC de reposição para "${desc}"?`)) return
     try {
-      const res = await gerarRc.mutateAsync({ baseId: s.base_id, itemId: s.item_id })
+      // Linha sintética (item sem movimentação) não tem base — a RPC escolhe e a
+      // idempotência garante uma RC só.
+      const res = await gerarRc.mutateAsync({ baseId: s.base_id || undefined, itemId: s.item_id })
       if (res.rcs_criadas > 0) {
         alert(`RC ${res.resumo[0]?.rc_numero ?? ''} criada em rascunho. Revise em Compras antes de enviar para aprovação.`)
       } else if (res.itens_ja_pendentes > 0) {
@@ -160,11 +172,31 @@ export default function Itens() {
 
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
-    // Com o filtro "abaixo do mínimo" ativo, inclui também saldo zerado —
-    // item que zerou é justamente o caso mais crítico de reposição.
+    // Com o filtro "abaixo do mínimo" ativo, inclui saldo zerado e também itens
+    // com mínimo configurado que nunca movimentaram (sem linha em est_saldos) —
+    // esses entram como linha sintética de saldo 0, senão ficariam invisíveis.
     let list = soAbaixoMinimo
-      ? saldos.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo))
+      ? saldos.filter(s => {
+          const lim = limiteReposicao(s.item)
+          return s.item && lim > 0 && s.saldo <= lim
+        })
       : saldos.filter(s => s.saldo > 0)
+    if (soAbaixoMinimo) {
+      const comSaldo = new Set(saldos.map(s => s.item_id))
+      const sinteticos = itensCatalogo
+        .filter(it => limiteReposicao(it) > 0 && !comSaldo.has(it.id))
+        .map(it => ({
+          id: `sem-saldo-${it.id}`,
+          item_id: it.id,
+          base_id: '',
+          saldo: 0,
+          saldo_reservado: 0,
+          atualizado_em: '',
+          item: it,
+          base: { codigo: '', nome: 'Sem movimentação' },
+        } as unknown as EstSaldo))
+      list = [...list, ...sinteticos]
+    }
     if (curvaFiltro) list = list.filter(s => s.item?.curva_abc === curvaFiltro)
     if (busca.trim()) {
       const t = busca.toLowerCase()
@@ -174,7 +206,7 @@ export default function Itens() {
       )
     }
     return list
-  }, [saldos, curvaFiltro, busca, soAbaixoMinimo])
+  }, [saldos, itensCatalogo, curvaFiltro, busca, soAbaixoMinimo])
 
   const baseFilterNome = useMemo(
     () => baseFilter ? bases.find(b => b.id === baseFilter)?.nome ?? '' : '',
@@ -443,13 +475,13 @@ export default function Itens() {
 
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             <span>{counts[activeTab]} item(ns)</span>
-            {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length > 0 && (
+            {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)).length > 0 && (
               <button
                 onClick={() => setSoAbaixoMinimo(v => !v)}
                 className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
                 title="Filtrar somente itens abaixo do mínimo"
               >
-                <AlertTriangle size={11} /> {saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length} abaixo do mínimo
+                <AlertTriangle size={11} /> {saldosFiltrados.filter(s => s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)).length} abaixo do mínimo
               </button>
             )}
           </div>
@@ -535,7 +567,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem, onQR, onEnviarRc, envia
       </div>
       {/* Rows */}
       {data.map(s => {
-        const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
+        const abaixo = s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
@@ -610,7 +642,7 @@ function SaldosCards({ data, isDark, onClickItem, onQR, onEnviarRc, enviandoRc }
   return (
     <div className="space-y-2 p-4">
       {data.map(s => {
-        const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
+        const abaixo = s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
