@@ -30,11 +30,14 @@ function getInitials(nome: string) {
 
 // Contrato de experiência vencendo: admissão há 35–45 dias (1ª renovação, 45d)
 // ou há 80–90 dias (efetivação, 90d).
-function experienciaVencendo(dataAdmissao?: string | null): boolean {
-  if (!dataAdmissao) return false
+function janelaExperiencia(dataAdmissao?: string | null): { label: string; title: string } | null {
+  if (!dataAdmissao) return null
   const dias = Math.floor((Date.now() - new Date(dataAdmissao + 'T00:00:00').getTime()) / 86_400_000)
-  return (dias >= 35 && dias <= 45) || (dias >= 80 && dias <= 90)
+  if (dias >= 35 && dias <= 45) return { label: 'exp 45d', title: `Experiência vencendo — ${dias}º dia (renovação dos 45 dias)` }
+  if (dias >= 80 && dias <= 90) return { label: 'exp 90d', title: `Experiência vencendo — ${dias}º dia (efetivação dos 90 dias)` }
+  return null
 }
+const experienciaVencendo = (dataAdmissao?: string | null) => janelaExperiencia(dataAdmissao) !== null
 
 export default function RHColaboradores() {
   const { isLightSidebar: isLight } = useTheme()
@@ -429,6 +432,9 @@ export default function RHColaboradores() {
                                 {!c.data_nascimento && (
                                   <span title="Sem data de nascimento" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/20 text-amber-300'}`}>sem nasc</span>
                                 )}
+                                {(() => { const j = janelaExperiencia(c.data_admissao); return j && (
+                                  <span title={j.title} className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-sky-100 text-sky-600' : 'bg-sky-500/20 text-sky-300'}`}>{j.label}</span>
+                                ) })()}
                               </div>
                               {c.matricula && (
                                 <p className={`text-[10px] font-mono sm:hidden ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{c.matricula}</p>
@@ -533,6 +539,9 @@ export default function RHColaboradores() {
                           {!c.data_nascimento && (
                             <span title="Sem data de nascimento" className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/20 text-amber-300'}`}>sem nasc</span>
                           )}
+                          {(() => { const j = janelaExperiencia(c.data_admissao); return j && (
+                            <span title={j.title} className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide ${isLight ? 'bg-sky-100 text-sky-600' : 'bg-sky-500/20 text-sky-300'}`}>{j.label}</span>
+                          ) })()}
                           {c.matricula && (
                             <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-500'}`}>
                               {c.matricula}
