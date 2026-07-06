@@ -3211,7 +3211,12 @@ export default function CPPipeline() {
   const resolvePipelineStage = useCallback((cp: ContaPagar): PipelineStageId => {
     if (cp.status !== 'em_lote') return cp.status
 
-    const lote = cp.lote_id ? lotesById.get(cp.lote_id) : undefined
+    // CP órfã (status em_lote mas sem lote — ex.: lote apagado) ficaria
+    // invisível na aba de lotes, que agrupa por lote_id. Volta pra Confirmados,
+    // onde ela aparece e pode entrar num lote novo.
+    if (!cp.lote_id) return 'confirmado'
+
+    const lote = lotesById.get(cp.lote_id)
     if (lote?.status === 'enviado_aprovacao') return 'em_aprovacao'
     return 'em_lote'
   }, [lotesById])

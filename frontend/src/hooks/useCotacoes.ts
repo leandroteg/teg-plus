@@ -11,7 +11,7 @@ const TABLE_FORN = 'cmp_cotacao_fornecedores'
 const SELECT_COTACAO = `
   id, requisicao_id, comprador_id, status,
   fornecedor_selecionado_id, valor_selecionado, fornecedor_selecionado_nome,
-  observacao, data_limite, data_conclusao,
+  observacao, data_limite, data_conclusao, concluido_por_nome,
   created_at, updated_at, criado_por_nome, atualizado_por_nome,
   requisicao:cmp_requisicoes(
     id, numero, solicitante_nome, obra_nome, descricao, justificativa,
@@ -54,7 +54,7 @@ export function useCotacoes(compradorId?: string, status?: string) {
       return all.map((c: unknown) => {
         const cot = c as Record<string, unknown>
         const comprador = cot.comprador as Record<string, string> | null
-        return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+        return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
       })
     },
     refetchInterval: 60_000,
@@ -79,7 +79,7 @@ export function useCotacao(id?: string) {
 
       const cot = data as Record<string, unknown>
       const comprador = cot.comprador as Record<string, string> | null
-      return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+      return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
     },
     retry: false,
   })
@@ -134,7 +134,7 @@ export function useCotacaoByRequisicao(requisicaoId?: string) {
 
       const cot = data as Record<string, unknown>
       const comprador = cot.comprador as Record<string, string> | null
-      return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+      return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
     },
     staleTime: 15_000,
   })
