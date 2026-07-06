@@ -17,6 +17,7 @@ import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import AuditoriaCard from '../components/AuditoriaCard'
+import VincularItemCatalogo from '../components/VincularItemCatalogo'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
@@ -959,7 +960,7 @@ export default function RequisicaoDetalhe() {
             </div>
             {!podeEnviar && (
               <p className="text-xs text-orange-700">
-                Cadastre cada item livre no cat&aacute;logo de estoque — o v&iacute;nculo &eacute; autom&aacute;tico ao salvar. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
+                <b>Vincular</b>: se o item j&aacute; existe no cat&aacute;logo, aponte a linha para ele (funciona mesmo quando o texto livre tem marca e o cat&aacute;logo n&atilde;o). <b>Cadastrar</b>: s&oacute; se o item ainda n&atilde;o existe — ao salvar, a linha &eacute; vinculada sozinha. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
               </p>
             )}
 
@@ -969,8 +970,13 @@ export default function RequisicaoDetalhe() {
                 {orfaos.map(i => (
                   <div key={i.id} className="flex items-center gap-2 px-3 py-2">
                     <span className="text-xs text-slate-700 flex-1 truncate" title={i.descricao}>{i.descricao}</span>
+                    <VincularItemCatalogo
+                      riId={i.id!}
+                      descricaoLivre={i.descricao}
+                      onDone={setEnviarMsg}
+                    />
                     <button
-                      onClick={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}`, '_blank', 'noopener')}
+                      onClick={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}&ri=${i.id}`, '_blank', 'noopener')}
                       className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500 text-white text-[10px] font-bold hover:bg-orange-600 transition-all flex-shrink-0"
                     >
                       <ExternalLink size={11} /> Cadastrar

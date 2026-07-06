@@ -487,6 +487,28 @@ export function useEnviarParaAprovacao() {
   })
 }
 
+// Vínculo MANUAL de item órfão a um item de catálogo escolhido pelo comprador.
+// Contorna o match por descrição (que falha quando o texto livre traz marca e o
+// catálogo é sem marca). RPC SECURITY DEFINER — mig 184.
+export function useVincularItemManual() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ riId, itemId }: { riId: string; itemId: string }) => {
+      const { data, error } = await supabase.rpc('fn_vincular_item_rc_manual', {
+        p_ri_id: riId,
+        p_item_id: itemId,
+      })
+      if (error) throw error
+      return data as { ok: boolean; item_id: string; codigo: string; descricao: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 export function useProcessarAprovacao() {
   const qc = useQueryClient()
   return useMutation({

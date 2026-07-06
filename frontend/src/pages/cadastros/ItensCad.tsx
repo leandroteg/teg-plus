@@ -43,12 +43,19 @@ export default function ItensCad() {
   const [sortCol, setSortCol] = useState<string>('descricao')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Linha de RC (cmp_requisicao_itens.id) que abriu este cadastro — ao salvar um
+  // item NOVO, vinculamos essa linha ao item recém-criado (fluxo aguardando_catalogo).
+  const [vinculoRi, setVinculoRi] = useState<string | null>(null)
+  const [vinculoMsg, setVinculoMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // Prefill via query param ?descricao=X — usado pelo fluxo "aguardando_catalogo"
   // do RequisicaoDetalhe: abre o modal com a descricao livre da RC ja preenchida.
+  // ?ri=<id> (opcional): vincula a linha da RC ao item ao salvar.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const desc = params.get('descricao')
+    const ri = params.get('ri')
+    if (ri && ri.trim()) setVinculoRi(ri.trim())
     if (desc && desc.trim()) {
       setEditItem({ ...EMPTY, descricao: desc.trim() })
       setClasseBusca('')
@@ -200,12 +207,37 @@ export default function ItensCad() {
         ? (editItem.ponto_reposicao ?? editItem.estoque_minimo ?? 0)
         : 0,
     }
-    await salvar.mutateAsync(payload)
+    const isNovo = !editItem.id
+    const novoId = await salvar.mutateAsync(payload)
+
+    // Fluxo aguardando_catalogo: item criado a partir de uma linha de RC — vincula
+    // a linha ao item recém-criado (por id, sem depender de match de descrição).
+    if (isNovo && vinculoRi && novoId) {
+      try {
+        const { error } = await supabase.rpc('fn_vincular_item_rc_manual', {
+          p_ri_id: vinculoRi,
+          p_item_id: novoId,
+        })
+        if (error) throw error
+        setVinculoMsg({ type: 'success', msg: 'Item cadastrado e vinculado à requisição. Pode voltar à aba da RC.' })
+        setVinculoRi(null)
+      } catch (e) {
+        setVinculoMsg({ type: 'error', msg: `Item cadastrado, mas o vínculo falhou: ${(e as Error).message}` })
+      }
+    }
     closeForm()
   }
 
   return (
     <div className="space-y-4">
+      {vinculoMsg && (
+        <div className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm ${vinculoMsg.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          <span>{vinculoMsg.msg}</span>
+          <button onClick={() => setVinculoMsg(null)} className="shrink-0 opacity-60 hover:opacity-100">
+            <X size={15} />
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">Catalogo de Itens</h1>

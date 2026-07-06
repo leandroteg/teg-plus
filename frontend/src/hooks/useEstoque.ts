@@ -65,6 +65,29 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
   })
 }
 
+// Busca ampla no catálogo (sem filtro de categoria) — usada no vínculo MANUAL
+// de item órfão de RC, onde o comprador já sabe qual item apontar e não pode
+// ser limitado pelo mapeamento categoria→estoque.
+export function useItemCatalogSearchAll(search: string) {
+  return useQuery<EstItem[]>({
+    queryKey: ['est-itens-catalog-all', search],
+    enabled: search.trim().length >= 2,
+    queryFn: async () => {
+      const term = `%${search.trim()}%`
+      const { data, error } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, categoria, categoria_financeira_descricao, valor_medio')
+        .eq('ativo', true)
+        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
+        .order('descricao')
+        .limit(30)
+      if (error) return []
+      return (data ?? []) as EstItem[]
+    },
+    staleTime: 15_000,
+  })
+}
+
 // ── Bases ─────────────────────────────────────────────────────────────────────
 export function useBases() {
   return useQuery<EstBase[]>({
@@ -175,7 +198,7 @@ export function useFichaItemEstoque(codigo: string | undefined) {
 export function useSalvarItem() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Partial<EstItem> & { id?: string }) => {
+    mutationFn: async (payload: Partial<EstItem> & { id?: string }): Promise<string> => {
       const { id, ...rest } = payload
       if (rest.descricao) rest.descricao = rest.descricao.replace(/^"+|"+$/g, '').trim()
       // Guarda final: força `unidade` para o enum est_unidade (UPPER + valid).
@@ -185,10 +208,13 @@ export function useSalvarItem() {
       if (id) {
         const { error } = await supabase.from('est_itens').update(rest).eq('id', id)
         if (error) throw error
-      } else {
-        const { error } = await supabase.from('est_itens').insert(rest)
-        if (error) throw error
+        return id
       }
+      // Retorna o id do novo item p/ quem precisa vincular na sequência
+      // (fluxo aguardando_catalogo: cadastro a partir da RC linka a linha órfã).
+      const { data, error } = await supabase.from('est_itens').insert(rest).select('id').single()
+      if (error) throw error
+      return (data as { id: string }).id
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['est-itens'] })
