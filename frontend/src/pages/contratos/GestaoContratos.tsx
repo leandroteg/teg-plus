@@ -1287,7 +1287,9 @@ export function NovaMedicaoModal({
   contratoInicial?: string
 }) {
   const criar = useCriarMedicao()
+  const upload = useUploadMedicaoArquivo()
   const today = new Date().toISOString().slice(0, 10)
+  const [file, setFile] = useState<File | null>(null)
   const [contratoId, setContratoId] = useState(contratoInicial ?? '')
   const [numeroBm, setNumeroBm] = useState(() => {
     const cid = contratoInicial ?? ''
@@ -1326,10 +1328,10 @@ export function NovaMedicaoModal({
   const reset = () => {
     setContratoId(contratoInicial ?? ''); setNumeroBm(''); setBmTouched(false)
     setPeriodoInicio(today); setPeriodoFim(today)
-    setValorMedido(''); setValorRetencao(''); setObservacoes('')
+    setValorMedido(''); setValorRetencao(''); setObservacoes(''); setFile(null)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!contratoId) { onToast('error', 'Selecione o contrato'); return }
     if (!numeroBm.trim()) { onToast('error', 'Informe o número do BM'); return }
     if (!periodoInicio || !periodoFim) { onToast('error', 'Informe o período (início e fim)'); return }
@@ -1337,8 +1339,8 @@ export function NovaMedicaoModal({
     if (medido <= 0) { onToast('error', 'Valor medido deve ser maior que zero'); return }
     if (retencao > medido) { onToast('error', 'Retenção não pode ser maior que o valor medido'); return }
 
-    criar.mutate(
-      {
+    try {
+      const criada = await criar.mutateAsync({
         contrato_id: contratoId,
         numero_bm: numeroBm.trim().toUpperCase(),
         periodo_inicio: periodoInicio,
@@ -1348,15 +1350,22 @@ export function NovaMedicaoModal({
         // valor_liquido é coluna gerada no banco (valor_medido - valor_retencao); não enviar
         status: 'em_aprovacao',
         observacoes: observacoes.trim() || undefined,
-      } as any,
-      {
-        onSuccess: () => {
-          onToast('success', 'Medição criada com sucesso')
-          reset(); onClose()
-        },
-        onError: (err: any) => onToast('error', `Erro ao criar medição: ${err?.message ?? 'desconhecido'}`),
+      } as any)
+      if (file) {
+        try {
+          await upload.mutateAsync({ medicaoId: criada.id, file })
+          onToast('success', 'Medição criada com documento anexado')
+        } catch (e: any) {
+          // Medição já existe — não bloqueia; dá pra anexar depois pela lista.
+          onToast('error', `Medição criada, mas o anexo falhou: ${e?.message ?? 'desconhecido'}. Anexe pela lista de medições.`)
+        }
+      } else {
+        onToast('success', 'Medição criada com sucesso')
       }
-    )
+      reset(); onClose()
+    } catch (err: any) {
+      onToast('error', `Erro ao criar medição: ${err?.message ?? 'desconhecido'}`)
+    }
   }
 
   if (!open) return null
@@ -1474,22 +1483,41 @@ export function NovaMedicaoModal({
               className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30 resize-none"
             />
           </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Documento (opcional)</label>
+            <p className="text-[11px] text-slate-400 mb-1.5">Planilha de medição, boletim (BM) ou nota — acompanha a medição até o Financeiro.</p>
+            {file ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-fuchsia-700 truncate">
+                  <Paperclip size={12} /> {file.name}
+                </span>
+                <button onClick={() => setFile(null)} disabled={criar.isPending || upload.isPending} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer">
+                <Upload size={14} /> Selecionar arquivo
+                <input type="file" className="hidden" disabled={criar.isPending || upload.isPending}
+                  onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
           <button
             onClick={onClose}
-            disabled={criar.isPending}
+            disabled={criar.isPending || upload.isPending}
             className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-all disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
-            disabled={criar.isPending}
+            disabled={criar.isPending || upload.isPending}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all disabled:opacity-50"
           >
-            {criar.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            {(criar.isPending || upload.isPending) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
             Criar Medição
           </button>
         </div>
@@ -1924,18 +1952,17 @@ function TabMedicoes() {
                             </button>
                           )}
                           {jaEnviada && (
-                            <div className="inline-flex items-center gap-1.5">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
-                                <CheckCircle2 size={11} /> No Financeiro
-                              </span>
-                              <MedicaoAnexoInline medicao={m} onToast={showToast} />
-                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700">
+                              <CheckCircle2 size={11} /> No Financeiro
+                            </span>
                           )}
                           {m.status === 'rejeitado' && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500">
                               <XCircle size={11} /> Rejeitada
                             </span>
                           )}
+                          {/* Anexo disponível em qualquer status — o doc acompanha a medição até o Financeiro */}
+                          <MedicaoAnexoInline medicao={m} onToast={showToast} />
                         </div>
                       </td>
                     </tr>
