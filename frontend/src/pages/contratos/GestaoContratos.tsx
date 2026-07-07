@@ -392,7 +392,7 @@ function TabContratos() {
   const { hasSetorPapel, perfil } = useAuth()
   const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('vigente')   // pré-filtrado: só vigentes
   const [tipoFilter, setTipoFilter] = useState('')
   const [filtroGrupo, setFiltroGrupo] = useState<string>('')
   const [vencFilter, setVencFilter] = useState('')   // absorve a antiga aba Vencimentos
