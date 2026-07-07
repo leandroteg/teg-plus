@@ -10,7 +10,7 @@ import { useEfetivoReal, useEquipeObrasReal, type EquipeObrasReal } from '../../
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
-  DRV, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
+  DRV, COR_PREL, COR_ADM, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
   buildTree, makeDefaultConfig, projObra, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 
@@ -232,9 +232,23 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                                             <td className={`${tdx} pr-3 font-semibold`} style={{ color: r.d.cor }}>{fmtM(rowTot)}</td>
                                           </tr>
                                         ) })}
+                                        {o.prelR > 0 && (
+                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_PREL }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Preliminares</b> <span className="text-slate-400">Serv. Prelim. + Canteiro · {fmtM(o.prelR)}</span></td>
+                                            {mesesArr.map((_, i) => { const v = pj.prelRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                            <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.prelR)}</td>
+                                          </tr>
+                                        )}
+                                        {o.admR > 0 && (
+                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_ADM }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Administração</b> <span className="text-slate-400">{fmtM(o.admR)}</span></td>
+                                            {mesesArr.map((_, i) => { const v = pj.admRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                            <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.admR)}</td>
+                                          </tr>
+                                        )}
                                         {o.outrosR > 0 && (
                                           <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>ADM + Outros</b> <span className="text-slate-400">{fmtM(o.outrosR)}</span></td>
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_OUTROS }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Outros</b> <span className="text-slate-400">desmont/conf/aterr… · {fmtM(o.outrosR)}</span></td>
                                             {mesesArr.map((_, i) => { const v = pj.outrosRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
                                             <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.outrosR)}</td>
                                           </tr>
