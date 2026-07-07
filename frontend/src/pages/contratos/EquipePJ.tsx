@@ -1,293 +1,222 @@
+// pages/contratos/EquipePJ.tsx — Equipe PJ (SIGILOSO)
+// Valores mensais individuais dos prestadores PJ. Proteção em 2 camadas:
+// RLS na tabela con_equipe_pj (admin / diretor-ceo / supervisor de Contratos) + gate nesta tela.
+// A soma dos ativos vira o contrato agregado EQUIPE-PJ (aparece na Gestão e no Provisionado
+// só com o TOTAL — base do fluxo de caixa previsto), mantido por trigger no banco.
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  Users, Search, UserCheck, UserX, Clock, FileText,
-  Building2, Calendar, Briefcase, BadgeDollarSign,
-  Plus, Eye,
+  Users, Lock, ShieldCheck, Loader2, CheckCircle2, BadgeDollarSign, Ban,
 } from 'lucide-react'
-import { useContratos } from '../../hooks/useContratos'
-import { useSolicitacoes } from '../../hooks/useSolicitacoes'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 
-const fmt = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
 
-const fmtData = (d: string) =>
-  new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-
-type StatusPJ = 'ativo' | 'em_processo' | 'encerrado'
-
-const STATUS_CFG: Record<StatusPJ, { label: string; dot: string; bg: string; text: string; icon: typeof UserCheck }> = {
-  ativo:       { label: 'Ativo',       dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: UserCheck },
-  em_processo: { label: 'Em Processo', dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',   icon: Clock },
-  encerrado:   { label: 'Encerrado',   dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-600',   icon: UserX },
+interface LinhaPJ {
+  colaborador_id: string
+  nome: string
+  cargo: string | null
+  valor_mensal: number
+  row_ativo: boolean
+  tem_linha: boolean
 }
 
-const FILTROS = [
-  { label: 'Todos',       value: '' },
-  { label: 'Ativos',      value: 'ativo' },
-  { label: 'Em Processo',  value: 'em_processo' },
-  { label: 'Encerrados',  value: 'encerrado' },
-]
-
 export default function EquipePJ() {
-  const nav = useNavigate()
-  const [busca, setBusca] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState('')
+  const { perfil, hasSetorPapel } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
+  const qc = useQueryClient()
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const [okId, setOkId] = useState<string | null>(null)
 
-  // PJ contracts (is_pj or tipo_contrato pj)
-  const { data: contratos = [], isLoading: loadingCon } = useContratos()
-  // PJ solicitacoes
-  const { data: solicitacoes = [], isLoading: loadingSol } = useSolicitacoes()
-
-  const isLoading = loadingCon || loadingSol
-
-  // Build unified PJ list
-  type PJItem = {
-    id: string
-    tipo: 'contrato' | 'solicitacao'
-    nome: string
-    cnpj?: string
-    numero: string
-    objeto: string
-    valor?: number
-    status: StatusPJ
-    vigencia_inicio?: string
-    vigencia_fim?: string
-    obra?: string
-    centro_custo?: string
-  }
-
-  const pjContratos: PJItem[] = contratos
-    .filter(c => c.is_pj || c.tipo_contrato === 'pj')
-    .map(c => {
-      const nome = c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? c.cliente?.nome ?? '—'
-      const statusPJ: StatusPJ = c.status === 'vigente' || c.status === 'assinado'
-        ? 'ativo'
-        : c.status === 'encerrado' || c.status === 'rescindido'
-          ? 'encerrado'
-          : 'em_processo'
-      return {
-        id: c.id,
-        tipo: 'contrato' as const,
-        nome,
-        cnpj: c.fornecedor?.cnpj ?? c.cliente?.cnpj,
-        numero: c.numero,
-        objeto: c.objeto,
-        valor: c.valor_total,
-        status: statusPJ,
-        vigencia_inicio: c.data_inicio,
-        vigencia_fim: c.data_fim_previsto,
-        obra: c.obra?.nome,
-        centro_custo: c.centro_custo,
-      }
-    })
-
-  const pjSolicitacoes: PJItem[] = solicitacoes
-    .filter(s => s.tipo_contraparte === 'pj')
-    .filter(s => s.status !== 'cancelado')
-    .map(s => ({
-      id: s.id,
-      tipo: 'solicitacao' as const,
-      nome: s.contraparte_nome,
-      cnpj: s.contraparte_cnpj ?? undefined,
-      numero: s.numero,
-      objeto: s.objeto,
-      valor: s.valor_estimado ?? undefined,
-      status: 'em_processo' as StatusPJ,
-      vigencia_inicio: s.data_inicio_prevista ?? undefined,
-      vigencia_fim: s.data_fim_prevista ?? undefined,
-      centro_custo: s.centro_custo ?? undefined,
-    }))
-
-  // Deduplicate: if a solicitacao already has a contrato, skip it
-  const contratoSolIds = new Set(contratos.filter(c => c.solicitacao_id).map(c => c.solicitacao_id))
-  const uniqueSol = pjSolicitacoes.filter(s => !contratoSolIds.has(s.id))
-
-  const items: PJItem[] = [...pjContratos, ...uniqueSol]
-
-  const filtered = items.filter(i => {
-    if (filtroStatus && i.status !== filtroStatus) return false
-    if (busca) {
-      const q = busca.toLowerCase()
-      return (
-        i.nome.toLowerCase().includes(q) ||
-        i.numero.toLowerCase().includes(q) ||
-        i.objeto.toLowerCase().includes(q) ||
-        (i.cnpj?.includes(q) ?? false)
-      )
-    }
-    return true
+  const { data: linhas = [], isLoading } = useQuery<LinhaPJ[]>({
+    queryKey: ['con-equipe-pj'],
+    enabled: canPJ,
+    queryFn: async () => {
+      const [colabs, rows] = await Promise.all([
+        supabase.from('rh_colaboradores').select('id, nome, cargo')
+          .eq('ativo', true).ilike('tipo_contrato', 'pj').order('nome'),
+        supabase.from('con_equipe_pj').select('colaborador_id, valor_mensal, ativo'),
+      ])
+      const mapa = new Map((rows.data ?? []).map(r => [r.colaborador_id, r]))
+      return (colabs.data ?? []).map(c => {
+        const r = mapa.get(c.id)
+        return {
+          colaborador_id: c.id, nome: c.nome, cargo: c.cargo,
+          valor_mensal: Number(r?.valor_mensal ?? 0),
+          row_ativo: r?.ativo ?? true,
+          tem_linha: !!r,
+        }
+      })
+    },
   })
 
-  const ativos = items.filter(i => i.status === 'ativo').length
-  const emProcesso = items.filter(i => i.status === 'em_processo').length
-  const totalValor = items.filter(i => i.status === 'ativo').reduce((s, i) => s + (i.valor ?? 0), 0)
+  const salvar = useMutation({
+    mutationFn: async (i: { colaboradorId: string; valor?: number; ativo?: boolean }) => {
+      const patch: Record<string, unknown> = {
+        colaborador_id: i.colaboradorId,
+        atualizado_em: new Date().toISOString(),
+        atualizado_por_nome: perfil?.nome ?? null,
+      }
+      if (i.valor !== undefined) patch.valor_mensal = i.valor
+      if (i.ativo !== undefined) patch.ativo = i.ativo
+      const { error } = await supabase.from('con_equipe_pj')
+        .upsert(patch, { onConflict: 'colaborador_id' })
+      if (error) throw error
+    },
+    onSuccess: (_, v) => {
+      setOkId(v.colaboradorId); setTimeout(() => setOkId(null), 1800)
+      qc.invalidateQueries({ queryKey: ['con-equipe-pj'] })
+      qc.invalidateQueries({ queryKey: ['contratos'] })
+    },
+  })
 
-  if (isLoading) {
+  // ── Acesso restrito ─────────────────────────────────────────────────────────
+  if (!canPJ) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+          <Lock size={28} className="text-slate-400" />
+        </div>
+        <p className="text-sm font-bold text-slate-600">Acesso restrito</p>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          Os valores da Equipe PJ são sigilosos. Somente administradores e a supervisão
+          do módulo Contratos podem abrir esta tela.
+        </p>
       </div>
     )
+  }
+
+  const total = linhas.filter(l => l.row_ativo).reduce((s, l) => s + l.valor_mensal, 0)
+  const preenchidos = linhas.filter(l => l.row_ativo && l.valor_mensal > 0).length
+
+  function valorEditado(l: LinhaPJ): string {
+    return edits[l.colaborador_id] ?? (l.valor_mensal ? String(l.valor_mensal).replace('.', ',') : '')
+  }
+  function salvarValor(l: LinhaPJ) {
+    const raw = (edits[l.colaborador_id] ?? '').trim()
+    if (raw === '') return
+    const num = Number(raw.replace(/\./g, '').replace(',', '.'))
+    if (!Number.isFinite(num) || num < 0) return
+    if (num === l.valor_mensal) { setEdits(e => { const n = { ...e }; delete n[l.colaborador_id]; return n }); return }
+    salvar.mutate({ colaboradorId: l.colaborador_id, valor: num })
+    setEdits(e => { const n = { ...e }; delete n[l.colaborador_id]; return n })
   }
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-            <Users size={20} className="text-indigo-500" />
-            Equipe PJ
+            <Users size={20} className="text-indigo-500" /> Equipe PJ
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-wide">
+              <Lock size={10} /> sigiloso
+            </span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Prestadores de serviço pessoa jurídica vinculados a contratos
+            Valores mensais dos prestadores PJ. A soma alimenta o contrato agregado
+            <span className="font-mono font-semibold"> EQUIPE-PJ</span> (Gestão/Provisionado) — só o total é visível fora daqui.
           </p>
         </div>
-        <button
-          onClick={() => nav('/contratos/solicitacoes/nova')}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 text-white
-            text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm"
-        >
-          <Plus size={14} />
-          Novo PJ
-        </button>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total PJs</p>
-          <p className="text-2xl font-extrabold text-slate-800 mt-1">{items.length}</p>
-        </div>
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-4">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Ativos</p>
-          <p className="text-2xl font-extrabold text-emerald-700 mt-1">{ativos}</p>
-        </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4">
-          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Em Processo</p>
-          <p className="text-2xl font-extrabold text-amber-700 mt-1">{emProcesso}</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-4">
-          <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Valor Mensal</p>
-          <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmt(totalValor)}</p>
+          <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Total mensal (ativos)</p>
+          <p className="text-xl font-extrabold text-indigo-700 mt-1">{fmt(total)}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PJs ativos</p>
+          <p className="text-xl font-extrabold text-slate-800 mt-1">{linhas.filter(l => l.row_ativo).length}</p>
+        </div>
+        <div className={`rounded-2xl border p-4 ${preenchidos === linhas.length ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${preenchidos === linhas.length ? 'text-emerald-600' : 'text-amber-600'}`}>Com valor definido</p>
+          <p className={`text-xl font-extrabold mt-1 ${preenchidos === linhas.length ? 'text-emerald-700' : 'text-amber-700'}`}>{preenchidos}/{linhas.length}</p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar prestador, CNPJ, contrato..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          />
-        </div>
-        <div className="flex gap-1">
-          {FILTROS.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFiltroStatus(f.value)}
-              className={`px-3 py-2 rounded-xl text-[10px] font-bold transition-all ${
-                filtroStatus === f.value
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      {/* Aviso de proteção */}
+      <div className="flex items-start gap-2 rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
+        <ShieldCheck size={16} className="text-indigo-500 shrink-0 mt-0.5" />
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          Estes valores ficam numa tabela protegida por RLS no banco — nem a API entrega os dados
+          a quem não for administrador ou supervisão de Contratos. No módulo, todos veem apenas o bloco
+          agregado com o total.
+        </p>
       </div>
 
-      {/* List */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-            <Users size={28} className="text-indigo-300" />
-          </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum prestador PJ encontrado</p>
-          <p className="text-xs text-slate-400 mt-1">Crie uma solicitacao de contrato PJ para comecar</p>
+      {/* Lista */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={26} className="animate-spin text-indigo-500" />
         </div>
+      ) : linhas.length === 0 ? (
+        <p className="text-center text-sm text-slate-400 py-12">Nenhum colaborador PJ ativo no headcount.</p>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(item => {
-            const st = STATUS_CFG[item.status]
-            const Icon = st.icon
-            return (
-              <div
-                key={`${item.tipo}-${item.id}`}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md
-                  transition-all p-4 cursor-pointer"
-                onClick={() => {
-                  if (item.tipo === 'solicitacao') nav(`/contratos/solicitacoes/${item.id}`)
-                  else nav(`/contratos/gestao`)
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl ${st.bg} flex items-center justify-center shrink-0`}>
-                    <Icon size={16} className={st.text} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{item.nome}</p>
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 ${st.bg} ${st.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                          {st.label}
-                        </span>
-                      </div>
-                      {item.valor != null && (
-                        <p className="text-sm font-extrabold text-indigo-600 shrink-0">{fmt(item.valor)}</p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prestador</th>
+                <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Cargo</th>
+                <th className="text-right px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[220px]">Valor mensal (R$)</th>
+                <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[90px]">No total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {linhas.map(l => (
+                <tr key={l.colaborador_id} className={l.row_ativo ? '' : 'opacity-50'}>
+                  <td className="px-4 py-2.5">
+                    <p className="text-xs font-bold text-slate-700">{l.nome}</p>
+                  </td>
+                  <td className="px-4 py-2.5 hidden sm:table-cell">
+                    <p className="text-[11px] text-slate-400">{l.cargo || '—'}</p>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="inline-flex items-center gap-1.5">
+                      {okId === l.colaborador_id && <CheckCircle2 size={13} className="text-emerald-500" />}
+                      {l.valor_mensal === 0 && !edits[l.colaborador_id] && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 uppercase">definir</span>
                       )}
+                      <BadgeDollarSign size={13} className="text-slate-300" />
+                      <input
+                        inputMode="decimal"
+                        value={valorEditado(l)}
+                        onChange={e => setEdits(m => ({ ...m, [l.colaborador_id]: e.target.value }))}
+                        onBlur={() => salvarValor(l)}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                        placeholder="0,00"
+                        disabled={!l.row_ativo || salvar.isPending}
+                        className="w-[120px] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-right text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 disabled:bg-slate-50"
+                      />
                     </div>
-
-                    <p className="text-[11px] text-slate-500 mt-1 truncate">{item.objeto}</p>
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                        <FileText size={10} />
-                        <span className="font-mono font-semibold">{item.numero}</span>
-                      </div>
-                      {item.cnpj && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                          <Building2 size={10} />
-                          {item.cnpj}
-                        </div>
-                      )}
-                      {item.vigencia_inicio && item.vigencia_fim && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                          <Calendar size={10} />
-                          {fmtData(item.vigencia_inicio)} — {fmtData(item.vigencia_fim)}
-                        </div>
-                      )}
-                      {item.obra && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                          <Briefcase size={10} />
-                          {item.obra}
-                        </div>
-                      )}
-                      {item.centro_custo && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-indigo-500 font-medium">
-                          <BadgeDollarSign size={10} />
-                          {item.centro_custo}
-                        </div>
-                      )}
-                      <span className={`text-[9px] font-semibold rounded-full px-2 py-0.5 ${
-                        item.tipo === 'solicitacao' ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500'
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <button
+                      onClick={() => salvar.mutate({ colaboradorId: l.colaborador_id, ativo: !l.row_ativo })}
+                      title={l.row_ativo ? 'Tirar do total (não soma no contrato agregado)' : 'Voltar a somar no total'}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                        l.row_ativo
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
+                          : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200'
                       }`}>
-                        {item.tipo === 'solicitacao' ? 'Solicitação' : 'Contrato'}
-                      </span>
-                    </div>
-                  </div>
-                  <Eye size={14} className="text-slate-300 mt-1 shrink-0" />
-                </div>
-              </div>
-            )
-          })}
+                      {l.row_ativo ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                      {l.row_ativo ? 'Sim' : 'Não'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-slate-200 bg-slate-50/60">
+                <td className="px-4 py-3 text-xs font-extrabold text-slate-600" colSpan={2}>Total mensal (vai pro contrato EQUIPE-PJ)</td>
+                <td className="px-4 py-3 text-right text-sm font-extrabold text-indigo-700">{fmt(total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
     </div>
