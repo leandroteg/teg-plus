@@ -184,8 +184,8 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   const secSubtotal = (items: string[]) => (ym: string) => items.reduce((s, it) => s + (mapa.get(it)?.get(ym) ?? 0), 0)
   const totalSaidas = (ym: string) => SECTIONS.reduce((s, sec) => s + secSubtotal(sec.items)(ym), 0)
 
-  const td = 'px-3 py-2 text-right text-[11px] font-mono whitespace-nowrap'
-  const tdLbl = 'px-3 py-2 text-[11px] font-medium whitespace-nowrap'
+  const td = 'px-3 py-2 text-right text-[13px] font-mono whitespace-nowrap'
+  const tdLbl = 'px-3 py-2 text-[13px] font-medium whitespace-nowrap'
   const secBg = isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'
   const border = isDark ? 'divide-white/[0.05]' : 'divide-slate-100'
   const txt = isDark ? 'text-slate-300' : 'text-slate-600'
@@ -204,9 +204,9 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
         <table className={`w-full divide-y ${border}`}>
           <thead>
             <tr className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Categoria</th>
-              {meses.map(ym => <th key={ym} className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 whitespace-nowrap">{ymLbl(ym)}</th>)}
-              <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400">Total</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">Categoria</th>
+              {meses.map(ym => <th key={ym} className="px-3 py-2.5 text-right text-[11px] font-bold uppercase text-slate-400 whitespace-nowrap">{ymLbl(ym)}</th>)}
+              <th className="px-3 py-2.5 text-right text-[11px] font-bold uppercase text-slate-400">Total</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${border}`}>
@@ -216,7 +216,7 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
             {SECTIONS.map(sec => (
               <>
                 <tr key={sec.title} className={secBg}>
-                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">{sec.title}</td>
+                  <td colSpan={meses.length + 2} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider">{sec.title}</td>
                 </tr>
                 {sec.items.map(it => <Linha key={it} sub label={it} val={catDe(it)} />)}
                 <Linha label="Subtotal" val={secSubtotal(sec.items)}
