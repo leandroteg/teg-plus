@@ -61,10 +61,10 @@ type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText },
+  { key: 'aditivos',     label: 'Aditivos e Reajustes', icon: FileSignature },
   { key: 'medicoes',     label: 'Medições',     icon: Receipt },
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
-  { key: 'aditivos',     label: 'Aditivos e Reajustes', icon: FileSignature },
 ]
 
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
