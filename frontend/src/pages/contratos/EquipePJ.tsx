@@ -1,8 +1,8 @@
 // pages/contratos/EquipePJ.tsx — Equipe PJ (SIGILOSO, sem item de menu)
 // Acessada só pelo bloco agregado "EQUIPE-PJ" na Gestão de Contratos.
 // Lista enxuta integrada ao RH (headcount): nome, cargo, base e admissão vêm de
-// rh_colaboradores; o valor mensal fica em con_equipe_pj (RLS: admin/supervisão
-// de Contratos). A soma mantém o contrato agregado (Provisionado/fluxo de caixa).
+// rh_colaboradores. Valores individuais ficam SÓ no banco (con_equipe_pj, RLS);
+// a tela mostra apenas o total mensal. A soma mantém o agregado (Provisionado).
 import { useState } from 'react'
 import { ArrowLeft, Lock, Loader2, CheckCircle2, Ban } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +28,6 @@ export default function EquipePJ() {
   const { perfil, hasSetorPapel } = useAuth()
   const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const qc = useQueryClient()
-  const [edits, setEdits] = useState<Record<string, string>>({})
   const [okId, setOkId] = useState<string | null>(null)
 
   const { data: linhas = [], isLoading } = useQuery<LinhaPJ[]>({
@@ -55,14 +54,13 @@ export default function EquipePJ() {
   })
 
   const salvar = useMutation({
-    mutationFn: async (i: { colaboradorId: string; valor?: number; ativo?: boolean }) => {
+    mutationFn: async (i: { colaboradorId: string; ativo: boolean }) => {
       const patch: Record<string, unknown> = {
         colaborador_id: i.colaboradorId,
+        ativo: i.ativo,
         atualizado_em: new Date().toISOString(),
         atualizado_por_nome: perfil?.nome ?? null,
       }
-      if (i.valor !== undefined) patch.valor_mensal = i.valor
-      if (i.ativo !== undefined) patch.ativo = i.ativo
       const { error } = await supabase.from('con_equipe_pj').upsert(patch, { onConflict: 'colaborador_id' })
       if (error) throw error
     },
@@ -85,20 +83,6 @@ export default function EquipePJ() {
 
   const total = linhas.filter(l => l.row_ativo).reduce((s, l) => s + l.valor_mensal, 0)
 
-  function valorEditado(l: LinhaPJ): string {
-    return edits[l.colaborador_id] ?? (l.valor_mensal ? String(l.valor_mensal).replace('.', ',') : '')
-  }
-  function salvarValor(l: LinhaPJ) {
-    const raw = (edits[l.colaborador_id] ?? '').trim()
-    if (raw === '') return
-    const num = Number(raw.replace(/\./g, '').replace(',', '.'))
-    if (!Number.isFinite(num) || num < 0 || num === l.valor_mensal) {
-      setEdits(e => { const n = { ...e }; delete n[l.colaborador_id]; return n }); return
-    }
-    salvar.mutate({ colaboradorId: l.colaborador_id, valor: num })
-    setEdits(e => { const n = { ...e }; delete n[l.colaborador_id]; return n })
-  }
-
   return (
     <div className="max-w-3xl space-y-4">
       {/* Header enxuto: voltar + título + total */}
@@ -115,7 +99,6 @@ export default function EquipePJ() {
                 <Lock size={9} /> sigiloso
               </span>
             </h1>
-            <p className="text-[11px] text-slate-400 truncate">Contrato agregado EQUIPE-PJ · a soma vai pro Provisionado</p>
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -144,19 +127,6 @@ export default function EquipePJ() {
                 </p>
               </div>
               {okId === l.colaborador_id && <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />}
-              <div className="relative shrink-0">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-300 font-bold">R$</span>
-                <input
-                  inputMode="decimal"
-                  value={valorEditado(l)}
-                  onChange={e => setEdits(m => ({ ...m, [l.colaborador_id]: e.target.value }))}
-                  onBlur={() => salvarValor(l)}
-                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                  placeholder="0,00"
-                  disabled={!l.row_ativo || salvar.isPending}
-                  className="w-[110px] pl-7 pr-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50/60 text-right text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:bg-white disabled:bg-slate-50"
-                />
-              </div>
               <button
                 onClick={() => salvar.mutate({ colaboradorId: l.colaborador_id, ativo: !l.row_ativo })}
                 title={l.row_ativo ? 'Tirar do total' : 'Voltar a somar no total'}
@@ -168,9 +138,6 @@ export default function EquipePJ() {
         </div>
       )}
 
-      <p className="text-[10px] text-slate-400 px-1">
-        Valores protegidos por RLS no banco (admin/supervisão de Contratos). Fora daqui, o módulo mostra só o total do bloco.
-      </p>
     </div>
   )
 }
