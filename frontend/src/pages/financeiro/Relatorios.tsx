@@ -9,7 +9,7 @@ import FluxoCaixaPrevisto from './FluxoCaixaPrevisto'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-export type ReportType = 'dre' | 'fluxo' | 'cc' | 'aging'
+export type ReportType = 'fluxo' | 'aging'
 
 // ── Filtro de período De → Até (mês/ano) — mesmo padrão do EGP ────────────────
 function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
@@ -69,7 +69,7 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
   de?: string; ate?: string
 } = {}) {
   const { isDark } = useTheme()
-  const activeReport: ReportType = initialTipo ?? 'dre'
+  const activeReport: ReportType = initialTipo ?? 'fluxo'
   const controlado = deProp != null && ateProp != null
   // padrão: jan → mês atual; Fluxo de Caixa abre próximo mês → fim do ano
   const [deState, setDeState] = useState(() => activeReport === 'fluxo' ? fluxoPeriodoDefault().de : `${new Date().getFullYear()}-01`)
@@ -86,29 +86,6 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
     ['pago', 'conciliado'].includes(c.status) ? (c.data_pagamento || c.data_vencimento) : c.data_vencimento))
   const crPeriodo = cr.filter(c => noPeriodo(
     ['recebido', 'conciliado'].includes(c.status) ? (c.data_recebimento || c.data_vencimento) : c.data_vencimento))
-
-  // Compute data
-  const totalDespesas = cpPeriodo
-    .filter(c => ['pago', 'conciliado'].includes(c.status))
-    .reduce((s, c) => s + c.valor_pago, 0)
-  const totalReceitas = crPeriodo
-    .filter(c => ['recebido', 'conciliado'].includes(c.status))
-    .reduce((s, c) => s + c.valor_recebido, 0)
-  const resultado = totalReceitas - totalDespesas
-
-  // Centro de custo breakdown
-  const ccMap = new Map<string, { pago: number; aberto: number }>()
-  cpPeriodo.forEach(c => {
-    const cc = c.centro_custo || 'Sem CC'
-    const curr = ccMap.get(cc) ?? { pago: 0, aberto: 0 }
-    if (['pago', 'conciliado'].includes(c.status)) curr.pago += c.valor_pago
-    else if (c.status !== 'cancelado') curr.aberto += c.valor_original
-    ccMap.set(cc, curr)
-  })
-  const ccData = [...ccMap.entries()]
-    .map(([cc, v]) => ({ cc, ...v, total: v.pago + v.aberto }))
-    .sort((a, b) => b.total - a.total)
-  const maxCC = ccData[0]?.total || 1
 
   // Aging buckets (universo = títulos em aberto com vencimento no período)
   const now = new Date()
@@ -134,104 +111,8 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
       )}
 
       {/* ── Report content ──────────────────────────────────── */}
-      {activeReport === 'dre' && (
-        <div className="space-y-4">
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <ArrowUpRight size={14} className="text-emerald-500" />
-                <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Receitas</p>
-              </div>
-              <p className="text-lg font-extrabold text-emerald-600">{fmt(totalReceitas)}</p>
-            </div>
-            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <ArrowDownRight size={14} className="text-red-500" />
-                <p className="text-[10px] text-red-500 font-semibold uppercase tracking-widest">Despesas</p>
-              </div>
-              <p className="text-lg font-extrabold text-red-600">{fmt(totalDespesas)}</p>
-            </div>
-            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white'}
-              ${resultado >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Minus size={14} className={resultado >= 0 ? 'text-emerald-500' : 'text-red-500'} />
-                <p className={`text-[10px] font-semibold uppercase tracking-widest
-                  ${resultado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>Resultado</p>
-              </div>
-              <p className={`text-lg font-extrabold ${resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {fmt(resultado)}
-              </p>
-            </div>
-          </div>
-
-          {/* DRE table */}
-          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Demonstrativo de Resultado do Exercício</p>
-            </div>
-            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
-              <DRERow isDark={isDark} label="(+) Receita Operacional" value={totalReceitas} bold isPositive />
-              <DRERow isDark={isDark} label="(-) Despesas Operacionais" value={totalDespesas} isPositive={false} />
-              <DRERow isDark={isDark} label="(-) Folha de Pagamento" value={0} isPositive={false} sub />
-              <DRERow isDark={isDark} label="(-) Fornecedores" value={totalDespesas} isPositive={false} sub />
-              <DRERow isDark={isDark} label="(-) Impostos" value={0} isPositive={false} sub />
-              <DRERow isDark={isDark} label="(=) Resultado Operacional" value={resultado} bold isPositive={resultado >= 0} highlight />
-              <DRERow isDark={isDark} label="(+/-) Resultado Financeiro" value={0} isPositive />
-              <DRERow isDark={isDark} label="(=) Resultado Líquido" value={resultado} bold isPositive={resultado >= 0} highlight />
-            </div>
-          </div>
-        </div>
-      )}
-
       {activeReport === 'fluxo' && (
         <FluxoCaixaPrevisto de={de} ate={ate} isDark={isDark} />
-      )}
-
-      {activeReport === 'cc' && (
-        <div className="space-y-4">
-          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Gastos por Centro de Custo</p>
-            </div>
-            {ccData.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum dado disponível</p>
-              </div>
-            ) : (
-              <div className="p-4 space-y-3">
-                {ccData.map(item => (
-                  <div key={item.cc}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.cc}</p>
-                      <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(item.total)}</p>
-                    </div>
-                    <div className={`h-2.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
-                      <div className="h-full rounded-full flex">
-                        <div
-                          className="bg-emerald-500 rounded-l-full"
-                          style={{ width: `${(item.pago / maxCC) * 100}%` }}
-                        />
-                        <div
-                          className="bg-amber-400"
-                          style={{ width: `${(item.aberto / maxCC) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-4 mt-1 text-[9px] text-slate-400">
-                      <span>Pago: {fmt(item.pago)}</span>
-                      <span>Aberto: {fmt(item.aberto)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-4 text-[10px] text-slate-400 px-1">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pago</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /> Em Aberto</span>
-          </div>
-        </div>
       )}
 
       {activeReport === 'aging' && (
@@ -334,25 +215,6 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
 }
 
 // ── Sub-components ─────────────────────────────────────────────
-
-function DRERow({ label, value, bold, isPositive, sub, highlight, isDark }: {
-  label: string; value: number; bold?: boolean; isPositive: boolean; sub?: boolean; highlight?: boolean; isDark: boolean
-}) {
-  return (
-    <div className={`flex items-center justify-between px-4 py-2.5
-      ${highlight ? (isDark ? 'bg-white/[0.02]' : 'bg-slate-50') : ''}
-      ${sub ? 'pl-8' : ''}`}>
-      <p className={`text-xs ${bold ? (isDark ? 'font-bold text-white' : 'font-bold text-slate-800') : (isDark ? 'font-medium text-slate-400' : 'font-medium text-slate-500')}
-        ${sub ? 'text-[11px]' : ''}`}>
-        {label}
-      </p>
-      <p className={`text-xs font-mono ${bold ? 'font-bold' : 'font-medium'}
-        ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-        {fmt(value)}
-      </p>
-    </div>
-  )
-}
 
 function FluxoBar({ label, value, textColor, barColor, max, isDark }: {
   label: string; value: number; textColor: string; barColor: string; max: number; isDark: boolean
