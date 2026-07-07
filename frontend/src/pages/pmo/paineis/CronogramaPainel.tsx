@@ -102,6 +102,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   }, [tree, fFrente, fObra, fPct, hideOM, applied])
 
   const totPessoas = useMemo(() => applied ? view.frentesF.flatMap(f => f.obras).reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, view.frentesF])
+  // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
+  const totPessoasAll = useMemo(() => applied ? allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, allObras])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
@@ -151,7 +153,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         <Kpi label="Saldo a faturar" value={fmtM(view.saldoRtot)} tone="amber" isDark={isDark} note="R$ restante (filtro)" />
         <Kpi label="Início" value={ymLabel(start)} tone="sky" isDark={isDark} note="próximo mês" />
         <Kpi label="Término previsto" value={view.terminoGeral ? ymLabel(view.terminoGeral) : '—'} tone="violet" isDark={isDark} note={`${view.maxMeses} mes(es)`} />
-        <Kpi label="Equipe" value={`${totPessoas} pessoas`} tone="teal" isDark={isDark} note="Fund. + Mont. + Lanç." />
+        <Kpi label="Equipe" value={`${totPessoasAll} pessoas`} tone="teal" isDark={isDark} note={totPessoas !== totPessoasAll ? `${totPessoas} no filtro atual` : 'Fund. + Mont. + Lanç.'} />
       </div>
 
       <PanelCard title="Cronograma por frente e obra" icon={<CalendarDays size={14} className="text-teal-500" />} isDark={isDark}
