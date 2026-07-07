@@ -5,7 +5,7 @@ import {
   TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Clock, Banknote, CreditCard,
-  Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
+  Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play, Users,
   LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
   Paperclip, ExternalLink, Upload,
 } from 'lucide-react'
@@ -1103,6 +1103,9 @@ function TabRecebiveis() {
 // ── Tab: Provisionado (A Pagar) ──────────────────────────────────────────────
 function TabProvisionado() {
   const { isDark } = useTheme()
+  const nav = useNavigate()
+  const { perfil, hasSetorPapel } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [statusFilter, setStatusFilter] = useState('')
   const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
   const [ate, setAte] = useState(ymMais(36))
@@ -1146,6 +1149,11 @@ function TabProvisionado() {
     if (statusFilter && p.status !== statusFilter) return false
     return true
   })
+
+  // Bloco agregado Equipe PJ fixo no topo (saldo do período = mensal × meses na janela)
+  const pjRow = filtered.find(p => p.contrato?.numero === 'EQUIPE-PJ')
+  const demais = filtered.filter(p => p.contrato?.numero !== 'EQUIPE-PJ')
+  const pjMeses = pjRow?.contrato?.valor_mensal ? Math.round(pjRow.aPagar / pjRow.contrato.valor_mensal) : 0
 
   const totalEmAberto = compromissos
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
@@ -1246,7 +1254,35 @@ function TabProvisionado() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(p => {
+          {pjRow && (
+            <div
+              onClick={() => { if (canPJ) nav('/contratos/equipe-pj') }}
+              className={`bg-white rounded-2xl border border-indigo-200 shadow-sm p-4 transition-all ${canPJ ? 'cursor-pointer hover:shadow-md' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <Users size={16} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-800 truncate flex items-center gap-2">
+                      Equipe PJ
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase tracking-wide">
+                        <Lock size={9} /> sigiloso
+                      </span>
+                    </p>
+                    <div className="text-right shrink-0 leading-tight">
+                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(pjRow.aPagar)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">no período</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {fmt(pjRow.contrato?.valor_mensal || 0)}/mês × {pjMeses} {pjMeses === 1 ? 'mês' : 'meses'} no período selecionado
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {demais.map(p => {
             const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
             const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
             return (
