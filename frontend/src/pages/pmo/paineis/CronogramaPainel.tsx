@@ -57,7 +57,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const { data: equipeObras, isLoading: equipeLoading } = useEquipeObrasReal()
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
-  const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
+  const [fPct, setFPct] = useState<Set<string>>(new Set()) // todos os % físicos visíveis por padrão
   const [hideOM, setHideOM] = useState(true) // O&M (manutenção) oculto por padrão
   const [hideSemProd, setHideSemProd] = useState(true) // obras sem produção projetada no período ocultas por padrão
   const [slot, setSlot] = useState<HTMLElement | null>(null)
