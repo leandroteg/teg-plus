@@ -983,11 +983,12 @@ function TabRecebiveis() {
     return true
   })
 
-  const medsEmAberto = meds.filter(m => m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  // Faturado = medições já enviadas ao Financeiro (não recebidas) + parcelas em aberto
+  const medsFaturadas = meds.filter(m => m.status === 'faturado' && m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
   const medsRecebidas = meds.filter(m => m.fin_status === 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
-  const totalEmAberto = recebiveis
+  const totalFaturado = recebiveis
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
-    .reduce((s, p) => s + p.valor, 0) + medsEmAberto
+    .reduce((s, p) => s + p.valor, 0) + medsFaturadas
   const totalRecebido = recebiveis
     .filter(p => p.status === 'pago')
     .reduce((s, p) => s + p.valor, 0) + medsRecebidas
@@ -1016,20 +1017,20 @@ function TabRecebiveis() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-indigo-500 uppercase">Saldo</p>
+          <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmt(saldoEgp)}</p>
+        </div>
         <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Em Aberto</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalEmAberto)}</p>
+          <p className="text-[10px] font-bold text-emerald-600 uppercase">Faturado</p>
+          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalFaturado)}</p>
         </div>
         <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
           <p className="text-[10px] font-bold text-blue-600 uppercase">Recebido</p>
           <p className="text-lg font-extrabold text-blue-700 mt-1">{fmt(totalRecebido)}</p>
         </div>
-        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-indigo-500 uppercase">Saldo EGP a faturar</p>
-          <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmt(saldoEgp)}</p>
-        </div>
         <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasadas</p>
+          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasado</p>
           <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
         </div>
       </div>
