@@ -167,14 +167,15 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   // SEM equipe alocada (drivers não produzem) → mede ZERO — nada de espalhar saldo sem produção.
   const propMes = (valor: number) => meses.map((_, m) => totDrvR > 0 ? valor * drvRmes[m] / totDrvR : 0)
   // Preliminares/Outros: medição por MARCOS do driver âncora — 25% do saldo a cada 25% atingido
-  // (Preliminares ← Fundação; Outros ← Montagem). Sem o driver na obra (ou já 100%), cai no proporcional geral.
+  // (Preliminares ← Fundação; Outros ← Montagem). Âncora JÁ 100% antes da projeção → saldo FICA EM ABERTO
+  // (não fatura só porque acabou); sem o driver âncora no escopo, mede junto da produção que existir.
   const marcoMes = (valor: number, anc: string) => {
     if (!(valor > 0)) return meses.map(() => 0)
     const c = contr[anc]
     if (!c || !(c > 0)) return propMes(valor)
     const pct0 = (real[anc] || 0) / c
     const marcos = [0.25, 0.5, 0.75, 1].filter(x => x > pct0 + 1e-9)
-    if (!marcos.length) return propMes(valor)
+    if (!marcos.length) return meses.map(() => 0) // âncora já concluída no passado → em aberto
     const porMarco = valor / marcos.length
     let prev = pct0
     return meses.map((_, m) => {
