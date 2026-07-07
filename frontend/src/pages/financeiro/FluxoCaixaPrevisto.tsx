@@ -130,7 +130,10 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   const receitaCronograma = new Map<string, number>()
   if (eap && eap.length) {
     const tree = buildTree(eap)
+    // espelha a visão padrão do painel Cronograma do EGP: O&M (manutenção) fora
     const obras = tree.flatMap(f => f.obras)
+      .filter(o => !(o.omR > 0 && !o.drivers.some(d => d.contr > 0)))
+      .map(o => o.omR > 0 ? { ...o, omR: 0, omOscs: [], saldoR: o.saldoR - o.omR } : o)
     const cfg = versoes?.[0]?.config ?? makeDefaultConfig(obras)
     const start = startYM()
     obras.forEach(o => {
