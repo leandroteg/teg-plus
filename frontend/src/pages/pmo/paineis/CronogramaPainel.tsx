@@ -223,6 +223,13 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                                         <th className={`${thx} pr-3`}>Total</th>
                                       </tr></thead>
                                       <tbody>
+                                        {o.prelR > 0 && (
+                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_PREL }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Preliminares</b> <span className="text-slate-400">Serv. Prelim. + Canteiro · {fmtM(o.prelR)}</span></td>
+                                            {mesesArr.map((_, i) => { const v = pj.prelRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
+                                            <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.prelR)}</td>
+                                          </tr>
+                                        )}
                                         {pj.rows.map(r => { const rowTot = r.rMes.reduce((s, x) => s + x, 0); return (
                                           <tr key={r.d.label} className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                                             <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: r.d.cor }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>{r.d.label}</b> <span className="text-slate-400">{fmtQ(r.d.saldoQ)} {r.d.uni} · {fmtM(r.d.saldoR)}</span></td>
@@ -232,13 +239,6 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                                             <td className={`${tdx} pr-3 font-semibold`} style={{ color: r.d.cor }}>{fmtM(rowTot)}</td>
                                           </tr>
                                         ) })}
-                                        {o.prelR > 0 && (
-                                          <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                                            <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_PREL }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Preliminares</b> <span className="text-slate-400">Serv. Prelim. + Canteiro · {fmtM(o.prelR)}</span></td>
-                                            {mesesArr.map((_, i) => { const v = pj.prelRmes[i] || 0; return <td key={i} className={tdx}>{v > 0 ? fmtM(v) : <span className="text-slate-400">·</span>}</td> })}
-                                            <td className={`${tdx} pr-3 font-semibold`}>{fmtM(o.prelR)}</td>
-                                          </tr>
-                                        )}
                                         {o.admR > 0 && (
                                           <tr className={`border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                                             <td className={`px-2 py-1 text-left text-[11px] truncate ${stk}`}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: COR_ADM }} /><b className={isDark ? 'text-slate-200' : 'text-slate-700'}>Administração</b> <span className="text-slate-400">{fmtM(o.admR)}</span></td>
