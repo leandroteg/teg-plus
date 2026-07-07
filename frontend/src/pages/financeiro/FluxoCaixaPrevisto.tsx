@@ -1,17 +1,76 @@
-// Fluxo de Caixa Previsto — matriz mensal (meses do filtro De→Até do Painel Financeiro).
-// RECEITAS: cronograma do EGP (engine projObra, mesma projeção do painel Cronograma);
-//   no mês em que já existe previsão real (fin_contas_receber de medição faturada), ela substitui.
-// SAÍDAS: linhas = classes financeiras agrupadas pelos grupos (fin_grupos/fin_classes),
-//   alimentadas por fin_contas_pagar (vencimento; pago usa data de pagamento)
-//   + seção Contratos Recorrentes (Provisionado: aluguéis, Equipe PJ etc., valor mensal na vigência).
-// RESULTADO: receitas − saídas, mês a mês.
+// Fluxo de Caixa Previsto — matriz mensal com a MESMA estrutura de categorias do
+// Plano Orçamentário da Controladoria (sempre todas as linhas), + RECEITAS no topo
+// e RESULTADO embaixo. Cada fonte é mapeada para UMA categoria:
+//   fin_contas_pagar  -> pela classe financeira (código/descrição, keywords + grupo)
+//   contratos recorrentes (Provisionado) -> pelo grupo do contrato
+//   folha CLT (última competência)       -> Mão de Obra Direta / Pessoal
+// RECEITAS: projeção do cronograma EGP; substituída pelo real (contas a receber)
+// nos meses em que já houver lançamento.
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 import { useEAPFinal } from '../../hooks/usePMO'
 import { buildTree, makeDefaultConfig, projObra, startYM, type Config } from '../pmo/paineis/cronogramaEngine'
-import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
-import type { GrupoContrato } from '../../types/contratos'
+
+// ── Estrutura fixa (idêntica ao Plano Orçamentário) ──────────────────────────
+const SECTIONS: { title: string; items: string[] }[] = [
+  { title: 'CUSTOS DIRETOS E IND. OBRAS', items: [
+    'Materiais (Aço, Concreto)', 'Mão de Obra Direta', 'Alojamentos e Alimentação',
+    'Frotas', 'Serviços Terc. + Outros C. Diretos', 'Equipamentos e EPIs'] },
+  { title: 'DESPESAS ADMINISTRATIVAS', items: [
+    'Pessoal', 'Administrativo', 'Serviços Administrativos', 'Sistemas', 'Desp Fin. e Outra Desp Adm'] },
+  { title: 'DESPESAS APÓS O LUCRO', items: [
+    'Amortizações', 'Investimentos', 'Impostos (PIS/COFINS/IRPJ/CSLL)'] },
+]
+
+// classe financeira (código CLS-GG.* + descrição) → categoria fixa
+function catDaClasse(codigo: string | null, descricao: string): string {
+  const d = descricao.toLowerCase()
+  if (/aço|aco|concreto|cimento|material/.test(d)) return 'Materiais (Aço, Concreto)'
+  if (/imposto|pis|cofins|irpj|csll|iss|icms|tribut|simples/.test(d)) return 'Impostos (PIS/COFINS/IRPJ/CSLL)'
+  if (/amortiz|financiamento|empr[eé]stimo|consórcio|consorcio/.test(d)) return 'Amortizações'
+  if (/investimento|imobilizado|patrim[oô]n|aquisi[cç][aã]o/.test(d)) return 'Investimentos'
+  if (/aloj|aliment|refei|hosped|pousada|loca[cç][aã]o de im[oó]v|aluguel/.test(d)) return 'Alojamentos e Alimentação'
+  if (/ve[ií]cul|frota|combust|abastec|ped[aá]gio|ipva|licenciam/.test(d)) return 'Frotas'
+  if (/equipament|epi|ferrament|m[aá]quina/.test(d)) return 'Equipamentos e EPIs'
+  if (/sistema|software|internet|telefon|licen[cç]a de uso/.test(d)) return 'Sistemas'
+  if (/juro|tarifa|banc[aá]|financeir|seguro|multa/.test(d)) return 'Desp Fin. e Outra Desp Adm'
+  const grp = /^CLS-(\d{2})/.exec(codigo ?? '')?.[1]
+  if (grp === '02') {
+    if (/sal[aá]rio|fopag|inss|fgts|rescis|f[eé]rias|13|gratifica|pens[aã]o|sindical|m[aã]o de obra|di[aá]ria/.test(d)) return 'Mão de Obra Direta'
+    if (/terceir|subcontrat|servi[cç]o/.test(d)) return 'Serviços Terc. + Outros C. Diretos'
+    return 'Serviços Terc. + Outros C. Diretos'
+  }
+  if (grp === '05') return 'Impostos (PIS/COFINS/IRPJ/CSLL)'
+  if (grp === '06') return 'Desp Fin. e Outra Desp Adm'
+  if (grp === '08') return 'Amortizações'
+  if (grp === '09') return 'Investimentos'
+  if (grp === '04') {
+    if (/sal[aá]rio|fopag|pessoal|inss|fgts|pr[oó]-labore/.test(d)) return 'Pessoal'
+    if (/contab|jur[ií]dic|consult|assessor|servi[cç]o/.test(d)) return 'Serviços Administrativos'
+    return 'Administrativo'
+  }
+  if (grp === '03') return 'Serviços Terc. + Outros C. Diretos'
+  if (/servi[cç]o|terceir|subcontrat/.test(d)) return 'Serviços Terc. + Outros C. Diretos'
+  return 'Administrativo'
+}
+
+// grupo do contrato recorrente → categoria fixa
+const CAT_CONTRATO: Record<string, string> = {
+  locacao_imovel: 'Alojamentos e Alimentação',
+  apoio_operacional: 'Alojamentos e Alimentação',
+  locacao_veiculos: 'Frotas',
+  locacao_equipamentos: 'Equipamentos e EPIs',
+  equipe_pj: 'Mão de Obra Direta',
+  servico_recorrente: 'Serviços Administrativos',
+  consultoria_juridico: 'Serviços Administrativos',
+  seguros: 'Desp Fin. e Outra Desp Adm',
+  aquisicao: 'Investimentos',
+  prestacao_servicos: 'Serviços Terc. + Outros C. Diretos',
+  subcontratacao_empreitada: 'Serviços Terc. + Outros C. Diretos',
+  outras_locacoes: 'Alojamentos e Alimentação',
+  outro: 'Serviços Terc. + Outros C. Diretos',
+}
 
 const fmtK = (v: number) => {
   if (Math.abs(v) < 0.5) return '—'
@@ -34,19 +93,17 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   const { data: cp = [] } = useContasPagar()
   const { data: cr = [] } = useContasReceber()
 
-  // grupos + classes financeiras (linhas); grupo da classe = prefixo do código (CLS-02.* → GRP-02)
   const { data: cad } = useQuery({
-    queryKey: ['fluxo-grupos-classes'],
+    queryKey: ['fluxo-cad'],
     queryFn: async () => {
-      const [g, c, ct, pf] = await Promise.all([
-        supabase.from('fin_grupos_financeiros').select('codigo, descricao, tipo').eq('ativo', true).order('codigo'),
-        supabase.from('fin_classes_financeiras').select('codigo, descricao, tipo').eq('ativo', true).order('codigo'),
-        supabase.from('con_contratos').select('numero, objeto, grupo_contrato, valor_mensal, recorrente, data_inicio, data_fim_previsto')
+      const [c, ct, pf] = await Promise.all([
+        supabase.from('fin_classes_financeiras').select('codigo, descricao'),
+        supabase.from('con_contratos').select('numero, grupo_contrato, valor_mensal, data_inicio, data_fim_previsto')
           .eq('tipo_contrato', 'despesa').eq('recorrente', true).in('status', ['assinado', 'vigente']),
         supabase.from('pmo_fluxo_os').select('portfolio_id').not('portfolio_id', 'is', null).limit(1),
       ])
       return {
-        grupos: g.data ?? [], classes: c.data ?? [], contratos: ct.data ?? [],
+        classes: c.data ?? [], contratos: ct.data ?? [],
         portfolioId: (pf.data?.[0] as { portfolio_id?: string } | undefined)?.portfolio_id,
       }
     },
@@ -61,22 +118,15 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
     },
   })
   const { data: eap } = useEAPFinal(cad?.portfolioId)
-
-  // Folha CLT: última competência lançada projetada nos meses correntes/futuros.
-  // Esc. Central + administrativos = Despesa de Pessoal; restante = Mão de Obra Direta.
   const { data: folha } = useQuery<{ competencia: string | null; pessoal: number; mod: number } | null>({
     queryKey: ['fluxo-folha-projecao'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('fin_folha_projecao')
-      if (error) return null
-      return data as { competencia: string | null; pessoal: number; mod: number }
+      return error ? null : data as { competencia: string | null; pessoal: number; mod: number }
     },
   })
-  const ymAtual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-  const folhaNoMes = (bucket: 'pessoal' | 'mod') => (ym: string) =>
-    ym >= ymAtual ? (folha?.[bucket] ?? 0) : 0
 
-  // ── Receita projetada pelo cronograma EGP (R$/mês) ──────────────────────────
+  // ── Receitas: cronograma EGP, substituído pelo real quando houver ───────────
   const receitaCronograma = new Map<string, number>()
   if (eap && eap.length) {
     const tree = buildTree(eap)
@@ -88,8 +138,6 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
       proj.meses.forEach((ym, i) => receitaCronograma.set(ym, (receitaCronograma.get(ym) ?? 0) + proj.totalRmes[i]))
     })
   }
-
-  // ── Receita real prevista (contas a receber por vencimento/recebimento) ─────
   const receitaReal = new Map<string, number>()
   cr.filter(c => c.status !== 'cancelado').forEach(c => {
     const d = ['recebido', 'conciliado'].includes(c.status) ? (c.data_recebimento || c.data_vencimento) : c.data_vencimento
@@ -98,58 +146,45 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   })
   const receitaDe = (ym: string) => receitaReal.has(ym) ? receitaReal.get(ym)! : (receitaCronograma.get(ym) ?? 0)
 
-  // ── Saídas por classe financeira × mês (fin_contas_pagar) ───────────────────
-  const porClasse = new Map<string, Map<string, number>>()  // classeKey -> ym -> R$
+  // ── Saídas: tudo cai numa categoria fixa (cat -> ym -> R$) ──────────────────
+  const mapa = new Map<string, Map<string, number>>()
+  const soma = (cat: string, ym: string, v: number) => {
+    if (!v || !ym) return
+    if (!mapa.has(cat)) mapa.set(cat, new Map())
+    const m = mapa.get(cat)!
+    m.set(ym, (m.get(ym) ?? 0) + v)
+  }
+  const classes = cad?.classes ?? []
+  const classeDesc = (key: string) => classes.find(cl => cl.codigo === key)?.descricao ?? key
+
+  // 1. contas a pagar (classe financeira → categoria)
   cp.filter(c => c.status !== 'cancelado').forEach(c => {
     const d = ['pago', 'conciliado'].includes(c.status) ? (c.data_pagamento || c.data_vencimento) : c.data_vencimento
-    const ym = (d ?? '').slice(0, 7)
-    if (!ym) return
-    const key = c.classe_financeira || 'sem'
-    if (!porClasse.has(key)) porClasse.set(key, new Map())
-    const m = porClasse.get(key)!
-    m.set(ym, (m.get(ym) ?? 0) + c.valor_original)
+    const key = c.classe_financeira || ''
+    const cat = catDaClasse(key.startsWith('CLS-') ? key : null, key.startsWith('CLS-') ? classeDesc(key) : key)
+    soma(cat, (d ?? '').slice(0, 7), c.valor_original)
   })
-
-  const grupos = (cad?.grupos ?? []).filter(g => g.tipo !== 'receita')
-  const classes = cad?.classes ?? []
-  const classeLabel = (key: string) => classes.find(cl => cl.codigo === key)?.descricao ?? key
-  const grupoDaClasse = (key: string): string => {
-    const m = /^CLS-(\d{2})/.exec(key)
-    return m ? `GRP-${m[1]}` : 'GRP-XX'
-  }
-  // seções: grupo -> [classeKeys com valor na janela]
-  const secoes = grupos.map(g => ({
-    grupo: g,
-    linhas: [...porClasse.keys()].filter(k => grupoDaClasse(k) === g.codigo &&
-      meses.some(ym => (porClasse.get(k)!.get(ym) ?? 0) > 0)),
-  })).filter(s => s.linhas.length > 0)
-  const semClasse = [...porClasse.keys()].filter(k => k === 'sem' || grupoDaClasse(k) === 'GRP-XX')
-    .filter(k => meses.some(ym => (porClasse.get(k)!.get(ym) ?? 0) > 0))
-
-  // ── Contratos recorrentes (Provisionado) — SOMADOS por grupo de contrato ────
+  // 2. contratos recorrentes (grupo do contrato → categoria), mês a mês na vigência
   const contratos = (cad?.contratos ?? []).filter(ct => (ct.valor_mensal ?? 0) > 0)
-  const contratoNoMes = (ct: (typeof contratos)[number], ym: string) => {
+  meses.forEach(ym => contratos.forEach(ct => {
     const ini = (ct.data_inicio ?? '').slice(0, 7) || '0000-00'
     const fim = (ct.data_fim_previsto ?? '9999-12').slice(0, 7)
-    return ym >= ini && ym <= fim ? (ct.valor_mensal ?? 0) : 0
-  }
-  const gruposContrato = [...new Set(contratos.map(ct => (ct.grupo_contrato as string) || 'outro'))]
-    .map(g => ({
-      key: g,
-      label: GRUPO_CONTRATO_LABEL[g as GrupoContrato] ?? g,
-      val: (ym: string) => contratos.filter(ct => ((ct.grupo_contrato as string) || 'outro') === g)
-        .reduce((s, ct) => s + contratoNoMes(ct, ym), 0),
-    }))
-    .sort((a, b) => meses.reduce((s, ym) => s + b.val(ym), 0) - meses.reduce((s, ym) => s + a.val(ym), 0))
+    if (ym >= ini && ym <= fim)
+      soma(CAT_CONTRATO[(ct.grupo_contrato as string) || 'outro'] ?? 'Serviços Terc. + Outros C. Diretos', ym, ct.valor_mensal ?? 0)
+  }))
+  // 3. folha CLT projetada (meses correntes/futuros)
+  const ymAtual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  meses.filter(ym => ym >= ymAtual).forEach(ym => {
+    soma('Mão de Obra Direta', ym, folha?.mod ?? 0)
+    soma('Pessoal', ym, folha?.pessoal ?? 0)
+  })
 
-  const saidaDe = (ym: string) =>
-    [...porClasse.values()].reduce((s, m) => s + (m.get(ym) ?? 0), 0) +
-    contratos.reduce((s, ct) => s + contratoNoMes(ct, ym), 0) +
-    folhaNoMes('pessoal')(ym) + folhaNoMes('mod')(ym)
+  const catDe = (cat: string) => (ym: string) => mapa.get(cat)?.get(ym) ?? 0
+  const secSubtotal = (items: string[]) => (ym: string) => items.reduce((s, it) => s + (mapa.get(it)?.get(ym) ?? 0), 0)
+  const totalSaidas = (ym: string) => SECTIONS.reduce((s, sec) => s + secSubtotal(sec.items)(ym), 0)
 
-  const td = `px-3 py-2 text-right text-[11px] font-mono whitespace-nowrap`
-  const tdLbl = `px-3 py-2 text-[11px] font-medium whitespace-nowrap`
-  const headBg = isDark ? 'bg-white/[0.03]' : 'bg-slate-50'
+  const td = 'px-3 py-2 text-right text-[11px] font-mono whitespace-nowrap'
+  const tdLbl = 'px-3 py-2 text-[11px] font-medium whitespace-nowrap'
   const secBg = isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'
   const border = isDark ? 'divide-white/[0.05]' : 'divide-slate-100'
   const txt = isDark ? 'text-slate-300' : 'text-slate-600'
@@ -167,66 +202,37 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
       <div className="overflow-x-auto">
         <table className={`w-full divide-y ${border}`}>
           <thead>
-            <tr className={headBg}>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Grupo / Classe</th>
+            <tr className={isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Categoria</th>
               {meses.map(ym => <th key={ym} className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 whitespace-nowrap">{ymLbl(ym)}</th>)}
               <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400">Total</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${border}`}>
-            {/* RECEITAS: cronograma EGP, substituído por previsão real quando existir no mês */}
-            <Linha label="RECEITAS (cronograma EGP / medições faturadas)" val={receitaDe}
+            <Linha label="RECEITAS" val={receitaDe}
               cls={`font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`} />
 
-            {secoes.map(s => (
+            {SECTIONS.map(sec => (
               <>
-                <tr key={s.grupo.codigo} className={secBg}>
-                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">{s.grupo.descricao}</td>
+                <tr key={sec.title} className={secBg}>
+                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">{sec.title}</td>
                 </tr>
-                {s.linhas.map(k => <Linha key={k} sub label={classeLabel(k)} val={ym => porClasse.get(k)!.get(ym) ?? 0} />)}
+                {sec.items.map(it => <Linha key={it} sub label={it} val={catDe(it)} />)}
+                <Linha label="Subtotal" val={secSubtotal(sec.items)}
+                  cls={`font-bold ${isDark ? 'text-violet-300' : 'text-violet-700 bg-violet-50/50'}`} />
               </>
             ))}
 
-            {semClasse.length > 0 && (
-              <>
-                <tr className={secBg}>
-                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">Sem classificação</td>
-                </tr>
-                {semClasse.map(k => <Linha key={k} sub label={k === 'sem' ? 'Sem classe financeira' : classeLabel(k)} val={ym => porClasse.get(k)!.get(ym) ?? 0} />)}
-              </>
-            )}
-
-            {gruposContrato.length > 0 && (
-              <>
-                <tr className={secBg}>
-                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">Contratos Recorrentes (Provisionado)</td>
-                </tr>
-                {gruposContrato.map(g => <Linha key={g.key} sub label={g.label} val={g.val} />)}
-              </>
-            )}
-
-            {folha && (folha.mod > 0 || folha.pessoal > 0) && (
-              <>
-                <tr className={secBg}>
-                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">
-                    Folha CLT — projeção pela última folha ({folha.competencia?.slice(5, 7)}/{folha.competencia?.slice(0, 4)})
-                  </td>
-                </tr>
-                <Linha sub label="Mão de Obra Direta" val={folhaNoMes('mod')} />
-                <Linha sub label="Despesa de Pessoal (Esc. Central e administrativos)" val={folhaNoMes('pessoal')} />
-              </>
-            )}
-
-            <Linha label="TOTAL SAÍDAS" val={saidaDe}
-              cls={`font-bold ${isDark ? 'bg-red-500/10 text-red-300' : 'bg-red-50 text-red-600'}`} />
-            <Linha label="RESULTADO" val={ym => receitaDe(ym) - saidaDe(ym)}
-              cls={`font-extrabold ${isDark ? 'bg-violet-500/15 text-violet-200' : 'bg-violet-600 text-white'}`} />
+            <Linha label="TOTAL CUSTOS + IMPOSTOS" val={totalSaidas}
+              cls={`font-extrabold ${isDark ? 'bg-violet-500/20 text-violet-200' : 'bg-violet-600 text-white'}`} />
+            <Linha label="RESULTADO" val={ym => receitaDe(ym) - totalSaidas(ym)}
+              cls={`font-extrabold ${isDark ? 'bg-emerald-500/15 text-emerald-200' : 'bg-slate-800 text-white'}`} />
           </tbody>
         </table>
       </div>
       <p className={`px-4 py-2 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        Receitas: projeção do cronograma EGP; nos meses com contas a receber lançadas (medições faturadas), o valor real substitui a projeção.
-        Saídas: contas a pagar por classe financeira + contratos recorrentes provisionados.
+        Receitas: cronograma EGP (substituído pelo real nos meses com contas a receber). Saídas: contas a pagar (classe financeira),
+        contratos recorrentes provisionados e folha CLT projetada — todas mapeadas nas categorias do Plano Orçamentário.
       </p>
     </div>
   )
