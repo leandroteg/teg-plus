@@ -118,11 +118,11 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
     },
   })
   const { data: eap } = useEAPFinal(cad?.portfolioId)
-  const { data: folha } = useQuery<{ competencia: string | null; pessoal: number; mod: number } | null>({
+  const { data: folha } = useQuery<{ competencia: string | null; pessoal: number; mod: number; pj_pessoal: number; pj_mod: number } | null>({
     queryKey: ['fluxo-folha-projecao'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('fin_folha_projecao')
-      return error ? null : data as { competencia: string | null; pessoal: number; mod: number }
+      return error ? null : data as { competencia: string | null; pessoal: number; mod: number; pj_pessoal: number; pj_mod: number }
     },
   })
 
@@ -165,7 +165,8 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
     soma(cat, (d ?? '').slice(0, 7), c.valor_original)
   })
   // 2. contratos recorrentes (grupo do contrato → categoria), mês a mês na vigência
-  const contratos = (cad?.contratos ?? []).filter(ct => (ct.valor_mensal ?? 0) > 0)
+  const contratos = (cad?.contratos ?? []).filter(ct =>
+    (ct.valor_mensal ?? 0) > 0 && ct.numero !== 'EQUIPE-PJ' && (ct.grupo_contrato as string) !== 'equipe_pj')
   meses.forEach(ym => contratos.forEach(ct => {
     const ini = (ct.data_inicio ?? '').slice(0, 7) || '0000-00'
     const fim = (ct.data_fim_previsto ?? '9999-12').slice(0, 7)
@@ -175,8 +176,8 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   // 3. folha CLT projetada (meses correntes/futuros)
   const ymAtual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   meses.filter(ym => ym >= ymAtual).forEach(ym => {
-    soma('Mão de Obra Direta', ym, folha?.mod ?? 0)
-    soma('Pessoal', ym, folha?.pessoal ?? 0)
+    soma('Mão de Obra Direta', ym, (folha?.mod ?? 0) + (folha?.pj_mod ?? 0))
+    soma('Pessoal', ym, (folha?.pessoal ?? 0) + (folha?.pj_pessoal ?? 0))
   })
 
   const catDe = (cat: string) => (ym: string) => mapa.get(cat)?.get(ym) ?? 0
