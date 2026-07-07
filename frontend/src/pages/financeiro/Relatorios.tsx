@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
+import FluxoCaixaPrevisto from './FluxoCaixaPrevisto'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -176,15 +177,7 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
       )}
 
       {activeReport === 'fluxo' && (
-        // Painel em reconstrução: os widgets antigos (previsto no período + vencimentos
-        // 4 semanas) foram movidos para o relatório Aging. O novo Fluxo de Caixa
-        // previsto (recebíveis EGP/média móvel × provisionado × folha) entra aqui.
-        <div className={`rounded-2xl border border-dashed p-10 text-center ${isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-300'}`}>
-          <p className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — novo painel em construção</p>
-          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            As visões anteriores (previsto no período e vencimentos por semana) foram movidas para o relatório Aging.
-          </p>
-        </div>
+        <FluxoCaixaPrevisto de={de} ate={ate} isDark={isDark} />
       )}
 
       {activeReport === 'cc' && (
