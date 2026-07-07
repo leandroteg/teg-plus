@@ -138,6 +138,8 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
     const start = startYM()
     obras.forEach(o => {
       const proj = projObra(o, cfg, start)
+      // mesma regra do painel (hideSemProd): obra sem produção projetada fica fora
+      if (proj.totalRmes.reduce((s2, x) => s2 + x, 0) < 1) return
       proj.meses.forEach((ym, i) => receitaCronograma.set(ym, (receitaCronograma.get(ym) ?? 0) + proj.totalRmes[i]))
     })
   }
