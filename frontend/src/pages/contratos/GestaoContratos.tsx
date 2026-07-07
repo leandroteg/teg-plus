@@ -958,7 +958,7 @@ function TabRecebiveis() {
   const { data: parcelas = [], isLoading } = useParcelas()
 
   // Recebíveis além das parcelas: saldo EGP a faturar + medições (BM) por estágio
-  type RecEgp = { contrato_id: string; numero: string; objeto: string; valor_oscs: number; faturado: number; saldo: number }
+  type RecEgp = { contrato_id: string; numero: string; objeto: string; valor_oscs: number; faturado: number; saldo: number; media_6m: number | null }
   type RecMed = { id: string; numero_bm: string; valor: number; status: string; fin_status: string | null; contrato: string; objeto: string; periodo_fim: string | null; vencimento: string | null }
   const { data: extra } = useQuery<{ egp: RecEgp[]; medicoes: RecMed[] } | null>({
     queryKey: ['con-recebiveis-egp'],
@@ -1079,6 +1079,7 @@ function TabRecebiveis() {
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {e.numero} · {fmt(e.faturado)} faturado de {fmt(e.valor_oscs)} em OSCs emitidas
+                    {e.media_6m ? <> · <span className="font-bold text-indigo-500">{fmt(e.media_6m)}/mês</span> (média móvel 6m)</> : null}
                   </p>
                 </div>
               </div>
