@@ -78,8 +78,15 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   // config default (produtividade/pessoa padrão; equipe p/ terminar cada obra em 12m, ∝ saldo)
   const defaultConfig = useMemo<Config>(() => makeDefaultConfig(allObras), [allObras])
 
-  // aplica o default automaticamente na 1ª carga (não fica vazio)
-  useEffect(() => { if (!applied && allObras.length) setApplied(defaultConfig) }, [applied, allObras.length, defaultConfig])
+  // 1ª carga: restaura a última config APLICADA (localStorage, por contrato); sem ela, cai no default (12m ∝ saldo)
+  useEffect(() => {
+    if (applied || !allObras.length) return
+    try {
+      const s = localStorage.getItem(`crono-cfg-${portfolioId}`)
+      if (s) { setApplied({ ...defaultConfig, ...JSON.parse(s) }); return }
+    } catch { /* config corrompida → segue pro padrão */ }
+    setApplied(defaultConfig)
+  }, [applied, allObras.length, defaultConfig, portfolioId])
 
   // versões salvas
   const { data: versoes = [] } = useQuery<Versao[]>({
@@ -258,7 +265,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       {modalOpen && <ConfigModal isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
         tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
         inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
-        onAplicar={c => { setApplied(c); setModalOpen(false) }} onClose={() => setModalOpen(false)} />}
+        onAplicar={c => { setApplied(c); try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setModalOpen(false) }} onClose={() => setModalOpen(false)} />}
     </div>
   )
 }
