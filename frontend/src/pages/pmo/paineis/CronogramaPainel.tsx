@@ -11,7 +11,7 @@ import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
   DRV, COR_PREL, COR_ADM, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
-  buildTree, makeDefaultConfig, projObra, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
+  buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
@@ -102,6 +102,15 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   const start = startYM()
 
+  // projeção de TODAS as obras de uma vez (necessário p/ realocação automática — as obras interagem).
+  // O filtro de exibição não muda a simulação: obra oculta continua segurando/recebendo equipe.
+  const projMap = useMemo(() => {
+    if (!applied) return new Map<string, ReturnType<typeof projObra>>()
+    const strip = (o: Obra): Obra => (hideOM && o.omR > 0) ? { ...o, omR: 0, omOscs: [], saldoR: o.saldoR - o.omR } : o
+    return projTodas(allObras.map(strip), applied, start)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applied, allObras, hideOM])
+
   const view = useMemo(() => {
     if (!applied) return { frentesF: [] as typeof tree, maxMeses: 0, saldoRtot: 0, terminoGeral: null as string | null }
     const isOM = (o: Obra) => o.omR > 0 && !o.drivers.some(d => d.contr > 0) // obra pura de O&M
@@ -109,12 +118,12 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
       .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o))).map(stripOM)
         // sem produção no período = projeção zerada (sem equipe/capacidade e sem O&M visível)
-        .filter(o => !hideSemProd || projObra(o, applied, start).totalRmes.reduce((s, x) => s + x, 0) >= 1) })).filter(fr => fr.obras.length > 0)
+        .filter(o => !hideSemProd || (projMap.get(o.nome)?.totalRmes.reduce((s, x) => s + x, 0) ?? 0) >= 1) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
-    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied, start).maxMeses) }
+    for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projMap.get(o.nome)?.maxMeses ?? 0) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, fFrente, fObra, fPct, hideOM, hideSemProd, applied])
+  }, [tree, fFrente, fObra, fPct, hideOM, hideSemProd, applied, projMap])
 
   const totPessoas = useMemo(() => applied ? view.frentesF.flatMap(f => f.obras).reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, view.frentesF])
   // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
@@ -125,9 +134,9 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const obraMeses = (o: Obra, cfg: Config) => projObra(o, cfg, start).maxMeses
+  const obraMeses = (o: Obra, _cfg: Config) => projMap.get(o.nome)?.maxMeses ?? 0
   const mesesArr = (applied && view.maxMeses > 0) ? Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i)) : []
-  const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projObra(o, applied, start).totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
+  const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projMap.get(o.nome)?.totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
   // larguras fixas p/ TODAS as tabelas alinharem as colunas
   const W_LABEL = 190, W_MES = 72, W_TOT = 78
   const tableW = W_LABEL + mesesArr.length * W_MES + W_TOT // largura fixa idêntica p/ todas as tabelas (não esticar)
@@ -228,7 +237,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                               <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={10} />{oTerm ? ymLabel(oTerm) : '—'}</span></span>
                             </button>
                             {oOpen && (() => {
-                              const pj = projObra(o, applied, start)
+                              const pj = projMap.get(o.nome) ?? projObra(o, applied, start)
                               const thx = `px-2 py-1 text-right text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} whitespace-nowrap`
                               const tdx = `px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`
                               return (
@@ -321,11 +330,13 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   onAplicar: (c: Config) => void; onClose: () => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
-  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag })
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, inicio: c?.inicio })
   const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
+  const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; return { ...c, inicio } })
+  const setFila = (o: string, v: number) => setCfg(c => { const fila = { ...(c.fila ?? {}) }; if (v > 0) fila[o] = Math.round(v); else delete fila[o]; return { ...c, fila } })
   const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
@@ -403,6 +414,8 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                 <span className="flex-1">Obra</span>
                 {DRV.map(d => <span key={d.label} className="w-14 text-center" style={{ color: d.cor }}>{d.label}</span>)}
                 <span className="w-9 text-right">total</span>
+                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele">Início</span>
+                <span className="w-10 text-center" title="Ordem na fila de realocação automática (vazio = fora da fila)">Fila</span>
               </div>
               <div className="max-h-52 overflow-auto">
                 {allObras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
@@ -412,6 +425,8 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                       <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                     ) })}
                     <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
+                    <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                    <input type="number" min="0" value={cfg.fila?.[o.nome] ?? ''} placeholder="—" onChange={e => setFila(o.nome, Number(e.target.value))} className={`w-10 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                   </div>
                 ) })}
               </div>
@@ -433,6 +448,11 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
               </div>
             )}
             <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Montagem não avança além do % de fundação já concluído (volume liberado); lançamento idem em relação à montagem.</p>
+            <label className="flex items-center gap-2 mt-3 mb-1 cursor-pointer">
+              <span onClick={() => setCfg(c => ({ ...c, realoc: !c.realoc }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.realoc ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.realoc ? 'translate-x-4' : ''}`} /></span>
+              <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra próxima obra da fila</span>
+            </label>
+            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra próxima obra da <b>Fila</b> (coluna nº na tabela acima) que ainda tem saldo daquele serviço — respeitando o <b>Início</b> planejado. Sem realocação, use só o Início pra planejar as ondas manualmente.</p>
           </div>
         </div>
         {/* Footer */}
