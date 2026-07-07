@@ -954,8 +954,16 @@ function TabAditivosReajustes() {
 // ── Tab: Recebiveis (A Receber) ──────────────────────────────────────────────
 function TabRecebiveis() {
   const nav = useNavigate()
+  const { isDark } = useTheme()
   const [statusFilter, setStatusFilter] = useState('')
+  const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses
+  const [ate, setAte] = useState(ymMais(36))
+  const [quick, setQuick] = useState<'7d' | null>(null)
   const { data: parcelas = [], isLoading } = useParcelas()
+
+  const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0)
+  const lim7d = new Date(hoje0); lim7d.setDate(lim7d.getDate() + 7)
+  const mesesJanela = diffMeses(de, ate) + 1
 
   // Recebíveis além das parcelas: saldo EGP a faturar + medições (BM) por estágio
   type RecEgp = { contrato_id: string; numero: string; objeto: string; valor_oscs: number; faturado: number; saldo: number; media_6m: number | null }
@@ -968,35 +976,94 @@ function TabRecebiveis() {
       return data as { egp: RecEgp[]; medicoes: RecMed[] }
     },
   })
-  const egpRows = (extra?.egp ?? []).filter(e => e.saldo > 0)
   const meds = extra?.medicoes ?? []
   const medEstagio = (m: RecMed) =>
     m.status === 'aprovado' ? { label: 'A Faturar', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400' }
     : m.fin_status === 'recebido' ? { label: 'Recebido', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' }
     : { label: 'No Financeiro', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' }
 
-  // Only receita parcels
-  const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
+  // ── Janela de período (mesma mecânica do Provisionado) ─────────────────────
+  // EGP: projeção = média móvel 6m × meses da janela, limitada ao saldo (backlog sem data).
+  // No atalho 7 dias o backlog não entra (não tem vencimento).
+  const egpProjecao = (e: RecEgp): number => {
+    if (quick === '7d') return 0
+    if (!e.media_6m) return e.saldo
+    return Math.min(e.saldo, e.media_6m * mesesJanela)
+  }
+  const egpRows = (extra?.egp ?? [])
+    .map(e => ({ ...e, projecao: egpProjecao(e) }))
+    .filter(e => e.saldo > 0 && e.projecao > 0)
 
-  const filtered = recebiveis.filter(p => {
+  // Medições: entram pela data (vencimento no Financeiro; senão fim do período medido)
+  const medNaJanela = (m: RecMed): boolean => {
+    const ref = m.vencimento || m.periodo_fim
+    if (!ref) return quick !== '7d'
+    if (quick === '7d') {
+      const d = new Date(ref + 'T00:00:00')
+      return d >= hoje0 && d <= lim7d
+    }
+    const ym = ref.slice(0, 7)
+    return ym >= de && ym <= ate
+  }
+  const medsJanela = meds.filter(medNaJanela)
+
+  // Parcelas de receita: recorrente = valor_mensal × meses ativos na janela
+  const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
+  const aReceberDe = (p: typeof parcelas[number]): number => {
+    const c = p.contrato
+    if (quick === '7d') {
+      const fim = (c?.data_fim_previsto || '9999-12').slice(0, 7)
+      if (fim < ymHoje()) return 0
+      const dia = parseInt((p.data_vencimento || '').slice(8, 10)) || 1
+      let occ = new Date(hoje0.getFullYear(), hoje0.getMonth(), dia)
+      if (occ < hoje0) occ = new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, dia)
+      if (occ > lim7d) return 0
+      return c?.recorrente ? (c.valor_mensal || 0) : p.valor
+    }
+    if (c?.recorrente) {
+      const ini = (c.data_inicio || '').slice(0, 7) || '0000-00'
+      const fim = (c.data_fim_previsto || '9999-12').slice(0, 7)
+      const lo = ini > de ? ini : de
+      const hi = fim < ate ? fim : ate
+      if (lo > hi) return 0
+      return (c.valor_mensal || 0) * (diffMeses(lo, hi) + 1)
+    }
+    const ym = (p.data_vencimento || '').slice(0, 7)
+    return (ym >= de && ym <= ate) ? p.valor : 0
+  }
+  const parcelasJanela = recebiveis
+    .map(p => ({ ...p, aReceber: aReceberDe(p) }))
+    .filter(p => p.aReceber > 0)
+
+  const filtered = parcelasJanela.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false
     return true
   })
 
-  // Faturado = medições já enviadas ao Financeiro (não recebidas) + parcelas em aberto
-  const medsFaturadas = meds.filter(m => m.status === 'faturado' && m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
-  const medsRecebidas = meds.filter(m => m.fin_status === 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
-  const totalFaturado = recebiveis
+  // KPIs sobre a janela
+  const medsFaturadas = medsJanela.filter(m => m.status === 'faturado' && m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  const medsRecebidas = medsJanela.filter(m => m.fin_status === 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  const totalFaturado = parcelasJanela
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
-    .reduce((s, p) => s + p.valor, 0) + medsFaturadas
-  const totalRecebido = recebiveis
+    .reduce((s, p) => s + p.aReceber, 0) + medsFaturadas
+  const totalRecebido = parcelasJanela
     .filter(p => p.status === 'pago')
-    .reduce((s, p) => s + p.valor, 0) + medsRecebidas
-  const saldoEgp = egpRows.reduce((s, e) => s + e.saldo, 0)
-  const atrasadas = recebiveis.filter(p =>
+    .reduce((s, p) => s + p.aReceber, 0) + medsRecebidas
+  const saldoEgp = egpRows.reduce((s, e) => s + e.projecao, 0)
+  const atrasadas = parcelasJanela.filter(p =>
     p.status !== 'pago' && p.status !== 'cancelado' &&
     new Date(p.data_vencimento).getTime() < Date.now()
   ).length
+
+  // atalhos de período (mesmos do Provisionado)
+  const mesAtual = ymHoje(), mesProx = ymMais(1)
+  const anoFim = `${new Date().getFullYear()}-12`
+  const ATALHOS: Array<[string, boolean, () => void]> = [
+    ['Próx. 7 dias', quick === '7d', () => setQuick('7d')],
+    ['Esse mês', quick === null && de === mesAtual && ate === mesAtual, () => { setQuick(null); setDe(mesAtual); setAte(mesAtual) }],
+    ['Próx. mês', quick === null && de === mesProx && ate === mesProx, () => { setQuick(null); setDe(mesProx); setAte(mesProx) }],
+    ['Esse ano', quick === null && de === mesAtual && ate === anoFim, () => { setQuick(null); setDe(mesAtual); setAte(anoFim) }],
+  ]
 
   const STATUS_PARCELA: Record<string, { label: string; dot: string; bg: string; text: string }> = {
     previsto:  { label: 'Previsto',  dot: 'bg-slate-400',   bg: 'bg-slate-100',   text: 'text-slate-600' },
@@ -1035,23 +1102,38 @@ function TabRecebiveis() {
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+          {FILTROS.map(f => (
+            <button key={f.value} onClick={() => setStatusFilter(f.value)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+                ${statusFilter === f.value
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white text-slate-500 border border-slate-200'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
+          {ATALHOS.map(([label, active, onClick]) => (
+            <button key={label} onClick={onClick}
+              className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+                ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+              {label}
+            </button>
+          ))}
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className="text-xs text-slate-400">→</span>
+          <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : filtered.length === 0 && egpRows.length === 0 && meds.length === 0 ? (
+      ) : filtered.length === 0 && egpRows.length === 0 && medsJanela.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
             <Banknote size={24} className="text-emerald-300" />
@@ -1073,12 +1155,12 @@ function TabRecebiveis() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-bold text-slate-800 truncate">{e.objeto}</p>
                     <div className="text-right shrink-0 leading-tight">
-                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(e.saldo)}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">saldo a faturar (EGP)</p>
+                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(e.projecao)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">{e.projecao < e.saldo ? 'projeção no período (EGP)' : 'saldo a faturar (EGP)'}</p>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    {e.numero} · {fmt(e.faturado)} faturado de {fmt(e.valor_oscs)} em OSCs emitidas
+                    {e.numero} · saldo total {fmt(e.saldo)} · {fmt(e.faturado)} faturado de {fmt(e.valor_oscs)} em OSCs
                     {e.media_6m ? <> · <span className="font-bold text-indigo-500">{fmt(e.media_6m)}/mês</span> (média móvel 6m)</> : null}
                   </p>
                 </div>
@@ -1087,7 +1169,7 @@ function TabRecebiveis() {
           ))}
 
           {/* Medições (BM) de contratos de receita, por estágio */}
-          {meds.map(m => {
+          {medsJanela.map(m => {
             const st = medEstagio(m)
             return (
               <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
@@ -1128,7 +1210,7 @@ function TabRecebiveis() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
-                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.valor)}</p>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.aReceber)}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
                       <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
