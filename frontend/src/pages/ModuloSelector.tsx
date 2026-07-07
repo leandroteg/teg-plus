@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, ChevronRight, ChevronLeft,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -840,17 +840,21 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
   onNavigate: (path: string) => void
 }) {
   const { isAdmin, hasModule } = useAuth()
+  // Um ÚNICO botão ("Minha Área Pessoal") que expande a lista com todas as
+  // funções pessoais — padrão do flyout "Novo Registro" do EGP.
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => { if (!open) setExpanded(false) }, [open])
   if (!open) return null
 
-  type Tile = { label: string; icon: LucideIcon; path: string; tone: string; desc: string; span?: boolean }
-  const tiles: Tile[] = [
+  type Funcao = { label: string; icon: LucideIcon; path: string; tone: string; desc: string }
+  const funcoes: Funcao[] = [
     { label: 'Minhas Tarefas',       icon: CheckSquare,    path: '/minhas-tarefas',       tone: 'teal',    desc: 'Pendencias em todos os modulos' },
     { label: 'Minhas Solicitacoes',  icon: ClipboardList,  path: '/minhas-solicitacoes',  tone: 'indigo',  desc: 'Requisicoes e pedidos abertos' },
     { label: 'Minhas Despesas',      icon: Receipt,        path: '/despesas',             tone: 'rose',    desc: 'Adiantamentos e reembolsos' },
     { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
     // Helpdesk: chamados pessoais do usuário no módulo TI (some p/ quem não tem o módulo)
     ...(isAdmin || hasModule('ti')
-      ? [{ label: 'Meus Chamados', icon: Headset, path: '/meus-chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.', span: true } as Tile]
+      ? [{ label: 'Meus Chamados', icon: Headset, path: '/meus-chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.' } as Funcao]
       : []),
   ]
 
@@ -895,32 +899,61 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
           </button>
         </div>
 
-        {/* Grid */}
-        <div className="p-5 grid grid-cols-2 gap-3">
-          {tiles.map(t => {
-            const clr = toneMap[t.tone]
-            const Icon = t.icon
-            return (
+        {/* Corpo: um único botão que expande a lista de funções — padrão do
+            flyout "Novo Registro" do EGP */}
+        {!expanded ? (
+          <div className="p-5">
+            <button
+              onClick={() => setExpanded(true)}
+              className={`group flex w-full items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-white hover:shadow-lg hover:ring-teal-300 active:scale-[0.98]'
+                  : 'bg-white/[0.03] hover:bg-white/[0.06] hover:ring-teal-400/40 active:scale-[0.98]'
+              }`}
+            >
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-110 ${isLight ? 'bg-teal-50' : 'bg-teal-500/10'}`}>
+                <User size={20} strokeWidth={2.2} className={isLight ? 'text-teal-600' : 'text-teal-300'} />
+              </div>
+              <div className="flex-1">
+                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>Minha Área Pessoal</p>
+                <p className={`mt-1 text-[10px] leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Tarefas, solicitações, despesas, cautelas e chamados</p>
+              </div>
+              <ChevronRight size={16} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
+            </button>
+          </div>
+        ) : (
+          <div className="p-3">
+            <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1">
               <button
-                key={t.path}
-                onClick={() => onNavigate(t.path)}
-                className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${t.span ? 'col-span-2 flex items-center gap-4' : ''} ${
-                  isLight
-                    ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
-                    : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
-                }`}
+                onClick={() => setExpanded(false)}
+                className={`rounded-lg p-1 transition-colors ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}
+                aria-label="Voltar"
               >
-                <div className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${t.span ? '' : 'mb-3'} ${isLight ? clr.bg : clr.bgDark}`}>
-                  <Icon size={20} strokeWidth={2.2} className={isLight ? clr.text : clr.textDark} />
-                </div>
-                <div>
-                  <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
-                  <p className={`text-[10px] mt-1 leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
-                </div>
+                <ChevronLeft size={14} />
               </button>
-            )
-          })}
-        </div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Área Pessoal</p>
+            </div>
+            {funcoes.map(f => {
+              const clr = toneMap[f.tone]
+              const Icon = f.icon
+              return (
+                <button
+                  key={f.path}
+                  onClick={() => onNavigate(f.path)}
+                  className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
+                >
+                  <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
+                    <Icon size={16} />
+                  </span>
+                  <span>
+                    <span className={`block text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{f.label}</span>
+                    <span className={`mt-0.5 block text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{f.desc}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <style>{`
