@@ -7,9 +7,9 @@ import {
   ArrowDownRight, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play, Users,
   LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
-  Paperclip, ExternalLink, Upload,
+  Paperclip, ExternalLink, Upload, FileStack,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao, useUploadMedicaoArquivo } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao, useUploadMedicaoArquivo, useModelosContrato } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { Contrato, ContratoMedicao } from '../../types/contratos'
@@ -17,6 +17,7 @@ import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
+import ModelosContrato from './ModelosContrato'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -57,7 +58,7 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 }
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado'
+type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado' | 'modelos'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText },
@@ -65,6 +66,7 @@ const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'medicoes',     label: 'Medições',     icon: Receipt },
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
+  { key: 'modelos',      label: 'Modelos',      icon: FileStack },
 ]
 
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -75,6 +77,7 @@ const TAB_ACCENT: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
   provisionado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
   aditivos:     { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
+  modelos:      { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',    border:'border-cyan-200' },
 }
 
 const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
@@ -83,6 +86,7 @@ const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   provisionado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
   aditivos:     { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
+  modelos:      { bg:'bg-cyan-500/5',    bgActive:'bg-cyan-500/15',    text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
 }
 
 // ── Status configs ──────────────────────────────────────────────────────────
@@ -2013,6 +2017,7 @@ export default function GestaoContratos() {
   const { data: reajustes = [] } = useReajustes()
   const { data: medicoes = [] } = useMedicoes()
   const { data: parcelas = [] } = useParcelas()
+  const { data: modelos = [] } = useModelosContrato()
 
   const counts: Record<Tab, number> = useMemo(() => ({
     contratos: contratos.length,
@@ -2020,7 +2025,8 @@ export default function GestaoContratos() {
     recebiveis: parcelas.filter(p => p.contrato?.tipo_contrato === 'receita').length,
     provisionado: parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa').length,
     aditivos: aditivos.length + reajustes.length,
-  }), [contratos, medicoes, parcelas, aditivos, reajustes])
+    modelos: modelos.length,
+  }), [contratos, medicoes, parcelas, aditivos, reajustes, modelos])
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -2067,6 +2073,7 @@ export default function GestaoContratos() {
         {tab === 'medicoes' && <TabMedicoes />}
         {tab === 'recebiveis' && <TabRecebiveis />}
         {tab === 'provisionado' && <TabProvisionado />}
+        {tab === 'modelos' && <ModelosContrato />}
         {tab === 'aditivos' && <TabAditivosReajustes />}
       </div>
     </div>
