@@ -35,6 +35,10 @@ const fmtPct = (v: number) =>
 function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function ymMais(meses: number) { const d = new Date(); d.setMonth(d.getMonth() + meses); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function diffMeses(a: string, b: string) { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by - ay) * 12 + (bm - am) }
+
+// Contrato agregado "Equipe PJ": os valores individuais são SIGILOSOS.
+// O bloco aparece na lista (total), mas o detalhe só abre para admin/supervisão de Contratos.
+const isEquipePJ = (c: { grupo_contrato?: string | null }) => (c?.grupo_contrato ?? '') === 'equipe_pj'
 const MESES_OPT: Array<[string, string]> = [
   ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
   ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
@@ -150,7 +154,8 @@ const ACTIONS: Record<string, ContratoAction[]> = {
 // ── Contrato Card ───────────────────────────────────────────────────────────
 function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (type: 'success' | 'error', msg: string) => void }) {
   const nav = useNavigate()
-  const { atLeast, hasSetorPapel } = useAuth()
+  const { atLeast, hasSetorPapel, perfil } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const atualizarContrato = useAtualizarContrato()
   const [expanded, setExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ContratoAction | null>(null)
@@ -272,15 +277,21 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-3">
-          <button
-            onClick={() => nav(`/contratos/detalhe/${contrato.id}`)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-              bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
-              hover:bg-indigo-100 transition-all"
-          >
-            <CalendarDays size={11} />
-            Ver detalhes
-          </button>
+          {isEquipePJ(contrato) && !canPJ ? (
+            <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-400">
+              <Lock size={11} /> Sigiloso
+            </span>
+          ) : (
+            <button
+              onClick={() => nav(isEquipePJ(contrato) ? '/contratos/equipe-pj' : `/contratos/detalhe/${contrato.id}`)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
+                hover:bg-indigo-100 transition-all"
+            >
+              <CalendarDays size={11} />
+              Ver detalhes
+            </button>
+          )}
           {actions.map(action => {
             const Icon = action.icon
             return (
@@ -378,6 +389,8 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
 // ── Tab: Contratos ──────────────────────────────────────────────────────────
 function TabContratos() {
   const nav = useNavigate()
+  const { hasSetorPapel, perfil } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [statusFilter, setStatusFilter] = useState('')
   const [tipoFilter, setTipoFilter] = useState('')
@@ -520,7 +533,9 @@ function TabContratos() {
                   const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
                   const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || (c as any).solicitacao?.contraparte_nome || (c as any).contraparte_nome || '—'
                   return (
-                    <tr key={c.id} onClick={() => nav(`/contratos/detalhe/${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
+                    <tr key={c.id}
+                      onClick={() => { if (isEquipePJ(c) && !canPJ) return; nav(isEquipePJ(c) ? '/contratos/equipe-pj' : `/contratos/detalhe/${c.id}`) }}
+                      className={`hover:bg-slate-50/80 transition-colors ${isEquipePJ(c) && !canPJ ? 'cursor-default' : 'cursor-pointer'}`}>
                       <td className="px-3 py-2.5">
                         <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
@@ -552,10 +567,17 @@ function TabContratos() {
                         <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center">
-                        <button onClick={e => { e.stopPropagation(); nav(`/contratos/detalhe/${c.id}`) }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
-                          <Eye size={11} /> Detalhes
-                        </button>
+                        {isEquipePJ(c) && !canPJ ? (
+                          <span title="Valores individuais sob sigilo — acesso restrito à supervisão de Contratos"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-400 bg-slate-50 border border-slate-100">
+                            <Lock size={11} /> Sigiloso
+                          </span>
+                        ) : (
+                          <button onClick={e => { e.stopPropagation(); nav(isEquipePJ(c) ? '/contratos/equipe-pj' : `/contratos/detalhe/${c.id}`) }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
+                            <Eye size={11} /> Detalhes
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
