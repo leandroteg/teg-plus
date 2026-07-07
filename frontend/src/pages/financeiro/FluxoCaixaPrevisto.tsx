@@ -9,8 +9,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
-import { useEAPFinal } from '../../hooks/usePMO'
-import { buildTree, makeDefaultConfig, projObra, startYM, type Config } from '../pmo/paineis/cronogramaEngine'
 
 // ── Estrutura fixa (idêntica ao Plano Orçamentário) ──────────────────────────
 const SECTIONS: { title: string; items: string[] }[] = [
@@ -108,16 +106,6 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
       }
     },
   })
-  const { data: versoes } = useQuery({
-    queryKey: ['fluxo-cronog-versao', cad?.portfolioId],
-    enabled: !!cad?.portfolioId,
-    queryFn: async () => {
-      const { data } = await supabase.from('pmo_cronograma_versao').select('config, updated_at')
-        .eq('portfolio_id', cad!.portfolioId!).order('updated_at', { ascending: false }).limit(1)
-      return (data ?? []) as { config: Config }[]
-    },
-  })
-  const { data: eap } = useEAPFinal(cad?.portfolioId)
   const { data: folha } = useQuery<{ competencia: string | null; pessoal: number; mod: number; pj_pessoal: number; pj_mod: number } | null>({
     queryKey: ['fluxo-folha-projecao'],
     queryFn: async () => {
@@ -126,23 +114,17 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
     },
   })
 
-  // ── Receitas: cronograma EGP, substituído pelo real quando houver ───────────
+  // ── Receitas: SOMENTE o cronograma PUBLICADO no EGP (pmo_cronograma_previsao) ──
+  const { data: prevRows = [] } = useQuery<{ competencia: string; valor: number }[]>({
+    queryKey: ['fluxo-cronograma-publicado'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_cronograma_previsao').select('competencia, valor')
+      return (data ?? []) as { competencia: string; valor: number }[]
+    },
+  })
   const receitaCronograma = new Map<string, number>()
-  if (eap && eap.length) {
-    const tree = buildTree(eap)
-    // espelha a visão padrão do painel Cronograma do EGP: O&M (manutenção) fora
-    const obras = tree.flatMap(f => f.obras)
-      .filter(o => !(o.omR > 0 && !o.drivers.some(d => d.contr > 0)))
-      .map(o => o.omR > 0 ? { ...o, omR: 0, omOscs: [], saldoR: o.saldoR - o.omR } : o)
-    const cfg = versoes?.[0]?.config ?? makeDefaultConfig(obras)
-    const start = startYM()
-    obras.forEach(o => {
-      const proj = projObra(o, cfg, start)
-      // mesma regra do painel (hideSemProd): obra sem produção projetada fica fora
-      if (proj.totalRmes.reduce((s2, x) => s2 + x, 0) < 1) return
-      proj.meses.forEach((ym, i) => receitaCronograma.set(ym, (receitaCronograma.get(ym) ?? 0) + proj.totalRmes[i]))
-    })
-  }
+  prevRows.forEach(r => receitaCronograma.set(r.competencia, (receitaCronograma.get(r.competencia) ?? 0) + Number(r.valor)))
+
   const receitaReal = new Map<string, number>()
   cr.filter(c => c.status !== 'cancelado').forEach(c => {
     const d = ['recebido', 'conciliado'].includes(c.status) ? (c.data_recebimento || c.data_vencimento) : c.data_vencimento
@@ -237,7 +219,7 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
         </table>
       </div>
       <p className={`px-4 py-2 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        Receitas: cronograma EGP (substituído pelo real nos meses com contas a receber). Saídas: contas a pagar (classe financeira),
+        Receitas: cronograma PUBLICADO no EGP (painel Cronograma → Publicar cronograma); real de contas a receber substitui no mês. Saídas: contas a pagar (classe financeira),
         contratos recorrentes provisionados e folha CLT projetada — todas mapeadas nas categorias do Plano Orçamentário.
       </p>
     </div>
