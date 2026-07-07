@@ -43,6 +43,7 @@ export const GRUPO_CONTRATO_OPTIONS: { value: GrupoContrato; label: string; subt
     { value: 'frete', label: 'Frete / Transportes' },
   ]},
   { value: 'seguros', label: 'Seguros' },
+  { value: 'fornecimento', label: 'Fornecimento' },
   { value: 'outro', label: 'Outro' },
 ]
 
