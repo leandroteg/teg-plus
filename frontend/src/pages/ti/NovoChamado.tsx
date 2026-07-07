@@ -11,7 +11,10 @@ import { PRIORITY_LIST, PRIORITY_META } from './lib/constants'
 import { PageHeader, ErrorNote } from './components/ui'
 import { FileUpload } from './components/FileUpload'
 
-export default function NovoChamado() {
+/** Formulário de abertura de chamado — usado pela página /ti/chamados/novo e
+ *  pelo MODAL "Nova Solicitação" do colaborador (padrão Estoque/Nova Movimentação).
+ *  `plain`: sem a casca .card (o modal já fornece); `onCancel`: fecha o modal. */
+export function NovoChamadoForm({ plain = false, onCancel }: { plain?: boolean; onCancel?: () => void }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, isStaff: staff } = useTiAuth()
@@ -77,9 +80,7 @@ export default function NovoChamado() {
   }
 
   return (
-    <div className="ti-scope mx-auto max-w-2xl">
-      <PageHeader title="Abrir novo chamado" subtitle="Descreva o problema para a T.I." />
-      <form onSubmit={onSubmit} className="card space-y-5 p-6">
+    <form onSubmit={onSubmit} className={plain ? 'space-y-5' : 'card space-y-5 p-6'}>
         {error && <ErrorNote message={error} />}
         <div>
           <label className="label">Assunto</label>
@@ -173,12 +174,21 @@ export default function NovoChamado() {
           <FileUpload files={files} onChange={setFiles} />
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" className="btn-outline" onClick={() => navigate(-1)}>Cancelar</button>
+          <button type="button" className="btn-outline" onClick={() => (onCancel ? onCancel() : navigate(-1))}>Cancelar</button>
           <button type="submit" className="btn-primary" disabled={mutation.isPending}>
             {mutation.isPending ? 'Enviando…' : 'Abrir chamado'}
           </button>
         </div>
-      </form>
+    </form>
+  )
+}
+
+/** Página /ti/chamados/novo (equipe e acesso direto). */
+export default function NovoChamado() {
+  return (
+    <div className="ti-scope mx-auto max-w-2xl">
+      <PageHeader title="Abrir novo chamado" subtitle="Descreva o problema para a T.I." />
+      <NovoChamadoForm />
     </div>
   )
 }

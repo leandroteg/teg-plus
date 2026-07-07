@@ -245,6 +245,7 @@ const TiArtigo = lazy(() => import('./pages/ti/Artigo'))
 const TiArtigoEditor = lazy(() => import('./pages/ti/ArtigoEditor'))
 const TiRespostas = lazy(() => import('./pages/ti/Respostas'))
 const TiUsuarios = lazy(() => import('./pages/ti/Usuarios'))
+const MeusChamadosPessoal = lazy(() => import('./pages/ti/MeusChamadosPessoal'))
 
 // Orçamentação (Expansão)
 const OrcamentacaoHome = lazy(() => import('./pages/orcamentacao/OrcamentacaoHome'))
@@ -330,6 +331,7 @@ export default function App() {
           <Route path="/perfil"      element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-tarefas" element={<Lazy><MinhasTarefas /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
+          <Route path="/meus-chamados" element={<Lazy><MeusChamadosPessoal /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 

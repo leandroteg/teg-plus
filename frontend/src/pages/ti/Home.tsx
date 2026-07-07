@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX, Plus,
-  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown, BookOpen,
+  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -20,7 +20,7 @@ import { useTiAuth } from './data/auth'
 import type { Ticket, Status, Priority } from './data/shapes'
 import { STATUS_LIST, STATUS_META, PRIORITY_LIST, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner } from './components/ui'
-import { TiTabs } from './components/TiTabs'
+import { MeusChamados } from './Chamados'
 import { StatusBadge, PriorityBadge } from './components/Badges'
 import { SlaBadge } from './components/SlaBadge'
 import { Avatar } from './components/Avatar'
@@ -91,20 +91,6 @@ function SectionTitle({ icon: Icon, title, to, toLabel }: { icon: ComponentType<
       </h2>
       {to && <Link to={to} className="flex items-center gap-1 text-sm font-medium text-sky-600 hover:underline">{toLabel ?? 'Ver todos'} <ArrowRight className="h-3.5 w-3.5" /></Link>}
     </div>
-  )
-}
-
-function Shortcut({ to, icon: Icon, title, desc }: { to: string; icon: ComponentType<{ className?: string }>; title: string; desc: string }) {
-  return (
-    <Link to={to} className="card flex items-center gap-3 p-4 transition hover:border-sky-300 hover:shadow">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-        <Icon className="h-5 w-5" />
-      </div>
-      <div>
-        <div className="text-sm font-semibold text-slate-700">{title}</div>
-        <div className="text-xs text-slate-500">{desc}</div>
-      </div>
-    </Link>
   )
 }
 
@@ -222,6 +208,10 @@ export default function TiHome() {
   const categoryData = summary ? summary.byCategory.slice(0, 8) : []
   const agentData = summary ? summary.byAgent.slice(0, 6) : []
 
+  // Colaborador: home = lista "Meus Chamados" (Abertos/Encerrados), padrão da
+  // visão do requisitante no Compras — sem painel de KPIs nem fita.
+  if (!staff) return <MeusChamados home />
+
   return (
     <div className="ti-scope">
       <PageHeader
@@ -248,35 +238,10 @@ export default function TiHome() {
         }
       />
 
-      {/* ── Visão do COLABORADOR: fita Painel → Meus Chamados → Base + KPIs dos
-           próprios chamados (RLS escopa) + atalhos + recentes ── */}
-      {!staff && (<>
-        <TiTabs />
-        {statsQ.isLoading || !stats ? (
-          <Spinner />
-        ) : (
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Kpi label="Abertos" value={stats.abertos} icon={Inbox} color="bg-blue-100 text-blue-600" />
-            <Kpi label="Em andamento" value={stats.emAndamento} icon={Clock} color="bg-amber-100 text-amber-600" />
-            <Kpi label="Aguardando" value={stats.aguardando} icon={PauseCircle} color="bg-violet-100 text-violet-600" />
-            <Kpi label="Resolvidos" value={stats.resolvidos} icon={CheckCircle2} color="bg-emerald-100 text-emerald-600" />
-          </div>
-        )}
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          <Shortcut to="/ti/chamados/novo" icon={Plus} title="Abrir chamado" desc="Descreva o problema para a T.I." />
-          <Shortcut to="/ti/chamados" icon={Inbox} title="Meus chamados" desc="Acompanhe suas solicitações" />
-          <Shortcut to="/ti/base" icon={BookOpen} title="Base de conhecimento" desc="Tutoriais e soluções rápidas" />
-        </div>
-        <section className="mt-8">
-          <SectionTitle icon={Inbox} title="Meus chamados recentes" to="/ti/chamados" />
-          <RecentList tickets={recent} loading={ticketsQ.isLoading} />
-        </section>
-      </>)}
-
       {/* Visão Relatório — mesmo conteúdo da página /ti/relatorios */}
-      {staff && visao === 'relatorio' && <RelatoriosPanel />}
+      {visao === 'relatorio' && <RelatoriosPanel />}
 
-      {staff && visao === 'resumo' && (<>
+      {visao === 'resumo' && (<>
       {/* KPIs operacionais */}
       {statsQ.isLoading || !stats ? (
         <Spinner />

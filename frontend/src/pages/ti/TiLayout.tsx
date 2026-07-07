@@ -2,9 +2,10 @@
 // Menu enxuto, no padrão dos demais módulos: topo fixo (Painel, Chamados, Nova
 // Solicitação) + grupos COLAPSÁVEIS (cada um é uma barra que abre um painel
 // flutuante com os sub-itens), via `navGroups` — mesmo recurso do módulo Painéis.
+import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Inbox, Plus,
-  Laptop, FileSignature, Users, Settings,
+  Laptop, FileSignature, Settings,
   Boxes, SlidersHorizontal,
 } from 'lucide-react'
 import ModuleLayout from '../../components/ModuleLayout'
@@ -38,32 +39,33 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'gestao',
     label: 'Gestão',
     icon: SlidersHorizontal,
-    // Relatórios saiu do menu: agora é a visão "Relatório" do Painel (seletor
-    // no título, padrão Painel-Compras). A rota /ti/relatorios segue viva.
+    // Relatórios saiu do menu (virou a visão "Relatório" do Painel) e Usuários
+    // também (gestão é feita no cadastro central /admin/usuarios; a rota
+    // /ti/usuarios segue viva para acesso direto — é lá que se promove Agente).
     items: [
-      { to: '/ti/usuarios', icon: Users, label: 'Usuários' },
       { to: '/ti/configuracoes', icon: Settings, label: 'Configurações' },
     ],
   },
 ]
 
-// Visão do COLABORADOR (não é equipe de TI): menu enxuto — a navegação do fluxo
-// (Painel → Meus Chamados → Base de Conhecimento) acontece pela fita TiTabs.
-const NAV_COLABORADOR: NavItem[] = [
-  { to: '/ti', icon: LayoutDashboard, label: 'Painel', end: true },
-  { to: '/ti/chamados', icon: Inbox, label: 'Meus Chamados', end: true },
-  { to: '/ti/chamados/novo', icon: Plus, label: 'Nova Solicitação', end: false },
-]
-
 export default function TiLayout() {
   const { isStaff } = useTiAuth()
+  const navigate = useNavigate()
+
+  // Visão do COLABORADOR (não é equipe de TI): padrão do Compras/Estoque —
+  // menu SÓ com o botão "Nova Solicitação", que abre o formulário em MODAL
+  // sobre a home (/ti?nova=1 → fundo embaçado, padrão Nova Movimentação).
+  const navColaborador: NavItem[] = [
+    { to: '/ti?nova=1', icon: Plus, label: 'Nova Solicitação', end: false, accent: true, action: () => navigate('/ti?nova=1') },
+  ]
+
   return (
     <ModuleLayout
       moduleKey="ti"
       moduleName="Helpdesk TEG"
       moduleEmoji="🖥️"
       accent="blue"
-      nav={isStaff ? NAV : NAV_COLABORADOR}
+      nav={isStaff ? NAV : navColaborador}
       navGroups={isStaff ? NAV_GROUPS : undefined}
       moduleSubtitle="Suporte de T.I."
       maxWidth="max-w-6xl"

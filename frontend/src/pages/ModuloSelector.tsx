@@ -850,7 +850,7 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
     { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
     // Helpdesk: chamados pessoais do usuário no módulo TI (some p/ quem não tem o módulo)
     ...(isAdmin || hasModule('ti')
-      ? [{ label: 'Meus Chamados', icon: Headset, path: '/ti/chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.', span: true } as Tile]
+      ? [{ label: 'Meus Chamados', icon: Headset, path: '/meus-chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.', span: true } as Tile]
       : []),
   ]
 
