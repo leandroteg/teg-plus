@@ -7,6 +7,20 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { toUpperNorm } from './components/UpperInput'
 import './index.css'
 
+// ── Auto-recuperação pós-deploy ───────────────────────────────────────────────
+// Após um deploy, abas abertas ficam com index.html antigo apontando p/ chunks
+// (hash) que não existem mais — o import dinâmico falha e caía no ErrorBoundary
+// ("Algo deu errado"). O Vite emite 'vite:preloadError' nesse caso: recarrega a
+// página 1x p/ buscar o index novo; trava de 30s evita loop se o erro persistir.
+window.addEventListener('vite:preloadError', (e) => {
+  const KEY = 'teg_chunk_reload_at'
+  const last = Number(sessionStorage.getItem(KEY) || 0)
+  if (Date.now() - last < 30_000) return // acabou de recarregar e falhou de novo — deixa o ErrorBoundary agir
+  sessionStorage.setItem(KEY, String(Date.now()))
+  e.preventDefault()
+  window.location.reload()
+})
+
 // ── Global uppercase enforcement ─────────────────────────────────────────────
 // Transforms text input values to uppercase before React processes the event.
 // Skips: readonly, disabled, email, url, password, number, date/time inputs,
