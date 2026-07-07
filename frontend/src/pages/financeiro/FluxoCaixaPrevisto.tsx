@@ -62,6 +62,20 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   })
   const { data: eap } = useEAPFinal(cad?.portfolioId)
 
+  // Folha CLT: última competência lançada projetada nos meses correntes/futuros.
+  // Esc. Central + administrativos = Despesa de Pessoal; restante = Mão de Obra Direta.
+  const { data: folha } = useQuery<{ competencia: string | null; pessoal: number; mod: number } | null>({
+    queryKey: ['fluxo-folha-projecao'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('fin_folha_projecao')
+      if (error) return null
+      return data as { competencia: string | null; pessoal: number; mod: number }
+    },
+  })
+  const ymAtual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  const folhaNoMes = (bucket: 'pessoal' | 'mod') => (ym: string) =>
+    ym >= ymAtual ? (folha?.[bucket] ?? 0) : 0
+
   // ── Receita projetada pelo cronograma EGP (R$/mês) ──────────────────────────
   const receitaCronograma = new Map<string, number>()
   if (eap && eap.length) {
@@ -130,7 +144,8 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
 
   const saidaDe = (ym: string) =>
     [...porClasse.values()].reduce((s, m) => s + (m.get(ym) ?? 0), 0) +
-    contratos.reduce((s, ct) => s + contratoNoMes(ct, ym), 0)
+    contratos.reduce((s, ct) => s + contratoNoMes(ct, ym), 0) +
+    folhaNoMes('pessoal')(ym) + folhaNoMes('mod')(ym)
 
   const td = `px-3 py-2 text-right text-[11px] font-mono whitespace-nowrap`
   const tdLbl = `px-3 py-2 text-[11px] font-medium whitespace-nowrap`
@@ -187,6 +202,18 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
                   <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">Contratos Recorrentes (Provisionado)</td>
                 </tr>
                 {gruposContrato.map(g => <Linha key={g.key} sub label={g.label} val={g.val} />)}
+              </>
+            )}
+
+            {folha && (folha.mod > 0 || folha.pessoal > 0) && (
+              <>
+                <tr className={secBg}>
+                  <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">
+                    Folha CLT — projeção pela última folha ({folha.competencia?.slice(5, 7)}/{folha.competencia?.slice(0, 4)})
+                  </td>
+                </tr>
+                <Linha sub label="Mão de Obra Direta" val={folhaNoMes('mod')} />
+                <Linha sub label="Despesa de Pessoal (Esc. Central e administrativos)" val={folhaNoMes('pessoal')} />
               </>
             )}
 
