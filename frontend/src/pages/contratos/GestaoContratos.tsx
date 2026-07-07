@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Briefcase, Search, FileText, FileSignature, TrendingUp,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
@@ -1695,6 +1695,17 @@ function TabMedicoes() {
   const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
   const [enviarMedicao, setEnviarMedicao] = useState<ContratoMedicao | null>(null)
 
+  // Chegou pelo menu flutuante "Nova Solicitação > Nova Medição" do módulo
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.has('nova-medicao')) {
+      setNovaMedicaoOpen(true)
+      searchParams.delete('nova-medicao')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const { data: medicoes = [], isLoading } = useMedicoes()
   const { data: contratos = [] } = useContratos()
   const faturar = useFaturarMedicao()
@@ -1808,22 +1819,12 @@ function TabMedicoes() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar BM, contrato..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
-        </div>
-        <button
-          onClick={() => setNovaMedicaoOpen(true)}
-          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-fuchsia-600 text-white
-            text-xs font-bold hover:bg-fuchsia-700 transition-all shadow-sm whitespace-nowrap"
-        >
-          <Plus size={14} />
-          Nova Medição de Contrato
-        </button>
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar BM, contrato..."
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
+            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
@@ -2005,7 +2006,8 @@ function TabMedicoes() {
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
   const { isDark } = useTheme()
-  const [tab, setTab] = useState<Tab>('contratos')
+  const [tab, setTab] = useState<Tab>(() =>
+    new URLSearchParams(window.location.search).has('nova-medicao') ? 'medicoes' : 'contratos')
   const { data: contratos = [] } = useContratos()
   const { data: aditivos = [] } = useAditivos()
   const { data: reajustes = [] } = useReajustes()
