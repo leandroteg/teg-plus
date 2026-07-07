@@ -57,15 +57,14 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 }
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
+type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText },
   { key: 'medicoes',     label: 'Medições',     icon: Receipt },
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
-  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature },
-  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp },
+  { key: 'aditivos',     label: 'Aditivos e Reajustes', icon: FileSignature },
   { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
 ]
 
@@ -77,7 +76,6 @@ const TAB_ACCENT: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
   provisionado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
   aditivos:     { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
-  reajustes:    { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',    border:'border-cyan-200' },
   vencimentos:  { bg:'bg-red-50',     bgActive:'bg-red-100',     text:'text-red-500',     textActive:'text-red-800',     dot:'bg-red-500',     badge:'bg-red-200/80 text-red-700',     border:'border-red-200' },
 }
 
@@ -87,7 +85,6 @@ const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   provisionado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
   aditivos:     { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
-  reajustes:    { bg:'bg-cyan-500/5',    bgActive:'bg-cyan-500/15',    text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
   vencimentos:  { bg:'bg-red-500/5',     bgActive:'bg-red-500/15',     text:'text-red-400',     textActive:'text-red-200',     dot:'bg-red-400',     badge:'bg-red-500/15 text-red-300',     border:'border-red-500/20' },
 }
 
@@ -595,28 +592,54 @@ function TabContratos() {
 }
 
 // ── Tab: Aditivos ───────────────────────────────────────────────────────────
-function TabAditivos() {
+function TabAditivosReajustes() {
   const { perfil } = useAuth()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [view, setView] = useState<'table' | 'card'>('table')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const { data: aditivos = [], isLoading } = useAditivos()
+  const { data: aditivos = [], isLoading: l1 } = useAditivos()
+  const { data: reajustes = [], isLoading: l2 } = useReajustes()
+  const isLoading = l1 || l2
   const atualizarAditivo = useAtualizarAditivo()
 
-  const filtered = aditivos.filter(a => {
-    if (statusFilter && a.status !== statusFilter) return false
+  // Linha unificada (mesmo padrão da tela Aditivos & Renovações de Locações):
+  // aditivos e reajustes continuam em tabelas separadas; o merge é só visual.
+  const linhas = [
+    ...aditivos.map(a => ({ kind: 'aditivo' as const, key: `a-${a.id}`, data: ((a as any).created_at ?? '').slice(0, 10), a, r: undefined })),
+    ...reajustes.map(r => ({ kind: 'reajuste' as const, key: `r-${r.id}`, data: r.data_base ?? '', a: undefined, r })),
+  ]
+
+  const filtered = linhas.filter(l => {
+    if (statusFilter === 'aditivo' && l.kind !== 'aditivo') return false
+    if (statusFilter === 'reajuste' && l.kind !== 'reajuste') return false
+    if (['rascunho', 'em_aprovacao', 'aprovado', 'rejeitado'].includes(statusFilter) &&
+        (l.kind !== 'aditivo' || l.a!.status !== statusFilter)) return false
     if (busca) {
       const q = busca.toLowerCase()
+      if (l.kind === 'aditivo') {
+        const a = l.a!
+        return (
+          a.numero_aditivo.toLowerCase().includes(q) ||
+          a.descricao.toLowerCase().includes(q) ||
+          a.contrato?.numero?.toLowerCase().includes(q) ||
+          a.contrato?.objeto?.toLowerCase().includes(q)
+        )
+      }
+      const r = l.r!
       return (
-        a.numero_aditivo.toLowerCase().includes(q) ||
-        a.descricao.toLowerCase().includes(q) ||
-        a.contrato?.numero?.toLowerCase().includes(q) ||
-        a.contrato?.objeto?.toLowerCase().includes(q)
+        r.indice_nome.toLowerCase().includes(q) ||
+        r.observacoes?.toLowerCase().includes(q) ||
+        r.contrato?.numero?.toLowerCase().includes(q) ||
+        r.contrato?.objeto?.toLowerCase().includes(q)
       )
     }
     return true
-  })
+  }).sort((x, y) => (y.data || '').localeCompare(x.data || ''))
+
+  const impacto = filtered.reduce((s, l) =>
+    s + (l.kind === 'aditivo' ? (l.a!.valor_acrescimo || 0) : (l.r!.valor_depois - l.r!.valor_antes)), 0)
 
   const handleStatusChange = (id: string, status: StatusAditivo) => {
     const label = status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : status
@@ -634,9 +657,10 @@ function TabAditivos() {
   }
 
   const FILTROS = [
-    { label: 'Todos', value: '' }, { label: 'Rascunho', value: 'rascunho' },
-    { label: 'Em Aprovação', value: 'em_aprovacao' }, { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Rejeitados', value: 'rejeitado' },
+    { label: 'Todos', value: '' },
+    { label: 'Aditivos', value: 'aditivo' }, { label: 'Reajustes', value: 'reajuste' },
+    { label: 'Rascunho', value: 'rascunho' }, { label: 'Em Aprovação', value: 'em_aprovacao' },
+    { label: 'Aprovados', value: 'aprovado' }, { label: 'Rejeitados', value: 'rejeitado' },
   ]
 
   return (
@@ -650,24 +674,52 @@ function TabAditivos() {
         </div>
       )}
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar aditivo, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <p className="text-[10px] font-semibold text-violet-500 uppercase tracking-widest">Aditivos</p>
+          <p className="text-lg font-extrabold text-slate-800 mt-1">{aditivos.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <p className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest">Reajustes</p>
+          <p className="text-lg font-extrabold text-slate-800 mt-1">{reajustes.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest">Impacto</p>
+          <p className={`text-lg font-extrabold mt-1 ${impacto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(impacto)}</p>
+        </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
+      {/* Toolbar: busca + filtros + toggle (1 linha, padrão Locações) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar aditivo, reajuste, contrato..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
+              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+          {FILTROS.map(f => (
+            <button key={f.value} onClick={() => setStatusFilter(f.value)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+                ${statusFilter === f.value
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-white text-slate-500 border border-slate-200'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setView('table')} title="Tabela"
+            className={`p-1.5 rounded-lg transition-colors ${view === 'table' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}>
+            <LayoutList size={16} />
           </button>
-        ))}
+          <button onClick={() => setView('card')} title="Cards"
+            className={`p-1.5 rounded-lg transition-colors ${view === 'card' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}>
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -679,72 +731,109 @@ function TabAditivos() {
           <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
             <FileSignature size={24} className="text-indigo-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum aditivo encontrado</p>
+          <p className="text-sm font-semibold text-slate-500">Nenhum aditivo ou reajuste encontrado</p>
         </div>
-      ) : (
+      ) : view === 'table' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Aditivo</th>
                   <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Descricao</th>
+                  <th className="px-4 py-3">Detalhe</th>
+                  <th className="px-4 py-3">Data</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Acoes</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(a => {
-                  const sc = STATUS_ADITIVO[a.status]
-                  const tc = TIPO_ADITIVO[a.tipo]
+                {filtered.map(l => {
+                  const contrato = l.kind === 'aditivo' ? l.a!.contrato : l.r!.contrato
                   return (
-                    <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={l.key} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <p className="text-xs font-bold text-slate-800">{a.contrato?.numero ?? '-'}</p>
-                        <p className="text-[10px] truncate max-w-[160px] text-slate-400">{a.contrato?.objeto}</p>
+                        <p className="text-xs font-bold text-slate-800">{contrato?.numero ?? '-'}</p>
+                        <p className="text-[10px] truncate max-w-[160px] text-slate-400">{contrato?.objeto}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs font-mono font-semibold text-slate-700">{a.numero_aditivo}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 ${tc.bg} ${tc.text}`}>
-                          {tc.label}
-                        </span>
+                        {l.kind === 'aditivo' ? (
+                          <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 ${TIPO_ADITIVO[l.a!.tipo].bg} ${TIPO_ADITIVO[l.a!.tipo].text}`}>
+                            Aditivo · {TIPO_ADITIVO[l.a!.tipo].label}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-cyan-50 text-cyan-700">
+                            Reajuste
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-xs max-w-[220px] truncate text-slate-600">{a.descricao}</td>
-                      <td className={`px-4 py-3 text-xs font-bold text-right ${a.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {fmtFull(a.valor_acrescimo)}
+                      <td className="px-4 py-3 text-xs max-w-[220px] text-slate-600">
+                        {l.kind === 'aditivo' ? (
+                          <>
+                            <span className="font-mono font-semibold text-slate-700">{l.a!.numero_aditivo}</span>
+                            <span className="block truncate text-[11px] text-slate-400">{l.a!.descricao}</span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-700">{l.r!.indice_nome}</span>
+                            <span className={`inline-flex items-center gap-0.5 font-bold ${l.r!.percentual_aplicado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {l.r!.percentual_aplicado >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                              {fmtPct(l.r!.percentual_aplicado)}
+                            </span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{l.data ? fmtData(l.data) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-right whitespace-nowrap">
+                        {l.kind === 'aditivo' ? (
+                          <span className={`font-bold ${l.a!.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(l.a!.valor_acrescimo)}</span>
+                        ) : (
+                          <span className="text-slate-500">
+                            {fmtFull(l.r!.valor_antes)}
+                            <span className={`ml-1 font-bold ${l.r!.valor_depois - l.r!.valor_antes >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>→ {fmtFull(l.r!.valor_depois)}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
-                        </span>
+                        {l.kind === 'aditivo' ? (
+                          <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${STATUS_ADITIVO[l.a!.status].bg} ${STATUS_ADITIVO[l.a!.status].text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_ADITIVO[l.a!.status].dot}`} />{STATUS_ADITIVO[l.a!.status].label}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Aplicado
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {a.status === 'em_aprovacao' && (
-                            <>
-                              <button onClick={() => handleStatusChange(a.id, 'aprovado')} disabled={atualizarAditivo.isPending}
-                                title="Aprovar" className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all disabled:opacity-50">
-                                <CheckCircle2 size={13} />
+                        {l.kind === 'aditivo' ? (
+                          <div className="flex items-center justify-center gap-1">
+                            {l.a!.status === 'em_aprovacao' && (
+                              <>
+                                <button onClick={() => handleStatusChange(l.a!.id, 'aprovado')} disabled={atualizarAditivo.isPending}
+                                  title="Aprovar" className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all disabled:opacity-50">
+                                  <CheckCircle2 size={13} />
+                                </button>
+                                <button onClick={() => handleStatusChange(l.a!.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
+                                  title="Rejeitar" className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-all disabled:opacity-50">
+                                  <XCircle size={13} />
+                                </button>
+                              </>
+                            )}
+                            {l.a!.status === 'rascunho' && (
+                              <button onClick={() => handleStatusChange(l.a!.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
+                                className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all disabled:opacity-50">
+                                Enviar
                               </button>
-                              <button onClick={() => handleStatusChange(a.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
-                                title="Rejeitar" className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-all disabled:opacity-50">
-                                <XCircle size={13} />
-                              </button>
-                            </>
-                          )}
-                          {a.status === 'rascunho' && (
-                            <button onClick={() => handleStatusChange(a.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
-                              className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all disabled:opacity-50">
-                              Enviar
-                            </button>
-                          )}
-                          {(a.status === 'aprovado' || a.status === 'rejeitado') && (
-                            <span className="text-[10px] text-slate-400">—</span>
-                          )}
-                        </div>
+                            )}
+                            {(l.a!.status === 'aprovado' || l.a!.status === 'rejeitado') && (
+                              <span className="text-[10px] text-slate-400">—</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
                       </td>
                     </tr>
                   )
@@ -752,112 +841,85 @@ function TabAditivos() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Tab: Reajustes ──────────────────────────────────────────────────────────
-function TabReajustes() {
-  const [busca, setBusca] = useState('')
-  const { data: reajustes = [], isLoading } = useReajustes()
-
-  const filtered = reajustes.filter(r => {
-    if (!busca) return true
-    const q = busca.toLowerCase()
-    return (
-      r.indice_nome.toLowerCase().includes(q) ||
-      r.observacoes?.toLowerCase().includes(q) ||
-      r.contrato?.numero?.toLowerCase().includes(q) ||
-      r.contrato?.objeto?.toLowerCase().includes(q)
-    )
-  })
-
-  const totalDelta = filtered.reduce((s, r) => s + (r.valor_depois - r.valor_antes), 0)
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{filtered.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest">Impacto</p>
-          <p className={`text-lg font-extrabold mt-1 ${totalDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {fmtFull(totalDelta)}
-          </p>
-        </div>
-      </div>
-
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar índice, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-            <TrendingUp size={24} className="text-indigo-300" />
-          </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum reajuste encontrado</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Data Base</th>
-                  <th className="px-4 py-3">Indice</th>
-                  <th className="px-4 py-3 text-right">Percentual</th>
-                  <th className="px-4 py-3 text-right">Antes</th>
-                  <th className="px-4 py-3 text-right">Depois</th>
-                  <th className="px-4 py-3 text-right">Diferenca</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => {
-                  const delta = r.valor_depois - r.valor_antes
-                  const isPositive = r.percentual_aplicado >= 0
-                  return (
-                    <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-bold text-slate-800">{r.contrato?.numero ?? '-'}</p>
-                        <p className="text-[10px] truncate max-w-[140px] text-slate-400">{r.contrato?.objeto}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-700">{fmtData(r.data_base)}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-700">
-                          {r.indice_nome}
+        <div className="space-y-2">
+          {filtered.map(l => {
+            const contrato = l.kind === 'aditivo' ? l.a!.contrato : l.r!.contrato
+            return (
+              <div key={l.key} className="bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-200 hover:shadow-sm transition-all">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {l.kind === 'aditivo' ? (
+                      <>
+                        <p className="text-sm font-bold text-slate-800 truncate">{l.a!.numero_aditivo}</p>
+                        <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 ${TIPO_ADITIVO[l.a!.tipo].bg} ${TIPO_ADITIVO[l.a!.tipo].text}`}>
+                          Aditivo · {TIPO_ADITIVO[l.a!.tipo].label}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`inline-flex items-center gap-1 text-xs font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                          {fmtPct(r.percentual_aplicado)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-right text-slate-500">{fmtFull(r.valor_antes)}</td>
-                      <td className="px-4 py-3 text-xs font-bold text-right text-slate-800">{fmtFull(r.valor_depois)}</td>
-                      <td className={`px-4 py-3 text-xs font-bold text-right ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {fmtFull(delta)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-slate-800 truncate">{l.r!.indice_nome}</p>
+                        <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 bg-cyan-50 text-cyan-700">Reajuste</span>
+                      </>
+                    )}
+                  </div>
+                  {l.kind === 'aditivo' ? (
+                    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 ${STATUS_ADITIVO[l.a!.status].bg} ${STATUS_ADITIVO[l.a!.status].text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_ADITIVO[l.a!.status].dot}`} />{STATUS_ADITIVO[l.a!.status].label}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 bg-emerald-50 text-emerald-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Aplicado
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mb-2 truncate">{contrato?.numero ?? '-'}{contrato?.objeto ? ` · ${contrato.objeto}` : ''}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                  {l.data && <span>{fmtData(l.data)}</span>}
+                  {l.kind === 'aditivo' ? (
+                    <>
+                      <span className={`font-bold ${l.a!.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(l.a!.valor_acrescimo)}</span>
+                      {l.a!.descricao && <span className="truncate max-w-[320px] text-slate-400">{l.a!.descricao}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className={`inline-flex items-center gap-0.5 font-bold ${l.r!.percentual_aplicado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {l.r!.percentual_aplicado >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                        {fmtPct(l.r!.percentual_aplicado)}
+                      </span>
+                      <span>
+                        {fmtFull(l.r!.valor_antes)}
+                        <span className={`ml-1 font-bold ${l.r!.valor_depois - l.r!.valor_antes >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>→ {fmtFull(l.r!.valor_depois)}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+                {l.kind === 'aditivo' && (l.a!.status === 'rascunho' || l.a!.status === 'em_aprovacao') && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                    {l.a!.status === 'em_aprovacao' && (
+                      <>
+                        <button onClick={() => handleStatusChange(l.a!.id, 'aprovado')} disabled={atualizarAditivo.isPending}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                          <CheckCircle2 size={12} /> Aprovar
+                        </button>
+                        <button onClick={() => handleStatusChange(l.a!.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 ml-3">
+                          <XCircle size={12} /> Rejeitar
+                        </button>
+                      </>
+                    )}
+                    {l.a!.status === 'rascunho' && (
+                      <button onClick={() => handleStatusChange(l.a!.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:text-amber-700 disabled:opacity-50">
+                        <Send size={12} /> Enviar p/ aprovação
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -2050,8 +2112,7 @@ export default function GestaoContratos() {
     medicoes: medicoes.length,
     recebiveis: parcelas.filter(p => p.contrato?.tipo_contrato === 'receita').length,
     provisionado: parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa').length,
-    aditivos: aditivos.length,
-    reajustes: reajustes.length,
+    aditivos: aditivos.length + reajustes.length,
     vencimentos: contratos.filter(c => c.status === 'vigente').length,
   }), [contratos, medicoes, parcelas, aditivos, reajustes])
 
@@ -2100,8 +2161,7 @@ export default function GestaoContratos() {
         {tab === 'medicoes' && <TabMedicoes />}
         {tab === 'recebiveis' && <TabRecebiveis />}
         {tab === 'provisionado' && <TabProvisionado />}
-        {tab === 'aditivos' && <TabAditivos />}
-        {tab === 'reajustes' && <TabReajustes />}
+        {tab === 'aditivos' && <TabAditivosReajustes />}
         {tab === 'vencimentos' && <TabVencimentos />}
       </div>
     </div>
