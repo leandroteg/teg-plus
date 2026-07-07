@@ -152,6 +152,20 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     )
   }
 
+  const publicar = useMutation({
+    mutationFn: async () => {
+      const obrasAll = view.frentesF.flatMap(fr => fr.obras)
+      const tot = totMensal(obrasAll)
+      await supabase.from('pmo_cronograma_previsao').delete().eq('portfolio_id', portfolioId)
+      const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
+        .filter(r => r.valor > 0.5)
+      if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
+      return rows.length
+    },
+    onSuccess: n => alert(`Cronograma publicado: ${n} competência(s) — o Fluxo de Caixa do Financeiro já enxerga.`),
+    onError: () => alert('Erro ao publicar o cronograma.'),
+  })
+
   const controles = (<>
     <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
     <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
@@ -159,6 +173,11 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
     <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
     <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
+    <button onClick={() => publicar.mutate()} disabled={publicar.isPending || mesesArr.length === 0}
+      title="Grava o Total geral exibido como cronograma oficial (fonte do Fluxo de Caixa do Financeiro)"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+      {publicar.isPending ? '...' : 'Publicar cronograma'}
+    </button>
   </>)
 
   return (
