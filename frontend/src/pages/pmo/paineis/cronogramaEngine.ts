@@ -163,8 +163,9 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   const execMes = meses.map((_, m) => (omMeses > 0 && m < omMeses) ? o.omR / omMeses : 0)
   const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + (x.rMes[m] || 0), 0))
   const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
-  // Preliminares/Administração/Outros: proporcional à medição dos drivers (ADM mede junto com o avanço físico)
-  const propMes = (valor: number) => meses.map((_, m) => totDrvR > 0 ? valor * drvRmes[m] / totDrvR : (drvMax ? valor / drvMax : (maxMeses ? valor / maxMeses : 0)))
+  // Preliminares/Administração/Outros: proporcional à medição dos drivers (ADM mede junto com o avanço físico).
+  // SEM equipe alocada (drivers não produzem) → mede ZERO — nada de espalhar saldo sem produção.
+  const propMes = (valor: number) => meses.map((_, m) => totDrvR > 0 ? valor * drvRmes[m] / totDrvR : 0)
   const prelRmes = propMes(o.prelR)
   const admRmes = propMes(o.admR)
   const outrosRmes = propMes(o.outrosR)
