@@ -59,6 +59,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const [fObra, setFObra] = useState<Set<string>>(new Set())
   const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
   const [hideOM, setHideOM] = useState(true) // O&M (manutenção) oculto por padrão
+  const [hideSemProd, setHideSemProd] = useState(true) // obras sem produção projetada no período ocultas por padrão
   const [slot, setSlot] = useState<HTMLElement | null>(null)
   useEffect(() => { setSlot(document.getElementById('crono-filters-slot')) })
   const [openF, setOpenF] = useState<Set<string>>(new Set())
@@ -106,12 +107,14 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const isOM = (o: Obra) => o.omR > 0 && !o.drivers.some(d => d.contr > 0) // obra pura de O&M
     const stripOM = (o: Obra): Obra => (hideOM && o.omR > 0) ? { ...o, omR: 0, omOscs: [], saldoR: o.saldoR - o.omR } : o // tira a parte O&M de obra mista
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
-      .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o))).map(stripOM) })).filter(fr => fr.obras.length > 0)
+      .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o))).map(stripOM)
+        // sem produção no período = projeção zerada (sem equipe/capacidade e sem O&M visível)
+        .filter(o => !hideSemProd || projObra(o, applied, start).totalRmes.reduce((s, x) => s + x, 0) >= 1) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
     for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projObra(o, applied, start).maxMeses) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, fFrente, fObra, fPct, hideOM, applied])
+  }, [tree, fFrente, fObra, fPct, hideOM, hideSemProd, applied])
 
   const totPessoas = useMemo(() => applied ? view.frentesF.flatMap(f => f.obras).reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, view.frentesF])
   // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
@@ -154,6 +157,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
     <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
     <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
+    <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
     <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
   </>)
 
