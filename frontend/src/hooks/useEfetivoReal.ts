@@ -69,3 +69,38 @@ export function useEfetivoReal(portfolioId?: string) {
     },
   })
 }
+
+// ── Equipe real alocada por OBRA (obr_planejamento_equipe) ───────────────────
+// Frente = funcao_equipe do ENCARREGADO; o time herda via lider_id (encarregado conta junto).
+// Engenheiro/supervisor/apoio ficam de fora (não são produção); Supressão não é driver do cronograma.
+export interface EquipeObrasReal { porObra: Record<string, Record<string, number>>; total: number }
+const STATUS_EQ = new Set(['planejado', 'mobilizado', 'ativo'])
+const DRIVERS_EQ = new Set(['Fundação', 'Montagem', 'Lançamento'])
+
+export function useEquipeObrasReal() {
+  return useQuery<EquipeObrasReal>({
+    queryKey: ['equipe-obras-real'],
+    queryFn: async () => {
+      const [{ data: rows }, { data: obras }] = await Promise.all([
+        supabase.from('obr_planejamento_equipe').select('id, obra_id, papel, funcao_equipe, lider_id, status'),
+        supabase.from('sys_obras').select('id, nome'),
+      ])
+      const obraNome = new Map((obras ?? []).map((o: any) => [o.id as string, o.nome as string]))
+      const ativos = ((rows ?? []) as any[]).filter(r => STATUS_EQ.has(r.status))
+      const timePorLider = new Map<string, number>()
+      for (const r of ativos) if (r.papel === 'time' && r.lider_id) timePorLider.set(r.lider_id, (timePorLider.get(r.lider_id) ?? 0) + 1)
+      const porObra: Record<string, Record<string, number>> = {}
+      let total = 0
+      for (const r of ativos) {
+        if (r.papel !== 'encarregado' || !r.funcao_equipe || !DRIVERS_EQ.has(r.funcao_equipe)) continue
+        const nome = r.obra_id ? obraNome.get(r.obra_id) : undefined
+        if (!nome) continue
+        const n = 1 + (timePorLider.get(r.id) ?? 0)
+        const e = porObra[nome] ?? (porObra[nome] = {})
+        e[r.funcao_equipe] = (e[r.funcao_equipe] ?? 0) + n
+        total += n
+      }
+      return { porObra, total }
+    },
+  })
+}
