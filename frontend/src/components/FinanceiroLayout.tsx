@@ -3,11 +3,12 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
+import type { NavItem } from './ModuleLayout'
 
 export default function FinanceiroLayout() {
   const navigate = useNavigate()
 
-  const NAV = [
+  const NAV: NavItem[] = [
     { to: '/financeiro',                      icon: LayoutDashboard, label: 'Painel',           end: true },
     {
       to: '/financeiro',
