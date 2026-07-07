@@ -176,67 +176,14 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
       )}
 
       {activeReport === 'fluxo' && (
-        <div className="space-y-4">
-          <div className={`rounded-2xl border shadow-sm p-5 ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-            <p className={`text-xs font-bold mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — Previsto no período</p>
-            <div className="space-y-3">
-              <FluxoBar isDark={isDark} label="Receitas Previstas"
-                value={crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
-                  .reduce((s, c) => s + c.valor_original, 0)}
-                textColor="text-emerald-600" barColor="bg-emerald-500"
-                max={Math.max(
-                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
-                    .reduce((s, c) => s + c.valor_original, 0),
-                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
-                    .reduce((s, c) => s + c.valor_original, 0)
-                ) || 1}
-              />
-              <FluxoBar isDark={isDark} label="Pagamentos Previstos"
-                value={cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
-                  .reduce((s, c) => s + c.valor_original, 0)}
-                textColor="text-red-600" barColor="bg-red-500"
-                max={Math.max(
-                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
-                    .reduce((s, c) => s + c.valor_original, 0),
-                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
-                    .reduce((s, c) => s + c.valor_original, 0)
-                ) || 1}
-              />
-            </div>
-          </div>
-
-          {/* Weekly breakdown */}
-          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Vencimentos — Próximas 4 Semanas</p>
-            </div>
-            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
-              {[
-                { label: 'Semana 1', days: 7 },
-                { label: 'Semana 2', days: 14 },
-                { label: 'Semana 3', days: 21 },
-                { label: 'Semana 4', days: 28 },
-              ].map((w, i) => {
-                const start = new Date()
-                start.setDate(start.getDate() + (i * 7))
-                const end = new Date()
-                end.setDate(end.getDate() + w.days)
-                const weekCP = cp
-                  .filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
-                  .filter(c => {
-                    const d = new Date(c.data_vencimento)
-                    return d >= start && d < end
-                  })
-                  .reduce((s, c) => s + c.valor_original, 0)
-                return (
-                  <div key={w.label} className="flex items-center justify-between px-4 py-3">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{w.label}</p>
-                    <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(weekCP)}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        // Painel em reconstrução: os widgets antigos (previsto no período + vencimentos
+        // 4 semanas) foram movidos para o relatório Aging. O novo Fluxo de Caixa
+        // previsto (recebíveis EGP/média móvel × provisionado × folha) entra aqui.
+        <div className={`rounded-2xl border border-dashed p-10 text-center ${isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-300'}`}>
+          <p className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — novo painel em construção</p>
+          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            As visões anteriores (previsto no período e vencimentos por semana) foram movidas para o relatório Aging.
+          </p>
         </div>
       )}
 
@@ -313,6 +260,67 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
                         style={{ width: `${(bucket.value / maxAging) * 100}%` }}
                       />
                     </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── Movidos do antigo Fluxo de Caixa ─────────────────────────────── */}
+          <div className={`rounded-2xl border shadow-sm p-5 ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <p className={`text-xs font-bold mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — Previsto no período</p>
+            <div className="space-y-3">
+              <FluxoBar isDark={isDark} label="Receitas Previstas"
+                value={crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                  .reduce((s, c) => s + c.valor_original, 0)}
+                textColor="text-emerald-600" barColor="bg-emerald-500"
+                max={Math.max(
+                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                    .reduce((s, c) => s + c.valor_original, 0),
+                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                    .reduce((s, c) => s + c.valor_original, 0)
+                ) || 1}
+              />
+              <FluxoBar isDark={isDark} label="Pagamentos Previstos"
+                value={cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                  .reduce((s, c) => s + c.valor_original, 0)}
+                textColor="text-red-600" barColor="bg-red-500"
+                max={Math.max(
+                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                    .reduce((s, c) => s + c.valor_original, 0),
+                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                    .reduce((s, c) => s + c.valor_original, 0)
+                ) || 1}
+              />
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Vencimentos — Próximas 4 Semanas</p>
+            </div>
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
+              {[
+                { label: 'Semana 1', days: 7 },
+                { label: 'Semana 2', days: 14 },
+                { label: 'Semana 3', days: 21 },
+                { label: 'Semana 4', days: 28 },
+              ].map((w, i) => {
+                const start = new Date()
+                start.setDate(start.getDate() + (i * 7))
+                const end = new Date()
+                end.setDate(end.getDate() + w.days)
+                const weekCP = cp
+                  .filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                  .filter(c => {
+                    const d = new Date(c.data_vencimento)
+                    return d >= start && d < end
+                  })
+                  .reduce((s, c) => s + c.valor_original, 0)
+                return (
+                  <div key={w.label} className="flex items-center justify-between px-4 py-3">
+                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{w.label}</p>
+                    <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(weekCP)}</p>
                   </div>
                 )
               })}
