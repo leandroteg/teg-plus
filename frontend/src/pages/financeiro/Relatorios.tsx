@@ -11,6 +11,25 @@ const fmt = (v: number) =>
 
 export type ReportType = 'dre' | 'fluxo' | 'cc' | 'aging'
 
+// ── Filtro de período De → Até (mês/ano) — mesmo padrão do EGP ────────────────
+function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+const MESES_OPT: Array<[string, string]> = [
+  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
+  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
+]
+function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
+  const [y, m] = value.split('-')
+  const anoAtual = new Date().getFullYear()
+  const anos: number[] = []; for (let a = 2024; a <= anoAtual + 1; a++) anos.push(a)
+  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">{MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">{anos.map(a => <option key={a} value={a}>{a}</option>)}</select>
+    </span>
+  )
+}
+
 interface ReportDef {
   key: ReportType; label: string; desc: string; icon: typeof BarChart3
   activeBg: string; activeBorder: string; activeIcon: string; activeLabel: string
@@ -26,21 +45,31 @@ const REPORTS: ReportDef[] = [
 export default function Relatorios({ initialTipo }: { initialTipo?: ReportType } = {}) {
   const { isDark } = useTheme()
   const [activeReport, setActiveReport] = useState<ReportType>(initialTipo ?? 'dre')
+  const [de, setDe] = useState(`${new Date().getFullYear()}-01`)  // padrão: jan → mês atual
+  const [ate, setAte] = useState(ymHoje())
   const { data: cp = [] } = useContasPagar()
   const { data: cr = [] } = useContasReceber()
 
+  // Período: compara por competência YYYY-MM. Pagos/recebidos usam a data do
+  // pagamento/recebimento (fallback vencimento); em aberto usa o vencimento.
+  const noPeriodo = (d?: string | null) => { const ym = (d ?? '').slice(0, 7); return ym >= de && ym <= ate }
+  const cpPeriodo = cp.filter(c => noPeriodo(
+    ['pago', 'conciliado'].includes(c.status) ? (c.data_pagamento || c.data_vencimento) : c.data_vencimento))
+  const crPeriodo = cr.filter(c => noPeriodo(
+    ['recebido', 'conciliado'].includes(c.status) ? (c.data_recebimento || c.data_vencimento) : c.data_vencimento))
+
   // Compute data
-  const totalDespesas = cp
+  const totalDespesas = cpPeriodo
     .filter(c => ['pago', 'conciliado'].includes(c.status))
     .reduce((s, c) => s + c.valor_pago, 0)
-  const totalReceitas = cr
+  const totalReceitas = crPeriodo
     .filter(c => ['recebido', 'conciliado'].includes(c.status))
     .reduce((s, c) => s + c.valor_recebido, 0)
   const resultado = totalReceitas - totalDespesas
 
   // Centro de custo breakdown
   const ccMap = new Map<string, { pago: number; aberto: number }>()
-  cp.forEach(c => {
+  cpPeriodo.forEach(c => {
     const cc = c.centro_custo || 'Sem CC'
     const curr = ccMap.get(cc) ?? { pago: 0, aberto: 0 }
     if (['pago', 'conciliado'].includes(c.status)) curr.pago += c.valor_pago
@@ -52,10 +81,10 @@ export default function Relatorios({ initialTipo }: { initialTipo?: ReportType }
     .sort((a, b) => b.total - a.total)
   const maxCC = ccData[0]?.total || 1
 
-  // Aging buckets
+  // Aging buckets (universo = títulos em aberto com vencimento no período)
   const now = new Date()
   const aging = { corrente: 0, ate30: 0, ate60: 0, ate90: 0, acima90: 0 }
-  cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status)).forEach(c => {
+  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status)).forEach(c => {
     const venc = new Date(c.data_vencimento)
     const diff = Math.floor((now.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24))
     if (diff <= 0) aging.corrente += c.valor_original
@@ -77,11 +106,19 @@ export default function Relatorios({ initialTipo }: { initialTipo?: ReportType }
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>DRE, Fluxo de Caixa, Centro de Custo e Aging</p>
         </div>
-        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
-          ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
-          <Download size={12} />
-          Exportar
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Filtro De → Até (padrão EGP) */}
+          <span className="inline-flex items-center gap-1.5">
+            <PeriodoSelect value={de} onChange={setDe} isDark={isDark} />
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
+            <PeriodoSelect value={ate} onChange={setAte} isDark={isDark} />
+          </span>
+          <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
+            ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
+            <Download size={12} />
+            Exportar
+          </button>
+        </div>
       </div>
 
       {/* ── Report selector ─────────────────────────────────── */}
@@ -159,27 +196,27 @@ export default function Relatorios({ initialTipo }: { initialTipo?: ReportType }
       {activeReport === 'fluxo' && (
         <div className="space-y-4">
           <div className={`rounded-2xl border shadow-sm p-5 ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-            <p className={`text-xs font-bold mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — Próximos 30 dias</p>
+            <p className={`text-xs font-bold mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — Previsto no período</p>
             <div className="space-y-3">
               <FluxoBar isDark={isDark} label="Receitas Previstas"
-                value={cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                value={crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
                 textColor="text-emerald-600" barColor="bg-emerald-500"
                 max={Math.max(
-                  cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0),
-                  cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0)
                 ) || 1}
               />
               <FluxoBar isDark={isDark} label="Pagamentos Previstos"
-                value={cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                value={cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
                 textColor="text-red-600" barColor="bg-red-500"
                 max={Math.max(
-                  cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
+                  crPeriodo.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0),
-                  cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
+                  cpPeriodo.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0)
                 ) || 1}
               />
