@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
   Briefcase, Search, FileText, FileSignature, TrendingUp,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
@@ -951,8 +953,27 @@ function TabAditivosReajustes() {
 
 // ── Tab: Recebiveis (A Receber) ──────────────────────────────────────────────
 function TabRecebiveis() {
+  const nav = useNavigate()
   const [statusFilter, setStatusFilter] = useState('')
   const { data: parcelas = [], isLoading } = useParcelas()
+
+  // Recebíveis além das parcelas: saldo EGP a faturar + medições (BM) por estágio
+  type RecEgp = { contrato_id: string; numero: string; objeto: string; valor_oscs: number; faturado: number; saldo: number }
+  type RecMed = { id: string; numero_bm: string; valor: number; status: string; fin_status: string | null; contrato: string; objeto: string; periodo_fim: string | null; vencimento: string | null }
+  const { data: extra } = useQuery<{ egp: RecEgp[]; medicoes: RecMed[] } | null>({
+    queryKey: ['con-recebiveis-egp'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('con_recebiveis_egp')
+      if (error) return null
+      return data as { egp: RecEgp[]; medicoes: RecMed[] }
+    },
+  })
+  const egpRows = (extra?.egp ?? []).filter(e => e.saldo > 0)
+  const meds = extra?.medicoes ?? []
+  const medEstagio = (m: RecMed) =>
+    m.status === 'aprovado' ? { label: 'A Faturar', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400' }
+    : m.fin_status === 'recebido' ? { label: 'Recebido', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' }
+    : { label: 'No Financeiro', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' }
 
   // Only receita parcels
   const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
@@ -962,13 +983,15 @@ function TabRecebiveis() {
     return true
   })
 
+  const medsEmAberto = meds.filter(m => m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  const medsRecebidas = meds.filter(m => m.fin_status === 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
   const totalEmAberto = recebiveis
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
-    .reduce((s, p) => s + p.valor, 0)
+    .reduce((s, p) => s + p.valor, 0) + medsEmAberto
   const totalRecebido = recebiveis
     .filter(p => p.status === 'pago')
-    .reduce((s, p) => s + p.valor, 0)
-  const pendentes = recebiveis.filter(p => p.status === 'pendente' || p.status === 'liberado').length
+    .reduce((s, p) => s + p.valor, 0) + medsRecebidas
+  const saldoEgp = egpRows.reduce((s, e) => s + e.saldo, 0)
   const atrasadas = recebiveis.filter(p =>
     p.status !== 'pago' && p.status !== 'cancelado' &&
     new Date(p.data_vencimento).getTime() < Date.now()
@@ -1001,9 +1024,9 @@ function TabRecebiveis() {
           <p className="text-[10px] font-bold text-blue-600 uppercase">Recebido</p>
           <p className="text-lg font-extrabold text-blue-700 mt-1">{fmt(totalRecebido)}</p>
         </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-600 uppercase">Pendentes</p>
-          <p className="text-xl font-extrabold text-amber-700 mt-1">{pendentes}</p>
+        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-indigo-500 uppercase">Saldo EGP a faturar</p>
+          <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmt(saldoEgp)}</p>
         </div>
         <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
           <p className="text-[10px] font-bold text-red-500 uppercase">Atrasadas</p>
@@ -1027,7 +1050,7 @@ function TabRecebiveis() {
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && egpRows.length === 0 && meds.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
             <Banknote size={24} className="text-emerald-300" />
@@ -1036,6 +1059,61 @@ function TabRecebiveis() {
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Saldo a faturar dos contratos vinculados ao EGP (backlog de OSCs) */}
+          {egpRows.map(e => (
+            <div key={e.contrato_id}
+              onClick={() => nav(`/contratos/detalhe/${e.contrato_id}`)}
+              className="bg-white rounded-2xl border border-indigo-200 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <TrendingUp size={16} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-800 truncate">{e.objeto}</p>
+                    <div className="text-right shrink-0 leading-tight">
+                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(e.saldo)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">saldo a faturar (EGP)</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {e.numero} · {fmt(e.faturado)} faturado de {fmt(e.valor_oscs)} em OSCs emitidas
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Medições (BM) de contratos de receita, por estágio */}
+          {meds.map(m => {
+            const st = medEstagio(m)
+            return (
+              <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-fuchsia-50 flex items-center justify-center shrink-0">
+                    <Receipt size={16} className="text-fuchsia-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{m.objeto ?? 'Medição'}</p>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(m.valor || 0)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                      <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${st.bg} ${st.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
+                        {m.contrato} — {m.numero_bm}
+                      </span>
+                      {m.vencimento && <span className="text-slate-400">Vence: {fmtData(m.vencimento)}</span>}
+                      {!m.vencimento && m.periodo_fim && <span className="text-slate-400">Período até: {fmtData(m.periodo_fim)}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
           {filtered.map(p => {
             const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
             const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
