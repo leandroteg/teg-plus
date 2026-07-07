@@ -56,6 +56,13 @@ export function RelatoriosToolbar({ de, ate, setDe, setAte, isDark }: {
 
 export const relPeriodoDefault = () => ({ de: `${new Date().getFullYear()}-01`, ate: ymHoje() })
 
+// Fluxo de Caixa abre olhando pra FRENTE: próximo mês → dezembro do ano desse mês.
+export const fluxoPeriodoDefault = () => {
+  const d = new Date(); d.setMonth(d.getMonth() + 1)
+  const y = d.getFullYear()
+  return { de: `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`, ate: `${y}-12` }
+}
+
 export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
   initialTipo?: ReportType
   /** Período controlado pelo pai (Painel Financeiro renderiza a toolbar no header). */
@@ -64,8 +71,9 @@ export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
   const { isDark } = useTheme()
   const activeReport: ReportType = initialTipo ?? 'dre'
   const controlado = deProp != null && ateProp != null
-  const [deState, setDeState] = useState(`${new Date().getFullYear()}-01`)  // padrão: jan → mês atual
-  const [ateState, setAteState] = useState(ymHoje())
+  // padrão: jan → mês atual; Fluxo de Caixa abre próximo mês → fim do ano
+  const [deState, setDeState] = useState(() => activeReport === 'fluxo' ? fluxoPeriodoDefault().de : `${new Date().getFullYear()}-01`)
+  const [ateState, setAteState] = useState(() => activeReport === 'fluxo' ? fluxoPeriodoDefault().ate : ymHoje())
   const de = deProp ?? deState
   const ate = ateProp ?? ateState
   const { data: cp = [] } = useContasPagar()
