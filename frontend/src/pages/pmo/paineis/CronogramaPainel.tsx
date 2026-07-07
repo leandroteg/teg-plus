@@ -54,7 +54,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const qc = useQueryClient()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const { data: efetivo } = useEfetivoReal(portfolioId)
-  const { data: equipeObras } = useEquipeObrasReal()
+  const { data: equipeObras, isLoading: equipeLoading } = useEquipeObrasReal()
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
   const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
@@ -78,15 +78,20 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   // config default (produtividade/pessoa padrão; equipe p/ terminar cada obra em 12m, ∝ saldo)
   const defaultConfig = useMemo<Config>(() => makeDefaultConfig(allObras), [allObras])
 
-  // 1ª carga: restaura a última config APLICADA (localStorage, por contrato); sem ela, cai no default (12m ∝ saldo)
+  // 1ª carga: restaura a última config APLICADA (localStorage, por contrato).
+  // Sem config salva, o padrão é a ALOCAÇÃO REAL das Obras (Equipes); teórico 12m só se não houver equipe nenhuma.
   useEffect(() => {
-    if (applied || !allObras.length) return
+    if (applied || !allObras.length || equipeLoading) return
     try {
       const s = localStorage.getItem(`crono-cfg-${portfolioId}`)
       if (s) { setApplied({ ...defaultConfig, ...JSON.parse(s) }); return }
     } catch { /* config corrompida → segue pro padrão */ }
+    if (equipeObras && equipeObras.total > 0) {
+      setApplied({ ...defaultConfig, equipe: Object.fromEntries(allObras.map(o => [o.nome, { ...(equipeObras.porObra[o.nome] ?? {}) }])) })
+      return
+    }
     setApplied(defaultConfig)
-  }, [applied, allObras.length, defaultConfig, portfolioId])
+  }, [applied, allObras, defaultConfig, portfolioId, equipeObras, equipeLoading])
 
   // versões salvas
   const { data: versoes = [] } = useQuery<Versao[]>({
