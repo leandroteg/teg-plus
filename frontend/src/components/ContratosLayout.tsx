@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ClipboardList,
-  FileSignature, Briefcase, FileStack, Plus,
+  FileSignature, Briefcase, FileStack, Plus, FileText, Receipt,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -11,8 +11,32 @@ export default function ContratosLayout() {
 
   const NAV: NavItem[] = [
     { to: '/contratos',              icon: LayoutDashboard,  label: 'Painel',            end: true  },
-    { to: '/contratos/solicitacoes/nova', icon: Plus,        label: 'Nova Solicitação',  end: false,
-      action: () => navigate(`/contratos/solicitacoes/nova`), accent: true },
+    {
+      to: 'con-nova-solicitacao',
+      icon: Plus,
+      label: 'Nova Solicitação',
+      end: false,
+      accent: true,
+      actionMenu: {
+        title: 'Nova solicitação',
+        items: [
+          {
+            icon: FileText,
+            label: 'Novo Contrato',
+            description: 'Abrir uma solicitação de contrato — da minuta à assinatura.',
+            tone: 'violet' as const,
+            action: () => navigate('/contratos/solicitacoes/nova'),
+          },
+          {
+            icon: Receipt,
+            label: 'Nova Medição',
+            description: 'Lançar medição (BM) de um contrato ativo.',
+            tone: 'rose' as const,
+            action: () => navigate('/contratos/gestao?nova-medicao=1'),
+          },
+        ],
+      },
+    },
     { to: '/contratos/solicitacoes', icon: ClipboardList,    label: 'Elaboração'        },
     { to: '/contratos/assinaturas',  icon: FileSignature,    label: 'Assinaturas'       },
     { to: '/contratos/gestao',       icon: Briefcase,        label: 'Gestão'            },
