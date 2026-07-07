@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ClipboardList,
-  FileSignature, Briefcase, FileStack, Plus, FileText, Receipt,
+  FileSignature, Briefcase, Plus, FileText, Receipt,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -40,7 +40,6 @@ export default function ContratosLayout() {
     { to: '/contratos/solicitacoes', icon: ClipboardList,    label: 'Elaboração'        },
     { to: '/contratos/assinaturas',  icon: FileSignature,    label: 'Assinaturas'       },
     { to: '/contratos/gestao',       icon: Briefcase,        label: 'Gestão'            },
-    { to: '/contratos/modelos',      icon: FileStack,        label: 'Modelos'           },
   ]
 
   return (
