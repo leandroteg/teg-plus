@@ -318,6 +318,13 @@ export default function ContratoDetalhe() {
     enabled: !!id,
   })
   const egpAtivo = (egp?.oscs ?? 0) > 0
+  // Valor mensal previsto = média móvel das últimas 6 competências faturadas no EGP
+  const egpMedia6m = (() => {
+    const serie = egp?.mensal ?? []
+    if (serie.length === 0) return null
+    const ult = serie.slice(-6)
+    return ult.reduce((s, m) => s + m.realizado, 0) / ult.length
+  })()
 
   const { data: reajustes = [] } = useQuery({
     queryKey: ['contrato-reajustes', id],
@@ -451,7 +458,8 @@ export default function ContratoDetalhe() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-          <SummaryCard icon={DollarSign} label="Valor Total" value={fmtCompact(valorTotal)} sub={valorMensal ? `${fmt(valorMensal)}/mes` : undefined} color="indigo" />
+          <SummaryCard icon={DollarSign} label="Valor Total" value={fmtCompact(valorTotal)}
+            sub={egpAtivo && egpMedia6m ? `${fmt(egpMedia6m)}/mês (média 6m)` : valorMensal ? `${fmt(valorMensal)}/mes` : undefined} color="indigo" />
           <SummaryCard icon={Calendar} label="Vigencia" value={meses ? `${meses} meses` : '—'} sub={contrato.data_fim_previsto ? `ate ${fmtDate(contrato.data_fim_previsto)}` : undefined} color="violet" />
           {egpAtivo ? (
             <SummaryCard icon={Hash} label="OSCs (EGP)" value={String(egp!.oscs)} sub={`${fmtCompact(egp!.valor_oscs)} emitidos`} color="emerald" />
@@ -519,9 +527,16 @@ export default function ContratoDetalhe() {
             const max = Math.max(...serie.map(m => m.realizado), 1)
             return (
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Faturamento por competência (últimos {serie.length} meses)
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Faturamento por competência (últimos {serie.length} meses)
+                  </p>
+                  {egpMedia6m && (
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 rounded-full px-2.5 py-1">
+                      média móvel 6m: {fmt(egpMedia6m)}/mês
+                    </span>
+                  )}
+                </div>
                 <div className="space-y-1.5">
                   {serie.map(m => (
                     <div key={m.competencia} className="flex items-center gap-2">
