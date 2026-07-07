@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
-  BarChart3, TrendingUp, Calendar, Download,
-  PieChart, ArrowUpRight, ArrowDownRight, Minus,
+  Download, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
@@ -30,21 +29,12 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
-interface ReportDef {
-  key: ReportType; label: string; desc: string; icon: typeof BarChart3
-  activeBg: string; activeBorder: string; activeIcon: string; activeLabel: string
-}
-
-const REPORTS: ReportDef[] = [
-  { key: 'dre',   label: 'DRE',            desc: 'Demonstrativo de Resultado',  icon: BarChart3,  activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeIcon: 'text-emerald-600', activeLabel: 'text-emerald-700' },
-  { key: 'fluxo', label: 'Fluxo de Caixa', desc: 'Entradas e saídas previstas', icon: TrendingUp, activeBg: 'bg-blue-50',    activeBorder: 'border-blue-200',    activeIcon: 'text-blue-600',    activeLabel: 'text-blue-700'    },
-  { key: 'cc',    label: 'Centro de Custo', desc: 'Gastos por CC / Projeto',     icon: PieChart,   activeBg: 'bg-violet-50',  activeBorder: 'border-violet-200',  activeIcon: 'text-violet-600',  activeLabel: 'text-violet-700'  },
-  { key: 'aging', label: 'Aging',           desc: 'Títulos por vencimento',      icon: Calendar,   activeBg: 'bg-amber-50',   activeBorder: 'border-amber-200',   activeIcon: 'text-amber-600',   activeLabel: 'text-amber-700'   },
-]
+// Os cards-atalho e o título saíram — o acesso às telas é pelo seletor do Painel
+// Financeiro (initialTipo); esta página só renderiza o relatório escolhido.
 
 export default function Relatorios({ initialTipo }: { initialTipo?: ReportType } = {}) {
   const { isDark } = useTheme()
-  const [activeReport, setActiveReport] = useState<ReportType>(initialTipo ?? 'dre')
+  const activeReport: ReportType = initialTipo ?? 'dre'
   const [de, setDe] = useState(`${new Date().getFullYear()}-01`)  // padrão: jan → mês atual
   const [ate, setAte] = useState(ymHoje())
   const { data: cp = [] } = useContasPagar()
@@ -97,49 +87,18 @@ export default function Relatorios({ initialTipo }: { initialTipo?: ReportType }
   return (
     <div className="space-y-5">
 
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <BarChart3 size={20} className="text-emerald-600" />
-            Relatórios Financeiros
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>DRE, Fluxo de Caixa, Centro de Custo e Aging</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Filtro De → Até (padrão EGP) */}
-          <span className="inline-flex items-center gap-1.5">
-            <PeriodoSelect value={de} onChange={setDe} isDark={isDark} />
-            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
-            <PeriodoSelect value={ate} onChange={setAte} isDark={isDark} />
-          </span>
-          <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
-            ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
-            <Download size={12} />
-            Exportar
-          </button>
-        </div>
-      </div>
-
-      {/* ── Report selector ─────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {REPORTS.map(r => {
-          const isActive = activeReport === r.key
-          return (
-            <button key={r.key} onClick={() => setActiveReport(r.key)}
-              className={`rounded-2xl p-3 text-left transition-all border
-                ${isActive
-                  ? `${r.activeBg} ${r.activeBorder} shadow-sm`
-                  : isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}>
-              <r.icon size={16} className={isActive ? r.activeIcon : 'text-slate-400'} />
-              <p className={`text-[11px] font-bold mt-1.5 ${isActive ? r.activeLabel : isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                {r.label}
-              </p>
-              <p className="text-[9px] text-slate-400 mt-0.5">{r.desc}</p>
-            </button>
-          )
-        })}
+      {/* ── Filtro de período + Exportar (título e atalhos saíram) ── */}
+      <div className="flex items-center justify-end gap-3">
+        <span className="inline-flex items-center gap-1.5">
+          <PeriodoSelect value={de} onChange={setDe} isDark={isDark} />
+          <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
+          <PeriodoSelect value={ate} onChange={setAte} isDark={isDark} />
+        </span>
+        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
+          ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
+          <Download size={12} />
+          Exportar
+        </button>
       </div>
 
       {/* ── Report content ──────────────────────────────────── */}
