@@ -11,9 +11,9 @@ const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 import Relatorios, { RelatoriosToolbar, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
-type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_dre' | 'rel_fluxo' | 'rel_cc' | 'rel_aging'
-const REL_TIPO: Record<string, 'dre' | 'fluxo' | 'cc' | 'aging'> = {
-  rel_dre: 'dre', rel_fluxo: 'fluxo', rel_cc: 'cc', rel_aging: 'aging',
+type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_fluxo' | 'rel_aging'
+const REL_TIPO: Record<string, 'fluxo' | 'aging'> = {
+  rel_fluxo: 'fluxo', rel_aging: 'aging',
 }
 import { useTheme } from '../../contexts/ThemeContext'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
@@ -157,9 +157,7 @@ export default function DashboardFinanceiro() {
             >
               <option value="painel">Painel</option>
               <option value="pgtos_previstos">Pgtos Previstos</option>
-              <option value="rel_dre">DRE</option>
               <option value="rel_fluxo">Fluxo de Caixa</option>
-              <option value="rel_cc">Centro de Custo</option>
               <option value="rel_aging">Aging</option>
             </select>
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
