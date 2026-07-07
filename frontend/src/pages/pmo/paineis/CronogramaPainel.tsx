@@ -6,7 +6,7 @@ import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
-import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
+import { useEfetivoReal, useEquipeObrasReal, type EquipeObrasReal } from '../../../hooks/useEfetivoReal'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
@@ -54,6 +54,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const qc = useQueryClient()
   const { data: raw, isLoading } = useEAPFinal(portfolioId)
   const { data: efetivo } = useEfetivoReal(portfolioId)
+  const { data: equipeObras } = useEquipeObrasReal()
   const [fFrente, setFFrente] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
   const [fPct, setFPct] = useState<Set<string>>(new Set(PROD_BANDS.slice(0, -2).map(b => b[0]))) // oculta 85–95% e >95% por padrão
@@ -253,7 +254,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       </PanelCard>
 
       {modalOpen && <ConfigModal isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
-        tree={tree} efetivoFrente={efetivo?.porFrente}
+        tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
         inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
         onAplicar={c => { setApplied(c); setModalOpen(false) }} onClose={() => setModalOpen(false)} />}
     </div>
@@ -261,9 +262,10 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 }
 
 // ── Modal de configuração ────────────────────────────────────────────────────
-function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, inicial, defaultConfig, versoes, qc, onAplicar, onClose }: {
+function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, equipeObras, inicial, defaultConfig, versoes, qc, onAplicar, onClose }: {
   isDark: boolean; portfolioId: string; allObras: Obra[]; saldoGlobal: Record<string, number>
   tree: Frente[]; efetivoFrente?: Record<string, { fundacao: number; montlanc: number }>
+  equipeObras?: EquipeObrasReal
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
   onAplicar: (c: Config) => void; onClose: () => void
 }) {
@@ -277,6 +279,9 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
   const fillFromReal = () => setCfg(c => ({ ...c, equipe: equipeFromEfetivo(tree, efetivoFrente ?? {}, true) }))
+  // preenche com a alocação REAL das Obras (obr_planejamento_equipe): direto por obra × frente; obra sem equipe fica 0
+  const equipesTot = equipeObras?.total ?? 0
+  const fillFromEquipes = () => setCfg(c => ({ ...c, equipe: Object.fromEntries(allObras.map(o => [o.nome, { ...(equipeObras?.porObra[o.nome] ?? {}) }])) }))
   const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
 
   const salvar = useMutation({
@@ -337,6 +342,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
               <p className={lbl}>Equipe por obra — nº de pessoas</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
+                <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-violet-500/40 text-violet-300 bg-violet-500/10' : 'border-violet-300 text-violet-700 bg-violet-50'}`}><Sparkles size={11} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
                 <span className="text-[10px] text-slate-400 ml-1">terminar em</span>
                 {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
               </div>
