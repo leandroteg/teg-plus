@@ -10,6 +10,8 @@ import { supabase } from '../../services/supabase'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 import { useEAPFinal } from '../../hooks/usePMO'
 import { buildTree, makeDefaultConfig, projObra, startYM, type Config } from '../pmo/paineis/cronogramaEngine'
+import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import type { GrupoContrato } from '../../types/contratos'
 
 const fmtK = (v: number) => {
   if (Math.abs(v) < 0.5) return '—'
@@ -110,13 +112,21 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   const semClasse = [...porClasse.keys()].filter(k => k === 'sem' || grupoDaClasse(k) === 'GRP-XX')
     .filter(k => meses.some(ym => (porClasse.get(k)!.get(ym) ?? 0) > 0))
 
-  // ── Contratos recorrentes (Provisionado) ─────────────────────────────────────
+  // ── Contratos recorrentes (Provisionado) — SOMADOS por grupo de contrato ────
   const contratos = (cad?.contratos ?? []).filter(ct => (ct.valor_mensal ?? 0) > 0)
   const contratoNoMes = (ct: (typeof contratos)[number], ym: string) => {
     const ini = (ct.data_inicio ?? '').slice(0, 7) || '0000-00'
     const fim = (ct.data_fim_previsto ?? '9999-12').slice(0, 7)
     return ym >= ini && ym <= fim ? (ct.valor_mensal ?? 0) : 0
   }
+  const gruposContrato = [...new Set(contratos.map(ct => (ct.grupo_contrato as string) || 'outro'))]
+    .map(g => ({
+      key: g,
+      label: GRUPO_CONTRATO_LABEL[g as GrupoContrato] ?? g,
+      val: (ym: string) => contratos.filter(ct => ((ct.grupo_contrato as string) || 'outro') === g)
+        .reduce((s, ct) => s + contratoNoMes(ct, ym), 0),
+    }))
+    .sort((a, b) => meses.reduce((s, ym) => s + b.val(ym), 0) - meses.reduce((s, ym) => s + a.val(ym), 0))
 
   const saidaDe = (ym: string) =>
     [...porClasse.values()].reduce((s, m) => s + (m.get(ym) ?? 0), 0) +
@@ -171,15 +181,12 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
               </>
             )}
 
-            {contratos.length > 0 && (
+            {gruposContrato.length > 0 && (
               <>
                 <tr className={secBg}>
                   <td colSpan={meses.length + 2} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">Contratos Recorrentes (Provisionado)</td>
                 </tr>
-                {contratos.map(ct => (
-                  <Linha key={ct.numero} sub label={ct.numero === 'EQUIPE-PJ' ? 'Equipe PJ (sigiloso — total)' : (ct.objeto ?? ct.numero)}
-                    val={ym => contratoNoMes(ct, ym)} />
-                ))}
+                {gruposContrato.map(g => <Linha key={g.key} sub label={g.label} val={g.val} />)}
               </>
             )}
 
