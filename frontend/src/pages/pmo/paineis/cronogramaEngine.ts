@@ -163,12 +163,30 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   const execMes = meses.map((_, m) => (omMeses > 0 && m < omMeses) ? o.omR / omMeses : 0)
   const drvRmes = meses.map((_, m) => rows.reduce((s, x) => s + (x.rMes[m] || 0), 0))
   const totDrvR = drvRmes.reduce((s, x) => s + x, 0)
-  // Preliminares/Administração/Outros: proporcional à medição dos drivers (ADM mede junto com o avanço físico).
+  // Administração: proporcional à medição dos drivers (ADM mede junto com o avanço físico).
   // SEM equipe alocada (drivers não produzem) → mede ZERO — nada de espalhar saldo sem produção.
   const propMes = (valor: number) => meses.map((_, m) => totDrvR > 0 ? valor * drvRmes[m] / totDrvR : 0)
-  const prelRmes = propMes(o.prelR)
+  // Preliminares/Outros: medição por MARCOS do driver âncora — 25% do saldo a cada 25% atingido
+  // (Preliminares ← Fundação; Outros ← Montagem). Sem o driver na obra (ou já 100%), cai no proporcional geral.
+  const marcoMes = (valor: number, anc: string) => {
+    if (!(valor > 0)) return meses.map(() => 0)
+    const c = contr[anc]
+    if (!c || !(c > 0)) return propMes(valor)
+    const pct0 = (real[anc] || 0) / c
+    const marcos = [0.25, 0.5, 0.75, 1].filter(x => x > pct0 + 1e-9)
+    if (!marcos.length) return propMes(valor)
+    const porMarco = valor / marcos.length
+    let prev = pct0
+    return meses.map((_, m) => {
+      const cur = ((hist[anc]?.[m] ?? cum[anc]) || 0) / c
+      const n = marcos.filter(x => x > prev + 1e-9 && x <= cur + 1e-9).length
+      prev = Math.max(prev, cur)
+      return porMarco * n
+    })
+  }
+  const prelRmes = marcoMes(o.prelR, 'Fundação')
   const admRmes = propMes(o.admR)
-  const outrosRmes = propMes(o.outrosR)
+  const outrosRmes = marcoMes(o.outrosR, 'Montagem')
   const totalRmes = meses.map((_, m) => drvRmes[m] + prelRmes[m] + admRmes[m] + outrosRmes[m] + execMes[m])
   return { meses, rows, execMes, prelRmes, admRmes, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
 }
