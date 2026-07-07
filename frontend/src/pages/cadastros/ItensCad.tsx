@@ -137,13 +137,13 @@ export default function ItensCad() {
     window.location.reload()
   }
 
+  // Sem corte: com a busca vazia lista TODAS as classes (o dropdown rola).
   const classesFiltradas = classes
     .filter((classe) => {
       const termo = classeBusca.trim().toLowerCase()
       if (!termo) return true
       return `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(termo)
     })
-    .slice(0, 12)
 
   function formatClasseLabel(classe?: typeof classes[number]) {
     if (!classe) return ''
