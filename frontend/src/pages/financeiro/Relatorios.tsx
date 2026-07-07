@@ -32,11 +32,41 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 // Os cards-atalho e o título saíram — o acesso às telas é pelo seletor do Painel
 // Financeiro (initialTipo); esta página só renderiza o relatório escolhido.
 
-export default function Relatorios({ initialTipo }: { initialTipo?: ReportType } = {}) {
+// Toolbar (filtro De → Até + Exportar) — reutilizada pelo header do Painel
+// Financeiro (linha do título) e pela página standalone /financeiro/relatorios.
+export function RelatoriosToolbar({ de, ate, setDe, setAte, isDark }: {
+  de: string; ate: string; setDe: (v: string) => void; setAte: (v: string) => void; isDark: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="inline-flex items-center gap-1.5">
+        <PeriodoSelect value={de} onChange={setDe} isDark={isDark} />
+        <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
+        <PeriodoSelect value={ate} onChange={setAte} isDark={isDark} />
+      </span>
+      <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
+        ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
+        <Download size={12} />
+        Exportar
+      </button>
+    </div>
+  )
+}
+
+export const relPeriodoDefault = () => ({ de: `${new Date().getFullYear()}-01`, ate: ymHoje() })
+
+export default function Relatorios({ initialTipo, de: deProp, ate: ateProp }: {
+  initialTipo?: ReportType
+  /** Período controlado pelo pai (Painel Financeiro renderiza a toolbar no header). */
+  de?: string; ate?: string
+} = {}) {
   const { isDark } = useTheme()
   const activeReport: ReportType = initialTipo ?? 'dre'
-  const [de, setDe] = useState(`${new Date().getFullYear()}-01`)  // padrão: jan → mês atual
-  const [ate, setAte] = useState(ymHoje())
+  const controlado = deProp != null && ateProp != null
+  const [deState, setDeState] = useState(`${new Date().getFullYear()}-01`)  // padrão: jan → mês atual
+  const [ateState, setAteState] = useState(ymHoje())
+  const de = deProp ?? deState
+  const ate = ateProp ?? ateState
   const { data: cp = [] } = useContasPagar()
   const { data: cr = [] } = useContasReceber()
 
@@ -87,19 +117,12 @@ export default function Relatorios({ initialTipo }: { initialTipo?: ReportType }
   return (
     <div className="space-y-5">
 
-      {/* ── Filtro de período + Exportar (título e atalhos saíram) ── */}
-      <div className="flex items-center justify-end gap-3">
-        <span className="inline-flex items-center gap-1.5">
-          <PeriodoSelect value={de} onChange={setDe} isDark={isDark} />
-          <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
-          <PeriodoSelect value={ate} onChange={setAte} isDark={isDark} />
-        </span>
-        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
-          ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
-          <Download size={12} />
-          Exportar
-        </button>
-      </div>
+      {/* ── Toolbar interna — só quando NÃO controlado pelo pai (standalone) ── */}
+      {!controlado && (
+        <div className="flex items-center justify-end">
+          <RelatoriosToolbar de={de} ate={ate} setDe={setDeState} setAte={setAteState} isDark={isDark} />
+        </div>
+      )}
 
       {/* ── Report content ──────────────────────────────────── */}
       {activeReport === 'dre' && (

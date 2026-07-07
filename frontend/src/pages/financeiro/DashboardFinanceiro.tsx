@@ -7,7 +7,8 @@ import {
 } from 'lucide-react'
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
-const Relatorios = lazy(() => import('./Relatorios'))
+// Import estático: a toolbar do período renderiza no header (mesma linha do título)
+import Relatorios, { RelatoriosToolbar, relPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
 type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_dre' | 'rel_fluxo' | 'rel_cc' | 'rel_aging'
@@ -95,6 +96,7 @@ export default function DashboardFinanceiro() {
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
   const [painelAtivo, setPainelAtivo] = useState<PainelKey>('painel')
+  const [relPeriodo, setRelPeriodo] = useState(relPeriodoDefault)  // De → Até dos relatórios (vive no header)
 
   useEffect(() => { setPeriodo('30d') }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
@@ -179,6 +181,14 @@ export default function DashboardFinanceiro() {
               </button>
             </>
           )}
+          {painelAtivo in REL_TIPO && (
+            <RelatoriosToolbar
+              de={relPeriodo.de} ate={relPeriodo.ate}
+              setDe={v => setRelPeriodo(p => ({ ...p, de: v }))}
+              setAte={v => setRelPeriodo(p => ({ ...p, ate: v }))}
+              isDark={isDark}
+            />
+          )}
         </div>
       </div>
 
@@ -188,11 +198,10 @@ export default function DashboardFinanceiro() {
         </Suspense>
       )}
 
-      {/* Telas da visão Relatórios como sub-painéis — key remonta p/ abrir na tela certa */}
+      {/* Telas da visão Relatórios como sub-painéis — key remonta p/ abrir na tela certa;
+          período controlado pelo header (RelatoriosToolbar acima) */}
       {painelAtivo in REL_TIPO && (
-        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-          <Relatorios key={painelAtivo} initialTipo={REL_TIPO[painelAtivo]} />
-        </Suspense>
+        <Relatorios key={painelAtivo} initialTipo={REL_TIPO[painelAtivo]} de={relPeriodo.de} ate={relPeriodo.ate} />
       )}
 
       {painelAtivo === 'painel' && (<>
