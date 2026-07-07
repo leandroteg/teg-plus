@@ -45,8 +45,10 @@ export const worstCor = (cs: string[]) => cs.includes('#ef4444') ? '#ef4444' : c
 export type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
 export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; prelR: number; admR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; pctFis: number; ini: string | null; fim: string | null }
 export type Frente = { label: string; obras: Obra[] }
-// prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver
-export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number }
+// prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver.
+// inicio: mês planejado (YYYY-MM) por obra — não produz antes dele.
+// realoc + fila: realocação automática — equipe liberada (driver concluído) migra pra próxima obra da fila (nº = ordem).
+export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; inicio?: Record<string, string> }
 export type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 export function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
@@ -125,29 +127,24 @@ export function rateOf(o: Obra, d: Drv, cfg: Config) {
   return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
 }
 
-// projeção mês a mês da obra com PRECEDÊNCIA: Fundação libera Montagem, Montagem libera Lançamento.
-// rows[].pessoas[m] = nº de pessoas ativas naquele mês (= equipe se o driver produz no mês).
-export function projObra(o: Obra, cfg: Config, start: string) {
+// mês de início planejado (cfg.inicio) → offset em meses a partir do start (0 = já pode produzir)
+const delayOf = (o: Obra, cfg: Config, start: string) => {
+  const ini = cfg.inicio?.[o.nome]
+  return ini ? Math.max(0, ymNum(ini) - ymNum(start)) : 0
+}
+
+// estado bruto de uma simulação (por obra) — consumido por finalizeObra
+type SimObra = {
+  order: string[]; monthly: Record<string, number[]>; hist: Record<string, number[]>
+  cum: Record<string, number>; contr: Record<string, number>; real: Record<string, number>
+  pessoas?: Record<string, number[]>; meses: number
+}
+
+// transforma a simulação em resultado (linhas, R$/mês, Prelim/ADM/Outros por marcos, O&M)
+function finalizeObra(o: Obra, cfg: Config, start: string, sim: SimObra) {
   const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
-  const order = present.map(d => d.label)
-  const rate: Record<string, number> = {}, contr: Record<string, number> = {}, real: Record<string, number> = {}, cum: Record<string, number> = {}
-  const hist: Record<string, number[]> = {}, monthly: Record<string, number[]> = {}
-  present.forEach(d => { rate[d.label] = rateOf(o, d, cfg); contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = [] })
-  const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
-  let i = 0
-  while (i < 120) {
-    for (let k = 0; k < order.length; k++) {
-      const lbl = order[k]
-      let capPct = 1
-      if (prec && k > 0) { const pl = order[k - 1]; const predCum = lag <= 0 ? cum[pl] : (i - lag >= 0 ? hist[pl][i - lag] : real[pl]); capPct = contr[pl] > 0 ? predCum / contr[pl] : 1 }
-      const adv = Math.max(0, Math.min(rate[lbl], contr[lbl] - cum[lbl], capPct * contr[lbl] - cum[lbl]))
-      monthly[lbl].push(adv); cum[lbl] += adv
-    }
-    order.forEach(l => hist[l].push(cum[l]))
-    i++
-    if (!order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
-  }
-  let drvMax = 0; for (let m = 0; m < i; m++) if (order.some(l => monthly[l][m] > 0.001)) drvMax = m + 1
+  const { order, monthly, hist, cum, contr, real } = sim
+  let drvMax = 0; for (let m = 0; m < sim.meses; m++) if (order.some(l => (monthly[l][m] || 0) > 0.001)) drvMax = m + 1
   // O&M (manutenção): execução distribuída uniformemente até o vencimento (sem drivers/precedência)
   const omMeses = o.omR > 0 ? (present.length > 0 ? drvMax : Math.max(1, Math.min(60, o.fim ? (ymNum(o.fim.slice(0, 7)) - ymNum(start) + 1) : 12))) : 0
   let maxMeses = Math.max(drvMax, omMeses)
@@ -156,7 +153,8 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   const rows = present.map(d => {
     const qty = Array.from({ length: maxMeses }, (_, m) => monthly[d.label][m] || 0)
     const rMes = qty.map(q => d.saldoQ > 0 ? d.saldoR * (q / d.saldoQ) : 0)
-    const pessoas = qty.map(q => q > 0.001 ? (cfg.equipe?.[o.nome]?.[d.label] ?? 0) : 0) // efetivo ativo no mês
+    // efetivo ativo no mês: com realocação usa o histórico de alocação; senão a equipe fixa da config
+    const pessoas = qty.map((q, m) => q > 0.001 ? (sim.pessoas?.[d.label]?.[m] ?? cfg.equipe?.[o.nome]?.[d.label] ?? 0) : 0)
     const mesesD = qty.reduce((a, q, m) => q > 0.001 ? m + 1 : a, 0)
     return { d, qty, rMes, pessoas, meses: mesesD }
   })
@@ -190,4 +188,99 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   const outrosRmes = marcoMes(o.outrosR, 'Montagem')
   const totalRmes = meses.map((_, m) => drvRmes[m] + prelRmes[m] + admRmes[m] + outrosRmes[m] + execMes[m])
   return { meses, rows, execMes, prelRmes, admRmes, outrosRmes, totalRmes, maxMeses, termino: maxMeses > 0 ? meses[maxMeses - 1] : null }
+}
+
+// projeção mês a mês da obra ISOLADA com PRECEDÊNCIA (Fundação libera Montagem, Montagem libera Lançamento)
+// e início planejado (cfg.inicio). rows[].pessoas[m] = nº de pessoas ativas naquele mês.
+export function projObra(o: Obra, cfg: Config, start: string) {
+  const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
+  const order = present.map(d => d.label)
+  const rate: Record<string, number> = {}, contr: Record<string, number> = {}, real: Record<string, number> = {}, cum: Record<string, number> = {}
+  const hist: Record<string, number[]> = {}, monthly: Record<string, number[]> = {}
+  present.forEach(d => { rate[d.label] = rateOf(o, d, cfg); contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = [] })
+  const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
+  const delay = delayOf(o, cfg, start)
+  let i = 0
+  while (i < 120) {
+    for (let k = 0; k < order.length; k++) {
+      const lbl = order[k]
+      let adv = 0
+      if (i >= delay) {
+        let capPct = 1
+        if (prec && k > 0) { const pl = order[k - 1]; const predCum = lag <= 0 ? cum[pl] : (i - lag >= 0 ? hist[pl][i - lag] : real[pl]); capPct = contr[pl] > 0 ? predCum / contr[pl] : 1 }
+        adv = Math.max(0, Math.min(rate[lbl], contr[lbl] - cum[lbl], capPct * contr[lbl] - cum[lbl]))
+      }
+      monthly[lbl].push(adv); cum[lbl] += adv
+    }
+    order.forEach(l => hist[l].push(cum[l]))
+    i++
+    if (i > delay && !order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
+  }
+  return finalizeObra(o, cfg, start, { order, monthly, hist, cum, contr, real, meses: i })
+}
+
+// projeção CONJUNTA com realocação automática: quando um driver conclui numa obra, a equipe liberada
+// migra pra próxima obra da fila (cfg.fila, nº = ordem) que ainda tem saldo daquele driver, produzindo
+// com a produtividade padrão. Sem realoc, equivale a projObra por obra.
+export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string, ReturnType<typeof projObra>> {
+  const res = new Map<string, ReturnType<typeof projObra>>()
+  if (!cfg.realoc) { for (const o of obras) res.set(o.nome, projObra(o, cfg, start)); return res }
+  const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
+  const filaOrd = Object.entries(cfg.fila ?? {}).map(([n, v]) => [n, Number(v)] as const)
+    .filter(([, v]) => v > 0).sort((a, b) => a[1] - b[1]).map(([n]) => n)
+  type S = {
+    o: Obra; order: string[]; delay: number
+    assign: Record<string, number>; monthly: Record<string, number[]>; hist: Record<string, number[]>
+    pess: Record<string, number[]>; cum: Record<string, number>; contr: Record<string, number>; real: Record<string, number>
+  }
+  const sts: S[] = obras.map(o => {
+    const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
+    const s: S = { o, order: present.map(d => d.label), delay: delayOf(o, cfg, start), assign: {}, monthly: {}, hist: {}, pess: {}, cum: {}, contr: {}, real: {} }
+    present.forEach(d => { s.assign[d.label] = cfg.equipe?.[o.nome]?.[d.label] ?? 0; s.monthly[d.label] = []; s.hist[d.label] = []; s.pess[d.label] = []; s.cum[d.label] = d.real; s.contr[d.label] = d.contr; s.real[d.label] = d.real })
+    return s
+  })
+  const byNome = new Map(sts.map(s => [s.o.nome, s]))
+  const pool: Record<string, number> = {}; DRV.forEach(d => pool[d.label] = 0)
+  let i = 0
+  while (i < 120) {
+    let any = false
+    for (const s of sts) {
+      for (let k = 0; k < s.order.length; k++) {
+        const lbl = s.order[k]
+        let adv = 0
+        if (i >= s.delay && s.assign[lbl] > 0) {
+          let capPct = 1
+          if (prec && k > 0) { const pl = s.order[k - 1]; const predCum = lag <= 0 ? s.cum[pl] : (i - lag >= 0 ? s.hist[pl][i - lag] : s.real[pl]); capPct = s.contr[pl] > 0 ? predCum / s.contr[pl] : 1 }
+          const rate = s.assign[lbl] * (cfg.prodPP?.[lbl] ?? 0)
+          adv = Math.max(0, Math.min(rate, s.contr[lbl] - s.cum[lbl], capPct * s.contr[lbl] - s.cum[lbl]))
+        }
+        s.monthly[lbl].push(adv); s.cum[lbl] += adv
+        if (adv > 0.001) any = true
+      }
+      s.order.forEach(l => { s.hist[l].push(s.cum[l]); s.pess[l].push(s.assign[l]) })
+    }
+    // fim do mês: drivers concluídos liberam a equipe pro pool
+    for (const s of sts) for (const l of s.order) if (s.assign[l] > 0 && s.cum[l] >= s.contr[l] - 1e-6) { pool[l] += s.assign[l]; s.assign[l] = 0 }
+    // pool → próxima obra da fila com saldo daquele driver (respeitando o início planejado dela)
+    for (const d of DRV) {
+      const l = d.label
+      if (pool[l] <= 0) continue
+      for (const nome of filaOrd) {
+        const s = byNome.get(nome)
+        if (!s || !s.order.includes(l)) continue
+        if (s.cum[l] >= s.contr[l] - 1e-6) continue
+        if (i + 1 < s.delay) continue
+        s.assign[l] += pool[l]; pool[l] = 0; break
+      }
+    }
+    i++
+    if (!any) {
+      // só encerra se nada mais vai acontecer: sem início futuro pendente e sem pool com destino possível
+      const aindaVem = sts.some(s => s.order.some(l => s.assign[l] > 0 && s.cum[l] < s.contr[l] - 1e-6 && i < s.delay))
+      const poolTemDestino = DRV.some(d => pool[d.label] > 0 && filaOrd.some(n => { const s = byNome.get(n); return !!s && s.order.includes(d.label) && s.cum[d.label] < s.contr[d.label] - 1e-6 }))
+      if (!aindaVem && !poolTemDestino) break
+    }
+  }
+  for (const s of sts) res.set(s.o.nome, finalizeObra(s.o, cfg, start, { order: s.order, monthly: s.monthly, hist: s.hist, cum: s.cum, contr: s.contr, real: s.real, pessoas: s.pess, meses: i }))
+  return res
 }
