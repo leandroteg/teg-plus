@@ -8,7 +8,7 @@ import {
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 // Import estático: a toolbar do período renderiza no header (mesma linha do título)
-import Relatorios, { RelatoriosToolbar, relPeriodoDefault } from './Relatorios'
+import Relatorios, { RelatoriosToolbar, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
 type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_dre' | 'rel_fluxo' | 'rel_cc' | 'rel_aging'
@@ -97,6 +97,12 @@ export default function DashboardFinanceiro() {
   const [periodo, setPeriodo] = useState('30d')
   const [painelAtivo, setPainelAtivo] = useState<PainelKey>('painel')
   const [relPeriodo, setRelPeriodo] = useState(relPeriodoDefault)  // De → Até dos relatórios (vive no header)
+
+  // Fluxo de Caixa SEMPRE abre olhando pra frente: próximo mês → fim do ano
+  useEffect(() => {
+    if (REL_TIPO[painelAtivo] === 'fluxo') setRelPeriodo(fluxoPeriodoDefault())
+    else if (painelAtivo in REL_TIPO) setRelPeriodo(relPeriodoDefault())
+  }, [painelAtivo])
 
   useEffect(() => { setPeriodo('30d') }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
