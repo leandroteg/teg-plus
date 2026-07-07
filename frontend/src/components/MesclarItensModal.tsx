@@ -9,8 +9,11 @@ import type { EstItem } from '../types/estoque'
 // A seção "Possíveis duplicados" agrupa por descrição normalizada (sem acento/
 // espaços extras) pra acelerar a limpeza.
 
+// Chave de agrupamento: ignora acentos, espaços E pontuação — pega typo de
+// concatenação ("CHAVECOMBINADA" = "CHAVE COMBINADA") e variação de grafia
+// ("10 MM" = "10MM", "TAM .G" = "TAM G"). Busca usa a mesma chave dos dois lados.
 function norm(s: string) {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase()
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
 export function MesclarItensModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
@@ -48,7 +51,7 @@ export function MesclarItensModal({ onClose, isDark }: { onClose: () => void; is
     if (!busca.trim()) return []
     const t = norm(busca)
     return itens
-      .filter(i => norm(i.descricao ?? '').includes(t) || (i.codigo ?? '').toUpperCase().includes(t.replace(/\s/g, '')))
+      .filter(i => norm(i.descricao ?? '').includes(t) || norm(i.codigo ?? '').includes(t))
       .slice(0, 40)
   }, [itens, busca])
 
