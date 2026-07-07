@@ -9,7 +9,7 @@ import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-type ReportType = 'dre' | 'fluxo' | 'cc' | 'aging'
+export type ReportType = 'dre' | 'fluxo' | 'cc' | 'aging'
 
 interface ReportDef {
   key: ReportType; label: string; desc: string; icon: typeof BarChart3
@@ -23,9 +23,9 @@ const REPORTS: ReportDef[] = [
   { key: 'aging', label: 'Aging',           desc: 'Títulos por vencimento',      icon: Calendar,   activeBg: 'bg-amber-50',   activeBorder: 'border-amber-200',   activeIcon: 'text-amber-600',   activeLabel: 'text-amber-700'   },
 ]
 
-export default function Relatorios() {
+export default function Relatorios({ initialTipo }: { initialTipo?: ReportType } = {}) {
   const { isDark } = useTheme()
-  const [activeReport, setActiveReport] = useState<ReportType>('dre')
+  const [activeReport, setActiveReport] = useState<ReportType>(initialTipo ?? 'dre')
   const { data: cp = [] } = useContasPagar()
   const { data: cr = [] } = useContasReceber()
 

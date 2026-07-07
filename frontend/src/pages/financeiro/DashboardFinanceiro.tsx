@@ -7,6 +7,13 @@ import {
 } from 'lucide-react'
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
+const Relatorios = lazy(() => import('./Relatorios'))
+
+// Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
+type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_dre' | 'rel_fluxo' | 'rel_cc' | 'rel_aging'
+const REL_TIPO: Record<string, 'dre' | 'fluxo' | 'cc' | 'aging'> = {
+  rel_dre: 'dre', rel_fluxo: 'fluxo', rel_cc: 'cc', rel_aging: 'aging',
+}
 import { useTheme } from '../../contexts/ThemeContext'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
 import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
@@ -87,7 +94,7 @@ export default function DashboardFinanceiro() {
   const nav = useNavigate()
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
-  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'pgtos_previstos'>('painel')
+  const [painelAtivo, setPainelAtivo] = useState<PainelKey>('painel')
 
   useEffect(() => { setPeriodo('30d') }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
@@ -133,7 +140,7 @@ export default function DashboardFinanceiro() {
           <div className="relative">
             <select
               value={painelAtivo}
-              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'pgtos_previstos')}
+              onChange={e => setPainelAtivo(e.target.value as PainelKey)}
               className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
                 isDark
                   ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]'
@@ -142,6 +149,10 @@ export default function DashboardFinanceiro() {
             >
               <option value="painel">Painel</option>
               <option value="pgtos_previstos">Pgtos Previstos</option>
+              <option value="rel_dre">DRE</option>
+              <option value="rel_fluxo">Fluxo de Caixa</option>
+              <option value="rel_cc">Centro de Custo</option>
+              <option value="rel_aging">Aging</option>
             </select>
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
           </div>
@@ -174,6 +185,13 @@ export default function DashboardFinanceiro() {
       {painelAtivo === 'pgtos_previstos' && (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
           <PainelPagamentos />
+        </Suspense>
+      )}
+
+      {/* Telas da visão Relatórios como sub-painéis — key remonta p/ abrir na tela certa */}
+      {painelAtivo in REL_TIPO && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <Relatorios key={painelAtivo} initialTipo={REL_TIPO[painelAtivo]} />
         </Suspense>
       )}
 
