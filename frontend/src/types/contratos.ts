@@ -337,7 +337,7 @@ export type GrupoContrato =
   | 'locacao_imovel' | 'locacao_veiculos' | 'locacao_equipamentos'
   | 'equipe_pj' | 'prestacao_servicos' | 'servico_recorrente'
   | 'aquisicao' | 'subcontratacao_empreitada' | 'consultoria_juridico'
-  | 'apoio_operacional' | 'seguros' | 'outro'
+  | 'apoio_operacional' | 'seguros' | 'fornecimento' | 'outro'
 
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'critica'
 
