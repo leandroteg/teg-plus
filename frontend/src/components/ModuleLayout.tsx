@@ -532,7 +532,7 @@ export default function ModuleLayout({
       if (actionMenu) {
         const isOpen = openNavMenu?.id === to
         return (
-          <div key={to}>
+          <div key={`${to}:${label}`}>
             <button
               type="button"
               onClick={event => {
@@ -597,7 +597,7 @@ export default function ModuleLayout({
       }
       if (action) {
         return (
-          <button key={to} onClick={action} className={accent
+          <button key={`${to}:${label}`} onClick={action} className={accent
             ? `w-full flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
               ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
             }`
@@ -609,7 +609,7 @@ export default function ModuleLayout({
       }
       if (accent) {
         return (
-          <NavLink key={to} to={to} end={end}
+          <NavLink key={`${to}:${label}`} to={to} end={end}
             className={`flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
               ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
             }`}>
@@ -619,7 +619,7 @@ export default function ModuleLayout({
         )
       }
       return (
-        <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+        <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
           <Icon size={16} className="shrink-0" />
           <span className={variant === 'compact' && adminOnly ? 'flex-1' : undefined}>{label}</span>
           {variant === 'compact' && adminOnly && (
@@ -634,7 +634,7 @@ export default function ModuleLayout({
     return (
       <>
         {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+          <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
           </NavLink>
@@ -646,7 +646,7 @@ export default function ModuleLayout({
               {section.label}
             </p>
             {section.items.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to} className={sidebarLinkClass}>
+              <NavLink key={`${to}:${label}`} to={to} className={sidebarLinkClass}>
                 <Icon size={16} className="shrink-0" />
                 <span>{label}</span>
               </NavLink>
@@ -661,7 +661,7 @@ export default function ModuleLayout({
     return (
       <>
         {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+          <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
           </NavLink>
@@ -722,7 +722,7 @@ export default function ModuleLayout({
             const active = location.pathname === to
             return (
               <NavLink
-                key={to}
+                key={`${to}:${label}`}
                 to={to}
                 end={end}
                 onClick={() => setGroupFlyout(null)}
@@ -1242,7 +1242,7 @@ export default function ModuleLayout({
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
             {mobileBottomNav.map(({ to, icon: Icon, label, end }) => (
-              <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
+              <NavLink key={`${to}:${label}`} to={to} end={end} className={bottomLinkClass}>
                 <Icon className="w-5 h-5 mb-0.5" />
                 {truncateBottomLabels && label.length > 8 ? label.slice(0, 8) + '.' : label}
               </NavLink>
