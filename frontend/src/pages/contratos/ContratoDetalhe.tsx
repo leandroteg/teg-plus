@@ -302,6 +302,23 @@ export default function ContratoDetalhe() {
     enabled: !!id,
   })
 
+  // Execução real no EGP (pmo_projetos.contrato_id -> OSCs -> medições mensais)
+  type EgpResumo = {
+    oscs: number; valor_oscs: number; saldo: number; faturado: number
+    primeira_osc: string | null; ultima_osc: string | null
+    mensal: { competencia: string; realizado: number }[]
+  }
+  const { data: egp } = useQuery<EgpResumo | null>({
+    queryKey: ['contrato-egp', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('con_contrato_egp_resumo', { p_contrato_id: id! })
+      if (error) return null
+      return data as EgpResumo
+    },
+    enabled: !!id,
+  })
+  const egpAtivo = (egp?.oscs ?? 0) > 0
+
   const { data: reajustes = [] } = useQuery({
     queryKey: ['contrato-reajustes', id],
     queryFn: async () => {
@@ -360,7 +377,10 @@ export default function ContratoDetalhe() {
   const parcelasPagas = parcelas.filter(p => p.status === 'pago')
   const totalPago = parcelasPagas.reduce((s, p) => s + p.valor, 0)
   const totalMedido = medicoes.reduce((s, m) => s + m.valor_medido, 0)
-  const execPct = valorTotal > 0 ? Math.round((totalMedido / valorTotal) * 100) : (totalPago > 0 && valorTotal > 0 ? Math.round((totalPago / valorTotal) * 100) : 0)
+  // Com EGP vinculado, a execução vem do faturado real das OSCs (fonte da verdade)
+  const execPct = egpAtivo && egp!.valor_oscs > 0
+    ? Math.round((egp!.faturado / egp!.valor_oscs) * 100)
+    : valorTotal > 0 ? Math.round((totalMedido / valorTotal) * 100) : (totalPago > 0 && valorTotal > 0 ? Math.round((totalPago / valorTotal) * 100) : 0)
   const grupoLabel = contrato.grupo_contrato ? (GRUPO_CONTRATO_LABEL[contrato.grupo_contrato as GrupoContrato] ?? contrato.grupo_contrato) : '—'
   const porMedicao = contrato.forma_faturamento === 'medicao'
 
@@ -433,8 +453,12 @@ export default function ContratoDetalhe() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
           <SummaryCard icon={DollarSign} label="Valor Total" value={fmtCompact(valorTotal)} sub={valorMensal ? `${fmt(valorMensal)}/mes` : undefined} color="indigo" />
           <SummaryCard icon={Calendar} label="Vigencia" value={meses ? `${meses} meses` : '—'} sub={contrato.data_fim_previsto ? `ate ${fmtDate(contrato.data_fim_previsto)}` : undefined} color="violet" />
-          <SummaryCard icon={Hash} label="Parcelas" value={parcelas.length > 0 ? `${parcelasPagas.length}/${parcelas.length}` : '—'} sub={parcelasPagas.length > 0 ? 'pagas' : 'nenhuma parcela'} color="emerald" />
-          <SummaryCard icon={BarChart3} label="Execucao" value={`${execPct}%`} sub="realizado" color="amber" />
+          {egpAtivo ? (
+            <SummaryCard icon={Hash} label="OSCs (EGP)" value={String(egp!.oscs)} sub={`${fmtCompact(egp!.valor_oscs)} emitidos`} color="emerald" />
+          ) : (
+            <SummaryCard icon={Hash} label="Parcelas" value={parcelas.length > 0 ? `${parcelasPagas.length}/${parcelas.length}` : '—'} sub={parcelasPagas.length > 0 ? 'pagas' : 'nenhuma parcela'} color="emerald" />
+          )}
+          <SummaryCard icon={BarChart3} label="Execucao" value={`${execPct}%`} sub={egpAtivo ? `${fmtCompact(egp!.faturado)} faturado` : 'realizado'} color="amber" />
         </div>
       </div>
 
@@ -463,6 +487,63 @@ export default function ContratoDetalhe() {
           />
         </div>
       </Section>
+
+      {/* ── Execução no EGP (contratos vinculados a projetos do EGP) ───────── */}
+      {egpAtivo && (
+        <Section icon={BarChart3} title="Execução no EGP" count={egp!.oscs} defaultOpen={true}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-indigo-500 uppercase">OSCs emitidas</p>
+              <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmtCompact(egp!.valor_oscs)}</p>
+              <p className="text-[10px] text-indigo-400">{egp!.oscs} ordens de serviço</p>
+            </div>
+            <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase">Faturado</p>
+              <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmtCompact(egp!.faturado)}</p>
+              <p className="text-[10px] text-emerald-500">{egp!.valor_oscs > 0 ? Math.round(egp!.faturado / egp!.valor_oscs * 100) : 0}% das OSCs</p>
+            </div>
+            <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-amber-600 uppercase">Saldo a faturar</p>
+              <p className="text-lg font-extrabold text-amber-700 mt-1">{fmtCompact(egp!.saldo)}</p>
+              <p className="text-[10px] text-amber-500">nas OSCs abertas</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
+              <p className="text-[10px] font-bold text-slate-500 uppercase">Período das OSCs</p>
+              <p className="text-sm font-extrabold text-slate-700 mt-1.5">{fmtDate(egp!.primeira_osc)}</p>
+              <p className="text-[10px] text-slate-400">até {fmtDate(egp!.ultima_osc)}</p>
+            </div>
+          </div>
+
+          {egp!.mensal.length > 0 && (() => {
+            const serie = egp!.mensal.slice(-12)
+            const max = Math.max(...serie.map(m => m.realizado), 1)
+            return (
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Faturamento por competência (últimos {serie.length} meses)
+                </p>
+                <div className="space-y-1.5">
+                  {serie.map(m => (
+                    <div key={m.competencia} className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-semibold text-slate-500 w-14 shrink-0">
+                        {m.competencia.slice(5, 7)}/{m.competencia.slice(2, 4)}
+                      </span>
+                      <div className="flex-1 h-4 bg-slate-100 rounded-md overflow-hidden">
+                        <div className="h-full bg-emerald-400/80 rounded-md" style={{ width: `${Math.max(2, (m.realizado / max) * 100)}%` }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 w-16 text-right shrink-0">{fmtCompact(m.realizado)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          <p className="text-[10px] text-slate-400 mt-4">
+            Fonte: módulo EGP (Projeto › Obra › OSC) — medições e saldos das OSCs vinculadas a este contrato.
+          </p>
+        </Section>
+      )}
 
       {/* ── Section 2: Linha do Tempo ─────────────────────────────────────── */}
       <Section icon={Clock} title="Linha do Tempo" count={historico.length} defaultOpen={true}>
