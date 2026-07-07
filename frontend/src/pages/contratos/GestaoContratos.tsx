@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
+  Briefcase, Search, FileText, FileSignature, TrendingUp,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Clock, Banknote, CreditCard,
@@ -57,7 +57,7 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 }
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'vencimentos' | 'recebiveis' | 'provisionado'
+type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText },
@@ -65,7 +65,6 @@ const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
   { key: 'aditivos',     label: 'Aditivos e Reajustes', icon: FileSignature },
-  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
 ]
 
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -76,7 +75,6 @@ const TAB_ACCENT: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
   provisionado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
   aditivos:     { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
-  vencimentos:  { bg:'bg-red-50',     bgActive:'bg-red-100',     text:'text-red-500',     textActive:'text-red-800',     dot:'bg-red-500',     badge:'bg-red-200/80 text-red-700',     border:'border-red-200' },
 }
 
 const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
@@ -85,7 +83,6 @@ const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   provisionado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
   aditivos:     { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
-  vencimentos:  { bg:'bg-red-500/5',     bgActive:'bg-red-500/15',     text:'text-red-400',     textActive:'text-red-200',     dot:'bg-red-400',     badge:'bg-red-500/15 text-red-300',     border:'border-red-500/20' },
 }
 
 // ── Status configs ──────────────────────────────────────────────────────────
@@ -392,6 +389,7 @@ function TabContratos() {
   const [statusFilter, setStatusFilter] = useState('')
   const [tipoFilter, setTipoFilter] = useState('')
   const [filtroGrupo, setFiltroGrupo] = useState<string>('')
+  const [vencFilter, setVencFilter] = useState('')   // absorve a antiga aba Vencimentos
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -416,6 +414,14 @@ function TabContratos() {
   )
   if (filtroGrupo) {
     filtered = filtered.filter(c => c.grupo_contrato === filtroGrupo)
+  }
+  if (vencFilter) {
+    const hoje = Date.now()
+    const dias = (c: Contrato) => Math.ceil((new Date(c.data_fim_previsto).getTime() - hoje) / 86400000)
+    filtered = filtered
+      .filter(c => c.status === 'vigente')
+      .filter(c => vencFilter === 'vencido' ? dias(c) < 0 : dias(c) >= 0 && dias(c) <= Number(vencFilter))
+      .sort((a, b) => dias(a) - dias(b))
   }
 
   return (
@@ -473,6 +479,19 @@ function TabContratos() {
           {GRUPO_CONTRATO_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
+        </select>
+
+        <select
+          value={vencFilter}
+          onChange={e => setVencFilter(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${
+            vencFilter ? 'border-red-200 bg-red-50 text-red-700 font-semibold' : 'border-slate-200 bg-white text-slate-600'}`}
+        >
+          <option value="">Vencimento</option>
+          <option value="vencido">Vencidos</option>
+          <option value="30">Vence em até 30d</option>
+          <option value="60">Vence em até 60d</option>
+          <option value="90">Vence em até 90d</option>
         </select>
 
         <div className="flex border rounded-lg border-slate-200">
@@ -920,120 +939,6 @@ function TabAditivosReajustes() {
               </div>
             )
           })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Tab: Vencimentos ────────────────────────────────────────────────────────
-function TabVencimentos() {
-  const [faixa, setFaixa] = useState<'' | '30' | '60' | '90' | 'vencido'>('')
-  const { data: contratos = [], isLoading } = useContratos({ status: 'vigente' })
-
-  const hoje = Date.now()
-
-  const items = contratos.map(c => {
-    const fim = new Date(c.data_fim_previsto).getTime()
-    const dias = Math.ceil((fim - hoje) / (1000 * 60 * 60 * 24))
-    const contraparte = c.tipo_contrato === 'despesa'
-      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
-      : c.cliente?.nome ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
-    return { ...c, dias, contraparte }
-  }).sort((a, b) => a.dias - b.dias)
-
-  const filtered = items.filter(i => {
-    if (faixa === 'vencido') return i.dias < 0
-    if (faixa === '30') return i.dias >= 0 && i.dias <= 30
-    if (faixa === '60') return i.dias >= 0 && i.dias <= 60
-    if (faixa === '90') return i.dias >= 0 && i.dias <= 90
-    return true
-  })
-
-  const vencidos = items.filter(i => i.dias < 0).length
-  const ate30 = items.filter(i => i.dias >= 0 && i.dias <= 30).length
-  const ate60 = items.filter(i => i.dias > 30 && i.dias <= 60).length
-  const ate90 = items.filter(i => i.dias > 60 && i.dias <= 90).length
-
-  const FAIXAS = [
-    { label: 'Todos', value: '' as const },
-    { label: `Vencidos (${vencidos})`, value: 'vencido' as const },
-    { label: `Ate 30d (${ate30})`, value: '30' as const },
-    { label: `Ate 60d (${ate60 + ate30})`, value: '60' as const },
-    { label: `Ate 90d (${ate90 + ate60 + ate30})`, value: '90' as const },
-  ]
-
-  const diasColor = (d: number) =>
-    d < 0 ? 'text-red-600 bg-red-50' : d <= 30 ? 'text-amber-700 bg-amber-50' : d <= 60 ? 'text-orange-600 bg-orange-50' : 'text-slate-600 bg-slate-100'
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Vencidos</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{vencidos}</p>
-        </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-500 uppercase">30 dias</p>
-          <p className="text-xl font-extrabold text-amber-700 mt-1">{ate30}</p>
-        </div>
-        <div className="bg-orange-50 rounded-2xl border border-orange-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-orange-500 uppercase">31-60 dias</p>
-          <p className="text-xl font-extrabold text-orange-600 mt-1">{ate60}</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">61-90 dias</p>
-          <p className="text-xl font-extrabold text-slate-700 mt-1">{ate90}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FAIXAS.map(f => (
-          <button key={f.value} onClick={() => setFaixa(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${faixa === f.value
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-            <CalendarClock size={24} className="text-indigo-300" />
-          </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum contrato nessa faixa</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${diasColor(c.dias)}`}>
-                  {c.dias < 0 ? <AlertTriangle size={16} /> : <Clock size={16} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-800 truncate">{c.contraparte}</p>
-                    <span className={`text-xs font-extrabold shrink-0 rounded-full px-2.5 py-0.5 ${diasColor(c.dias)}`}>
-                      {c.dias < 0 ? `${Math.abs(c.dias)}d vencido` : `${c.dias}d restantes`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
-                    <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">{c.numero}</span>
-                    <span className="text-slate-400">Vence: {fmtData(c.data_fim_previsto)}</span>
-                    {c.objeto && <span className="text-slate-400 truncate max-w-[200px]">{c.objeto}</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -2113,7 +2018,6 @@ export default function GestaoContratos() {
     recebiveis: parcelas.filter(p => p.contrato?.tipo_contrato === 'receita').length,
     provisionado: parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa').length,
     aditivos: aditivos.length + reajustes.length,
-    vencimentos: contratos.filter(c => c.status === 'vigente').length,
   }), [contratos, medicoes, parcelas, aditivos, reajustes])
 
   return (
@@ -2124,7 +2028,7 @@ export default function GestaoContratos() {
           <Briefcase size={18} className="text-indigo-500" /> Gestão de Contratos
         </h1>
         <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Contratos ativos, aditivos, reajustes e vencimentos
+          Contratos ativos, aditivos, reajustes e provisionamento
         </p>
       </div>
 
@@ -2162,7 +2066,6 @@ export default function GestaoContratos() {
         {tab === 'recebiveis' && <TabRecebiveis />}
         {tab === 'provisionado' && <TabProvisionado />}
         {tab === 'aditivos' && <TabAditivosReajustes />}
-        {tab === 'vencimentos' && <TabVencimentos />}
       </div>
     </div>
   )
