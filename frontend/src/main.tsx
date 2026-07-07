@@ -8,17 +8,18 @@ import { toUpperNorm } from './components/UpperInput'
 import './index.css'
 
 // ── Auto-recuperação pós-deploy ───────────────────────────────────────────────
-// Após um deploy, abas abertas ficam com index.html antigo apontando p/ chunks
-// (hash) que não existem mais — o import dinâmico falha e caía no ErrorBoundary
-// ("Algo deu errado"). O Vite emite 'vite:preloadError' nesse caso: recarrega a
-// página 1x p/ buscar o index novo; trava de 30s evita loop se o erro persistir.
+// Após um deploy, abas abertas ficam com chunks defasados (e o SW do PWA pode
+// continuar servindo o index antigo — aí reload simples não basta). O Vite emite
+// 'vite:preloadError' nesse caso: desregistra SW + limpa caches + recarrega.
+// Trava de 30s evita loop se o erro persistir.
+import { hardRecoverFromStaleChunk } from './utils/chunkRecovery'
 window.addEventListener('vite:preloadError', (e) => {
   const KEY = 'teg_chunk_reload_at'
   const last = Number(sessionStorage.getItem(KEY) || 0)
   if (Date.now() - last < 30_000) return // acabou de recarregar e falhou de novo — deixa o ErrorBoundary agir
   sessionStorage.setItem(KEY, String(Date.now()))
   e.preventDefault()
-  window.location.reload()
+  void hardRecoverFromStaleChunk()
 })
 
 // ── Global uppercase enforcement ─────────────────────────────────────────────
