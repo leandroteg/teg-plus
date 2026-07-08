@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
-  useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato,
+  useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
@@ -635,11 +635,28 @@ const TRANSPORTES = [
   { value: 'veiculo_proprio', label: 'Veículo próprio' }, { value: 'aereo', label: 'Aéreo' }, { value: 'outro', label: 'Outro' },
 ]
 
+function ToggleSN({ value, onChange }: { value: boolean | null | undefined; onChange: (v: boolean) => void }) {
+  return (
+    <span className="inline-flex gap-1">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${value === false ? 'bg-slate-200 text-slate-700 border-slate-300' : 'border-slate-200 text-slate-400'}`}>Não</button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${value === true ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'border-slate-200 text-slate-400'}`}>Sim</button>
+    </span>
+  )
+}
+
 function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; isDark: boolean; autorNome?: string }) {
   const { data, isLoading } = useEtapaCandidato(cand.id)
   const { enviarMissao, atualizar } = useMobilizacao()
   const mob = data?.mobilizacao ?? null
   const r = (mob?.respostas ?? {}) as Record<string, string>
+  const { data: apoio } = useMobApoio()
+  const bases = apoio?.bases ?? []
+  const alojamentos = apoio?.alojamentos ?? []
+  const cidadesAloj = [...new Set(alojamentos.map(a => a.cidade || '—'))].sort()
+  const receptoresBase = (apoio?.receptores ?? []).filter(x => !mob?.apresentacao_base_id || x.base_id === mob.apresentacao_base_id)
+  const receptores = receptoresBase.length ? receptoresBase : (apoio?.receptores ?? [])
 
   function upd(patch: Partial<RHMobilizacao>) { atualizar.mutate({ candidatoId: cand.id, patch }) }
 
@@ -667,41 +684,78 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
       )}
 
       {/* Apresentação */}
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5">
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Data de apresentação</label>
           <CampoTexto type="date" valor={mob?.data_apresentacao} onSave={v => upd({ data_apresentacao: v || null })} className={IN} />
         </div>
         <div>
-          <label className="text-[9px] font-bold uppercase text-slate-400">Local</label>
-          <CampoTexto valor={mob?.local_apresentacao} onSave={v => upd({ local_apresentacao: v || null })} placeholder="Obra / base" className={IN} />
+          <label className="text-[9px] font-bold uppercase text-slate-400">Local (base)</label>
+          <select value={mob?.apresentacao_base_id ?? ''} className={IN}
+            onChange={e => {
+              const b = bases.find(x => x.id === e.target.value)
+              upd({ apresentacao_base_id: e.target.value || null, local_apresentacao: b ? b.nome : null, recebido_por_id: null })
+            }}>
+            <option value="">Selecionar base…</option>
+            {bases.map(b => <option key={b.id} value={b.id}>{b.nome}{b.cidade ? ` — ${b.cidade}` : ''}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[9px] font-bold uppercase text-slate-400">Quem vai receber</label>
+          <select value={mob?.recebido_por_id ?? ''} className={IN}
+            onChange={e => upd({ recebido_por_id: e.target.value || null })}>
+            <option value="">Selecionar…</option>
+            {receptores.map(x => <option key={x.id} value={x.id}>{x.nome}{x.cargo ? ` — ${x.cargo}` : ''}</option>)}
+          </select>
         </div>
       </div>
 
       {/* Deslocamento */}
       <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Truck size={11} /> Deslocamento</span>
-        <div className="flex items-center gap-1.5">
-          <select value={mob?.transporte_tipo ?? ''} onChange={e => upd({ transporte_tipo: e.target.value || null })} className={`${IN} w-36`}>
-            <option value="">Transporte…</option>
-            {TRANSPORTES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-          <CampoTexto valor={mob?.transporte_detalhes} onSave={v => upd({ transporte_detalhes: v || null })}
-            placeholder="Detalhes (horário, ponto de encontro...)" className={`${IN} flex-1`} />
-        </div>
-        <CheckRow checked={!!mob?.transporte_ok} label="Deslocamento providenciado" onToggle={() => upd({ transporte_ok: !mob?.transporte_ok })} />
+        <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <Truck size={11} /> Deslocamento
+          <ToggleSN value={mob?.tem_deslocamento} onChange={v => upd(v ? { tem_deslocamento: true } : { tem_deslocamento: false, transporte_tipo: null, transporte_detalhes: null, transporte_ok: false })} />
+        </span>
+        {mob?.tem_deslocamento && (<>
+          <div className="flex items-center gap-1.5">
+            <select value={mob?.transporte_tipo ?? ''} onChange={e => upd({ transporte_tipo: e.target.value || null })} className={`${IN} w-36`}>
+              <option value="">Transporte…</option>
+              {TRANSPORTES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <CampoTexto valor={mob?.transporte_detalhes} onSave={v => upd({ transporte_detalhes: v || null })}
+              placeholder="Detalhes (horário, ponto de encontro...)" className={`${IN} flex-1`} />
+          </div>
+          <CheckRow checked={!!mob?.transporte_ok} label="Deslocamento providenciado" onToggle={() => upd({ transporte_ok: !mob?.transporte_ok })} />
+        </>)}
       </div>
 
       {/* Alojamento */}
       <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Home size={11} /> Alojamento</span>
-        <div className="flex items-center gap-1.5">
-          <CampoTexto valor={mob?.alojamento_endereco} onSave={v => upd({ alojamento_endereco: v || null })}
-            placeholder="Endereço do alojamento" className={`${IN} flex-1`} />
-          <CampoTexto valor={mob?.alojamento_detalhes} onSave={v => upd({ alojamento_detalhes: v || null })}
-            placeholder="Quarto, regras..." className={`${IN} flex-1`} />
-        </div>
-        <CheckRow checked={!!mob?.alojamento_ok} label="Alojamento garantido" onToggle={() => upd({ alojamento_ok: !mob?.alojamento_ok })} />
+        <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <Home size={11} /> Alojamento
+          <ToggleSN value={mob?.tem_alojamento} onChange={v => upd(v ? { tem_alojamento: true } : { tem_alojamento: false, alojamento_imovel_id: null, alojamento_endereco: null, alojamento_detalhes: null, alojamento_ok: false })} />
+        </span>
+        {mob?.tem_alojamento && (<>
+          <div className="flex items-center gap-1.5">
+            <select value={mob?.alojamento_imovel_id ?? ''} className={`${IN} flex-1`}
+              onChange={e => {
+                const a = alojamentos.find(x => x.id === e.target.value)
+                upd({ alojamento_imovel_id: e.target.value || null, alojamento_endereco: a ? (a.titulo || a.nome) : null })
+              }}>
+              <option value="">Selecionar alojamento…</option>
+              {cidadesAloj.map(cid => (
+                <optgroup key={cid} label={cid}>
+                  {alojamentos.filter(a => (a.cidade || '—') === cid).map(a => (
+                    <option key={a.id} value={a.id}>{a.titulo || a.nome}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <CampoTexto valor={mob?.alojamento_detalhes} onSave={v => upd({ alojamento_detalhes: v || null })}
+              placeholder="Quarto, regras..." className={`${IN} flex-1`} />
+          </div>
+          <CheckRow checked={!!mob?.alojamento_ok} label="Alojamento garantido" onToggle={() => upd({ alojamento_ok: !mob?.alojamento_ok })} />
+        </>)}
       </div>
 
       {/* Preparo interno */}
