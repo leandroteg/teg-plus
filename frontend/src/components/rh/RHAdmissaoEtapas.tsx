@@ -684,10 +684,14 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
       )}
 
       {/* Apresentação */}
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Data de apresentação</label>
           <CampoTexto type="date" valor={mob?.data_apresentacao} onSave={v => upd({ data_apresentacao: v || null })} className={IN} />
+        </div>
+        <div>
+          <label className="text-[9px] font-bold uppercase text-slate-400">Hora</label>
+          <CampoTexto type="time" valor={mob?.hora_apresentacao} onSave={v => upd({ hora_apresentacao: v || null })} className={IN} />
         </div>
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Local (base)</label>
