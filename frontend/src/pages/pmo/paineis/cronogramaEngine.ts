@@ -131,12 +131,13 @@ export function rateOf(o: Obra, d: Drv, cfg: Config) {
   return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
 }
 
-// início/fim planejados POR DRIVER: override do serviço (inicioS/fimS) vence o nível obra (inicio/fim)
+// início/fim planejados POR DRIVER: override do serviço (inicioS/fimS) vence o nível obra (inicio/fim).
+// Aceita YYYY-MM ou YYYY-MM-DD (data completa) — a simulação é mensal, o dia é ignorado (slice 0,7).
 const delayOf = (o: Obra, lbl: string, cfg: Config, start: string) => {
   const ini = cfg.inicioS?.[o.nome]?.[lbl] ?? cfg.inicio?.[o.nome]
-  return ini ? Math.max(0, ymNum(ini) - ymNum(start)) : 0
+  return ini ? Math.max(0, ymNum(ini.slice(0, 7)) - ymNum(start)) : 0
 }
-const fimOf = (o: Obra, lbl: string, cfg: Config) => cfg.fimS?.[o.nome]?.[lbl] ?? cfg.fim?.[o.nome]
+const fimOf = (o: Obra, lbl: string, cfg: Config) => { const f = cfg.fimS?.[o.nome]?.[lbl] ?? cfg.fim?.[o.nome]; return f ? f.slice(0, 7) : f }
 
 // estado bruto de uma simulação (por obra) — consumido por finalizeObra
 type SimObra = {
