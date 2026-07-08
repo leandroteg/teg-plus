@@ -11,10 +11,12 @@ import {
   type JornalEdicao,
 } from '../../hooks/useJornal'
 import JornalTegBuilder from './JornalTegBuilder'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 function EdicaoRow({ ed }: { ed: JornalEdicao }) {
+  const { isLightSidebar: isLight } = useTheme()
   const [aberto, setAberto] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const { data: cards = [], isLoading } = useEdicaoCards(aberto ? ed.id : undefined)
@@ -22,16 +24,16 @@ function EdicaoRow({ ed }: { ed: JornalEdicao }) {
   const excluir = useExcluirEdicao()
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden">
+    <div className={`rounded-2xl overflow-hidden border ${isLight ? 'bg-white border-slate-200' : 'glass-card border-transparent'}`}>
       <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => setAberto(a => !a)} className="text-slate-400 hover:text-white">
+        <button onClick={() => setAberto(a => !a)} className={isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'}>
           {aberto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
         {ed.capa_url
           ? <img src={ed.capa_url} alt="" className="w-9 h-12 object-cover object-top rounded-md ring-1 ring-white/10" />
           : <div className="w-9 h-12 rounded-md bg-white/5 flex items-center justify-center"><FileText size={14} className="text-slate-500" /></div>}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{ed.titulo}</p>
+          <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{ed.titulo}</p>
           <p className="text-[11px] text-slate-500">
             {ed.mes ? `${MESES[ed.mes - 1]} ` : ''}{ed.ano ?? ''}
             {ed.publicado
@@ -92,6 +94,7 @@ function EdicaoRow({ ed }: { ed: JornalEdicao }) {
 }
 
 export default function JornalSection() {
+  const { isLightSidebar: isLight } = useTheme()
   const { data: edicoes = [], isLoading } = useEdicoes()
   const [criando, setCriando] = useState(false)
 
@@ -100,9 +103,9 @@ export default function JornalSection() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20 flex-1">
           <Newspaper size={16} className="text-violet-400 mt-0.5 shrink-0" />
-          <div className="text-xs text-slate-400 leading-relaxed">
-            Suba o <span className="text-white/80 font-semibold">PDF do Jornal TEG</span> e recorte os blocos —
-            cada bloco vira um <span className="text-white/80 font-semibold">card</span> do Mural (imagem exata).
+          <div className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Suba o <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>PDF do Jornal TEG</span> e recorte os blocos —
+            cada bloco vira um <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>card</span> do Mural (imagem exata).
             A edição nasce como rascunho; publique quando quiser exibir aos colaboradores.
           </div>
         </div>
@@ -115,7 +118,7 @@ export default function JornalSection() {
       </div>
 
       {criando && (
-        <div className="rounded-2xl border border-white/10 p-4 bg-white/[0.02]">
+        <div className={`rounded-2xl border p-4 ${isLight ? 'bg-white border-slate-200' : 'border-white/10 bg-white/[0.02]'}`}>
           <JornalTegBuilder onSaved={() => { /* lista revalida via react-query */ }} />
         </div>
       )}

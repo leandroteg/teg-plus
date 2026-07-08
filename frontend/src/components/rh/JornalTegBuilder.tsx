@@ -14,6 +14,7 @@ import {
   type JornalCard,
 } from '../../hooks/useJornal'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 
 // Retângulo em fração (0–1) da página → resolução-independente
 interface Crop {
@@ -29,6 +30,7 @@ let cropSeq = 0
 
 export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) {
   const { user } = useAuth()
+  const { isLightSidebar: isLight } = useTheme()
   const criarEdicao = useCriarEdicao()
   const salvarCards = useSalvarCards()
 
@@ -52,7 +54,10 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
   const [draw, setDraw] = useState<{ page: number; x0: number; y0: number; x1: number; y1: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const inp = 'w-full px-3 py-2.5 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30'
+  const inp = isLight
+    ? 'w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30'
+    : 'w-full px-3 py-2.5 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30'
+  const txt = isLight ? 'text-slate-800' : 'text-white'
 
   const reset = () => {
     setPdfFile(null); setPageUrls([]); canvasesRef.current = []
@@ -182,7 +187,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
         </div>
         <div>
           <label className="text-[11px] text-slate-400 block mb-1.5">Mês</label>
-          <select className={`${inp} [&>option]:bg-slate-900`} value={mes} onChange={e => setMes(+e.target.value)}>
+          <select className={`${inp} ${isLight ? '' : '[&>option]:bg-slate-900'}`} value={mes} onChange={e => setMes(+e.target.value)}>
             {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
         </div>
@@ -199,7 +204,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
           <button
             onClick={() => fileRef.current?.click()}
             disabled={rendering}
-            className="w-full py-10 rounded-2xl border-2 border-dashed border-white/15 text-sm text-slate-400 hover:border-violet-500/50 hover:text-violet-300 transition-all flex flex-col items-center justify-center gap-2 disabled:opacity-50"
+            className={`w-full py-10 rounded-2xl border-2 border-dashed text-sm hover:border-violet-500/50 hover:text-violet-400 transition-all flex flex-col items-center justify-center gap-2 disabled:opacity-50 ${isLight ? 'border-slate-300 text-slate-500' : 'border-white/15 text-slate-400 hover:text-violet-300'}`}
           >
             {rendering
               ? <><Loader2 size={22} className="animate-spin text-violet-400" /> Renderizando páginas…</>
@@ -219,9 +224,9 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
         <>
           <div className="flex items-start gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20">
             <Scissors size={16} className="text-violet-400 mt-0.5 shrink-0" />
-            <div className="text-xs text-slate-400 leading-relaxed">
-              <span className="text-white/80 font-semibold">Arraste sobre cada bloco</span> da página para recortá-lo — cada retângulo vira um card do Mural.
-              Use <span className="text-white/70">“Página inteira”</span> para adicionar a página toda. {pdfFile?.name}
+            <div className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>Arraste sobre cada bloco</span> da página para recortá-lo — cada retângulo vira um card do Mural.
+              Use <span className={isLight ? 'text-slate-700' : 'text-white/70'}>“Página inteira”</span> para adicionar a página toda. {pdfFile?.name}
             </div>
           </div>
 
@@ -267,7 +272,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
             {/* Cards recortados */}
             <div className="lg:sticky lg:top-4 self-start space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white">{crops.length} card{crops.length !== 1 ? 's' : ''}</span>
+                <span className={`text-xs font-semibold ${txt}`}>{crops.length} card{crops.length !== 1 ? 's' : ''}</span>
                 {crops.length > 0 && <button onClick={() => setCrops([])} className="text-[11px] text-slate-500 hover:text-rose-400">limpar</button>}
               </div>
               <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto styled-scrollbar pr-1">
