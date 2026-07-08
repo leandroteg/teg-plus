@@ -588,6 +588,30 @@ export function useSetMatrizCelula() {
   })
 }
 
+export function useColaboradoresTreino() {
+  return useQuery({
+    queryKey: ['qsma_colab_treino'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_colaboradores')
+        .select('id, nome, cargo, ativo').eq('ativo', true).order('nome', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as { id: string; nome: string; cargo: string | null; ativo: boolean }[]
+    },
+  })
+}
+
+// status de um treinamento obrigatório face à data de vencimento
+export type TreinoStatus = 'ok' | 'vencendo' | 'vencido' | 'faltando'
+export function treinoStatus(temRegistro: boolean, vencimento: string | null | undefined): TreinoStatus {
+  if (!temRegistro) return 'faltando'
+  if (!vencimento) return 'ok'
+  const hoje = new Date().toISOString().split('T')[0]
+  const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
+  if (vencimento < hoje) return 'vencido'
+  if (vencimento <= lim60) return 'vencendo'
+  return 'ok'
+}
+
 // ── Meio Ambiente ────────────────────────────────────────────────────────────
 
 export function useLicencas() {
