@@ -545,6 +545,11 @@ export interface RHMobilizacao {
   alojamento_endereco: string | null
   alojamento_detalhes: string | null
   alojamento_ok: boolean
+  tem_deslocamento: boolean | null
+  tem_alojamento: boolean | null
+  alojamento_imovel_id: string | null
+  apresentacao_base_id: string | null
+  recebido_por_id: string | null
   kit_epi_ok: boolean
   acessos_ok: boolean
   dados_confirmados: boolean
@@ -761,6 +766,28 @@ export function useMobilizacao() {
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
   return { enviarMissao, atualizar }
+}
+
+// Apoio da Mobilização: alojamentos (Locação), bases e possíveis receptores
+export function useMobApoio() {
+  return useQuery({
+    queryKey: ['rh-mob-apoio'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const [aloj, bases, rec] = await Promise.all([
+        supabase.from('loc_imoveis').select('id, titulo, nome, cidade').eq('tipo', 'ALOJ').eq('status', 'ativo').order('cidade'),
+        supabase.from('est_bases').select('id, nome, cidade, endereco').eq('ativa', true).order('nome'),
+        supabase.from('rh_colaboradores').select('id, nome, cargo, base_id').eq('ativo', true)
+          .or('cargo.ilike.%engenheir%,cargo.ilike.%supervisor%,cargo.ilike.%administrat%,cargo.ilike.%gerente%,departamento.ilike.rh,departamento.ilike.adm%,departamento.ilike.dp')
+          .order('nome'),
+      ])
+      return {
+        alojamentos: (aloj.data ?? []) as { id: string; titulo: string | null; nome: string | null; cidade: string | null }[],
+        bases: (bases.data ?? []) as { id: string; nome: string; cidade: string | null; endereco: string | null }[],
+        receptores: (rec.data ?? []) as { id: string; nome: string; cargo: string | null; base_id: string | null }[],
+      }
+    },
+  })
 }
 
 export function useIntegracao() {
