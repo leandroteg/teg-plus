@@ -573,7 +573,7 @@ function EtapaRail({
               <button
                 key={e.key}
                 onClick={() => setEtapa(e.key)}
-                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:min-w-0 md:flex-1 md:shrink ${
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
                   isActive
                     ? `${accent.bgActive} ${accent.textActive} border font-bold shadow-sm ${accent.border}`
                     : `${accent.bg} ${accent.text} font-medium`
