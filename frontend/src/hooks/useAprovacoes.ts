@@ -744,7 +744,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           ctx,
         ))
     },
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
     retry: 1,
     staleTime: 10_000,
   })
@@ -951,7 +951,7 @@ export function useAprovacaoKPIs() {
       }
     },
     enabled: !!perfil,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
     retry: false,
   })

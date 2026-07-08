@@ -209,7 +209,8 @@ export function useLoteById(loteId?: string) {
       return { ...lote, itens: enriched } as LotePagamento & { itens: (LoteItem & { cp: ContaPagar })[] }
     },
     enabled: !!loteId,
-    refetchInterval: 10_000,
+    // Só faz poll enquanto o lote está em pagamento (aguardando baixa); para nos estados finais.
+    refetchInterval: (query) => query.state.data?.status === 'em_pagamento' ? 10_000 : false,
   })
 }
 
@@ -456,7 +457,7 @@ export function useCPsParaPagamento(statuses: string[] = ['aprovado_pgto']) {
       if (error) throw error
       return (data ?? []) as ContaPagar[]
     },
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
   })
 }
 

@@ -133,7 +133,10 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       retry: 2,
       gcTime: 1000 * 60 * 5,        // 5min — evita cache antigo
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,  // não recarrega tudo ao voltar pra aba (evita rajada de requisições)
+      // Pausa o polling (refetchInterval) quando a aba está em segundo plano/oculta.
+      // Só faz poll na aba ativa — corta requisições de abas minimizadas.
+      refetchIntervalInBackground: false,
     },
   },
 })

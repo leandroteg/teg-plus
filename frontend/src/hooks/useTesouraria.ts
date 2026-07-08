@@ -79,7 +79,7 @@ export function useTesourariaDashboard(periodo = '30d') {
       }
       return (data as TesourariaDashboardData) ?? EMPTY_DASHBOARD
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 }
 

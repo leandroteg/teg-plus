@@ -43,7 +43,8 @@ export function useLastSync(dominio: string) {
         .single()
       return data ?? null
     },
-    refetchInterval: 10_000, // faz polling a cada 10s para acompanhar status 'running'
+    // Só faz poll enquanto há sync em andamento; para quando conclui (success/error).
+    refetchInterval: (query) => query.state.data?.status === 'running' ? 10_000 : false,
     retry: false,
   })
 }

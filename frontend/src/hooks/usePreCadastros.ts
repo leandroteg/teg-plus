@@ -87,7 +87,7 @@ export function usePreCadastros() {
     },
     enabled: isAdminOrDirector,
     staleTime: 30_000, // poll every 30s
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 
   // ── Dedup automatico: pre-cadastros que ja existem como cadastro real ─────────

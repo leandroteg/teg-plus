@@ -66,7 +66,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
       }
       return data as FinanceiroDashboardData
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 }
 

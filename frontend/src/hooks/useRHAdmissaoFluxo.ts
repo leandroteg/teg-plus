@@ -477,7 +477,7 @@ export function useMissoesDocsStatus(candidatoId?: string) {
   return useQuery<MissaoDocStatus[]>({
     queryKey: ['rh-admissao-missoes-docs', candidatoId],
     enabled: !!candidatoId,
-    refetchInterval: 30_000,   // RH vê os checks chegando quase em tempo real
+    refetchInterval: 60_000,   // RH vê os checks chegando quase em tempo real
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('rh_admissao_missoes_status', {
@@ -505,7 +505,7 @@ export function useParecerQualificacao(candidatoId?: string) {
   return useQuery<ParecerQualificacao | null>({
     queryKey: ['rh-parecer-qual', candidatoId],
     enabled: !!candidatoId,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data } = await supabase.from('rh_admissao_pareceres')

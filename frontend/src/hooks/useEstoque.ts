@@ -409,7 +409,7 @@ export function useRCsEmTriagemCD() {
       if (error) return []
       return data ?? []
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
   })
 }
@@ -550,7 +550,7 @@ export function useAcompanhamentoCD() {
         } as AcompCD
       }).sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? ''))
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
   })
 }

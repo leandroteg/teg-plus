@@ -101,7 +101,7 @@ export function useSolicitacoesDashboard() {
       }
       return counts
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 }
 
