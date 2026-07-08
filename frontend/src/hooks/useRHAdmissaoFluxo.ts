@@ -545,6 +545,7 @@ export interface RHMobilizacao {
   alojamento_endereco: string | null
   alojamento_detalhes: string | null
   alojamento_ok: boolean
+  hora_apresentacao: string | null
   tem_deslocamento: boolean | null
   tem_alojamento: boolean | null
   alojamento_imovel_id: string | null
