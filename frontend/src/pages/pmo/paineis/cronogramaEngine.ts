@@ -49,9 +49,10 @@ export type Frente = { label: string; obras: Obra[] }
 // inicio: mês planejado (YYYY-MM) por obra — não produz antes dele.
 // fim: mês planejado de término (YYYY-MM) — quando definido, o ritmo é FORÇADO pela data (saldo ÷ meses até o fim),
 //   ignorando equipe×produtividade naquela obra (precedência entre serviços ainda vale).
+// inicioS/fimS: overrides POR SERVIÇO (obra → driver → YYYY-MM) — vencem o nível obra; editar a obra limpa os overrides.
 // realoc: realocação automática — equipe liberada (driver concluído) migra pra obra que aponta esta como
 //   predecessora (pred: obra → obra predecessora); sem sucessora com saldo, cai na fila legada (fila: nº = ordem).
-export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; pred?: Record<string, string>; inicio?: Record<string, string>; fim?: Record<string, string> }
+export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; pred?: Record<string, string>; inicio?: Record<string, string>; fim?: Record<string, string>; inicioS?: Record<string, Record<string, string>>; fimS?: Record<string, Record<string, string>> }
 export type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 export function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
@@ -130,11 +131,12 @@ export function rateOf(o: Obra, d: Drv, cfg: Config) {
   return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
 }
 
-// mês de início planejado (cfg.inicio) → offset em meses a partir do start (0 = já pode produzir)
-const delayOf = (o: Obra, cfg: Config, start: string) => {
-  const ini = cfg.inicio?.[o.nome]
+// início/fim planejados POR DRIVER: override do serviço (inicioS/fimS) vence o nível obra (inicio/fim)
+const delayOf = (o: Obra, lbl: string, cfg: Config, start: string) => {
+  const ini = cfg.inicioS?.[o.nome]?.[lbl] ?? cfg.inicio?.[o.nome]
   return ini ? Math.max(0, ymNum(ini) - ymNum(start)) : 0
 }
+const fimOf = (o: Obra, lbl: string, cfg: Config) => cfg.fimS?.[o.nome]?.[lbl] ?? cfg.fim?.[o.nome]
 
 // estado bruto de uma simulação (por obra) — consumido por finalizeObra
 type SimObra = {
@@ -199,19 +201,23 @@ export function projObra(o: Obra, cfg: Config, start: string) {
   const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
   const order = present.map(d => d.label)
   const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
-  const delay = delayOf(o, cfg, start)
-  // fim planejado → ritmo forçado (saldo ÷ meses entre o início efetivo e o fim)
-  const fimYM = cfg.fim?.[o.nome]
-  const durF = fimYM ? Math.max(1, ymNum(fimYM) - ymNum(start) - delay + 1) : 0
   const rate: Record<string, number> = {}, contr: Record<string, number> = {}, real: Record<string, number> = {}, cum: Record<string, number> = {}
   const hist: Record<string, number[]> = {}, monthly: Record<string, number[]> = {}
-  present.forEach(d => { rate[d.label] = durF > 0 && d.saldoQ > 0 ? d.saldoQ / durF : rateOf(o, d, cfg); contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = [] })
+  const delayD: Record<string, number> = {} // início planejado POR DRIVER (override do serviço vence a obra)
+  present.forEach(d => {
+    delayD[d.label] = delayOf(o, d.label, cfg, start)
+    const fimYM = fimOf(o, d.label, cfg) // fim planejado → ritmo forçado (saldo ÷ meses entre o início efetivo e o fim)
+    const durF = fimYM ? Math.max(1, ymNum(fimYM) - ymNum(start) - delayD[d.label] + 1) : 0
+    rate[d.label] = durF > 0 && d.saldoQ > 0 ? d.saldoQ / durF : rateOf(o, d, cfg)
+    contr[d.label] = d.contr; real[d.label] = d.real; cum[d.label] = d.real; hist[d.label] = []; monthly[d.label] = []
+  })
+  const maxDelay = Math.max(0, ...order.map(l => delayD[l]))
   let i = 0
   while (i < 120) {
     for (let k = 0; k < order.length; k++) {
       const lbl = order[k]
       let adv = 0
-      if (i >= delay) {
+      if (i >= delayD[lbl]) {
         let capPct = 1
         if (prec && k > 0) { const pl = order[k - 1]; const predCum = lag <= 0 ? cum[pl] : (i - lag >= 0 ? hist[pl][i - lag] : real[pl]); capPct = contr[pl] > 0 ? predCum / contr[pl] : 1 }
         adv = Math.max(0, Math.min(rate[lbl], contr[lbl] - cum[lbl], capPct * contr[lbl] - cum[lbl]))
@@ -220,7 +226,7 @@ export function projObra(o: Obra, cfg: Config, start: string) {
     }
     order.forEach(l => hist[l].push(cum[l]))
     i++
-    if (i > delay && !order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
+    if (i > maxDelay && !order.some(l => monthly[l][i - 1] > 0.001)) break // travou (sem capacidade) ou terminou
   }
   return finalizeObra(o, cfg, start, { order, monthly, hist, cum, contr, real, meses: i })
 }
@@ -237,16 +243,20 @@ export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string
   const succ: Record<string, string[]> = {} // predecessora → sucessoras
   for (const [nome, p] of Object.entries(cfg.pred ?? {})) { if (!p || p === nome) continue; (succ[p] ??= []).push(nome) }
   type S = {
-    o: Obra; order: string[]; delay: number
+    o: Obra; order: string[]; delayD: Record<string, number>
     assign: Record<string, number>; forced: Record<string, number>; monthly: Record<string, number[]>; hist: Record<string, number[]>
     pess: Record<string, number[]>; cum: Record<string, number>; contr: Record<string, number>; real: Record<string, number>
   }
   const sts: S[] = obras.map(o => {
     const present = DRV.map(dv => o.drivers.find(d => d.label === dv.label && d.contr > 0)).filter(Boolean) as Drv[]
-    const s: S = { o, order: present.map(d => d.label), delay: delayOf(o, cfg, start), assign: {}, forced: {}, monthly: {}, hist: {}, pess: {}, cum: {}, contr: {}, real: {} }
-    const fimYM = cfg.fim?.[o.nome]
-    const durF = fimYM ? Math.max(1, ymNum(fimYM) - ymNum(start) - s.delay + 1) : 0
-    present.forEach(d => { s.assign[d.label] = cfg.equipe?.[o.nome]?.[d.label] ?? 0; s.forced[d.label] = durF > 0 && d.saldoQ > 0 ? d.saldoQ / durF : 0; s.monthly[d.label] = []; s.hist[d.label] = []; s.pess[d.label] = []; s.cum[d.label] = d.real; s.contr[d.label] = d.contr; s.real[d.label] = d.real })
+    const s: S = { o, order: present.map(d => d.label), delayD: {}, assign: {}, forced: {}, monthly: {}, hist: {}, pess: {}, cum: {}, contr: {}, real: {} }
+    present.forEach(d => {
+      s.delayD[d.label] = delayOf(o, d.label, cfg, start)
+      const fimYM = fimOf(o, d.label, cfg)
+      const durF = fimYM ? Math.max(1, ymNum(fimYM) - ymNum(start) - s.delayD[d.label] + 1) : 0
+      s.assign[d.label] = cfg.equipe?.[o.nome]?.[d.label] ?? 0; s.forced[d.label] = durF > 0 && d.saldoQ > 0 ? d.saldoQ / durF : 0
+      s.monthly[d.label] = []; s.hist[d.label] = []; s.pess[d.label] = []; s.cum[d.label] = d.real; s.contr[d.label] = d.contr; s.real[d.label] = d.real
+    })
     return s
   })
   const byNome = new Map(sts.map(s => [s.o.nome, s]))
@@ -258,7 +268,7 @@ export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string
       for (let k = 0; k < s.order.length; k++) {
         const lbl = s.order[k]
         let adv = 0
-        if (i >= s.delay && (s.assign[lbl] > 0 || s.forced[lbl] > 0)) {
+        if (i >= (s.delayD[lbl] ?? 0) && (s.assign[lbl] > 0 || s.forced[lbl] > 0)) {
           let capPct = 1
           if (prec && k > 0) { const pl = s.order[k - 1]; const predCum = lag <= 0 ? s.cum[pl] : (i - lag >= 0 ? s.hist[pl][i - lag] : s.real[pl]); capPct = s.contr[pl] > 0 ? predCum / s.contr[pl] : 1 }
           const rate = s.forced[lbl] > 0 ? s.forced[lbl] : s.assign[lbl] * (cfg.prodPP?.[lbl] ?? 0)
@@ -290,14 +300,14 @@ export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string
         const s = byNome.get(nome)
         if (!s || !s.order.includes(l)) continue
         if (s.cum[l] >= s.contr[l] - 1e-6) continue
-        if (i + 1 < s.delay) continue
+        if (i + 1 < (s.delayD[l] ?? 0)) continue
         s.assign[l] += pool[l]; pool[l] = 0; break
       }
     }
     i++
     if (!any) {
       // só encerra se nada mais vai acontecer: sem início futuro pendente e sem pool com destino possível
-      const aindaVem = sts.some(s => s.order.some(l => (s.assign[l] > 0 || s.forced[l] > 0) && s.cum[l] < s.contr[l] - 1e-6 && i < s.delay))
+      const aindaVem = sts.some(s => s.order.some(l => (s.assign[l] > 0 || s.forced[l] > 0) && s.cum[l] < s.contr[l] - 1e-6 && i < (s.delayD[l] ?? 0)))
       const poolTemDestino = DRV.some(d => pool[d.label] > 0 && filaOrd.some(n => { const s = byNome.get(n); return !!s && s.order.includes(d.label) && s.cum[d.label] < s.contr[d.label] - 1e-6 }))
       if (!aindaVem && !poolTemDestino) break
     }
