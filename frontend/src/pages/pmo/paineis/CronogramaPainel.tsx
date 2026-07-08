@@ -13,6 +13,7 @@ import {
   DRV, COR_PREL, COR_ADM, COR_OUTROS, ymLabel, shiftYM, startYM, ymNum, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
   buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
+import { planejarComReforco, type PlanParams, type PlanObraIn, type PlanResult } from './planejadorAuto'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const PROD_BANDS: [string, string, (p: number) => boolean][] = [
@@ -405,50 +406,70 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
     projTodas(allObras, cfg, startYM()).forEach((v, k) => { const srv: Record<string, number> = {}; v.rows.forEach(r => { srv[r.d.label] = r.meses }); m[k] = { termino: v.termino, meses: v.maxMeses, srv } })
     return m
   }, [allObras, cfg])
-  // Planejamento Automático — preenche início/fim/predecessão/recursos por prazo-alvo ou por recursos disponíveis
+  // Planejamento Automático — simulador por EQUIPE-PADRÃO + recursos críticos (planejadorAuto.ts)
   const [planOpen, setPlanOpen] = useState(false)
-  const [planMode, setPlanMode] = useState<'prazo' | 'recursos'>('prazo')
-  const [planAlvo, setPlanAlvo] = useState('') // dd/mm/aaaa (YYYY-MM-DD)
-  const [planTot, setPlanTot] = useState<Record<string, number>>({})
-  const curTot = (l: string) => allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.[l] || 0), 0)
-  const preencher = () => {
+  const [planP, setPlanP] = useState<PlanParams>({ eqF: 1, eqML: 1, rotores: 5, perfuratrizes: 1, guindastes: 1, comboios: 4, residual: 0.7, limiarGuind: 10, eqPorLanc: 2, diasUteis: 22, excluidas: [] })
+  const [planAlvo, setPlanAlvo] = useState('') // YYYY-MM opcional → cálculo de reforço mínimo
+  const [planExc, setPlanExc] = useState<Set<string>>(new Set()) // obras embargadas / fora do plano
+  const [planRes, setPlanRes] = useState<PlanResult | null>(null)
+  // torres por obra = Σ qtd_torres das OSCs de CONSTRUÇÃO ativas (lançadas na Iniciação) — busca só com o modal aberto
+  const { data: torresObra } = useQuery<Record<string, number>>({
+    queryKey: ['plan-torres', portfolioId],
+    enabled: planOpen,
+    queryFn: async () => {
+      const { data: oscs } = await supabase.from('pmo_fluxo_os').select('obra_id, qtd_torres, tipo, etapa_atual').eq('portfolio_id', portfolioId)
+      const ids = [...new Set((oscs ?? []).map(o => o.obra_id).filter(Boolean))]
+      const { data: obs } = ids.length ? await supabase.from('sys_obras').select('id, nome').in('id', ids) : { data: [] as { id: string; nome: string }[] }
+      const nm = new Map((obs ?? []).map(o => [o.id as string, o.nome as string]))
+      const m: Record<string, number> = {}
+      for (const o of oscs ?? []) {
+        if (o.tipo !== 'construcao' || o.etapa_atual === 'cancelada' || o.qtd_torres == null) continue
+        const n = nm.get(o.obra_id); if (!n) continue
+        m[n] = (m[n] ?? 0) + Number(o.qtd_torres)
+      }
+      return m
+    },
+  })
+  const abrirPlan = () => {
+    // equipes default = alocação atual da tabela convertida em equipes-padrão (Fundação 7 · Mont/Lanç 12)
+    const totF = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Fundação'] || 0), 0)
+    const totML = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Montagem'] || 0) + (cfg.equipe[o.nome]?.['Lançamento'] || 0), 0)
+    setPlanP(pp => ({ ...pp, eqF: Math.max(1, Math.round(totF / 7)), eqML: Math.max(1, Math.round(totML / 12)) }))
+    setPlanRes(null); setPlanOpen(true)
+  }
+  const simular = () => {
     const start = startYM()
-    if (planMode === 'prazo') {
-      if (!planAlvo) return
-      // todas as obras terminam na data-alvo: fim forçado + recursos = pessoas necessárias pra cumprir
-      const meses = Math.max(1, ymNum(planAlvo.slice(0, 7)) - ymNum(start) + 1)
-      const equipe: Record<string, Record<string, number>> = {}; const fim: Record<string, string> = {}
-      for (const o of allObras) {
-        const e: Record<string, number> = {}; let has = false
-        o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { e[d.label] = Math.max(1, Math.ceil(d.saldoQ / ((cfg.prodPP[d.label] || 1) * meses))); has = true } })
-        equipe[o.nome] = e
-        if (has) fim[o.nome] = planAlvo
+    const ins: PlanObraIn[] = allObras.filter(o => o.drivers.some(d => d.contr > 0)).map(o => {
+      const g = (l: string) => o.drivers.find(d => d.label === l)
+      const f = g('Fundação'), mo = g('Montagem'), l = g('Lançamento')
+      return {
+        nome: o.nome, frente: o.frente, saldoR: o.saldoR,
+        prazoIdx: o.fim ? Math.max(0, ymNum(o.fim.slice(0, 7)) - ymNum(start)) : null,
+        fund: { c: f?.contr ?? 0, s: f?.saldoQ ?? 0 }, mont: { c: mo?.contr ?? 0, s: mo?.saldoQ ?? 0 }, lanc: { c: l?.contr ?? 0, s: l?.saldoQ ?? 0 },
+        torres: torresObra?.[o.nome] ?? null,
       }
-      setCfg(c => ({ ...c, equipe, fim, inicio: {}, inicioS: {}, fimS: {}, pred: {}, fila: {} }))
-    } else {
-      // recursos: escala as equipes atuais pros totais escolhidos; obras sem equipe entram em ONDAS via predecessão
-      const equipe: Record<string, Record<string, number>> = {}
-      allObras.forEach(o => { equipe[o.nome] = { ...(cfg.equipe[o.nome] ?? {}) } })
-      const prazoDe = (o: Obra) => o.fim ?? '9999'
-      for (const d of DRV) {
-        const l = d.label
-        const cur = allObras.map(o => ({ o, n: cfg.equipe[o.nome]?.[l] || 0, saldo: o.drivers.find(x => x.label === l)?.saldoQ || 0 }))
-        const tot = cur.reduce((s, x) => s + x.n, 0)
-        const alvo = planTot[l] ?? tot
-        if (tot > 0) cur.forEach(x => { if (x.n > 0) equipe[x.o.nome][l] = Math.max(x.saldo > 0 ? 1 : 0, Math.round(x.n * alvo / tot)) })
-        else if (alvo > 0) { const first = cur.filter(x => x.saldo > 0).sort((a, b) => prazoDe(a.o).localeCompare(prazoDe(b.o)))[0]; if (first) equipe[first.o.nome][l] = alvo }
-      }
-      const temEquipe = (nome: string) => DRV.some(d => (equipe[nome]?.[d.label] || 0) > 0)
-      const comSaldo = [...allObras.filter(o => o.drivers.some(d => d.contr > 0 && d.saldoQ > 0))].sort((a, b) => prazoDe(a).localeCompare(prazoDe(b)))
-      const wave1 = comSaldo.filter(o => temEquipe(o.nome)); const queue = comSaldo.filter(o => !temEquipe(o.nome))
-      const pred: Record<string, string> = {}
-      queue.forEach((o, i) => { const ant = i < wave1.length ? wave1[i] : queue[i - wave1.length]; if (ant) pred[o.nome] = ant.nome })
-      const nova: Config = { ...cfg, equipe, pred, inicio: {}, inicioS: {}, fim: {}, fimS: {}, fila: {}, realoc: true }
-      // início informativo = 1º mês projetado de produção (idempotente: coincide com a chegada da equipe)
-      const inicio: Record<string, string> = {}
-      projTodas(allObras, nova, start).forEach((v, k) => { const idx = v.totalRmes.findIndex(x => x > 0.5); if (idx > 0) inicio[k] = `${shiftYM(start, idx)}-01` })
-      setCfg({ ...nova, inicio })
+    })
+    const alvoIdx = planAlvo ? Math.max(0, ymNum(planAlvo) - ymNum(start)) : null
+    setPlanRes(planejarComReforco(ins, { ...planP, excluidas: [...planExc], alvoIdx }))
+  }
+  // grava o plano nos campos EXISTENTES da config: datas por serviço + predecessão + pessoas (equipes × tamanho)
+  const preencherPlano = () => {
+    if (!planRes) return
+    const start = startYM()
+    const dd = (i: number) => `${shiftYM(start, i)}-01`
+    const inicioS: Record<string, Record<string, string>> = {}, fimS: Record<string, Record<string, string>> = {}
+    const pred: Record<string, string> = {}
+    const equipe: Record<string, Record<string, number>> = {}
+    allObras.forEach(o => { equipe[o.nome] = { ...(cfg.equipe[o.nome] ?? {}) } })
+    for (const [nome, o] of Object.entries(planRes.obras)) {
+      const iS: Record<string, string> = {}, fS: Record<string, string> = {}
+      if (o.fund) { iS['Fundação'] = dd(o.fund.ini); fS['Fundação'] = dd(o.fund.fim); equipe[nome]['Fundação'] = o.fund.eqMax * 7 }
+      if (o.mont) { iS['Montagem'] = dd(o.mont.ini); fS['Montagem'] = dd(o.mont.fim); equipe[nome]['Montagem'] = o.mont.eqMax * 12 }
+      if (o.lanc) { iS['Lançamento'] = dd(o.lanc.ini); fS['Lançamento'] = dd(o.lanc.fim); equipe[nome]['Lançamento'] = o.lanc.eqMax * 12 }
+      if (Object.keys(iS).length) { inicioS[nome] = iS; fimS[nome] = fS }
+      if (o.pred) pred[nome] = o.pred
     }
+    setCfg(c => ({ ...c, equipe, inicioS, fimS, pred, inicio: {}, fim: {}, fila: {}, realoc: false }))
     setPlanOpen(false)
   }
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
@@ -509,7 +530,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
               <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Sparkles size={14} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
               <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><Sparkles size={14} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
-              <button onClick={() => { setPlanTot(Object.fromEntries(DRV.map(d => [d.label, curTot(d.label)]))); setPlanOpen(true) }} title="Gera início, término, predecessão e recursos automaticamente — por prazo-alvo ou pelos recursos disponíveis" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
+              <button onClick={abrirPlan} title="Simula o portfólio por equipe-padrão e recursos críticos (rotor/perfuratriz/guindaste/comboio) e preenche início, término, predecessão e recursos" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className="max-h-[58vh] overflow-auto">
@@ -650,44 +671,110 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
             </div>
           </div>
         )}
-        {/* Mini modal: Planejamento Automático */}
-        {planOpen && (
+        {/* Mini modal: Planejamento Automático — equipes-padrão + recursos críticos */}
+        {planOpen && (() => {
+          const pin = `w-16 text-center text-[12px] font-bold rounded-lg border px-1.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`
+          const plbl = `text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+          const setP = (k: keyof PlanParams, v: number) => { setPlanP(pp => ({ ...pp, [k]: Math.max(0, v) })); setPlanRes(null) }
+          const campo = (rot: string, k: keyof PlanParams, title: string, step = 1) => (
+            <label className="flex items-center gap-1.5" title={title}>
+              <input type="number" min="0" step={step} value={planP[k] as number} onChange={e => setP(k, Number(e.target.value))} className={pin} />
+              <span className="text-[11px] font-semibold">{rot}</span>
+            </label>
+          )
+          const start = startYM()
+          const dt = (i: number) => ymLabel(shiftYM(start, i))
+          const planejaveis = allObras.filter(o => o.drivers.some(d => d.contr > 0 && d.saldoQ > 0))
+          return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setPlanOpen(false)}>
-            <div className={`w-full max-w-sm rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
-              <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                <h3 className="text-[13px] font-bold flex items-center gap-2"><Sparkles size={14} className="text-teal-500" /> Planejamento Automático</h3>
+            <div className={`w-full max-w-2xl max-h-[90vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+              <div className={`flex items-center justify-between px-4 py-2.5 border-b sticky top-0 z-10 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+                <h3 className="text-[13px] font-bold flex items-center gap-2"><Sparkles size={14} className="text-teal-500" /> Planejamento Automático — equipes-padrão + recursos críticos</h3>
                 <button onClick={() => setPlanOpen(false)} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={14} /></button>
               </div>
               <div className="px-4 py-3 space-y-3">
-                <div className={`flex rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-100/80'}`}>
-                  {([['prazo', 'Por prazo'], ['recursos', 'Por recursos']] as const).map(([k, lb]) => (
-                    <button key={k} onClick={() => setPlanMode(k)} className={`flex-1 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${planMode === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300' : 'text-slate-500')}`}>{lb}</button>
-                  ))}
-                </div>
-                {planMode === 'prazo' ? (<>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-semibold">Terminar tudo até</span>
-                    <input type="date" value={planAlvo} onChange={e => setPlanAlvo(e.target.value)} className={`flex-1 text-[12px] rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                <div>
+                  <p className={`${plbl} mb-1.5`}>Equipes disponíveis</p>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {campo('equipes de Fundação (7 pessoas · 100 m³/mês)', 'eqF', 'Equipe-padrão de fundação: 7 pessoas → 100 m³/mês prevista')}
+                    {campo('equipes de Mont./Lanç. (12 pessoas)', 'eqML', 'Equipe-padrão de montagem/lançamento: 12 pessoas; pré-montagem 1 torre/dia; lançamento junta 2-3 equipes')}
                   </div>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cada obra ganha <b>Término</b> na data-alvo (ritmo forçado) e os <b>recursos</b> viram as pessoas necessárias pra cumprir (saldo ÷ produtividade ÷ meses). Predecessões são limpas.</p>
-                </>) : (<>
-                  <p className="text-[12px] font-semibold">Pessoas disponíveis por serviço</p>
-                  {DRV.map(d => (
-                    <div key={d.label} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.cor }} />
-                      <span className="flex-1 text-[11px] font-semibold">{d.label} <span className="opacity-50">· atual {curTot(d.label)}</span></span>
-                      <input type="number" min="0" value={planTot[d.label] ?? 0} onChange={e => setPlanTot(t => ({ ...t, [d.label]: Math.max(0, Math.round(Number(e.target.value))) }))} className={`w-20 text-center text-[12px] font-bold rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
-                    </div>
-                  ))}
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Mantém/escala as equipes atuais pros totais acima (aumente pra acelerar); obras sem equipe entram em <b>ondas</b> via <b>Predecessão</b> (ordem = prazo contratual), com realocação automática ligada e <b>Início</b> preenchido com o mês projetado.</p>
-                </>)}
+                </div>
+                <div>
+                  <p className={`${plbl} mb-1.5`}>Recursos críticos</p>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {campo('rotores', 'rotores', 'Porteiro da fundação: cada frente ocupa 1 rotor — máx. de frentes de fundação simultâneas')}
+                    {campo('perfuratrizes', 'perfuratrizes', 'Multiplica a fundação ×4 — só compensa em obra com mais de 10 torres')}
+                    {campo('guindastes', 'guindastes', 'Multiplica a montagem ×10 (10 torres/dia); obra acima do limiar só monta com guindaste')}
+                    {campo('comboios', 'comboios', 'Porteiro do lançamento (puller-freio + munck + prensa): sem comboio a frente não abre')}
+                  </div>
+                </div>
+                <div>
+                  <p className={`${plbl} mb-1.5`}>Parâmetros</p>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <label className="flex items-center gap-1.5" title="Fator residual (material/clima/retrabalho) sobre a produtividade prevista — calibrar com o realizado">
+                      <input type="number" min="5" max="100" step="5" value={Math.round(planP.residual * 100)} onChange={e => { setPlanP(pp => ({ ...pp, residual: Math.min(1, Math.max(0.05, Number(e.target.value) / 100)) })); setPlanRes(null) }} className={pin} />
+                      <span className="text-[11px] font-semibold">% eficiência</span>
+                    </label>
+                    {campo('torres: limiar do guindaste', 'limiarGuind', 'Obra com mais torres que isso NÃO monta sem guindaste (espera na fila); abaixo, monta manual a 1 torre/dia')}
+                    {campo('equipes por frente de lançamento', 'eqPorLanc', 'Frente de lançamento consome 2-3 equipes de 12 + 1 comboio → 15 km/mês')}
+                    <label className="flex items-center gap-1.5" title="Opcional: data-alvo pro portfólio — calcula o reforço MÍNIMO de equipes que cumpre">
+                      <input type="month" value={planAlvo} onChange={e => { setPlanAlvo(e.target.value); setPlanRes(null) }} className={`w-[120px] text-[12px] rounded-lg border px-1.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                      <span className="text-[11px] font-semibold">data-alvo (opcional)</span>
+                    </label>
+                  </div>
+                </div>
+                <details>
+                  <summary className={`cursor-pointer text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Obras embargadas / fora do plano {planExc.size > 0 ? `(${planExc.size} excluída${planExc.size > 1 ? 's' : ''})` : ''}</summary>
+                  <div className={`mt-1.5 max-h-40 overflow-auto rounded-lg border p-1.5 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                    {planejaveis.map(o => (
+                      <label key={o.nome} className="flex items-center gap-2 text-[11px] cursor-pointer">
+                        <input type="checkbox" checked={planExc.has(o.nome)} onChange={() => { setPlanExc(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n }); setPlanRes(null) }} />
+                        <span className="truncate">{o.nome}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Simula o portfólio mês a mês: prioridade = <b>prazo CEMIG × volume R$</b>; fundação ∥ pré-montagem → montagem → lançamento; equipes e recursos migram entre obras (1º mês de frente nova = mobilização, 50%). Torres vêm do <b>qtd_torres das OSCs</b> (Iniciação); sem lançamento, estima ~3/km e avisa. As datas são <b>resultado</b> — depois de preencher, revise na tabela e clique Aplicar.</p>
+                <button onClick={simular} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold border ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10 hover:bg-teal-500/20' : 'border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100'}`}><Gauge size={13} /> Simular</button>
+
+                {planRes && (
+                  <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+                    <p className="text-[12px] font-bold">Término geral: <span className="text-violet-500">{planRes.fimGeral >= 0 ? `${dt(planRes.fimGeral)} (${planRes.fimGeral + 1} meses)` : '—'}</span></p>
+                    {planRes.inconclusas.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold text-rose-500 mb-0.5">⚠ NÃO CONCLUEM nem em 10 anos — gargalo permanente ({planRes.inconclusas.length}):</p>
+                        {planRes.inconclusas.slice(0, 8).map(i => <p key={i.nome} className="text-[10px] text-rose-400 truncate">· {i.nome} — {i.motivo}</p>)}
+                      </div>
+                    )}
+                    {planAlvo && (planRes.reforco
+                      ? <p className="text-[11px] font-semibold text-emerald-500">Reforço mínimo pro alvo: +{planRes.reforco.eqF} equipe(s) de fundação e +{planRes.reforco.eqML} de mont./lanç. → termina {dt(planRes.reforco.fimIdx)}</p>
+                      : planRes.fimGeral > (Math.max(0, ymNum(planAlvo) - ymNum(start))) && <p className="text-[11px] font-semibold text-rose-500">Nem +5/+5 equipes cumprem o alvo — o gargalo é recurso crítico (guindaste/rotor/comboio).</p>)}
+                    {planRes.estouros.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold text-rose-500 mb-0.5">Estouros de prazo CEMIG ({planRes.estouros.length}):</p>
+                        {planRes.estouros.slice(0, 8).map(e => <p key={e.nome} className="text-[10px] text-rose-400 truncate">· {e.nome} — termina {dt(e.fimIdx)}, prazo {dt(e.prazoIdx)} (+{e.fimIdx - e.prazoIdx}m)</p>)}
+                      </div>
+                    )}
+                    {(() => { const esp = Object.entries(planRes.obras).filter(([, o]) => o.esperas.length).slice(0, 8); return esp.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold text-amber-500 mb-0.5">Esperas de recurso (onde a gestão recupera prazo):</p>
+                        {esp.map(([n, o]) => <p key={n} className={`text-[10px] truncate ${isDark ? 'text-amber-300/80' : 'text-amber-600'}`}>· {n}: {o.esperas.join(' · ')}</p>)}
+                      </div>
+                    ) })()}
+                    {planRes.torresEstimadas.length > 0 && (
+                      <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><b>Torres estimadas por km</b> (lançar qtd_torres na Iniciação): {planRes.torresEstimadas.join(' · ')}</p>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className={`flex justify-end px-4 py-2.5 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                <button onClick={preencher} disabled={planMode === 'prazo' && !planAlvo} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"><Sparkles size={13} /> Preencher Cronograma</button>
+              <div className={`flex justify-end gap-2 px-4 py-2.5 border-t sticky bottom-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+                <button onClick={preencherPlano} disabled={!planRes} title={planRes ? 'Grava início/término por serviço, predecessão e recursos na tabela — revise e clique Aplicar' : 'Simule primeiro'} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"><Sparkles size={13} /> Preencher Cronograma</button>
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
         {/* Footer */}
         <div className={`flex items-center gap-2 px-5 py-3 border-t sticky bottom-0 rounded-b-2xl ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="nome da versão" className={`flex-1 text-sm rounded-lg border px-3 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder:text-slate-500' : 'bg-white border-slate-300 text-slate-800'}`} />
