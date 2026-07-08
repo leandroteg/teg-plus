@@ -13,6 +13,7 @@ import {
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useEnviarOcorrenciaSgi,
+  useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
 } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
@@ -61,6 +62,8 @@ const KANBAN: StatusOcorrencia[] = ['registro', 'investigacao', 'acao', 'encerra
 export default function QsmaSeguranca() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
+  const { perfil } = useAuth()
+  const isAdmin = perfil?.role === 'administrador'
   const [params, setParams] = useSearchParams()
   const [aba, setAba] = useState<string>(params.get('aba') ?? 'riscos')
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
@@ -100,6 +103,7 @@ export default function QsmaSeguranca() {
   const [normaF, setNormaF] = useState('')
   const [tipoOcoF, setTipoOcoF] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
+  const [subTreino, setSubTreino] = useState<'matriz' | 'controle'>('matriz')
   const [quickFicha, setQuickFicha] = useState('todos')
   const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
   const q = busca.trim().toLowerCase()
@@ -310,6 +314,21 @@ export default function QsmaSeguranca() {
       {/* ── Treinamentos ── */}
       {aba === 'treinamentos' && (
         <div className="space-y-3">
+          {/* Sub-abas */}
+          <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            {([['matriz', 'Matriz de Treinamentos'], ['controle', 'Controle de Treinamentos']] as const).map(([k, lbl]) => (
+              <button key={k} onClick={() => setSubTreino(k)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  subTreino === k
+                    ? isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}>{lbl}</button>
+            ))}
+          </div>
+
+          {subTreino === 'matriz' && <MatrizTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
+
+          {subTreino === 'controle' && (<>
           <QsmaToolbar
             isDark={isDark}
             contagem={`${treinamentosF.length} treinamento${treinamentosF.length !== 1 ? 's' : ''}`}
@@ -358,6 +377,7 @@ export default function QsmaSeguranca() {
               })}
             </div>
           )}
+          </>)}
         </div>
       )}
 
@@ -885,6 +905,101 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
         onCancel={onClose} saveLabel="Criar ficha" onSave={salvar}
       />
     </QsmaModal>
+  )
+}
+
+// ── Matriz de Treinamentos (cargo × treinamento) ─────────────────────────────
+function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
+  isDark: boolean; card: string; txtMain: string; txtMuted: string; isAdmin: boolean
+}) {
+  const { data: catalogo = [], isLoading: lc } = useCatalogoTreinamentos()
+  const { data: matriz = [], isLoading: lm } = useMatrizTreinamentos()
+  const setCel = useSetMatrizCelula()
+  const [busca, setBusca] = useState('')
+  const [tipoF, setTipoF] = useState<'todos' | 'legal' | 'contratual'>('todos')
+
+  const cols = catalogo.filter(c => tipoF === 'todos' || c.tipo === tipoF)
+  const cargos = [...new Set(matriz.map(m => m.cargo))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const q = busca.trim().toLowerCase()
+  const cargosF = q ? cargos.filter(c => c.toLowerCase().includes(q)) : cargos
+  const cel = (cargo: string, tid: string) => matriz.find(m => m.cargo === cargo && m.treinamento_id === tid)?.exigencia ?? 'na'
+
+  const ciclo: Record<string, 'obrigatorio' | 'atividade' | 'na'> = { na: 'obrigatorio', obrigatorio: 'atividade', atividade: 'na' }
+  const onCel = (cargo: string, tid: string, atual: string) => {
+    if (!isAdmin || setCel.isPending) return
+    setCel.mutate({ cargo, treinamento_id: tid, exigencia: ciclo[atual] })
+  }
+
+  const cellStyle = (e: string) =>
+    e === 'obrigatorio' ? (isDark ? 'bg-emerald-500/25 text-emerald-300' : 'bg-emerald-500 text-white')
+      : e === 'atividade' ? (isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-300 text-amber-900')
+      : (isDark ? 'text-slate-700' : 'text-slate-200')
+  const cellTxt = (e: string) => e === 'obrigatorio' ? 'O' : e === 'atividade' ? 'A' : '·'
+
+  if (lc || lm) return <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+
+  return (
+    <div className="space-y-3">
+      {/* toolbar + legenda */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm flex-1 min-w-[200px] max-w-xs ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cargo…"
+            className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+        <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {([['todos', 'Todos'], ['legal', 'Legais (NR)'], ['contratual', 'Contratuais']] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setTipoF(k)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${tipoF === k ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 ml-auto text-[11px]">
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('obrigatorio')}`}>O</span> Obrigatório</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('atividade')}`}>A</span> Conforme atividade</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center ${cellStyle('na')}`}>·</span> Não se aplica</span>
+        </div>
+      </div>
+      {isAdmin && <p className={`text-[11px] ${txtMuted}`}>Clique numa célula para alternar: Não se aplica → Obrigatório → Conforme atividade. 1ª versão baseada na Matriz CEMIG OD/ST-06114/2025 — ajuste conforme sua operação.</p>}
+
+      {/* grade */}
+      <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <table className="border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={`sticky left-0 top-0 z-30 text-left px-3 py-2 font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
+              {cols.map(c => (
+                <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}${c.carga_horaria ? ' · ' + c.carga_horaria + 'h' : ''}`}
+                  className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                  <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{c.norma || c.codigo}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {cargosF.map((cargo, i) => (
+              <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                <td className={`sticky left-0 z-10 px-3 py-1.5 font-semibold whitespace-nowrap ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                {cols.map(c => {
+                  const e = cel(cargo, c.id)
+                  return (
+                    <td key={c.id} className={`text-center ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
+                      <button disabled={!isAdmin} onClick={() => onCel(cargo, c.id, e)}
+                        className={`w-7 h-7 m-0.5 rounded font-bold text-[11px] transition-all ${cellStyle(e)} ${isAdmin ? 'hover:ring-2 hover:ring-sky-400 cursor-pointer' : 'cursor-default'}`}>
+                        {cellTxt(e)}
+                      </button>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+            {cargosF.length === 0 && (
+              <tr><td colSpan={cols.length + 1} className={`px-3 py-8 text-center ${txtMuted}`}>Nenhum cargo encontrado.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className={`text-[11px] ${txtMuted}`}>{cargosF.length} cargos · {cols.length} treinamentos</p>
+    </div>
   )
 }
 
