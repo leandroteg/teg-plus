@@ -866,7 +866,7 @@ export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark
         <div key={c.id} className={`rounded-xl border px-3 py-2 flex items-center gap-2 ${
           isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50'}`}>
           <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-          <span className={`text-xs font-bold flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{c.nome}</span>
+          <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Colaborador apto e liberado para atividades</span>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Ativo · Portal liberado</span>
         </div>
       ))}
