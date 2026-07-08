@@ -15,7 +15,7 @@ import { useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao } from 
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
-import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
+import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard, ExcluirAdmissaoBtn } from '../../components/rh/RHAdmissaoEtapas'
 import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
@@ -321,8 +321,9 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       ? `${candidatos[0].nome || 'Candidato'} +${nCand - 1}`
       : (adm.nome_candidato || 'Solicitação de admissão')
   return (
+    <div className="relative">
     <button onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all group flex items-center gap-3 ${
+      className={`w-full text-left rounded-2xl border p-4 pr-16 transition-all group flex items-center gap-3 ${
         isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.05]' : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
       }`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
@@ -355,6 +356,8 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       </div>
       <ChevR size={14} className={`shrink-0 ${isDark ? 'text-slate-600 group-hover:text-violet-400' : 'text-slate-300 group-hover:text-violet-500'} transition-colors`} />
     </button>
+      <ExcluirAdmissaoBtn admId={adm.id} nome={titulo} className="absolute top-1/2 -translate-y-1/2 right-9 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" />
+    </div>
   )
 }
 
@@ -372,6 +375,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
             <th className="text-center px-3 py-2 font-semibold">Docs</th>
             <th className={th}>Status</th>
             <th className={th}>Data</th>
+            <th className="px-2 py-2" />
           </tr>
         </thead>
         <tbody>
@@ -396,6 +400,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
                 <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
                 <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusCls}`}>{statusTxt}</span></td>
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(a.created_at).toLocaleDateString('pt-BR')}</td>
+                <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
               </tr>
             )
           })}
