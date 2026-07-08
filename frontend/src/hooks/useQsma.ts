@@ -542,6 +542,52 @@ export function useSalvarTreinamento() {
   })
 }
 
+// ── Matriz de Treinamentos (cargo × treinamento) ─────────────────────────────
+export interface QsmaTreinamentoCatalogo {
+  id: string; codigo: string; nome: string; tipo: 'legal' | 'contratual'
+  norma: string | null; carga_horaria: number | null; validade_meses: number | null
+  ordem: number; ativo: boolean
+}
+export interface QsmaMatrizCelula {
+  id: string; cargo: string; treinamento_id: string
+  exigencia: 'obrigatorio' | 'atividade' | 'na'; obs: string | null
+}
+
+export function useCatalogoTreinamentos() {
+  return useQuery({
+    queryKey: ['qsma_treinamento_catalogo'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_treinamento_catalogo')
+        .select('*').eq('ativo', true).order('ordem', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as QsmaTreinamentoCatalogo[]
+    },
+  })
+}
+
+export function useMatrizTreinamentos() {
+  return useQuery({
+    queryKey: ['qsma_matriz_treinamento'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_matriz_treinamento').select('*')
+      if (error) throw error
+      return (data ?? []) as QsmaMatrizCelula[]
+    },
+  })
+}
+
+export function useSetMatrizCelula() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { cargo: string; treinamento_id: string; exigencia: 'obrigatorio' | 'atividade' | 'na' }) => {
+      const { error } = await supabase.from('qsma_matriz_treinamento')
+        .upsert({ ...p, updated_at: new Date().toISOString() }, { onConflict: 'cargo,treinamento_id' })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_matriz_treinamento'] }),
+  })
+}
+
 // ── Meio Ambiente ────────────────────────────────────────────────────────────
 
 export function useLicencas() {
