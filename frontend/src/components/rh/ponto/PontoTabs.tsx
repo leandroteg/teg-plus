@@ -291,8 +291,8 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo }: PontoT
           return (
             <tr key={i} className={`border-t ${c.row}`}>
               <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}{aberto && <span className="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold uppercase">em aberto</span>}</td>
-              {/* dispositivo ≠ base do colaborador → ambos em vermelho */}
-              <td className={`${TD} hidden md:table-cell ${foraBase ? 'text-rose-500 font-semibold' : c.sub}`}>{r.base?.nome ?? '—'}</td>
+              {/* Base = cadastro do colaborador; dispositivo divergente → ambos em vermelho */}
+              <td className={`${TD} hidden md:table-cell ${foraBase ? 'text-rose-500 font-semibold' : c.sub}`}>{r.colaborador?.base?.nome ?? r.base?.nome ?? '—'}</td>
               <td className={`${TD} hidden md:table-cell ${foraBase ? 'text-rose-500 font-semibold' : c.sub}`}>{disp?.descricao ?? '—'}</td>
               <td className={`${TD} ${horaCls(fora.entrada1)}`}>{fmtHora(r.entrada1)}</td>
               <td className={`${TD} ${horaCls(fora.saida1)}`}>{fmtHora(r.saida1)}</td>

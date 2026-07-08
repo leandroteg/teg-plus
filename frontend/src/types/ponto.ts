@@ -128,7 +128,7 @@ export interface PontoDiaLista {
   normais: string | null; faltas: string | null
   ex50: string | null; ex70: string | null; ex100: string | null
   aprov_status: AprovStatus
-  colaborador?: { nome: string | null; base_id?: string | null } | null
+  colaborador?: { nome: string | null; base_id?: string | null; base?: { nome: string | null } | null } | null
   base?: { nome: string | null } | null
 }
 
