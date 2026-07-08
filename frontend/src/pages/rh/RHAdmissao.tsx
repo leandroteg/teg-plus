@@ -563,7 +563,7 @@ function EtapaRail({
         onWheel={handleWheel}
         className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
       >
-        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:w-full">
+        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:min-w-0 md:w-full md:pr-0">
           {ETAPAS.map(e => {
             const count = counts[e.key] || 0
             const isActive = etapa === e.key
@@ -573,7 +573,7 @@ function EtapaRail({
               <button
                 key={e.key}
                 onClick={() => setEtapa(e.key)}
-                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:min-w-0 md:flex-1 md:shrink ${
                   isActive
                     ? `${accent.bgActive} ${accent.textActive} border font-bold shadow-sm ${accent.border}`
                     : `${accent.bg} ${accent.text} font-medium`
