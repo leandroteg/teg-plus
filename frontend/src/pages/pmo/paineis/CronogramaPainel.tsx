@@ -462,13 +462,14 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-                <span className="flex-1">Obra</span>
-                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele (digite ou clique no calendário)">Data Início</span>
-                <span className="w-[104px] text-center" title="Mês de término planejado — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Data Fim</span>
-                <span className="w-20 text-center" title="Duração projetada (meses · término) com a configuração atual">Duração</span>
-                <span className="w-40 text-center" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
-                {DRV.map(d => <span key={d.label} className="w-14 text-center" style={{ color: d.cor }}>{d.label}</span>)}
-                <span className="w-9 text-right">total</span>
+                <span className="flex-1 pl-4">Obra</span>
+                <span className="w-[104px] text-center shrink-0" title="Mês de início planejado — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
+                <span className="w-[104px] text-center shrink-0" title="Mês de término planejado — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
+                <span className="w-14 text-center shrink-0" title="Prazo — limite contratual (vencimento da OSC mais tardia da obra)">Prazo</span>
+                <span className="w-20 text-center shrink-0" title="Duração projetada (meses · término) com a configuração atual — vermelho quando estoura o Prazo">Duração</span>
+                <span className="w-40 text-center shrink-0" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
+                {DRV.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
+                <span className="w-9 text-right shrink-0">total</span>
               </div>
               <div className="max-h-[58vh] overflow-auto">
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
@@ -487,14 +488,22 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                       {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
                         <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
                           <span className={`flex-1 text-[11px] truncate pl-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
-                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <input type="month" value={cfg.fim?.[o.nome] ?? ''} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado — força o ritmo pela data" className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fim?.[o.nome] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <span className="w-20 text-center text-[10px] font-semibold tabular-nums text-violet-500 whitespace-nowrap" title="Duração projetada · término (config atual)">{fimMap[o.nome]?.meses ? `${fimMap[o.nome]!.meses}m · ${ymLabel(fimMap[o.nome]!.termino!)}` : '—'}</span>
+                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="month" value={cfg.fim?.[o.nome] ?? ''} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado — força o ritmo pela data" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fim?.[o.nome] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          {(() => {
+                            const prazo = o.fim ? o.fim.slice(0, 7) : null
+                            const pj = fimMap[o.nome]
+                            const estoura = !!(prazo && pj?.termino && pj.termino > prazo)
+                            return (<>
+                              <span className={`w-14 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title="Limite contratual (vencimento da OSC mais tardia)">{prazo ? ymLabel(prazo) : '—'}</span>
+                              <span className={`w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap ${estoura ? 'text-rose-500' : 'text-violet-500'}`} title={estoura ? 'Duração projetada ESTOURA o prazo contratual' : 'Duração projetada · término (config atual)'}>{pj?.meses ? `${pj.meses}m · ${ymLabel(pj.termino!)}` : '—'}</span>
+                            </>)
+                          })()}
                           <PredCombo value={cfg.pred?.[o.nome] ?? ''} options={predOpts.filter(n => n !== o.nome)} onPick={v => setPred(o.nome, v)} isDark={isDark} />
                           {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
-                            <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                            <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                           ) })}
-                          <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
+                          <span className={`w-9 shrink-0 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
                         </div>
                       ) })}
                     </div>
