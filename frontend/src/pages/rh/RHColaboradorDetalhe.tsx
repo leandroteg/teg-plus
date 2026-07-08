@@ -8,11 +8,12 @@ import {
   ChevronDown, ChevronUp, Clock, TrendingUp,
   Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
   Sparkles, FileBarChart, X, Paperclip, AlertCircle,
-  PenLine, Send, CheckCircle2, ShieldCheck, RotateCcw,
+  PenLine, Send, CheckCircle2, ShieldCheck, RotateCcw, GraduationCap,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes } from '../../hooks/useRH'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, type TreinoStatus } from '../../hooks/useQsma'
 import { useCadObras } from '../../hooks/useCadastros'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
@@ -399,6 +400,9 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      {/* Treinamentos & Saúde (matriz QSMA + ASO) */}
+      <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />
+
       {/* Missões & Assinaturas (Portal TEG) */}
       <MissoesColaborador
         colaboradorId={id}
@@ -452,6 +456,90 @@ function fmtTam(bytes: number | null) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ── Bloco Treinamentos & ASO (matriz QSMA do cargo × registros do colaborador) ──
+function TreinamentosSaude({ colaboradorId, cargo, sectionCls, isLight }: {
+  colaboradorId: string; cargo?: string | null; sectionCls: string; isLight: boolean
+}) {
+  const [aberto, setAberto] = useState(true)
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: matriz = [] } = useMatrizTreinamentos()
+  const { data: treinos = [] } = useTreinamentos()
+
+  const cargoNorm = (cargo ?? '').trim().toUpperCase()
+  const requeridos = new Set(
+    matriz.filter(m => m.cargo.trim().toUpperCase() === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id)
+  )
+  const meus = treinos.filter(t => t.colaborador_id === colaboradorId)
+  // último registro por treinamento (por treinamento_id; fallback norma)
+  const regDe = (cat: { id: string; norma: string | null }) => {
+    const cands = meus.filter(t => (t as any).treinamento_id === cat.id || (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()))
+    return cands.sort((a, b) => (b.data_realizacao ?? '').localeCompare(a.data_realizacao ?? ''))[0] ?? null
+  }
+
+  const linhas = catalogo
+    .filter(c => requeridos.has(c.id))
+    .map(c => {
+      const r = regDe(c)
+      return { cat: c, reg: r, status: treinoStatus(!!r, r?.vencimento) }
+    })
+    .sort((a, b) => (a.status === 'faltando' ? -1 : 0) - (b.status === 'faltando' ? -1 : 0) || a.cat.ordem - b.cat.ordem)
+
+  const cont = {
+    ok: linhas.filter(l => l.status === 'ok').length,
+    vencendo: linhas.filter(l => l.status === 'vencendo').length,
+    vencido: linhas.filter(l => l.status === 'vencido').length,
+    faltando: linhas.filter(l => l.status === 'faltando').length,
+  }
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+  const chip = (s: TreinoStatus) => s === 'ok' ? 'bg-emerald-100 text-emerald-700'
+    : s === 'vencendo' ? 'bg-amber-100 text-amber-700'
+    : s === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'
+  const chipTxt = (l: typeof linhas[number]) => l.status === 'faltando' ? 'Faltando'
+    : l.status === 'vencido' ? `Vencido ${fmt(l.reg?.vencimento)}`
+    : l.status === 'vencendo' ? `Vence ${fmt(l.reg?.vencimento)}`
+    : l.reg?.vencimento ? `Válido até ${fmt(l.reg?.vencimento)}` : 'Válido'
+
+  return (
+    <div className={sectionCls}>
+      <button onClick={() => setAberto(a => !a)} className="w-full px-5 py-3 flex items-center justify-between">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <GraduationCap size={16} className="text-sky-500" /> Treinamentos & Saúde (ASO)
+          <span className="flex items-center gap-1.5 ml-2">
+            {cont.faltando > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{cont.faltando} faltando</span>}
+            {cont.vencido > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{cont.vencido} vencido</span>}
+            {cont.vencendo > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{cont.vencendo} vencendo</span>}
+            {cont.ok > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{cont.ok} ok</span>}
+          </span>
+        </h3>
+        {aberto ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {aberto && (
+        <div className="px-5 pb-4">
+          {linhas.length === 0 ? (
+            <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum treinamento obrigatório mapeado para o cargo "{cargo || '—'}". Verifique a Matriz de Treinamentos (QSMA › Segurança).</p>
+          ) : (
+            <div className="space-y-1.5">
+              {linhas.map(l => (
+                <div key={l.cat.id} className={`flex items-center gap-3 py-1.5 px-3 rounded-lg ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                      {l.cat.nome} {l.cat.norma && <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>· {l.cat.norma}</span>}
+                    </p>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {l.reg?.data_realizacao ? `Realizado ${fmt(l.reg.data_realizacao)}` : 'Sem registro'}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${chip(l.status)}`}>{chipTxt(l)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function OneDriveDocs({ colaboradorId, sectionCls, isLight }: { colaboradorId: string; sectionCls: string; isLight: boolean }) {
