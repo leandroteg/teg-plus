@@ -477,8 +477,8 @@ export default function Ativos() {
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 {[
-                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'nome', label: 'NOME', align: 'text-left' },
+                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
                   { key: 'locador', label: 'LOCADOR', align: 'text-left' },
                   { key: 'cc', label: 'C. CUSTO', align: 'text-left' },
@@ -507,12 +507,10 @@ export default function Ativos() {
                 return (
                   <tr key={imo.id} onClick={() => setDetail(imo)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
-                    <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
-                    <td className="px-3 py-2.5">
-                      {(imo as any).nome
-                        ? <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{(imo as any).nome}</span>
-                        : <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>{(imo as any).titulo ?? '—'}</span>}
+                    <td className={`px-3 py-2.5 font-bold whitespace-nowrap ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                      {(imo as any).nome || (imo as any).titulo || '—'}
                     </td>
+                    <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
                     <td className="px-3 py-2.5">
                       <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtEndereco(imo)}</p>
                     </td>
