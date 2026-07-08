@@ -95,14 +95,14 @@ function VagaCard({ adm, isDark, onClick, children }: {
       <button onClick={onClick} className="w-full text-left flex items-start justify-between gap-3 mb-2 group">
         <div className="min-w-0">
           <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            {candidatos[0]?.cargo || adm.cargo_previsto || 'Vaga'}
+            {nomeAlvo}
             {adm.urgente && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Urgente</span>}
             {criadoPorSuperTEG && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">🦸 SuperTEG</span>}
           </p>
           <div className={`flex items-center gap-3 flex-wrap mt-0.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {(candidatos[0]?.cargo || adm.cargo_previsto) && <span className="flex items-center gap-1 font-semibold"><Briefcase size={11} /> {candidatos[0]?.cargo || adm.cargo_previsto}</span>}
             {adm.base && <span className="flex items-center gap-1"><Building2 size={11} /> {adm.base}</span>}
-            {ccTxt && <span className="flex items-center gap-1"><Briefcase size={11} /> {ccTxt}</span>}
-            {adm.departamento_previsto && <span>{adm.departamento_previsto}</span>}
+            {ccTxt && <span>{ccTxt}</span>}
             {adm.data_prevista_inicio && (
               <span className="flex items-center gap-1"><Calendar size={11} /> início {new Date(adm.data_prevista_inicio).toLocaleDateString('pt-BR')}</span>
             )}
