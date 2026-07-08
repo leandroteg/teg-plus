@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Link2, Loader2, Package, Search, X } from 'lucide-react'
 import { useItemCatalogSearchAll } from '../hooks/useEstoque'
 import { useVincularItemManual } from '../hooks/useRequisicoes'
@@ -23,16 +24,40 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState(() => primeirasPalavras(descricaoLivre))
   const wrapRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const { data: itens = [], isLoading } = useItemCatalogSearchAll(busca)
   const vincular = useVincularItemManual()
 
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
+  // Painel renderizado via portal (foge do overflow-y-auto da lista de orfaos, que
+  // senao corta o dropdown e ele fica escondido atras do resto da tela).
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) })
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+    updatePos()
+    function onClick(e: MouseEvent) {
+      if (
+        wrapRef.current?.contains(e.target as Node) ||
+        panelRef.current?.contains(e.target as Node)
+      ) return
+      setOpen(false)
+    }
+    function onScroll() { updatePos() }
+    document.addEventListener('mousedown', onClick)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', updatePos)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', updatePos)
+    }
+  }, [open, updatePos])
 
   async function pick(item: EstItem) {
     try {
@@ -47,14 +72,19 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
   return (
     <div ref={wrapRef} className="relative flex-shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1 px-2 py-1 rounded-md border border-orange-300 bg-white text-orange-600 text-[10px] font-bold hover:bg-orange-50 transition-all"
       >
         <Link2 size={11} /> Vincular
       </button>
 
-      {open && (
-        <div className="absolute z-50 right-0 top-full mt-1 w-80 bg-white rounded-xl border border-orange-200 shadow-xl overflow-hidden">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[9999] w-80 bg-white rounded-xl border border-orange-200 shadow-xl overflow-hidden"
+          style={{ top: pos.top, right: pos.right, maxWidth: 'calc(100vw - 16px)' }}
+        >
           <div className="p-2 border-b border-slate-100">
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -91,6 +121,7 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
                   key={item.id}
                   disabled={vincular.isPending}
                   onClick={() => pick(item)}
+                  title={`${item.codigo} — ${item.descricao}`}
                   className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-orange-50 transition-colors flex items-center gap-2 border-b border-slate-50 last:border-0 disabled:opacity-50"
                 >
                   <Package size={13} className="text-orange-400 shrink-0" />
@@ -100,7 +131,7 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
                       <span className="truncate">{item.descricao}</span>
                     </div>
                     {item.categoria_financeira_descricao && (
-                      <span className="text-[10px] text-slate-400 truncate block">{item.categoria_financeira_descricao}</span>
+                      <span className="text-[10px] text-slate-400 truncate block" title={item.categoria_financeira_descricao}>{item.categoria_financeira_descricao}</span>
                     )}
                   </div>
                   <span className="text-[9px] text-slate-400 shrink-0">{item.unidade}</span>
@@ -108,7 +139,8 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

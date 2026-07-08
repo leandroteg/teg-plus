@@ -976,7 +976,7 @@ export default function RequisicaoDetalhe() {
                       onDone={setEnviarMsg}
                     />
                     <button
-                      onClick={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}&ri=${i.id}`, '_blank', 'noopener')}
+                      onClick={() => navigate(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}&ri=${i.id}&voltar=${encodeURIComponent(`/requisicoes/${req.id}`)}`)}
                       className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500 text-white text-[10px] font-bold hover:bg-orange-600 transition-all flex-shrink-0"
                     >
                       <ExternalLink size={11} /> Cadastrar

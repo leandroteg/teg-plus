@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, RefreshCw } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
@@ -33,6 +34,7 @@ const EMPTY: Partial<EstItem> = {
 }
 
 export default function ItensCad() {
+  const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -47,15 +49,21 @@ export default function ItensCad() {
   // item NOVO, vinculamos essa linha ao item recém-criado (fluxo aguardando_catalogo).
   const [vinculoRi, setVinculoRi] = useState<string | null>(null)
   const [vinculoMsg, setVinculoMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  // Rota da RC que abriu este cadastro — ao vincular com sucesso, volta pra la
+  // automaticamente (pode ter outros itens orfaos esperando cadastro).
+  const [voltarPara, setVoltarPara] = useState<string | null>(null)
 
   // Prefill via query param ?descricao=X — usado pelo fluxo "aguardando_catalogo"
   // do RequisicaoDetalhe: abre o modal com a descricao livre da RC ja preenchida.
   // ?ri=<id> (opcional): vincula a linha da RC ao item ao salvar.
+  // ?voltar=<path> (opcional): rota da RC pra onde voltar apos o vinculo.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const desc = params.get('descricao')
     const ri = params.get('ri')
+    const voltar = params.get('voltar')
     if (ri && ri.trim()) setVinculoRi(ri.trim())
+    if (voltar && voltar.trim()) setVoltarPara(voltar.trim())
     if (desc && desc.trim()) {
       setEditItem({ ...EMPTY, descricao: desc.trim() })
       setClasseBusca('')
@@ -219,10 +227,21 @@ export default function ItensCad() {
           p_item_id: novoId,
         })
         if (error) throw error
-        setVinculoMsg({ type: 'success', msg: 'Item cadastrado e vinculado à requisição. Pode voltar à aba da RC.' })
         setVinculoRi(null)
+        closeForm()
+        // Chegou aqui pelo botao "Cadastrar" da RC (aguardando_catalogo) — volta
+        // direto pra la, assim da pra cadastrar o proximo item orfao sem precisar
+        // achar a RC de novo na lista.
+        if (voltarPara) {
+          navigate(voltarPara)
+          return
+        }
+        setVinculoMsg({ type: 'success', msg: 'Item cadastrado e vinculado à requisição.' })
+        return
       } catch (e) {
         setVinculoMsg({ type: 'error', msg: `Item cadastrado, mas o vínculo falhou: ${(e as Error).message}` })
+        closeForm()
+        return
       }
     }
     closeForm()
