@@ -60,6 +60,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const [fPct, setFPct] = useState<Set<string>>(new Set()) // todos os % físicos visíveis por padrão
   const [hideOM, setHideOM] = useState(true) // O&M (manutenção) oculto por padrão
   const [hideSemProd, setHideSemProd] = useState(true) // obras sem produção projetada no período ocultas por padrão
+  const [qObra, setQObra] = useState('') // busca por nome — vale nas duas sub-telas
+  const [hide100, setHide100] = useState(true) // >95% físico = concluída na prática — oculta nas duas sub-telas
   const [slot, setSlot] = useState<HTMLElement | null>(null)
   useEffect(() => { setSlot(document.getElementById('crono-filters-slot')) })
   const [openF, setOpenF] = useState<Set<string>>(new Set())
@@ -116,14 +118,14 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const isOM = (o: Obra) => o.omR > 0 && !o.drivers.some(d => d.contr > 0) // obra pura de O&M
     const stripOM = (o: Obra): Obra => (hideOM && o.omR > 0) ? { ...o, omR: 0, omOscs: [], saldoR: o.saldoR - o.omR } : o // tira a parte O&M de obra mista
     const frentesF = tree.filter(fr => fFrente.size === 0 || fFrente.has(fr.label))
-      .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o))).map(stripOM)
+      .map(fr => ({ ...fr, obras: fr.obras.filter(o => (fObra.size === 0 || fObra.has(o.nome)) && (fPct.size === 0 || PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) && !(hideOM && isOM(o)) && !(hide100 && o.pctFis > 95) && (!qObra || o.nome.toLowerCase().includes(qObra.toLowerCase()))).map(stripOM)
         // sem produção no período = projeção zerada (sem equipe/capacidade e sem O&M visível)
         .filter(o => !hideSemProd || (projMap.get(o.nome)?.totalRmes.reduce((s, x) => s + x, 0) ?? 0) >= 1) })).filter(fr => fr.obras.length > 0)
     let maxMeses = 0, saldoRtot = 0
     for (const fr of frentesF) for (const o of fr.obras) { saldoRtot += o.saldoR; maxMeses = Math.max(maxMeses, projMap.get(o.nome)?.maxMeses ?? 0) }
     return { frentesF, maxMeses, saldoRtot, terminoGeral: maxMeses > 0 ? shiftYM(start, maxMeses - 1) : null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, fFrente, fObra, fPct, hideOM, hideSemProd, applied, projMap])
+  }, [tree, fFrente, fObra, fPct, hideOM, hideSemProd, hide100, qObra, applied, projMap])
 
   const totPessoas = useMemo(() => applied ? view.frentesF.flatMap(f => f.obras).reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, view.frentesF])
   // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
@@ -180,23 +182,28 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const subBtn = (k: 'proj' | 'cfg', label: string, icon: ReactNode) => (
     <button key={k} onClick={() => setSub(k)} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${sub === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}>{icon}{label}</button>
   )
+  const ocultas100 = allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).length
+  // linha única de controles, IDÊNTICA nas duas sub-telas (seletor + filtros compartilhados); só a ação da direita muda
   const controles = (<>
     <div className={`inline-flex items-center rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-100/80'}`}>
       {subBtn('proj', 'Projeção', <CalendarDays size={13} />)}
       {subBtn('cfg', 'Cronograma', <Settings2 size={13} />)}
     </div>
-    {sub === 'proj' && (<>
-      <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
-      <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
-      <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
-      <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
-      <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
+    <input value={qObra} onChange={e => setQObra(e.target.value)} placeholder="buscar obra…"
+      className={`w-40 text-[12px] rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800/60 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'}`} />
+    <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
+    <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
+    <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
+    <button onClick={() => setHide100(v => !v)} title={hide100 ? 'Mostrar obras >95% físico (concluídas na prática)' : 'Ocultar obras >95% físico'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hide100 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hide100 ? <EyeOff size={14} /> : <Eye size={14} />} &gt;95%{hide100 && ocultas100 > 0 ? ` (${ocultas100})` : ''}</button>
+    <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
+    <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
+    {sub === 'proj' && (
       <button onClick={() => publicar.mutate()} disabled={publicar.isPending || mesesArr.length === 0}
         title="Grava o Total geral exibido como cronograma oficial (fonte do Fluxo de Caixa do Financeiro)"
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
         {publicar.isPending ? '...' : 'Publicar cronograma'}
       </button>
-    </>)}
+    )}
   </>)
 
   return (
@@ -205,6 +212,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 
       {sub === 'cfg' && <ConfigView isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
         tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
+        qObra={qObra} hide100={hide100} fFrente={fFrente} fObra={fObra} fPct={fPct}
         inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
         onAplicar={c => { setApplied(c); try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setSub('proj') }} />}
 
@@ -339,10 +347,11 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
 }
 
 // ── Sub-tela de configuração (ex-modal) — Aplicar volta pra Projeção ─────────
-function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, equipeObras, inicial, defaultConfig, versoes, qc, onAplicar }: {
+function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, equipeObras, qObra, hide100, fFrente, fObra, fPct, inicial, defaultConfig, versoes, qc, onAplicar }: {
   isDark: boolean; portfolioId: string; allObras: Obra[]; saldoGlobal: Record<string, number>
   tree: Frente[]; efetivoFrente?: Record<string, { fundacao: number; montlanc: number }>
   equipeObras?: EquipeObrasReal
+  qObra: string; hide100: boolean; fFrente: Set<string>; fObra: Set<string>; fPct: Set<string>
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
   onAplicar: (c: Config) => void
 }) {
@@ -364,9 +373,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const equipesTot = equipeObras?.total ?? 0
   const fillFromEquipes = () => setCfg(c => ({ ...c, equipe: Object.fromEntries(allObras.map(o => [o.nome, { ...(equipeObras?.porObra[o.nome] ?? {}) }])) }))
   const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
-  // filtros da lista de obras: busca, ocultar 100% concluídas (padrão), agrupar por frente (colapsável)
-  const [qObra, setQObra] = useState('')
-  const [hide100, setHide100] = useState(true)
+  // lista de obras filtrada pelos MESMOS filtros compartilhados da linha de controles (busca, >95%, frente, obra, % físico)
   const [prodOpen, setProdOpen] = useState(false) // modal secundário: produtividade padrão por pessoa
   const [grpFechado, setGrpFechado] = useState<Set<string>>(new Set())
   const grupos = useMemo(() => {
@@ -375,11 +382,13 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
       if (!o.drivers.some(d => d.contr > 0)) continue // só O&M/sem drivers → não tem onde alocar equipe
       if (hide100 && o.pctFis > 95) continue // >95% = concluída na prática (nem toda obra fecha em 100%)
       if (qObra && !o.nome.toLowerCase().includes(qObra.toLowerCase())) continue
+      if (fFrente.size > 0 && !fFrente.has(o.frente)) continue
+      if (fObra.size > 0 && !fObra.has(o.nome)) continue
+      if (fPct.size > 0 && !PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) continue
       const arr = map.get(o.frente) ?? []; arr.push(o); map.set(o.frente, arr)
     }
     return [...map.entries()]
-  }, [allObras, hide100, qObra])
-  const ocultas100 = allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).length
+  }, [allObras, hide100, qObra, fFrente, fObra, fPct])
   const predOpts = useMemo(() => allObras.filter(o => o.drivers.some(d => d.contr > 0)).map(o => o.nome).sort(), [allObras])
 
   const salvar = useMutation({
@@ -416,11 +425,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
           {/* Equipe por obra (nº de pessoas) — toolbar única: busca/filtro à esquerda, preenchimentos à direita */}
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <input value={qObra} onChange={e => setQObra(e.target.value)} placeholder="buscar obra…"
-                className={`w-44 text-[12px] rounded-lg border px-2.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
-              <button onClick={() => setHide100(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${hide100 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
-                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} concluídas &gt;95%{hide100 && ocultas100 > 0 ? ` (${ocultas100})` : ''}
-              </button>
+              <p className={lbl}>Equipe por obra — nº de pessoas</p>
               <span className="flex-1" />
               <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${isDark ? 'border-white/15 text-slate-300 bg-white/[0.04]' : 'border-slate-300 text-slate-600 bg-white'}`}><Gauge size={11} className="text-teal-500" /> Produtividade · {DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</button>
               <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
