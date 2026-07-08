@@ -398,7 +398,9 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const effIni = (o: Obra, d: string) => cfg.inicioS?.[o.nome]?.[d] ?? cfg.inicio?.[o.nome] ?? ''
   const effFim = (o: Obra, d: string) => cfg.fimS?.[o.nome]?.[d] ?? cfg.fim?.[o.nome] ?? ''
   const d8 = (v: string) => v ? (v.length === 7 ? `${v}-01` : v) : '' // config antiga YYYY-MM → dia 01 (input type=date exige data completa)
-  const obraVal = (o: Obra, eff: (o: Obra, d: string) => string) => { const vs = new Set(o.drivers.filter(d => d.contr > 0).map(d => eff(o, d.label))); return vs.size === 1 ? [...vs][0] : '' }
+  // linha-pai mostra a JANELA da obra: menor início → maior término entre os serviços (editar aplica a todos)
+  const obraIniVal = (o: Obra) => { const vs = o.drivers.filter(d => d.contr > 0).map(d => effIni(o, d.label)).filter(Boolean); return vs.length ? vs.reduce((a, b) => a < b ? a : b) : '' }
+  const obraFimVal = (o: Obra) => { const vs = o.drivers.filter(d => d.contr > 0).map(d => effFim(o, d.label)).filter(Boolean); return vs.length ? vs.reduce((a, b) => a > b ? a : b) : '' }
   const start0 = startYM()
   // projeção ao vivo com a config SENDO editada — Duração (obra e por serviço) reage a equipe/datas/predecessão
   const fimMap = useMemo(() => {
@@ -565,8 +567,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
                             <span className="truncate" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
                           </span>
-                          <input type="date" value={d8(obraVal(o, effIni))} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra (dd/mm/aaaa) — aplica a TODOS os serviços (vazio = serviços com datas diferentes)" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <input type="date" value={d8(obraVal(o, effFim))} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado da obra (dd/mm/aaaa) — força o ritmo pela data e aplica a TODOS os serviços" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${obraVal(o, effFim) ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="date" value={d8(obraIniVal(o))} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra = menor início dos serviços — EDITAR aplica a data a TODOS os serviços" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="date" value={d8(obraFimVal(o))} onChange={e => setFim(o.nome, e.target.value)} title="Término da obra = maior término dos serviços — EDITAR força o ritmo pela data em TODOS os serviços" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${obraFimVal(o) ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                           {(() => {
                             const prazo = o.fim ? o.fim.slice(0, 7) : null
                             const pj = fimMap[o.nome]
