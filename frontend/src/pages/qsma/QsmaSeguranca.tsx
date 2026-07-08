@@ -924,7 +924,7 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
   const cargosF = q ? cargos.filter(c => c.toLowerCase().includes(q)) : cargos
   const cel = (cargo: string, tid: string) => matriz.find(m => m.cargo === cargo && m.treinamento_id === tid)?.exigencia ?? 'na'
 
-  const ciclo: Record<string, 'obrigatorio' | 'atividade' | 'na'> = { na: 'obrigatorio', obrigatorio: 'atividade', atividade: 'na' }
+  const ciclo: Record<string, 'obrigatorio' | 'atividade' | 'na'> = { na: 'obrigatorio', obrigatorio: 'na', atividade: 'na' }
   const onCel = (cargo: string, tid: string, atual: string) => {
     if (!isAdmin || setCel.isPending) return
     setCel.mutate({ cargo, treinamento_id: tid, exigencia: ciclo[atual] })
@@ -955,11 +955,10 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
         </div>
         <div className="flex items-center gap-3 ml-auto text-[11px]">
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('obrigatorio')}`}>O</span> Obrigatório</span>
-          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('atividade')}`}>A</span> Conforme atividade</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center ${cellStyle('na')}`}>·</span> Não se aplica</span>
         </div>
       </div>
-      {isAdmin && <p className={`text-[11px] ${txtMuted}`}>Clique numa célula para alternar: Não se aplica → Obrigatório → Conforme atividade. 1ª versão baseada na Matriz CEMIG OD/ST-06114/2025 — ajuste conforme sua operação.</p>}
+      {isAdmin && <p className={`text-[11px] ${txtMuted}`}>Clique numa célula para alternar entre Obrigatório e Não se aplica. Base: Matriz CEMIG OD/ST-06114/2025 + operação TEG.</p>}
 
       {/* grade */}
       <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
