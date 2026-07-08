@@ -588,14 +588,27 @@ export function useSetMatrizCelula() {
   })
 }
 
+export interface ColabTreino {
+  id: string; nome: string; cargo: string | null; setor: string | null
+  departamento: string | null; data_admissao: string | null; base: string | null
+}
 export function useColaboradoresTreino() {
   return useQuery({
     queryKey: ['qsma_colab_treino'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('rh_colaboradores')
-        .select('id, nome, cargo, ativo').eq('ativo', true).order('nome', { ascending: true })
+    queryFn: async (): Promise<ColabTreino[]> => {
+      const [{ data: colabs, error }, { data: bases }] = await Promise.all([
+        supabase.from('rh_colaboradores')
+          .select('id, nome, cargo, setor, departamento, data_admissao, base_id')
+          .eq('ativo', true).order('nome', { ascending: true }),
+        supabase.from('est_bases').select('id, nome'),
+      ])
       if (error) throw error
-      return (data ?? []) as { id: string; nome: string; cargo: string | null; ativo: boolean }[]
+      const baseNome = new Map((bases ?? []).map((b: any) => [b.id, b.nome]))
+      return (colabs ?? []).map((c: any) => ({
+        id: c.id, nome: c.nome, cargo: c.cargo, setor: c.setor,
+        departamento: c.departamento, data_admissao: c.data_admissao,
+        base: c.base_id ? (baseNome.get(c.base_id) ?? null) : null,
+      }))
     },
   })
 }
