@@ -199,3 +199,16 @@ export function useAprovarItem() {
     },
   })
 }
+
+// dispositivos de ponto (Ponto Virtual) — p/ o filtro da tela Registros Ponto
+export function usePontoDispositivos() {
+  return useQuery<{ descricao: string }[]>({
+    queryKey: ['ponto-dispositivos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_ponto_linkdisp').select('descricao').order('descricao')
+      if (error) { console.error('usePontoDispositivos:', error); return [] }
+      return (data ?? []) as { descricao: string }[]
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+}

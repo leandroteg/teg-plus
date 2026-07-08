@@ -5,7 +5,7 @@ import DPFluxoPage from '../../components/rh/DPFluxoPage'
 import type { RHTab } from '../../components/rh/RHTabRail'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useBases } from '../../hooks/useEstoque'
-import { usePontoRetificacoes } from '../../hooks/usePonto'
+import { usePontoRetificacoes, usePontoDispositivos } from '../../hooks/usePonto'
 import { ultimosMeses, labelMes, mesAtual, hojeISO, ontemISO } from '../../lib/ponto'
 import {
   RegistrosPontoTab, RetificacoesTab, HorasExtrasTab, AtestadosTab, AprovacaoTab, ConsolidacaoTab,
@@ -32,7 +32,9 @@ export default function DPPonto() {
   const [quickReg, setQuickReg] = useState('todos')
   const [vista, setVista] = useState('mes')
   const [diaData, setDiaData] = useState(hojeISO())
+  const [dispositivo, setDispositivo] = useState('')
   const { data: basesRaw = [] } = useBases()
+  const { data: dispositivos = [] } = usePontoDispositivos()
   const bases = basesRaw.map(b => ({ id: b.id, nome: b.nome, codigo: b.codigo }))
 
   // motivos de retificação (p/ o dropdown na barra), do mesmo cache do hook
@@ -46,7 +48,7 @@ export default function DPPonto() {
   const selCls = `px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
 
   function renderPanel(key: string) {
-    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, bases }
+    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, dispositivo, bases }
     const temStatus = key === 'retificacoes' || key === 'horas_extras' || key === 'atestados'
     const chipCls = (on: boolean) => `inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${on ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30') : (isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`
     const segCls = (on: boolean) => `px-2.5 py-2 text-xs font-semibold inline-flex items-center gap-1 ${on ? (isLight ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-300') : (isLight ? 'bg-white text-slate-500 hover:bg-slate-50' : 'bg-transparent text-slate-400 hover:bg-white/[0.05]')}`
@@ -77,6 +79,13 @@ export default function DPPonto() {
           {key === 'retificacoes' && (
             <MultiSelectJustif motivos={motivosRetif} ocultos={ocultosJustif} toggle={toggleJustif} />
           )}
+          {/* dispositivo (Ponto Virtual) — dado existe só na visão mensal */}
+          {key === 'registros' && vista === 'mes' && (
+            <select value={dispositivo} onChange={e => setDispositivo(e.target.value)} className={selCls}>
+              <option value="">Todos os dispositivos</option>
+              {dispositivos.map(d => <option key={d.descricao} value={d.descricao}>{d.descricao}</option>)}
+            </select>
+          )}
           {!semFiltroBase(key) && (
             <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
               className={`${selCls} w-[180px]`} />
@@ -95,7 +104,7 @@ export default function DPPonto() {
           {/* filtros pré-prontos (só ícone p/ caber) — valem nos 2 modos */}
           {key === 'registros' && (
             <div className="flex items-center gap-1.5">
-              {REG_CHIPS.map(ch => (
+              {REG_CHIPS.filter(ch => ch.k !== 'fora_base' || vista === 'mes').map(ch => (
                 <button key={ch.k} onClick={() => setQuickReg(ch.k)} title={ch.label}
                   className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border transition-colors ${quickReg === ch.k
                     ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')

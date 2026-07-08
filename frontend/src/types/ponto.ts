@@ -34,6 +34,10 @@ export interface PontoResumoMes {
   extras_validos_real: string | null
   dias_em_aberto_real: number
   dias_fora_horario_real: number
+  // dispositivo (Ponto Virtual) mais usado no mês + base onde ele está
+  dispositivo: string | null
+  dispositivo_base_id: string | null
+  fora_base: boolean | null
 }
 
 export interface PontoDia {
@@ -107,6 +111,7 @@ export interface PontoTabProps {
   quickReg: string
   vista: string
   diaData: string
+  dispositivo: string
   bases: { id: string; nome: string; codigo: string }[]
 }
 

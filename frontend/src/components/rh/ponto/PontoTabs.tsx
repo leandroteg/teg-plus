@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2 } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2, MapPinOff } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -110,26 +110,30 @@ export const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
   { k: 'ausencias', label: 'Ausências', icon: UserX },
   { k: 'sem_registro', label: 'Sem registro de ponto', icon: CalendarX2 },
   { k: 'com_registro', label: 'Somente com registro', icon: CalendarCheck2 },
+  { k: 'fora_base', label: 'Fora da base (dispositivo ≠ base)', icon: MapPinOff },
 ]
 
 export function RegistrosPontoTab(props: PontoTabProps) {
   return props.vista === 'dia' ? <RegistrosDia {...props} /> : <RegistrosMes {...props} />
 }
 
-function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
+function RegistrosMes({ anoMes, baseId, pessoa, quickReg, dispositivo }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const { data: atestados = [] } = usePontoAtestados(anoMes)
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
   const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
-  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (
+  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa)
+    && (!dispositivo || r.dispositivo === dispositivo)
+    && (
     quickReg === 'aberto' ? r.dias_em_aberto > 0
       : quickReg === 'fora_horario' ? r.dias_fora_horario > 0
         : quickReg === 'extras' ? intervalToMin(r.extras) > 0
           : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
             : quickReg === 'sem_registro' ? r.dias_batidos === 0
               : quickReg === 'com_registro' ? r.dias_batidos > 0
-                : true
+                : quickReg === 'fora_base' ? !!r.fora_base
+                  : true
   ))
   const mHH = lista.reduce((s, r) => s + intervalToMin(r.hh_trabalhada), 0)
   const mExtras = lista.reduce((s, r) => s + intervalToMin(r.extras), 0)
@@ -142,12 +146,14 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
       <Painel>
         <table className="w-full">
           <thead><tr className={c.head}>
-            <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Dias</th>
+            <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th>
+            <th className={`${TH} hidden md:table-cell`}>Dispositivo</th><th className={TH}>Dias</th>
             <th className={`${TH} hidden sm:table-cell`}>HH Trab.</th><th className={TH}>Extras</th><th className={TH}>Faltas</th><th className={TH}></th>
           </tr></thead>
           <tbody>
             <tr className={`border-t font-extrabold ${c.isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-100'}`}>
               <td className={TD}>Total · {lista.length}</td>
+              <td className={`${TD} hidden md:table-cell`} />
               <td className={`${TD} hidden md:table-cell`} />
               <td className={TD} />
               <td className={`${TD} hidden sm:table-cell`}>{mHH > 0 ? minToHoras(mHH) : '—'}</td>
@@ -158,14 +164,16 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
             {/* key composta c/ índice: colaborador pode ter 2+ linhas no resumo (ex.: troca de base no mês) */}
             {lista.map((r, i) => (
             <tr key={`${r.colaborador_id ?? r.colaborador_nome}:${i}`} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
-              <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}
+              <td className={`${TD} font-semibold ${c.txt} max-w-[260px]`}><span className="block truncate" title={r.colaborador_nome ?? ''}>{r.colaborador_nome ?? '—'}</span>
                 <div className={`text-[10px] flex items-center gap-1.5 flex-wrap ${c.sub}`}>
                   <span>{r.cargo}</span>
                   {r.dias_em_aberto > 0 && <span className="px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold">{r.dias_em_aberto} em aberto</span>}
                   {r.dias_fora_horario > 0 && <span className="px-1 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">{r.dias_fora_horario} fora horário</span>}
                 </div>
               </td>
-              <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
+              {/* dispositivo ≠ base do colaborador → ambos em vermelho */}
+              <td className={`${TD} hidden md:table-cell ${r.fora_base ? 'text-rose-500 font-semibold' : c.sub}`}>{r.base_nome ?? '—'}</td>
+              <td className={`${TD} hidden md:table-cell ${r.fora_base ? 'text-rose-500 font-semibold' : c.sub}`}>{r.dispositivo ?? '—'}</td>
               <td className={`${TD} ${c.txt}`}>{r.dias_batidos}/{r.dias}</td>
               <td className={`${TD} hidden sm:table-cell ${c.txt}`}>{fmtHoras(r.hh_trabalhada)}</td>
               <td className={`${TD} font-semibold ${intervalToMin(r.extras) > 0 ? 'text-orange-500' : c.sub}`}>{fmtHoras(r.extras)}</td>
