@@ -396,6 +396,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   // valor efetivo por serviço e valor exibido na obra (comum a todos os serviços, ou vazio quando misto)
   const effIni = (o: Obra, d: string) => cfg.inicioS?.[o.nome]?.[d] ?? cfg.inicio?.[o.nome] ?? ''
   const effFim = (o: Obra, d: string) => cfg.fimS?.[o.nome]?.[d] ?? cfg.fim?.[o.nome] ?? ''
+  const d8 = (v: string) => v ? (v.length === 7 ? `${v}-01` : v) : '' // config antiga YYYY-MM → dia 01 (input type=date exige data completa)
   const obraVal = (o: Obra, eff: (o: Obra, d: string) => string) => { const vs = new Set(o.drivers.filter(d => d.contr > 0).map(d => eff(o, d.label))); return vs.size === 1 ? [...vs][0] : '' }
   const start0 = startYM()
   // projeção ao vivo com a config SENDO editada — Duração (obra e por serviço) reage a equipe/datas/predecessão
@@ -471,8 +472,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               {/* cabeçalho DENTRO do scroll (sticky) — compartilha a barra de rolagem e alinha 1:1 com as células */}
               <div className={`sticky top-0 z-10 flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider border-b ${isDark ? 'bg-slate-900 text-slate-500 border-white/[0.06]' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                 <span className="flex-1 pl-4">Obra</span>
-                <span className="w-[104px] text-center shrink-0" title="Mês de início planejado — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
-                <span className="w-[104px] text-center shrink-0" title="Mês de término planejado — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
+                <span className="w-[118px] text-center shrink-0" title="Início planejado (dd/mm/aaaa) — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
+                <span className="w-[118px] text-center shrink-0" title="Término planejado (dd/mm/aaaa) — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
                 <span className="w-14 text-center shrink-0" title="Prazo — limite contratual (vencimento da OSC mais tardia da obra)">Prazo</span>
                 <span className="w-20 text-center shrink-0" title="Duração projetada (meses · término) com a configuração atual — vermelho quando estoura o Prazo">Duração</span>
                 <span className="w-40 text-center shrink-0" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
@@ -499,8 +500,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
                             <span className="truncate" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
                           </span>
-                          <input type="month" value={obraVal(o, effIni)} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra — aplica a TODOS os serviços (vazio = serviços com datas diferentes)" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <input type="month" value={obraVal(o, effFim)} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado da obra — força o ritmo pela data e aplica a TODOS os serviços" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${obraVal(o, effFim) ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="date" value={d8(obraVal(o, effIni))} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra (dd/mm/aaaa) — aplica a TODOS os serviços (vazio = serviços com datas diferentes)" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="date" value={d8(obraVal(o, effFim))} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado da obra (dd/mm/aaaa) — força o ritmo pela data e aplica a TODOS os serviços" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${obraVal(o, effFim) ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                           {(() => {
                             const prazo = o.fim ? o.fim.slice(0, 7) : null
                             const pj = fimMap[o.nome]
@@ -522,15 +523,15 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                           if (o.prelR > 0) srvRows.push({ key: 'prel', cor: COR_PREL, nome: 'Serv. Preliminares', info: `Prelim. + Canteiro · ${fmtM(o.prelR)}`, marcos: 'marcos Fund.' })
                           o.drivers.filter(d => d.contr > 0).forEach(d => srvRows.push({ key: d.label, cor: d.cor, nome: d.label, info: `${fmtQ(d.saldoQ)} ${d.uni} · ${fmtM(d.saldoR)}`, drv: d.label }))
                           if (o.outrosR > 0) srvRows.push({ key: 'outros', cor: COR_OUTROS, nome: 'Outros Serviços', info: `desmont/conf/aterr · ${fmtM(o.outrosR)}`, marcos: 'marcos Mont.' })
-                          const cell = 'w-[104px] shrink-0'
+                          const cell = 'w-[118px] shrink-0'
                           return srvRows.map(r => {
                             const nm = r.drv ? (fimMap[o.nome]?.srv[r.drv] ?? 0) : 0
                             return (
                               <div key={r.key} className={`flex items-center gap-2 px-2.5 py-1 border-b last:border-0 ${isDark ? 'border-white/[0.03] bg-white/[0.02]' : 'border-slate-50 bg-slate-50/60'}`}>
                                 <span className={`flex-1 min-w-0 truncate pl-9 text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" style={{ background: r.cor }} /><b className={isDark ? 'text-slate-300' : 'text-slate-600'}>{r.nome}</b> <span className="opacity-60">{r.info}</span></span>
                                 {r.drv ? (<>
-                                  <input type="month" value={effIni(o, r.drv)} onChange={e => setInicioSrv(o.nome, r.drv!, e.target.value)} title="Início deste serviço (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.inicioS?.[o.nome]?.[r.drv] ? 'border-teal-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                                  <input type="month" value={effFim(o, r.drv)} onChange={e => setFimSrv(o.nome, r.drv!, e.target.value)} title="Término deste serviço — força o ritmo pela data (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fimS?.[o.nome]?.[r.drv] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                                  <input type="date" value={d8(effIni(o, r.drv))} onChange={e => setInicioSrv(o.nome, r.drv!, e.target.value)} title="Início deste serviço (dd/mm/aaaa — sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.inicioS?.[o.nome]?.[r.drv] ? 'border-teal-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                                  <input type="date" value={d8(effFim(o, r.drv))} onChange={e => setFimSrv(o.nome, r.drv!, e.target.value)} title="Término deste serviço (dd/mm/aaaa) — força o ritmo pela data (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fimS?.[o.nome]?.[r.drv] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                                   <span className="w-14 shrink-0" />
                                   <span className="w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap text-violet-500" title="Duração projetada deste serviço">{nm > 0 ? `${nm}m · ${ymLabel(shiftYM(start0, nm - 1))}` : '—'}</span>
                                   <span className="w-40 shrink-0" />
