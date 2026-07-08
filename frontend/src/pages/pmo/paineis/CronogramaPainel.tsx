@@ -10,7 +10,7 @@ import { useEfetivoReal, useEquipeObrasReal, type EquipeObrasReal } from '../../
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
-  DRV, COR_PREL, COR_ADM, COR_OUTROS, ymLabel, shiftYM, startYM, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
+  DRV, COR_PREL, COR_ADM, COR_OUTROS, ymLabel, shiftYM, startYM, ymNum, fmtM, fmtQ, ritmoCor, prazoCor, worstCor,
   buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 
@@ -405,7 +405,52 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
     projTodas(allObras, cfg, startYM()).forEach((v, k) => { const srv: Record<string, number> = {}; v.rows.forEach(r => { srv[r.d.label] = r.meses }); m[k] = { termino: v.termino, meses: v.maxMeses, srv } })
     return m
   }, [allObras, cfg])
-  const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
+  // Planejamento Automático — preenche início/fim/predecessão/recursos por prazo-alvo ou por recursos disponíveis
+  const [planOpen, setPlanOpen] = useState(false)
+  const [planMode, setPlanMode] = useState<'prazo' | 'recursos'>('prazo')
+  const [planAlvo, setPlanAlvo] = useState('') // dd/mm/aaaa (YYYY-MM-DD)
+  const [planTot, setPlanTot] = useState<Record<string, number>>({})
+  const curTot = (l: string) => allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.[l] || 0), 0)
+  const preencher = () => {
+    const start = startYM()
+    if (planMode === 'prazo') {
+      if (!planAlvo) return
+      // todas as obras terminam na data-alvo: fim forçado + recursos = pessoas necessárias pra cumprir
+      const meses = Math.max(1, ymNum(planAlvo.slice(0, 7)) - ymNum(start) + 1)
+      const equipe: Record<string, Record<string, number>> = {}; const fim: Record<string, string> = {}
+      for (const o of allObras) {
+        const e: Record<string, number> = {}; let has = false
+        o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { e[d.label] = Math.max(1, Math.ceil(d.saldoQ / ((cfg.prodPP[d.label] || 1) * meses))); has = true } })
+        equipe[o.nome] = e
+        if (has) fim[o.nome] = planAlvo
+      }
+      setCfg(c => ({ ...c, equipe, fim, inicio: {}, inicioS: {}, fimS: {}, pred: {}, fila: {} }))
+    } else {
+      // recursos: escala as equipes atuais pros totais escolhidos; obras sem equipe entram em ONDAS via predecessão
+      const equipe: Record<string, Record<string, number>> = {}
+      allObras.forEach(o => { equipe[o.nome] = { ...(cfg.equipe[o.nome] ?? {}) } })
+      const prazoDe = (o: Obra) => o.fim ?? '9999'
+      for (const d of DRV) {
+        const l = d.label
+        const cur = allObras.map(o => ({ o, n: cfg.equipe[o.nome]?.[l] || 0, saldo: o.drivers.find(x => x.label === l)?.saldoQ || 0 }))
+        const tot = cur.reduce((s, x) => s + x.n, 0)
+        const alvo = planTot[l] ?? tot
+        if (tot > 0) cur.forEach(x => { if (x.n > 0) equipe[x.o.nome][l] = Math.max(x.saldo > 0 ? 1 : 0, Math.round(x.n * alvo / tot)) })
+        else if (alvo > 0) { const first = cur.filter(x => x.saldo > 0).sort((a, b) => prazoDe(a.o).localeCompare(prazoDe(b.o)))[0]; if (first) equipe[first.o.nome][l] = alvo }
+      }
+      const temEquipe = (nome: string) => DRV.some(d => (equipe[nome]?.[d.label] || 0) > 0)
+      const comSaldo = [...allObras.filter(o => o.drivers.some(d => d.contr > 0 && d.saldoQ > 0))].sort((a, b) => prazoDe(a).localeCompare(prazoDe(b)))
+      const wave1 = comSaldo.filter(o => temEquipe(o.nome)); const queue = comSaldo.filter(o => !temEquipe(o.nome))
+      const pred: Record<string, string> = {}
+      queue.forEach((o, i) => { const ant = i < wave1.length ? wave1[i] : queue[i - wave1.length]; if (ant) pred[o.nome] = ant.nome })
+      const nova: Config = { ...cfg, equipe, pred, inicio: {}, inicioS: {}, fim: {}, fimS: {}, fila: {}, realoc: true }
+      // início informativo = 1º mês projetado de produção (idempotente: coincide com a chegada da equipe)
+      const inicio: Record<string, string> = {}
+      projTodas(allObras, nova, start).forEach((v, k) => { const idx = v.totalRmes.findIndex(x => x > 0.5); if (idx > 0) inicio[k] = `${shiftYM(start, idx)}-01` })
+      setCfg({ ...nova, inicio })
+    }
+    setPlanOpen(false)
+  }
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
   const fillFromReal = () => setCfg(c => ({ ...c, equipe: equipeFromEfetivo(tree, efetivoFrente ?? {}, true) }))
@@ -464,8 +509,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
               <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Sparkles size={14} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
               <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><Sparkles size={14} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
-              <span className="text-[11px] text-slate-400">terminar em</span>
-              {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400 hover:border-teal-500/50' : 'border-slate-300 text-slate-500 hover:border-teal-400')}`}>{h}m</button>)}
+              <button onClick={() => { setPlanTot(Object.fromEntries(DRV.map(d => [d.label, curTot(d.label)]))); setPlanOpen(true) }} title="Gera início, término, predecessão e recursos automaticamente — por prazo-alvo ou pelos recursos disponíveis" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className="max-h-[58vh] overflow-auto">
@@ -602,6 +646,44 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               </div>
               <div className={`flex justify-end px-4 py-2.5 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
                 <button onClick={() => setProdOpen(false)} className="px-3 py-1 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700">OK</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Mini modal: Planejamento Automático */}
+        {planOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setPlanOpen(false)}>
+            <div className={`w-full max-w-sm rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+              <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                <h3 className="text-[13px] font-bold flex items-center gap-2"><Sparkles size={14} className="text-teal-500" /> Planejamento Automático</h3>
+                <button onClick={() => setPlanOpen(false)} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={14} /></button>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <div className={`flex rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-100/80'}`}>
+                  {([['prazo', 'Por prazo'], ['recursos', 'Por recursos']] as const).map(([k, lb]) => (
+                    <button key={k} onClick={() => setPlanMode(k)} className={`flex-1 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${planMode === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300' : 'text-slate-500')}`}>{lb}</button>
+                  ))}
+                </div>
+                {planMode === 'prazo' ? (<>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-semibold">Terminar tudo até</span>
+                    <input type="date" value={planAlvo} onChange={e => setPlanAlvo(e.target.value)} className={`flex-1 text-[12px] rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                  </div>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cada obra ganha <b>Término</b> na data-alvo (ritmo forçado) e os <b>recursos</b> viram as pessoas necessárias pra cumprir (saldo ÷ produtividade ÷ meses). Predecessões são limpas.</p>
+                </>) : (<>
+                  <p className="text-[12px] font-semibold">Pessoas disponíveis por serviço</p>
+                  {DRV.map(d => (
+                    <div key={d.label} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.cor }} />
+                      <span className="flex-1 text-[11px] font-semibold">{d.label} <span className="opacity-50">· atual {curTot(d.label)}</span></span>
+                      <input type="number" min="0" value={planTot[d.label] ?? 0} onChange={e => setPlanTot(t => ({ ...t, [d.label]: Math.max(0, Math.round(Number(e.target.value))) }))} className={`w-20 text-center text-[12px] font-bold rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                    </div>
+                  ))}
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Mantém/escala as equipes atuais pros totais acima (aumente pra acelerar); obras sem equipe entram em <b>ondas</b> via <b>Predecessão</b> (ordem = prazo contratual), com realocação automática ligada e <b>Início</b> preenchido com o mês projetado.</p>
+                </>)}
+              </div>
+              <div className={`flex justify-end px-4 py-2.5 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                <button onClick={preencher} disabled={planMode === 'prazo' && !planAlvo} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"><Sparkles size={13} /> Preencher Cronograma</button>
               </div>
             </div>
           </div>
