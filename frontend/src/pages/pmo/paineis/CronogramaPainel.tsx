@@ -402,6 +402,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
   // lista de obras filtrada pelos MESMOS filtros compartilhados da linha de controles (busca, >95%, frente, obra, % físico)
   const [prodOpen, setProdOpen] = useState(false) // modal secundário: produtividade padrão por pessoa
+  const [verSel, setVerSel] = useState('') // versão salva selecionada no combo
   const [grpFechado, setGrpFechado] = useState<Set<string>>(new Set())
   const grupos = useMemo(() => {
     const map = new Map<string, Obra[]>()
@@ -436,32 +437,26 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   return (
       <div className={`rounded-2xl border ${isDark ? 'bg-slate-900/60 border-white/[0.06] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
         <div className="px-5 py-3 space-y-3">
-          {/* Versões (inline) */}
-          {versoes.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className={lbl}>Versões</p>
-              {versoes.map(v => (
-                <span key={v.id} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[11px] font-semibold border ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-50'}`}>
-                  <button onClick={() => { setCfg(normalize(v.config)); setNome(v.nome) }} className="hover:text-teal-500">{v.nome}</button>
-                  <button onClick={() => excluir.mutate(v.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={11} /></button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Equipe por obra (nº de pessoas) — toolbar única: busca/filtro à esquerda, preenchimentos à direita */}
+          {/* Equipe por obra — toolbar única: versões (select) à esquerda, ferramentas de preenchimento à direita */}
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <p className={lbl}>Equipe por obra — nº de pessoas</p>
+              <select value={verSel} onChange={e => { const id = e.target.value; setVerSel(id); const v = versoes.find(x => x.id === id); if (v) { setCfg(normalize(v.config)); setNome(v.nome) } }}
+                className={`min-w-[190px] text-[12px] font-semibold rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-700'}`}>
+                <option value="">Versões salvas…</option>
+                {versoes.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+              {verSel && <button onClick={() => { excluir.mutate(verSel); setVerSel(''); setNome('') }} title="Excluir a versão selecionada" className={`p-1.5 rounded-xl border ${isDark ? 'border-white/15 text-slate-400 hover:text-rose-400' : 'border-slate-200 text-slate-400 hover:text-rose-500'}`}><Trash2 size={14} /></button>}
               <span className="flex-1" />
-              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${isDark ? 'border-white/15 text-slate-300 bg-white/[0.04]' : 'border-slate-300 text-slate-600 bg-white'}`}><Gauge size={11} className="text-teal-500" /> Produtividade · {DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</button>
-              <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
-              <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-violet-500/40 text-violet-300 bg-violet-500/10' : 'border-violet-300 text-violet-700 bg-violet-50'}`}><Sparkles size={11} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
-              <span className="text-[10px] text-slate-400">terminar em</span>
-              {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
+              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
+              <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Sparkles size={14} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
+              <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><Sparkles size={14} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
+              <span className="text-[11px] text-slate-400">terminar em</span>
+              {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400 hover:border-teal-500/50' : 'border-slate-300 text-slate-500 hover:border-teal-400')}`}>{h}m</button>)}
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-              <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+              <div className="max-h-[58vh] overflow-auto">
+              {/* cabeçalho DENTRO do scroll (sticky) — compartilha a barra de rolagem e alinha 1:1 com as células */}
+              <div className={`sticky top-0 z-10 flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider border-b ${isDark ? 'bg-slate-900 text-slate-500 border-white/[0.06]' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                 <span className="flex-1 pl-4">Obra</span>
                 <span className="w-[104px] text-center shrink-0" title="Mês de início planejado — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
                 <span className="w-[104px] text-center shrink-0" title="Mês de término planejado — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
@@ -471,7 +466,6 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                 {DRV.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
                 <span className="w-9 text-right shrink-0">total</span>
               </div>
-              <div className="max-h-[58vh] overflow-auto">
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
                 {grupos.map(([frente, obras]) => {
                   const fechado = grpFechado.has(frente)
