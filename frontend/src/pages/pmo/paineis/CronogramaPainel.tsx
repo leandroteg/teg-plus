@@ -49,6 +49,32 @@ function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark
   )
 }
 
+// combo pesquisável de predecessora: digite pra filtrar, clique pra escolher
+function PredCombo({ value, options, onPick, isDark }: { value: string; options: string[]; onPick: (v: string) => void; isDark: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const list = q ? options.filter(n => n.toLowerCase().includes(q.toLowerCase())) : options
+  return (
+    <div className="relative w-40 shrink-0">
+      <input value={open ? q : value} placeholder={value && !open ? undefined : '— digite pra filtrar'}
+        onFocus={() => { setOpen(true); setQ('') }}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onChange={e => { setQ(e.target.value); setOpen(true) }}
+        title={value || 'sem predecessora — digite pra filtrar'}
+        className={`w-full text-[11px] rounded-lg border px-1.5 py-0.5 outline-none truncate ${value ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
+      {open && (
+        <div className={`absolute right-0 z-30 mt-1 w-80 max-h-56 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
+          <button onMouseDown={e => { e.preventDefault(); onPick(''); setOpen(false) }} className={`w-full text-left px-2 py-1 rounded-lg text-[11px] text-slate-400 ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>— sem predecessora</button>
+          {list.length === 0 && <p className="px-2 py-1.5 text-[11px] text-slate-400">nenhuma obra</p>}
+          {list.map(n => (
+            <button key={n} onMouseDown={e => { e.preventDefault(); onPick(n); setOpen(false) }} className={`w-full text-left px-2 py-1 rounded-lg text-[11px] truncate ${n === value ? 'font-bold text-teal-500' : (isDark ? 'text-slate-200' : 'text-slate-700')} ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>{n}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { portfolioId?: string } = {}) {
   const { isDark } = useTheme()
   const qc = useQueryClient()
@@ -356,15 +382,16 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   onAplicar: (c: Config) => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
-  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio })
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim })
   const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
   const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; return { ...c, inicio } })
+  const setFim = (o: string, v: string) => setCfg(c => { const fim = { ...(c.fim ?? {}) }; if (v) fim[o] = v; else delete fim[o]; return { ...c, fim } })
   const setPred = (o: string, v: string) => setCfg(c => { const pred = { ...(c.pred ?? {}) }; if (v && v !== o) pred[o] = v; else delete pred[o]; return { ...c, pred } })
-  // término projetado por obra com a config SENDO editada — a coluna Fim reage ao vivo a equipe/início/predecessão
-  const fimMap = useMemo(() => { const m: Record<string, string | null> = {}; projTodas(allObras, cfg, startYM()).forEach((v, k) => { m[k] = v.termino }); return m }, [allObras, cfg])
+  // projeção ao vivo com a config SENDO editada — a coluna Duração (meses · término) reage a equipe/datas/predecessão
+  const fimMap = useMemo(() => { const m: Record<string, { termino: string | null; meses: number }> = {}; projTodas(allObras, cfg, startYM()).forEach((v, k) => { m[k] = { termino: v.termino, meses: v.maxMeses } }); return m }, [allObras, cfg])
   const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
@@ -436,11 +463,12 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
                 <span className="flex-1">Obra</span>
-                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele">Início</span>
-                <span className="w-12 text-center" title="Término projetado com a configuração atual (equipe, início e predecessão)">Fim</span>
+                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele (digite ou clique no calendário)">Data Início</span>
+                <span className="w-[104px] text-center" title="Mês de término planejado — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Data Fim</span>
+                <span className="w-20 text-center" title="Duração projetada (meses · término) com a configuração atual">Duração</span>
+                <span className="w-40 text-center" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
                 {DRV.map(d => <span key={d.label} className="w-14 text-center" style={{ color: d.cor }}>{d.label}</span>)}
                 <span className="w-9 text-right">total</span>
-                <span className="w-36 text-center" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra">Predecessão</span>
               </div>
               <div className="max-h-[58vh] overflow-auto">
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
@@ -460,15 +488,13 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
                           <span className={`flex-1 text-[11px] truncate pl-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
                           <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <span className="w-12 text-center text-[11px] font-semibold tabular-nums text-violet-500" title="Término projetado com a configuração atual">{fimMap[o.nome] ? ymLabel(fimMap[o.nome]!) : '—'}</span>
+                          <input type="month" value={cfg.fim?.[o.nome] ?? ''} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado — força o ritmo pela data" className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fim?.[o.nome] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <span className="w-20 text-center text-[10px] font-semibold tabular-nums text-violet-500 whitespace-nowrap" title="Duração projetada · término (config atual)">{fimMap[o.nome]?.meses ? `${fimMap[o.nome]!.meses}m · ${ymLabel(fimMap[o.nome]!.termino!)}` : '—'}</span>
+                          <PredCombo value={cfg.pred?.[o.nome] ?? ''} options={predOpts.filter(n => n !== o.nome)} onPick={v => setPred(o.nome, v)} isDark={isDark} />
                           {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
                             <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                           ) })}
                           <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
-                          <select value={cfg.pred?.[o.nome] ?? ''} onChange={e => setPred(o.nome, e.target.value)} title={cfg.pred?.[o.nome] ?? 'sem predecessora'} className={`w-36 text-[11px] rounded-lg border px-1 py-0.5 outline-none truncate ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`}>
-                            <option value="">—</option>
-                            {predOpts.filter(n => n !== o.nome).map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
                         </div>
                       ) })}
                     </div>
@@ -497,7 +523,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               <span onClick={() => setCfg(c => ({ ...c, realoc: !c.realoc }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.realoc ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.realoc ? 'translate-x-4' : ''}`} /></span>
               <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra obra sucessora</span>
             </label>
-            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia se a sucessora não tiver saldo daquele serviço) — a produção lá só começa a partir do <b>Início</b> planejado, e a coluna <b>Fim</b> mostra o término projetado. Sem realocação, use só o Início pra planejar as ondas manualmente.</p>
+            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia se a sucessora não tiver saldo daquele serviço) — a produção lá só começa a partir da <b>Data Início</b>, e a <b>Duração</b> mostra meses · término projetados. <b>Data Fim</b> preenchida força o ritmo pela data (saldo ÷ meses), ignorando a equipe daquela obra. Sem realocação, use as datas pra planejar as ondas manualmente.</p>
           </div>
         </div>
         {/* Modal secundário: produtividade padrão por pessoa */}
