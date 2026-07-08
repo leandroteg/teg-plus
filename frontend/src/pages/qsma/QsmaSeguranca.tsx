@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
-  Search, Loader2, FileDown, Paperclip, Trash2,
+  Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,7 +14,9 @@ import {
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useEnviarOcorrenciaSgi,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
+  useColaboradoresTreino, treinoStatus,
 } from '../../hooks/useQsma'
+import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips } from '../../components/qsma/Toolbar'
@@ -104,6 +106,7 @@ export default function QsmaSeguranca() {
   const [tipoOcoF, setTipoOcoF] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
   const [subTreino, setSubTreino] = useState<'matriz' | 'controle'>('matriz')
+  const [treinoColab, setTreinoColab] = useState<string | null>(null)
   const [quickFicha, setQuickFicha] = useState('todos')
   const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
   const q = busca.trim().toLowerCase()
@@ -328,56 +331,12 @@ export default function QsmaSeguranca() {
 
           {subTreino === 'matriz' && <MatrizTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
 
-          {subTreino === 'controle' && (<>
-          <QsmaToolbar
-            isDark={isDark}
-            contagem={`${treinamentosF.length} treinamento${treinamentosF.length !== 1 ? 's' : ''}`}
-            busca={busca} onBusca={setBusca} placeholder="Buscar colaborador ou curso…"
-            acoes={<BotaoNovo label="Novo Treinamento" onClick={() => setModalTreinamento('novo')} />}
-          >
-            <ToolbarSelect
-              isDark={isDark} value={normaF} onChange={setNormaF} allLabel="Todas as normas"
-              options={NORMAS_TREINAMENTO.map(n => ({ value: n, label: n }))}
-            />
-            <QuickChips
-              isDark={isDark} value={quickTre} onChange={setQuickTre}
-              chips={[
-                { k: 'vencendo', label: 'Vencendo em 60 dias', icon: Timer },
-                { k: 'vencido', label: 'Vencidos', icon: AlertTriangle },
-              ]}
-            />
-          </QsmaToolbar>
-          {treinamentosF.length === 0 ? (
-            <Vazio isDark={isDark} texto="Nenhum treinamento registrado" />
-          ) : (
-            <div className="space-y-2">
-              {treinamentosF.map(t => {
-                const vencido = t.vencimento && t.vencimento < hoje
-                const vencendo = !vencido && t.vencimento && t.vencimento <= new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
-                return (
-                  <div key={t.id} className={`${card} p-3.5 flex items-center gap-3 flex-wrap`}>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-bold ${txtMain}`}>{t.colaborador_nome ?? '—'} <span className={`font-normal ${txtMuted}`}>· {t.norma}</span></p>
-                      <p className={`text-[11px] ${txtMuted}`}>
-                        {t.curso ?? ''} {t.carga_horaria ? `· ${t.carga_horaria}h` : ''} · realizado {fmtData(t.data_realizacao)}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      vencido ? isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700'
-                        : vencendo ? isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700'
-                        : isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {vencido ? `Vencido ${fmtData(t.vencimento)}` : t.vencimento ? `Vence ${fmtData(t.vencimento)}` : 'Sem vencimento'}
-                    </span>
-                    <button onClick={() => setModalTreinamento(t)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
-                      <Pencil size={13} />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
+          {subTreino === 'controle' && (
+            treinoColab
+              ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} />
+              : <ControleTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+                  onSelect={setTreinoColab} onNovo={() => setModalTreinamento('novo')} />
           )}
-          </>)}
         </div>
       )}
 
@@ -905,6 +864,92 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
         onCancel={onClose} saveLabel="Criar ficha" onSave={salvar}
       />
     </QsmaModal>
+  )
+}
+
+// ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
+function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNovo }: {
+  isDark: boolean; card: string; txtMain: string; txtMuted: string
+  onSelect: (id: string) => void; onNovo: () => void
+}) {
+  const { data: colabs = [], isLoading } = useColaboradoresTreino()
+  const { data: matriz = [] } = useMatrizTreinamentos()
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: treinos = [] } = useTreinamentos()
+  const [busca, setBusca] = useState('')
+  const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+
+  const catById = new Map(catalogo.map(c => [c.id, c]))
+  const reqPorCargo = new Map<string, string[]>()
+  matriz.forEach(m => {
+    if (m.exigencia !== 'obrigatorio') return
+    const k = m.cargo.trim().toUpperCase()
+    reqPorCargo.set(k, [...(reqPorCargo.get(k) ?? []), m.treinamento_id])
+  })
+
+  const linhas = colabs.map(c => {
+    const req = reqPorCargo.get((c.cargo ?? '').trim().toUpperCase()) ?? []
+    const meus = treinos.filter(t => t.colaborador_id === c.id)
+    let ok = 0, vencendo = 0, vencido = 0, faltando = 0
+    let prox: string | null = null
+    req.forEach(tid => {
+      const cat = catById.get(tid)
+      const cands = meus.filter(t => (t as any).treinamento_id === tid || (cat?.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()))
+      const r = cands.sort((a, b) => (b.data_realizacao ?? '').localeCompare(a.data_realizacao ?? ''))[0] ?? null
+      const s = treinoStatus(!!r, r?.vencimento)
+      if (s === 'ok') ok++; else if (s === 'vencendo') vencendo++; else if (s === 'vencido') vencido++; else faltando++
+      if (r?.vencimento && (s === 'ok' || s === 'vencendo') && (!prox || r.vencimento < prox)) prox = r.vencimento
+    })
+    return { c, total: req.length, ok, vencendo, vencido, faltando, prox }
+  })
+
+  const q = busca.trim().toLowerCase()
+  const filt = linhas.filter(l =>
+    (!q || l.c.nome.toLowerCase().includes(q) || (l.c.cargo ?? '').toLowerCase().includes(q))
+    && (quick === 'todos' || (quick === 'pendencia' && (l.faltando > 0 || l.vencido > 0 || l.vencendo > 0)))
+  ).sort((a, b) => (b.faltando + b.vencido) - (a.faltando + a.vencido) || a.c.nome.localeCompare(b.c.nome))
+
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+  const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
+
+  return (
+    <div className="space-y-3">
+      <QsmaToolbar
+        isDark={isDark}
+        contagem={`${filt.length} colaborador${filt.length !== 1 ? 'es' : ''}${comPend ? ` · ${comPend} com pendência` : ''}`}
+        busca={busca} onBusca={setBusca} placeholder="Buscar colaborador ou cargo…"
+        acoes={<BotaoNovo label="Novo Treinamento" onClick={onNovo} />}
+      >
+        <QuickChips isDark={isDark} value={quick} onChange={v => setQuick(v as 'todos' | 'pendencia')}
+          chips={[{ k: 'pendencia', label: 'Com pendência', icon: AlertTriangle }]} />
+      </QsmaToolbar>
+
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+      ) : filt.length === 0 ? (
+        <Vazio isDark={isDark} texto="Nenhum colaborador encontrado" />
+      ) : (
+        <div className="space-y-2">
+          {filt.map(l => (
+            <button key={l.c.id} onClick={() => onSelect(l.c.id)}
+              className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50`}>
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold truncate ${txtMain}`}>{l.c.nome}</p>
+                <p className={`text-[11px] ${txtMuted}`}>{l.c.cargo ?? '—'}{l.prox ? ` · próx. venc. ${fmt(l.prox)}` : ''}</p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                {l.total === 0 && <span className={`text-[10px] ${txtMuted}`}>sem matriz</span>}
+                {l.faltando > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{l.faltando} faltando</span>}
+                {l.vencido > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{l.vencido} vencido</span>}
+                {l.vencendo > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{l.vencendo} vencendo</span>}
+                {l.total > 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${l.ok === l.total ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{l.ok}/{l.total} ok</span>}
+                <ChevronRight size={14} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
