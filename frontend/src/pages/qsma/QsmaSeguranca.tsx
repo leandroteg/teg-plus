@@ -35,6 +35,12 @@ import {
 
 const STEPS: FlowStep[] = [
   {
+    key: 'treinamentos', label: 'Treinamentos',
+    description: 'Matriz de NRs por colaborador com vencimentos e reciclagens.',
+    icon: GraduationCap,
+    accent: { bg: 'hover:bg-sky-50', bgActive: 'bg-sky-50', text: 'text-sky-600', textActive: 'text-sky-800', border: 'border-sky-500', badge: 'bg-sky-100 text-sky-700' },
+  },
+  {
     key: 'riscos', label: 'Riscos (PGR/APR)',
     description: 'Inventário de riscos por GHE e análise preliminar por tarefa — matriz 5×5.',
     icon: AlertTriangle,
@@ -45,12 +51,6 @@ const STEPS: FlowStep[] = [
     description: 'Catálogo com CA e fichas de entrega assinadas via PortalTEG.',
     icon: ShieldCheck,
     accent: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', badge: 'bg-violet-100 text-violet-700' },
-  },
-  {
-    key: 'treinamentos', label: 'Treinamentos',
-    description: 'Matriz de NRs por colaborador com vencimentos e reciclagens.',
-    icon: GraduationCap,
-    accent: { bg: 'hover:bg-sky-50', bgActive: 'bg-sky-50', text: 'text-sky-600', textActive: 'text-sky-800', border: 'border-sky-500', badge: 'bg-sky-100 text-sky-700' },
   },
   {
     key: 'ocorrencias', label: 'Ocorrências',
@@ -68,7 +68,7 @@ export default function QsmaSeguranca() {
   const { perfil } = useAuth()
   const isAdmin = perfil?.role === 'administrador'
   const [params, setParams] = useSearchParams()
-  const [aba, setAba] = useState<string>(params.get('aba') ?? 'riscos')
+  const [aba, setAba] = useState<string>(params.get('aba') ?? 'treinamentos')
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
@@ -336,7 +336,7 @@ export default function QsmaSeguranca() {
             treinoColab
               ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} />
               : <ControleTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
-                  onSelect={setTreinoColab} onNovo={() => setModalTreinamento('novo')} />
+                  onSelect={setTreinoColab} />
           )}
         </div>
       )}
@@ -869,9 +869,9 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
 }
 
 // ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
-function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNovo }: {
+function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   isDark: boolean; card: string; txtMain: string; txtMuted: string
-  onSelect: (id: string) => void; onNovo: () => void
+  onSelect: (id: string) => void
 }) {
   const { data: colabs = [], isLoading } = useColaboradoresTreino()
   const { data: matriz = [] } = useMatrizTreinamentos()
@@ -880,6 +880,15 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
+  const [fBase, setFBase] = useState('')
+  const [fCargo, setFCargo] = useState('')
+  const [fSetor, setFSetor] = useState('')
+  const [fAdmDe, setFAdmDe] = useState('')
+  const [fAdmAte, setFAdmAte] = useState('')
+
+  const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
+  const cargos = [...new Set(colabs.map(c => c.cargo).filter(Boolean))].sort() as string[]
+  const setores = [...new Set(colabs.map(c => c.setor).filter(Boolean))].sort() as string[]
 
   const catById = new Map(catalogo.map(c => [c.id, c]))
   const reqPorCargo = new Map<string, string[]>()
@@ -918,6 +927,11 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
   const q = busca.trim().toLowerCase()
   const filt = linhas.filter(l =>
     (!q || l.c.nome.toLowerCase().includes(q) || (l.c.cargo ?? '').toLowerCase().includes(q))
+    && (!fBase || l.c.base === fBase)
+    && (!fCargo || l.c.cargo === fCargo)
+    && (!fSetor || l.c.setor === fSetor)
+    && (!fAdmDe || (l.c.data_admissao ?? '') >= fAdmDe)
+    && (!fAdmAte || (l.c.data_admissao ?? '9999') <= fAdmAte)
     && (quick === 'todos' || (quick === 'pendencia' && (l.faltando > 0 || l.vencido > 0 || l.vencendo > 0)))
   ).sort((a, b) => (b.faltando + b.vencido) - (a.faltando + a.vencido) || a.c.nome.localeCompare(b.c.nome))
 
@@ -934,21 +948,44 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
 
   return (
     <div className="space-y-3">
-      <QsmaToolbar
-        isDark={isDark}
-        contagem={`${filt.length} colaborador${filt.length !== 1 ? 'es' : ''}${comPend ? ` · ${comPend} com pendência` : ''}`}
-        busca={busca} onBusca={setBusca} placeholder="Buscar colaborador ou cargo…"
-        acoes={<BotaoNovo label="Novo Treinamento" onClick={onNovo} />}
-      >
-        <QuickChips isDark={isDark} value={quick} onChange={v => setQuick(v as 'todos' | 'pendencia')}
-          chips={[{ k: 'pendencia', label: 'Com pendência', icon: AlertTriangle }]} />
-        <div className={`inline-flex p-0.5 rounded-lg ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
-          <button onClick={() => setVista('tabela')} title="Tabela"
-            className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
-          <button onClick={() => setVista('cards')} title="Cards"
-            className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
-        </div>
-      </QsmaToolbar>
+      {(() => {
+        const selCls = `text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
+        return (
+          <div className="space-y-1.5">
+            <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
+            <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+                <Search size={14} className={txtMuted} />
+                <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+              </div>
+              <select value={fBase} onChange={e => setFBase(e.target.value)} className={selCls}>
+                <option value="">Todas as bases</option>{bases.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <select value={fCargo} onChange={e => setFCargo(e.target.value)} className={selCls}>
+                <option value="">Todas as posições</option>{cargos.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={fSetor} onChange={e => setFSetor(e.target.value)} className={selCls}>
+                <option value="">Todos os setores</option>{setores.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <span className={`flex items-center gap-1 text-[11px] ${txtMuted}`} title="Data de admissão">
+                Adm.
+                <input type="date" value={fAdmDe} onChange={e => setFAdmDe(e.target.value)} className={selCls} />
+                <input type="date" value={fAdmAte} onChange={e => setFAdmAte(e.target.value)} className={selCls} />
+              </span>
+              <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
+                className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'pendencia' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
+                <AlertTriangle size={12} /> Com pendência
+              </button>
+              <div className={`inline-flex p-0.5 rounded-lg ml-auto ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+                <button onClick={() => setVista('tabela')} title="Tabela"
+                  className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
+                <button onClick={() => setVista('cards')} title="Cards"
+                  className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* legenda */}
       <div className="flex items-center gap-3 text-[11px] flex-wrap">
