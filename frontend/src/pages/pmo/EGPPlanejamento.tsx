@@ -141,7 +141,7 @@ export default function EGPPlanejamento() {
       {/* Barra de filtro: Cronograma/Histograma não usam o seletor de Projetos (contrato inteiro).
           Medição tem a própria linha de filtros (MedicoesPanel), então dispensa a barra de cima. */}
       {tab === 'histograma' || tab === 'custos' || tab === 'riscos' || tab === 'medicao' ? null : tab === 'cronograma' ? (
-        <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-end" />
+        <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-start" />
       ) : (
         <ProjetosFilterBar
           projetos={projetos ?? []}
