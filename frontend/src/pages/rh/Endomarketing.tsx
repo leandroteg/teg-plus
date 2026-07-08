@@ -1295,8 +1295,8 @@ export default function Endomarketing() {
         </p>
       </div>
 
-      {/* Tabs — padrão RHTabRail (igual DP/Headcount) */}
-      <RHTabRail tabs={TABS} active={tab} onChange={k => setTab(k as TabKey)} isDark={isDark} />
+      {/* Tabs — padrão RHTabRail (igual DP/Headcount), largura do conteúdo p/ 3 abas */}
+      <RHTabRail tabs={TABS} active={tab} onChange={k => setTab(k as TabKey)} isDark={isDark} fill={false} />
 
       {/* Content */}
       {tab === 'identidade' && <TabIdentidadeVisual />}
