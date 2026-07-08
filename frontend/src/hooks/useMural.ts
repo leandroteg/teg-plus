@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// hooks/useMural.ts — Mural de Recados e Comunicação Empresarial
+// hooks/useMural.ts — Mural TEG e Comunicação Empresarial
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// components/MuralPopup.tsx — Mural de Recados
+// components/MuralPopup.tsx — Mural TEG
 // Mobile: bottom-sheet · Desktop: centered floating modal
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -218,7 +218,7 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
               </div>
               <div>
                 <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                  Mural de Recados
+                  Mural TEG
                 </h2>
                 <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                   {slides.length} comunicado{slides.length !== 1 ? 's' : ''} · TEG+ Comunicados

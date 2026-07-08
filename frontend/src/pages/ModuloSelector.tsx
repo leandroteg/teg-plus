@@ -129,7 +129,7 @@ const PILLARS: Pillar[] = [
       { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount', moduleKey: 'rh' },
       { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
       { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
-      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura', moduleKey: 'rh' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e Mural TEG', Icon: Heart, active: true, route: '/rh/cultura', moduleKey: 'rh' },
       { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: true, route: '/rh/dp', moduleKey: 'rh' },
     ],
   },
