@@ -126,6 +126,24 @@ export function useExcluirCard() {
   })
 }
 
+// ── Detecção automática de blocos (Gemini Vision via n8n) ─────────────────────
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+export interface BlocoDetectado { titulo: string; x: number; y: number; w: number; h: number }
+
+/** Envia a página (PNG base64) ao workflow de visão e recebe os retângulos dos blocos. */
+export async function detectarBlocosJornal(pagina: number, imagemBase64: string): Promise<BlocoDetectado[]> {
+  const res = await fetch(`${N8N_BASE}/endomarketing/jornal-blocos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pagina, imagem_base64: imagemBase64 }),
+  })
+  if (!res.ok) throw new Error(`Erro ${res.status} ao detectar blocos`)
+  const data = await res.json()
+  const arr = Array.isArray(data) ? data : (data?.blocos ?? [])
+  return (arr as BlocoDetectado[]).filter(b => typeof b?.x === 'number' && typeof b?.w === 'number')
+}
+
 // ── Storage (reaproveita o bucket mural-banners) ──────────────────────────────
 export async function uploadJornalArquivo(file: Blob, kind: 'pdf' | 'card' | 'capa', ext = 'png'): Promise<string> {
   const path = `jornal/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`

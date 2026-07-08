@@ -5,12 +5,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useRef, useState, useCallback } from 'react'
 import {
-  Upload, Loader2, Trash2, Save, FileText, CheckCircle2, Scissors,
+  Upload, Loader2, Trash2, Save, FileText, CheckCircle2, Sparkles,
   Newspaper, AlertTriangle, Square,
 } from 'lucide-react'
 import { renderPdfPages, cropCanvasToBlob } from '../../lib/pdfRender'
 import {
-  useCriarEdicao, useSalvarCards, uploadJornalArquivo,
+  useCriarEdicao, useSalvarCards, uploadJornalArquivo, detectarBlocosJornal,
   type JornalCard,
 } from '../../hooks/useJornal'
 import { useAuth } from '../../contexts/AuthContext'
@@ -22,7 +22,10 @@ interface Crop {
   page: number
   x: number; y: number; w: number; h: number   // frações 0–1
   thumb: string                                  // objectURL p/ preview
+  titulo?: string                                // vindo da detecção por IA
 }
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -44,6 +47,8 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
   const canvasesRef = useRef<HTMLCanvasElement[]>([])
 
   const [rendering, setRendering] = useState(false)
+  const [detecting, setDetecting] = useState(false)
+  const [detProg, setDetProg] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
   const [erro, setErro] = useState('')
@@ -75,12 +80,45 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
       canvasesRef.current = canvases
       setPageUrls(canvases.map(c => c.toDataURL('image/png')))
       if (!titulo) setTitulo(`Jornal TEG — ${MESES[mes - 1]} ${ano}`)
+      setRendering(false)
+      // detecção automática dos blocos com IA
+      await autoDetect(canvases)
     } catch (err) {
       console.error(err)
       setErro('Falha ao ler o PDF. Verifique o arquivo e tente novamente.')
       setPdfFile(null)
-    } finally {
       setRendering(false)
+    }
+  }
+
+  // ── Detecta blocos de todas as páginas via Gemini Vision e cria os cards ─────
+  async function autoDetect(canvases: HTMLCanvasElement[]) {
+    setDetecting(true); setErro(''); setCrops([])
+    let feitos = 0
+    setDetProg(`0/${canvases.length}`)
+    try {
+      const novos: Crop[] = []
+      for (let pi = 0; pi < canvases.length; pi++) {
+        const canvas = canvases[pi]
+        const b64 = canvas.toDataURL('image/png').split(',')[1]
+        try {
+          const blocos = await detectarBlocosJornal(pi + 1, b64)
+          for (const bl of blocos) {
+            const x = clamp01(bl.x), y = clamp01(bl.y)
+            const w = clamp01(Math.min(bl.w, 1 - x)), h = clamp01(Math.min(bl.h, 1 - y))
+            if (w < 0.02 || h < 0.015) continue
+            const blob = await cropCanvasToBlob(canvas, x * canvas.width, y * canvas.height, w * canvas.width, h * canvas.height)
+            novos.push({ id: `c${++cropSeq}`, page: pi, x, y, w, h, thumb: URL.createObjectURL(blob), titulo: bl.titulo })
+          }
+        } catch (e) {
+          console.error('detecção página', pi + 1, e)
+        }
+        feitos++; setDetProg(`${feitos}/${canvases.length}`)
+        setCrops([...novos])
+      }
+      if (!novos.length) setErro('A IA não detectou blocos. Você pode recortar manualmente arrastando sobre a página.')
+    } finally {
+      setDetecting(false)
     }
   }
 
@@ -148,7 +186,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
         const url = await uploadJornalArquivo(blob, 'card')
         rows.push({
           edicao_id: edicao.id, pagina: c.page + 1, ordem: i,
-          titulo: null, imagem_url: url,
+          titulo: c.titulo ?? null, imagem_url: url,
           largura: Math.round(px.w), altura: Math.round(px.h),
         })
       }
@@ -222,12 +260,23 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
       {/* Editor de recorte */}
       {pageUrls.length > 0 && (
         <>
-          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20">
-            <Scissors size={16} className="text-violet-400 mt-0.5 shrink-0" />
-            <div className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>Arraste sobre cada bloco</span> da página para recortá-lo — cada retângulo vira um card do Mural.
-              Use <span className={isLight ? 'text-slate-700' : 'text-white/70'}>“Página inteira”</span> para adicionar a página toda. {pdfFile?.name}
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20">
+            {detecting
+              ? <Loader2 size={16} className="text-violet-400 shrink-0 animate-spin" />
+              : <Sparkles size={16} className="text-violet-400 shrink-0" />}
+            <div className={`text-xs leading-relaxed flex-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {detecting ? (
+                <><span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>Detectando blocos com IA…</span> {detProg} páginas — aguarde.</>
+              ) : (
+                <><span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>Blocos detectados automaticamente.</span> Ajuste se precisar: arraste sobre a página pra adicionar um bloco, ou remova na lixeira. {pdfFile?.name}</>
+              )}
             </div>
+            {!detecting && (
+              <button onClick={() => autoDetect(canvasesRef.current)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-400 hover:text-violet-300 px-2 py-1 rounded-lg hover:bg-white/5 shrink-0">
+                <Sparkles size={12} /> Detectar de novo
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
