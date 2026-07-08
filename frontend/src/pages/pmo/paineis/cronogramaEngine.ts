@@ -47,8 +47,9 @@ export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: numbe
 export type Frente = { label: string; obras: Obra[] }
 // prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver.
 // inicio: mês planejado (YYYY-MM) por obra — não produz antes dele.
-// realoc + fila: realocação automática — equipe liberada (driver concluído) migra pra próxima obra da fila (nº = ordem).
-export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; inicio?: Record<string, string> }
+// realoc: realocação automática — equipe liberada (driver concluído) migra pra obra que aponta esta como
+//   predecessora (pred: obra → obra predecessora); sem sucessora com saldo, cai na fila legada (fila: nº = ordem).
+export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; pred?: Record<string, string>; inicio?: Record<string, string> }
 export type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 export function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
@@ -220,14 +221,16 @@ export function projObra(o: Obra, cfg: Config, start: string) {
 }
 
 // projeção CONJUNTA com realocação automática: quando um driver conclui numa obra, a equipe liberada
-// migra pra próxima obra da fila (cfg.fila, nº = ordem) que ainda tem saldo daquele driver, produzindo
-// com a produtividade padrão. Sem realoc, equivale a projObra por obra.
+// migra pra obra que tem esta como PREDECESSORA (cfg.pred, seguindo a cadeia se a sucessora não tiver
+// saldo daquele driver); sem sucessora, cai na fila legada (cfg.fila). Sem realoc, projObra por obra.
 export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string, ReturnType<typeof projObra>> {
   const res = new Map<string, ReturnType<typeof projObra>>()
   if (!cfg.realoc) { for (const o of obras) res.set(o.nome, projObra(o, cfg, start)); return res }
   const prec = cfg.precedencia !== false; const lag = cfg.lag || 0
   const filaOrd = Object.entries(cfg.fila ?? {}).map(([n, v]) => [n, Number(v)] as const)
     .filter(([, v]) => v > 0).sort((a, b) => a[1] - b[1]).map(([n]) => n)
+  const succ: Record<string, string[]> = {} // predecessora → sucessoras
+  for (const [nome, p] of Object.entries(cfg.pred ?? {})) { if (!p || p === nome) continue; (succ[p] ??= []).push(nome) }
   type S = {
     o: Obra; order: string[]; delay: number
     assign: Record<string, number>; monthly: Record<string, number[]>; hist: Record<string, number[]>
@@ -259,8 +262,19 @@ export function projTodas(obras: Obra[], cfg: Config, start: string): Map<string
       }
       s.order.forEach(l => { s.hist[l].push(s.cum[l]); s.pess[l].push(s.assign[l]) })
     }
-    // fim do mês: drivers concluídos liberam a equipe pro pool
-    for (const s of sts) for (const l of s.order) if (s.assign[l] > 0 && s.cum[l] >= s.contr[l] - 1e-6) { pool[l] += s.assign[l]; s.assign[l] = 0 }
+    // fim do mês: driver concluído libera a equipe → sucessora direta (cadeia de predecessão); sem destino → pool
+    for (const s of sts) for (const l of s.order) if (s.assign[l] > 0 && s.cum[l] >= s.contr[l] - 1e-6) {
+      const freed = s.assign[l]; s.assign[l] = 0
+      let dest: S | null = null
+      const q = [...(succ[s.o.nome] ?? [])]; const seen = new Set<string>()
+      while (q.length) {
+        const n = q.shift()!; if (seen.has(n)) continue; seen.add(n)
+        const t = byNome.get(n)
+        if (t && t.order.includes(l) && t.cum[l] < t.contr[l] - 1e-6) { dest = t; break }
+        q.push(...(succ[n] ?? [])) // sucessora sem saldo deste serviço → segue a cadeia
+      }
+      if (dest) dest.assign[l] += freed; else pool[l] += freed
+    }
     // pool → próxima obra da fila com saldo daquele driver (respeitando o início planejado dela)
     for (const d of DRV) {
       const l = d.label
