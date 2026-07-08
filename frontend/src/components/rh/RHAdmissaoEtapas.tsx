@@ -4,6 +4,8 @@
 // Ação do candidato → missão no Portal; ação interna → checklist aqui.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
@@ -58,8 +60,24 @@ function VagaCard({ adm, isDark, onClick, children }: {
   const candidatos = adm.candidatos ?? []
   const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
   const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
+  const { perfil } = useAuth()
+  const isAdmin = perfil?.role === 'administrador'
+  const qc = useQueryClient()
+  const excluir = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('rh_admissao_excluir', { p_id: adm.id })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao excluir')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-admissoes'] })
+    },
+  })
+  const nomeAlvo = candidatos[0]?.nome || adm.nome_candidato || 'esta vaga'
   return (
-    <div className={`w-full rounded-2xl border p-4 ${
+    <div className={`relative w-full rounded-2xl border p-4 ${
       isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       <button onClick={onClick} className="w-full text-left flex items-start justify-between gap-3 mb-2 group">
         <div className="min-w-0">
@@ -79,6 +97,17 @@ function VagaCard({ adm, isDark, onClick, children }: {
         </div>
         <ChevR size={16} className={`shrink-0 mt-1 ${isDark ? 'text-slate-500' : 'text-slate-300'} group-hover:text-violet-400`} />
       </button>
+      {isAdmin && (
+        <button
+          onClick={() => {
+            if (confirm(`Excluir ${nomeAlvo} do fluxo de admissão? Esta ação não pode ser desfeita.`)) excluir.mutate()
+          }}
+          disabled={excluir.isPending}
+          title="Excluir do fluxo (administrador)"
+          className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
+          {excluir.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+        </button>
+      )}
       <div className="space-y-2">{children}</div>
     </div>
   )
