@@ -345,6 +345,20 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   const equipesTot = equipeObras?.total ?? 0
   const fillFromEquipes = () => setCfg(c => ({ ...c, equipe: Object.fromEntries(allObras.map(o => [o.nome, { ...(equipeObras?.porObra[o.nome] ?? {}) }])) }))
   const totPessoas = allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
+  // filtros da lista de obras: busca, ocultar 100% concluídas (padrão), agrupar por frente (colapsável)
+  const [qObra, setQObra] = useState('')
+  const [hide100, setHide100] = useState(true)
+  const [grpFechado, setGrpFechado] = useState<Set<string>>(new Set())
+  const grupos = useMemo(() => {
+    const map = new Map<string, Obra[]>()
+    for (const o of allObras) {
+      if (hide100 && o.pctFis >= 100) continue
+      if (qObra && !o.nome.toLowerCase().includes(qObra.toLowerCase())) continue
+      const arr = map.get(o.frente) ?? []; arr.push(o); map.set(o.frente, arr)
+    }
+    return [...map.entries()]
+  }, [allObras, hide100, qObra])
+  const ocultas100 = allObras.filter(o => o.pctFis >= 100).length
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -363,7 +377,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   const lbl = `text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className={`w-full max-w-2xl max-h-[90vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+      <div className={`w-full max-w-5xl max-h-[92vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-5 py-3 border-b sticky top-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
           <h2 className="text-sm font-bold flex items-center gap-2"><Settings2 size={16} className="text-teal-500" /> Configurar cronograma</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={16} /></button>
@@ -409,6 +423,14 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                 {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
               </div>
             </div>
+            {/* filtros da lista */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <input value={qObra} onChange={e => setQObra(e.target.value)} placeholder="buscar obra…"
+                className={`w-52 text-[12px] rounded-lg border px-2.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
+              <button onClick={() => setHide100(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${hide100 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
+                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} 100% concluídas{hide100 && ocultas100 > 0 ? ` (${ocultas100} ocultas)` : ''}
+              </button>
+            </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
                 <span className="flex-1">Obra</span>
@@ -417,18 +439,34 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                 <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele">Início</span>
                 <span className="w-10 text-center" title="Ordem na fila de realocação automática (vazio = fora da fila)">Fila</span>
               </div>
-              <div className="max-h-52 overflow-auto">
-                {allObras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
-                  <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                    <span className={`flex-1 text-[11px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={o.nome}>{o.nome}</span>
-                    {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
-                      <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
-                    ) })}
-                    <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
-                    <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                    <input type="number" min="0" value={cfg.fila?.[o.nome] ?? ''} placeholder="—" onChange={e => setFila(o.nome, Number(e.target.value))} className={`w-10 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
-                  </div>
-                ) })}
+              <div className="max-h-[46vh] overflow-auto">
+                {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
+                {grupos.map(([frente, obras]) => {
+                  const fechado = grpFechado.has(frente)
+                  const totFr = obras.reduce((s, o) => s + DRV.reduce((a, d) => a + (cfg.equipe[o.nome]?.[d.label] || 0), 0), 0)
+                  return (
+                    <div key={frente}>
+                      <button type="button" onClick={() => setGrpFechado(s => { const n = new Set(s); n.has(frente) ? n.delete(frente) : n.add(frente); return n })}
+                        className={`w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left border-b ${isDark ? 'bg-white/[0.03] border-white/[0.05]' : 'bg-slate-50/80 border-slate-100'}`}>
+                        {fechado ? <ChevronRight size={12} className="shrink-0 opacity-60" /> : <ChevronDown size={12} className="shrink-0 opacity-60" />}
+                        <span className={`text-[11px] font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{frente}</span>
+                        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obras.length} obra(s)</span>
+                        <span className={`ml-auto text-[11px] font-bold tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totFr > 0 ? `${totFr} pessoas` : ''}</span>
+                      </button>
+                      {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
+                        <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
+                          <span className={`flex-1 text-[11px] truncate pl-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
+                          {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
+                            <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                          ) })}
+                          <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
+                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="number" min="0" value={cfg.fila?.[o.nome] ?? ''} placeholder="—" onChange={e => setFila(o.nome, Number(e.target.value))} className={`w-10 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                        </div>
+                      ) })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
             <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total: <b>{totPessoas} pessoas</b> · cada obra avança no ritmo nº pessoas × produtividade/pessoa. Drivers que a obra não tem ficam desabilitados.</p>
