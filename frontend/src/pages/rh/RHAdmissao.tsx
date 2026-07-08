@@ -24,13 +24,13 @@ type EtapaAdmissao = EtapaAdmissaoFluxo
 const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
   { key: 'requisicao',          num: 1, label: 'Pendente',                 descricao: 'Requisições aguardando envio para aprovação.',                   icon: ClipboardList },
   { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
-  { key: 'proposta_alinhamento', num: 3, label: 'Proposta e Alinhamento', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
+  { key: 'proposta_alinhamento', num: 3, label: 'Proposta', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
   { key: 'documentacao',        num: 4, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
   { key: 'exames_treinamentos', num: 5, label: 'Exames',                  descricao: 'Exame admissional (ASO) — agendamento e resultado.',             icon: Stethoscope },
   { key: 'registro',            num: 6, label: 'Registro',                descricao: 'Ficha p/ contabilidade, contrato, assinatura e matrícula.',      icon: ClipboardList },
   { key: 'mobilizacao',         num: 7, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
   { key: 'integracao',          num: 8, label: 'Treinamentos e Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
-  { key: 'liberado',            num: 9, label: 'Liberado',                descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
+  { key: 'liberado',            num: 9, label: 'Liberação',               descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
 const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = Object.fromEntries(
