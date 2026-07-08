@@ -382,16 +382,28 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   onAplicar: (c: Config) => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
-  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim })
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim, inicioS: c?.inicioS, fimS: c?.fimS })
   const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
-  const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; return { ...c, inicio } })
-  const setFim = (o: string, v: string) => setCfg(c => { const fim = { ...(c.fim ?? {}) }; if (v) fim[o] = v; else delete fim[o]; return { ...c, fim } })
+  // datas: editar a OBRA aplica a todos os serviços (limpa overrides); editar o SERVIÇO sobrescreve só ele
+  const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; const inicioS = { ...(c.inicioS ?? {}) }; delete inicioS[o]; return { ...c, inicio, inicioS } })
+  const setFim = (o: string, v: string) => setCfg(c => { const fim = { ...(c.fim ?? {}) }; if (v) fim[o] = v; else delete fim[o]; const fimS = { ...(c.fimS ?? {}) }; delete fimS[o]; return { ...c, fim, fimS } })
+  const setInicioSrv = (o: string, d: string, v: string) => setCfg(c => { const inicioS = { ...(c.inicioS ?? {}) }; const m = { ...(inicioS[o] ?? {}) }; if (v) m[d] = v; else delete m[d]; if (Object.keys(m).length) inicioS[o] = m; else delete inicioS[o]; return { ...c, inicioS } })
+  const setFimSrv = (o: string, d: string, v: string) => setCfg(c => { const fimS = { ...(c.fimS ?? {}) }; const m = { ...(fimS[o] ?? {}) }; if (v) m[d] = v; else delete m[d]; if (Object.keys(m).length) fimS[o] = m; else delete fimS[o]; return { ...c, fimS } })
   const setPred = (o: string, v: string) => setCfg(c => { const pred = { ...(c.pred ?? {}) }; if (v && v !== o) pred[o] = v; else delete pred[o]; return { ...c, pred } })
-  // projeção ao vivo com a config SENDO editada — a coluna Duração (meses · término) reage a equipe/datas/predecessão
-  const fimMap = useMemo(() => { const m: Record<string, { termino: string | null; meses: number }> = {}; projTodas(allObras, cfg, startYM()).forEach((v, k) => { m[k] = { termino: v.termino, meses: v.maxMeses } }); return m }, [allObras, cfg])
+  // valor efetivo por serviço e valor exibido na obra (comum a todos os serviços, ou vazio quando misto)
+  const effIni = (o: Obra, d: string) => cfg.inicioS?.[o.nome]?.[d] ?? cfg.inicio?.[o.nome] ?? ''
+  const effFim = (o: Obra, d: string) => cfg.fimS?.[o.nome]?.[d] ?? cfg.fim?.[o.nome] ?? ''
+  const obraVal = (o: Obra, eff: (o: Obra, d: string) => string) => { const vs = new Set(o.drivers.filter(d => d.contr > 0).map(d => eff(o, d.label))); return vs.size === 1 ? [...vs][0] : '' }
+  const start0 = startYM()
+  // projeção ao vivo com a config SENDO editada — Duração (obra e por serviço) reage a equipe/datas/predecessão
+  const fimMap = useMemo(() => {
+    const m: Record<string, { termino: string | null; meses: number; srv: Record<string, number> }> = {}
+    projTodas(allObras, cfg, startYM()).forEach((v, k) => { const srv: Record<string, number> = {}; v.rows.forEach(r => { srv[r.d.label] = r.meses }); m[k] = { termino: v.termino, meses: v.maxMeses, srv } })
+    return m
+  }, [allObras, cfg])
   const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
@@ -403,6 +415,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   // lista de obras filtrada pelos MESMOS filtros compartilhados da linha de controles (busca, >95%, frente, obra, % físico)
   const [prodOpen, setProdOpen] = useState(false) // modal secundário: produtividade padrão por pessoa
   const [verSel, setVerSel] = useState('') // versão salva selecionada no combo
+  const [openSrv, setOpenSrv] = useState<Set<string>>(new Set()) // obras expandidas (linhas de serviço)
   const [grpFechado, setGrpFechado] = useState<Set<string>>(new Set())
   const grupos = useMemo(() => {
     const map = new Map<string, Obra[]>()
@@ -479,11 +492,15 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obras.length} obra(s)</span>
                         <span className={`ml-auto text-[11px] font-bold tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totFr > 0 ? `${totFr} pessoas` : ''}</span>
                       </button>
-                      {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
-                        <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                          <span className={`flex-1 text-[11px] truncate pl-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
-                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <input type="month" value={cfg.fim?.[o.nome] ?? ''} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado — força o ritmo pela data" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fim?.[o.nome] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                      {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); const aberto = openSrv.has(o.nome); return (
+                        <div key={o.nome}>
+                        <div className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
+                          <span className={`flex-1 min-w-0 flex items-center text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                            <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
+                            <span className="truncate" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
+                          </span>
+                          <input type="month" value={obraVal(o, effIni)} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra — aplica a TODOS os serviços (vazio = serviços com datas diferentes)" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <input type="month" value={obraVal(o, effFim)} onChange={e => setFim(o.nome, e.target.value)} title="Término planejado da obra — força o ritmo pela data e aplica a TODOS os serviços" className={`w-[104px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${obraVal(o, effFim) ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                           {(() => {
                             const prazo = o.fim ? o.fim.slice(0, 7) : null
                             const pj = fimMap[o.nome]
@@ -498,6 +515,38 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                           ) })}
                           <span className={`w-9 shrink-0 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
+                        </div>
+                        {/* linhas de serviço — datas por serviço (override vence a obra); equipe só na coluna do próprio tipo */}
+                        {aberto && (() => {
+                          const srvRows: { key: string; cor: string; nome: string; info: string; drv?: string; marcos?: string }[] = []
+                          if (o.prelR > 0) srvRows.push({ key: 'prel', cor: COR_PREL, nome: 'Serv. Preliminares', info: `Prelim. + Canteiro · ${fmtM(o.prelR)}`, marcos: 'marcos Fund.' })
+                          o.drivers.filter(d => d.contr > 0).forEach(d => srvRows.push({ key: d.label, cor: d.cor, nome: d.label, info: `${fmtQ(d.saldoQ)} ${d.uni} · ${fmtM(d.saldoR)}`, drv: d.label }))
+                          if (o.outrosR > 0) srvRows.push({ key: 'outros', cor: COR_OUTROS, nome: 'Outros Serviços', info: `desmont/conf/aterr · ${fmtM(o.outrosR)}`, marcos: 'marcos Mont.' })
+                          const cell = 'w-[104px] shrink-0'
+                          return srvRows.map(r => {
+                            const nm = r.drv ? (fimMap[o.nome]?.srv[r.drv] ?? 0) : 0
+                            return (
+                              <div key={r.key} className={`flex items-center gap-2 px-2.5 py-1 border-b last:border-0 ${isDark ? 'border-white/[0.03] bg-white/[0.02]' : 'border-slate-50 bg-slate-50/60'}`}>
+                                <span className={`flex-1 min-w-0 truncate pl-9 text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" style={{ background: r.cor }} /><b className={isDark ? 'text-slate-300' : 'text-slate-600'}>{r.nome}</b> <span className="opacity-60">{r.info}</span></span>
+                                {r.drv ? (<>
+                                  <input type="month" value={effIni(o, r.drv)} onChange={e => setInicioSrv(o.nome, r.drv!, e.target.value)} title="Início deste serviço (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.inicioS?.[o.nome]?.[r.drv] ? 'border-teal-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                                  <input type="month" value={effFim(o, r.drv)} onChange={e => setFimSrv(o.nome, r.drv!, e.target.value)} title="Término deste serviço — força o ritmo pela data (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fimS?.[o.nome]?.[r.drv] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                                  <span className="w-14 shrink-0" />
+                                  <span className="w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap text-violet-500" title="Duração projetada deste serviço">{nm > 0 ? `${nm}m · ${ymLabel(shiftYM(start0, nm - 1))}` : '—'}</span>
+                                  <span className="w-40 shrink-0" />
+                                  {DRV.map(d => d.label === r.drv ? (
+                                    <input key={d.label} type="number" min="0" value={eq[d.label] ?? 0} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                                  ) : <span key={d.label} className="w-14 shrink-0" />)}
+                                  <span className="w-9 shrink-0" />
+                                </>) : (<>
+                                  <span className={cell} /><span className={cell} /><span className="w-14 shrink-0" />
+                                  <span className={`w-20 shrink-0 text-center text-[9px] whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`} title="Mede por marcos do serviço âncora (25% a cada 25%)">{r.marcos}</span>
+                                  <span className="w-40 shrink-0" />{DRV.map(d => <span key={d.label} className="w-14 shrink-0" />)}<span className="w-9 shrink-0" />
+                                </>)}
+                              </div>
+                            )
+                          })
+                        })()}
                         </div>
                       ) })}
                     </div>
