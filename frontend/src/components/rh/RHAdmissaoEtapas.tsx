@@ -116,14 +116,11 @@ function VagaCard({ adm, isDark, onClick, children }: {
   )
 }
 
-function CandHeader({ nome, isDark, right }: { nome?: string; isDark: boolean; right?: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      <User size={12} className="text-slate-400" />
-      <span className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{nome || 'Candidato'}</span>
-      {right}
-    </div>
-  )
+// Admissão = 1 pessoa: o nome já é o título do card (VagaCard), então aqui só
+// mostramos o status/ações à direita (evita repetir o nome).
+function CandHeader({ right }: { nome?: string; isDark: boolean; right?: React.ReactNode }) {
+  if (!right) return null
+  return <div className="flex items-center justify-end mb-1">{right}</div>
 }
 
 function CheckRow({ checked, label, onToggle, disabled }: { checked: boolean; label: string; onToggle?: () => void; disabled?: boolean }) {
