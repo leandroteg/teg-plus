@@ -729,7 +729,6 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
             <CampoTexto valor={mob?.transporte_detalhes} onSave={v => upd({ transporte_detalhes: v || null })}
               placeholder="Detalhes (horário, ponto de encontro...)" className={`${IN} flex-1`} />
           </div>
-          <CheckRow checked={!!mob?.transporte_ok} label="Deslocamento providenciado" onToggle={() => upd({ transporte_ok: !mob?.transporte_ok })} />
         </>)}
       </div>
 
@@ -758,14 +757,7 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
             <CampoTexto valor={mob?.alojamento_detalhes} onSave={v => upd({ alojamento_detalhes: v || null })}
               placeholder="Quarto, regras..." className={`${IN} flex-1`} />
           </div>
-          <CheckRow checked={!!mob?.alojamento_ok} label="Alojamento garantido" onToggle={() => upd({ alojamento_ok: !mob?.alojamento_ok })} />
         </>)}
-      </div>
-
-      {/* Preparo interno */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <CheckRow checked={!!mob?.kit_epi_ok} label="Kit EPI separado" onToggle={() => upd({ kit_epi_ok: !mob?.kit_epi_ok })} />
-        <CheckRow checked={!!mob?.acessos_ok} label="Acessos criados (ponto, e-mail)" onToggle={() => upd({ acessos_ok: !mob?.acessos_ok })} />
       </div>
     </div>
   )
