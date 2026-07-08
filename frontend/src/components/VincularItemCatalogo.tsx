@@ -82,7 +82,7 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
       {open && createPortal(
         <div
           ref={panelRef}
-          className="fixed z-[9999] w-80 bg-white rounded-xl border border-orange-200 shadow-xl overflow-hidden"
+          className="fixed z-[9999] w-max min-w-[20rem] bg-white rounded-xl border border-orange-200 shadow-xl overflow-hidden"
           style={{ top: pos.top, right: pos.right, maxWidth: 'calc(100vw - 16px)' }}
         >
           <div className="p-2 border-b border-slate-100">
@@ -125,13 +125,13 @@ export default function VincularItemCatalogo({ riId, descricaoLivre, onDone }: P
                   className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-orange-50 transition-colors flex items-center gap-2 border-b border-slate-50 last:border-0 disabled:opacity-50"
                 >
                   <Package size={13} className="text-orange-400 shrink-0" />
-                  <div className="min-w-0 flex-1">
+                  <div className="flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] font-mono text-slate-400 shrink-0">{item.codigo}</span>
-                      <span className="truncate">{item.descricao}</span>
+                      <span className="whitespace-nowrap">{item.descricao}</span>
                     </div>
                     {item.categoria_financeira_descricao && (
-                      <span className="text-[10px] text-slate-400 truncate block" title={item.categoria_financeira_descricao}>{item.categoria_financeira_descricao}</span>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap block" title={item.categoria_financeira_descricao}>{item.categoria_financeira_descricao}</span>
                     )}
                   </div>
                   <span className="text-[9px] text-slate-400 shrink-0">{item.unidade}</span>
