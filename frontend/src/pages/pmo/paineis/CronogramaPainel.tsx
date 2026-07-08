@@ -135,6 +135,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const obraOptions = (fFrente.size ? tree.filter(f => fFrente.has(f.label)) : tree).flatMap(f => f.obras.map(o => o.nome))
   const togF = (k: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => set(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const obraMeses = (o: Obra, _cfg: Config) => projMap.get(o.nome)?.maxMeses ?? 0
+  // 1º mês com produção projetada (respeita Início planejado/realocação) — data de início da obra
+  const obraIni = (o: Obra) => { const idx = projMap.get(o.nome)?.totalRmes.findIndex(v => v > 0.5) ?? -1; return idx >= 0 ? shiftYM(start, idx) : null }
   const mesesArr = (applied && view.maxMeses > 0) ? Array.from({ length: view.maxMeses }, (_, i) => shiftYM(start, i)) : []
   const totMensal = (obras: Obra[]) => { const a = new Array(mesesArr.length).fill(0); if (applied) for (const o of obras) projMap.get(o.nome)?.totalRmes.forEach((v, i) => { if (i < a.length) a[i] += v }); return a }
   // larguras fixas p/ TODAS as tabelas alinharem as colunas
@@ -211,6 +213,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
               const fOpen = openF.has(fr.label)
               const frMaxMes = Math.max(0, ...fr.obras.map(o => obraMeses(o, applied)))
               const frTerm = frMaxMes > 0 ? shiftYM(start, frMaxMes - 1) : null
+              const frIniIdx = Math.min(...fr.obras.map(o => { const idx = projMap.get(o.nome)?.totalRmes.findIndex(v => v > 0.5) ?? -1; return idx >= 0 ? idx : Infinity }))
+              const frIni = Number.isFinite(frIniIdx) ? shiftYM(start, frIniIdx) : null
               const frSaldoR = fr.obras.reduce((s, o) => s + o.saldoR, 0)
               const frRitmo = worstCor(fr.obras.map(o => ritmoCor(o.pctFis, o.ini, o.fim)))
               const frPrazo = worstCor(fr.obras.map(o => { const m = obraMeses(o, applied); return prazoCor(m > 0 ? shiftYM(start, m - 1) : null, o.fim) }))
@@ -220,21 +224,24 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
                     {fOpen ? <ChevronDown size={14} className="shrink-0 text-teal-500" /> : <ChevronRight size={14} className="shrink-0 text-slate-400" />}
                     <Dots ritmo={frRitmo} prazo={frPrazo} />
                     <span className={`text-[13px] font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fr.label}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-500 whitespace-nowrap"><Flag size={10} />{frIni ? ymLabel(frIni) : '—'} → {frTerm ? ymLabel(frTerm) : '—'}</span>
                     <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fr.obras.length} obra(s)</span>
-                    <span className="ml-auto flex items-center gap-3 text-[11px]"><span className={isDark ? 'text-amber-400' : 'text-amber-600'}>{fmtM(frSaldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={11} />{frTerm ? ymLabel(frTerm) : '—'}</span></span>
+                    <span className="ml-auto flex items-center gap-3 text-[11px]"><span className={isDark ? 'text-amber-400' : 'text-amber-600'}>{fmtM(frSaldoR)}</span></span>
                   </button>
                   {fOpen && (
                     <div className={`px-2 pb-2 space-y-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                       {fr.obras.map(o => {
                         const okey = fr.label + '|' + o.nome; const oOpen = openO.has(okey)
                         const oMax = obraMeses(o, applied); const oTerm = oMax > 0 ? shiftYM(start, oMax - 1) : null
+                        const oIni = obraIni(o)
                         return (
                           <div key={o.nome} className="mt-1">
                             <button onClick={() => togF(okey, setOpenO)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-slate-100/80 hover:bg-slate-200/70'}`}>
                               {oOpen ? <ChevronDown size={12} className="shrink-0 text-teal-500" /> : <ChevronRight size={12} className="shrink-0 text-slate-400" />}
                               <Dots ritmo={ritmoCor(o.pctFis, o.ini, o.fim)} prazo={prazoCor(oTerm, o.fim)} />
                               <span className={`text-[12px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`} title={o.nome}>{o.nome}</span>
-                              <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span><span className="inline-flex items-center gap-1 font-semibold text-violet-500"><Flag size={10} />{oTerm ? ymLabel(oTerm) : '—'}</span></span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-500 whitespace-nowrap shrink-0"><Flag size={10} />{oIni ? ymLabel(oIni) : '—'} → {oTerm ? ymLabel(oTerm) : '—'}</span>
+                              <span className="ml-auto flex items-center gap-3 text-[10px]"><span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{fmtM(o.saldoR)}</span></span>
                             </button>
                             {oOpen && (() => {
                               const pj = projMap.get(o.nome) ?? projObra(o, applied, start)
@@ -330,13 +337,15 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   onAplicar: (c: Config) => void; onClose: () => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
-  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, inicio: c?.inicio })
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio })
   const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
   const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; return { ...c, inicio } })
-  const setFila = (o: string, v: number) => setCfg(c => { const fila = { ...(c.fila ?? {}) }; if (v > 0) fila[o] = Math.round(v); else delete fila[o]; return { ...c, fila } })
+  const setPred = (o: string, v: string) => setCfg(c => { const pred = { ...(c.pred ?? {}) }; if (v && v !== o) pred[o] = v; else delete pred[o]; return { ...c, pred } })
+  // término projetado por obra com a config SENDO editada — a coluna Fim reage ao vivo a equipe/início/predecessão
+  const fimMap = useMemo(() => { const m: Record<string, string | null> = {}; projTodas(allObras, cfg, startYM()).forEach((v, k) => { m[k] = v.termino }); return m }, [allObras, cfg])
   const fillEquipe = (h: number) => setCfg(c => { const equipe: Record<string, Record<string, number>> = {}; allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = c.prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e }); return { ...c, equipe, horizonte: h } })
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
@@ -360,6 +369,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
     return [...map.entries()]
   }, [allObras, hide100, qObra])
   const ocultas100 = allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).length
+  const predOpts = useMemo(() => allObras.filter(o => o.drivers.some(d => d.contr > 0)).map(o => o.nome).sort(), [allObras])
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -435,10 +445,11 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
                 <span className="flex-1">Obra</span>
+                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele">Início</span>
+                <span className="w-12 text-center" title="Término projetado com a configuração atual (equipe, início e predecessão)">Fim</span>
                 {DRV.map(d => <span key={d.label} className="w-14 text-center" style={{ color: d.cor }}>{d.label}</span>)}
                 <span className="w-9 text-right">total</span>
-                <span className="w-[104px] text-center" title="Mês de início planejado — a obra não produz antes dele">Início</span>
-                <span className="w-10 text-center" title="Ordem na fila de realocação automática (vazio = fora da fila)">Fila</span>
+                <span className="w-36 text-center" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra">Predecessão</span>
               </div>
               <div className="max-h-[46vh] overflow-auto">
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
@@ -457,12 +468,16 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                       {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); return (
                         <div key={o.nome} className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
                           <span className={`flex-1 text-[11px] truncate pl-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
+                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
+                          <span className="w-12 text-center text-[11px] font-semibold tabular-nums text-violet-500" title="Término projetado com a configuração atual">{fimMap[o.nome] ? ymLabel(fimMap[o.nome]!) : '—'}</span>
                           {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
                             <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                           ) })}
                           <span className={`w-9 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
-                          <input type="month" value={cfg.inicio?.[o.nome] ?? ''} onChange={e => setInicio(o.nome, e.target.value)} className={`w-[104px] text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
-                          <input type="number" min="0" value={cfg.fila?.[o.nome] ?? ''} placeholder="—" onChange={e => setFila(o.nome, Number(e.target.value))} className={`w-10 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                          <select value={cfg.pred?.[o.nome] ?? ''} onChange={e => setPred(o.nome, e.target.value)} title={cfg.pred?.[o.nome] ?? 'sem predecessora'} className={`w-36 text-[11px] rounded-lg border px-1 py-0.5 outline-none truncate ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`}>
+                            <option value="">—</option>
+                            {predOpts.filter(n => n !== o.nome).map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
                         </div>
                       ) })}
                     </div>
@@ -489,9 +504,9 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
             <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Montagem não avança além do % de fundação já concluído (volume liberado); lançamento idem em relação à montagem.</p>
             <label className="flex items-center gap-2 mt-3 mb-1 cursor-pointer">
               <span onClick={() => setCfg(c => ({ ...c, realoc: !c.realoc }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.realoc ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.realoc ? 'translate-x-4' : ''}`} /></span>
-              <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra próxima obra da fila</span>
+              <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra obra sucessora</span>
             </label>
-            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra próxima obra da <b>Fila</b> (coluna nº na tabela acima) que ainda tem saldo daquele serviço — respeitando o <b>Início</b> planejado. Sem realocação, use só o Início pra planejar as ondas manualmente.</p>
+            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia se a sucessora não tiver saldo daquele serviço) — a produção lá só começa a partir do <b>Início</b> planejado, e a coluna <b>Fim</b> mostra o término projetado. Sem realocação, use só o Início pra planejar as ondas manualmente.</p>
           </div>
         </div>
         {/* Footer */}
