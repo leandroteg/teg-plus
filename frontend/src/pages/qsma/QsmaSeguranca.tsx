@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight,
+  CheckCircle2, XCircle, Circle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -878,6 +879,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
   const { data: treinos = [] } = useTreinamentos()
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+  const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
 
   const catById = new Map(catalogo.map(c => [c.id, c]))
   const reqPorCargo = new Map<string, string[]>()
@@ -903,6 +905,16 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
     return { c, total: req.length, ok, vencendo, vencido, faltando, prox }
   })
 
+  // registros por colaborador (para status por célula)
+  const meusPorColab = new Map<string, typeof treinos>()
+  treinos.forEach(t => { meusPorColab.set(t.colaborador_id, [...(meusPorColab.get(t.colaborador_id) ?? []), t]) })
+  const statusCel = (colabId: string, tidSet: Set<string>, cat: { id: string; norma: string | null }) => {
+    if (!tidSet.has(cat.id)) return 'na' as const
+    const cands = (meusPorColab.get(colabId) ?? []).filter(t => (t as any).treinamento_id === cat.id || (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()))
+    const r = cands.sort((a, b) => (b.data_realizacao ?? '').localeCompare(a.data_realizacao ?? ''))[0] ?? null
+    return treinoStatus(!!r, r?.vencimento)
+  }
+
   const q = busca.trim().toLowerCase()
   const filt = linhas.filter(l =>
     (!q || l.c.nome.toLowerCase().includes(q) || (l.c.cargo ?? '').toLowerCase().includes(q))
@@ -911,6 +923,14 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
 
   const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
   const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
+  const cols = catalogo // já ordenado por ordem
+
+  const IconeStatus = ({ s }: { s: 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' }) =>
+    s === 'ok' ? <CheckCircle2 size={16} className="text-emerald-500" />
+    : s === 'vencendo' ? <AlertTriangle size={15} className="text-amber-500" />
+    : s === 'vencido' ? <XCircle size={16} className="text-red-500" />
+    : s === 'faltando' ? <Circle size={14} className={isDark ? 'text-red-400/70' : 'text-red-400'} />
+    : <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
 
   return (
     <div className="space-y-3">
@@ -922,12 +942,63 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect, onNov
       >
         <QuickChips isDark={isDark} value={quick} onChange={v => setQuick(v as 'todos' | 'pendencia')}
           chips={[{ k: 'pendencia', label: 'Com pendência', icon: AlertTriangle }]} />
+        <div className={`inline-flex p-0.5 rounded-lg ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+          <button onClick={() => setVista('tabela')} title="Tabela"
+            className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
+          <button onClick={() => setVista('cards')} title="Cards"
+            className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
+        </div>
       </QsmaToolbar>
+
+      {/* legenda */}
+      <div className="flex items-center gap-3 text-[11px] flex-wrap">
+        <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Em dia</span>
+        <span className={`flex items-center gap-1 ${txtMuted}`}><AlertTriangle size={13} className="text-amber-500" /> Vencendo (60d)</span>
+        <span className={`flex items-center gap-1 ${txtMuted}`}><XCircle size={14} className="text-red-500" /> Vencido</span>
+        <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Não feito</span>
+        <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
+      </div>
 
       {isLoading ? (
         <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
       ) : filt.length === 0 ? (
         <Vazio isDark={isDark} texto="Nenhum colaborador encontrado" />
+      ) : vista === 'tabela' ? (
+        <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="border-collapse text-xs">
+            <thead>
+              <tr>
+                <th className={`sticky left-0 top-0 z-30 text-left px-3 py-2 font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                {cols.map(c => (
+                  <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
+                    className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                    <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{c.norma || c.codigo}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filt.map((l, i) => {
+                const tidSet = new Set(reqPorCargo.get((l.c.cargo ?? '').trim().toUpperCase()) ?? [])
+                return (
+                  <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                    <td className={`sticky left-0 z-10 px-3 py-1.5 whitespace-nowrap ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                      <button onClick={() => onSelect(l.c.id)} className="text-left group">
+                        <p className={`text-xs font-bold group-hover:text-sky-500 ${txtMain}`}>{l.c.nome}</p>
+                        <p className={`text-[10px] ${txtMuted}`}>{l.c.cargo ?? '—'}</p>
+                      </button>
+                    </td>
+                    {cols.map(c => (
+                      <td key={c.id} className={`text-center ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
+                        <div className="flex items-center justify-center h-7"><IconeStatus s={statusCel(l.c.id, tidSet, c)} /></div>
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="space-y-2">
           {filt.map(l => (
