@@ -54,18 +54,13 @@ const ASO_LABEL: Record<RHExame['status'], { label: string; cls: string }> = {
 }
 
 // ── Wrapper comum: dados da vaga + candidatos ────────────────────────────────
-function VagaCard({ adm, isDark, onClick, children }: {
-  adm: RHAdmissao; isDark: boolean; onClick: () => void; children: React.ReactNode
-}) {
-  const candidatos = adm.candidatos ?? []
-  const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
-  const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
+// Botão de excluir do fluxo — admin only, reutilizado em todos os cards da Admissão
+export function ExcluirAdmissaoBtn({ admId, nome, className }: { admId: string; nome?: string; className?: string }) {
   const { perfil } = useAuth()
-  const isAdmin = perfil?.role === 'administrador'
   const qc = useQueryClient()
   const excluir = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc('rh_admissao_excluir', { p_id: adm.id })
+      const { data, error } = await supabase.rpc('rh_admissao_excluir', { p_id: admId })
       if (error) throw error
       const r = data as { ok: boolean; erro?: string }
       if (!r.ok) throw new Error(r.erro || 'Falha ao excluir')
@@ -75,6 +70,24 @@ function VagaCard({ adm, isDark, onClick, children }: {
       qc.invalidateQueries({ queryKey: ['rh-admissoes'] })
     },
   })
+  if (perfil?.role !== 'administrador') return null
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); if (confirm(`Excluir ${nome || 'este registro'} do fluxo de admissão? Esta ação não pode ser desfeita.`)) excluir.mutate() }}
+      disabled={excluir.isPending}
+      title="Excluir do fluxo (administrador)"
+      className={className ?? 'p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50'}>
+      {excluir.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+    </button>
+  )
+}
+
+function VagaCard({ adm, isDark, onClick, children }: {
+  adm: RHAdmissao; isDark: boolean; onClick: () => void; children: React.ReactNode
+}) {
+  const candidatos = adm.candidatos ?? []
+  const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
+  const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
   const nomeAlvo = candidatos[0]?.nome || adm.nome_candidato || 'esta vaga'
   return (
     <div className={`relative w-full rounded-2xl border p-4 ${
@@ -97,17 +110,7 @@ function VagaCard({ adm, isDark, onClick, children }: {
         </div>
         <ChevR size={16} className={`shrink-0 mt-1 ${isDark ? 'text-slate-500' : 'text-slate-300'} group-hover:text-violet-400`} />
       </button>
-      {isAdmin && (
-        <button
-          onClick={() => {
-            if (confirm(`Excluir ${nomeAlvo} do fluxo de admissão? Esta ação não pode ser desfeita.`)) excluir.mutate()
-          }}
-          disabled={excluir.isPending}
-          title="Excluir do fluxo (administrador)"
-          className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
-          {excluir.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-        </button>
-      )}
+      <ExcluirAdmissaoBtn admId={adm.id} nome={nomeAlvo} className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" />
       <div className="space-y-2">{children}</div>
     </div>
   )
