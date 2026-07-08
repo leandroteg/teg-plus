@@ -352,6 +352,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   const grupos = useMemo(() => {
     const map = new Map<string, Obra[]>()
     for (const o of allObras) {
+      if (!o.drivers.some(d => d.contr > 0)) continue // só O&M/sem drivers → não tem onde alocar equipe
       if (hide100 && o.pctFis >= 100) continue
       if (qObra && !o.nome.toLowerCase().includes(qObra.toLowerCase())) continue
       const arr = map.get(o.frente) ?? []; arr.push(o); map.set(o.frente, arr)
