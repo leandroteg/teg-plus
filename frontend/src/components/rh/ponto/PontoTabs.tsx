@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -108,6 +108,8 @@ export const REG_CHIPS: { k: string; label: string; icon: LucideIcon }[] = [
   { k: 'fora_horario', label: 'Pontos fora do horário', icon: AlarmClock },
   { k: 'extras', label: 'Horas extras', icon: Timer },
   { k: 'ausencias', label: 'Ausências', icon: UserX },
+  { k: 'sem_registro', label: 'Sem registro de ponto', icon: CalendarX2 },
+  { k: 'com_registro', label: 'Somente com registro', icon: CalendarCheck2 },
 ]
 
 export function RegistrosPontoTab(props: PontoTabProps) {
@@ -125,7 +127,9 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
       : quickReg === 'fora_horario' ? r.dias_fora_horario > 0
         : quickReg === 'extras' ? intervalToMin(r.extras) > 0
           : quickReg === 'ausencias' ? (!!r.colaborador_id && afastados.has(r.colaborador_id))
-            : true
+            : quickReg === 'sem_registro' ? r.dias_batidos === 0
+              : quickReg === 'com_registro' ? r.dias_batidos > 0
+                : true
   ))
   const mHH = lista.reduce((s, r) => s + intervalToMin(r.hh_trabalhada), 0)
   const mExtras = lista.reduce((s, r) => s + intervalToMin(r.extras), 0)
@@ -151,8 +155,9 @@ function RegistrosMes({ anoMes, baseId, pessoa, quickReg }: PontoTabProps) {
               <td className={`${TD} text-rose-500`}>{mFaltas > 0 ? minToHoras(mFaltas) : '—'}</td>
               <td className={TD} />
             </tr>
-            {lista.map(r => (
-            <tr key={r.colaborador_id ?? r.colaborador_nome} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
+            {/* key composta c/ índice: colaborador pode ter 2+ linhas no resumo (ex.: troca de base no mês) */}
+            {lista.map((r, i) => (
+            <tr key={`${r.colaborador_id ?? r.colaborador_nome}:${i}`} onClick={() => setSel(r)} className={`border-t cursor-pointer ${c.row}`}>
               <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador_nome ?? '—'}
                 <div className={`text-[10px] flex items-center gap-1.5 flex-wrap ${c.sub}`}>
                   <span>{r.cargo}</span>
@@ -228,7 +233,9 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
         : quickReg === 'fora_horario' ? fora.algum
           : quickReg === 'extras' ? (intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)) > 0
             : quickReg === 'ausencias' ? !r.entrada1
-              : true
+              : quickReg === 'sem_registro' ? (!r.entrada1 && !r.saida1 && !r.entrada2 && !r.saida2)
+                : quickReg === 'com_registro' ? (!!r.entrada1 || !!r.saida1 || !!r.entrada2 || !!r.saida2)
+                  : true
     ))
     .sort((a, b) => (a.r.colaborador?.nome || '').localeCompare(b.r.colaborador?.nome || ''))
   const tNormais = rows.reduce((s, { r }) => s + intervalToMin(r.normais), 0)
