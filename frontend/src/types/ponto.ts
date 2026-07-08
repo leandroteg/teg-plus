@@ -123,10 +123,12 @@ export interface PontoDiaLista {
   base_id: string | null
   cargo: string | null
   entrada1: string | null; saida1: string | null; entrada2: string | null; saida2: string | null
+  // equip id (Ponto Virtual) de cada batida, extraído do raw do cartão
+  equip_e1: string | null; equip_s1: string | null; equip_e2: string | null; equip_s2: string | null
   normais: string | null; faltas: string | null
   ex50: string | null; ex70: string | null; ex100: string | null
   aprov_status: AprovStatus
-  colaborador?: { nome: string | null } | null
+  colaborador?: { nome: string | null; base_id?: string | null } | null
   base?: { nome: string | null } | null
 }
 

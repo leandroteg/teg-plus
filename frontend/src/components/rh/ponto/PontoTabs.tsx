@@ -6,10 +6,10 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras,
-  usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia,
+  usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia, usePontoDispositivos,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
-import type { PontoResumoMes, PontoTabProps, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
+import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -229,21 +229,35 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 }
 
 // visão diária — registros de UM dia (todos os colaboradores)
-function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
+function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo }: PontoTabProps) {
   const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
+  const { data: dispositivos = [] } = usePontoDispositivos()
   const c = useThemeCls()
   const horaCls = (fora: boolean) => fora ? 'text-rose-500 font-bold' : c.txt
+  // resolve o Ponto Virtual do dia: primeiro equip id não-vazio das batidas → cadastro linkdisp
+  const dispById = new Map(dispositivos.map(d => [d.secullum_equip_id, d]))
+  const dispDoDia = (r: PontoDiaLista) => {
+    const eq = [r.equip_e1, r.equip_s1, r.equip_e2, r.equip_s2].find(v => v && v !== '0')
+    return eq ? dispById.get(Number(eq)) ?? null : null
+  }
   const rows = data
     .filter(r => matchPessoa(r.colaborador?.nome, pessoa))
-    .map(r => ({ r, fora: batidasForaHorario({ data: r.data, cargo: r.cargo, entrada1: r.entrada1, saida1: r.saida1, saida2: r.saida2 }) }))
-    .filter(({ r, fora }) => (
+    .map(r => {
+      const disp = dispDoDia(r)
+      // compara com a base de CADASTRO do colaborador (a base do dia é derivada do próprio dispositivo)
+      const foraBase = !!(disp?.base_id && r.colaborador?.base_id && disp.base_id !== r.colaborador.base_id)
+      return { r, disp, foraBase, fora: batidasForaHorario({ data: r.data, cargo: r.cargo, entrada1: r.entrada1, saida1: r.saida1, saida2: r.saida2 }) }
+    })
+    .filter(({ disp }) => !dispositivo || disp?.descricao === dispositivo)
+    .filter(({ r, fora, foraBase }) => (
       quickReg === 'aberto' ? pontoEmAberto(r)
         : quickReg === 'fora_horario' ? fora.algum
           : quickReg === 'extras' ? (intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)) > 0
             : quickReg === 'ausencias' ? !r.entrada1
               : quickReg === 'sem_registro' ? (!r.entrada1 && !r.saida1 && !r.entrada2 && !r.saida2)
                 : quickReg === 'com_registro' ? (!!r.entrada1 || !!r.saida1 || !!r.entrada2 || !!r.saida2)
-                  : true
+                  : quickReg === 'fora_base' ? foraBase
+                    : true
     ))
     .sort((a, b) => (a.r.colaborador?.nome || '').localeCompare(b.r.colaborador?.nome || ''))
   const tNormais = rows.reduce((s, { r }) => s + intervalToMin(r.normais), 0)
@@ -256,6 +270,7 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
       <table className="w-full">
         <thead><tr className={c.head}>
           <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th>
+          <th className={`${TH} hidden md:table-cell`}>Dispositivo</th>
           <th className={TH}>E1</th><th className={TH}>S1</th><th className={TH}>E2</th><th className={TH}>S2</th>
           <th className={`${TH} hidden sm:table-cell`}>Normais</th><th className={TH}>Faltas</th><th className={TH}>Extras</th>
         </tr></thead>
@@ -263,19 +278,22 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg }: PontoTabProps) {
           <tr className={`border-t font-extrabold ${c.isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-100'}`}>
             <td className={TD}>Total · {rows.length}</td>
             <td className={`${TD} hidden md:table-cell`} />
+            <td className={`${TD} hidden md:table-cell`} />
             <td className={TD} /><td className={TD} /><td className={TD} /><td className={TD} />
             <td className={`${TD} hidden sm:table-cell`}>{tNormais > 0 ? minToHoras(tNormais) : '—'}</td>
             <td className={`${TD} text-rose-500`}>{tFaltas > 0 ? minToHoras(tFaltas) : '—'}</td>
             <td className={`${TD} text-orange-500`}>{tExtras > 0 ? minToHoras(tExtras) : '—'}</td>
           </tr>
-          {rows.map(({ r, fora }, i) => {
+          {rows.map(({ r, fora, disp, foraBase }, i) => {
           const ex = intervalToMin(r.ex50) + intervalToMin(r.ex70) + intervalToMin(r.ex100)
           const falta = intervalToMin(r.faltas) > 0
           const aberto = pontoEmAberto(r)
           return (
             <tr key={i} className={`border-t ${c.row}`}>
               <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}{aberto && <span className="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold uppercase">em aberto</span>}</td>
-              <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base?.nome ?? '—'}</td>
+              {/* dispositivo ≠ base do colaborador → ambos em vermelho */}
+              <td className={`${TD} hidden md:table-cell ${foraBase ? 'text-rose-500 font-semibold' : c.sub}`}>{r.base?.nome ?? '—'}</td>
+              <td className={`${TD} hidden md:table-cell ${foraBase ? 'text-rose-500 font-semibold' : c.sub}`}>{disp?.descricao ?? '—'}</td>
               <td className={`${TD} ${horaCls(fora.entrada1)}`}>{fmtHora(r.entrada1)}</td>
               <td className={`${TD} ${horaCls(fora.saida1)}`}>{fmtHora(r.saida1)}</td>
               <td className={`${TD} ${c.txt}`}>{fmtHora(r.entrada2)}</td>

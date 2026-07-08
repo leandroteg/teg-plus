@@ -79,8 +79,8 @@ export default function DPPonto() {
           {key === 'retificacoes' && (
             <MultiSelectJustif motivos={motivosRetif} ocultos={ocultosJustif} toggle={toggleJustif} />
           )}
-          {/* dispositivo (Ponto Virtual) — dado existe só na visão mensal */}
-          {key === 'registros' && vista === 'mes' && (
+          {/* dispositivo (Ponto Virtual) — vale nos modos Mês e Dia */}
+          {key === 'registros' && (
             <select value={dispositivo} onChange={e => setDispositivo(e.target.value)} className={selCls}>
               <option value="">Todos os dispositivos</option>
               {dispositivos.map(d => <option key={d.descricao} value={d.descricao}>{d.descricao}</option>)}
@@ -104,7 +104,7 @@ export default function DPPonto() {
           {/* filtros pré-prontos (só ícone p/ caber) — valem nos 2 modos */}
           {key === 'registros' && (
             <div className="flex items-center gap-1.5">
-              {REG_CHIPS.filter(ch => ch.k !== 'fora_base' || vista === 'mes').map(ch => (
+              {REG_CHIPS.map(ch => (
                 <button key={ch.k} onClick={() => setQuickReg(ch.k)} title={ch.label}
                   className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border transition-colors ${quickReg === ch.k
                     ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30')

@@ -13,7 +13,7 @@ export function usePontoDia(dataISO: string, baseId?: string) {
     enabled: !!dataISO,
     queryFn: async () => {
       let q = supabase.from('rh_ponto_dia')
-        .select('data, secullum_func_id, colaborador_id, base_id, cargo, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, aprov_status, colaborador:rh_colaboradores!colaborador_id(nome), base:est_bases!base_id(nome)')
+        .select('data, secullum_func_id, colaborador_id, base_id, cargo, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, aprov_status, equip_e1:raw->>EquipIdEntrada1, equip_s1:raw->>EquipIdSaida1, equip_e2:raw->>EquipIdEntrada2, equip_s2:raw->>EquipIdSaida2, colaborador:rh_colaboradores!colaborador_id(nome, base_id), base:est_bases!base_id(nome)')
         .eq('data', dataISO)
       if (baseId) q = q.eq('base_id', baseId)
       const { data, error } = await q.limit(2000)
@@ -202,12 +202,12 @@ export function useAprovarItem() {
 
 // dispositivos de ponto (Ponto Virtual) — p/ o filtro da tela Registros Ponto
 export function usePontoDispositivos() {
-  return useQuery<{ descricao: string }[]>({
+  return useQuery<{ secullum_equip_id: number; descricao: string; base_id: string | null }[]>({
     queryKey: ['ponto-dispositivos'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('rh_ponto_linkdisp').select('descricao').order('descricao')
+      const { data, error } = await supabase.from('rh_ponto_linkdisp').select('secullum_equip_id, descricao, base_id').order('descricao')
       if (error) { console.error('usePontoDispositivos:', error); return [] }
-      return (data ?? []) as { descricao: string }[]
+      return (data ?? []) as { secullum_equip_id: number; descricao: string; base_id: string | null }[]
     },
     staleTime: 10 * 60 * 1000,
   })
