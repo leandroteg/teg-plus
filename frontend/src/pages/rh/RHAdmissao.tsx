@@ -208,14 +208,14 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
           <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            {candidatos[0]?.cargo || adm.cargo_previsto || 'Vaga'}
+            {candidatos[0]?.nome || adm.nome_candidato || 'Candidato'}
             {adm.urgente && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Urgente</span>}
             {criadoPorSuperTEG && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">🦸 SuperTEG</span>}
           </p>
           <div className={`flex items-center gap-3 flex-wrap mt-0.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {(candidatos[0]?.cargo || adm.cargo_previsto) && <span className="flex items-center gap-1 font-semibold"><Briefcase size={11} /> {candidatos[0]?.cargo || adm.cargo_previsto}</span>}
             {adm.base && <span className="flex items-center gap-1"><Building2 size={11} /> {adm.base}</span>}
-            {ccTxt && <span className="flex items-center gap-1"><Briefcase size={11} /> {ccTxt}</span>}
-            {adm.departamento_previsto && <span>{adm.departamento_previsto}</span>}
+            {ccTxt && <span>{ccTxt}</span>}
             {adm.data_prevista_inicio && (
               <span className="flex items-center gap-1"><Calendar size={11} /> início {new Date(adm.data_prevista_inicio).toLocaleDateString('pt-BR')}</span>
             )}
@@ -249,9 +249,7 @@ function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico 
 
   return (
     <div className={`rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
-      <div className="flex items-center gap-2">
-        <User size={12} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
-        <span className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{nome || 'Candidato'}</span>
+      <div className="flex items-center gap-2 justify-end">
         {parecer && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
             parecer.aprovado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
