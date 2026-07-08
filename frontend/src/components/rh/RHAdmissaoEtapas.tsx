@@ -18,6 +18,7 @@ import {
   useRegistro, useMatriculaColaborador, anexoSignedUrl,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
+import { useCatalogoTreinamentos, useMatrizTreinamentos } from '../../hooks/useQsma'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 import RHFichaRegistroModal, { type FichaDados } from './RHFichaRegistroModal'
 
@@ -325,22 +326,62 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
   )
 }
 
-// Bloco de treinamentos (usado na etapa Treinamentos e Integração)
-function TreinamentosBlock({ cand, treinamentos }: { cand: RHAdmissaoCandidato; treinamentos: { id: string; nome: string; norma: string | null; status: string }[] }) {
+// Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
+function TreinamentosBlock({ cand, cargo, treinamentos }: {
+  cand: RHAdmissaoCandidato; cargo?: string | null
+  treinamentos: { id: string; nome: string; norma: string | null; status: string }[]
+}) {
   const trein = useTreinamentos()
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: matriz = [] } = useMatrizTreinamentos()
   const [novoTrein, setNovoTrein] = useState({ nome: '', norma: '' })
+
+  const cargoNorm = ((cand as any).cargo || cargo || '').trim().toUpperCase()
+  const reqIds = new Set(matriz.filter(m => m.cargo.trim().toUpperCase() === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
+  const required = catalogo.filter(c => reqIds.has(c.id)).sort((a, b) => a.ordem - b.ordem)
+  const recDe = (cat: { nome: string; norma: string | null }) =>
+    treinamentos.find(t => (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
+  const usadosIds = new Set(required.map(c => recDe(c)?.id).filter(Boolean) as string[])
+  const extras = treinamentos.filter(t => !usadosIds.has(t.id))
+  const feitos = required.filter(c => recDe(c)?.status === 'concluido').length
+
+  const toggleReq = (cat: typeof required[number]) => {
+    const rec = recDe(cat)
+    if (rec) trein.toggle.mutate({ id: rec.id, candidatoId: cand.id, concluido: rec.status !== 'concluido' })
+    else trein.add.mutate({ candidatoId: cand.id, nome: cat.nome, norma: cat.norma ?? undefined, concluido: true })
+  }
+
   return (
     <div className="space-y-1.5">
-      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><GraduationCap size={11} /> Treinamentos obrigatórios</span>
-      {treinamentos.map(t => (
-        <div key={t.id} className="flex items-center gap-1.5">
-          <CheckRow checked={t.status === 'concluido'} label={`${t.nome}${t.norma ? ` (${t.norma})` : ''}`}
-            onToggle={() => trein.toggle.mutate({ id: t.id, candidatoId: cand.id, concluido: t.status !== 'concluido' })} />
-          <button onClick={() => trein.remover.mutate({ id: t.id, candidatoId: cand.id })} className="text-slate-300 hover:text-red-400"><Trash2 size={11} /></button>
+      <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        <GraduationCap size={11} /> Treinamentos obrigatórios
+        {required.length > 0 && <span className="text-slate-400 normal-case">· da matriz do cargo · {feitos}/{required.length}</span>}
+      </span>
+
+      {required.length === 0 ? (
+        <p className="text-[11px] text-slate-400">Cargo "{(cand as any).cargo || cargo || '—'}" sem treinamentos na Matriz (defina em QSMA › Segurança › Matriz de Treinamentos).</p>
+      ) : (
+        required.map(cat => (
+          <CheckRow key={cat.id} checked={recDe(cat)?.status === 'concluido'}
+            label={`${cat.nome}${cat.norma ? ` (${cat.norma})` : ''}`} onToggle={() => toggleReq(cat)} />
+        ))
+      )}
+
+      {extras.length > 0 && (
+        <div className="pt-0.5 space-y-1">
+          <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Outros (fora da matriz)</span>
+          {extras.map(t => (
+            <div key={t.id} className="flex items-center gap-1.5">
+              <CheckRow checked={t.status === 'concluido'} label={`${t.nome}${t.norma ? ` (${t.norma})` : ''}`}
+                onToggle={() => trein.toggle.mutate({ id: t.id, candidatoId: cand.id, concluido: t.status !== 'concluido' })} />
+              <button onClick={() => trein.remover.mutate({ id: t.id, candidatoId: cand.id })} className="text-slate-300 hover:text-red-400"><Trash2 size={11} /></button>
+            </div>
+          ))}
         </div>
-      ))}
-      <div className="flex items-center gap-1.5">
-        <input placeholder="Treinamento (ex: Trabalho em Altura)" value={novoTrein.nome}
+      )}
+
+      <div className="flex items-center gap-1.5 pt-0.5">
+        <input placeholder="Adicionar outro treinamento…" value={novoTrein.nome}
           onChange={e => setNovoTrein(p => ({ ...p, nome: e.target.value }))} className={`${IN} flex-1`} />
         <input placeholder="NR" value={novoTrein.norma}
           onChange={e => setNovoTrein(p => ({ ...p, norma: e.target.value }))} className={`${IN} w-20`} />
@@ -798,12 +839,12 @@ export function IntegracaoCard({ adm, isDark, onClick, autorNome }: {
 }) {
   return (
     <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
-      {(adm.candidatos ?? []).map(c => <IntCandidato key={c.id} cand={c} isDark={isDark} autorNome={autorNome} />)}
+      {(adm.candidatos ?? []).map(c => <IntCandidato key={c.id} cand={c} cargoVaga={adm.cargo_previsto} isDark={isDark} autorNome={autorNome} />)}
     </VagaCard>
   )
 }
 
-function IntCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; isDark: boolean; autorNome?: string }) {
+function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissaoCandidato; cargoVaga?: string | null; isDark: boolean; autorNome?: string }) {
   const { data, isLoading } = useEtapaCandidato(cand.id)
   const { enviarAceites, atualizar } = useIntegracao()
   const integ = data?.integracao ?? null
@@ -852,8 +893,8 @@ function IntCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
         )}
       </div>
 
-      {/* Treinamentos obrigatórios (matriz por cargo pluga aqui) */}
-      <TreinamentosBlock cand={cand} treinamentos={data?.treinamentos ?? []} />
+      {/* Treinamentos obrigatórios (dirigido pela Matriz QSMA do cargo) */}
+      <TreinamentosBlock cand={cand} cargo={cargoVaga} treinamentos={data?.treinamentos ?? []} />
     </div>
   )
 }
