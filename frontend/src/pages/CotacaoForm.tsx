@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
@@ -74,15 +75,41 @@ function ItemPricingTable({
   onChange: (items: ItemPreco[]) => void
   reqItens?: ReqItem[]
 }) {
-  // Qtd trancada por padrao (alterar exige devolver a RC). Excecao temporaria:
-  // comprador (flag sys_perfis.comprador) ou admin podem ajustar direto aqui,
-  // ate organizarmos o fluxo de alteracao de quantidade na cotacao.
+  // Itens trancados ao escopo da RC por padrao (alterar exige devolver ao
+  // solicitante). Excecao temporaria (1a fase): comprador (flag
+  // sys_perfis.comprador) ou admin podem inserir itens novos e editar a
+  // descricao/quantidade direto na cotacao, ate organizarmos o fluxo formal.
   const { isAdmin, perfil } = useAuth()
-  const podeEditarQtd = isAdmin || !!perfil?.comprador
+  const podeEditarItens = isAdmin || !!perfil?.comprador
+  const podeEditarQtd = podeEditarItens
   const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
   const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
   const [itemQuery, setItemQuery] = useState<Record<number, string>>({})
   const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+  // Dropdown de sugestao renderizado via portal (position:fixed) pra fugir do
+  // overflow-hidden da tabela — senao fica cortado atras do banner de total.
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const [ddPos, setDdPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const openIdx = useMemo(() => {
+    const k = Object.keys(itemOpen).find(key => itemOpen[Number(key)])
+    return k !== undefined ? Number(k) : null
+  }, [itemOpen])
+  useLayoutEffect(() => {
+    if (openIdx === null) { setDdPos(null); return }
+    const el = inputRefs.current[openIdx]
+    if (!el) { setDdPos(null); return }
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      setDdPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 288) })
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [openIdx])
 
   // Itens que vieram do parse de PDF sem bater automaticamente com a RC (descricao
   // vazia + sugestao com o texto original) chegam aqui pra o comprador escolher o
@@ -105,7 +132,8 @@ function ItemPricingTable({
   const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()).filter(Boolean))
   const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
 
-  const canAddItem = availableReqItens.length > 0
+  // Comprador/admin pode adicionar item mesmo sem sobra da RC (item novo, fora do escopo).
+  const canAddItem = availableReqItens.length > 0 || podeEditarItens
 
   const addItem = () => {
     if (!canAddItem) return
@@ -149,8 +177,45 @@ function ItemPricingTable({
 
     const reqMatches = filterReqItens(normalizedQuery)
     setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
+    // Um dropdown aberto por vez: abrir substitui o mapa (fecha os demais).
+    setItemOpen(prev => reqMatches.length > 0 ? { [i]: true } : { ...prev, [i]: false })
   }, [availableReqItens])
+
+  // Descrição livre (comprador/admin): escreve direto no item e sugere itens da
+  // RC (sincrono) + do catálogo est_itens (async, debounced) pra facilitar o
+  // pareamento e evitar recadastro. Pegar do catálogo preenche unidade/valor médio.
+  const handleDescChange = (i: number, text: string) => {
+    if (!podeEditarItens) { searchItem(i, text); return }
+    const normalized = toUpperNorm(text)
+    onChange(items.map((item, idx) => idx === i ? { ...item, descricao: normalized } : item))
+    setItemQuery(prev => ({ ...prev, [i]: normalized }))
+
+    const rcMatches = filterReqItens(normalized).map(ri => ({ ...ri, _fromReq: true }))
+    setItemResults(prev => ({ ...prev, [i]: rcMatches }))
+    // Abre o dropdown se ha sugestao OU se ja da pra oferecer "Cadastrar" (>=2 chars),
+    // senao o rodape de cadastro nunca aparece quando o item nao existe.
+    // Substitui o mapa (um aberto por vez).
+    setItemOpen((rcMatches.length > 0 || normalized.trim().length >= 2) ? { [i]: true } : {})
+
+    if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
+    if (normalized.trim().length < 2) return
+    itemTimerRef.current[i] = setTimeout(async () => {
+      const term = `%${normalized.trim()}%`
+      const { data } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, valor_medio')
+        .eq('ativo', true)
+        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
+        .order('descricao')
+        .limit(20)
+      const rcDescs = new Set(rcMatches.map(r => r.descricao.toLowerCase().trim()))
+      const catalogo = (data ?? [])
+        .filter((c: any) => !rcDescs.has(String(c.descricao ?? '').toLowerCase().trim()))
+        .map((c: any) => ({ ...c, _fromReq: false }))
+      setItemResults(prev => ({ ...prev, [i]: [...rcMatches, ...catalogo] }))
+      setItemOpen({ [i]: true })
+    }, 300)
+  }
 
   const clearItemDescricao = (i: number) => {
     onChange(items.map((item, idx) => idx === i ? { ...item, descricao: '' } : item))
@@ -222,28 +287,27 @@ function ItemPricingTable({
             >
               <div className="relative flex items-center gap-1">
                 <input
+                  ref={el => { inputRefs.current[i] = el }}
                   className={`text-[11px] border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full ${
-                    item.descricao
+                    item.descricao && !podeEditarItens
                       ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default'
-                      : item.sugestao
+                      : item.sugestao && !item.descricao
                         ? 'bg-amber-50 border-amber-300'
                         : 'bg-white border-slate-200'
                   }`}
-                  placeholder="Selecione um item da RC..."
+                  placeholder={podeEditarItens ? 'Descreva o item ou escolha da RC...' : 'Selecione um item da RC...'}
                   title={!item.descricao && item.sugestao ? `Não bateu automaticamente com a RC — texto original: "${item.sugestao}". Escolha o item correto abaixo.` : undefined}
                   autoComplete="off"
-                  readOnly={!!item.descricao}
+                  readOnly={!!item.descricao && !podeEditarItens}
                   value={item.descricao || (itemQuery[i] ?? '')}
-                  onChange={e => searchItem(i, e.target.value)}
+                  onChange={e => handleDescChange(i, e.target.value)}
                   onFocus={() => {
-                    if (item.descricao) return
-                    const reqMatches = filterReqItens(itemQuery[i] ?? '')
-                    setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-                    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
+                    if (item.descricao && !podeEditarItens) return
+                    handleDescChange(i, item.descricao || (itemQuery[i] ?? ''))
                   }}
                   onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
                 />
-                {item.descricao && (
+                {item.descricao && !podeEditarItens && (
                   <button
                     type="button"
                     onClick={() => clearItemDescricao(i)}
@@ -253,9 +317,17 @@ function ItemPricingTable({
                     <X size={11} />
                   </button>
                 )}
-                {itemOpen[i] && !item.descricao && (itemResults[i]?.length ?? 0) > 0 && (
-                  <div className="absolute z-50 left-0 w-72 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-                    {itemResults[i].map((est: any, ri: number) => (
+                {itemOpen[i] && ddPos && (!item.descricao || podeEditarItens) && (() => {
+                  const text = (item.descricao || itemQuery[i] || '').trim()
+                  const results = itemResults[i] ?? []
+                  const showCadastrar = podeEditarItens && text.length >= 2
+                  if (results.length === 0 && !showCadastrar) return null
+                  return createPortal(
+                  <div
+                    className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto"
+                    style={{ top: ddPos.top, left: ddPos.left, width: ddPos.width }}
+                  >
+                    {results.map((est: any, ri: number) => (
                       <button
                         key={est.id || `req-${ri}`}
                         type="button"
@@ -265,7 +337,9 @@ function ItemPricingTable({
                         onMouseDown={() => selectItem(i, est)}
                       >
                         <p className="text-[11px] font-semibold text-slate-800 truncate">
-                          {est._fromReq && <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>}
+                          {est._fromReq
+                            ? <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>
+                            : <span className="text-[9px] font-bold text-teal-600 mr-1">CATÁLOGO</span>}
                           {est.descricao}
                         </p>
                         <p className="text-[10px] text-slate-400">
@@ -276,8 +350,20 @@ function ItemPricingTable({
                         </p>
                       </button>
                     ))}
-                  </div>
-                )}
+                    {showCadastrar && (
+                      <button
+                        type="button"
+                        onMouseDown={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(text)}`, '_blank')}
+                        className="w-full text-left px-2.5 py-2 hover:bg-violet-50 border-t border-slate-100 flex items-center gap-1.5 text-violet-600"
+                      >
+                        <PlusCircle size={12} className="shrink-0" />
+                        <span className="text-[11px] font-semibold truncate">Cadastrar “{text}” no catálogo</span>
+                      </button>
+                    )}
+                  </div>,
+                  document.body
+                  )
+                })()}
               </div>
               <input
                 type="number" min="0" step="0.01"
@@ -342,7 +428,9 @@ function ItemPricingTable({
       )}
       {items.some(it => !it.descricao.trim()) && (
         <p className="text-[10px] text-rose-500 text-center mt-1 font-semibold">
-          Existe item sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha.
+          {podeEditarItens
+            ? 'Existe item sem descrição. Preencha a descrição ou remova a linha.'
+            : 'Existe item sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha.'}
         </p>
       )}
     </div>
