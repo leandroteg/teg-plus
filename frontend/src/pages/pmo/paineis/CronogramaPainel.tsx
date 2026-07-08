@@ -353,13 +353,13 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
     const map = new Map<string, Obra[]>()
     for (const o of allObras) {
       if (!o.drivers.some(d => d.contr > 0)) continue // só O&M/sem drivers → não tem onde alocar equipe
-      if (hide100 && o.pctFis >= 100) continue
+      if (hide100 && o.pctFis > 95) continue // >95% = concluída na prática (nem toda obra fecha em 100%)
       if (qObra && !o.nome.toLowerCase().includes(qObra.toLowerCase())) continue
       const arr = map.get(o.frente) ?? []; arr.push(o); map.set(o.frente, arr)
     }
     return [...map.entries()]
   }, [allObras, hide100, qObra])
-  const ocultas100 = allObras.filter(o => o.pctFis >= 100).length
+  const ocultas100 = allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).length
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -429,7 +429,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
               <input value={qObra} onChange={e => setQObra(e.target.value)} placeholder="buscar obra…"
                 className={`w-52 text-[12px] rounded-lg border px-2.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
               <button onClick={() => setHide100(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${hide100 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
-                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} 100% concluídas{hide100 && ocultas100 > 0 ? ` (${ocultas100} ocultas)` : ''}
+                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} concluídas &gt;95%{hide100 && ocultas100 > 0 ? ` (${ocultas100} ocultas)` : ''}
               </button>
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
