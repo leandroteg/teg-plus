@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import JornalSection from '../../components/rh/JornalSection'
+import RHTabRail, { type RHTab } from '../../components/rh/RHTabRail'
 import {
   useIdentidadeVisual, useSalvarIdentidadeVisual, useUploadLogo,
   useComunicados, useSalvarComunicado, useExcluirComunicado,
@@ -1257,10 +1258,10 @@ function TabIdentidadeVisual() {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 type TabKey = 'identidade' | 'comunicados' | 'mural'
-const TABS: { key: TabKey; label: string; icon: typeof Sparkles }[] = [
-  { key: 'identidade',   label: 'Identidade Visual',  icon: Palette },
-  { key: 'comunicados',  label: 'Comunicados',        icon: Megaphone },
-  { key: 'mural',        label: 'Mural TEG',          icon: Newspaper },
+const TABS: RHTab[] = [
+  { key: 'identidade',   label: 'Identidade Visual',  icon: Palette,    cor: 'violet' },
+  { key: 'comunicados',  label: 'Comunicados',        icon: Megaphone,  cor: 'indigo' },
+  { key: 'mural',        label: 'Mural TEG',          icon: Newspaper,  cor: 'teal' },
 ]
 
 type SubTab = 'gerar' | 'historico'
@@ -1270,7 +1271,7 @@ const SUBTABS: { key: SubTab; label: string; icon: typeof Sparkles }[] = [
 ]
 
 export default function Endomarketing() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isLightSidebar: isLight, isDark } = useTheme()
   const [tab, setTab] = useState<TabKey>('comunicados')
   const [sub, setSub] = useState<SubTab>('gerar')
   const { data: ivData } = useIdentidadeVisual()
@@ -1294,15 +1295,8 @@ export default function Endomarketing() {
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className={`flex gap-1 p-1 rounded-xl w-fit ${isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={tabCls(tab === t.key)}>
-            <t.icon size={13} />
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — padrão RHTabRail (igual DP/Headcount) */}
+      <RHTabRail tabs={TABS} active={tab} onChange={k => setTab(k as TabKey)} isDark={isDark} />
 
       {/* Content */}
       {tab === 'identidade' && <TabIdentidadeVisual />}
