@@ -477,7 +477,7 @@ export function useMissoesDocsStatus(candidatoId?: string) {
   return useQuery<MissaoDocStatus[]>({
     queryKey: ['rh-admissao-missoes-docs', candidatoId],
     enabled: !!candidatoId,
-    refetchInterval: 60_000,   // RH vê os checks chegando quase em tempo real
+    refetchInterval: 30_000,   // RH vê os checks chegando quase em tempo real
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('rh_admissao_missoes_status', {
@@ -505,7 +505,7 @@ export function useParecerQualificacao(candidatoId?: string) {
   return useQuery<ParecerQualificacao | null>({
     queryKey: ['rh-parecer-qual', candidatoId],
     enabled: !!candidatoId,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data } = await supabase.from('rh_admissao_pareceres')
@@ -719,9 +719,13 @@ export function useAsoSetStatus() {
 export function useTreinamentos() {
   const qc = useQueryClient()
   const add = useMutation({
-    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string }) => {
+    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; concluido?: boolean }) => {
       const { error } = await supabase.from('rh_admissao_treinamentos')
-        .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null })
+        .insert({
+          candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+          status: i.concluido ? 'concluido' : 'pendente',
+          concluido_em: i.concluido ? new Date().toISOString() : null,
+        })
       if (error) throw error
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
