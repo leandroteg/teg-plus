@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { X, Wrench, FileText, Handshake, RefreshCw, Loader2 } from 'lucide-react'
+import { X, Wrench, FileText, Handshake, RefreshCw, Loader2, Paperclip } from 'lucide-react'
+import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
 import type { TipoSolicitacao, UrgenciaSolicitacao } from '../../types/locacao'
@@ -11,12 +12,6 @@ const TIPOS: { key: TipoSolicitacao; label: string; desc: string; icon: typeof W
   { key: 'renovacao',  label: 'Aditivo / Renovacao',  desc: 'Renovar ou aditivar contrato de locacao', icon: RefreshCw,  iconColor: 'text-violet-500' },
 ]
 
-const URGENCIAS: { key: UrgenciaSolicitacao; label: string; color: string }[] = [
-  { key: 'baixa',   label: 'Baixa',   color: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { key: 'normal',  label: 'Normal',  color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { key: 'alta',    label: 'Alta',    color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { key: 'urgente', label: 'Urgente', color: 'bg-red-100 text-red-700 border-red-200' },
-]
 
 interface Props {
   onClose: () => void
@@ -32,7 +27,10 @@ export default function NovaSolicitacaoModal({ onClose }: Props) {
   const [imovelId, setImovelId] = useState('')
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
-  const [urgencia, setUrgencia] = useState<UrgenciaSolicitacao>('normal')
+  const [urgente, setUrgente] = useState(false)
+  const [dataLimite, setDataLimite] = useState('')
+  const [anexo, setAnexo] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'
@@ -50,15 +48,27 @@ export default function NovaSolicitacaoModal({ onClose }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!tipo) return
-    await criar.mutateAsync({
-      tipo,
-      titulo,
-      descricao,
-      urgencia,
-      imovel_id: imovelId || undefined,
-    })
-    onClose()
+    setEnviando(true)
+    try {
+      let anexoUrl: string | undefined, anexoNome: string | undefined
+      if (anexo) {
+        const path = `solicitacoes/${Date.now()}_${anexo.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
+        const { error: upErr } = await supabase.storage.from('locacao-faturas').upload(path, anexo)
+        if (!upErr) { anexoUrl = path; anexoNome = anexo.name }
+      }
+      await criar.mutateAsync({
+        tipo, titulo, descricao,
+        urgencia: (urgente ? 'urgente' : 'normal') as UrgenciaSolicitacao,
+        imovel_id: imovelId || undefined,
+        data_limite: dataLimite || undefined,
+        anexo_url: anexoUrl, anexo_nome: anexoNome,
+      } as any)
+      onClose()
+    } finally { setEnviando(false) }
   }
+
+  // imóveis agrupados por cidade, exibidos pelo código (titulo padronizado)
+  const cidades = [...new Set(imoveis.map(im => (im as any).cidade || '—'))].sort()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -111,10 +121,16 @@ export default function NovaSolicitacaoModal({ onClose }: Props) {
                 className={`w-full text-sm rounded-xl px-3 py-2 border outline-none transition-colors ${inputCls}`}
               >
                 <option value="">Selecionar imovel...</option>
-                {imoveis.map(im => (
-                  <option key={im.id} value={im.id}>
-                    {im.codigo ? `[${im.codigo}] ` : ''}{im.descricao}{im.cidade ? ` - ${im.cidade}` : ''}
-                  </option>
+                {cidades.map(cid => (
+                  <optgroup key={cid} label={cid}>
+                    {imoveis.filter(im => ((im as any).cidade || '—') === cid)
+                      .sort((a, b) => (((a as any).titulo ?? '') as string).localeCompare(((b as any).titulo ?? '') as string))
+                      .map(im => (
+                        <option key={im.id} value={im.id}>
+                          {(im as any).titulo || (im as any).nome || im.descricao}
+                        </option>
+                      ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -144,21 +160,36 @@ export default function NovaSolicitacaoModal({ onClose }: Props) {
               />
             </div>
 
-            {/* Urgencia */}
-            <div>
-              <label className={`block text-xs font-semibold mb-2 ${txtMuted}`}>Urgencia</label>
-              <div className="flex gap-2 flex-wrap">
-                {URGENCIAS.map(({ key, label, color }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setUrgencia(key)}
-                    className={`px-3 py-1 rounded-full border text-xs font-semibold transition-all ${urgencia === key ? color : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-400'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {/* Data limite + Urgente */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data limite</label>
+                <input type="date" value={dataLimite} onChange={e => setDataLimite(e.target.value)}
+                  className={`w-full text-sm rounded-xl px-3 py-2 border outline-none transition-colors ${inputCls}`} />
               </div>
+              <div>
+                <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Urgente?</label>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setUrgente(false)}
+                    className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${!urgente ? 'bg-slate-100 text-slate-700 border-slate-300' : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-400'}`}>
+                    Nao
+                  </button>
+                  <button type="button" onClick={() => setUrgente(true)}
+                    className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${urgente ? 'bg-red-100 text-red-700 border-red-300' : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-400'}`}>
+                    Sim
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Anexo */}
+            <div>
+              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Anexo</label>
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm ${inputCls}`}>
+                <Paperclip size={14} className="shrink-0 opacity-60" />
+                <span className={anexo ? '' : 'opacity-50'}>{anexo ? anexo.name : 'Selecionar arquivo...'}</span>
+                <input type="file" className="hidden" onChange={e => setAnexo(e.target.files?.[0] ?? null)} />
+              </label>
             </div>
 
             {/* Actions */}
@@ -172,10 +203,10 @@ export default function NovaSolicitacaoModal({ onClose }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={criar.isPending || !titulo}
+                disabled={criar.isPending || enviando || !titulo}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
-                {criar.isPending && <Loader2 size={14} className="animate-spin" />}
+                {(criar.isPending || enviando) && <Loader2 size={14} className="animate-spin" />}
                 Criar Solicitacao
               </button>
             </div>
