@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 import {
-  Newspaper, Plus, Eye, EyeOff, Trash2, ChevronDown, ChevronRight, Loader2, FileText,
+  Newspaper, Plus, Eye, EyeOff, Trash2, ChevronDown, ChevronRight, Loader2, FileText, X,
 } from 'lucide-react'
 import {
   useEdicoes, useEdicaoCards, useAtualizarEdicao, useExcluirEdicao,
@@ -110,16 +110,27 @@ export default function JornalSection() {
           </div>
         </div>
         <button
-          onClick={() => setCriando(c => !c)}
+          onClick={() => setCriando(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold shrink-0"
         >
-          <Plus size={15} /> {criando ? 'Fechar' : 'Nova edição'}
+          <Plus size={15} /> Importar Jornal (PDF)
         </button>
       </div>
 
+      {/* Modal de upload + recorte */}
       {criando && (
-        <div className={`rounded-2xl border p-4 ${isLight ? 'bg-white border-slate-200' : 'border-white/10 bg-white/[0.02]'}`}>
-          <JornalTegBuilder onSaved={() => { /* lista revalida via react-query */ }} />
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className={`w-full sm:max-w-5xl rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 my-0 sm:my-6 ${isLight ? 'bg-white' : 'bg-[#0A1020] border border-white/10'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-base font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                <Newspaper size={16} className="text-violet-400" /> Importar Jornal TEG
+              </h3>
+              <button onClick={() => setCriando(false)} className={isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}>
+                <X size={20} />
+              </button>
+            </div>
+            <JornalTegBuilder onSaved={() => { /* lista revalida via react-query; usuário fecha no X */ }} />
+          </div>
         </div>
       )}
 

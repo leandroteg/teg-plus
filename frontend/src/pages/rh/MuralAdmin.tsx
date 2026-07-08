@@ -8,14 +8,13 @@ import {
   ToggleLeft, ToggleRight, XCircle, Upload, Link,
   AlertTriangle, Eye, EyeOff, GripVertical, CheckCircle2,
 } from 'lucide-react'
-import { Newspaper } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import {
   useBannersAdmin, useSalvarBanner, useExcluirBanner,
   useToggleBanner, useUploadBannerImagem,
   type MuralBanner,
 } from '../../hooks/useMural'
-import JornalSection from '../../components/rh/JornalSection'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(d?: string) {
@@ -422,11 +421,11 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export default function MuralAdmin() {
   const { isAdmin }  = useAuth()
+  const { isLightSidebar: isLight } = useTheme()
   const { data: banners = [], isLoading } = useBannersAdmin()
 
   const [tab, setTab]     = useState<TabKey>('todos')
   const [modal, setModal] = useState<Partial<MuralBanner> | null>(null)
-  const [secao, setSecao] = useState<'banners' | 'jornal'>('banners')
 
   if (!isAdmin) {
     return (
@@ -447,40 +446,22 @@ export default function MuralAdmin() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <ImagePlay size={20} className="text-violet-400" />
             Mural TEG
           </h1>
           <p className="text-sm text-slate-500">
-            {secao === 'banners' ? (
-              <>{banners.length} banner{banners.length !== 1 ? 's' : ''} cadastrado{banners.length !== 1 ? 's' : ''}
-              {ativos > 0 && <span className="text-emerald-400 ml-1.5">· {ativos} exibindo agora</span>}</>
-            ) : 'Jornal mensal fatiado em cards'}
+            {banners.length} banner{banners.length !== 1 ? 's' : ''} cadastrado{banners.length !== 1 ? 's' : ''}
+            {ativos > 0 && <span className="text-emerald-400 ml-1.5">· {ativos} exibindo agora</span>}
           </p>
         </div>
-        {secao === 'banners' && (
-          <button
-            onClick={() => setModal({})}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold transition-colors shrink-0"
-          >
-            <Plus size={15} /> Novo Banner
-          </button>
-        )}
-      </div>
-
-      {/* Seletor de seção */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/4 border border-white/8 w-fit">
-        <button onClick={() => setSecao('banners')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${secao === 'banners' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-          <ImagePlay size={13} /> Banners
-        </button>
-        <button onClick={() => setSecao('jornal')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${secao === 'jornal' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-          <Newspaper size={13} /> Jornal TEG
+        <button
+          onClick={() => setModal({})}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold transition-colors shrink-0"
+        >
+          <Plus size={15} /> Novo Banner
         </button>
       </div>
-
-      {secao === 'jornal' ? <JornalSection /> : (<>
 
       {/* Info box */}
       <div className="flex items-start gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20">
@@ -547,7 +528,6 @@ export default function MuralAdmin() {
           onClose={() => setModal(null)}
         />
       )}
-      </>)}
     </div>
   )
 }
