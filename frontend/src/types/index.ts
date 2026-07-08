@@ -337,7 +337,7 @@ export interface CotacaoFornecedor {
   condicao_pagamento?: string
   itens_precos: ItemPreco[]
   observacao?: string
-  arquivo_url?: string
+  arquivo_urls?: string[]
   selecionado: boolean
 }
 

@@ -45,14 +45,14 @@ interface FornecedorForm {
   prazo_entrega_dias: number
   condicao_pagamento: string
   observacao:         string
-  arquivo_url:        string
+  arquivo_urls:       string[]
   itens_precos:       ItemPreco[]
 }
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_telefone: '', fornecedor_email: '', fornecedor_cnpj: '',
   valor_total: 0, valor_frete: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
-  arquivo_url: '', itens_precos: [],
+  arquivo_urls: [], itens_precos: [],
 })
 
 const calcTotalItems = (itens: ItemPreco[]) =>
@@ -981,7 +981,7 @@ export default function CotacaoForm() {
         prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
         condicao_pagamento: f.condicao_pagamento ?? '',
         observacao:         f.observacao ?? '',
-        arquivo_url:        f.arquivo_url ?? '',
+        arquivo_urls:       f.arquivo_urls ?? [],
         itens_precos:       comEscopoCompletoDaRC(f.itens_precos),
       })))
     } else {
@@ -1070,7 +1070,7 @@ export default function CotacaoForm() {
     }
   }, [handleCnpjLookup])
 
-  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) => {
+  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number | string[]) => {
     const normalized = typeof value === 'string'
       && field !== 'fornecedor_cnpj'
       && field !== 'fornecedor_contato'
@@ -1296,7 +1296,7 @@ export default function CotacaoForm() {
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
           observacao:         toUpperNorm(p.observacao || ''),
-          arquivo_url:        uploadedPath,
+          arquivo_urls:       uploadedPath ? [uploadedPath] : [],
           itens_precos:       itensComValor,
         }
       }).filter((f): f is FornecedorForm => f !== null)
@@ -1460,7 +1460,7 @@ export default function CotacaoForm() {
         prazo_entrega_dias:  f.prazo_entrega_dias || (p.prazo_entrega_dias || 0),
         condicao_pagamento:  f.condicao_pagamento.trim() || toUpperNorm(p.condicao_pagamento || ''),
         observacao:          f.observacao.trim() || toUpperNorm(p.observacao || ''),
-        arquivo_url:         f.arquivo_url || uploadedPath,
+        arquivo_urls:        f.arquivo_urls.length > 0 ? f.arquivo_urls : (uploadedPath ? [uploadedPath] : []),
         itens_precos:        itensAtualizados,
         valor_total:         calcTotalItems(itensAtualizados),
       }
@@ -1491,20 +1491,20 @@ export default function CotacaoForm() {
       const path = `${id}/${Date.now()}_${safeName}`
       const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
       if (error) throw error
-      updateFornecedor(idx, 'arquivo_url', path)
+      updateFornecedor(idx, 'arquivo_urls', [...(fornecedores[idx]?.arquivo_urls ?? []), path])
     } catch (err) {
       setUploadError(prev => ({ ...prev, [idx]: err instanceof Error ? err.message : 'Erro no upload' }))
     } finally {
       setUploading(prev => ({ ...prev, [idx]: false }))
     }
-  }, [id, updateFornecedor])
+  }, [id, fornecedores, updateFornecedor])
 
-  const removeFile = useCallback(async (idx: number) => {
-    const path = fornecedores[idx]?.arquivo_url
+  const removeFile = useCallback(async (idx: number, fileIdx: number) => {
+    const path = fornecedores[idx]?.arquivo_urls?.[fileIdx]
     if (path) {
       await supabase.storage.from('cotacoes-docs').remove([path]).catch(() => {})
     }
-    updateFornecedor(idx, 'arquivo_url', '')
+    updateFornecedor(idx, 'arquivo_urls', (fornecedores[idx]?.arquivo_urls ?? []).filter((_, i) => i !== fileIdx))
   }, [fornecedores, updateFornecedor])
 
   const viewFile = useCallback(async (path: string) => {
@@ -1657,7 +1657,7 @@ export default function CotacaoForm() {
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
             observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
-            arquivo_url:        f.arquivo_url || undefined,
+            arquivo_urls:       f.arquivo_urls,
             itens_precos:       itensComSelecao.length > 0 ? itensComSelecao : undefined,
           }
         }),
@@ -2070,60 +2070,63 @@ export default function CotacaoForm() {
               </div>
             </div>
 
-            {/* ── Anexo da Cotação ─────────────────────────────────────────── */}
-            <div className="pt-1">
+            {/* ── Anexos da Cotação ────────────────────────────────────────── */}
+            <div className="pt-1 space-y-1.5">
               <input
                 ref={el => { fileInputRefs.current[idx] = el }}
                 type="file"
                 accept={FILE_ACCEPTED.join(',')}
+                multiple
                 className="hidden"
                 onChange={e => {
-                  const file = e.target.files?.[0]
-                  if (file) handleFileUpload(idx, file)
+                  const files = Array.from(e.target.files ?? [])
+                  files.forEach(file => handleFileUpload(idx, file))
                   if (fileInputRefs.current[idx]) fileInputRefs.current[idx]!.value = ''
                 }}
               />
 
-              {forn.arquivo_url ? (
+              {forn.arquivo_urls.map((url, fileIdx) => (
                 /* Arquivo anexado */
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                <div key={url} className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                   <FileText size={16} className="text-emerald-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-emerald-700 truncate">
                       Cotação anexada
                     </p>
                     <p className="text-[10px] text-emerald-500 truncate">
-                      {forn.arquivo_url.split('/').pop()?.replace(/^\d+_/, '') ?? 'arquivo'}
+                      {url.split('/').pop()?.replace(/^\d+_/, '') ?? 'arquivo'}
                     </p>
                   </div>
-                  <button type="button" onClick={() => viewFile(forn.arquivo_url)}
+                  <button type="button" onClick={() => viewFile(url)}
                     className="p-1.5 rounded-lg hover:bg-emerald-100 transition" title="Visualizar">
                     <Eye size={14} className="text-emerald-600" />
                   </button>
-                  <button type="button" onClick={() => removeFile(idx)}
+                  <button type="button" onClick={() => removeFile(idx, fileIdx)}
                     className="p-1.5 rounded-lg hover:bg-red-50 transition" title="Remover">
                     <X size={14} className="text-red-400 hover:text-red-600" />
                   </button>
                 </div>
-              ) : uploading[idx] ? (
+              ))}
+
+              {uploading[idx] && (
                 /* Fazendo upload */
                 <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                   <Loader2 size={16} className="text-amber-600 animate-spin flex-shrink-0" />
                   <p className="text-xs font-semibold text-amber-700">Enviando arquivo...</p>
                 </div>
-              ) : (
-                /* Botão de upload */
-                <button
-                  type="button"
-                  onClick={() => fileInputRefs.current[idx]?.click()}
-                  className="w-full flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-3 py-2.5 hover:border-violet-400 hover:bg-violet-50/30 transition-all group"
-                >
-                  <Paperclip size={14} className="text-slate-400 group-hover:text-violet-500 transition" />
-                  <span className="text-xs text-slate-400 group-hover:text-violet-600 font-semibold transition">
-                    Anexar cotação (PDF, foto)
-                  </span>
-                </button>
               )}
+
+              {/* Botão de upload — sempre visível, permite anexar mais de um arquivo */}
+              <button
+                type="button"
+                onClick={() => fileInputRefs.current[idx]?.click()}
+                className="w-full flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-3 py-2.5 hover:border-violet-400 hover:bg-violet-50/30 transition-all group"
+              >
+                <Paperclip size={14} className="text-slate-400 group-hover:text-violet-500 transition" />
+                <span className="text-xs text-slate-400 group-hover:text-violet-600 font-semibold transition">
+                  {forn.arquivo_urls.length > 0 ? 'Anexar mais um arquivo' : 'Anexar cotação (PDF, foto)'}
+                </span>
+              </button>
 
               {uploadError[idx] && (
                 <p className="text-[11px] text-red-500 mt-1 pl-1">{uploadError[idx]}</p>
@@ -2201,7 +2204,7 @@ export default function CotacaoForm() {
               prazo_entrega_dias: f.prazo_entrega_dias || undefined,
               condicao_pagamento: f.condicao_pagamento || undefined,
               itens_precos: f.itens_precos,
-              arquivo_url: f.arquivo_url || undefined,
+              arquivo_urls: f.arquivo_urls,
               selecionado: calcTotalEntregue(f) === Math.min(...validos.map(x => calcTotalEntregue(x))),
             }))}
             selecaoPorItem={selecaoPorItemParaComparativo}

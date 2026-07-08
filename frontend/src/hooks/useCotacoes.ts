@@ -157,7 +157,7 @@ export interface FinalizarCotacaoPayload {
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
-    arquivo_url?: string
+    arquivo_urls?: string[]
     itens_precos?: ItemPreco[]
   }[]
   sem_cotacoes_minimas?: boolean
@@ -197,7 +197,7 @@ export function useFinalizarCotacao() {
         condicao_pagamento: f.condicao_pagamento || null,
         itens_precos: f.itens_precos ?? [],
         observacao: f.observacao || null,
-        arquivo_url: f.arquivo_url || null,
+        arquivo_urls: f.arquivo_urls ?? [],
         selecionado: false,
       })
 
@@ -385,7 +385,7 @@ export function useFinalizarCotacao() {
       try {
         await api.submeterCotacao({
           cotacao_id,
-          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [], arquivo_url: f.arquivo_url ?? null })),
+          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [], arquivo_urls: f.arquivo_urls ?? [] })),
         })
       } catch {
         // n8n indisponível, tudo já está salvo no Supabase
