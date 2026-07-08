@@ -357,6 +357,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   // filtros da lista de obras: busca, ocultar 100% concluídas (padrão), agrupar por frente (colapsável)
   const [qObra, setQObra] = useState('')
   const [hide100, setHide100] = useState(true)
+  const [prodOpen, setProdOpen] = useState(false) // modal secundário: produtividade padrão por pessoa
   const [grpFechado, setGrpFechado] = useState<Set<string>>(new Set())
   const grupos = useMemo(() => {
     const map = new Map<string, Obra[]>()
@@ -393,54 +394,34 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
           <h2 className="text-sm font-bold flex items-center gap-2"><Settings2 size={16} className="text-teal-500" /> Configurar cronograma</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={16} /></button>
         </div>
-        <div className="px-5 py-4 space-y-5">
-          {/* Versões */}
+        <div className="px-5 py-3 space-y-3">
+          {/* Versões (inline) */}
           {versoes.length > 0 && (
-            <div>
-              <p className={`${lbl} mb-1.5`}>Versões salvas</p>
-              <div className="flex flex-wrap gap-1.5">
-                {versoes.map(v => (
-                  <span key={v.id} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[11px] font-semibold border ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-50'}`}>
-                    <button onClick={() => { setCfg(normalize(v.config)); setNome(v.nome) }} className="hover:text-teal-500">{v.nome}</button>
-                    <button onClick={() => excluir.mutate(v.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={11} /></button>
-                  </span>
-                ))}
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={lbl}>Versões</p>
+              {versoes.map(v => (
+                <span key={v.id} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[11px] font-semibold border ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-50'}`}>
+                  <button onClick={() => { setCfg(normalize(v.config)); setNome(v.nome) }} className="hover:text-teal-500">{v.nome}</button>
+                  <button onClick={() => excluir.mutate(v.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={11} /></button>
+                </span>
+              ))}
             </div>
           )}
 
-          {/* Produtividade por pessoa */}
+          {/* Equipe por obra (nº de pessoas) — toolbar única: busca/filtro à esquerda, preenchimentos à direita */}
           <div>
-            <p className={`${lbl} mb-2`}><Gauge size={11} className="inline mr-1 text-teal-500" />Produtividade por pessoa (por mês)</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {DRV.map(d => (
-                <div key={d.label} className={`rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
-                  <div className="flex items-center gap-1.5 mb-1"><span className="w-2 h-2 rounded-full" style={{ background: d.cor }} /><span className="text-[11px] font-bold">{d.label}</span></div>
-                  <p className={`text-[9px] mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saldo total {fmtQ(saldoGlobal[d.label] || 0)} {d.uni}</p>
-                  <div className="flex items-center gap-1"><input type="number" min="0" step="0.1" value={cfg.prodPP[d.label] ?? 0} onChange={e => setPP(d.label, Number(e.target.value))} className={inp} /><span className="text-[10px] text-slate-400">{d.uni}/pessoa·mês</span></div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Equipe por obra (nº de pessoas) */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className={lbl}>Equipe por obra — nº de pessoas</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
-                <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-violet-500/40 text-violet-300 bg-violet-500/10' : 'border-violet-300 text-violet-700 bg-violet-50'}`}><Sparkles size={11} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
-                <span className="text-[10px] text-slate-400 ml-1">terminar em</span>
-                {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
-              </div>
-            </div>
-            {/* filtros da lista */}
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <input value={qObra} onChange={e => setQObra(e.target.value)} placeholder="buscar obra…"
-                className={`w-52 text-[12px] rounded-lg border px-2.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
+                className={`w-44 text-[12px] rounded-lg border px-2.5 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`} />
               <button onClick={() => setHide100(v => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${hide100 ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
-                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} concluídas &gt;95%{hide100 && ocultas100 > 0 ? ` (${ocultas100} ocultas)` : ''}
+                {hide100 ? <EyeOff size={12} /> : <Eye size={12} />} concluídas &gt;95%{hide100 && ocultas100 > 0 ? ` (${ocultas100})` : ''}
               </button>
+              <span className="flex-1" />
+              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${isDark ? 'border-white/15 text-slate-300 bg-white/[0.04]' : 'border-slate-300 text-slate-600 bg-white'}`}><Gauge size={11} className="text-teal-500" /> Produtividade · {DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</button>
+              <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10' : 'border-teal-300 text-teal-700 bg-teal-50'}`}><Sparkles size={11} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
+              <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border disabled:opacity-40 ${isDark ? 'border-violet-500/40 text-violet-300 bg-violet-500/10' : 'border-violet-300 text-violet-700 bg-violet-50'}`}><Sparkles size={11} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
+              <span className="text-[10px] text-slate-400">terminar em</span>
+              {[6, 12, 18, 24].map(h => <button key={h} onClick={() => fillEquipe(h)} title="distribui equipe ∝ saldo p/ terminar nesse prazo" className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.horizonte === h ? 'bg-teal-600 text-white border-teal-600' : (isDark ? 'border-white/15 text-slate-400' : 'border-slate-300 text-slate-500')}`}>{h}m</button>)}
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className={`flex items-center gap-2 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
@@ -451,7 +432,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
                 <span className="w-9 text-right">total</span>
                 <span className="w-36 text-center" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra">Predecessão</span>
               </div>
-              <div className="max-h-[46vh] overflow-auto">
+              <div className="max-h-[58vh] overflow-auto">
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
                 {grupos.map(([frente, obras]) => {
                   const fechado = grpFechado.has(frente)
@@ -509,6 +490,33 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
             <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia se a sucessora não tiver saldo daquele serviço) — a produção lá só começa a partir do <b>Início</b> planejado, e a coluna <b>Fim</b> mostra o término projetado. Sem realocação, use só o Início pra planejar as ondas manualmente.</p>
           </div>
         </div>
+        {/* Modal secundário: produtividade padrão por pessoa */}
+        {prodOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setProdOpen(false)}>
+            <div className={`w-full max-w-sm rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+              <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                <h3 className="text-[13px] font-bold flex items-center gap-2"><Gauge size={14} className="text-teal-500" /> Produtividade por pessoa (por mês)</h3>
+                <button onClick={() => setProdOpen(false)} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={14} /></button>
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                {DRV.map(d => (
+                  <div key={d.label} className={`flex items-center gap-2 rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.cor }} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[11px] font-bold">{d.label}</span>
+                      <span className={`block text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saldo total {fmtQ(saldoGlobal[d.label] || 0)} {d.uni}</span>
+                    </span>
+                    <input type="number" min="0" step="0.1" value={cfg.prodPP[d.label] ?? 0} onChange={e => setPP(d.label, Number(e.target.value))} className={inp} />
+                    <span className="text-[10px] text-slate-400 w-24">{d.uni}/pessoa·mês</span>
+                  </div>
+                ))}
+              </div>
+              <div className={`flex justify-end px-4 py-2.5 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                <button onClick={() => setProdOpen(false)} className="px-3 py-1 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700">OK</button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Footer */}
         <div className={`flex items-center gap-2 px-5 py-3 border-t sticky bottom-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="nome da versão" className={`flex-1 text-sm rounded-lg border px-3 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder:text-slate-500' : 'bg-white border-slate-300 text-slate-800'}`} />
