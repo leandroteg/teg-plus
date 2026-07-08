@@ -64,7 +64,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   useEffect(() => { setSlot(document.getElementById('crono-filters-slot')) })
   const [openF, setOpenF] = useState<Set<string>>(new Set())
   const [openO, setOpenO] = useState<Set<string>>(new Set())
-  const [modalOpen, setModalOpen] = useState(false)
+  const [sub, setSub] = useState<'proj' | 'cfg'>('proj') // sub-telas da aba: Projeção (tabela) | Cronograma (config, ex-modal)
   const [applied, setApplied] = useState<Config | null>(null)
 
   // árvore frente → obra → drivers (saldo) — engine compartilhada
@@ -177,24 +177,38 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     onError: () => alert('Erro ao publicar o cronograma.'),
   })
 
+  const subBtn = (k: 'proj' | 'cfg', label: string, icon: ReactNode) => (
+    <button key={k} onClick={() => setSub(k)} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${sub === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}>{icon}{label}</button>
+  )
   const controles = (<>
-    <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
-    <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
-    <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
-    <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
-    <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
-    <button onClick={() => setModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700"><Settings2 size={14} /> Configurar / Gerar</button>
-    <button onClick={() => publicar.mutate()} disabled={publicar.isPending || mesesArr.length === 0}
-      title="Grava o Total geral exibido como cronograma oficial (fonte do Fluxo de Caixa do Financeiro)"
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
-      {publicar.isPending ? '...' : 'Publicar cronograma'}
-    </button>
+    <div className={`inline-flex items-center rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-slate-100/80'}`}>
+      {subBtn('proj', 'Projeção', <CalendarDays size={13} />)}
+      {subBtn('cfg', 'Cronograma', <Settings2 size={13} />)}
+    </div>
+    {sub === 'proj' && (<>
+      <MultiSelect label="Frente" icon={<Filter size={12} className="opacity-70" />} options={tree.map(f => ({ value: f.label, label: f.label }))} selected={fFrente} onToggle={v => { togF(v, setFFrente); setFObra(new Set()) }} onClear={() => { setFFrente(new Set()); setFObra(new Set()) }} isDark={isDark} />
+      <MultiSelect label="Obra" options={[...new Set(obraOptions)].sort().map(o => ({ value: o, label: o }))} selected={fObra} onToggle={v => togF(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} />
+      <MultiSelect label="% Físico" options={PROD_BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPct} onToggle={v => togF(v, setFPct)} onClear={() => setFPct(new Set())} isDark={isDark} />
+      <button onClick={() => setHideOM(v => !v)} title={hideOM ? 'Mostrar obras de O&M' : 'Ocultar obras de O&M'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideOM ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideOM ? <EyeOff size={14} /> : <Eye size={14} />} O&amp;M</button>
+      <button onClick={() => setHideSemProd(v => !v)} title={hideSemProd ? 'Mostrar obras sem produção no período' : 'Ocultar obras sem produção no período (projeção zerada)'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${hideSemProd ? (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-600') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400')}`}>{hideSemProd ? <EyeOff size={14} /> : <Eye size={14} />} Sem produção</button>
+      <button onClick={() => publicar.mutate()} disabled={publicar.isPending || mesesArr.length === 0}
+        title="Grava o Total geral exibido como cronograma oficial (fonte do Fluxo de Caixa do Financeiro)"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+        {publicar.isPending ? '...' : 'Publicar cronograma'}
+      </button>
+    </>)}
   </>)
 
   return (
     <div className="space-y-3">
       {slot ? createPortal(controles, slot) : <div className="flex flex-wrap items-center gap-2">{controles}</div>}
 
+      {sub === 'cfg' && <ConfigView isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
+        tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
+        inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
+        onAplicar={c => { setApplied(c); try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setSub('proj') }} />}
+
+      {sub === 'proj' && (<>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <Kpi label="Saldo a faturar" value={fmtM(view.saldoRtot)} tone="amber" isDark={isDark} note="R$ restante (filtro)" />
         <Kpi label="Início" value={ymLabel(start)} tone="sky" isDark={isDark} note="mês atual" />
@@ -319,22 +333,18 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
           </div>
         )}
       </PanelCard>
-
-      {modalOpen && <ConfigModal isDark={isDark} portfolioId={portfolioId} allObras={allObras} saldoGlobal={saldoGlobal}
-        tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
-        inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
-        onAplicar={c => { setApplied(c); try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setModalOpen(false) }} onClose={() => setModalOpen(false)} />}
+      </>)}
     </div>
   )
 }
 
-// ── Modal de configuração ────────────────────────────────────────────────────
-function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, equipeObras, inicial, defaultConfig, versoes, qc, onAplicar, onClose }: {
+// ── Sub-tela de configuração (ex-modal) — Aplicar volta pra Projeção ─────────
+function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoFrente, equipeObras, inicial, defaultConfig, versoes, qc, onAplicar }: {
   isDark: boolean; portfolioId: string; allObras: Obra[]; saldoGlobal: Record<string, number>
   tree: Frente[]; efetivoFrente?: Record<string, { fundacao: number; montlanc: number }>
   equipeObras?: EquipeObrasReal
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
-  onAplicar: (c: Config) => void; onClose: () => void
+  onAplicar: (c: Config) => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
   const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio })
@@ -388,12 +398,7 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
   const inp = `w-20 text-sm font-bold rounded-lg border px-2 py-1 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`
   const lbl = `text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className={`w-full max-w-5xl max-h-[92vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-5 py-3 border-b sticky top-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
-          <h2 className="text-sm font-bold flex items-center gap-2"><Settings2 size={16} className="text-teal-500" /> Configurar cronograma</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={16} /></button>
-        </div>
+      <div className={`rounded-2xl border ${isDark ? 'bg-slate-900/60 border-white/[0.06] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
         <div className="px-5 py-3 space-y-3">
           {/* Versões (inline) */}
           {versoes.length > 0 && (
@@ -518,12 +523,11 @@ function ConfigModal({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivo
           </div>
         )}
         {/* Footer */}
-        <div className={`flex items-center gap-2 px-5 py-3 border-t sticky bottom-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+        <div className={`flex items-center gap-2 px-5 py-3 border-t sticky bottom-0 rounded-b-2xl ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="nome da versão" className={`flex-1 text-sm rounded-lg border px-3 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder:text-slate-500' : 'bg-white border-slate-300 text-slate-800'}`} />
           <button onClick={() => salvar.mutate()} disabled={!nome.trim() || salvar.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border disabled:opacity-40 ${isDark ? 'border-white/15 text-slate-200 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Save size={14} /> Salvar versão</button>
-          <button onClick={() => onAplicar(cfg)} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold bg-teal-600 text-white hover:bg-teal-700"><Sparkles size={14} /> Aplicar</button>
+          <button onClick={() => onAplicar(cfg)} title="Aplica a configuração e volta pra Projeção" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold bg-teal-600 text-white hover:bg-teal-700"><Sparkles size={14} /> Aplicar</button>
         </div>
       </div>
-    </div>
   )
 }
