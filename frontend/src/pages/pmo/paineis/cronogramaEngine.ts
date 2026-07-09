@@ -3,10 +3,12 @@
 import type { EAPPoloRaw } from '../../../hooks/usePMO'
 
 // drivers de construção (pp = produtividade padrão por pessoa/mês; maq = máquinas padrão por pessoa)
+// pp = produtividade por pessoa/mês na UNIDADE do driver (m³/ton/km); ppTorre = idem em TORRES (só Fund./Mont.).
+// Quando a obra tem nº de torres lançado, o motor usa ppTorre (× m³ou-ton por torre da obra); senão, pp (volume).
 export const DRV = [
-  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 14.29, maq: 0.3 }, // 100 m³/mês por equipe de 7 (padrão prevista)
-  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#059669', pp: 8, maq: 0.25 },
-  { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2, maq: 0.2 },
+  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 14.29, ppTorre: 0, maq: 0.3 }, // 100 m³/mês por equipe de 7 (padrão prevista)
+  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#059669', pp: 8, ppTorre: 1.83, maq: 0.25 }, // 22 torres/mês por equipe de 12 (pré-montagem)
+  { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2, ppTorre: 0, maq: 0.2 }, // sempre km
 ]
 // tudo que não é driver vira 3 linhas próprias (só R$):
 //   Preliminares (Serv. Preliminares + Canteiro e Mobiliz.) · Administração (ADM Local) · Outros (desmont/conf/aterr/etc)
@@ -43,7 +45,7 @@ export function prazoCor(termino: string | null, fim: string | null): string {
 export const worstCor = (cs: string[]) => cs.includes('#ef4444') ? '#ef4444' : cs.includes('#f59e0b') ? '#f59e0b' : cs.includes('#10b981') ? '#10b981' : '#94a3b8'
 
 export type Drv = { label: string; uni: string; cor: string; pac: string; contr: number; real: number; valor: number; fat: number; saldoQ: number; saldoR: number; pctFis: number }
-export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; prelR: number; admR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; pctFis: number; ini: string | null; fim: string | null }
+export type Obra = { nome: string; frente: string; drivers: Drv[]; saldoR: number; prelR: number; admR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; torres: number; pctFis: number; ini: string | null; fim: string | null }
 export type Frente = { label: string; obras: Obra[] }
 // prodPP: produtividade por pessoa/mês por driver; equipe: nº de pessoas por obra → por driver.
 // inicio: mês planejado (YYYY-MM) por obra — não produz antes dele.
@@ -52,21 +54,22 @@ export type Frente = { label: string; obras: Obra[] }
 // inicioS/fimS: overrides POR SERVIÇO (obra → driver → YYYY-MM) — vencem o nível obra; editar a obra limpa os overrides.
 // realoc: realocação automática — equipe liberada (driver concluído) migra pra obra que aponta esta como
 //   predecessora (pred: obra → obra predecessora); sem sucessora com saldo, cai na fila legada (fila: nº = ordem).
-export type Config = { prodPP: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; pred?: Record<string, string>; inicio?: Record<string, string>; fim?: Record<string, string>; inicioS?: Record<string, Record<string, string>>; fimS?: Record<string, Record<string, string>> }
+export type Config = { prodPP: Record<string, number>; prodPPTorre?: Record<string, number>; equipe: Record<string, Record<string, number>>; horizonte: number; precedencia?: boolean; lag?: number; realoc?: boolean; fila?: Record<string, number>; pred?: Record<string, string>; inicio?: Record<string, string>; fim?: Record<string, string>; inicioS?: Record<string, Record<string, string>>; fimS?: Record<string, Record<string, string>> }
 export type Versao = { id: string; nome: string; config: Config; updated_at: string }
 
 export function emptyDrivers(): Drv[] { return DRV.map(d => ({ ...d, contr: 0, real: 0, valor: 0, fat: 0, saldoQ: 0, saldoR: 0, pctFis: 0 })) }
 
 // árvore frente → obra → drivers (saldo) a partir do raw da EAP
 export function buildTree(raw: EAPPoloRaw[] | undefined): Frente[] {
-  const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; prelR: number; admR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; ini: string | null; fim: string | null }> }>()
+  const frentes = new Map<string, { label: string; obras: Map<string, { drivers: Drv[]; prelR: number; admR: number; outrosR: number; omR: number; omOscs: string[]; valorContr: number; torres: number; ini: string | null; fim: string | null }> }>()
   for (const polo of (raw ?? [])) {
     let fr = frentes.get(polo.label); if (!fr) { fr = { label: polo.label, obras: new Map() }; frentes.set(polo.label, fr) }
     for (const o of polo.oscs) {
       if (o.etapa_atual === 'cancelada') continue
       if (o.tipo !== 'construcao' && o.tipo !== 'manutencao') continue // exclui depósito; construção+O&M
-      let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), prelR: 0, admR: 0, outrosR: 0, omR: 0, omOscs: [], valorContr: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
+      let od = fr.obras.get(o.obra_nome); if (!od) { od = { drivers: emptyDrivers(), prelR: 0, admR: 0, outrosR: 0, omR: 0, omOscs: [], valorContr: 0, torres: 0, ini: null, fim: null }; fr.obras.set(o.obra_nome, od) }
       od.valorContr += Number(o.valor || 0) // valor contratual previsto (todas as OSCs da obra)
+      od.torres += Number(o.qtd_torres || 0) // nº de torres somado das OSCs (lançado manualmente na Iniciação)
       const di = o.data_osc?.slice(0, 10); if (di && (!od.ini || di < od.ini)) od.ini = di
       const dv = o.vencimento?.slice(0, 10); if (dv && (!od.fim || dv > od.fim)) od.fim = dv
       if (o.tipo === 'manutencao') { // O&M → uma linha "Execução" (saldo R$ total), identificando a OSC
@@ -89,7 +92,7 @@ export function buildTree(raw: EAPPoloRaw[] | undefined): Frente[] {
       od.drivers.forEach(d => { d.saldoQ = Math.max(0, d.contr - d.real); d.pctFis = d.contr ? Math.round(d.real / d.contr * 100) : 0 })
       const wf = od.drivers.filter(d => d.contr > 0); const wsum = wf.reduce((s, d) => s + d.valor, 0)
       const pctFis = wsum ? Math.round(wf.reduce((s, d) => s + (d.real / d.contr * 100) * d.valor, 0) / wsum) : 0
-      return { nome, frente: fr.label, drivers: od.drivers, prelR: od.prelR, admR: od.admR, outrosR: od.outrosR, omR: od.omR, omOscs: od.omOscs, valorContr: od.valorContr, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.prelR + od.admR + od.outrosR + od.omR } as Obra
+      return { nome, frente: fr.label, drivers: od.drivers, prelR: od.prelR, admR: od.admR, outrosR: od.outrosR, omR: od.omR, omOscs: od.omOscs, valorContr: od.valorContr, torres: od.torres, ini: od.ini, fim: od.fim, pctFis, saldoR: od.drivers.reduce((s, d) => s + d.saldoR, 0) + od.prelR + od.admR + od.outrosR + od.omR } as Obra
     }).filter(o => o.drivers.some(d => d.contr > 0) || o.prelR > 0 || o.admR > 0 || o.outrosR > 0 || o.omR > 0).sort((a, b) => b.saldoR - a.saldoR),
   })).filter(fr => fr.obras.length > 0).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
 }
@@ -97,9 +100,10 @@ export function buildTree(raw: EAPPoloRaw[] | undefined): Frente[] {
 // config default (produtividade/pessoa padrão; equipe p/ terminar cada obra em 12m, ∝ saldo)
 export function makeDefaultConfig(allObras: Obra[]): Config {
   const prodPP: Record<string, number> = {}; DRV.forEach(d => prodPP[d.label] = d.pp)
+  const prodPPTorre: Record<string, number> = {}; DRV.forEach(d => prodPPTorre[d.label] = d.ppTorre)
   const h = 12, equipe: Record<string, Record<string, number>> = {}
   allObras.forEach(o => { const e: Record<string, number> = {}; o.drivers.forEach(d => { if (d.contr > 0 && d.saldoQ > 0) { const pp = prodPP[d.label] || 1; e[d.label] = Math.max(1, Math.round(d.saldoQ / (pp * h))) } }); equipe[o.nome] = e })
-  return { prodPP, equipe, horizonte: h, precedencia: true, lag: 0 }
+  return { prodPP, prodPPTorre, equipe, horizonte: h, precedencia: true, lag: 0 }
 }
 
 // distribui o efetivo real de cada frente (Fundação + Montagem&Lançamento) entre as obras ∝ saldo.
@@ -125,10 +129,16 @@ export function equipeFromEfetivo(tree: Frente[], porFrente: Record<string, { fu
   return equipe
 }
 
-// rate (qtd/mês) por (obra, driver) = nº de pessoas × produtividade por pessoa
+// rate (qtd/mês na unidade do driver) = nº de pessoas × produtividade.
+// Se a obra tem nº de torres E há produtividade POR TORRE (Fund./Mont.), usa torres: rate = pessoas × torres/mês
+// convertido pra unidade nativa via (contr ÷ torres) = m³ (ou ton) por torre — mesma duração que o cálculo por torre.
+// Sem torres lançadas (ou driver sem ppTorre, ex.: Lançamento) → cai no volume (m³/ton/km por pessoa).
 export function rateOf(o: Obra, d: Drv, cfg: Config) {
   if (d.saldoQ <= 0) return 0
-  return (cfg.equipe?.[o.nome]?.[d.label] ?? 0) * (cfg.prodPP?.[d.label] ?? 0)
+  const ppl = cfg.equipe?.[o.nome]?.[d.label] ?? 0
+  const pt = cfg.prodPPTorre?.[d.label] ?? 0
+  if (o.torres > 0 && pt > 0 && d.contr > 0) return ppl * pt * (d.contr / o.torres)
+  return ppl * (cfg.prodPP?.[d.label] ?? 0)
 }
 
 // início/fim planejados POR DRIVER: override do serviço (inicioS/fimS) vence o nível obra (inicio/fim).
