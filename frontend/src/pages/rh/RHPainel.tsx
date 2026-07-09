@@ -89,20 +89,30 @@ function fmtComp(ym: string): string {
   return `${lbl.toLowerCase()}/${y.slice(2)}`
 }
 
-// Card de Movimento do mês: entradas (↑ verde) e saídas (↓ vermelho) juntos
+// Card de Movimento do mês: entradas (↑ verde, esquerda) e saídas (↓ vermelho, direita)
 function MovimentoCard({ entradas, saidas, isDark }: { entradas: number; saidas: number; isDark: boolean }) {
+  const emerald = isDark ? 'text-emerald-400' : 'text-emerald-600'
+  const red = saidas > 0 ? (isDark ? 'text-red-400' : 'text-red-600') : 'text-slate-400'
+  const labelCls = `text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
   return (
-    <div className={`rounded-2xl p-3 flex flex-col justify-center gap-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+    <div className={`rounded-2xl p-3 flex flex-col gap-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Movimento</p>
-      <div className="flex items-center gap-1.5">
-        <ArrowUp size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} strokeWidth={2.6} />
-        <span className={`text-xl font-extrabold leading-none ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{entradas}</span>
-        <span className={`text-[9px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>entradas</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <ArrowDown size={16} className={saidas > 0 ? (isDark ? 'text-red-400' : 'text-red-600') : 'text-slate-400'} strokeWidth={2.6} />
-        <span className={`text-xl font-extrabold leading-none ${saidas > 0 ? (isDark ? 'text-red-400' : 'text-red-600') : 'text-slate-400'}`}>{saidas}</span>
-        <span className={`text-[9px] font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saídas</span>
+      <div className="flex items-stretch flex-1">
+        <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <ArrowUp size={18} className={emerald} strokeWidth={2.8} />
+            <span className={`text-[1.85rem] font-extrabold leading-none ${emerald}`}>{entradas}</span>
+          </div>
+          <span className={labelCls}>entradas</span>
+        </div>
+        <div className={`w-px self-stretch ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <ArrowDown size={18} className={red} strokeWidth={2.8} />
+            <span className={`text-[1.85rem] font-extrabold leading-none ${red}`}>{saidas}</span>
+          </div>
+          <span className={labelCls}>saídas</span>
+        </div>
       </div>
     </div>
   )
