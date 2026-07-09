@@ -514,6 +514,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const predOpts = useMemo(() => allObras.filter(o => o.drivers.some(d => d.contr > 0)).map(o => o.nome).sort(), [allObras])
   // Gantt integrado à DIREITA das colunas (estilo MS Project) — linha do tempo mensal + barras por serviço
   const [ganttWide, setGanttWide] = useState(false) // true = encobre as colunas de dados (Gantt toma o lugar)
+  const [durDias, setDurDias] = useState(false) // Duração em meses ou dias (clique no título da coluna alterna)
+  const fmtDur = (meses: number) => durDias ? `${meses * 30}d` : `${meses}m`
   const CW = 34, NAMEW = 280
   const gantt = useMemo(() => {
     let minYM = '', maxYM = ''
@@ -582,7 +584,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                 <span className="w-[118px] text-center shrink-0" title="Início planejado (dd/mm/aaaa) — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
                 <span className="w-[118px] text-center shrink-0" title="Término planejado (dd/mm/aaaa) — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
                 <span className="w-14 text-center shrink-0" title="Prazo — limite contratual (vencimento da OSC mais tardia da obra)">Prazo</span>
-                <span className="w-20 text-center shrink-0" title="Duração projetada (meses · término) com a configuração atual — vermelho quando estoura o Prazo">Duração</span>
+                <span onClick={() => setDurDias(v => !v)} className="w-20 text-center shrink-0 cursor-pointer hover:text-teal-500 select-none" title="Duração projetada com a configuração atual — vermelho quando estoura o Prazo. CLIQUE pra alternar meses/dias">Duração ({durDias ? 'd' : 'm'})</span>
                 <span className="w-40 text-center shrink-0" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
                 {DRV.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
                 <span className="w-9 text-right shrink-0">total</span>
@@ -623,7 +625,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             const estoura = !!(prazo && pj?.termino && pj.termino > prazo)
                             return (<>
                               <span className={`w-14 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title="Limite contratual (vencimento da OSC mais tardia)">{prazo ? ymLabel(prazo) : '—'}</span>
-                              <span className={`w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap ${estoura ? 'text-rose-500' : 'text-violet-500'}`} title={estoura ? 'Duração projetada ESTOURA o prazo contratual' : 'Duração projetada · término (config atual)'}>{pj?.meses ? `${pj.meses}m · ${ymLabel(pj.termino!)}` : '—'}</span>
+                              <span className={`w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap ${estoura ? 'text-rose-500' : 'text-violet-500'}`} title={`${estoura ? 'ESTOURA o prazo contratual — ' : ''}término projetado: ${pj?.termino ? ymLabel(pj.termino) : '—'}`}>{pj?.meses ? fmtDur(pj.meses) : '—'}</span>
                             </>)
                           })()}
                           <PredCombo value={cfg.pred?.[o.nome] ?? ''} options={predOpts.filter(n => n !== o.nome)} onPick={v => setPred(o.nome, v)} isDark={isDark} />
@@ -663,7 +665,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                                   <input type="date" value={d8(effIni(o, r.drv))} onChange={e => setInicioSrv(o.nome, r.drv!, e.target.value)} title="Início deste serviço (dd/mm/aaaa — sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.inicioS?.[o.nome]?.[r.drv] ? 'border-teal-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                                   <input type="date" value={d8(effFim(o, r.drv))} onChange={e => setFimSrv(o.nome, r.drv!, e.target.value)} title="Término deste serviço (dd/mm/aaaa) — força o ritmo pela data (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fimS?.[o.nome]?.[r.drv] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                                   <span className="w-14 shrink-0" />
-                                  <span className="w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap text-violet-500" title="Duração projetada deste serviço">{nm > 0 ? `${nm}m · ${ymLabel(shiftYM(start0, nm - 1))}` : '—'}</span>
+                                  <span className="w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap text-violet-500" title={`Duração projetada deste serviço — término: ${nm > 0 ? ymLabel(shiftYM(start0, nm - 1)) : '—'}`}>{nm > 0 ? fmtDur(nm) : '—'}</span>
                                   <span className="w-40 shrink-0" />
                                   {DRV.map(d => d.label === r.drv ? (
                                     <input key={d.label} type="number" min="0" value={eq[d.label] ?? 0} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
