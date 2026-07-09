@@ -538,7 +538,6 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const GW = gantt.nM * CW
   const gIx = (ym: string) => Math.max(0, Math.min(gantt.nM - 1, ymNum(ym) - ymNum(gantt.minYM)))
   const hojeIx = (() => { const d = ymNum(startYM()) - ymNum(gantt.minYM); return d >= 0 && d < gantt.nM ? d : null })()
-  const laneOf = (l: string) => DRV.findIndex(x => x.label === l)
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -607,7 +606,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <span className={`text-[11px] font-bold tabular-nums ml-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totFr > 0 ? `· ${totFr} pessoas` : ''}</span>
                       </button>
                       {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); const aberto = openSrv.has(o.nome)
-                        const gBars = o.drivers.filter(d => d.contr > 0).map(d => ({ d, i: (effIni(o, d.label) || '').slice(0, 7), f: (effFim(o, d.label) || '').slice(0, 7) })).filter(b => b.i && b.f && b.f >= b.i)
+                        // barra-resumo da obra (janela total: menor início → maior término); serviços têm barra própria quando expandidos
+                        const gIni = (obraIniVal(o) || '').slice(0, 7), gFim = (obraFimVal(o) || '').slice(0, 7)
                         const gPz = o.fim ? o.fim.slice(0, 7) : ''
                         return (
                         <div key={o.nome}>
@@ -638,10 +638,10 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                           <div className="relative shrink-0 self-stretch" style={{ width: GW }}>
                             {gantt.meses.map((_, i2) => <span key={i2} className={`absolute top-0 bottom-0 border-l ${isDark ? 'border-white/[0.03]' : 'border-slate-100/80'}`} style={{ left: i2 * CW }} />)}
                             {hojeIx != null && <span className="absolute top-0 bottom-0 w-px bg-teal-500/60" style={{ left: hojeIx * CW + CW / 2 }} title="hoje" />}
-                            {gBars.map(b => (
-                              <span key={b.d.label} className="absolute rounded-sm" title={`${b.d.label}: ${ymLabel(b.i)} → ${ymLabel(b.f)}`}
-                                style={{ left: gIx(b.i) * CW + 1, width: Math.max(6, (gIx(b.f) - gIx(b.i) + 1) * CW - 2), top: `calc(50% - 8px + ${laneOf(b.d.label) * 6}px)`, height: 5, background: b.d.cor }} />
-                            ))}
+                            {gIni && gFim && gFim >= gIni && (
+                              <span className="absolute rounded" title={`${o.nome}: ${ymLabel(gIni)} → ${ymLabel(gFim)}`}
+                                style={{ left: gIx(gIni) * CW + 1, width: Math.max(8, (gIx(gFim) - gIx(gIni) + 1) * CW - 2), top: 'calc(50% - 5px)', height: 10, background: isDark ? '#64748b' : '#334155' }} />
+                            )}
                             {gPz && ymNum(gPz) >= ymNum(gantt.minYM) && ymNum(gPz) - ymNum(gantt.minYM) < gantt.nM && (
                               <span className="absolute w-[3px] top-1 bottom-1 bg-rose-500 rounded" style={{ left: gIx(gPz) * CW + CW - 3 }} title={`prazo CEMIG: ${ymLabel(gPz)}`} />
                             )}
@@ -698,6 +698,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
             </div>
             <div className={`flex items-center gap-3 mt-1.5 flex-wrap text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <span>Total: <b>{totPessoas} pessoas</b> · nº pessoas × produtividade/pessoa (drivers ausentes ficam desabilitados)</span>
+              <span className="inline-flex items-center gap-1"><span className={`w-4 h-[9px] rounded inline-block ${isDark ? 'bg-slate-500' : 'bg-slate-700'}`} />obra (janela)</span>
               {DRV.map(d => <span key={d.label} className="inline-flex items-center gap-1"><span className="w-3 h-[5px] rounded-sm inline-block" style={{ background: d.cor }} />{d.label}</span>)}
               <span className="inline-flex items-center gap-1"><span className="w-[3px] h-3 bg-rose-500 rounded inline-block" />prazo CEMIG</span>
               <span className="inline-flex items-center gap-1"><span className="w-px h-3 bg-teal-500 inline-block" />hoje</span>
