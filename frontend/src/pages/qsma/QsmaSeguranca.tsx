@@ -15,7 +15,7 @@ import {
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useEnviarOcorrenciaSgi,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
-  useColaboradoresTreino, treinoStatus,
+  useColaboradoresTreino, treinoStatus, cargoBase,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -877,6 +877,7 @@ const TREINO_ABREV: Record<string, string> = {
 }
 const colLabel = (c: { codigo: string; norma: string | null }) => TREINO_ABREV[c.codigo] || c.norma || c.codigo
 
+
 // ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
 function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   isDark: boolean; card: string; txtMain: string; txtMuted: string
@@ -896,19 +897,19 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const [fAdmAte, setFAdmAte] = useState('')
 
   const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
-  const cargos = [...new Set(colabs.map(c => c.cargo).filter(Boolean))].sort() as string[]
+  const cargos = [...new Set(colabs.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
   const setores = [...new Set(colabs.map(c => c.setor).filter(Boolean))].sort() as string[]
 
   const catById = new Map(catalogo.map(c => [c.id, c]))
   const reqPorCargo = new Map<string, string[]>()
   matriz.forEach(m => {
     if (m.exigencia !== 'obrigatorio') return
-    const k = m.cargo.trim().toUpperCase()
+    const k = cargoBase(m.cargo)
     reqPorCargo.set(k, [...(reqPorCargo.get(k) ?? []), m.treinamento_id])
   })
 
   const linhas = colabs.map(c => {
-    const req = reqPorCargo.get((c.cargo ?? '').trim().toUpperCase()) ?? []
+    const req = reqPorCargo.get(cargoBase(c.cargo)) ?? []
     const meus = treinos.filter(t => t.colaborador_id === c.id)
     let ok = 0, vencendo = 0, vencido = 0, faltando = 0
     let prox: string | null = null
@@ -937,7 +938,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const filt = linhas.filter(l =>
     (!q || l.c.nome.toLowerCase().includes(q) || (l.c.cargo ?? '').toLowerCase().includes(q))
     && (!fBase || l.c.base === fBase)
-    && (!fCargo || l.c.cargo === fCargo)
+    && (!fCargo || cargoBase(l.c.cargo) === fCargo)
     && (!fSetor || l.c.setor === fSetor)
     && (!fAdmDe || (l.c.data_admissao ?? '') >= fAdmDe)
     && (!fAdmAte || (l.c.data_admissao ?? '9999') <= fAdmAte)
@@ -949,7 +950,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const cols = catalogo // já ordenado por ordem
   // agrupado por função (cargo), colaboradores ordenados por nome dentro do grupo
   const grupos = [...filt.reduce((m, l) => {
-    const k = l.c.cargo || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
+    const k = cargoBase(l.c.cargo) || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
   }, new Map<string, typeof filt>()).entries()]
     .map(([k, arr]) => [k, arr.sort((a, b) => a.c.nome.localeCompare(b.c.nome, 'pt-BR'))] as [string, typeof filt])
     .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
@@ -1041,7 +1042,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
                     </td>
                   </tr>
                   {linhas.map((l, i) => {
-                    const tidSet = new Set(reqPorCargo.get((l.c.cargo ?? '').trim().toUpperCase()) ?? [])
+                    const tidSet = new Set(reqPorCargo.get(cargoBase(l.c.cargo)) ?? [])
                     return (
                       <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
                         <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 whitespace-nowrap ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
