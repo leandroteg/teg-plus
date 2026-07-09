@@ -334,7 +334,6 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
   const trein = useTreinamentos()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
   const { data: matriz = [] } = useMatrizTreinamentos()
-  const [novoTrein, setNovoTrein] = useState({ nome: '', norma: '' })
 
   const cargoNorm = cargoBase((cand as any).cargo || cargo)
   const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
@@ -394,15 +393,6 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 pt-0.5">
-        <input placeholder="Adicionar outro treinamento…" value={novoTrein.nome}
-          onChange={e => setNovoTrein(p => ({ ...p, nome: e.target.value }))} className={`${IN} flex-1`} />
-        <input placeholder="NR" value={novoTrein.norma}
-          onChange={e => setNovoTrein(p => ({ ...p, norma: e.target.value }))} className={`${IN} w-20`} />
-        <button disabled={!novoTrein.nome.trim() || trein.add.isPending}
-          onClick={() => { trein.add.mutate({ candidatoId: cand.id, nome: novoTrein.nome.trim(), norma: novoTrein.norma.trim() || undefined }); setNovoTrein({ nome: '', norma: '' }) }}
-          className="p-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40"><Plus size={12} /></button>
-      </div>
     </div>
   )
 }
@@ -870,16 +860,6 @@ function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissao
   return (
     <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
       <CandHeader nome={cand.nome} isDark={isDark} right={isLoading ? <Loader2 size={12} className="animate-spin text-slate-400" /> : null} />
-
-      {/* Assinaturas e presencial */}
-      <div className="space-y-1">
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><PenLine size={11} /> Assinaturas e integração</span>
-        <div className="flex items-center gap-4 flex-wrap">
-          <CheckRow checked={!!integ?.contrato_assinado} label="Contrato assinado" onToggle={() => upd({ contrato_assinado: !integ?.contrato_assinado })} />
-          <CheckRow checked={!!integ?.ficha_epi_assinada} label="Ficha de EPI assinada" onToggle={() => upd({ ficha_epi_assinada: !integ?.ficha_epi_assinada })} />
-          <CheckRow checked={!!integ?.integracao_presencial} label="Integração presencial feita" onToggle={() => upd({ integracao_presencial: !integ?.integracao_presencial })} />
-        </div>
-      </div>
 
       {/* Aceites no Portal */}
       <div className="space-y-1">
