@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
-  Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight,
+  Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight, ChevronDown,
   CheckCircle2, XCircle, Circle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -878,6 +878,39 @@ const TREINO_ABREV: Record<string, string> = {
 const colLabel = (c: { codigo: string; norma: string | null }) => TREINO_ABREV[c.codigo] || c.norma || c.codigo
 
 
+// filtro multi-seleção (checkboxes) com "Selecionar todos"
+function CheckDropdown({ label, options, selected, onChange, isDark }: {
+  label: string; options: string[]; selected: Set<string> | null
+  onChange: (s: Set<string>) => void; isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const sel = selected ?? new Set(options)
+  const allSel = options.length > 0 && options.every(o => sel.has(o))
+  const toggle = (o: string) => { const n = new Set(sel); n.has(o) ? n.delete(o) : n.add(o); onChange(n) }
+  const resumo = allSel ? 'Todos' : sel.size === 0 ? 'Nenhum' : `${sel.size}/${options.length}`
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`text-xs rounded-lg px-2.5 py-1.5 border inline-flex items-center gap-1.5 ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+        {label}: <span className="font-bold">{resumo}</span> <ChevronDown size={13} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+        <div className={`absolute z-40 mt-1 max-h-72 w-60 overflow-auto rounded-xl border p-1 shadow-xl ${isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'}`}>
+          <label className={`flex items-center gap-2 px-2 py-1.5 rounded-lg font-bold cursor-pointer border-b mb-1 text-xs ${isDark ? 'border-white/10 text-slate-200' : 'border-slate-100 text-slate-700'}`}>
+            <input type="checkbox" checked={allSel} onChange={() => onChange(allSel ? new Set() : new Set(options))} /> Selecionar todos
+          </label>
+          {options.map(o => (
+            <label key={o} className={`flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer text-xs ${isDark ? 'text-slate-300 hover:bg-white/[0.05]' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <input type="checkbox" checked={sel.has(o)} onChange={() => toggle(o)} /> <span className="truncate">{o}</span>
+            </label>
+          ))}
+        </div>
+      </>)}
+    </div>
+  )
+}
+
 // ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
 function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   isDark: boolean; card: string; txtMain: string; txtMuted: string
@@ -890,15 +923,24 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
-  const [fBase, setFBase] = useState('')
-  const [fCargo, setFCargo] = useState('')
-  const [fSetor, setFSetor] = useState('')
+  const [fBase, setFBase] = useState<Set<string> | null>(null)
+  const [fCargo, setFCargo] = useState<Set<string> | null>(null)
+  const [fSetor, setFSetor] = useState<Set<string> | null>(null)
   const [fAdmDe, setFAdmDe] = useState('')
   const [fAdmAte, setFAdmAte] = useState('')
 
   const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
   const cargos = [...new Set(colabs.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
   const setores = [...new Set(colabs.map(c => c.setor).filter(Boolean))].sort() as string[]
+
+  // defaults: tudo marcado, exceto a base "Escritório Central"
+  useEffect(() => {
+    if (colabs.length && fBase === null) {
+      setFBase(new Set(bases.filter(b => cargoBase(b) !== 'ESCRITORIO CENTRAL' && b !== 'Escritório Central')))
+      setFCargo(new Set(cargos))
+      setFSetor(new Set(setores))
+    }
+  }, [colabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const catById = new Map(catalogo.map(c => [c.id, c]))
   const reqPorCargo = new Map<string, string[]>()
@@ -937,9 +979,9 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const q = busca.trim().toLowerCase()
   const filt = linhas.filter(l =>
     (!q || l.c.nome.toLowerCase().includes(q) || (l.c.cargo ?? '').toLowerCase().includes(q))
-    && (!fBase || l.c.base === fBase)
-    && (!fCargo || cargoBase(l.c.cargo) === fCargo)
-    && (!fSetor || l.c.setor === fSetor)
+    && (!fBase || !l.c.base || fBase.has(l.c.base))
+    && (!fCargo || !cargoBase(l.c.cargo) || fCargo.has(cargoBase(l.c.cargo)))
+    && (!fSetor || !l.c.setor || fSetor.has(l.c.setor))
     && (!fAdmDe || (l.c.data_admissao ?? '') >= fAdmDe)
     && (!fAdmAte || (l.c.data_admissao ?? '9999') <= fAdmAte)
     && (quick === 'todos' || (quick === 'pendencia' && (l.faltando > 0 || l.vencido > 0 || l.vencendo > 0)))
@@ -974,15 +1016,9 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
                 <Search size={14} className={txtMuted} />
                 <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
               </div>
-              <select value={fBase} onChange={e => setFBase(e.target.value)} className={selCls}>
-                <option value="">Todas as bases</option>{bases.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <select value={fCargo} onChange={e => setFCargo(e.target.value)} className={selCls}>
-                <option value="">Todas as posições</option>{cargos.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select value={fSetor} onChange={e => setFSetor(e.target.value)} className={selCls}>
-                <option value="">Todos os setores</option>{setores.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <CheckDropdown label="Bases" options={bases} selected={fBase} onChange={setFBase} isDark={isDark} />
+              <CheckDropdown label="Posições" options={cargos} selected={fCargo} onChange={setFCargo} isDark={isDark} />
+              <CheckDropdown label="Setores" options={setores} selected={fSetor} onChange={setFSetor} isDark={isDark} />
               <span className={`flex items-center gap-1 text-[11px] ${txtMuted}`} title="Data de admissão">
                 Adm.
                 <input type="date" value={fAdmDe} onChange={e => setFAdmDe(e.target.value)} className={selCls} />
@@ -1018,13 +1054,13 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
         <Vazio isDark={isDark} texto="Nenhum colaborador encontrado" />
       ) : vista === 'tabela' ? (
         <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-          <table className="border-collapse text-xs">
+          <table className="w-full min-w-[1000px] table-fixed border-collapse text-xs">
             <thead>
               <tr>
-                <th className={`sticky left-0 top-0 z-30 text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
                 {cols.map(c => (
                   <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
-                    className={`sticky top-0 z-20 h-[132px] w-[38px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                    className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
                     <div className="relative h-full">
                       <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{colLabel(c)}</span>
                     </div>
@@ -1045,9 +1081,9 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
                     const tidSet = new Set(reqPorCargo.get(cargoBase(l.c.cargo)) ?? [])
                     return (
                       <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
-                        <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 whitespace-nowrap ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
-                          <button onClick={() => onSelect(l.c.id)} className="text-left group">
-                            <p className={`text-xs font-bold group-hover:text-sky-500 ${txtMain}`}>{l.c.nome}</p>
+                        <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                          <button onClick={() => onSelect(l.c.id)} title={l.c.nome} className="text-left group block w-full">
+                            <p className={`text-xs font-bold truncate group-hover:text-sky-500 ${txtMain}`}>{l.c.nome}</p>
                           </button>
                         </td>
                         {cols.map(c => (
@@ -1147,13 +1183,13 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
 
       {/* grade */}
       <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-        <table className="border-collapse text-xs">
+        <table className="w-full min-w-[1000px] table-fixed border-collapse text-xs">
           <thead>
             <tr>
-              <th className={`sticky left-0 top-0 z-30 text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
+              <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
               {cols.map(c => (
                 <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}${c.carga_horaria ? ' · ' + c.carga_horaria + 'h' : ''}`}
-                  className={`sticky top-0 z-20 h-[132px] w-[38px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                  className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
                   <div className="relative h-full">
                     <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{colLabel(c)}</span>
                   </div>
@@ -1164,7 +1200,7 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
           <tbody>
             {cargosF.map((cargo, i) => (
               <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
-                <td className={`sticky left-0 z-10 px-3 py-1.5 font-semibold whitespace-nowrap ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                <td title={cargo} className={`sticky left-0 z-10 px-3 py-1.5 font-semibold truncate max-w-[240px] ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
                 {cols.map(c => {
                   const e = cel(cargo, c.id)
                   return (
