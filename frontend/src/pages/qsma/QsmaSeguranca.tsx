@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, Fragment, type ReactNode } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
@@ -106,7 +106,7 @@ export default function QsmaSeguranca() {
   const [normaF, setNormaF] = useState('')
   const [tipoOcoF, setTipoOcoF] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
-  const [subTreino, setSubTreino] = useState<'matriz' | 'controle'>('matriz')
+  const [subTreino, setSubTreino] = useState<'matriz' | 'controle'>('controle')
   const [treinoColab, setTreinoColab] = useState<string | null>(null)
   const [quickFicha, setQuickFicha] = useState('todos')
   const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
@@ -316,11 +316,12 @@ export default function QsmaSeguranca() {
       )}
 
       {/* ── Treinamentos ── */}
-      {aba === 'treinamentos' && (
-        <div className="space-y-3">
-          {/* Sub-abas */}
-          <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-            {([['matriz', 'Matriz de Treinamentos'], ['controle', 'Controle de Treinamentos']] as const).map(([k, lbl]) => (
+      {aba === 'treinamentos' && (() => {
+        // Toggle das sub-abas (Controle à esquerda, Matriz à direita) — renderizado
+        // dentro da linha de filtros de cada sub-aba (subimos tudo p/ a mesma linha).
+        const subTabsToggle = (
+          <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            {([['controle', 'Controle de Treinamentos'], ['matriz', 'Matriz de Treinamentos']] as const).map(([k, lbl]) => (
               <button key={k} onClick={() => setSubTreino(k)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   subTreino === k
@@ -329,17 +330,20 @@ export default function QsmaSeguranca() {
                 }`}>{lbl}</button>
             ))}
           </div>
+        )
+        return (
+          <div className="space-y-3">
+            {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
 
-          {subTreino === 'matriz' && <MatrizTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
-
-          {subTreino === 'controle' && (
-            treinoColab
-              ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} soTreinamentos />
-              : <ControleTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
-                  onSelect={setTreinoColab} />
-          )}
-        </div>
-      )}
+            {subTreino === 'controle' && (
+              treinoColab
+                ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} soTreinamentos />
+                : <ControleTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+                    onSelect={setTreinoColab} />
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Ocorrências (kanban) ── */}
       {aba === 'ocorrencias' && (
@@ -912,8 +916,8 @@ function CheckDropdown({ label, options, selected, onChange, isDark }: {
 }
 
 // ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
-function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
-  isDark: boolean; card: string; txtMain: string; txtMuted: string
+function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSelect }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
   onSelect: (id: string) => void
 }) {
   const { data: colabs = [], isLoading } = useColaboradoresTreino()
@@ -1012,6 +1016,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
           <div className="space-y-1.5">
             <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
             <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+              {subTabs}
               <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
                 <Search size={14} className={txtMuted} />
                 <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
@@ -1130,8 +1135,8 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
 }
 
 // ── Matriz de Treinamentos (cargo × treinamento) ─────────────────────────────
-function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
-  isDark: boolean; card: string; txtMain: string; txtMuted: string; isAdmin: boolean
+function MatrizTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string; isAdmin: boolean
 }) {
   const { data: catalogo = [], isLoading: lc } = useCatalogoTreinamentos()
   const { data: matriz = [], isLoading: lm } = useMatrizTreinamentos()
@@ -1157,12 +1162,18 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
       : (isDark ? 'text-slate-700' : 'text-slate-200')
   const cellTxt = (e: string) => e === 'obrigatorio' ? 'O' : e === 'atividade' ? 'A' : '·'
 
-  if (lc || lm) return <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+  if (lc || lm) return (
+    <div className="space-y-3">
+      {subTabs && <div className="flex items-center gap-2 flex-wrap">{subTabs}</div>}
+      <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+    </div>
+  )
 
   return (
     <div className="space-y-3">
-      {/* toolbar + legenda */}
+      {/* toolbar + legenda (toggle das sub-abas na mesma linha) */}
       <div className="flex items-center gap-2 flex-wrap">
+        {subTabs}
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm flex-1 min-w-[200px] max-w-xs ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <Search size={14} className={txtMuted} />
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cargo…"
