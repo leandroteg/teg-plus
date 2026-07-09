@@ -5,10 +5,11 @@
 //   · Histórico:  linha do tempo de quem passou por cada leito
 // QR de check-in (Portal TEG) fica para a próxima fase.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import QRCode from 'qrcode'
 import {
-  BedDouble, Building2, History, Search, Plus, X, Loader2, UserPlus,
-  LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2,
+  BedDouble, History, Search, Plus, X, Loader2, UserPlus,
+  LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
@@ -24,6 +25,56 @@ const fmtDate = (d?: string | null) =>
 
 const nomeAloj = (im?: { nome?: string | null; descricao?: string | null; titulo?: string | null } | null) =>
   im?.nome || im?.descricao || im?.titulo || 'Alojamento'
+
+// URL que o QR codifica → o Portal TEG lê o número do leito e chama a RPC de check-in
+const PORTAL_BASE = 'https://portal.teguniao.com.br'
+const leitoUrl = (numeroSeq: number) => `${PORTAL_BASE}/leito/${numeroSeq}`
+
+// Imagem de QR gerada no cliente (lib qrcode, sem chamada externa)
+function QrImg({ text, size = 160 }: { text: string; size?: number }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    let vivo = true
+    QRCode.toDataURL(text, { width: size, margin: 1 }).then(u => { if (vivo) setUrl(u) }).catch(() => {})
+    return () => { vivo = false }
+  }, [text, size])
+  return url
+    ? <img src={url} width={size} height={size} alt="QR do leito" style={{ width: size, height: size }} />
+    : <div style={{ width: size, height: size }} className="animate-pulse bg-slate-100 rounded-lg" />
+}
+
+// Abre uma folha imprimível com os QRs (1 leito ou o alojamento inteiro)
+async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
+  const itens = await Promise.all(leitos.map(async l => ({
+    l, dataUrl: await QRCode.toDataURL(leitoUrl(l.numero_seq), { width: 240, margin: 1 }),
+  })))
+  const cards = itens.map(({ l, dataUrl }) => `
+    <div class="card">
+      <img src="${dataUrl}" />
+      <div class="num">#${l.numero_seq}</div>
+      <div class="cod">${l.codigo}${l.quarto ? ' · ' + l.quarto : ''}</div>
+    </div>`).join('')
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>QRs — ${tituloAloj}</title>
+    <style>
+      *{font-family:system-ui,Arial,sans-serif;box-sizing:border-box}
+      body{margin:24px}
+      h1{font-size:18px;margin:0 0 4px}
+      p{color:#666;font-size:12px;margin:0 0 20px}
+      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+      .card{border:1px solid #ddd;border-radius:12px;padding:12px;text-align:center;page-break-inside:avoid}
+      .card img{width:100%;max-width:220px}
+      .num{font-family:monospace;font-weight:700;font-size:13px;color:#0891b2;margin-top:4px}
+      .cod{font-size:13px;font-weight:600}
+      @media print{.noprint{display:none}}
+    </style></head><body>
+    <h1>${tituloAloj} — QR de check-in dos leitos</h1>
+    <p>Cole cada QR no leito correspondente. O colaborador escaneia e faz check-in/check-out pelo Portal TEG.</p>
+    <button class="noprint" onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;border:0;border-radius:8px;background:#0891b2;color:#fff;font-weight:600;cursor:pointer">Imprimir</button>
+    <div class="grid">${cards}</div>
+    </body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close(); w.focus() }
+}
 
 interface Stats { total: number; ocupados: number; livres: number; taxa: number }
 function statsDe(leitos: Leito[], ocupadosSet: Set<string>): Stats {
@@ -197,6 +248,7 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   const [qtd, setQtd] = useState('')
   const [alocarLeito, setAlocarLeito] = useState<Leito | null>(null)
   const [moverOcup, setMoverOcup] = useState<{ ocup: LeitoOcupacao; leito: Leito } | null>(null)
+  const [qrLeito, setQrLeito] = useState<Leito | null>(null)
 
   const bg = isDark ? 'bg-[#0f172a]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -241,6 +293,15 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
             </button>
           </div>
 
+          {/* Folha de QRs do alojamento */}
+          {leitosOrd.length > 0 && (
+            <button onClick={() => imprimirFolhaQrs(nomeAloj(alojamento), leitosOrd)}
+              className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl border
+                ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              <Printer size={13} /> Folha de QRs ({leitosOrd.length} leitos)
+            </button>
+          )}
+
           {/* Lista de leitos */}
           {leitosOrd.length === 0 ? (
             <p className={`text-sm text-center py-8 ${txtMuted}`}>Nenhum leito cadastrado ainda.</p>
@@ -265,6 +326,10 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setQrLeito(l)} title="QR de check-in"
+                          className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
+                          <QrCode size={14} />
+                        </button>
                         {oc ? (
                           <>
                             <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
@@ -295,12 +360,47 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
         </div>
       </div>
 
+      {qrLeito && <QrLeitoModal leito={qrLeito} alojamento={alojamento} isDark={isDark} onClose={() => setQrLeito(null)} />}
       {alocarLeito && <AlocarModal leito={alocarLeito} isDark={isDark} onClose={() => setAlocarLeito(null)} />}
       {moverOcup && (
         <MoverModal ocup={moverOcup.ocup} leitoAtual={moverOcup.leito} isDark={isDark}
           leitosLivres={leitosOrd.filter(x => x.ativo && !ocupPorLeito.has(x.id))}
           onClose={() => setMoverOcup(null)} />
       )}
+    </div>
+  )
+}
+
+// ── Modal QR de um leito ─────────────────────────────────────────────────────
+function QrLeitoModal({ leito, alojamento, isDark, onClose }: {
+  leito: Leito; alojamento: LocImovel; isDark: boolean; onClose: () => void
+}) {
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-xs ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <h3 className={`text-base font-bold ${txt}`}>QR do leito</h3>
+          <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+        <div className="p-5 flex flex-col items-center gap-3">
+          <div className="bg-white p-3 rounded-xl">
+            <QrImg text={leitoUrl(leito.numero_seq)} size={180} />
+          </div>
+          <div className="text-center">
+            <p className={`font-mono font-bold text-cyan-500`}>#{leito.numero_seq}</p>
+            <p className={`text-sm font-semibold ${txt}`}>{leito.codigo}{leito.quarto ? ` · ${leito.quarto}` : ''}</p>
+            <p className={`text-xs ${txtMuted}`}>{nomeAloj(alojamento)}</p>
+          </div>
+          <p className={`text-[11px] text-center ${txtMuted}`}>O colaborador escaneia e faz check-in/check-out pelo Portal TEG (informando a matrícula).</p>
+          <button onClick={() => imprimirFolhaQrs(nomeAloj(alojamento), [leito])}
+            className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-700">
+            <Printer size={13} /> Imprimir
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
