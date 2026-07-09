@@ -178,23 +178,35 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
         criado_por: (user as { nome?: string; email?: string } | null)?.nome
           ?? (user as { email?: string } | null)?.email ?? null,
       })
-      // 4) recorta e sobe cada card
+      // 4) recorta e sobe cada card — cada um isolado: um card com problema
+      //    NÃO derruba o save inteiro (pula e segue), e gravamos os que deram certo.
       const rows: Omit<JornalCard, 'id' | 'created_at'>[] = []
+      let falhas = 0
       for (let i = 0; i < crops.length; i++) {
         const c = crops[i]
-        const canvas = canvasesRef.current[c.page]
-        const px = { x: c.x * canvas.width, y: c.y * canvas.height, w: c.w * canvas.width, h: c.h * canvas.height }
-        const blob = await cropCanvasToBlob(canvas, px.x, px.y, px.w, px.h)
-        const url = await uploadJornalArquivo(blob, 'card')
-        rows.push({
-          edicao_id: edicao.id, pagina: c.page + 1, ordem: i,
-          titulo: c.titulo ?? null, imagem_url: url,
-          largura: Math.round(px.w), altura: Math.round(px.h),
-        })
+        try {
+          const canvas = canvasesRef.current[c.page]
+          if (!canvas) { falhas++; continue }
+          const px = { x: c.x * canvas.width, y: c.y * canvas.height, w: c.w * canvas.width, h: c.h * canvas.height }
+          if (px.w < 4 || px.h < 4) { falhas++; continue }
+          const blob = await cropCanvasToBlob(canvas, px.x, px.y, px.w, px.h)
+          if (!blob || blob.size === 0) { falhas++; continue }
+          const url = await uploadJornalArquivo(blob, 'card')
+          rows.push({
+            edicao_id: edicao.id, pagina: c.page + 1, ordem: rows.length,
+            titulo: c.titulo ?? null, imagem_url: url,
+            largura: Math.round(px.w), altura: Math.round(px.h),
+          })
+        } catch (e) {
+          console.error('card', i, 'falhou — pulando', e)
+          falhas++
+        }
       }
-      await salvarCards.mutateAsync(rows)
+      if (rows.length) await salvarCards.mutateAsync(rows)
+      if (!rows.length) throw new Error('Nenhum card pôde ser gerado.')
       setDone(true)
       onSaved?.()
+      if (falhas) setErro(`${rows.length} cards salvos · ${falhas} não puderam ser gerados.`)
     } catch (err) {
       console.error(err)
       setErro('Falha ao salvar. Tente novamente.')
