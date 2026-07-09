@@ -136,7 +136,7 @@ export default function QsmaSeguranca() {
 
   return (
     <ControladoriaFlow
-      title="Segurança"
+      title="Gestão SST"
       subtitle="Prevenir (riscos) → equipar (EPIs) → capacitar (treinamentos) → tratar (ocorrências)"
       steps={STEPS}
       activeStep={aba}
@@ -1189,15 +1189,17 @@ function MatrizTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin 
         </div>
       </div>
 
-      {/* contagem (esquerda) + legenda (direita) — igual ao Controle */}
+      {/* contagem + dica (esquerda) + legenda (direita) — igual ao Controle */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className={`text-xs font-semibold ${txtMuted}`}>{cargosF.length} cargo{cargosF.length !== 1 ? 's' : ''} · {cols.length} treinamentos</p>
+        <p className={`text-xs ${txtMuted}`}>
+          <span className="font-semibold">{cargosF.length} cargo{cargosF.length !== 1 ? 's' : ''} · {cols.length} treinamentos</span>
+          {isAdmin && <span className="ml-2 opacity-80">· Clique numa célula para alternar entre Obrigatório e Não se aplica. Base: Matriz CEMIG OD/ST-06114/2025 + operação TEG.</span>}
+        </p>
         <div className="flex items-center gap-3 text-[11px]">
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('obrigatorio')}`}>O</span> Obrigatório</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center ${cellStyle('na')}`}>·</span> Não se aplica</span>
         </div>
       </div>
-      {isAdmin && <p className={`text-[11px] ${txtMuted}`}>Clique numa célula para alternar entre Obrigatório e Não se aplica. Base: Matriz CEMIG OD/ST-06114/2025 + operação TEG.</p>}
 
       {/* grade */}
       <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
