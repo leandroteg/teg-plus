@@ -326,6 +326,15 @@ export interface RHStats {
   admissoesMes: number
   desligamentosMes: number
   admissoesPendentes: number
+  // Movimento REAL de headcount (por data_admissao/data_demissao dos colaboradores) —
+  // fonte correta p/ turnover; rh_admissoes conta requisições e rh_desligamentos está vazia.
+  admitidosMes: number
+  desligadosMes: number
+  admitidosAno: number
+  desligadosAno: number
+  // Última folha lançada (rh_holerites, tipo mensal)
+  folhaTotal: number | null
+  folhaComp: string | null      // 'YYYY-MM' da última competência com holerite
   aniversariantes: RHColaborador[]
   porDepartamento: { departamento: string; total: number }[]
   porObra: { obra: string; total: number }[]
@@ -346,6 +355,13 @@ export function useRHStats() {
       const { data: desligamentos = [] } = await supabase
         .from('rh_desligamentos')
         .select('id, status, data_desligamento')
+
+      // Última folha lançada (holerites mensais) — soma o valor líquido da competência mais recente
+      const { data: holerites = [] } = await supabase
+        .from('rh_holerites')
+        .select('competencia, valor_liquido')
+        .eq('tipo', 'mensal')
+        .order('competencia', { ascending: false })
 
       const ativos = (todos as any[]).filter((c: any) => c.ativo)
       const inativos = (todos as any[]).filter((c: any) => !c.ativo)
@@ -397,6 +413,25 @@ export function useRHStats() {
         a.status === 'pendente' || a.status === 'avaliacao_documentos' || a.status === 'aguardando_cadastro'
       ).length
 
+      // Movimento real de headcount (datas de admissão/demissão dos colaboradores).
+      // Comparação por prefixo de string evita deslocamento de fuso (datas 'YYYY-MM-DD').
+      const anoStr = String(anoAtual)
+      const ymStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`
+      const admitidosAno = (todos as any[]).filter((c: any) => (c.data_admissao ?? '').startsWith(anoStr)).length
+      const desligadosAno = (todos as any[]).filter((c: any) => (c.data_demissao ?? '').startsWith(anoStr)).length
+      const admitidosMes = (todos as any[]).filter((c: any) => (c.data_admissao ?? '').startsWith(ymStr)).length
+      const desligadosMes = (todos as any[]).filter((c: any) => (c.data_demissao ?? '').startsWith(ymStr)).length
+
+      // Última folha: soma o líquido de todos os holerites da competência mais recente
+      let folhaComp: string | null = null
+      let folhaTotal: number | null = null
+      if ((holerites as any[]).length > 0) {
+        folhaComp = String((holerites as any[])[0].competencia).slice(0, 7)
+        folhaTotal = (holerites as any[])
+          .filter((h: any) => String(h.competencia).slice(0, 7) === folhaComp)
+          .reduce((s: number, h: any) => s + Number(h.valor_liquido || 0), 0)
+      }
+
       return {
         totalAtivos: ativos.length,
         totalInativos: inativos.length,
@@ -405,6 +440,12 @@ export function useRHStats() {
         admissoesMes,
         desligamentosMes,
         admissoesPendentes,
+        admitidosMes,
+        desligadosMes,
+        admitidosAno,
+        desligadosAno,
+        folhaTotal,
+        folhaComp,
         aniversariantes,
         porDepartamento,
         porObra,
