@@ -850,10 +850,8 @@ export function IntegracaoCard({ adm, isDark, onClick, autorNome }: {
 
 function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissaoCandidato; cargoVaga?: string | null; isDark: boolean; autorNome?: string }) {
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { enviarAceites, atualizar } = useIntegracao()
+  const { enviarMissoes, atualizar } = useIntegracao()
   const integ = data?.integracao ?? null
-  const aceites = data?.aceites ?? []
-  const aceitesOk = aceites.length > 0 && aceites.every(a => a.status === 'concluida')
 
   function upd(patch: Partial<RHIntegracao>) { atualizar.mutate({ candidatoId: cand.id, patch }) }
 
@@ -861,34 +859,20 @@ function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissao
     <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
       <CandHeader nome={cand.nome} isDark={isDark} right={isLoading ? <Loader2 size={12} className="animate-spin text-slate-400" /> : null} />
 
-      {/* Aceites no Portal */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><HeartHandshake size={11} /> Aceites no Portal</span>
-          {aceites.length === 0 ? (
-            <button onClick={() => enviarAceites.mutate({ candidatoId: cand.id, autorNome })} disabled={enviarAceites.isPending}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
-              {enviarAceites.isPending ? <Loader2 size={10} className="animate-spin" /> : <Smartphone size={10} />} Enviar aceites
-            </button>
-          ) : aceitesOk ? (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Todos aceitos ✓</span>
-          ) : (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
-              {aceites.filter(a => a.status === 'concluida').length}/{aceites.length} aceitos
-            </span>
-          )}
-        </div>
-        {aceites.length > 0 && (
-          <div className="flex items-center gap-3 flex-wrap">
-            {aceites.map(a => (
-              <CheckRow key={a.missao_id} checked={a.status === 'concluida'} label={a.titulo.replace(/^Aceitar (a |o )?/, '')} />
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Treinamentos obrigatórios (dirigido pela Matriz QSMA do cargo) */}
       <TreinamentosBlock cand={cand} cargo={cargoVaga} treinamentos={data?.treinamentos ?? []} />
+
+      {/* Rodapé: missões do Portal (Decl. de Ciência + Treinamentos) */}
+      <div className={`flex items-center justify-between gap-2 pt-2 mt-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <Smartphone size={11} /> Missões do Portal · Decl. de Ciência + Treinamentos
+          {integ?.aceites_enviados && <CheckCircle2 size={12} className="text-emerald-500" />}
+        </span>
+        <button onClick={() => enviarMissoes.mutate({ candidatoId: cand.id, autorNome })} disabled={enviarMissoes.isPending} className={BTN_PRI}>
+          {enviarMissoes.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />}
+          {integ?.aceites_enviados ? 'Reenviar Missão Integração' : 'Enviar Missão Integração'}
+        </button>
+      </div>
     </div>
   )
 }
