@@ -25,6 +25,7 @@ export type PlanParams = {
   eqPorLanc: number // equipes de 12 por frente de lançamento (2–3)
   diasUteis: number // dias úteis/mês (22)
   excluidas: string[] // obras embargadas / fora do plano
+  ordem?: string[] // prioridade manual (ordem das obras) — vence o critério prazo×R$; obras fora da lista caem no fim
   alvoIdx?: number | null // índice do mês-alvo (a partir do mês corrente) p/ cálculo de reforço
 }
 
@@ -75,8 +76,12 @@ export function planejar(obrasIn: PlanObraIn[], p: PlanParams): PlanResult {
     const tRest = o.mont.c > 0 && torresTot > 0 ? torresTot * (o.mont.s / o.mont.c) : 0
     return { o, torresTot, torresEst: est, fRest: o.fund.s, tRest, lRest: o.lanc.s, atv: { f: false, t: false, l: false }, esp: {} }
   })
-  // ordem de ataque: prazo CEMIG mais crítico primeiro; empate → maior saldo R$ (método PMO-MET-001)
+  // ordem de ataque: prioridade MANUAL (cfg.ordem) primeiro; senão prazo CEMIG + maior saldo R$ (PMO-MET-001)
+  const ordIdx = new Map((p.ordem ?? []).map((n, i) => [n, i]))
   const prio = [...sts].sort((a, b) => {
+    const oa = ordIdx.has(a.o.nome) ? ordIdx.get(a.o.nome)! : 1e9
+    const ob = ordIdx.has(b.o.nome) ? ordIdx.get(b.o.nome)! : 1e9
+    if (oa !== ob) return oa - ob
     const pa = a.o.prazoIdx ?? 9999, pb = b.o.prazoIdx ?? 9999
     if (pa !== pb) return pa - pb
     return b.o.saldoR - a.o.saldoR
