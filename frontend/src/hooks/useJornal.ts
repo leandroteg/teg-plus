@@ -23,6 +23,7 @@ export interface JornalCard {
   pagina: number
   ordem: number
   titulo: string | null
+  subtitulo: string | null
   imagem_url: string
   largura: number | null
   altura: number | null
@@ -155,9 +156,14 @@ export function useMuralJornalCards() {
 // ── Detecção automática de blocos (Gemini Vision via n8n) ─────────────────────
 const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
-export interface BlocoDetectado { titulo: string; x: number; y: number; w: number; h: number }
+// A IA devolve, por bloco: manchete, resumo e o retângulo da FOTO principal (frações 0–1).
+export interface BlocoDetectado {
+  titulo: string
+  subtitulo?: string
+  foto_x: number; foto_y: number; foto_w: number; foto_h: number
+}
 
-/** Envia a página (PNG base64) ao workflow de visão e recebe os retângulos dos blocos. */
+/** Envia a página (PNG base64) ao workflow de visão e recebe foto+chamada de cada bloco. */
 export async function detectarBlocosJornal(pagina: number, imagemBase64: string): Promise<BlocoDetectado[]> {
   const res = await fetch(`${N8N_BASE}/endomarketing/jornal-blocos`, {
     method: 'POST',
@@ -167,7 +173,7 @@ export async function detectarBlocosJornal(pagina: number, imagemBase64: string)
   if (!res.ok) throw new Error(`Erro ${res.status} ao detectar blocos`)
   const data = await res.json()
   const arr = Array.isArray(data) ? data : (data?.blocos ?? [])
-  return (arr as BlocoDetectado[]).filter(b => typeof b?.x === 'number' && typeof b?.w === 'number')
+  return (arr as BlocoDetectado[]).filter(b => typeof b?.foto_x === 'number' && typeof b?.foto_w === 'number')
 }
 
 // ── Storage (reaproveita o bucket mural-banners) ──────────────────────────────

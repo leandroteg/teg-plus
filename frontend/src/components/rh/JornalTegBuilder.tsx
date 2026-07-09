@@ -20,9 +20,10 @@ import { useTheme } from '../../contexts/ThemeContext'
 interface Crop {
   id: string
   page: number
-  x: number; y: number; w: number; h: number   // frações 0–1
+  x: number; y: number; w: number; h: number   // frações 0–1 (região da FOTO)
   thumb: string                                  // objectURL p/ preview
-  titulo?: string                                // vindo da detecção por IA
+  titulo?: string                                // manchete (IA)
+  subtitulo?: string                             // resumo (IA)
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
@@ -111,11 +112,12 @@ export default function JornalTegBuilder({ onSaved, initialFile }: { onSaved?: (
         try {
           const blocos = await detectarBlocosJornal(pi + 1, b64)
           for (const bl of blocos) {
-            const x = clamp01(bl.x), y = clamp01(bl.y)
-            const w = clamp01(Math.min(bl.w, 1 - x)), h = clamp01(Math.min(bl.h, 1 - y))
+            // o card é a FOTO principal do bloco (não o recorte cru)
+            const x = clamp01(bl.foto_x), y = clamp01(bl.foto_y)
+            const w = clamp01(Math.min(bl.foto_w, 1 - x)), h = clamp01(Math.min(bl.foto_h, 1 - y))
             if (w < 0.02 || h < 0.015) continue
             const blob = await cropCanvasToBlob(canvas, x * canvas.width, y * canvas.height, w * canvas.width, h * canvas.height)
-            novos.push({ id: `c${++cropSeq}`, page: pi, x, y, w, h, thumb: URL.createObjectURL(blob), titulo: bl.titulo })
+            novos.push({ id: `c${++cropSeq}`, page: pi, x, y, w, h, thumb: URL.createObjectURL(blob), titulo: bl.titulo, subtitulo: bl.subtitulo })
           }
         } catch (e) {
           console.error('detecção página', pi + 1, e)
@@ -201,7 +203,7 @@ export default function JornalTegBuilder({ onSaved, initialFile }: { onSaved?: (
           const url = await uploadJornalArquivo(blob, 'card')
           rows.push({
             edicao_id: edicao.id, pagina: c.page + 1, ordem: rows.length,
-            titulo: c.titulo ?? null, imagem_url: url,
+            titulo: c.titulo ?? null, subtitulo: c.subtitulo ?? null, imagem_url: url,
             largura: Math.round(px.w), altura: Math.round(px.h),
           })
         } catch (e) {
