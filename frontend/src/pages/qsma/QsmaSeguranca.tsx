@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
@@ -938,6 +938,10 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
   const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
   const cols = catalogo // já ordenado por ordem
+  // agrupado por função (cargo)
+  const grupos = [...filt.reduce((m, l) => {
+    const k = l.c.cargo || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
+  }, new Map<string, typeof filt>()).entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
 
   const IconeStatus = ({ s }: { s: 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' }) =>
     s === 'ok' ? <CheckCircle2 size={16} className="text-emerald-500" />
@@ -1015,45 +1019,59 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
               </tr>
             </thead>
             <tbody>
-              {filt.map((l, i) => {
-                const tidSet = new Set(reqPorCargo.get((l.c.cargo ?? '').trim().toUpperCase()) ?? [])
-                return (
-                  <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
-                    <td className={`sticky left-0 z-10 px-3 py-1.5 whitespace-nowrap ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
-                      <button onClick={() => onSelect(l.c.id)} className="text-left group">
-                        <p className={`text-xs font-bold group-hover:text-sky-500 ${txtMain}`}>{l.c.nome}</p>
-                        <p className={`text-[10px] ${txtMuted}`}>{l.c.cargo ?? '—'}</p>
-                      </button>
+              {grupos.map(([cargo, linhas]) => (
+                <Fragment key={cargo}>
+                  <tr>
+                    <td colSpan={cols.length + 1}
+                      className={`sticky left-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      {cargo} <span className="font-normal opacity-70">· {linhas.length}</span>
                     </td>
-                    {cols.map(c => (
-                      <td key={c.id} className={`text-center ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
-                        <div className="flex items-center justify-center h-7"><IconeStatus s={statusCel(l.c.id, tidSet, c)} /></div>
-                      </td>
-                    ))}
                   </tr>
-                )
-              })}
+                  {linhas.map((l, i) => {
+                    const tidSet = new Set(reqPorCargo.get((l.c.cargo ?? '').trim().toUpperCase()) ?? [])
+                    return (
+                      <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                        <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 whitespace-nowrap ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                          <button onClick={() => onSelect(l.c.id)} className="text-left group">
+                            <p className={`text-xs font-bold group-hover:text-sky-500 ${txtMain}`}>{l.c.nome}</p>
+                          </button>
+                        </td>
+                        {cols.map(c => (
+                          <td key={c.id} className={`text-center ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
+                            <div className="flex items-center justify-center h-7"><IconeStatus s={statusCel(l.c.id, tidSet, c)} /></div>
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filt.map(l => (
-            <button key={l.c.id} onClick={() => onSelect(l.c.id)}
-              className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50`}>
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-bold truncate ${txtMain}`}>{l.c.nome}</p>
-                <p className={`text-[11px] ${txtMuted}`}>{l.c.cargo ?? '—'}{l.prox ? ` · próx. venc. ${fmt(l.prox)}` : ''}</p>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                {l.total === 0 && <span className={`text-[10px] ${txtMuted}`}>sem matriz</span>}
-                {l.faltando > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{l.faltando} faltando</span>}
-                {l.vencido > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{l.vencido} vencido</span>}
-                {l.vencendo > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{l.vencendo} vencendo</span>}
-                {l.total > 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${l.ok === l.total ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{l.ok}/{l.total} ok</span>}
-                <ChevronRight size={14} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
-              </div>
-            </button>
+        <div className="space-y-4">
+          {grupos.map(([cargo, linhas]) => (
+            <div key={cargo} className="space-y-2">
+              <p className={`text-[11px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cargo} <span className="font-normal opacity-70">· {linhas.length}</span></p>
+              {linhas.map(l => (
+                <button key={l.c.id} onClick={() => onSelect(l.c.id)}
+                  className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold truncate ${txtMain}`}>{l.c.nome}</p>
+                    <p className={`text-[11px] ${txtMuted}`}>{l.prox ? `próx. venc. ${fmt(l.prox)}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {l.total === 0 && <span className={`text-[10px] ${txtMuted}`}>sem matriz</span>}
+                    {l.faltando > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{l.faltando} faltando</span>}
+                    {l.vencido > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{l.vencido} vencido</span>}
+                    {l.vencendo > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{l.vencendo} vencendo</span>}
+                    {l.total > 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${l.ok === l.total ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{l.ok}/{l.total} ok</span>}
+                    <ChevronRight size={14} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                  </div>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
