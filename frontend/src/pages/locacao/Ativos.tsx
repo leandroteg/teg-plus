@@ -386,6 +386,7 @@ export default function Ativos() {
       items.sort((a, b) => {
         let va: any, vb: any
         switch (sortCol) {
+          case 'nome': va = (a as any).nome || (a as any).titulo || ''; vb = (b as any).nome || (b as any).titulo || ''; break
           case 'imovel': va = a.endereco || a.descricao || ''; vb = b.endereco || b.descricao || ''; break
           case 'locador': va = a.locador_nome || ''; vb = b.locador_nome || ''; break
           case 'cc': va = (a as any).centro_custo?.descricao || ''; vb = (b as any).centro_custo?.descricao || ''; break
