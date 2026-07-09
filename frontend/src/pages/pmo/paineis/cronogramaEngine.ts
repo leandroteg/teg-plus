@@ -5,7 +5,7 @@ import type { EAPPoloRaw } from '../../../hooks/usePMO'
 // drivers de construção (pp = produtividade padrão por pessoa/mês; maq = máquinas padrão por pessoa)
 export const DRV = [
   { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 40, maq: 0.3 },
-  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#374151', pp: 8, maq: 0.25 },
+  { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#059669', pp: 8, maq: 0.25 },
   { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2, maq: 0.2 },
 ]
 // tudo que não é driver vira 3 linhas próprias (só R$):
