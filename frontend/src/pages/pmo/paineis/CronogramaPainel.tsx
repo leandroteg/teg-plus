@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
@@ -516,6 +516,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const [ganttWide, setGanttWide] = useState(false) // true = encobre as colunas de dados (Gantt toma o lugar)
   const [durDias, setDurDias] = useState(false) // Duração em meses ou dias (clique no título da coluna alterna)
   const fmtDur = (meses: number) => durDias ? `${meses * 30}d` : `${meses}m`
+  const [fSrv, setFSrv] = useState<Set<string>>(new Set()) // filtro de serviço (Fundação/Montagem/Lançamento) — vazio = todos
+  const DRVF = useMemo(() => DRV.filter(d => fSrv.size === 0 || fSrv.has(d.label)), [fSrv])
   const CW = 34, NAMEW = 280
   const gantt = useMemo(() => {
     let minYM = '', maxYM = ''
@@ -566,15 +568,29 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                 {versoes.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
               </select>
               {verSel && <button onClick={() => { excluir.mutate(verSel); setVerSel(''); setNome('') }} title="Excluir a versão selecionada" className={`p-1.5 rounded-xl border ${isDark ? 'border-white/15 text-slate-400 hover:text-rose-400' : 'border-slate-200 text-slate-400 hover:text-rose-500'}`}><Trash2 size={14} /></button>}
+              <MultiSelect label="Serviço" options={DRV.map(d => ({ value: d.label, label: d.label }))} selected={fSrv} onToggle={v => setFSrv(s => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n })} onClear={() => setFSrv(new Set())} isDark={isDark} />
               <span className="flex-1" />
-              <button onClick={() => setGanttWide(v => !v)} title={ganttWide ? 'Mostrar as colunas de dados de volta' : 'Encobrir as colunas de dados — o Gantt ocupa o lugar delas'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${ganttWide ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400')}`}>{ganttWide ? <ChevronsUpDown size={14} className="rotate-90" /> : <ChevronsDownUp size={14} className="rotate-90" />} Gantt</button>
-              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês + premissas de precedência e realocação" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade &amp; Premissas <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
-              <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Sparkles size={14} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
-              <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><Sparkles size={14} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
+              {(() => {
+                const todasObras = grupos.flatMap(([, obras]) => obras.map(o => o.nome))
+                const tudoAberto = grpFechado.size === 0 && todasObras.length > 0 && todasObras.every(n => openSrv.has(n))
+                const icone = `inline-flex items-center justify-center w-8 h-8 rounded-xl border transition disabled:opacity-40`
+                return (<>
+                  <button onClick={() => { if (tudoAberto) { setGrpFechado(new Set(grupos.map(([f]) => f))); setOpenSrv(new Set()) } else { setGrpFechado(new Set()); setOpenSrv(new Set(todasObras)) } }}
+                    title={tudoAberto ? 'Recolher tudo (frentes e serviços)' : 'Expandir tudo (frentes e serviços)'}
+                    className={`${icone} ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50 hover:text-teal-400' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
+                    {tudoAberto ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+                  </button>
+                  <button onClick={() => setGanttWide(v => !v)} title={ganttWide ? 'Gantt: mostrar as colunas de dados de volta' : 'Gantt: encobrir as colunas de dados (só nome + linha do tempo)'} className={`${icone} ${ganttWide ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-400')}`}>{ganttWide ? <ChevronsUpDown size={15} className="rotate-90" /> : <ChevronsDownUp size={15} className="rotate-90" />}</button>
+                  <button onClick={() => setProdOpen(true)} title={`Produtividade & Premissas — ${DRV.map(d => `${d.label} ${cfg.prodPP[d.label] ?? 0}`).join(' · ')} /pessoa·mês + precedência e realocação`} className={`${icone} ${isDark ? 'bg-slate-800/60 border-slate-700 text-teal-400 hover:border-teal-500/50' : 'bg-white border-slate-200 text-teal-600 hover:border-teal-400'}`}><Gauge size={15} /></button>
+                  <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'Efetivo real (RH): sem efetivo' : `Efetivo real (RH) · ${efetivoTot} pessoas — distribui às obras ∝ saldo`} className={`${icone} ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Users size={15} /></button>
+                  <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'Equipes (Obras): sem equipes alocadas' : `Equipes (Obras) · ${equipesTot} pessoas — alocação real por obra × frente (obra sem equipe fica 0)`} className={`${icone} ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><HardHat size={15} /></button>
+                </>)
+              })()}
               <button onClick={abrirPlan} title="Simula o portfólio por equipe-padrão e recursos críticos (rotor/perfuratriz/guindaste/comboio) e preenche início, término, predecessão e recursos" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-              <div className="max-h-[62vh] overflow-auto">
+              {/* overflow-x-scroll (não auto): barra horizontal SEMPRE visível no rodapé do bloco */}
+              <div className="max-h-[62vh] overflow-y-auto overflow-x-scroll">
               <div className="w-max min-w-full">
               {/* cabeçalho DENTRO do scroll (sticky) — colunas de dados (recolhíveis pelo botão Gantt) + linha do tempo à direita */}
               <div className={`sticky top-0 z-20 flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider border-b ${isDark ? 'bg-slate-900 text-slate-500 border-white/[0.06]' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
@@ -585,7 +601,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                 <span className="w-14 text-center shrink-0" title="Prazo — limite contratual (vencimento da OSC mais tardia da obra)">Prazo</span>
                 <span onClick={() => setDurDias(v => !v)} className="w-20 text-center shrink-0 cursor-pointer hover:text-teal-500 select-none" title="Duração projetada com a configuração atual — vermelho quando estoura o Prazo. CLIQUE pra alternar meses/dias">Duração ({durDias ? 'd' : 'm'})</span>
                 <span className="w-40 text-center shrink-0" title="Obra predecessora — quando ela conclui um serviço, a equipe liberada vem pra esta obra (digite pra filtrar)">Predecessão</span>
-                {DRV.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
+                {DRVF.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
                 <span className="w-9 text-right shrink-0">total</span>
                 </>)}
                 <div className="flex shrink-0" style={{ width: GW }}>
@@ -629,7 +645,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             </>)
                           })()}
                           <PredCombo value={cfg.pred?.[o.nome] ?? ''} options={predOpts.filter(n => n !== o.nome)} onPick={v => setPred(o.nome, v)} isDark={isDark} />
-                          {DRV.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
+                          {DRVF.map(d => { const has = o.drivers.some(x => x.label === d.label && x.contr > 0); return (
                             <input key={d.label} type="number" min="0" disabled={!has} value={has ? (eq[d.label] ?? 0) : ''} placeholder={has ? '' : '—'} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${!has ? 'opacity-30 cursor-not-allowed' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                           ) })}
                           <span className={`w-9 shrink-0 text-right text-[12px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tot}</span>
@@ -650,9 +666,9 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         {/* linhas de serviço — datas por serviço (override vence a obra); equipe só na coluna do próprio tipo */}
                         {aberto && (() => {
                           const srvRows: { key: string; cor: string; nome: string; info: string; drv?: string; marcos?: string }[] = []
-                          if (o.prelR > 0) srvRows.push({ key: 'prel', cor: COR_PREL, nome: 'Serv. Preliminares', info: `Prelim. + Canteiro · ${fmtM(o.prelR)}`, marcos: 'marcos Fund.' })
-                          o.drivers.filter(d => d.contr > 0).forEach(d => srvRows.push({ key: d.label, cor: d.cor, nome: d.label, info: `${fmtQ(d.saldoQ)} ${d.uni} · ${fmtM(d.saldoR)}`, drv: d.label }))
-                          if (o.outrosR > 0) srvRows.push({ key: 'outros', cor: COR_OUTROS, nome: 'Outros Serviços', info: `desmont/conf/aterr · ${fmtM(o.outrosR)}`, marcos: 'marcos Mont.' })
+                          if (o.prelR > 0 && fSrv.size === 0) srvRows.push({ key: 'prel', cor: COR_PREL, nome: 'Serv. Preliminares', info: `Prelim. + Canteiro · ${fmtM(o.prelR)}`, marcos: 'marcos Fund.' })
+                          o.drivers.filter(d => d.contr > 0 && (fSrv.size === 0 || fSrv.has(d.label))).forEach(d => srvRows.push({ key: d.label, cor: d.cor, nome: d.label, info: `${fmtQ(d.saldoQ)} ${d.uni} · ${fmtM(d.saldoR)}`, drv: d.label }))
+                          if (o.outrosR > 0 && fSrv.size === 0) srvRows.push({ key: 'outros', cor: COR_OUTROS, nome: 'Outros Serviços', info: `desmont/conf/aterr · ${fmtM(o.outrosR)}`, marcos: 'marcos Mont.' })
                           const cell = 'w-[118px] shrink-0'
                           return srvRows.map(r => {
                             const nm = r.drv ? (fimMap[o.nome]?.srv[r.drv] ?? 0) : 0
@@ -667,14 +683,14 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                                   <span className="w-14 shrink-0" />
                                   <span className="w-20 shrink-0 text-center text-[10px] font-semibold tabular-nums whitespace-nowrap text-violet-500" title={`Duração projetada deste serviço — término: ${nm > 0 ? ymLabel(shiftYM(start0, nm - 1)) : '—'}`}>{nm > 0 ? fmtDur(nm) : '—'}</span>
                                   <span className="w-40 shrink-0" />
-                                  {DRV.map(d => d.label === r.drv ? (
+                                  {DRVF.map(d => d.label === r.drv ? (
                                     <input key={d.label} type="number" min="0" value={eq[d.label] ?? 0} onChange={e => setEquipe(o.nome, d.label, Number(e.target.value))} className={`w-14 shrink-0 text-center text-[12px] font-semibold rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
                                   ) : <span key={d.label} className="w-14 shrink-0" />)}
                                   <span className="w-9 shrink-0" />
                                 </>) : (<>
                                   <span className={cell} /><span className={cell} /><span className="w-14 shrink-0" />
                                   <span className={`w-20 shrink-0 text-center text-[9px] whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`} title="Mede por marcos do serviço âncora (25% a cada 25%)">{r.marcos}</span>
-                                  <span className="w-40 shrink-0" />{DRV.map(d => <span key={d.label} className="w-14 shrink-0" />)}<span className="w-9 shrink-0" />
+                                  <span className="w-40 shrink-0" />{DRVF.map(d => <span key={d.label} className="w-14 shrink-0" />)}<span className="w-9 shrink-0" />
                                 </>))}
                                 {/* trilha do serviço no Gantt */}
                                 <div className="relative shrink-0 self-stretch" style={{ width: GW }}>
