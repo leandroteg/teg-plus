@@ -531,6 +531,12 @@ function TreinamentosSaude({ colaboradorId, cargo, sectionCls, isLight }: {
                       {l.reg?.data_realizacao ? `Realizado ${fmt(l.reg.data_realizacao)}` : 'Sem registro'}
                     </p>
                   </div>
+                  {(l.reg as any)?.certificado_url && (
+                    <a href={(l.reg as any).certificado_url} target="_blank" rel="noopener noreferrer" title="Abrir certificado"
+                      onClick={e => e.stopPropagation()} className="shrink-0 text-slate-400 hover:text-sky-500">
+                      <ExternalLink size={13} />
+                    </a>
+                  )}
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${chip(l.status)}`}>{chipTxt(l)}</span>
                 </div>
               ))}
