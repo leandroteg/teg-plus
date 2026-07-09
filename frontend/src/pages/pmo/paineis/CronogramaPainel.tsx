@@ -595,12 +595,12 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               <button onClick={abrirPlan} title="Simula o portfólio por equipe-padrão e recursos críticos (rotor/perfuratriz/guindaste/comboio) e preenche início, término, predecessão e recursos" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
             </div>
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-              {/* overflow-x-scroll (não auto): barra horizontal SEMPRE visível no rodapé do bloco */}
-              <div className="max-h-[62vh] overflow-y-auto overflow-x-scroll">
+              {/* overflow-x-scroll (não auto) + altura presa ao viewport: a barra horizontal fica SEMPRE visível acima do rodapé fixo */}
+              <div className="overflow-y-auto overflow-x-scroll" style={{ maxHeight: 'max(320px, calc(100vh - 380px))' }}>
               <div className="w-max min-w-full">
               {/* cabeçalho DENTRO do scroll (sticky) — colunas de dados (recolhíveis pelo botão Gantt) + linha do tempo à direita */}
               <div className={`sticky top-0 z-20 flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider border-b ${isDark ? 'bg-slate-900 text-slate-500 border-white/[0.06]' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                <span className={`shrink-0 sticky left-0 z-10 pl-4 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`} style={{ width: NAMEW }}>Obra</span>
+                <span className={`shrink-0 sticky left-0 z-10 pl-4 relative after:content-[''] after:absolute after:left-full after:inset-y-0 after:w-2 after:bg-inherit ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`} style={{ width: NAMEW }}>Obra</span>
                 {!ganttWide && (<>
                 <span className="w-[118px] text-center shrink-0" title="Início planejado (dd/mm/aaaa) — a obra não produz antes dele (digite ou clique no calendário)">Início</span>
                 <span className="w-[118px] text-center shrink-0" title="Término planejado (dd/mm/aaaa) — quando definido, o ritmo é forçado pela data (saldo ÷ meses), ignorando a equipe desta obra">Término</span>
@@ -610,8 +610,14 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                 {DRVF.map(d => <span key={d.label} className="w-14 text-center shrink-0" style={{ color: d.cor }} title={d.label}>{d.label.slice(0, 4)}.</span>)}
                 <span className="w-9 text-right shrink-0">total</span>
                 </>)}
-                <div className="flex shrink-0" style={{ width: GW }}>
-                  {gantt.meses.map(mm => <span key={mm} className={`shrink-0 text-center border-l ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`} style={{ width: CW }}>{ymLabel(mm)}</span>)}
+                {/* linha do tempo em 2 níveis: ano em cima, mês (3 letras) embaixo — legível a 34px/mês */}
+                <div className="flex flex-col shrink-0 self-stretch justify-center tracking-normal" style={{ width: GW }}>
+                  <div className="flex">
+                    {(() => { const gs: { y: string; n: number }[] = []; for (const m of gantt.meses) { const y = m.slice(0, 4); const u = gs[gs.length - 1]; if (u && u.y === y) u.n++; else gs.push({ y, n: 1 }) } return gs.map((g, i) => <span key={i} className={`shrink-0 text-center text-[8px] font-bold border-l ${isDark ? 'border-white/[0.08] text-slate-400' : 'border-slate-200 text-slate-500'}`} style={{ width: g.n * CW }}>{g.y}</span>) })()}
+                  </div>
+                  <div className="flex">
+                    {gantt.meses.map(mm => <span key={mm} className={`shrink-0 text-center text-[8px] font-semibold border-l ${isDark ? 'border-white/[0.04] text-slate-500' : 'border-slate-100 text-slate-400'}`} style={{ width: CW }}>{ymLabel(mm).split('/')[0]}</span>)}
+                  </div>
                 </div>
               </div>
                 {grupos.length === 0 && <p className={`px-3 py-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no filtro.</p>}
@@ -634,7 +640,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         return (
                         <div key={o.nome}>
                         <div className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
-                          <span className={`shrink-0 sticky left-0 z-10 min-w-0 flex items-center text-[11px] ${isDark ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600'}`} style={{ width: NAMEW }}>
+                          <span className={`shrink-0 sticky left-0 z-10 min-w-0 flex items-center text-[11px] relative after:content-[''] after:absolute after:left-full after:inset-y-0 after:w-2 after:bg-inherit ${isDark ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600'}`} style={{ width: NAMEW }}>
                             <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
                             <span className="truncate" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
                           </span>
@@ -682,7 +688,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                             const sf = r.drv ? (effFim(o, r.drv) || '').slice(0, 7) : ''
                             return (
                               <div key={r.key} className={`flex items-center gap-2 px-2.5 py-1 border-b last:border-0 ${isDark ? 'border-white/[0.03] bg-white/[0.02]' : 'border-slate-50 bg-slate-50/60'}`}>
-                                <span className={`shrink-0 sticky left-0 z-10 min-w-0 truncate pl-9 text-[10px] ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`} style={{ width: NAMEW }}><span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" style={{ background: r.cor }} /><b className={isDark ? 'text-slate-300' : 'text-slate-600'}>{r.nome}</b> <span className="opacity-60">{r.info}</span></span>
+                                <span className={`shrink-0 sticky left-0 z-10 min-w-0 truncate pl-9 text-[10px] relative after:content-[''] after:absolute after:left-full after:inset-y-0 after:w-2 after:bg-inherit ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`} style={{ width: NAMEW }}><span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" style={{ background: r.cor }} /><b className={isDark ? 'text-slate-300' : 'text-slate-600'}>{r.nome}</b> <span className="opacity-60">{r.info}</span></span>
                                 {!ganttWide && (r.drv ? (<>
                                   <input type="date" value={d8(effIni(o, r.drv))} onChange={e => setInicioSrv(o.nome, r.drv!, e.target.value)} title="Início deste serviço (dd/mm/aaaa — sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.inicioS?.[o.nome]?.[r.drv] ? 'border-teal-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
                                   <input type="date" value={d8(effFim(o, r.drv))} onChange={e => setFimSrv(o.nome, r.drv!, e.target.value)} title="Término deste serviço (dd/mm/aaaa) — força o ritmo pela data (sobrescreve a obra)" className={`${cell} text-[11px] rounded-lg border px-1 py-0.5 outline-none ${cfg.fimS?.[o.nome]?.[r.drv] ? 'border-violet-400' : ''} ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
