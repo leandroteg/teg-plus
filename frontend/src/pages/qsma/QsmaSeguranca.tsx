@@ -3,10 +3,15 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight, ChevronDown,
-  CheckCircle2, XCircle, Circle,
+  CheckCircle2, XCircle, Circle, Upload,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import {
+  useIntegracaoTreinos, useTreinamentos as useAdmissaoTreinamentos, certTreinamentoUrl,
+  type IntegracaoCand, type IntegracaoTreino,
+} from '../../hooks/useRHAdmissaoFluxo'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
@@ -106,7 +111,7 @@ export default function QsmaSeguranca() {
   const [normaF, setNormaF] = useState('')
   const [tipoOcoF, setTipoOcoF] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
-  const [subTreino, setSubTreino] = useState<'matriz' | 'controle'>('controle')
+  const [subTreino, setSubTreino] = useState<'integracao' | 'controle' | 'matriz'>('controle')
   const [treinoColab, setTreinoColab] = useState<string | null>(null)
   const [quickFicha, setQuickFicha] = useState('todos')
   const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
@@ -321,9 +326,9 @@ export default function QsmaSeguranca() {
         // dentro da linha de filtros de cada sub-aba (subimos tudo p/ a mesma linha).
         const subTabsToggle = (
           <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-            {([['controle', 'Controle de Treinamentos'], ['matriz', 'Matriz de Treinamentos']] as const).map(([k, lbl]) => (
+            {([['integracao', 'Integração'], ['controle', 'Controle'], ['matriz', 'Matriz']] as const).map(([k, lbl]) => (
               <button key={k} onClick={() => setSubTreino(k)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   subTreino === k
                     ? isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm'
                     : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
@@ -333,6 +338,8 @@ export default function QsmaSeguranca() {
         )
         return (
           <div className="space-y-3">
+            {subTreino === 'integracao' && <IntegracaoTreinamentos subTabs={subTabsToggle} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} />}
+
             {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
 
             {subTreino === 'controle' && (
@@ -1130,6 +1137,170 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
               ))}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Integração: candidatos em integração × treinamentos obrigatórios ─────────
+// Mesmo layout do Controle; o upload do certificado reusa o anexarCert da Admissão
+// (grava em rh_admissao_treinamentos + bucket rh-admissao-docs) → reflete na Admissão › Integração.
+function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
+  subTabs?: ReactNode; isDark: boolean; txtMain: string; txtMuted: string
+}) {
+  const qc = useQueryClient()
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: matriz = [] } = useMatrizTreinamentos()
+  const { data, isLoading } = useIntegracaoTreinos()
+  const admTrein = useAdmissaoTreinamentos()
+  const [busca, setBusca] = useState('')
+
+  const candidatos = data?.candidatos ?? []
+  const treinos = data?.treinos ?? []
+
+  // required por cargo-base (obrigatório, exceto ASO — que é da etapa de Exames, igual à Admissão)
+  const catById = new Map(catalogo.map(c => [c.id, c]))
+  const reqPorCargo = new Map<string, Set<string>>()
+  matriz.forEach(m => {
+    if (m.exigencia !== 'obrigatorio') return
+    if (catById.get(m.treinamento_id)?.codigo === 'ASO') return
+    const k = cargoBase(m.cargo)
+    if (!reqPorCargo.has(k)) reqPorCargo.set(k, new Set())
+    reqPorCargo.get(k)!.add(m.treinamento_id)
+  })
+
+  const treinosPorCand = new Map<string, IntegracaoTreino[]>()
+  treinos.forEach(t => { treinosPorCand.set(t.candidato_id, [...(treinosPorCand.get(t.candidato_id) ?? []), t]) })
+  const recDe = (candId: string, cat: { nome: string; norma: string | null }) =>
+    (treinosPorCand.get(candId) ?? []).find(t =>
+      (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
+
+  type Cel = { s: 'na' | 'ok' | 'faltando'; rec?: IntegracaoTreino }
+  const statusCel = (candId: string, cargoKey: string, cat: { id: string; nome: string; norma: string | null }): Cel => {
+    const req = reqPorCargo.get(cargoKey)
+    if (!req || !req.has(cat.id)) return { s: 'na' }
+    const rec = recDe(candId, cat)
+    if (rec?.status === 'concluido' && rec.certificado_path) return { s: 'ok', rec }
+    return { s: 'faltando', rec }
+  }
+
+  const q = busca.trim().toLowerCase()
+  const filt = candidatos.filter(c => !q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q))
+  const pendDe = (c: IntegracaoCand) => {
+    const req = reqPorCargo.get(cargoBase(c.cargo))
+    if (!req) return 0
+    let pend = 0
+    req.forEach(tid => { const cat = catById.get(tid); if (cat && statusCel(c.id, cargoBase(c.cargo), cat).s !== 'ok') pend++ })
+    return pend
+  }
+  const comPend = filt.filter(c => pendDe(c) > 0).length
+
+  const grupos = [...filt.reduce((m, c) => {
+    const k = cargoBase(c.cargo) || '—'; m.set(k, [...(m.get(k) ?? []), c]); return m
+  }, new Map<string, IntegracaoCand[]>()).entries()]
+    .map(([k, arr]) => [k, arr.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))] as [string, IntegracaoCand[]])
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+
+  const cols = catalogo
+  const upload = (candId: string, recId: string | undefined, cat: { nome: string; norma: string | null }, file: File) => {
+    admTrein.anexarCert.mutate(
+      { candidatoId: candId, recId, nome: cat.nome, norma: cat.norma ?? undefined, file },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: ['integracao-treinos'] }), onError: (e: any) => alert(`Erro ao anexar: ${e?.message ?? 'desconhecido'}`) },
+    )
+  }
+  const verCert = async (path?: string | null) => { const url = await certTreinamentoUrl(path); if (url) window.open(url, '_blank', 'noopener') }
+
+  return (
+    <div className="space-y-3">
+      {/* header (mesmo padrão do Controle) */}
+      <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        {subTabs}
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+      </div>
+
+      {/* contagem (esquerda) + legenda (direita) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} em integração{comPend ? ` · ${comPend} com pendência` : ''}</p>
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Certificado anexado</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Pendente (clique p/ anexar)</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+      ) : filt.length === 0 ? (
+        <Vazio isDark={isDark} texto="Nenhum colaborador em fase de integração" />
+      ) : (
+        <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full min-w-[1000px] table-fixed border-collapse text-xs">
+            <thead>
+              <tr>
+                <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                {cols.map(c => (
+                  <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
+                    className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                    <div className="relative h-full">
+                      <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{colLabel(c)}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map(([cargo, linhas]) => (
+                <Fragment key={cargo}>
+                  <tr>
+                    <td colSpan={cols.length + 1}
+                      className={`sticky left-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      {cargo} <span className="font-normal opacity-70">· {linhas.length}</span>
+                    </td>
+                  </tr>
+                  {linhas.map((c, i) => {
+                    const cargoKey = cargoBase(c.cargo)
+                    return (
+                      <tr key={c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                        <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                          <p className={`text-xs font-bold truncate ${txtMain}`} title={c.nome}>{c.nome}</p>
+                          {c.base && <p className={`text-[10px] truncate ${txtMuted}`}>{c.base}</p>}
+                        </td>
+                        {cols.map(col => {
+                          const st = statusCel(c.id, cargoKey, col)
+                          return (
+                            <td key={col.id} className={`text-center ${col.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
+                              <div className="flex items-center justify-center h-8">
+                                {st.s === 'na' ? (
+                                  <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                ) : st.s === 'ok' ? (
+                                  <button type="button" onClick={() => verCert(st.rec?.certificado_path)} title={`Ver certificado — ${st.rec?.certificado_nome ?? 'anexado'}`} className="group">
+                                    <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
+                                  </button>
+                                ) : (
+                                  <label title="Anexar certificado (reflete na Admissão › Integração)" className={`cursor-pointer inline-flex ${admTrein.anexarCert.isPending ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <span className="relative inline-flex items-center justify-center group">
+                                      <Circle size={14} className="text-red-400 group-hover:opacity-0" />
+                                      <Upload size={13} className="absolute text-sky-500 opacity-0 group-hover:opacity-100" />
+                                    </span>
+                                    <input type="file" className="hidden"
+                                      onChange={e => { const f = e.target.files?.[0]; if (f) upload(c.id, st.rec?.id, col, f); e.currentTarget.value = '' }} />
+                                  </label>
+                                )}
+                              </div>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
