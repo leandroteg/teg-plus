@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
-  useRegistro, useMatriculaColaborador, anexoSignedUrl,
+  useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -329,7 +329,7 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
 // Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
 function TreinamentosBlock({ cand, cargo, treinamentos }: {
   cand: RHAdmissaoCandidato; cargo?: string | null
-  treinamentos: { id: string; nome: string; norma: string | null; status: string }[]
+  treinamentos: { id: string; nome: string; norma: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
 }) {
   const trein = useTreinamentos()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
@@ -345,10 +345,9 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
   const extras = treinamentos.filter(t => !usadosIds.has(t.id))
   const feitos = required.filter(c => recDe(c)?.status === 'concluido').length
 
-  const toggleReq = (cat: typeof required[number]) => {
-    const rec = recDe(cat)
-    if (rec) trein.toggle.mutate({ id: rec.id, candidatoId: cand.id, concluido: rec.status !== 'concluido' })
-    else trein.add.mutate({ candidatoId: cand.id, nome: cat.nome, norma: cat.norma ?? undefined, concluido: true })
+  const abrirCert = async (path?: string | null) => {
+    const url = await certTreinamentoUrl(path)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -361,10 +360,25 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
       {required.length === 0 ? (
         <p className="text-[11px] text-slate-400">Cargo "{(cand as any).cargo || cargo || '—'}" sem treinamentos na Matriz (defina em QSMA › Segurança › Matriz de Treinamentos).</p>
       ) : (
-        required.map(cat => (
-          <CheckRow key={cat.id} checked={recDe(cat)?.status === 'concluido'}
-            label={`${cat.nome}${cat.norma ? ` (${cat.norma})` : ''}`} onToggle={() => toggleReq(cat)} />
-        ))
+        required.map(cat => {
+          const rec = recDe(cat) as (typeof treinamentos)[number] | undefined
+          const done = rec?.status === 'concluido'
+          const temCert = !!rec?.certificado_path
+          return (
+            <div key={cat.id} className="flex items-center gap-2 py-0.5">
+              {done ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> : <Circle size={13} className="text-slate-300 shrink-0" />}
+              <span className={`text-xs flex-1 min-w-0 truncate ${done ? 'text-slate-700' : 'text-slate-500'}`}>{cat.nome}{cat.norma ? ` (${cat.norma})` : ''}</span>
+              {temCert && (
+                <button type="button" onClick={() => abrirCert(rec?.certificado_path)} className="text-[10px] font-semibold text-sky-600 hover:underline shrink-0">ver</button>
+              )}
+              <label className={`cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${temCert ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-teal-600 hover:bg-teal-700 text-white'} ${trein.anexarCert.isPending ? 'opacity-50 pointer-events-none' : ''}`}>
+                <Upload size={11} /> {temCert ? 'Trocar' : 'Upload'}
+                <input type="file" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) trein.anexarCert.mutate({ candidatoId: cand.id, recId: rec?.id, nome: cat.nome, norma: cat.norma ?? undefined, file: f }); e.currentTarget.value = '' }} />
+              </label>
+            </div>
+          )
+        })
       )}
 
       {extras.length > 0 && (
