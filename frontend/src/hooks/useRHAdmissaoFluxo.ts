@@ -746,7 +746,32 @@ export function useTreinamentos() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
-  return { add, toggle, remover }
+  // anexa o certificado (bucket rh-admissao-docs) e conclui aquele treinamento
+  const anexarCert = useMutation({
+    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; file: File }) => {
+      const safe = i.file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `treinamentos/${i.candidatoId}/${Date.now()}_${safe}`
+      const { error: upErr } = await supabase.storage.from('rh-admissao-docs').upload(path, i.file, { upsert: true })
+      if (upErr) throw upErr
+      const patch = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      if (i.recId) {
+        const { error } = await supabase.from('rh_admissao_treinamentos').update(patch).eq('id', i.recId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('rh_admissao_treinamentos')
+          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null, ...patch })
+        if (error) throw error
+      }
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { add, toggle, remover, anexarCert }
+}
+
+export async function certTreinamentoUrl(path?: string | null): Promise<string | null> {
+  if (!path) return null
+  const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
 }
 
 export function useMobilizacao() {
