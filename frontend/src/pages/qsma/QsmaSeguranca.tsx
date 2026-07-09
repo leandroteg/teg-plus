@@ -868,6 +868,15 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
   )
 }
 
+// rótulo curto e legível por treinamento (o header mostrava "Anexo 1/2/3/4", críptico)
+const TREINO_ABREV: Record<string, string> = {
+  ASO: 'ASO', NR01: 'NR-01', NR06: 'NR-06', NR10B: 'NR-10', NR10SEP: 'NR-10 SEP',
+  NR11: 'NR-11', NR12: 'NR-12', NR18: 'NR-18', NR31: 'NR-31', NR33: 'NR-33', NR35: 'NR-35',
+  PS: 'Prim. Socorros', DDL: 'Direção Leve', DDGP: 'Direção Pesado', P4X4: 'Pilotagem 4x4',
+  CBSE: 'Curso Básico', MOTO: 'Motosserra', FAIXA: 'Faixa/Aceiro', IF: 'Instr. Formal', SINAL: 'Sinaleiro',
+}
+const colLabel = (c: { codigo: string; norma: string | null }) => TREINO_ABREV[c.codigo] || c.norma || c.codigo
+
 // ── Controle de Treinamentos: lista de colaboradores × conformidade da matriz ──
 function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   isDark: boolean; card: string; txtMain: string; txtMuted: string
@@ -938,10 +947,12 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
   const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
   const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
   const cols = catalogo // já ordenado por ordem
-  // agrupado por função (cargo)
+  // agrupado por função (cargo), colaboradores ordenados por nome dentro do grupo
   const grupos = [...filt.reduce((m, l) => {
     const k = l.c.cargo || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
-  }, new Map<string, typeof filt>()).entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+  }, new Map<string, typeof filt>()).entries()]
+    .map(([k, arr]) => [k, arr.sort((a, b) => a.c.nome.localeCompare(b.c.nome, 'pt-BR'))] as [string, typeof filt])
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
 
   const IconeStatus = ({ s }: { s: 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' }) =>
     s === 'ok' ? <CheckCircle2 size={16} className="text-emerald-500" />
@@ -1013,7 +1024,7 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
                 {cols.map(c => (
                   <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
                     className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
-                    <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{c.norma || c.codigo}</span>
+                    <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{colLabel(c)}</span>
                   </th>
                 ))}
               </tr>
@@ -1140,7 +1151,7 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
               {cols.map(c => (
                 <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}${c.carga_horaria ? ' · ' + c.carga_horaria + 'h' : ''}`}
                   className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
-                  <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{c.norma || c.codigo}</span>
+                  <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{colLabel(c)}</span>
                 </th>
               ))}
             </tr>
