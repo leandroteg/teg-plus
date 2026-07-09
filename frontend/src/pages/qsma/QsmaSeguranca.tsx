@@ -1173,10 +1173,10 @@ function MatrizTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin 
 
   return (
     <div className="space-y-3">
-      {/* toolbar + legenda (toggle das sub-abas na mesma linha) */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* header: filtros dentro da caixa com borda (mesmo padrão do Controle) */}
+      <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
         {subTabs}
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm flex-1 min-w-[200px] max-w-xs ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
           <Search size={14} className={txtMuted} />
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cargo…"
             className={`bg-transparent outline-none w-full ${txtMain}`} />
@@ -1187,7 +1187,12 @@ function MatrizTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin 
               className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${tipoF === k ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}>{l}</button>
           ))}
         </div>
-        <div className="flex items-center gap-3 ml-auto text-[11px]">
+      </div>
+
+      {/* contagem (esquerda) + legenda (direita) — igual ao Controle */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs font-semibold ${txtMuted}`}>{cargosF.length} cargo{cargosF.length !== 1 ? 's' : ''} · {cols.length} treinamentos</p>
+        <div className="flex items-center gap-3 text-[11px]">
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle('obrigatorio')}`}>O</span> Obrigatório</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center ${cellStyle('na')}`}>·</span> Não se aplica</span>
         </div>
@@ -1233,7 +1238,6 @@ function MatrizTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin 
           </tbody>
         </table>
       </div>
-      <p className={`text-[11px] ${txtMuted}`}>{cargosF.length} cargos · {cols.length} treinamentos</p>
     </div>
   )
 }
