@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
-  useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl,
+  useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -844,15 +844,27 @@ export function IntegracaoCard({ adm, isDark, onClick, autorNome }: {
 }) {
   return (
     <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
-      {(adm.candidatos ?? []).map(c => <IntCandidato key={c.id} cand={c} cargoVaga={adm.cargo_previsto} isDark={isDark} autorNome={autorNome} />)}
+      {(adm.candidatos ?? []).map(c => <IntCandidato key={c.id} cand={c} adm={adm} cargoVaga={adm.cargo_previsto} isDark={isDark} autorNome={autorNome} />)}
     </VagaCard>
   )
 }
 
-function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissaoCandidato; cargoVaga?: string | null; isDark: boolean; autorNome?: string }) {
+function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdmissaoCandidato; adm: RHAdmissao; cargoVaga?: string | null; isDark: boolean; autorNome?: string }) {
+  const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
   const { enviarMissoes, atualizar } = useIntegracao()
+  const liberar = useLiberarAdmissao()
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: matriz = [] } = useMatrizTreinamentos()
   const integ = data?.integracao ?? null
+
+  // todos os certificados anexados? (obrigatórios do cargo, exceto ASO)
+  const cargoNorm = cargoBase((cand as any).cargo || cargoVaga)
+  const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
+  const requeridos = catalogo.filter(c => reqIds.has(c.id) && c.codigo !== 'ASO')
+  const treinos = (data?.treinamentos ?? []) as { nome: string; norma: string | null; certificado_path?: string | null }[]
+  const temCert = (cat: { nome: string; norma: string | null }) => treinos.some(t => !!t.certificado_path && ((cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase()))
+  const todosCerts = requeridos.length > 0 && requeridos.every(temCert)
 
   function upd(patch: Partial<RHIntegracao>) { atualizar.mutate({ candidatoId: cand.id, patch }) }
 
@@ -873,6 +885,26 @@ function IntCandidato({ cand, cargoVaga, isDark, autorNome }: { cand: RHAdmissao
           {enviarMissoes.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />}
           {integ?.aceites_enviados ? 'Reenviar Missão Integração' : 'Enviar Missão Integração'}
         </button>
+      </div>
+
+      {/* Finalizar Integração — avança para Liberação (Pendente) quando todos os certificados estiverem anexados */}
+      <div className={`rounded-xl border px-3 py-2.5 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/60'}`}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="min-w-0">
+            <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar Integração</p>
+            <p className="text-[10px] text-slate-400">Conclui a integração e avança o colaborador para Liberação (Pendente).</p>
+          </div>
+          <button
+            onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }) }}
+            disabled={!todosCerts || liberar.isPending}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            {liberar.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar Integração</>}
+          </button>
+        </div>
+        {!todosCerts && (
+          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os certificados de treinamento estiverem anexados{requeridos.length > 0 ? ` (${requeridos.filter(temCert).length}/${requeridos.length})` : ''}.</p>
+        )}
+        {liberar.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(liberar.error as Error)?.message}</p>}
       </div>
     </div>
   )
