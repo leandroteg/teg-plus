@@ -12,7 +12,7 @@ import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
   useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao, useUploadAnexoCandidato,
-  useParecerQualificacao,
+  useParecerQualificacao, useDocsRecebidos,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
@@ -41,6 +41,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   const editar = useEditarAdmissao()
   const centrosCusto = useLookupCentrosCusto()
   const { data: bases = [] } = useBasesAdmissao()
+  const { data: docsRecebidos = false } = useDocsRecebidos(adm.etapa === 'documentacao' ? adm.id : undefined)
   const [motivoAcao, setMotivoAcao] = useState('')
   const [pedindo, setPedindo] = useState<'rejeitar' | 'esclarecer' | null>(null)
   const [abrindo, setAbrindo] = useState<string | null>(null)
@@ -346,8 +347,9 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
               </button>
             )}
             {etapa === 'documentacao' && (
-              <button onClick={() => executar('documentacao_recebida')} disabled={transicao.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+              <button onClick={() => executar('documentacao_recebida')} disabled={transicao.isPending || !docsRecebidos}
+                title={docsRecebidos ? undefined : 'Só avança para Exames após todos os documentos obrigatórios recebidos (+ pesquisa histórico).'}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
                 {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 Documentação Recebida
               </button>
