@@ -29,7 +29,12 @@ export default defineConfig({
     react(),
     stripPwaManifestFromAprovAi(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' (não 'autoUpdate'): a cada deploy, o SW novo ESPERA em vez de
+      // recarregar a página sozinho. O componente UpdateAvailable mostra o aviso
+      // "Nova versão disponível — Atualizar" e o usuário recarrega quando quiser,
+      // sem perder o que estava fazendo. autoUpdate forçava reload a cada deploy
+      // (dezenas por dia entre as sessões) → app "piscava e reiniciava".
+      registerType: 'prompt',
       includeAssets: ['icons/*.png', 'sounds/*.mp3'],
       manifest: {
         name: 'TEG+ ERP',
