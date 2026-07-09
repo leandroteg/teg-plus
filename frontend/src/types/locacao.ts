@@ -162,6 +162,9 @@ export interface LocImovel {
   id: string
   empresa_id?: string
   codigo?: string
+  tipo?: string            // ALOJ | CANT | CD | ESC ...
+  nome?: string
+  titulo?: string
   descricao: string
   endereco?: string
   numero?: string

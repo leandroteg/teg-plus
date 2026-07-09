@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { Building2, Receipt, Wrench, FileSignature, BedDouble } from 'lucide-react'
-import { useImoveis, useFaturas, useSolicitacoesLocacao, useAditivos, useAcordos } from '../../hooks/useLocacao'
+import { useImoveis, useFaturas, useSolicitacoesLocacao, useAditivos } from '../../hooks/useLocacao'
+import { useLeitos } from '../../hooks/useLeitos'
 import Ativos from './Ativos'
 import Faturas from './Faturas'
 import ManutencoesServicos from './ManutencoesServicos'
 import AditivosRenovacoes from './AditivosRenovacoes'
-import Acordos from './Acordos'
+import ControleLeitos from './ControleLeitos'
 
 const TABS = [
   { key: 'ativos',   label: 'Ativos',                  icon: Building2 },
@@ -44,15 +45,15 @@ export default function Gestao() {
   const { data: faturas = [] } = useFaturas()
   const { data: solicitacoes = [] } = useSolicitacoesLocacao()
   const { data: aditivos = [] } = useAditivos()
-  const { data: acordos = [] } = useAcordos()
+  const { data: leitos = [] } = useLeitos()
 
   const counts: Record<Tab, number> = useMemo(() => ({
     ativos: imoveis.length,
     faturas: faturas.length,
     servicos: solicitacoes.length,
     aditivos: aditivos.length,
-    acordos: acordos.length,
-  }), [imoveis, faturas, solicitacoes, aditivos, acordos])
+    acordos: leitos.length,
+  }), [imoveis, faturas, solicitacoes, aditivos, leitos])
 
   return (
     <div className={`rounded-2xl border overflow-hidden flex flex-col h-full ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -94,7 +95,7 @@ export default function Gestao() {
         {tab === 'faturas'  && <Faturas />}
         {tab === 'servicos' && <ManutencoesServicos />}
         {tab === 'aditivos' && <AditivosRenovacoes />}
-        {tab === 'acordos'  && <Acordos />}
+        {tab === 'acordos'  && <ControleLeitos />}
       </div>
     </div>
   )
