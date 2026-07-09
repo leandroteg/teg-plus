@@ -18,7 +18,7 @@ import { useCadObras } from '../../hooks/useCadastros'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
 
-export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
+export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { id: string; onBack: () => void; soTreinamentos?: boolean }) {
   const { isLightSidebar: isLight } = useTheme()
   const { data: colab, isLoading } = useRHColaborador(id)
   const { data: dependentes = [] } = useRHDependentes(id)
@@ -83,7 +83,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         <button onClick={onBack} className={`flex items-center gap-1.5 text-sm font-semibold ${isLight ? 'text-violet-600' : 'text-violet-400'}`}>
           <ArrowLeft size={16} /> Voltar
         </button>
-        {editMode ? (
+        {!soTreinamentos && (editMode ? (
           <div className="flex gap-2">
             <button onClick={() => setEditMode(false)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/10'}`}>
@@ -101,7 +101,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
             }`}>
             <Edit3 size={12} /> Editar
           </button>
-        )}
+        ))}
       </div>
 
       {/* Header card */}
@@ -141,6 +141,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      {!soTreinamentos && (<>
       {/* Dados Pessoais */}
       <div className={sectionCls}>
         <div className={headerCls} onClick={() => toggleSection('pessoal')}>
@@ -400,9 +401,12 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      </>)}
+
       {/* Treinamentos & Saúde (matriz QSMA + ASO) */}
       <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />
 
+      {!soTreinamentos && (<>
       {/* Missões & Assinaturas (Portal TEG) */}
       <MissoesColaborador
         colaboradorId={id}
@@ -436,6 +440,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
           )}
         </div>
       </div>
+      </>)}
     </div>
   )
 }
