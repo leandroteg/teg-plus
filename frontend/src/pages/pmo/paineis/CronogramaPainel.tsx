@@ -101,6 +101,8 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const [openO, setOpenO] = useState<Set<string>>(new Set())
   const [sub, setSub] = useState<'proj' | 'cfg'>('proj') // sub-telas da aba: Projeção (tabela) | Cronograma (config, ex-modal)
   const [applied, setApplied] = useState<Config | null>(null)
+  // nome da versão aplicada — usado pelo Publicar pra replicar no Histograma com o MESMO nome
+  const [appliedNome, setAppliedNome] = useState<string>(() => { try { return localStorage.getItem(`crono-cfg-nome-${portfolioId}`) ?? '' } catch { return '' } })
 
   // árvore frente → obra → drivers (saldo) — engine compartilhada
   const tree = useMemo(() => buildTree(raw), [raw])
@@ -206,9 +208,18 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
         .filter(r => r.valor > 0.5)
       if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
-      return rows.length
+      // replica no HISTOGRAMA: grava a config aplicada como versão com o MESMO nome do cronograma
+      let nomeV = ''
+      if (applied) {
+        nomeV = appliedNome.trim() || 'Cronograma publicado'
+        const ex = versoes.find(v => v.nome.toLowerCase() === nomeV.toLowerCase())
+        if (ex) { const { error } = await supabase.from('pmo_cronograma_versao').update({ config: applied, updated_at: new Date().toISOString() }).eq('id', ex.id); if (error) throw error }
+        else { const { error } = await supabase.from('pmo_cronograma_versao').insert({ portfolio_id: portfolioId, nome: nomeV, config: applied }); if (error) throw error }
+        qc.invalidateQueries({ queryKey: ['crono-versoes', portfolioId] })
+      }
+      return { n: rows.length, nomeV }
     },
-    onSuccess: n => alert(`Cronograma publicado: ${n} competência(s) — o Fluxo de Caixa do Financeiro já enxerga.`),
+    onSuccess: r => alert(`Cronograma publicado: ${r.n} competência(s) — Fluxo de Caixa atualizado${r.nomeV ? ` e replicado no Histograma (versão "${r.nomeV}")` : ''}.`),
     onError: () => alert('Erro ao publicar o cronograma.'),
   })
 
@@ -247,7 +258,7 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         tree={tree} efetivoFrente={efetivo?.porFrente} equipeObras={equipeObras}
         qObra={qObra} hide100={hide100} fFrente={fFrente} fObra={fObra} fPct={fPct}
         inicial={applied ?? defaultConfig} defaultConfig={defaultConfig} versoes={versoes} qc={qc}
-        onAplicar={c => { setApplied(c); try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setSub('proj') }} />}
+        onAplicar={(c, nomeV) => { setApplied(c); if (nomeV) { setAppliedNome(nomeV); try { localStorage.setItem(`crono-cfg-nome-${portfolioId}`, nomeV) } catch { /* segue sem persistir */ } } try { localStorage.setItem(`crono-cfg-${portfolioId}`, JSON.stringify(c)) } catch { /* storage cheio/bloqueado: segue sem persistir */ } setSub('proj') }} />}
 
       {sub === 'proj' && (<>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -386,7 +397,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   equipeObras?: EquipeObrasReal
   qObra: string; hide100: boolean; fFrente: Set<string>; fObra: Set<string>; fPct: Set<string>
   inicial: Config; defaultConfig: Config; versoes: Versao[]; qc: ReturnType<typeof useQueryClient>
-  onAplicar: (c: Config) => void
+  onAplicar: (c: Config, nomeVersao?: string) => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
   const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim, inicioS: c?.inicioS, fimS: c?.fimS })
@@ -887,7 +898,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
         <div className={`flex items-center gap-2 px-5 py-3 border-t sticky bottom-0 rounded-b-2xl ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="nome da versão" className={`flex-1 text-sm rounded-lg border px-3 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white placeholder:text-slate-500' : 'bg-white border-slate-300 text-slate-800'}`} />
           <button onClick={() => salvar.mutate()} disabled={!nome.trim() || salvar.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border disabled:opacity-40 ${isDark ? 'border-white/15 text-slate-200 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Save size={14} /> Salvar versão</button>
-          <button onClick={() => onAplicar(cfg)} title="Aplica a configuração e volta pra Projeção" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold bg-teal-600 text-white hover:bg-teal-700"><Sparkles size={14} /> Aplicar</button>
+          <button onClick={() => onAplicar(cfg, nome.trim() || undefined)} title="Aplica a configuração e volta pra Projeção" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold bg-teal-600 text-white hover:bg-teal-700"><Sparkles size={14} /> Aplicar</button>
         </div>
       </div>
   )
