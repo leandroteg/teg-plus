@@ -50,7 +50,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const v = verSel; if (!v) return defaultConfig
     const c = v.config as Partial<Config>
     // preserva TUDO da versão (datas por serviço, predecessão, realocação) — replica o cronograma 1:1
-    return { prodPP: c.prodPP ?? defaultConfig.prodPP, equipe: c.equipe ?? defaultConfig.equipe, horizonte: c.horizonte ?? 12, precedencia: c.precedencia, lag: c.lag, realoc: c.realoc, fila: c.fila, pred: c.pred, inicio: c.inicio, fim: c.fim, inicioS: c.inicioS, fimS: c.fimS }
+    return { prodPP: c.prodPP ?? defaultConfig.prodPP, prodPPTorre: c.prodPPTorre ?? defaultConfig.prodPPTorre, equipe: c.equipe ?? defaultConfig.equipe, horizonte: c.horizonte ?? 12, precedencia: c.precedencia, lag: c.lag, realoc: c.realoc, fila: c.fila, pred: c.pred, inicio: c.inicio, fim: c.fim, inicioS: c.inicioS, fimS: c.fimS }
   }, [verSel, defaultConfig])
   const realCfg = useMemo<Config>(() => ({
     prodPP: defaultConfig.prodPP, horizonte: 12, precedencia: true, lag: 0,
