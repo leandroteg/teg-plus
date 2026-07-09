@@ -161,8 +161,10 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
     if (!pdfFile || !crops.length) return
     setSaving(true); setErro('')
     try {
-      // 1) sobe o PDF original
-      const pdfUrl = await uploadJornalArquivo(pdfFile, 'pdf', 'pdf')
+      // 1) sobe o PDF original (não-fatal: se falhar, salva os cards mesmo assim)
+      let pdfUrl: string | null = null
+      try { pdfUrl = await uploadJornalArquivo(pdfFile, 'pdf', 'pdf') }
+      catch (e) { console.warn('Upload do PDF original falhou; seguindo sem ele.', e) }
       // 2) capa = primeira página renderizada
       let capaUrl: string | null = null
       if (canvasesRef.current[0]) {
