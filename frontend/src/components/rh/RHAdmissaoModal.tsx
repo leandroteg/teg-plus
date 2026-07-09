@@ -16,6 +16,7 @@ import {
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
+import { RegistroCard, IntegracaoCard } from './RHAdmissaoEtapas'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const EDIT_INPUT = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -261,19 +262,25 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             <p className="text-[11px] text-slate-400">Solicitado por <span className="font-semibold text-slate-600">{adm.solicitante_nome}</span></p>
           )}
 
-          {/* Candidatos */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1">
-              <Users size={11} /> Candidatos ({candidatos.length})
-            </p>
-            <div className="space-y-2">
-              {candidatos.map((c, i) => (
-                <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo}
-                  etapa={etapa} autorId={perfil?.id} autorNome={autorNome} editadoMap={editadoMap} />
-              ))}
-              {candidatos.length === 0 && <p className="text-xs text-slate-400">Nenhum candidato.</p>}
+          {/* Candidatos — nas etapas Registro/Integração usa o MESMO card rico da visão em cards */}
+          {etapa === 'registro' ? (
+            <RegistroCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'integracao' ? (
+            <IntegracaoCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1">
+                <Users size={11} /> Candidatos ({candidatos.length})
+              </p>
+              <div className="space-y-2">
+                {candidatos.map((c, i) => (
+                  <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo}
+                    etapa={etapa} autorId={perfil?.id} autorNome={autorNome} editadoMap={editadoMap} />
+                ))}
+                {candidatos.length === 0 && <p className="text-xs text-slate-400">Nenhum candidato.</p>}
+              </div>
             </div>
-          </div>
+          )}
           </>
           )}
 
@@ -360,15 +367,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 Mobilização Concluída
               </button>
             )}
-            {etapa === 'integracao' && (
-              <button
-                onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }); onClose() }}
-                disabled={liberar.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
-                {liberar.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                Concluir Integração e Liberar
-              </button>
-            )}
+            {/* Integração: concluída pelo box "Finalizar Integração" dentro do card, não aqui */}
             {etapa === 'aprovacao' && (
               <>
                 <button onClick={() => { setPedindo('esclarecer'); setMotivoAcao('') }}
