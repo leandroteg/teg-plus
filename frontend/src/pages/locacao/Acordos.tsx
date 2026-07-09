@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Handshake, Search, List, LayoutGrid, Plus, X, Loader2, FileText } from 'lucide-react'
+import { Handshake, Search, List, LayoutGrid, X, Loader2, FileText } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAcordos, useImoveis } from '../../hooks/useLocacao'
 import { supabase } from '../../services/supabase'
@@ -246,15 +246,9 @@ export default function Acordos() {
 
   return (
     <div className="space-y-4">
-      {/* Header com botão */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <p className={`text-xs ${txtMuted}`}>{acordos.length} acordos</p>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
-        >
-          <Plus size={14} /> Novo Acordo
-        </button>
       </div>
 
       {/* Toolbar */}

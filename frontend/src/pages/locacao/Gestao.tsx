@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { Building2, Receipt, Wrench, FileSignature, Handshake } from 'lucide-react'
+import { Building2, Receipt, Wrench, FileSignature, BedDouble } from 'lucide-react'
 import { useImoveis, useFaturas, useSolicitacoesLocacao, useAditivos, useAcordos } from '../../hooks/useLocacao'
 import Ativos from './Ativos'
 import Faturas from './Faturas'
@@ -13,7 +13,7 @@ const TABS = [
   { key: 'aditivos', label: 'Aditivos & Renovações',    icon: FileSignature },
   { key: 'faturas',  label: 'Faturas',                  icon: Receipt },
   { key: 'servicos', label: 'Manutenções e Serviços',   icon: Wrench },
-  { key: 'acordos',  label: 'Acordos',                  icon: Handshake },
+  { key: 'acordos',  label: 'Controle Leitos',          icon: BedDouble },
 ] as const
 
 type Tab = typeof TABS[number]['key']
