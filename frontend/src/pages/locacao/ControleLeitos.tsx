@@ -25,6 +25,15 @@ import type { LocImovel } from '../../types/locacao'
 
 const fmtDate = (d?: string | null) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
+const fmtCur = (v?: number | null) =>
+  v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+
+const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  ativo:      { label: 'Ativo',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  inativo:    { label: 'Inativo',    dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-600' },
+  em_entrada: { label: 'Em Entrada', dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700' },
+  em_saida:   { label: 'Em Saída',   dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
+}
 
 const nomeAloj = (im?: { nome?: string | null; descricao?: string | null; titulo?: string | null } | null) =>
   im?.nome || im?.descricao || im?.titulo || 'Alojamento'
@@ -35,6 +44,7 @@ const codigoAloj = (a: { titulo?: string | null; codigo?: string | null }) => a.
 // URL que o QR codifica → o Portal TEG lê o número do leito e chama a RPC de check-in
 const PORTAL_BASE = 'https://portal.teguniao.com.br'
 const leitoUrl = (numeroSeq: number) => `${PORTAL_BASE}/leito/${numeroSeq}`
+const alojamentoUrl = (imovelId: string) => `${PORTAL_BASE}/alojamento/${imovelId}`
 
 // Imagem de QR gerada no cliente (lib qrcode, sem chamada externa)
 function QrImg({ text, size = 160 }: { text: string; size?: number }) {
@@ -323,12 +333,20 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   const [moverOcup, setMoverOcup] = useState<{ ocup: LeitoOcupacao; leito: Leito } | null>(null)
   const [qrLeito, setQrLeito] = useState<Leito | null>(null)
 
-  const bg = isDark ? 'bg-[#0f172a]' : 'bg-white'
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const inputCls = isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+  const cardSection = `rounded-xl p-4 ${cardBg}`
+  const sectionLabel = 'text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5'
+  const contrato = (alojamento as { contrato?: { numero?: string; data_inicio?: string; data_fim_previsto?: string; data_assinatura?: string; status?: string } }).contrato
+  const stCfg = STATUS_CFG[alojamento.status] || STATUS_CFG.ativo
 
   const leitosOrd = [...leitos].sort((a, b) => a.ordem - b.ordem)
+  const ativosLeitos = leitosOrd.filter(l => l.ativo)
+  const ocupadosN = ativosLeitos.filter(l => ocupPorLeito.has(l.id)).length
+  const st = { total: ativosLeitos.length, ocupados: ocupadosN, livres: ativosLeitos.length - ocupadosN, taxa: ativosLeitos.length ? Math.round(ocupadosN / ativosLeitos.length * 100) : 0 }
 
   const handleGerar = async () => {
     const n = parseInt(qtd, 10)
@@ -344,124 +362,160 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className={`w-full max-w-md h-full overflow-y-auto shadow-2xl ${bg}`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className={`sticky top-0 z-10 px-5 py-4 border-b ${isDark ? 'border-white/[0.06] bg-[#0f172a]' : 'border-slate-100 bg-white'}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className={`text-base font-bold truncate ${txt}`}>{nomeAloj(alojamento)}</h3>
-              <p className={`flex items-center gap-1 text-xs mt-0.5 ${txtMuted}`}>
-                <MapPin size={11} /> {alojamento.cidade || '—'}{alojamento.uf ? `/${alojamento.uf}` : ''}
-                {alojamento.endereco ? ` · ${alojamento.endereco}${alojamento.numero ? ', ' + alojamento.numero : ''}` : ''}
-              </p>
-            </div>
-            <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <BedDouble size={18} className="text-cyan-600 shrink-0" />
+            <h3 className={`text-base font-bold truncate ${txt}`}>{codigoAloj(alojamento)}</h3>
           </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Status + ocupação */}
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-xs font-semibold ${txtMuted}`}>
+              {st.total > 0 ? <>{st.ocupados}/{st.total} leitos ocupados · <span className={taxaCor(st.taxa)}>{st.taxa}%</span></> : 'Sem leitos cadastrados'}
+            </span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${stCfg.bg} ${stCfg.text}`}>
+              <span className={`w-2 h-2 rounded-full ${stCfg.dot}`} /> {stCfg.label}
+            </span>
+          </div>
+
+          {/* Endereço */}
+          <div className={`rounded-xl p-4 ${isDark ? 'bg-cyan-500/10 border border-cyan-500/20' : 'bg-cyan-50 border border-cyan-200'}`}>
+            <p className="text-[9px] font-bold text-cyan-600 uppercase tracking-wider mb-2">Endereço</p>
+            <p className={`text-sm font-bold ${txt}`}>{fmtEndereco(alojamento)}</p>
+            {alojamento.bairro && <p className={`text-xs ${txtMuted}`}>{alojamento.bairro}</p>}
+            <p className={`text-xs ${txtMuted}`}>{[alojamento.cidade, alojamento.uf].filter(Boolean).join(' — ') || 'Cidade não informada'}{alojamento.cep ? ` · CEP ${alojamento.cep}` : ''}</p>
+          </div>
+
+          {/* Contrato */}
+          <div className={cardSection}>
+            <p className={sectionLabel}>Contrato</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+              <div><p className={txtMuted}>Número</p><p className={`font-semibold ${txt}`}>{contrato?.numero || '—'}</p></div>
+              <div><p className={txtMuted}>Vencimento</p><p className={`font-semibold ${txt}`}>{fmtDate(contrato?.data_fim_previsto)}</p></div>
+              <div><p className={txtMuted}>Data de Entrada</p><p className={`font-semibold ${txt}`}>{fmtDate(contrato?.data_inicio)}</p></div>
+              <div><p className={txtMuted}>Aluguel Mensal</p><p className={`font-semibold ${txt}`}>{fmtCur(alojamento.valor_aluguel_mensal)}</p></div>
+            </div>
+          </div>
+
           {/* Dados do alojamento — código + prefeito responsável (editável) */}
-          <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="flex items-center justify-between">
-              <p className={`text-xs font-bold ${txt}`}>Dados do alojamento</p>
+          <div className={cardSection}>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className={`${sectionLabel} mb-0`}>Dados do alojamento</p>
               {salvo && <span className="text-[10px] font-semibold text-emerald-500">salvo ✓</span>}
             </div>
-            <div>
-              <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Código do alojamento</label>
-              <p className={`text-sm font-mono font-semibold ${txt}`}>{alojamento.titulo || alojamento.codigo || '—'}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Prefeito responsável</label>
-                <input value={prefNome} onChange={e => setPrefNome(e.target.value)}
-                  onBlur={() => { if ((alojamento.prefeito_nome ?? '') !== prefNome) salvarAloj({ prefeito_nome: prefNome }) }}
-                  placeholder="Nome" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
-              </div>
-              <div>
-                <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Telefone</label>
-                <input value={prefTel} onChange={e => setPrefTel(e.target.value)}
-                  onBlur={() => { if ((alojamento.prefeito_telefone ?? '') !== prefTel) salvarAloj({ prefeito_telefone: prefTel }) }}
-                  placeholder="(00) 00000-0000" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
-              </div>
-            </div>
-          </div>
-
-          {/* Adicionar leitos */}
-          <div className={`flex items-center gap-2 rounded-xl border p-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
-            <span className={`text-xs font-semibold pl-1 ${txtMuted}`}>Adicionar leitos:</span>
-            <input type="number" min={1} placeholder="qtd" value={qtd} onChange={e => setQtd(e.target.value)}
-              className={`w-16 text-sm rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
-            <button onClick={handleGerar} disabled={gerar.isPending || !qtd}
-              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50">
-              {gerar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Gerar
-            </button>
-          </div>
-
-          {/* Folha de QRs do alojamento */}
-          {leitosOrd.length > 0 && (
-            <button onClick={() => imprimirFolhaQrs(nomeAloj(alojamento), leitosOrd)}
-              className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl border
-                ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              <Printer size={13} /> Folha de QRs ({leitosOrd.length} leitos)
-            </button>
-          )}
-
-          {/* Lista de leitos */}
-          {leitosOrd.length === 0 ? (
-            <p className={`text-sm text-center py-8 ${txtMuted}`}>Nenhum leito cadastrado ainda.</p>
-          ) : (
             <div className="space-y-2">
-              {leitosOrd.map(l => {
-                const oc = ocupPorLeito.get(l.id)
-                return (
-                  <div key={l.id} className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>#{l.numero_seq}</span>
-                        <div className="min-w-0">
-                          <p className={`text-sm font-semibold truncate ${txt}`}>{l.codigo}{l.quarto ? ` · ${l.quarto}` : ''}</p>
+              <div>
+                <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Código do alojamento</label>
+                <p className={`text-sm font-mono font-semibold ${txt}`}>{codigoAloj(alojamento)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Prefeito responsável</label>
+                  <input value={prefNome} onChange={e => setPrefNome(e.target.value)}
+                    onBlur={() => { if ((alojamento.prefeito_nome ?? '') !== prefNome) salvarAloj({ prefeito_nome: prefNome }) }}
+                    placeholder="Nome" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+                </div>
+                <div>
+                  <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Telefone</label>
+                  <input value={prefTel} onChange={e => setPrefTel(e.target.value)}
+                    onBlur={() => { if ((alojamento.prefeito_telefone ?? '') !== prefTel) salvarAloj({ prefeito_telefone: prefTel }) }}
+                    placeholder="(00) 00000-0000" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* QR de check-in */}
+          <div className={cardSection}>
+            <p className={sectionLabel}>QR de check-in</p>
+            <div className="flex items-center gap-3">
+              <div className="bg-white p-2 rounded-lg shrink-0"><QrImg text={alojamentoUrl(alojamento.id)} size={92} /></div>
+              <div className="min-w-0">
+                <p className={`text-xs ${txtMuted}`}>QR do alojamento — cole na entrada. Ao escanear, o colaborador informa o número do leito no Portal. Cada leito também tem o seu QR na lista abaixo.</p>
+                {leitosOrd.length > 0 && (
+                  <button onClick={() => imprimirFolhaQrs(codigoAloj(alojamento), leitosOrd)}
+                    className={`mt-2 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
+                    <Printer size={13} /> Folha de QRs dos leitos ({leitosOrd.length})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Leitos */}
+          <div className={cardSection}>
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <p className={`${sectionLabel} mb-0`}>Leitos ({leitosOrd.length})</p>
+              <div className="flex items-center gap-1.5">
+                <input type="number" min={1} placeholder="qtd" value={qtd} onChange={e => setQtd(e.target.value)}
+                  className={`w-14 text-sm rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
+                <button onClick={handleGerar} disabled={gerar.isPending || !qtd}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50">
+                  {gerar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Gerar
+                </button>
+              </div>
+            </div>
+            {leitosOrd.length === 0 ? (
+              <p className={`text-sm text-center py-6 ${txtMuted}`}>Nenhum leito cadastrado ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {leitosOrd.map(l => {
+                  const oc = ocupPorLeito.get(l.id)
+                  return (
+                    <div key={l.id} className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-500'}`}>#{l.numero_seq}</span>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-semibold truncate ${txt}`}>{l.codigo}{l.quarto ? ` · ${l.quarto}` : ''}</p>
+                            {oc ? (
+                              <p className="text-xs text-slate-500 truncate">
+                                <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{oc.colaborador_nome}</span> · desde {fmtDate(oc.data_inicio)}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 size={11} /> Livre</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setQrLeito(l)} title="QR de check-in"
+                            className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
+                            <QrCode size={14} />
+                          </button>
                           {oc ? (
-                            <p className="text-xs text-slate-500 truncate">
-                              <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{oc.colaborador_nome}</span> · desde {fmtDate(oc.data_inicio)}
-                            </p>
+                            <>
+                              <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
+                                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
+                                <ArrowRightLeft size={14} />
+                              </button>
+                              <LiberarBtn ocupacaoId={oc.id} isDark={isDark} />
+                            </>
                           ) : (
-                            <p className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 size={11} /> Livre</p>
+                            <>
+                              <button onClick={() => setAlocarLeito(l)} title="Alocar colaborador"
+                                className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
+                                <UserPlus size={13} /> Alocar
+                              </button>
+                              <button onClick={() => { if (confirm(`Remover o leito ${l.codigo}?`)) excluir.mutate(l.id) }} title="Remover leito"
+                                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-white/[0.06]' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}>
+                                <Trash2 size={13} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => setQrLeito(l)} title="QR de check-in"
-                          className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
-                          <QrCode size={14} />
-                        </button>
-                        {oc ? (
-                          <>
-                            <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
-                              className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
-                              <ArrowRightLeft size={14} />
-                            </button>
-                            <LiberarBtn ocupacaoId={oc.id} isDark={isDark} />
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={() => setAlocarLeito(l)} title="Alocar colaborador"
-                              className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
-                              <UserPlus size={13} /> Alocar
-                            </button>
-                            <button onClick={() => { if (confirm(`Remover o leito ${l.codigo}?`)) excluir.mutate(l.id) }} title="Remover leito"
-                              className={`p-1.5 rounded-lg ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-white/[0.06]' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}>
-                              <Trash2 size={13} />
-                            </button>
-                          </>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
