@@ -667,18 +667,18 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 
       {/* Finalizar registro — efetiva colaborador (ativo/headcount) + OneDrive + Secullum via SuperTEG */}
       <div className={`rounded-xl border px-3 py-2.5 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/60'}`}>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar registro</p>
             <p className="text-[10px] text-slate-400">Efetiva o colaborador (ativo/headcount), cria a pasta no OneDrive e cadastra no Secullum.</p>
           </div>
           {finalizarRegistro.isSuccess ? (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600"><CheckCircle2 size={14} /> Registro finalizado</span>
+            <span className="self-end sm:self-auto shrink-0 flex items-center gap-1 text-[11px] font-bold text-emerald-600"><CheckCircle2 size={14} /> Registro finalizado</span>
           ) : (
             <button
               onClick={() => { if (cand.colaborador_id) finalizarRegistro.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome }) }}
               disabled={!todosAssinados || !todaEmpresaAssinada || !matricula || !lotacao || finalizarRegistro.isPending}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="self-end sm:self-auto shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {finalizarRegistro.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar registro</>}
             </button>
           )}
@@ -889,7 +889,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
 
       {/* Finalizar Integração — avança para Liberação (Pendente) quando todos os certificados estiverem anexados */}
       <div className={`rounded-xl border px-3 py-2.5 ${isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/60'}`}>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar Integração</p>
             <p className="text-[10px] text-slate-400">Conclui a integração e avança o colaborador para Liberação (Pendente).</p>
@@ -897,7 +897,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
           <button
             onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }) }}
             disabled={!todosCerts || liberar.isPending}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            className="self-end sm:self-auto shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             {liberar.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar Integração</>}
           </button>
         </div>
