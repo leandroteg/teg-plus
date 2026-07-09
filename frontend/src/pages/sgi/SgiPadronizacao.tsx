@@ -70,6 +70,17 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
     try { await atualizar.mutateAsync({ id: doc.id, status: novo, ...(extra ?? {}) }); onClose() }
     catch (e) { alert('Erro na transição: ' + (e instanceof Error ? e.message : String(e))) }
   }
+  // Solicitar ciência em doc já publicado sem ciência: liga requer_ciencia e publica
+  // (o RPC lê o doc fresco → cria missões; NOT EXISTS evita duplicar quem já é ciente).
+  const handleSolicitarCiencia = async () => {
+    if (!confirm('Solicitar ciência deste documento já publicado?\n\nSerá criada uma missão de ciência no Portal TEG para cada colaborador ativo do público-alvo (com notificação). Quem já deu ciência não é duplicado.')) return
+    try {
+      await atualizar.mutateAsync({ id: doc.id, requer_ciencia: true })
+      const r = await publicar.mutateAsync(doc.id)
+      if (r.ok) { alert(`Ciência solicitada: ${r.missoes_criadas ?? 0} missão(ões) enviada(s) no Portal TEG.`); onClose() }
+      else alert('Erro ao solicitar ciência: ' + (r.erro || ''))
+    } catch (e) { alert('Erro ao solicitar ciência: ' + (e instanceof Error ? e.message : String(e))) }
+  }
   const btnBase = 'flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all disabled:opacity-60'
   const btnViolet = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white shadow-sm`
   const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
@@ -231,9 +242,13 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
                 </>)}
                 {doc.status === 'vigente' && (<>
                   <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
-                  {doc.requer_ciencia && (
+                  {doc.requer_ciencia ? (
                     <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
                       {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {adesao.length > 0 ? 'Republicar ciência' : 'Publicar para ciência'}
+                    </button>
+                  ) : (
+                    <button onClick={handleSolicitarCiencia} disabled={pend} className={btnViolet}>
+                      {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Solicitar ciência
                     </button>
                   )}
                 </>)}
