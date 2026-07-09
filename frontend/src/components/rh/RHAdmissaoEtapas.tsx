@@ -18,7 +18,7 @@ import {
   useRegistro, useMatriculaColaborador, anexoSignedUrl,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
-import { useCatalogoTreinamentos, useMatrizTreinamentos } from '../../hooks/useQsma'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 import RHFichaRegistroModal, { type FichaDados } from './RHFichaRegistroModal'
 
@@ -336,8 +336,8 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
   const { data: matriz = [] } = useMatrizTreinamentos()
   const [novoTrein, setNovoTrein] = useState({ nome: '', norma: '' })
 
-  const cargoNorm = ((cand as any).cargo || cargo || '').trim().toUpperCase()
-  const reqIds = new Set(matriz.filter(m => m.cargo.trim().toUpperCase() === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
+  const cargoNorm = cargoBase((cand as any).cargo || cargo)
+  const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
   const required = catalogo.filter(c => reqIds.has(c.id)).sort((a, b) => a.ordem - b.ordem)
   const recDe = (cat: { nome: string; norma: string | null }) =>
     treinamentos.find(t => (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
