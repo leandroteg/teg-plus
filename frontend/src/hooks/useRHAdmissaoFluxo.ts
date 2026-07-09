@@ -489,6 +489,21 @@ export function useMissoesDocsStatus(candidatoId?: string) {
   })
 }
 
+// true quando todos os candidatos têm os documentos recebidos (trava avanço p/ Exames)
+export function useDocsRecebidos(admissaoId?: string) {
+  return useQuery<boolean>({
+    queryKey: ['rh-admissao-docs-recebidos', admissaoId],
+    enabled: !!admissaoId,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rh_admissao_docs_recebidos', { p_admissao_id: admissaoId })
+      if (error) { console.error('useDocsRecebidos:', error); return false }
+      return !!data
+    },
+  })
+}
+
 // ── Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP ───────
 export interface ParecerQualificacao {
   candidato_id: string
