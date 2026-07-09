@@ -1014,7 +1014,6 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
         const selCls = `text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
         return (
           <div className="space-y-1.5">
-            <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
             <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               {subTabs}
               <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
@@ -1044,13 +1043,16 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
         )
       })()}
 
-      {/* legenda */}
-      <div className="flex items-center gap-3 text-[11px] flex-wrap">
-        <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Em dia</span>
-        <span className={`flex items-center gap-1 ${txtMuted}`}><AlertTriangle size={13} className="text-amber-500" /> Vencendo (60d)</span>
-        <span className={`flex items-center gap-1 ${txtMuted}`}><XCircle size={14} className="text-red-500" /> Vencido</span>
-        <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Não feito</span>
-        <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
+      {/* contagem (esquerda) + legenda (direita) na mesma linha */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
+        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+          <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Em dia</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><AlertTriangle size={13} className="text-amber-500" /> Vencendo (60d)</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><XCircle size={14} className="text-red-500" /> Vencido</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Não feito</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
+        </div>
       </div>
 
       {isLoading ? (
