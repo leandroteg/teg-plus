@@ -9,9 +9,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  useIntegracaoTreinos, useTreinamentos as useAdmissaoTreinamentos, certTreinamentoUrl,
+  useIntegracaoTreinos, useTreinamentos as useAdmissaoTreinamentos, certTreinamentoUrl, useEtapaCandidato,
   type IntegracaoCand, type IntegracaoTreino,
 } from '../../hooks/useRHAdmissaoFluxo'
+import { TreinamentosBlock } from '../../components/rh/RHAdmissaoEtapas'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
@@ -1159,7 +1160,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
   const [fBase, setFBase] = useState<Set<string> | null>(null)
   const [fCargo, setFCargo] = useState<Set<string> | null>(null)
-  const [detalheId, setDetalheId] = useState<string | null>(null)
+  const [detalhe, setDetalhe] = useState<IntegracaoCand | null>(null)
 
   const candidatos = data?.candidatos ?? []
   const treinos = data?.treinos ?? []
@@ -1230,10 +1231,13 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
     )
   }
   const verCert = async (path?: string | null) => { const url = await certTreinamentoUrl(path); if (url) window.open(url, '_blank', 'noopener') }
-  const abrir = (c: IntegracaoCand) => { if (c.colaborador_id) setDetalheId(c.colaborador_id) }
+  const abrir = (c: IntegracaoCand) => setDetalhe(c)
 
-  // Drill-in: ficha do colaborador (só treinamentos) — igual ao Controle
-  if (detalheId) return <RHColaboradorDetalhe id={detalheId} onBack={() => setDetalheId(null)} soTreinamentos />
+  // Drill-in: painel de treinamentos da Admissão (com upload) — grava em rh_admissao_treinamentos
+  if (detalhe) return (
+    <IntegracaoDetalhe cand={detalhe} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+      onBack={() => { setDetalhe(null); qc.invalidateQueries({ queryKey: ['integracao-treinos'] }) }} />
+  )
 
   const selCls = `text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
 
@@ -1304,8 +1308,8 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
                     return (
                       <tr key={c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
                         <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
-                          <button onClick={() => abrir(c)} disabled={!c.colaborador_id} title={c.nome} className="text-left group block w-full disabled:cursor-default">
-                            <p className={`text-xs font-bold truncate ${c.colaborador_id ? 'group-hover:text-sky-500' : ''} ${txtMain}`}>{c.nome}</p>
+                          <button onClick={() => abrir(c)} title={c.nome} className="text-left group block w-full">
+                            <p className={`text-xs font-bold truncate group-hover:text-sky-500 ${txtMain}`}>{c.nome}</p>
                             {c.base && <p className={`text-[10px] truncate ${txtMuted}`}>{c.base}</p>}
                           </button>
                         </td>
@@ -1350,8 +1354,8 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
               {linhas.map(c => {
                 const r = resumoDe(c)
                 return (
-                  <button key={c.id} onClick={() => abrir(c)} disabled={!c.colaborador_id}
-                    className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50 disabled:cursor-default`}>
+                  <button key={c.id} onClick={() => abrir(c)}
+                    className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${txtMain}`}>{c.nome}</p>
                       <p className={`text-[11px] ${txtMuted}`}>{c.base ?? ''}</p>
@@ -1369,6 +1373,28 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// Drill-in do Integração: painel de treinamentos da Admissão (com upload) do candidato.
+// Reusa o TreinamentosBlock da etapa de Integração → grava em rh_admissao_treinamentos.
+function IntegracaoDetalhe({ cand, isDark, card, txtMain, txtMuted, onBack }: {
+  cand: IntegracaoCand; isDark: boolean; card: string; txtMain: string; txtMuted: string; onBack: () => void
+}) {
+  const { data } = useEtapaCandidato(cand.id)
+  return (
+    <div className="space-y-3">
+      <button onClick={onBack} className={`inline-flex items-center gap-1 text-xs font-bold ${isDark ? 'text-sky-300' : 'text-sky-700'} hover:underline`}>
+        <ChevronRight size={14} className="rotate-180" /> Voltar
+      </button>
+      <div className={`${card} p-4`}>
+        <p className={`text-base font-black ${txtMain}`}>{cand.nome}</p>
+        <p className={`text-xs mt-0.5 ${txtMuted}`}>{[cand.cargo, cand.base].filter(Boolean).join(' · ') || '—'}</p>
+      </div>
+      <div className={`${card} p-4`}>
+        <TreinamentosBlock cand={cand as any} cargo={cand.cargo} treinamentos={data?.treinamentos ?? []} />
+      </div>
     </div>
   )
 }
