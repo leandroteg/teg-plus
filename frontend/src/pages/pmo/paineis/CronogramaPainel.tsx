@@ -437,7 +437,19 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
     const totF = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Fundação'] || 0), 0)
     const totML = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Montagem'] || 0) + (cfg.equipe[o.nome]?.['Lançamento'] || 0), 0)
     setPlanP(pp => ({ ...pp, eqF: Math.max(1, Math.round(totF / 7)), eqML: Math.max(1, Math.round(totML / 12)) }))
+    // exclusões: as que você marcou antes (persistidas) + obras >95% físico (concluídas na prática) pré-marcadas
+    const exc = new Set<string>(allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).map(o => o.nome))
+    try { for (const n of JSON.parse(localStorage.getItem(`crono-plan-exc-${portfolioId}`) ?? '[]')) exc.add(n) } catch { /* lista corrompida → segue só com as >95% */ }
+    setPlanExc(exc)
     setPlanRes(null); setPlanOpen(true)
+  }
+  const togglePlanExc = (nome: string) => {
+    setPlanExc(s => {
+      const n = new Set(s); n.has(nome) ? n.delete(nome) : n.add(nome)
+      try { localStorage.setItem(`crono-plan-exc-${portfolioId}`, JSON.stringify([...n])) } catch { /* storage cheio: segue sem persistir */ }
+      return n
+    })
+    setPlanRes(null)
   }
   const simular = () => {
     const start = startYM()
@@ -731,8 +743,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                   <div className={`mt-1.5 max-h-40 overflow-auto rounded-lg border p-1.5 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                     {planejaveis.map(o => (
                       <label key={o.nome} className="flex items-center gap-2 text-[11px] cursor-pointer">
-                        <input type="checkbox" checked={planExc.has(o.nome)} onChange={() => { setPlanExc(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n }); setPlanRes(null) }} />
-                        <span className="truncate">{o.nome}</span>
+                        <input type="checkbox" checked={planExc.has(o.nome)} onChange={() => togglePlanExc(o.nome)} />
+                        <span className="truncate">{o.nome} <span className={`font-semibold ${o.pctFis > 85 ? 'text-amber-500' : 'opacity-50'}`}>· {o.pctFis}%</span></span>
                       </label>
                     ))}
                   </div>
