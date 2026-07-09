@@ -400,10 +400,11 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   onAplicar: (c: Config, nomeVersao?: string) => void
 }) {
   // normaliza versões antigas (prod/modo/pesos) p/ o novo formato (prodPP/equipe)
-  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim, inicioS: c?.inicioS, fimS: c?.fimS })
+  const normalize = (c: any): Config => ({ prodPP: c?.prodPP ?? defaultConfig.prodPP, prodPPTorre: c?.prodPPTorre ?? defaultConfig.prodPPTorre, equipe: c?.equipe ?? defaultConfig.equipe, horizonte: c?.horizonte ?? 12, precedencia: c?.precedencia, lag: c?.lag, realoc: c?.realoc, fila: c?.fila, pred: c?.pred, inicio: c?.inicio, fim: c?.fim, inicioS: c?.inicioS, fimS: c?.fimS })
   const [cfg, setCfg] = useState<Config>(() => normalize(inicial))
   const [nome, setNome] = useState('')
   const setPP = (k: string, v: number) => setCfg(c => ({ ...c, prodPP: { ...c.prodPP, [k]: Math.max(0, v) } }))
+  const setPPTorre = (k: string, v: number) => setCfg(c => ({ ...c, prodPPTorre: { ...(c.prodPPTorre ?? {}), [k]: Math.max(0, v) } }))
   const setEquipe = (o: string, d: string, v: number) => setCfg(c => ({ ...c, equipe: { ...c.equipe, [o]: { ...(c.equipe[o] ?? {}), [d]: Math.max(0, Math.round(v)) } } }))
   // datas: editar a OBRA aplica a todos os serviços (limpa overrides); editar o SERVIÇO sobrescreve só ele
   const setInicio = (o: string, v: string) => setCfg(c => { const inicio = { ...(c.inicio ?? {}) }; if (v) inicio[o] = v; else delete inicio[o]; const inicioS = { ...(c.inicioS ?? {}) }; delete inicioS[o]; return { ...c, inicio, inicioS } })
@@ -805,17 +806,28 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               </div>
               <div className="px-4 py-3 space-y-2">
                 <p className={lbl}>Produtividade por pessoa (por mês)</p>
-                {DRV.map(d => (
-                  <div key={d.label} className={`flex items-center gap-2 rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.cor }} />
+                {DRV.map(d => { const temTorre = d.label !== 'Lançamento'; return (
+                  <div key={d.label} className={`flex items-start gap-2 rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-1" style={{ background: d.cor }} />
                     <span className="flex-1 min-w-0">
                       <span className="block text-[11px] font-bold">{d.label}</span>
                       <span className={`block text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>saldo total {fmtQ(saldoGlobal[d.label] || 0)} {d.uni}</span>
                     </span>
-                    <input type="number" min="0" step="0.1" value={cfg.prodPP[d.label] ?? 0} onChange={e => setPP(d.label, Number(e.target.value))} className={inp} />
-                    <span className="text-[10px] text-slate-400 w-24">{d.uni}/pessoa·mês</span>
+                    <div className="flex flex-col gap-1 items-end">
+                      <div className="flex items-center gap-1">
+                        <input type="number" min="0" step="0.1" value={cfg.prodPP[d.label] ?? 0} onChange={e => setPP(d.label, Number(e.target.value))} className={inp} />
+                        <span className="text-[10px] text-slate-400 w-28">{d.uni}/pessoa·mês</span>
+                      </div>
+                      {temTorre && (
+                        <div className="flex items-center gap-1" title="Usada quando a obra tem nº de torres lançado (Iniciação); senão cai no volume acima">
+                          <input type="number" min="0" step="0.1" value={cfg.prodPPTorre?.[d.label] ?? 0} onChange={e => setPPTorre(d.label, Number(e.target.value))} className={`${inp} ${(cfg.prodPPTorre?.[d.label] ?? 0) > 0 ? 'border-teal-400' : ''}`} />
+                          <span className="text-[10px] text-teal-500 w-28">torres/pessoa·mês</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
+                ) })}
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Obra <b>com nº de torres</b> lançado (Iniciação) usa a produtividade <b className="text-teal-500">por torre</b>; sem torres, usa o volume (m³/ton). Lançamento é sempre km.</p>
                 <p className={`${lbl} pt-2`}>Premissas — precedência entre serviços</p>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <span onClick={() => setCfg(c => ({ ...c, precedencia: !(c.precedencia !== false) }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.precedencia !== false ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.precedencia !== false ? 'translate-x-4' : ''}`} /></span>
