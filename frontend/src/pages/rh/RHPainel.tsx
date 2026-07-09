@@ -40,10 +40,13 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
     slate: isDark ? 'text-slate-400' : 'text-slate-500',
   }
   return (
-    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+    <div className={`rounded-2xl p-3 flex flex-col ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
-      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+      {/* valor centralizado no espaço restante → alinha com os números do Movimento */}
+      <div className="flex-1 flex flex-col justify-center">
+        <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+        {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+      </div>
     </div>
   )
 }
@@ -256,7 +259,7 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric label="Folha" value={folha != null ? formatBRLcompacto(folha) : '—'} tone="violet" isDark={isDark}
-                note={stats.folhaComp ? `líquida · ${fmtComp(stats.folhaComp)}` : 'sem holerite'} />
+                note={stats.folhaComp ? `CLT líq + PJ · ${fmtComp(stats.folhaComp)}` : 'CLT + PJ'} />
               <MovimentoCard entradas={entradas} saidas={saidas} isDark={isDark} />
               <SpotlightMetric label="Turnover" value={`${turnover.toFixed(1)}%`} tone={turnover >= 5 ? 'red' : 'emerald'} isDark={isDark} note={`acum. ${new Date().getFullYear()}`} />
             </div>

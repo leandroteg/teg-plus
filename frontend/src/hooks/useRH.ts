@@ -422,15 +422,19 @@ export function useRHStats() {
       const admitidosMes = (todos as any[]).filter((c: any) => (c.data_admissao ?? '').startsWith(ymStr)).length
       const desligadosMes = (todos as any[]).filter((c: any) => (c.data_demissao ?? '').startsWith(ymStr)).length
 
-      // Última folha: soma o líquido de todos os holerites da competência mais recente
+      // Folha = CLT líquido (holerites da competência mais recente) + PJ (agregado)
       let folhaComp: string | null = null
-      let folhaTotal: number | null = null
+      let cltLiquido = 0
       if ((holerites as any[]).length > 0) {
         folhaComp = String((holerites as any[])[0].competencia).slice(0, 7)
-        folhaTotal = (holerites as any[])
+        cltLiquido = (holerites as any[])
           .filter((h: any) => String(h.competencia).slice(0, 7) === folhaComp)
           .reduce((s: number, h: any) => s + Number(h.valor_liquido || 0), 0)
       }
+      // Folha PJ — só o total agregado (valores individuais são sigilosos): RPC SECURITY DEFINER
+      const { data: pjTot } = await supabase.rpc('rh_folha_pj_total')
+      const folhaPJ = Number(pjTot || 0)
+      const folhaTotal: number | null = (cltLiquido + folhaPJ) > 0 ? cltLiquido + folhaPJ : null
 
       return {
         totalAtivos: ativos.length,
