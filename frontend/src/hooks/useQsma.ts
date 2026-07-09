@@ -613,6 +613,14 @@ export function useColaboradoresTreino() {
   })
 }
 
+// cargo-base: une níveis (MONTADOR I/II/III/IV → MONTADOR). Igual à normalização do banco.
+export function cargoBase(cargo: string | null | undefined): string {
+  return (cargo || '')
+    .toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/(\s+NIVEL)?\s+(IV|V|VI|III|II|I|[0-9]+)\s*$/, '')
+    .replace(/\s+/g, ' ').trim()
+}
+
 // status de um treinamento obrigatório face à data de vencimento
 export type TreinoStatus = 'ok' | 'vencendo' | 'vencido' | 'faltando'
 export function treinoStatus(temRegistro: boolean, vencimento: string | null | undefined): TreinoStatus {
