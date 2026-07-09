@@ -21,8 +21,8 @@ const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
 
 type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
-  { key: 'composicao', label: 'Composição' },
   { key: 'geral', label: 'Visão Geral' },
+  { key: 'composicao', label: 'Composição' },
   { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
 ]
@@ -130,7 +130,7 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
 
 export default function RHPainel() {
   const { isDark } = useTheme()
-  const [painel, setPainel] = useState<PainelKey>('composicao')
+  const [painel, setPainel] = useState<PainelKey>('geral')
   const [de, setDe] = useState('2026-01')
   const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
@@ -192,14 +192,11 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
   const folha = stats.folhaTotal
 
   const emAndamento = admissoes.filter(a => EM_ANDAMENTO.includes(a.etapa ?? 'requisicao'))
-  // Liberações atrasadas: pessoas há +15 dias no fluxo e ainda não liberadas
-  const LIMITE_DIAS = 15
-  const agoraMs = Date.now()
+  // Liberações atrasadas: pessoas cujo início previsto já venceu e ainda não foram liberadas.
+  // (created_at não serve — as requisições foram recriadas em massa; data_prevista_inicio é o sinal real.)
+  const hojeStr = new Date().toISOString().slice(0, 10)
   const liberacoesAtrasadas = emAndamento
-    .filter(a => {
-      const inicio = a.created_at ? new Date(a.created_at).getTime() : agoraMs
-      return (agoraMs - inicio) > LIMITE_DIAS * 86400000
-    })
+    .filter(a => a.data_prevista_inicio && a.data_prevista_inicio.slice(0, 10) < hojeStr)
     .reduce((soma, a) => soma + Math.max(a.candidatos?.length ?? 0, 1), 0)
 
   // Admissões em andamento totalizadas por Centro de Custo (base), com contagem por cargo
@@ -269,7 +266,7 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
             </div>
             <div className="grid grid-cols-2 gap-2">
               <MiniInfoCard label="Liberações atrasadas" value={liberacoesAtrasadas} icon={AlertTriangle}
-                iconTone={liberacoesAtrasadas > 0 ? 'text-red-500' : 'text-slate-400'} note={liberacoesAtrasadas > 0 ? '+15 dias no fluxo' : 'em dia'} isDark={isDark} />
+                iconTone={liberacoesAtrasadas > 0 ? 'text-red-500' : 'text-slate-400'} note={liberacoesAtrasadas > 0 ? 'início já vencido' : 'em dia'} isDark={isDark} />
               <MiniInfoCard label="Em Andamento" value={emAndamento.length} icon={Activity}
                 iconTone={emAndamento.length > 0 ? 'text-violet-500' : 'text-slate-400'} note="no fluxo" isDark={isDark} />
             </div>
