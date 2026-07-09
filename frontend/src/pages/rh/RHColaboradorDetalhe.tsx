@@ -12,9 +12,11 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes } from '../../hooks/useRH'
+import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes, useDepartamentos } from '../../hooks/useRH'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus } from '../../hooks/useQsma'
 import { useCadObras } from '../../hooks/useCadastros'
+import { useBases } from '../../hooks/useEstoque'
+import { Lock } from 'lucide-react'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
 
@@ -24,6 +26,8 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { i
   const { data: dependentes = [] } = useRHDependentes(id)
   const { data: movimentacoes = [] } = useRHMovimentacoes({ colaborador_id: id })
   const { data: obras = [] } = useCadObras()
+  const { data: bases = [] } = useBases()
+  const { data: departamentos = [] } = useDepartamentos()
   const salvar = useSalvarRHColaborador()
   const salvarDep = useSalvarRHDependente()
   const removerDep = useRemoverRHDependente()
@@ -182,7 +186,29 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { i
               <Field label="CNPJ (PJ)" value={data?.cnpj_pj} onChange={v => set('cnpj_pj', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             )}
             <Field label="Cargo" value={data?.cargo} onChange={v => set('cargo', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Departamento" value={data?.departamento} onChange={v => set('departamento', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</label>
+              {editMode ? (
+                <select value={(data as any)?.base_id || ''} onChange={e => set('base_id', e.target.value || undefined)} className={inputCls}>
+                  <option value="">—</option>
+                  {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+                </select>
+              ) : (
+                <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.base?.nome || '—'}</p>
+              )}
+            </div>
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Departamento</label>
+              {editMode ? (
+                <select value={data?.departamento || ''} onChange={e => set('departamento', e.target.value || undefined)} className={inputCls}>
+                  <option value="">—</option>
+                  {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
+                  {data?.departamento && !departamentos.includes(data.departamento) && <option value={data.departamento}>{data.departamento}</option>}
+                </select>
+              ) : (
+                <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.departamento || '—'}</p>
+              )}
+            </div>
             <Field label="Setor" value={data?.setor} onChange={v => set('setor', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Obra</label>
@@ -196,8 +222,13 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { i
               )}
             </div>
             <FieldSelect label="Local de trabalho (UF)" value={data?.local_trabalho_uf} onChange={v => set('local_trabalho_uf', v || undefined)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Salário" value={data?.salario != null ? String(data.salario) : ''} onChange={v => set('salario', Number(v) || undefined)}
-              editable={editMode} type="number" cls={inputCls} isLight={isLight} />
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Salário</label>
+              <div className={`w-full px-3 py-2 rounded-xl border border-transparent text-sm flex items-center gap-1.5 ${isLight ? 'bg-slate-50 text-slate-400' : 'bg-white/[0.04] text-slate-500'}`}
+                title="Dado restrito — visível apenas em totalizações/painéis, não na ficha individual">
+                <Lock size={13} /> Restrito
+              </div>
+            </div>
             <Field label="Data Admissão" value={data?.data_admissao} onChange={v => set('data_admissao', v)} editable={editMode} type="date" cls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Status</label>
