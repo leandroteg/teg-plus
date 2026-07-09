@@ -10,6 +10,7 @@ import {
   useEstoqueItens, useBases, useSaldos,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/estoque'
 import NumericInput from '../../components/NumericInput'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
@@ -51,6 +52,8 @@ export default function Movimentacoes() {
   const [params, setParams] = useSearchParams()
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
+  // Debounce: a busca entra na queryKey — sem isso cada tecla vira uma requisição.
+  const buscaDebounced = useDebouncedValue(busca, 350)
   const [tipoFiltro, setTipoFiltro] = useState<string>('')
   const [baseFiltro, setBaseFiltro] = useState<string>('')
   const [periodo, setPeriodo] = useState<PeriodoPreset>('todos')
@@ -78,7 +81,7 @@ export default function Movimentacoes() {
   const { data: movs = [], isLoading } = useMovimentacoes({
     ...(tipoFiltro ? { tipo: tipoFiltro as TipoMovimentacao } : {}),
     ...(baseFiltro ? { base_id: baseFiltro } : {}),
-    ...(busca.trim().length >= 2 ? { busca: busca.trim() } : {}),
+    ...(buscaDebounced.trim().length >= 2 ? { busca: buscaDebounced.trim() } : {}),
     ...(periodoFiltro.dateFrom ? { dateFrom: periodoFiltro.dateFrom } : {}),
     ...(periodoFiltro.dateTo   ? { dateTo:   periodoFiltro.dateTo   } : {}),
     page,
@@ -108,7 +111,7 @@ export default function Movimentacoes() {
   // pra filtrar via .or no PostgREST). Quando server-side encontra > 0 ja
   // basta; quando 0, tenta o filtro extra de item nessa pagina.
   const filtradas = useMemo(() => {
-    const q = busca.trim().toLowerCase()
+    const q = buscaDebounced.trim().toLowerCase()
     if (!q || q.length < 2) return movs
     // Server ja filtrou por responsavel/obra/nf; aqui complementa com item.
     const extraItem = movs.filter(m =>
@@ -120,7 +123,7 @@ export default function Movimentacoes() {
     const ids = new Set(movs.map(m => m.id))
     extraItem.forEach(m => ids.add(m.id))
     return [...movs, ...extraItem.filter(m => !movs.find(x => x.id === m.id))]
-  }, [movs, busca])
+  }, [movs, buscaDebounced])
 
   const temFiltroAtivo = !!busca.trim() || !!tipoFiltro || !!baseFiltro || periodo !== 'todos'
   function limparFiltros() {

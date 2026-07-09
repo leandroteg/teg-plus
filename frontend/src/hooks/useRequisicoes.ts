@@ -136,10 +136,11 @@ export function useRequisicoes(status?: string, search?: string) {
       }) as Requisicao[]
     },
     refetchInterval: false,
-    refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: false,
-    staleTime: 0,
+    // Frescura pós-mutação é garantida pelas invalidateQueries das mutations;
+    // staleTime 0 refazia esta lista pesada a cada remontagem (troca de aba/rota).
+    staleTime: 30_000,
   })
 }
 

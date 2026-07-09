@@ -74,12 +74,16 @@ export default function CadastrosHome() {
   const { data: colaboradores = [] } = useCadColaboradores()
   const { data: grupos = [] } = useCadGrupos()
   const { data: categorias = [] } = useCadCategorias()
-  const { data: projetos = [] } = useQuery({
+  const { data: projetosCount = 0 } = useQuery({
     queryKey: ['cad-projetos-count'],
     queryFn: async () => {
-      const { data } = await supabase.from('pmo_projetos').select('id')
-      return data ?? []
+      // head:true — só o count, sem trafegar as linhas
+      const { count } = await supabase
+        .from('pmo_projetos')
+        .select('id', { count: 'exact', head: true })
+      return count ?? 0
     },
+    staleTime: 60_000,
   })
 
   const counts: Record<string, number> = {
@@ -89,7 +93,7 @@ export default function CadastrosHome() {
     classes: classes.length,
     centros: centros.length,
     obras: obras.length,
-    projetos: projetos.length,
+    projetos: projetosCount,
     colaboradores: colaboradores.length,
     grupos: grupos.length,
     categorias: categorias.length,

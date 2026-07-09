@@ -25,7 +25,10 @@ export function useContratosDashboard() {
       }
       return data as ContratosDashboardData
     },
-    refetchInterval: 60_000,
+    // Dashboard agregado de contratos muda devagar; 5min evita refazer a RPC
+    // pesada a cada minuto com a tela aberta.
+    refetchInterval: 300_000,
+    staleTime: 60_000,
   })
 }
 

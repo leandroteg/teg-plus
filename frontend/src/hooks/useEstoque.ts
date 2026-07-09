@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   EstBase, EstItem, EstSaldo, EstMovimentacao, EstSolicitacao,
@@ -101,6 +101,8 @@ export function useBases() {
       if (error) return []
       return (data ?? []) as EstBase[]
     },
+    // Bases raramente mudam e este hook monta em toda página (NotificationBell).
+    staleTime: 300_000,
   })
 }
 
@@ -332,6 +334,8 @@ export function useMovimentacoes(filtros?: {
       if (error) return []
       return (data ?? []) as EstMovimentacao[]
     },
+    // Mantém a página anterior visível ao trocar page/filtros em vez de piscar loading.
+    placeholderData: keepPreviousData,
   })
 }
 

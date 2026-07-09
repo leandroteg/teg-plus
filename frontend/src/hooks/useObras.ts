@@ -631,6 +631,8 @@ export function useObrasKPIs() {
         prestacoes_pendentes: prestRes.count ?? 0,
       }
     },
-    refetchInterval: 60_000,
+    // KPIs de acompanhamento — 3min é suficiente para contadores de home.
+    refetchInterval: 180_000,
+    staleTime: 60_000,
   })
 }

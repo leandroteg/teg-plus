@@ -256,7 +256,9 @@ export function useCautelaKPIs(colaboradorId: string | undefined) {
         devolver_hoje: devolverHoje,
       }
     },
-    refetchInterval: 60_000,
+    // Contadores de cautela mudam pouco; mutações do módulo já invalidam a query.
+    refetchInterval: 180_000,
+    staleTime: 60_000,
   })
 }
 

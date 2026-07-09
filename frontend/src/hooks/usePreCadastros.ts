@@ -86,8 +86,10 @@ export function usePreCadastros() {
       return (data || []) as PreCadastro[]
     },
     enabled: isAdminOrDirector,
-    staleTime: 30_000, // poll every 30s
-    refetchInterval: 60_000,
+    // Montado em toda página via NotificationBell — poll moderado para não gerar
+    // tráfego global; a lista também é invalidada pelas mutations deste hook.
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   })
 
   // ── Dedup automatico: pre-cadastros que ja existem como cadastro real ─────────
@@ -102,44 +104,58 @@ export function usePreCadastros() {
       const itensPendentes = pendentes.filter(p => p.entidade === 'itens')
       const fornPendentes  = pendentes.filter(p => p.entidade === 'fornecedores')
 
-      // itens — busca pelo descricao normalizada
+      // itens — 1 query em lote com todas as descricoes normalizadas
+      const descPorId = new Map<string, string>()
       for (const p of itensPendentes) {
-        const desc = (p.dados.descricao as string | undefined) ?? ''
-        const descNorm = norm(desc)
-        if (!descNorm) continue
+        const descNorm = norm((p.dados.descricao as string | undefined) ?? '')
+        if (descNorm) descPorId.set(p.id, descNorm)
+      }
+      if (descPorId.size > 0) {
         const { data } = await supabase
           .from('est_itens')
-          .select('id')
-          .eq('descricao', descNorm)
-          .limit(1)
-        if (data && data.length > 0) matchedIds.push(p.id)
+          .select('descricao')
+          .in('descricao', [...new Set(descPorId.values())])
+        const existentes = new Set((data || []).map(d => d.descricao as string))
+        for (const [id, desc] of descPorId) {
+          if (existentes.has(desc)) matchedIds.push(id)
+        }
       }
 
-      // fornecedores — bate por CNPJ se tiver, senao por razao_social normalizada
+      // fornecedores — 1 query em lote por CNPJ + 1 por razao_social (fallback)
+      const cnpjPorId  = new Map<string, string>()
+      const razaoPorId = new Map<string, string>()
       for (const p of fornPendentes) {
         const cnpj = (p.dados.cnpj as string | undefined)?.replace(/\D/g, '')
-        const razao = (p.dados.razao_social as string | undefined) ?? ''
-        let achou = false
-        if (cnpj && cnpj.length >= 11) {
-          const { data } = await supabase
-            .from('cmp_fornecedores')
-            .select('id')
-            .eq('cnpj', cnpj)
-            .limit(1)
-          if (data && data.length > 0) achou = true
+        if (cnpj && cnpj.length >= 11) cnpjPorId.set(p.id, cnpj)
+        const razNorm = norm((p.dados.razao_social as string | undefined) ?? '')
+        if (razNorm) razaoPorId.set(p.id, razNorm)
+      }
+      const cnpjsExistentes = new Set<string>()
+      if (cnpjPorId.size > 0) {
+        const { data } = await supabase
+          .from('cmp_fornecedores')
+          .select('cnpj')
+          .in('cnpj', [...new Set(cnpjPorId.values())])
+        for (const d of data || []) if (d.cnpj) cnpjsExistentes.add(d.cnpj as string)
+      }
+      // razao_social so para quem nao bateu por CNPJ
+      const razoesPendentes = [...razaoPorId.entries()]
+        .filter(([id]) => !cnpjsExistentes.has(cnpjPorId.get(id) ?? ''))
+        .map(([, raz]) => raz)
+      const razoesExistentes = new Set<string>()
+      if (razoesPendentes.length > 0) {
+        const { data } = await supabase
+          .from('cmp_fornecedores')
+          .select('razao_social')
+          .in('razao_social', [...new Set(razoesPendentes)])
+        for (const d of data || []) if (d.razao_social) razoesExistentes.add(d.razao_social as string)
+      }
+      for (const p of fornPendentes) {
+        const cnpj  = cnpjPorId.get(p.id)
+        const razao = razaoPorId.get(p.id)
+        if ((cnpj && cnpjsExistentes.has(cnpj)) || (razao && razoesExistentes.has(razao))) {
+          matchedIds.push(p.id)
         }
-        if (!achou && razao) {
-          const razNorm = norm(razao)
-          if (razNorm) {
-            const { data } = await supabase
-              .from('cmp_fornecedores')
-              .select('id')
-              .eq('razao_social', razNorm)
-              .limit(1)
-            if (data && data.length > 0) achou = true
-          }
-        }
-        if (achou) matchedIds.push(p.id)
       }
 
       return matchedIds

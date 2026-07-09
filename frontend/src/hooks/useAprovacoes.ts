@@ -951,8 +951,10 @@ export function useAprovacaoKPIs() {
       }
     },
     enabled: !!perfil,
-    refetchInterval: 60_000,
-    staleTime: 15_000,
+    // KPIs custam ~9 queries por ciclo; a fila (aprovacoes-pendentes) continua
+    // em 60s e as decisões invalidam os KPIs — 3min de poll é suficiente aqui.
+    refetchInterval: 180_000,
+    staleTime: 60_000,
     retry: false,
   })
 }
@@ -1353,26 +1355,43 @@ export function useDecisaoGenerica() {
 
       return { decisao }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
+      // Sempre: fila/histórico/KPIs de aprovações + dashboard (mostram pendências).
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
-      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
-      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
-      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['requisicoes'] })
-      qc.invalidateQueries({ queryKey: ['requisicao'] })
-      qc.invalidateQueries({ queryKey: ['cotacoes'] })
-      qc.invalidateQueries({ queryKey: ['cotacao'] })
-      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
-      qc.invalidateQueries({ queryKey: ['adiantamentos'] })
+
+      // Só as queries do módulo da entidade decidida — invalidar todos os
+      // módulos refazia dezenas de listas a cada decisão.
+      switch (vars.tipoAprovacao) {
+        case 'minuta_contratual':
+          qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
+          break
+        case 'autorizacao_pagamento':
+          qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+          qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+          qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+          qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+          break
+        case 'requisicao_compra':
+        case 'cotacao':
+          qc.invalidateQueries({ queryKey: ['requisicoes'] })
+          qc.invalidateQueries({ queryKey: ['requisicao'] })
+          qc.invalidateQueries({ queryKey: ['cotacoes'] })
+          qc.invalidateQueries({ queryKey: ['cotacao'] })
+          qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+          break
+        case 'aprovacao_transporte':
+          qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+          break
+        case 'solicitacao_adiantamento':
+          qc.invalidateQueries({ queryKey: ['adiantamentos'] })
+          break
+      }
     },
   })
 }
