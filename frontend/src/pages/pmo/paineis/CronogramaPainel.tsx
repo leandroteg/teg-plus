@@ -541,7 +541,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               </select>
               {verSel && <button onClick={() => { excluir.mutate(verSel); setVerSel(''); setNome('') }} title="Excluir a versão selecionada" className={`p-1.5 rounded-xl border ${isDark ? 'border-white/15 text-slate-400 hover:text-rose-400' : 'border-slate-200 text-slate-400 hover:text-rose-500'}`}><Trash2 size={14} /></button>}
               <span className="flex-1" />
-              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês (por serviço)" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
+              <button onClick={() => setProdOpen(true)} title="Produtividade padrão por pessoa/mês + premissas de precedência e realocação" className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition ${isDark ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400'}`}><Gauge size={14} className="text-teal-500" /> Produtividade &amp; Premissas <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{DRV.map(d => cfg.prodPP[d.label] ?? 0).join(' / ')}</span></button>
               <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'sem efetivo no RH' : 'puxa o efetivo real do RH (por frente) e distribui às obras ∝ saldo — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Sparkles size={14} /> Efetivo real (RH){efetivoTot > 0 ? ` · ${efetivoTot}` : ''}</button>
               <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'sem equipes alocadas nas Obras' : 'preenche com a alocação real das equipes (Obras › Equipe): encarregado + time por obra × frente. Obra sem equipe fica 0 — depois edite livre'} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition disabled:opacity-40 ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><Sparkles size={14} /> Equipes (Obras){equipesTot > 0 ? ` · ${equipesTot}` : ''}</button>
               <button onClick={abrirPlan} title="Simula o portfólio por equipe-padrão e recursos críticos (rotor/perfuratriz/guindaste/comboio) e preenche início, término, predecessão e recursos" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700 transition"><Sparkles size={14} /> Planejamento Automático</button>
@@ -635,38 +635,89 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               </div>
             </div>
             <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total: <b>{totPessoas} pessoas</b> · cada obra avança no ritmo nº pessoas × produtividade/pessoa. Drivers que a obra não tem ficam desabilitados.</p>
+
+            {/* Gantt (estilo MS Project) — mesmas obras/filtros da tabela; barras = datas por serviço; ▍prazo CEMIG; linha teal = hoje */}
+            {(() => {
+              let minYM = '', maxYM = ''
+              for (const [, obras] of grupos) for (const o of obras) {
+                for (const d of o.drivers) {
+                  if (!(d.contr > 0)) continue
+                  const i = (effIni(o, d.label) || '').slice(0, 7), f = (effFim(o, d.label) || '').slice(0, 7)
+                  if (i && (!minYM || i < minYM)) minYM = i
+                  if (f && (!maxYM || f > maxYM)) maxYM = f
+                }
+                const pz = o.fim ? o.fim.slice(0, 7) : ''
+                if (pz && (!maxYM || pz > maxYM)) maxYM = pz
+              }
+              if (!minYM) return <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Gantt: preencha Início/Término (ou rode o Planejamento Automático) pra desenhar as barras.</p>
+              if (!maxYM || maxYM < minYM) maxYM = minYM
+              const nM = Math.min(48, ymNum(maxYM) - ymNum(minYM) + 1)
+              const meses = Array.from({ length: nM }, (_, i) => shiftYM(minYM, i))
+              const CW = 34, NAMEW = 224
+              const ix = (ym: string) => Math.max(0, Math.min(nM - 1, ymNum(ym) - ymNum(minYM)))
+              const hoje = startYM()
+              const hojeIx = ymNum(hoje) >= ymNum(minYM) && ymNum(hoje) <= ymNum(shiftYM(minYM, nM - 1)) ? ix(hoje) : null
+              const lane = (l: string) => DRV.findIndex(x => x.label === l)
+              return (
+                <div className={`mt-3 rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                  <div className="overflow-auto max-h-[46vh]">
+                    <div style={{ width: NAMEW + nM * CW }}>
+                      <div className={`flex sticky top-0 z-20 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+                        <div className={`shrink-0 sticky left-0 z-10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-slate-900 text-slate-500' : 'bg-slate-50 text-slate-400'}`} style={{ width: NAMEW }}>Gantt</div>
+                        {meses.map(mm => <div key={mm} className={`shrink-0 text-center py-1 text-[9px] font-semibold border-l ${isDark ? 'text-slate-500 border-white/[0.04]' : 'text-slate-400 border-slate-100'}`} style={{ width: CW }}>{ymLabel(mm)}</div>)}
+                      </div>
+                      {grupos.map(([frente, obras]) => (
+                        <div key={frente}>
+                          <div className={`flex border-t ${isDark ? 'border-white/[0.05] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
+                            <div className={`shrink-0 sticky left-0 z-10 px-2.5 py-1 text-[10px] font-bold ${isDark ? 'bg-slate-800 text-teal-300' : 'bg-slate-100 text-teal-700'}`} style={{ width: NAMEW }}>{frente}</div>
+                            <div style={{ width: nM * CW }} />
+                          </div>
+                          {obras.map(o => {
+                            const bars = o.drivers.filter(d => d.contr > 0).map(d => ({ d, i: (effIni(o, d.label) || '').slice(0, 7), f: (effFim(o, d.label) || '').slice(0, 7) })).filter(b => b.i && b.f && b.f >= b.i)
+                            const pz = o.fim ? o.fim.slice(0, 7) : ''
+                            return (
+                              <div key={o.nome} className={`flex border-t ${isDark ? 'border-white/[0.03]' : 'border-slate-50'}`}>
+                                <div className={`shrink-0 sticky left-0 z-10 px-2.5 py-0.5 text-[10px] truncate ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`} style={{ width: NAMEW, lineHeight: '22px' }} title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome}</div>
+                                <div className="relative shrink-0" style={{ width: nM * CW, height: 24 }}>
+                                  {meses.map((_, i2) => <span key={i2} className={`absolute top-0 bottom-0 border-l ${isDark ? 'border-white/[0.03]' : 'border-slate-100/80'}`} style={{ left: i2 * CW }} />)}
+                                  {hojeIx != null && <span className="absolute top-0 bottom-0 w-px bg-teal-500/60" style={{ left: hojeIx * CW + CW / 2 }} title={`hoje (${ymLabel(hoje)})`} />}
+                                  {bars.map(b => (
+                                    <span key={b.d.label} className="absolute rounded-sm" title={`${b.d.label}: ${ymLabel(b.i)} → ${ymLabel(b.f)}`}
+                                      style={{ left: ix(b.i) * CW + 1, width: Math.max(6, (ix(b.f) - ix(b.i) + 1) * CW - 2), top: 4 + lane(b.d.label) * 6, height: 5, background: b.d.cor }} />
+                                  ))}
+                                  {bars.length === 0 && <span className={`absolute left-1.5 text-[9px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`} style={{ lineHeight: '24px' }}>sem datas</span>}
+                                  {pz && ymNum(pz) >= ymNum(minYM) && ymNum(pz) <= ymNum(shiftYM(minYM, nM - 1)) && (
+                                    <span className="absolute w-[3px] top-1 bottom-1 bg-rose-500 rounded" style={{ left: ix(pz) * CW + CW - 3 }} title={`prazo CEMIG: ${ymLabel(pz)}`} />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-3 px-2.5 py-1 text-[9px] border-t ${isDark ? 'border-white/[0.06] text-slate-500' : 'border-slate-100 text-slate-400'}`}>
+                    {DRV.map(d => <span key={d.label} className="inline-flex items-center gap-1"><span className="w-3 h-[5px] rounded-sm inline-block" style={{ background: d.cor }} />{d.label}</span>)}
+                    <span className="inline-flex items-center gap-1"><span className="w-[3px] h-3 bg-rose-500 rounded inline-block" />prazo CEMIG</span>
+                    <span className="inline-flex items-center gap-1"><span className="w-px h-3 bg-teal-500 inline-block" />hoje</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
-          {/* Premissas (precedência) */}
-          <div>
-            <p className={`${lbl} mb-2`}>Premissas — precedência entre serviços</p>
-            <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <span onClick={() => setCfg(c => ({ ...c, precedencia: !(c.precedencia !== false) }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.precedencia !== false ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.precedencia !== false ? 'translate-x-4' : ''}`} /></span>
-              <span className="text-[12px] font-semibold">Fundação libera Montagem · Montagem libera Lançamento</span>
-            </label>
-            {cfg.precedencia !== false && (
-              <div className="flex items-center gap-2 text-[11px] pl-1">
-                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Defasagem (meses) entre liberar e iniciar o próximo:</span>
-                <input type="number" min="0" max="12" value={cfg.lag || 0} onChange={e => setCfg(c => ({ ...c, lag: Math.max(0, Number(e.target.value)) }))} className={`w-14 text-[12px] font-semibold rounded-lg border px-1.5 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
-              </div>
-            )}
-            <p className={`text-[10px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Montagem não avança além do % de fundação já concluído (volume liberado); lançamento idem em relação à montagem.</p>
-            <label className="flex items-center gap-2 mt-3 mb-1 cursor-pointer">
-              <span onClick={() => setCfg(c => ({ ...c, realoc: !c.realoc }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.realoc ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.realoc ? 'translate-x-4' : ''}`} /></span>
-              <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra obra sucessora</span>
-            </label>
-            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia se a sucessora não tiver saldo daquele serviço) — a produção lá só começa a partir da <b>Data Início</b>, e a <b>Duração</b> mostra meses · término projetados. <b>Data Fim</b> preenchida força o ritmo pela data (saldo ÷ meses), ignorando a equipe daquela obra. Sem realocação, use as datas pra planejar as ondas manualmente.</p>
-          </div>
         </div>
-        {/* Modal secundário: produtividade padrão por pessoa */}
+        {/* Modal secundário: produtividade padrão por pessoa + premissas de precedência/realocação */}
         {prodOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setProdOpen(false)}>
-            <div className={`w-full max-w-sm rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
-              <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                <h3 className="text-[13px] font-bold flex items-center gap-2"><Gauge size={14} className="text-teal-500" /> Produtividade por pessoa (por mês)</h3>
+            <div className={`w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+              <div className={`flex items-center justify-between px-4 py-2.5 border-b sticky top-0 z-10 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+                <h3 className="text-[13px] font-bold flex items-center gap-2"><Gauge size={14} className="text-teal-500" /> Produtividade &amp; Premissas</h3>
                 <button onClick={() => setProdOpen(false)} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={14} /></button>
               </div>
               <div className="px-4 py-3 space-y-2">
+                <p className={lbl}>Produtividade por pessoa (por mês)</p>
                 {DRV.map(d => (
                   <div key={d.label} className={`flex items-center gap-2 rounded-xl p-2.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/70 border-slate-100'}`}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.cor }} />
@@ -678,6 +729,23 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                     <span className="text-[10px] text-slate-400 w-24">{d.uni}/pessoa·mês</span>
                   </div>
                 ))}
+                <p className={`${lbl} pt-2`}>Premissas — precedência entre serviços</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span onClick={() => setCfg(c => ({ ...c, precedencia: !(c.precedencia !== false) }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.precedencia !== false ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.precedencia !== false ? 'translate-x-4' : ''}`} /></span>
+                  <span className="text-[12px] font-semibold">Fundação libera Montagem · Montagem libera Lançamento</span>
+                </label>
+                {cfg.precedencia !== false && (
+                  <div className="flex items-center gap-2 text-[11px] pl-1">
+                    <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Defasagem (meses) entre liberar e iniciar o próximo:</span>
+                    <input type="number" min="0" max="12" value={cfg.lag || 0} onChange={e => setCfg(c => ({ ...c, lag: Math.max(0, Number(e.target.value)) }))} className={`w-14 text-[12px] font-semibold rounded-lg border px-1.5 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-800'}`} />
+                  </div>
+                )}
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Montagem não avança além do % de fundação já concluído (volume liberado); lançamento idem em relação à montagem.</p>
+                <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                  <span onClick={() => setCfg(c => ({ ...c, realoc: !c.realoc }))} className={`w-9 h-5 rounded-full p-0.5 transition ${cfg.realoc ? 'bg-teal-600' : (isDark ? 'bg-white/15' : 'bg-slate-300')}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${cfg.realoc ? 'translate-x-4' : ''}`} /></span>
+                  <span className="text-[12px] font-semibold">Realocação automática — equipe liberada migra pra obra sucessora</span>
+                </label>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando um serviço conclui numa obra, a equipe dele vai pra obra que apontou esta como <b>Predecessão</b> (seguindo a cadeia) — a produção lá só começa a partir da <b>Data Início</b>. <b>Data Fim</b> preenchida força o ritmo pela data (saldo ÷ meses), ignorando a equipe daquela obra. Sem realocação, use as datas pra planejar as ondas manualmente.</p>
               </div>
               <div className={`flex justify-end px-4 py-2.5 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
                 <button onClick={() => setProdOpen(false)} className="px-3 py-1 rounded-lg text-[12px] font-bold bg-teal-600 text-white hover:bg-teal-700">OK</button>
