@@ -338,7 +338,7 @@ export default function QsmaSeguranca() {
         )
         return (
           <div className="space-y-3">
-            {subTreino === 'integracao' && <IntegracaoTreinamentos subTabs={subTabsToggle} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} />}
+            {subTreino === 'integracao' && <IntegracaoTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />}
 
             {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
 
@@ -1146,8 +1146,8 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
 // ── Integração: candidatos em integração × treinamentos obrigatórios ─────────
 // Mesmo layout do Controle; o upload do certificado reusa o anexarCert da Admissão
 // (grava em rh_admissao_treinamentos + bucket rh-admissao-docs) → reflete na Admissão › Integração.
-function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
-  subTabs?: ReactNode; isDark: boolean; txtMain: string; txtMuted: string
+function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
 }) {
   const qc = useQueryClient()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
@@ -1155,9 +1155,22 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
   const { data, isLoading } = useIntegracaoTreinos()
   const admTrein = useAdmissaoTreinamentos()
   const [busca, setBusca] = useState('')
+  const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+  const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
+  const [fBase, setFBase] = useState<Set<string> | null>(null)
+  const [fCargo, setFCargo] = useState<Set<string> | null>(null)
+  const [detalheId, setDetalheId] = useState<string | null>(null)
 
   const candidatos = data?.candidatos ?? []
   const treinos = data?.treinos ?? []
+
+  const bases = [...new Set(candidatos.map(c => c.base).filter(Boolean))].sort() as string[]
+  const cargos = [...new Set(candidatos.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
+
+  // defaults: tudo marcado
+  useEffect(() => {
+    if (candidatos.length && fBase === null) { setFBase(new Set(bases)); setFCargo(new Set(cargos)) }
+  }, [candidatos.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // required por cargo-base (obrigatório, exceto ASO — que é da etapa de Exames, igual à Admissão)
   const catById = new Map(catalogo.map(c => [c.id, c]))
@@ -1185,16 +1198,23 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
     return { s: 'faltando', rec }
   }
 
-  const q = busca.trim().toLowerCase()
-  const filt = candidatos.filter(c => !q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q))
-  const pendDe = (c: IntegracaoCand) => {
+  // resumo por candidato (ok / pendente / total obrigatório)
+  const resumoDe = (c: IntegracaoCand) => {
     const req = reqPorCargo.get(cargoBase(c.cargo))
-    if (!req) return 0
-    let pend = 0
-    req.forEach(tid => { const cat = catById.get(tid); if (cat && statusCel(c.id, cargoBase(c.cargo), cat).s !== 'ok') pend++ })
-    return pend
+    const total = req ? req.size : 0
+    let ok = 0
+    req?.forEach(tid => { const cat = catById.get(tid); if (cat && statusCel(c.id, cargoBase(c.cargo), cat).s === 'ok') ok++ })
+    return { ok, pend: total - ok, total }
   }
-  const comPend = filt.filter(c => pendDe(c) > 0).length
+
+  const q = busca.trim().toLowerCase()
+  const filt = candidatos.filter(c =>
+    (!q || c.nome.toLowerCase().includes(q) || (c.cargo ?? '').toLowerCase().includes(q))
+    && (!fBase || !c.base || fBase.has(c.base))
+    && (!fCargo || !cargoBase(c.cargo) || fCargo.has(cargoBase(c.cargo)))
+    && (quick === 'todos' || (quick === 'pendencia' && resumoDe(c).pend > 0))
+  )
+  const comPend = filt.filter(c => resumoDe(c).pend > 0).length
 
   const grupos = [...filt.reduce((m, c) => {
     const k = cargoBase(c.cargo) || '—'; m.set(k, [...(m.get(k) ?? []), c]); return m
@@ -1210,15 +1230,33 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
     )
   }
   const verCert = async (path?: string | null) => { const url = await certTreinamentoUrl(path); if (url) window.open(url, '_blank', 'noopener') }
+  const abrir = (c: IntegracaoCand) => { if (c.colaborador_id) setDetalheId(c.colaborador_id) }
+
+  // Drill-in: ficha do colaborador (só treinamentos) — igual ao Controle
+  if (detalheId) return <RHColaboradorDetalhe id={detalheId} onBack={() => setDetalheId(null)} soTreinamentos />
+
+  const selCls = `text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
 
   return (
     <div className="space-y-3">
-      {/* header (mesmo padrão do Controle) */}
+      {/* header com filtros (mesmo padrão do Controle) */}
       <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
         {subTabs}
         <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
           <Search size={14} className={txtMuted} />
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+        <CheckDropdown label="Bases" options={bases} selected={fBase} onChange={setFBase} isDark={isDark} />
+        <CheckDropdown label="Posições" options={cargos} selected={fCargo} onChange={setFCargo} isDark={isDark} />
+        <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
+          className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'pendencia' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
+          <AlertTriangle size={12} /> Com pendência
+        </button>
+        <div className={`inline-flex p-0.5 rounded-lg ml-auto ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+          <button onClick={() => setVista('tabela')} title="Tabela"
+            className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
+          <button onClick={() => setVista('cards')} title="Cards"
+            className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
         </div>
       </div>
 
@@ -1236,7 +1274,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
         <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
       ) : filt.length === 0 ? (
         <Vazio isDark={isDark} texto="Nenhum colaborador em fase de integração" />
-      ) : (
+      ) : vista === 'tabela' ? (
         <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <table className="w-full min-w-[1000px] table-fixed border-collapse text-xs">
             <thead>
@@ -1266,8 +1304,10 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
                     return (
                       <tr key={c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
                         <td className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
-                          <p className={`text-xs font-bold truncate ${txtMain}`} title={c.nome}>{c.nome}</p>
-                          {c.base && <p className={`text-[10px] truncate ${txtMuted}`}>{c.base}</p>}
+                          <button onClick={() => abrir(c)} disabled={!c.colaborador_id} title={c.nome} className="text-left group block w-full disabled:cursor-default">
+                            <p className={`text-xs font-bold truncate ${c.colaborador_id ? 'group-hover:text-sky-500' : ''} ${txtMain}`}>{c.nome}</p>
+                            {c.base && <p className={`text-[10px] truncate ${txtMuted}`}>{c.base}</p>}
+                          </button>
                         </td>
                         {cols.map(col => {
                           const st = statusCel(c.id, cargoKey, col)
@@ -1301,6 +1341,32 @@ function IntegracaoTreinamentos({ subTabs, isDark, txtMain, txtMuted }: {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {grupos.map(([cargo, linhas]) => (
+            <div key={cargo} className="space-y-2">
+              <p className={`text-[11px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cargo} <span className="font-normal opacity-70">· {linhas.length}</span></p>
+              {linhas.map(c => {
+                const r = resumoDe(c)
+                return (
+                  <button key={c.id} onClick={() => abrir(c)} disabled={!c.colaborador_id}
+                    className={`${card} w-full text-left p-3.5 flex items-center gap-3 flex-wrap transition-all hover:border-sky-400/50 disabled:cursor-default`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${txtMain}`}>{c.nome}</p>
+                      <p className={`text-[11px] ${txtMuted}`}>{c.base ?? ''}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {r.total === 0 && <span className={`text-[10px] ${txtMuted}`}>sem matriz</span>}
+                      {r.pend > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{r.pend} pendente</span>}
+                      {r.total > 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.ok === r.total ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{r.ok}/{r.total} ok</span>}
+                      <ChevronRight size={14} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
