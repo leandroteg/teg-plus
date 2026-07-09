@@ -1017,14 +1017,16 @@ function ControleTreinamentos({ isDark, card, txtMain, txtMuted, onSelect }: {
         <Vazio isDark={isDark} texto="Nenhum colaborador encontrado" />
       ) : vista === 'tabela' ? (
         <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-          <table className="border-collapse text-xs">
+          <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className={`sticky left-0 top-0 z-30 text-left px-3 py-2 font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                <th className={`sticky left-0 top-0 z-30 w-full text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
                 {cols.map(c => (
                   <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
-                    className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
-                    <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{colLabel(c)}</span>
+                    className={`sticky top-0 z-20 h-[104px] w-8 p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                    <div className="relative h-full">
+                      <span className="absolute bottom-1.5 left-1/2 origin-bottom-left -rotate-45 whitespace-nowrap text-[10px] leading-none">{colLabel(c)}</span>
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -1144,14 +1146,16 @@ function MatrizTreinamentos({ isDark, card, txtMain, txtMuted, isAdmin }: {
 
       {/* grade */}
       <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-        <table className="border-collapse text-xs">
+        <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr>
-              <th className={`sticky left-0 top-0 z-30 text-left px-3 py-2 font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
+              <th className={`sticky left-0 top-0 z-30 w-full text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
               {cols.map(c => (
                 <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}${c.carga_horaria ? ' · ' + c.carga_horaria + 'h' : ''}`}
-                  className={`sticky top-0 z-20 px-1.5 py-2 font-bold whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
-                  <span className="[writing-mode:vertical-rl] rotate-180 inline-block leading-tight">{colLabel(c)}</span>
+                  className={`sticky top-0 z-20 h-[104px] w-8 p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo === 'contratual' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
+                  <div className="relative h-full">
+                    <span className="absolute bottom-1.5 left-1/2 origin-bottom-left -rotate-45 whitespace-nowrap text-[10px] leading-none">{colLabel(c)}</span>
+                  </div>
                 </th>
               ))}
             </tr>
