@@ -774,6 +774,43 @@ export async function certTreinamentoUrl(path?: string | null): Promise<string |
   return data?.signedUrl ?? null
 }
 
+// ── Integração: candidatos na etapa 'integracao' + seus treinamentos ─────────
+// Alimenta a sub-aba "Integração" do QSMA (Gestão SST › Treinamentos). O upload
+// de certificado reusa useTreinamentos().anexarCert (grava em rh_admissao_treinamentos),
+// então aparece automaticamente na Admissão › Integração.
+export interface IntegracaoCand { id: string; nome: string; cargo: string | null; base: string | null; admissao_id: string }
+export interface IntegracaoTreino {
+  id: string; candidato_id: string; nome: string; norma: string | null
+  status: string; certificado_path: string | null; certificado_nome: string | null
+}
+
+export function useIntegracaoTreinos() {
+  return useQuery<{ candidatos: IntegracaoCand[]; treinos: IntegracaoTreino[] }>({
+    queryKey: ['integracao-treinos'],
+    queryFn: async () => {
+      const { data: adms, error } = await supabase
+        .from('rh_admissoes')
+        .select('id, base, cargo_previsto, candidatos:rh_admissao_candidatos(id, nome, cargo)')
+        .eq('etapa', 'integracao')
+      if (error) { console.error('useIntegracaoTreinos:', error); return { candidatos: [], treinos: [] } }
+      const candidatos: IntegracaoCand[] = (adms ?? []).flatMap((a: any) =>
+        (a.candidatos ?? []).map((c: any) => ({
+          id: c.id, nome: c.nome, cargo: c.cargo || a.cargo_previsto || null, base: a.base ?? null, admissao_id: a.id,
+        })))
+      const ids = candidatos.map(c => c.id)
+      let treinos: IntegracaoTreino[] = []
+      if (ids.length) {
+        const { data: tr } = await supabase
+          .from('rh_admissao_treinamentos')
+          .select('id, candidato_id, nome, norma, status, certificado_path, certificado_nome')
+          .in('candidato_id', ids)
+        treinos = (tr ?? []) as IntegracaoTreino[]
+      }
+      return { candidatos, treinos }
+    },
+  })
+}
+
 export function useMobilizacao() {
   const qc = useQueryClient()
   const enviarMissao = useMutation({
