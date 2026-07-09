@@ -60,7 +60,23 @@ export function useRHColaborador(id?: string) {
         .eq('id', id!)
         .single()
       if (error) return null
-      return data as RHColaborador
+      // Salário é RESTRITO: não expõe na ficha (fica só no banco p/ totalizações em painéis)
+      const d = data as any
+      if (d) delete d.salario
+      return d as RHColaborador
+    },
+  })
+}
+
+// Departamentos cadastrados no sistema (distintos, para o select da ficha)
+export function useDepartamentos() {
+  return useQuery<string[]>({
+    queryKey: ['rh-departamentos'],
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_colaboradores').select('departamento')
+      const s = new Set<string>()
+      ;(data ?? []).forEach((r: any) => { if (r.departamento) s.add(r.departamento) })
+      return [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'))
     },
   })
 }
@@ -69,7 +85,7 @@ export function useSalvarRHColaborador() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<RHColaborador> & { id?: string }) => {
-      const { id, obra, base, gestor, ...rest } = payload as any
+      const { id, obra, base, gestor, salario, ...rest } = payload as any // salário restrito: nunca sobrescreve pela ficha
       if (id) {
         const { data, error } = await supabase.from('rh_colaboradores').update(rest).eq('id', id).select('*').single()
         if (error) throw error
