@@ -126,6 +126,32 @@ export function useExcluirCard() {
   })
 }
 
+// ── Mural do colaborador: cards da edição publicada mais recente ──────────────
+export function useMuralJornalCards() {
+  return useQuery<{ edicao: JornalEdicao | null; cards: JornalCard[] }>({
+    queryKey: ['mural-jornal-cards'],
+    queryFn: async () => {
+      const { data: ed } = await supabase
+        .from('jornal_edicoes')
+        .select('*')
+        .eq('publicado', true)
+        .order('ano', { ascending: false })
+        .order('mes', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!ed) return { edicao: null, cards: [] }
+      const { data: cards } = await supabase
+        .from('jornal_cards')
+        .select('*')
+        .eq('edicao_id', (ed as JornalEdicao).id)
+        .order('ordem', { ascending: true })
+      return { edicao: ed as JornalEdicao, cards: (cards ?? []) as JornalCard[] }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // ── Detecção automática de blocos (Gemini Vision via n8n) ─────────────────────
 const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
