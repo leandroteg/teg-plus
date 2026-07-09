@@ -39,7 +39,13 @@ function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark
       {open && (<><div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
         <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[300px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
           {options.length === 0 && <p className="px-2 py-1.5 text-[11px] text-slate-400">—</p>}
-          {n > 0 && <button onClick={onClear} className={`w-full text-left px-2 py-1 mb-0.5 text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>× limpar</button>}
+          {options.length > 0 && (() => { const todas = n === options.length; return (
+            <button onClick={() => { if (todas || n > 0) onClear(); else options.forEach(o => { if (!selected.has(o.value)) onToggle(o.value) }) }}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 mb-0.5 rounded-lg text-[11px] text-left border-b ${isDark ? 'hover:bg-white/[0.06] border-white/[0.06]' : 'hover:bg-slate-50 border-slate-100'}`}>
+              <span className={`shrink-0 w-4 h-4 rounded-md border flex items-center justify-center ${todas ? 'bg-teal-600 border-teal-600 text-white' : (isDark ? 'border-white/25' : 'border-slate-300')}`}>{todas && <Check size={11} strokeWidth={3} />}</span>
+              <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{todas || n > 0 ? 'Desmarcar todas' : 'Selecionar todas'}</span>
+            </button>
+          ) })()}
           {options.map(o => { const on = selected.has(o.value); return (
             <button key={o.value} onClick={() => onToggle(o.value)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] text-left ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
               <span className={`shrink-0 w-4 h-4 rounded-md border flex items-center justify-center ${on ? 'bg-teal-600 border-teal-600 text-white' : (isDark ? 'border-white/25' : 'border-slate-300')}`}>{on && <Check size={11} strokeWidth={3} />}</span>
