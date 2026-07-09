@@ -26,8 +26,8 @@ export default function QsmaLayout() {
         ],
       },
     },
+    { to: '/qsma/seguranca',     icon: HardHat,         label: 'Gestão SST' },
     { to: '/qsma/inspecoes',     icon: ClipboardCheck,  label: 'Inspeções' },
-    { to: '/qsma/seguranca',     icon: HardHat,         label: 'Segurança' },
     { to: '/qsma/meio-ambiente', icon: Leaf,            label: 'Meio Ambiente' },
   ]
   return (
