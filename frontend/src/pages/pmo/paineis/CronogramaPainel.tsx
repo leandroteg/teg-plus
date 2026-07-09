@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, ChevronUp, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
@@ -464,6 +464,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const [planP, setPlanP] = useState<PlanParams>({ eqF: 1, eqML: 1, rotores: 5, perfuratrizes: 1, guindastes: 1, comboios: 4, residual: 0.7, limiarGuind: 10, eqPorLanc: 2, diasUteis: 22, excluidas: [] })
   const [planAlvo, setPlanAlvo] = useState('') // YYYY-MM opcional → cálculo de reforço mínimo
   const [planExc, setPlanExc] = useState<Set<string>>(new Set()) // obras embargadas / fora do plano
+  const [planOrdem, setPlanOrdem] = useState<string[]>([]) // prioridade manual (ordem das obras)
   const [planRes, setPlanRes] = useState<PlanResult | null>(null)
   // torres por obra = Σ qtd_torres das OSCs de CONSTRUÇÃO ativas (lançadas na Iniciação) — busca só com o modal aberto
   const { data: torresObra } = useQuery<Record<string, number>>({
@@ -488,16 +489,33 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
     const totF = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Fundação'] || 0), 0)
     const totML = allObras.reduce((s, o) => s + (cfg.equipe[o.nome]?.['Montagem'] || 0) + (cfg.equipe[o.nome]?.['Lançamento'] || 0), 0)
     setPlanP(pp => ({ ...pp, eqF: Math.max(1, Math.round(totF / 7)), eqML: Math.max(1, Math.round(totML / 12)) }))
-    // exclusões: as que você marcou antes (persistidas) + obras >95% físico (concluídas na prática) pré-marcadas
+    // exclusões: as que você desmarcar depois + obras >95% físico (concluídas na prática) já FORA por padrão
     const exc = new Set<string>(allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).map(o => o.nome))
     try { for (const n of JSON.parse(localStorage.getItem(`crono-plan-exc-${portfolioId}`) ?? '[]')) exc.add(n) } catch { /* lista corrompida → segue só com as >95% */ }
     setPlanExc(exc)
+    // prioridade inicial = padrão do planejador (prazo CEMIG mais crítico → maior saldo R$); depois reordena com as setas
+    const st = startYM()
+    const ordem = allObras.filter(o => o.drivers.some(d => d.contr > 0))
+      .map(o => ({ nome: o.nome, pz: o.fim ? ymNum(o.fim.slice(0, 7)) - ymNum(st) : 9999, sr: o.saldoR }))
+      .sort((a, b) => a.pz !== b.pz ? a.pz - b.pz : b.sr - a.sr).map(o => o.nome)
+    try { const salvo: string[] = JSON.parse(localStorage.getItem(`crono-plan-ordem-${portfolioId}`) ?? '[]'); if (salvo.length) { const set = new Set(salvo); ordem.sort((a, b) => (set.has(a) ? salvo.indexOf(a) : 1e9) - (set.has(b) ? salvo.indexOf(b) : 1e9)) } } catch { /* ignora ordem salva corrompida */ }
+    setPlanOrdem(ordem)
     setPlanRes(null); setPlanOpen(true)
   }
   const togglePlanExc = (nome: string) => {
     setPlanExc(s => {
       const n = new Set(s); n.has(nome) ? n.delete(nome) : n.add(nome)
       try { localStorage.setItem(`crono-plan-exc-${portfolioId}`, JSON.stringify([...n])) } catch { /* storage cheio: segue sem persistir */ }
+      return n
+    })
+    setPlanRes(null)
+  }
+  const movePlan = (nome: string, dir: -1 | 1) => {
+    setPlanOrdem(o => {
+      const i = o.indexOf(nome), j = i + dir
+      if (i < 0 || j < 0 || j >= o.length) return o
+      const n = [...o];[n[i], n[j]] = [n[j], n[i]]
+      try { localStorage.setItem(`crono-plan-ordem-${portfolioId}`, JSON.stringify(n)) } catch { /* segue sem persistir */ }
       return n
     })
     setPlanRes(null)
@@ -515,7 +533,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
       }
     })
     const alvoIdx = planAlvo ? Math.max(0, ymNum(planAlvo) - ymNum(start)) : null
-    setPlanRes(planejarComReforco(ins, { ...planP, excluidas: [...planExc], alvoIdx }))
+    setPlanRes(planejarComReforco(ins, { ...planP, excluidas: [...planExc], ordem: planOrdem, alvoIdx }))
   }
   // grava o plano nos campos EXISTENTES da config: datas por serviço + predecessão + pessoas (equipes × tamanho)
   const preencherPlano = () => {
@@ -905,18 +923,31 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                     </label>
                   </div>
                 </div>
-                <details>
-                  <summary className={`cursor-pointer text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Obras embargadas / fora do plano {planExc.size > 0 ? `(${planExc.size} excluída${planExc.size > 1 ? 's' : ''})` : ''}</summary>
-                  <div className={`mt-1.5 max-h-40 overflow-auto rounded-lg border p-1.5 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                    {planejaveis.map(o => (
-                      <label key={o.nome} className="flex items-center gap-2 text-[11px] cursor-pointer">
-                        <input type="checkbox" checked={planExc.has(o.nome)} onChange={() => togglePlanExc(o.nome)} />
-                        <span className="truncate">{o.nome} <span className={`font-semibold ${o.pctFis > 85 ? 'text-amber-500' : 'opacity-50'}`}>· {o.pctFis}%</span></span>
-                      </label>
-                    ))}
-                  </div>
-                </details>
-                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Simula o portfólio mês a mês: prioridade = <b>prazo CEMIG × volume R$</b>; fundação ∥ pré-montagem → montagem → lançamento; equipes e recursos migram entre obras (1º mês de frente nova = mobilização, 50%). Torres vêm do <b>qtd_torres das OSCs</b> (Iniciação); sem lançamento, estima ~3/km e avisa. As datas são <b>resultado</b> — depois de preencher, revise na tabela e clique Aplicar.</p>
+                {(() => {
+                  const obraMap = new Map(planejaveis.map(o => [o.nome, o]))
+                  const lista = planOrdem.filter(n => obraMap.has(n))
+                  const incl = lista.filter(n => !planExc.has(n)).length
+                  return (
+                    <div>
+                      <p className={`${plbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— {incl} no plano · setas ordenam · desmarque pra tirar</span></p>
+                      <div className={`max-h-52 overflow-auto rounded-lg border p-1 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                        {lista.map((n, i) => { const o = obraMap.get(n)!; const on = !planExc.has(n); return (
+                          <div key={n} className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] ${on ? '' : 'opacity-40'} ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                            <span className={`w-5 text-right tabular-nums font-bold shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
+                            <div className="flex flex-col shrink-0">
+                              <button type="button" disabled={i === 0} onClick={() => movePlan(n, -1)} className="p-0 leading-none disabled:opacity-20 hover:text-teal-500" title="Subir prioridade"><ChevronUp size={12} /></button>
+                              <button type="button" disabled={i === lista.length - 1} onClick={() => movePlan(n, 1)} className="p-0 leading-none disabled:opacity-20 hover:text-teal-500" title="Descer prioridade"><ChevronDown size={12} /></button>
+                            </div>
+                            <input type="checkbox" checked={on} onChange={() => togglePlanExc(n)} title={on ? 'No plano — desmarque pra tirar (embargo/fora)' : 'Fora do plano'} className="shrink-0 accent-teal-600" />
+                            <span className="truncate flex-1" title={o.nome}>{o.nome} <span className={`font-semibold ${o.pctFis > 85 ? 'text-amber-500' : 'opacity-50'}`}>· {o.pctFis}%</span></span>
+                          </div>
+                        ) })}
+                        {lista.length === 0 && <p className={`px-2 py-2 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra planejável.</p>}
+                      </div>
+                    </div>
+                  )
+                })()}
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Simula o portfólio mês a mês na <b>ordem de prioridade acima</b> (começa pelo prazo CEMIG × R$, reordene com as setas); fundação ∥ pré-montagem → montagem → lançamento; equipes e recursos migram entre obras (1º mês de frente nova = mobilização, 50%). Torres vêm do <b>qtd_torres das OSCs</b> (Iniciação); sem lançamento, estima ~3/km e avisa. As datas são <b>resultado</b> — depois de preencher, revise na tabela e clique Aplicar.</p>
                 <button onClick={simular} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold border ${isDark ? 'border-teal-500/40 text-teal-300 bg-teal-500/10 hover:bg-teal-500/20' : 'border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100'}`}><Gauge size={13} /> Simular</button>
 
                 {planRes && (
