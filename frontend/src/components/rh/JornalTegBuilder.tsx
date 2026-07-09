@@ -3,7 +3,7 @@
 // Fluxo: upload PDF → renderiza páginas (pdf.js) → desenha retângulos sobre cada
 // página → cada retângulo vira um card (imagem exata do bloco) → salva a edição.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import {
   Upload, Loader2, Trash2, Save, FileText, CheckCircle2, Sparkles,
   Newspaper, AlertTriangle, Square,
@@ -31,7 +31,7 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 
 let cropSeq = 0
 
-export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) {
+export default function JornalTegBuilder({ onSaved, initialFile }: { onSaved?: () => void; initialFile?: File | null }) {
   const { user } = useAuth()
   const { isLightSidebar: isLight } = useTheme()
   const criarEdicao = useCriarEdicao()
@@ -51,6 +51,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
   const [detProg, setDetProg] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  const [publicadoOk, setPublicadoOk] = useState(false)
   const [erro, setErro] = useState('')
 
   const [crops, setCrops] = useState<Crop[]>([])
@@ -69,9 +70,15 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
     setCrops([]); setDone(false); setErro(''); setTitulo('')
   }
 
-  async function handlePdf(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // Arquivo já escolhido lá fora (botão "Importar Jornal") → processa direto
+  useEffect(() => {
+    if (initialFile) void processarPdf(initialFile)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handlePdf = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) void processarPdf(f) }
+
+  async function processarPdf(file: File) {
     if (file.type !== 'application/pdf') { setErro('Selecione um arquivo PDF.'); return }
     setErro(''); setRendering(true); setPdfFile(file); setCrops([])
     try {
@@ -157,7 +164,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
   }
 
   // ── Salvar edição + cards ───────────────────────────────────────────────────
-  async function handleSalvar() {
+  async function handleSalvar(publicar = false) {
     if (!pdfFile || !crops.length) return
     setSaving(true); setErro('')
     try {
@@ -174,7 +181,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
       // 3) cria a edição
       const edicao = await criarEdicao.mutateAsync({
         titulo: titulo || `Jornal TEG — ${MESES[mes - 1]} ${ano}`,
-        mes, ano, pdf_url: pdfUrl, capa_url: capaUrl, publicado: false,
+        mes, ano, pdf_url: pdfUrl, capa_url: capaUrl, publicado: publicar,
         criado_por: (user as { nome?: string; email?: string } | null)?.nome
           ?? (user as { email?: string } | null)?.email ?? null,
       })
@@ -204,6 +211,7 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
       }
       if (rows.length) await salvarCards.mutateAsync(rows)
       if (!rows.length) throw new Error('Nenhum card pôde ser gerado.')
+      setPublicadoOk(publicar)
       setDone(true)
       onSaved?.()
       if (falhas) setErro(`${rows.length} cards salvos · ${falhas} não puderam ser gerados.`)
@@ -220,8 +228,14 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
     return (
       <div className="flex flex-col items-center gap-4 py-14 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
         <CheckCircle2 size={48} className="text-emerald-400" />
-        <p className="text-lg font-bold text-emerald-300">Edição salva com {crops.length} card{crops.length !== 1 ? 's' : ''}!</p>
-        <p className="text-xs text-slate-400">Salva como rascunho (não publicada). Publique na lista de edições.</p>
+        <p className="text-lg font-bold text-emerald-300">
+          {publicadoOk ? 'Mural publicado' : 'Edição salva'} — {crops.length} card{crops.length !== 1 ? 's' : ''}!
+        </p>
+        <p className="text-xs text-slate-400">
+          {publicadoOk
+            ? 'Já está no ar: os colaboradores veem esta edição no Mural.'
+            : 'Salva como rascunho. Publique na lista (ícone de olho) quando quiser.'}
+        </p>
         <button onClick={reset} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold">
           <Newspaper size={14} /> Nova edição
         </button>
@@ -351,16 +365,27 @@ export default function JornalTegBuilder({ onSaved }: { onSaved?: () => void }) 
                 ))}
                 {!crops.length && <p className="col-span-2 text-[11px] text-slate-500 py-6 text-center">Nenhum bloco recortado ainda.</p>}
               </div>
+              {/* Ação principal: 1 clique = salva + publica no Mural */}
               <button
-                onClick={handleSalvar}
-                disabled={saving || !crops.length}
+                onClick={() => handleSalvar(true)}
+                disabled={saving || detecting || !crops.length}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold disabled:opacity-50"
               >
-                {saving ? <><Loader2 size={15} className="animate-spin" /> Salvando…</> : <><Save size={15} /> Salvar edição ({crops.length})</>}
+                {saving ? <><Loader2 size={15} className="animate-spin" /> Publicando…</> : <><Sparkles size={15} /> Publicar no Mural ({crops.length})</>}
               </button>
-              <button onClick={reset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-white/10 text-xs text-slate-400 hover:bg-white/5">
-                <FileText size={13} /> Trocar PDF
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSalvar(false)}
+                  disabled={saving || detecting || !crops.length}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs disabled:opacity-50 ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'}`}
+                >
+                  <Save size={13} /> Salvar rascunho
+                </button>
+                <button onClick={reset}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'}`}>
+                  <FileText size={13} /> Trocar PDF
+                </button>
+              </div>
             </div>
           </div>
         </>

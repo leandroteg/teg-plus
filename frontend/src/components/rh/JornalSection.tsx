@@ -2,7 +2,7 @@
 // components/rh/JornalSection.tsx — Seção "Jornal TEG" do admin do Mural.
 // Construtor (upload+recorte) + lista das edições com publicar/excluir/preview.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Newspaper, Plus, Eye, EyeOff, Trash2, ChevronDown, ChevronRight, Loader2, FileText, X,
 } from 'lucide-react'
@@ -97,20 +97,27 @@ export default function JornalSection() {
   const { isLightSidebar: isLight } = useTheme()
   const { data: edicoes = [], isLoading } = useEdicoes()
   const [criando, setCriando] = useState(false)
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const fecharModal = () => { setCriando(false); setArquivo(null) }
 
   return (
     <div className="space-y-5">
+      {/* seletor de arquivo direto (menos cliques): botão → escolhe PDF → abre modal já processando */}
+      <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) { setArquivo(f); setCriando(true) } e.target.value = '' }} />
+
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-violet-500/8 border border-violet-500/20 flex-1">
           <Newspaper size={16} className="text-violet-400 mt-0.5 shrink-0" />
           <div className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Suba o <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>PDF do Jornal TEG</span> e recorte os blocos —
-            cada bloco vira um <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>card</span> do Mural (imagem exata).
-            A edição nasce como rascunho; publique quando quiser exibir aos colaboradores.
+            Suba o <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>PDF do Jornal TEG</span> —
+            a IA detecta os blocos sozinha e um clique em <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white/80'}`}>Publicar no Mural</span> já atualiza o que o colaborador vê.
           </div>
         </div>
         <button
-          onClick={() => setCriando(true)}
+          onClick={() => fileRef.current?.click()}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-semibold shrink-0"
         >
           <Plus size={15} /> Importar Jornal (PDF)
@@ -125,11 +132,11 @@ export default function JornalSection() {
               <h3 className={`text-base font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                 <Newspaper size={16} className="text-violet-400" /> Importar Jornal TEG
               </h3>
-              <button onClick={() => setCriando(false)} className={isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}>
+              <button onClick={fecharModal} className={isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}>
                 <X size={20} />
               </button>
             </div>
-            <JornalTegBuilder onSaved={() => { /* lista revalida via react-query; usuário fecha no X */ }} />
+            <JornalTegBuilder initialFile={arquivo} onSaved={() => { /* lista revalida via react-query; usuário fecha no X */ }} />
           </div>
         </div>
       )}
