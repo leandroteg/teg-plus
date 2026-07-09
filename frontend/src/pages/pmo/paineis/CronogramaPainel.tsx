@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, ChevronUp, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, ChevronUp, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock, Scale } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
@@ -493,14 +493,17 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
     const exc = new Set<string>(allObras.filter(o => o.drivers.some(d => d.contr > 0) && o.pctFis > 95).map(o => o.nome))
     try { for (const n of JSON.parse(localStorage.getItem(`crono-plan-exc-${portfolioId}`) ?? '[]')) exc.add(n) } catch { /* lista corrompida → segue só com as >95% */ }
     setPlanExc(exc)
-    // prioridade inicial = padrão do planejador (prazo CEMIG mais crítico → maior saldo R$); depois reordena com as setas
+    initPlanPriority()
+    setPlanRes(null); setPlanOpen(true)
+  }
+  // prioridade = padrão do planejador (prazo CEMIG → saldo R$), preservando a ordem salva; usada pelo Plano e pelo Nivelar
+  const initPlanPriority = () => {
     const st = startYM()
     const ordem = allObras.filter(o => o.drivers.some(d => d.contr > 0))
       .map(o => ({ nome: o.nome, pz: o.fim ? ymNum(o.fim.slice(0, 7)) - ymNum(st) : 9999, sr: o.saldoR }))
       .sort((a, b) => a.pz !== b.pz ? a.pz - b.pz : b.sr - a.sr).map(o => o.nome)
     try { const salvo: string[] = JSON.parse(localStorage.getItem(`crono-plan-ordem-${portfolioId}`) ?? '[]'); if (salvo.length) { const set = new Set(salvo); ordem.sort((a, b) => (set.has(a) ? salvo.indexOf(a) : 1e9) - (set.has(b) ? salvo.indexOf(b) : 1e9)) } } catch { /* ignora ordem salva corrompida */ }
     setPlanOrdem(ordem)
-    setPlanRes(null); setPlanOpen(true)
   }
   const togglePlanExc = (nome: string) => {
     setPlanExc(s => {
@@ -557,6 +560,68 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   }
   // preenche a equipe a partir do efetivo real (RH), distribuído às obras ∝ saldo — depois editável livre
   const efetivoTot = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao + x.montlanc, 0) : 0
+  // limites de RH p/ Nivelar Recursos: Fundação e Montagem+Lançamento (mesma equipe no RH)
+  const rhFund = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.fundacao, 0) : 0
+  const rhML = efetivoFrente ? Object.values(efetivoFrente).reduce((s, x) => s + x.montlanc, 0) : 0
+  const [nivelarOpen, setNivelarOpen] = useState(false)
+  const obraMapAll = useMemo(() => new Map(allObras.map(o => [o.nome, o])), [allObras])
+  const abrirNivelar = () => { initPlanPriority(); setNivelarOpen(true) }
+  // demanda de pessoas por mês (config atual) e picos vs disponível
+  const nivelDem = useMemo(() => {
+    const st = startYM()
+    const inc = planOrdem.filter(n => !planExc.has(n) && obraMapAll.has(n))
+    const proj = projTodas(allObras.filter(o => inc.includes(o.nome)), cfg, st)
+    const occF: number[] = [], occML: number[] = []
+    proj.forEach(pj => {
+      const f = pj.rows.find(r => r.d.label === 'Fundação')?.pessoas ?? []
+      const mo = pj.rows.find(r => r.d.label === 'Montagem')?.pessoas ?? []
+      const la = pj.rows.find(r => r.d.label === 'Lançamento')?.pessoas ?? []
+      for (let m = 0; m < pj.maxMeses; m++) { occF[m] = (occF[m] || 0) + (f[m] || 0); occML[m] = (occML[m] || 0) + (mo[m] || 0) + (la[m] || 0) }
+    })
+    return { peakF: Math.max(0, ...occF), peakML: Math.max(0, ...occML), meses: Math.max(occF.length, occML.length) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allObras, cfg, planOrdem, planExc, nivelarOpen])
+  // NIVELAR: adia o início das obras menos prioritárias respeitando o teto de pessoas do RH (por prioridade)
+  const nivelar = () => {
+    const st = startYM()
+    const inc = planOrdem.filter(n => !planExc.has(n) && obraMapAll.has(n))
+    const occF: number[] = [], occML: number[] = []
+    const delays: Record<string, string> = {}
+    const semLimite: string[] = []
+    for (const nome of inc) {
+      const o = obraMapAll.get(nome)!
+      const pj = projObra(o, { ...cfg, inicio: {}, fim: {}, fimS: {}, inicioS: {} }, st) // perfil natural (equipe, sem datas)
+      const fP = pj.rows.find(r => r.d.label === 'Fundação')?.pessoas ?? []
+      const mP = pj.rows.find(r => r.d.label === 'Montagem')?.pessoas ?? []
+      const lP = pj.rows.find(r => r.d.label === 'Lançamento')?.pessoas ?? []
+      const dur = pj.maxMeses
+      const fund = Array.from({ length: dur }, (_, k) => fP[k] || 0)
+      const ml = Array.from({ length: dur }, (_, k) => (mP[k] || 0) + (lP[k] || 0))
+      const soFits = (rhFund <= 0 || Math.max(0, ...fund) <= rhFund + 0.01) && (rhML <= 0 || Math.max(0, ...ml) <= rhML + 0.01)
+      let t = 0
+      if (!soFits) semLimite.push(nome) // obra sozinha estoura o RH — não dá pra nivelar, fica no início
+      else if (rhFund > 0 || rhML > 0) {
+        for (; t < 240; t++) {
+          let ok = true
+          for (let k = 0; k < dur; k++) { const m = t + k
+            if (rhFund > 0 && (occF[m] || 0) + fund[k] > rhFund + 0.01) { ok = false; break }
+            if (rhML > 0 && (occML[m] || 0) + ml[k] > rhML + 0.01) { ok = false; break }
+          }
+          if (ok) break
+        }
+      }
+      for (let k = 0; k < dur; k++) { const m = t + k; occF[m] = (occF[m] || 0) + fund[k]; occML[m] = (occML[m] || 0) + ml[k] }
+      if (t > 0) delays[nome] = `${shiftYM(st, t)}-01`
+    }
+    setCfg(c => {
+      const inicio = { ...(c.inicio ?? {}) }, inicioS = { ...(c.inicioS ?? {}) }, fim = { ...(c.fim ?? {}) }, fimS = { ...(c.fimS ?? {}) }
+      for (const nome of inc) { if (delays[nome]) inicio[nome] = delays[nome]; else delete inicio[nome]; delete inicioS[nome]; delete fim[nome]; delete fimS[nome] }
+      return { ...c, inicio, inicioS, fim, fimS, realoc: false }
+    })
+    const nAdi = Object.keys(delays).length
+    setNivelarOpen(false)
+    alert(`Recursos nivelados: ${nAdi} obra(s) tiveram o início adiado pra caber no efetivo do RH${semLimite.length ? `.\n\n⚠ ${semLimite.length} obra(s) precisam de mais gente que o RH tem e não foram niveladas (ficam no início): ${semLimite.slice(0, 5).join(', ')}${semLimite.length > 5 ? '…' : ''}` : '.'}`)
+  }
   const fillFromReal = () => setCfg(c => ({ ...c, equipe: equipeFromEfetivo(tree, efetivoFrente ?? {}, true) }))
   // preenche com a alocação REAL das Obras (obr_planejamento_equipe): direto por obra × frente; obra sem equipe fica 0
   const equipesTot = equipeObras?.total ?? 0
@@ -651,6 +716,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                   </button>
                   <button onClick={() => setGanttWide(v => !v)} title={ganttWide ? 'Gantt: mostrar as colunas de dados de volta' : 'Gantt: encobrir as colunas de dados (só nome + linha do tempo)'} className={`${icone} ${ganttWide ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-400')}`}>{ganttWide ? <ChevronsUpDown size={15} className="rotate-90" /> : <ChevronsDownUp size={15} className="rotate-90" />}</button>
                   <button onClick={() => setProdOpen(true)} title={`Produtividade & Premissas — ${DRV.map(d => `${d.label} ${cfg.prodPP[d.label] ?? 0}`).join(' · ')} /pessoa·mês + precedência e realocação`} className={`${icone} ${isDark ? 'bg-slate-800/60 border-slate-700 text-teal-400 hover:border-teal-500/50' : 'bg-white border-slate-200 text-teal-600 hover:border-teal-400'}`}><Gauge size={15} /></button>
+                  <button onClick={abrirNivelar} title="Nivelar Recursos — adia o início das obras menos prioritárias pra caber no efetivo do RH" className={`${icone} ${isDark ? 'bg-slate-800/60 border-slate-700 text-amber-400 hover:border-amber-500/50' : 'bg-white border-slate-200 text-amber-600 hover:border-amber-400'}`}><Scale size={15} /></button>
                   <button onClick={fillFromReal} disabled={efetivoTot === 0} title={efetivoTot === 0 ? 'Efetivo real (RH): sem efetivo' : `Efetivo real (RH) · ${efetivoTot} pessoas — distribui às obras ∝ saldo`} className={`${icone} ${isDark ? 'bg-teal-500/10 border-teal-500/40 text-teal-300 hover:bg-teal-500/20' : 'bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100'}`}><Users size={15} /></button>
                   <button onClick={fillFromEquipes} disabled={equipesTot === 0} title={equipesTot === 0 ? 'Equipes (Obras): sem equipes alocadas' : `Equipes (Obras) · ${equipesTot} pessoas — alocação real por obra × frente (obra sem equipe fica 0)`} className={`${icone} ${isDark ? 'bg-violet-500/10 border-violet-500/40 text-violet-300 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'}`}><HardHat size={15} /></button>
                 </>)
@@ -814,6 +880,61 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
               </button>
             </div>
           </>, document.body)}
+        {/* Modal: Nivelar Recursos — adia obras menos prioritárias pra caber no efetivo do RH */}
+        {nivelarOpen && (() => {
+          const excedeF = rhFund > 0 && nivelDem.peakF > rhFund
+          const excedeML = rhML > 0 && nivelDem.peakML > rhML
+          const lista = planOrdem.filter(n => !planExc.has(n) && obraMapAll.has(n))
+          const barra = (pico: number, lim: number, excede: boolean, cor: string) => (
+            <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}>
+              <div className="h-full rounded-full" style={{ width: `${lim > 0 ? Math.min(100, pico / lim * 100) : 0}%`, background: excede ? '#e11d48' : cor }} />
+            </div>
+          )
+          return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setNivelarOpen(false)}>
+            <div className={`w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} onClick={e => e.stopPropagation()}>
+              <div className={`flex items-center justify-between px-4 py-2.5 border-b sticky top-0 z-10 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+                <h3 className="text-[13px] font-bold flex items-center gap-2"><Scale size={14} className="text-amber-500" /> Nivelar Recursos</h3>
+                <button onClick={() => setNivelarOpen(false)} className="p-1 rounded-lg hover:bg-slate-500/10"><X size={14} /></button>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <p className={lbl}>Pico de pessoas simultâneas × disponível no RH</p>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] mb-0.5"><span className="font-semibold" style={{ color: '#92400e' }}>Fundação</span><span className={`tabular-nums font-bold ${excedeF ? 'text-rose-500' : ''}`}>pico {Math.round(nivelDem.peakF)} / {rhFund} disp.{excedeF ? ` · falta ${Math.round(nivelDem.peakF - rhFund)}` : ' ✓'}</span></div>
+                    {barra(nivelDem.peakF, rhFund, excedeF, '#92400e')}
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] mb-0.5"><span className="font-semibold" style={{ color: '#059669' }}>Montagem + Lançamento</span><span className={`tabular-nums font-bold ${excedeML ? 'text-rose-500' : ''}`}>pico {Math.round(nivelDem.peakML)} / {rhML} disp.{excedeML ? ` · falta ${Math.round(nivelDem.peakML - rhML)}` : ' ✓'}</span></div>
+                    {barra(nivelDem.peakML, rhML, excedeML, '#059669')}
+                  </div>
+                </div>
+                {(rhFund === 0 && rhML === 0) && <p className="text-[10px] text-amber-500">Sem efetivo do RH carregado (por frente) — o nivelamento precisa dele. Use o botão “Efetivo real (RH)” antes.</p>}
+                <div>
+                  <p className={`${lbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— vem do Planejamento Automático · setas ajustam</span></p>
+                  <div className={`max-h-52 overflow-auto rounded-lg border p-1 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                    {lista.map((n, i) => { const o = obraMapAll.get(n)!; return (
+                      <div key={n} className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                        <span className={`w-5 text-right tabular-nums font-bold shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
+                        <div className="flex flex-col shrink-0">
+                          <button type="button" disabled={i === 0} onClick={() => movePlan(n, -1)} className="p-0 leading-none disabled:opacity-20 hover:text-teal-500" title="Subir prioridade"><ChevronUp size={12} /></button>
+                          <button type="button" disabled={i === lista.length - 1} onClick={() => movePlan(n, 1)} className="p-0 leading-none disabled:opacity-20 hover:text-teal-500" title="Descer prioridade"><ChevronDown size={12} /></button>
+                        </div>
+                        <span className="truncate flex-1" title={o.nome}>{o.nome}</span>
+                      </div>
+                    ) })}
+                    {lista.length === 0 && <p className={`px-2 py-2 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma obra no plano.</p>}
+                  </div>
+                </div>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nivelar <b>adia o Início</b> das obras menos prioritárias (mantém as de cima) até a soma de pessoas em cada mês caber no efetivo do RH. As datas por serviço são recalculadas pela equipe. Obra que sozinha já excede o RH fica no início (avisado).</p>
+              </div>
+              <div className={`flex justify-end px-4 py-2.5 border-t sticky bottom-0 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-100'}`}>
+                <button onClick={nivelar} disabled={rhFund === 0 && rhML === 0} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40"><Scale size={13} /> Nivelar Recursos</button>
+              </div>
+            </div>
+          </div>
+          )
+        })()}
         {/* Modal secundário: produtividade padrão por pessoa + premissas de precedência/realocação */}
         {prodOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setProdOpen(false)}>
