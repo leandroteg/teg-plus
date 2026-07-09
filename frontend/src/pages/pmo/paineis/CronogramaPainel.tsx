@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
@@ -419,6 +419,39 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const obraIniVal = (o: Obra) => { const vs = o.drivers.filter(d => d.contr > 0).map(d => effIni(o, d.label)).filter(Boolean); return vs.length ? vs.reduce((a, b) => a < b ? a : b) : '' }
   const obraFimVal = (o: Obra) => { const vs = o.drivers.filter(d => d.contr > 0).map(d => effFim(o, d.label)).filter(Boolean); return vs.length ? vs.reduce((a, b) => a > b ? a : b) : '' }
   const start0 = startYM()
+  // recálculo por obra (menu do ícone ⟳): prazo pela equipe ↔ equipe pelo prazo
+  const [recalcMenu, setRecalcMenu] = useState<{ obra: string; x: number; y: number } | null>(null)
+  const obraByNome = useMemo(() => new Map(allObras.map(o => [o.nome, o])), [allObras])
+  // "mudei equipe → recalcular prazo": projeta a obra pela equipe×produtividade (sem data forçada) e grava as datas resultantes
+  const recalcPrazo = (nome: string) => {
+    const o = obraByNome.get(nome); if (!o) return
+    const st = startYM()
+    const livre: Config = { ...cfg, fim: { ...(cfg.fim ?? {}) }, fimS: { ...(cfg.fimS ?? {}) } }
+    delete livre.fim![nome]; delete livre.fimS![nome]
+    const pj = projObra(o, livre, st)
+    const iS: Record<string, string> = {}, fS: Record<string, string> = {}
+    pj.rows.forEach(r => {
+      const first = r.qty.findIndex(q => q > 0.001)
+      let last = -1; r.qty.forEach((q, m) => { if (q > 0.001) last = m })
+      if (first >= 0 && last >= 0) { iS[r.d.label] = `${shiftYM(st, first)}-01`; fS[r.d.label] = `${shiftYM(st, last)}-01` }
+    })
+    setCfg(c => {
+      const inicioS = { ...(c.inicioS ?? {}) }, fimS = { ...(c.fimS ?? {}) }, fim = { ...(c.fim ?? {}) }
+      if (Object.keys(iS).length) { inicioS[nome] = iS; fimS[nome] = fS }
+      delete fim[nome] // trava de data da obra sai — o prazo passa a ser resultado da equipe
+      return { ...c, inicioS, fimS, fim }
+    })
+  }
+  // "mudei prazo → recalcular equipe": nº de pessoas = saldo ÷ produtividade ÷ meses da janela atual de cada serviço
+  const recalcEquipe = (nome: string) => {
+    const o = obraByNome.get(nome); if (!o) return
+    const eq: Record<string, number> = { ...(cfg.equipe[nome] ?? {}) }
+    o.drivers.filter(d => d.contr > 0 && d.saldoQ > 0).forEach(d => {
+      const ini = (effIni(o, d.label) || '').slice(0, 7), fim = (effFim(o, d.label) || '').slice(0, 7)
+      if (ini && fim && fim >= ini) { const meses = ymNum(fim) - ymNum(ini) + 1; const pp = cfg.prodPP[d.label] || 1; eq[d.label] = Math.max(1, Math.ceil(d.saldoQ / (pp * meses))) }
+    })
+    setCfg(c => ({ ...c, equipe: { ...c.equipe, [nome]: eq } }))
+  }
   // projeção ao vivo com a config SENDO editada — Duração (obra e por serviço) reage a equipe/datas/predecessão
   const fimMap = useMemo(() => {
     const m: Record<string, { termino: string | null; meses: number; srv: Record<string, number> }> = {}
@@ -653,7 +686,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <div className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
                           <span className={`shrink-0 sticky left-0 z-10 min-w-0 flex items-center text-[11px] relative after:content-[''] after:absolute after:left-full after:inset-y-0 after:w-2 after:bg-inherit ${isDark ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600'}`} style={{ width: NAMEW }}>
                             <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
-                            <span className="truncate" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
+                            <span className="truncate flex-1 min-w-0" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
+                            <button type="button" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setRecalcMenu(m => m?.obra === o.nome ? null : { obra: o.nome, x: r.left, y: r.bottom + 4 }) }} title="Recalcular esta obra — prazo pela equipe ou equipe pelo prazo" className="shrink-0 ml-1 mr-1 p-0.5 rounded opacity-40 hover:opacity-100 hover:text-teal-500"><RefreshCw size={12} /></button>
                           </span>
                           {!ganttWide && (<>
                           <input type="date" value={d8(obraIniVal(o))} onChange={e => setInicio(o.nome, e.target.value)} title="Início da obra = menor início dos serviços — EDITAR aplica a data a TODOS os serviços" className={`w-[118px] shrink-0 text-[11px] rounded-lg border px-1 py-0.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-700'}`} />
@@ -745,6 +779,22 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
           </div>
 
         </div>
+        {/* Menu de recálculo por obra (⟳) — portal p/ não ser cortado pelo scroll */}
+        {recalcMenu && createPortal(
+          <>
+            <div className="fixed inset-0 z-[70]" onClick={() => setRecalcMenu(null)} />
+            <div className={`fixed z-[71] w-64 rounded-xl border shadow-2xl p-1 ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} style={{ left: Math.min(recalcMenu.x, window.innerWidth - 268), top: recalcMenu.y }}>
+              <p className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{recalcMenu.obra}</p>
+              <button onClick={() => { recalcPrazo(recalcMenu.obra); setRecalcMenu(null) }} className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-lg text-left ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
+                <Clock size={14} className="shrink-0 mt-0.5 text-violet-500" />
+                <span><span className="block text-[12px] font-semibold">Recalcular prazo</span><span className={`block text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>pela equipe atual (ex.: dobrei a equipe → antecipa o término)</span></span>
+              </button>
+              <button onClick={() => { recalcEquipe(recalcMenu.obra); setRecalcMenu(null) }} className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-lg text-left ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'}`}>
+                <Users size={14} className="shrink-0 mt-0.5 text-teal-500" />
+                <span><span className="block text-[12px] font-semibold">Recalcular equipe</span><span className={`block text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>pelo prazo atual (ex.: mudei a Data Fim → nº de pessoas necessário)</span></span>
+              </button>
+            </div>
+          </>, document.body)}
         {/* Modal secundário: produtividade padrão por pessoa + premissas de precedência/realocação */}
         {prodOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setProdOpen(false)}>
