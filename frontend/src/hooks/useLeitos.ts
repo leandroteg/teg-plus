@@ -76,6 +76,21 @@ export function useLeitos() {
   })
 }
 
+// Atualiza dados do alojamento (código + prefeito responsável) — loc_imoveis
+export function useAtualizarAlojamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string } & Partial<Pick<LocImovel, 'codigo' | 'prefeito_nome' | 'prefeito_telefone'>>) => {
+      const { error } = await supabase
+        .from('loc_imoveis')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_alojamentos'] }),
+  })
+}
+
 // ── Ocupações ativas (data_fim null) — juntadas por leito_id no cliente ───────
 export function useOcupacoesAtivas() {
   return useQuery({

@@ -16,6 +16,7 @@ import { useColaboradoresAtivos } from '../../hooks/useObras'
 import {
   useAlojamentos, useLeitos, useOcupacoesAtivas, useLeitosHistorico,
   useGerarLeitos, useAlocarLeito, useLiberarLeito, useMoverLeito, useExcluirLeito,
+  useAtualizarAlojamento,
   type Leito, type LeitoOcupacao,
 } from '../../hooks/useLeitos'
 import type { LocImovel } from '../../types/locacao'
@@ -245,6 +246,11 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
 }) {
   const gerar = useGerarLeitos()
   const excluir = useExcluirLeito()
+  const atualizarAloj = useAtualizarAlojamento()
+  const [codigo, setCodigo] = useState(alojamento.codigo ?? '')
+  const [prefNome, setPrefNome] = useState(alojamento.prefeito_nome ?? '')
+  const [prefTel, setPrefTel] = useState(alojamento.prefeito_telefone ?? '')
+  const [salvo, setSalvo] = useState(false)
   const [qtd, setQtd] = useState('')
   const [alocarLeito, setAlocarLeito] = useState<Leito | null>(null)
   const [moverOcup, setMoverOcup] = useState<{ ocup: LeitoOcupacao; leito: Leito } | null>(null)
@@ -262,6 +268,12 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
     if (!n || n < 1) return
     await gerar.mutateAsync({ imovelId: alojamento.id, qtd: n })
     setQtd('')
+  }
+
+  function salvarAloj(patch: Partial<Pick<LocImovel, 'codigo' | 'prefeito_nome' | 'prefeito_telefone'>>) {
+    atualizarAloj.mutate({ id: alojamento.id, ...patch }, {
+      onSuccess: () => { setSalvo(true); window.setTimeout(() => setSalvo(false), 1500) },
+    })
   }
 
   return (
@@ -282,6 +294,34 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Dados do alojamento — código + prefeito responsável (editável) */}
+          <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex items-center justify-between">
+              <p className={`text-xs font-bold ${txt}`}>Dados do alojamento</p>
+              {salvo && <span className="text-[10px] font-semibold text-emerald-500">salvo ✓</span>}
+            </div>
+            <div>
+              <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Código do alojamento</label>
+              <input value={codigo} onChange={e => setCodigo(e.target.value)}
+                onBlur={() => { if ((alojamento.codigo ?? '') !== codigo) salvarAloj({ codigo }) }}
+                placeholder="ex: ALOJ-PDZ-…" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Prefeito responsável</label>
+                <input value={prefNome} onChange={e => setPrefNome(e.target.value)}
+                  onBlur={() => { if ((alojamento.prefeito_nome ?? '') !== prefNome) salvarAloj({ prefeito_nome: prefNome }) }}
+                  placeholder="Nome" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+              </div>
+              <div>
+                <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Telefone</label>
+                <input value={prefTel} onChange={e => setPrefTel(e.target.value)}
+                  onBlur={() => { if ((alojamento.prefeito_telefone ?? '') !== prefTel) salvarAloj({ prefeito_telefone: prefTel }) }}
+                  placeholder="(00) 00000-0000" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+              </div>
+            </div>
+          </div>
+
           {/* Adicionar leitos */}
           <div className={`flex items-center gap-2 rounded-xl border p-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
             <span className={`text-xs font-semibold pl-1 ${txtMuted}`}>Adicionar leitos:</span>

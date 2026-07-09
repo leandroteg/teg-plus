@@ -179,6 +179,8 @@ export interface LocImovel {
   locador_nome?: string
   locador_cpf_cnpj?: string
   locador_contato?: string
+  prefeito_nome?: string
+  prefeito_telefone?: string
   centro_custo_id?: string
   obra_id?: string
   responsavel_id?: string
