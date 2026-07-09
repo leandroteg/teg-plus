@@ -247,7 +247,6 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   const gerar = useGerarLeitos()
   const excluir = useExcluirLeito()
   const atualizarAloj = useAtualizarAlojamento()
-  const [codigo, setCodigo] = useState(alojamento.codigo ?? '')
   const [prefNome, setPrefNome] = useState(alojamento.prefeito_nome ?? '')
   const [prefTel, setPrefTel] = useState(alojamento.prefeito_telefone ?? '')
   const [salvo, setSalvo] = useState(false)
@@ -302,9 +301,7 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
             </div>
             <div>
               <label className={`block text-[10px] font-semibold uppercase mb-0.5 ${txtMuted}`}>Código do alojamento</label>
-              <input value={codigo} onChange={e => setCodigo(e.target.value)}
-                onBlur={() => { if ((alojamento.codigo ?? '') !== codigo) salvarAloj({ codigo }) }}
-                placeholder="ex: ALOJ-PDZ-…" className={`w-full text-sm rounded-lg px-2.5 py-1.5 border outline-none ${inputCls}`} />
+              <p className={`text-sm font-mono font-semibold ${txt}`}>{alojamento.titulo || alojamento.codigo || '—'}</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
