@@ -13,7 +13,7 @@ import {
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes } from '../../hooks/useRH'
-import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, type TreinoStatus } from '../../hooks/useQsma'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus } from '../../hooks/useQsma'
 import { useCadObras } from '../../hooks/useCadastros'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
@@ -467,9 +467,9 @@ function TreinamentosSaude({ colaboradorId, cargo, sectionCls, isLight }: {
   const { data: matriz = [] } = useMatrizTreinamentos()
   const { data: treinos = [] } = useTreinamentos()
 
-  const cargoNorm = (cargo ?? '').trim().toUpperCase()
+  const cargoNorm = cargoBase(cargo)
   const requeridos = new Set(
-    matriz.filter(m => m.cargo.trim().toUpperCase() === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id)
+    matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id)
   )
   const meus = treinos.filter(t => t.colaborador_id === colaboradorId)
   // último registro por treinamento (por treinamento_id; fallback norma)
