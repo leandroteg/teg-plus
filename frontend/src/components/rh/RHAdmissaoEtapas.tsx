@@ -327,7 +327,7 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
 }
 
 // Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
-function TreinamentosBlock({ cand, cargo, treinamentos }: {
+export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   cand: RHAdmissaoCandidato; cargo?: string | null
   treinamentos: { id: string; nome: string; norma: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
 }) {
