@@ -337,7 +337,8 @@ function TreinamentosBlock({ cand, cargo, treinamentos }: {
 
   const cargoNorm = cargoBase((cand as any).cargo || cargo)
   const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
-  const required = catalogo.filter(c => reqIds.has(c.id)).sort((a, b) => a.ordem - b.ordem)
+  // ASO vem da etapa Exames — não aparece aqui
+  const required = catalogo.filter(c => reqIds.has(c.id) && c.codigo !== 'ASO').sort((a, b) => a.ordem - b.ordem)
   const recDe = (cat: { nome: string; norma: string | null }) =>
     treinamentos.find(t => (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
   const usadosIds = new Set(required.map(c => recDe(c)?.id).filter(Boolean) as string[])
