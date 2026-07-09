@@ -334,7 +334,7 @@ export default function QsmaSeguranca() {
 
           {subTreino === 'controle' && (
             treinoColab
-              ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} />
+              ? <RHColaboradorDetalhe id={treinoColab} onBack={() => setTreinoColab(null)} soTreinamentos />
               : <ControleTreinamentos isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
                   onSelect={setTreinoColab} />
           )}
