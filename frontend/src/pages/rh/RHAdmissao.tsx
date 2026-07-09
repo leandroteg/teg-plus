@@ -29,7 +29,7 @@ const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: strin
   { key: 'exames_treinamentos', num: 5, label: 'Exames',                  descricao: 'Exame admissional (ASO) — agendamento e resultado.',             icon: Stethoscope },
   { key: 'registro',            num: 6, label: 'Registro',                descricao: 'Ficha p/ contabilidade, contrato, assinatura e matrícula.',      icon: ClipboardList },
   { key: 'mobilizacao',         num: 7, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
-  { key: 'integracao',          num: 8, label: 'Treinamentos e Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
+  { key: 'integracao',          num: 8, label: 'Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
   { key: 'liberado',            num: 9, label: 'Liberação',               descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
