@@ -10,8 +10,10 @@ import QRCode from 'qrcode'
 import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
   LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
+  LayoutList, LayoutGrid,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { fmtEndereco } from '../../types/locacao'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
 import {
   useAlojamentos, useLeitos, useOcupacoesAtivas, useLeitosHistorico,
@@ -26,6 +28,9 @@ const fmtDate = (d?: string | null) =>
 
 const nomeAloj = (im?: { nome?: string | null; descricao?: string | null; titulo?: string | null } | null) =>
   im?.nome || im?.descricao || im?.titulo || 'Alojamento'
+
+// Código do alojamento (ALOJ-…) vive em titulo; fallback codigo
+const codigoAloj = (a: { titulo?: string | null; codigo?: string | null }) => a.titulo || a.codigo || '—'
 
 // URL que o QR codifica → o Portal TEG lê o número do leito e chama a RPC de check-in
 const PORTAL_BASE = 'https://portal.teguniao.com.br'
@@ -91,6 +96,7 @@ function statsDe(leitos: Leito[], ocupadosSet: Set<string>): Stats {
 export default function ControleLeitos() {
   const { isDark } = useTheme()
   const [sub, setSub] = useState<'alojamento' | 'historico'>('alojamento')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [search, setSearch] = useState('')
   const [aberto, setAberto] = useState<LocImovel | null>(null)
 
@@ -147,6 +153,15 @@ export default function ControleLeitos() {
           <input type="text" placeholder="Buscar alojamento…" value={search} onChange={e => setSearch(e.target.value)}
             className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
         </div>
+        {/* Toggle lista/card — só na sub-visão Alojamento (padrão da aba Ativos) */}
+        {sub === 'alojamento' && (
+          <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <button onClick={() => setViewMode('table')} title="Lista"
+              className={`p-1.5 ${viewMode === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
+            <button onClick={() => setViewMode('cards')} title="Cards"
+              className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
+          </div>
+        )}
         {/* Toggle sub-visão — ícone discreto */}
         <div className={`flex items-center gap-1 rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-white'}`}>
           <button onClick={() => setSub('alojamento')} title="Alojamentos"
@@ -169,9 +184,9 @@ export default function ControleLeitos() {
           <div className="w-8 h-8 border-[3px] border-cyan-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : sub === 'alojamento' ? (
-        <AlojamentosGrid
+        <AlojamentosView
           alojamentos={alojFiltrados} leitosPorImovel={leitosPorImovel}
-          ocupadosSet={ocupadosSet} isDark={isDark} onAbrir={setAberto} />
+          ocupadosSet={ocupadosSet} viewMode={viewMode} isDark={isDark} onAbrir={setAberto} />
       ) : (
         <HistoricoView isDark={isDark} />
       )}
@@ -186,49 +201,102 @@ export default function ControleLeitos() {
   )
 }
 
-// ── Grid de alojamentos ──────────────────────────────────────────────────────
-function AlojamentosGrid({ alojamentos, leitosPorImovel, ocupadosSet, isDark, onAbrir }: {
+// ── Alojamentos: lista (tabela) ou cards — padrão da aba Ativos ───────────────
+function taxaCor(taxa: number) {
+  return taxa >= 100 ? 'text-rose-500' : taxa >= 80 ? 'text-amber-500' : 'text-cyan-500'
+}
+function taxaBar(taxa: number) {
+  return taxa >= 100 ? 'bg-rose-500' : taxa >= 80 ? 'bg-amber-500' : 'bg-cyan-500'
+}
+
+function AlojamentosView({ alojamentos, leitosPorImovel, ocupadosSet, viewMode, isDark, onAbrir }: {
   alojamentos: LocImovel[]; leitosPorImovel: Map<string, Leito[]>
-  ocupadosSet: Set<string>; isDark: boolean; onAbrir: (a: LocImovel) => void
+  ocupadosSet: Set<string>; viewMode: 'table' | 'cards'; isDark: boolean; onAbrir: (a: LocImovel) => void
 }) {
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
   if (alojamentos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <BedDouble size={40} className={txtMuted} />
-        <p className={`text-sm ${txtMuted}`}>Nenhum alojamento encontrado</p>
+      <div className={`flex flex-col items-center justify-center py-12 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+        <BedDouble size={36} className="mb-2" /><p className="text-sm">Nenhum alojamento encontrado</p>
       </div>
     )
   }
+
+  if (viewMode === 'table') {
+    return (
+      <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                {[
+                  { label: 'CÓDIGO', align: 'text-left' },
+                  { label: 'CIDADE', align: 'text-left' },
+                  { label: 'IMÓVEL', align: 'text-left' },
+                  { label: 'LEITOS', align: 'text-right' },
+                  { label: 'OCUPADOS', align: 'text-right' },
+                  { label: 'LIVRES', align: 'text-right' },
+                  { label: 'OCUPAÇÃO', align: 'text-right' },
+                ].map(c => <th key={c.label} className={`${c.align} px-3 py-2 font-semibold`}>{c.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {alojamentos.map(a => {
+                const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
+                const semLeitos = st.total === 0
+                return (
+                  <tr key={a.id} onClick={() => onAbrir(a)}
+                    className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-3 py-2.5 font-bold whitespace-nowrap ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{codigoAloj(a)}</td>
+                    <td className={`px-3 py-2.5 font-semibold ${txt}`}>{a.cidade || '—'}</td>
+                    <td className="px-3 py-2.5"><p className={`truncate max-w-[240px] ${txtMuted}`}>{fmtEndereco(a)}</p></td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{semLeitos ? '—' : st.total}</td>
+                    <td className={`px-3 py-2.5 text-right ${txtMuted}`}>{semLeitos ? '—' : st.ocupados}</td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${semLeitos ? txtMuted : st.livres > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{semLeitos ? '—' : st.livres}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      {semLeitos
+                        ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
+                        : <span className={`font-bold ${taxaCor(st.taxa)}`}>{st.taxa}%</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // Cards — full width, padrão Ativos
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="space-y-2">
       {alojamentos.map(a => {
         const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
         const semLeitos = st.total === 0
         return (
-          <button key={a.id} onClick={() => onAbrir(a)}
-            className={`text-left rounded-xl border p-4 transition-all
-              ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:border-cyan-200 hover:shadow-sm'}`}>
+          <button key={a.id} type="button" onClick={() => onAbrir(a)}
+            className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}>
             <div className="flex items-start justify-between gap-2 mb-1">
-              <p className={`text-sm font-bold truncate ${txt}`}>{nomeAloj(a)}</p>
+              <p className={`text-sm font-bold truncate ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{codigoAloj(a)}</p>
               {semLeitos
                 ? <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
                 : <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.livres > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{st.livres > 0 ? `${st.livres} livre${st.livres > 1 ? 's' : ''}` : 'lotado'}</span>}
             </div>
-            <div className={`flex items-center gap-1 text-xs mb-3 ${txtMuted}`}>
-              <MapPin size={11} /> {a.cidade || '—'}{a.uf ? `/${a.uf}` : ''}
-            </div>
+            <p className={`text-xs flex items-center gap-1 mb-0.5 ${txtMuted}`}><MapPin size={11} /> {a.cidade || '—'}{a.uf ? `/${a.uf}` : ''}</p>
+            <p className={`text-xs truncate mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtEndereco(a)}</p>
             {semLeitos ? (
               <p className={`text-xs ${txtMuted}`}>Clique para definir a capacidade</p>
             ) : (
               <>
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className={txtMuted}>{st.ocupados}/{st.total} ocupados</span>
-                  <span className={`font-semibold ${st.taxa >= 100 ? 'text-rose-500' : st.taxa >= 80 ? 'text-amber-500' : 'text-cyan-500'}`}>{st.taxa}%</span>
+                  <span className={`font-semibold ${taxaCor(st.taxa)}`}>{st.taxa}%</span>
                 </div>
                 <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
-                  <div className={`h-full rounded-full ${st.taxa >= 100 ? 'bg-rose-500' : st.taxa >= 80 ? 'bg-amber-500' : 'bg-cyan-500'}`} style={{ width: `${st.taxa}%` }} />
+                  <div className={`h-full rounded-full ${taxaBar(st.taxa)}`} style={{ width: `${st.taxa}%` }} />
                 </div>
               </>
             )}
