@@ -833,6 +833,18 @@ export function useIntegracao() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
+  // Envia as 2 missões de integração ao Portal: Declarações de Ciência + Treinamentos
+  const enviarMissoes = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_int_enviar_missoes', {
+        p_candidato_id: i.candidatoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar missões')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
   const atualizar = useMutation({
     mutationFn: async (i: { candidatoId: string; patch: Partial<RHIntegracao> }) => {
       const { error } = await supabase.from('rh_admissao_integracao')
@@ -841,7 +853,7 @@ export function useIntegracao() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
-  return { enviarAceites, atualizar }
+  return { enviarAceites, enviarMissoes, atualizar }
 }
 
 // Etapa Registro: ficha p/ contabilidade, contrato p/ assinatura, matrícula
