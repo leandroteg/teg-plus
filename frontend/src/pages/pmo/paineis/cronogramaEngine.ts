@@ -4,7 +4,7 @@ import type { EAPPoloRaw } from '../../../hooks/usePMO'
 
 // drivers de construção (pp = produtividade padrão por pessoa/mês; maq = máquinas padrão por pessoa)
 export const DRV = [
-  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 40, maq: 0.3 },
+  { pac: 'Fundações', label: 'Fundação', uni: 'm³', cor: '#92400e', pp: 14.29, maq: 0.3 }, // 100 m³/mês por equipe de 7 (padrão prevista)
   { pac: 'Montagem de Torres', label: 'Montagem', uni: 'ton', cor: '#059669', pp: 8, maq: 0.25 },
   { pac: 'Lançamento de Cabos', label: 'Lançamento', uni: 'km', cor: '#3730a3', pp: 1.2, maq: 0.2 },
 ]
