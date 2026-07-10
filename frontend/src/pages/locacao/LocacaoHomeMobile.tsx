@@ -107,7 +107,7 @@ export default function LocacaoHomeMobile() {
   return (
     <MobilePanel>
       <MobileHeader
-        title="Locação de Imóveis"
+        title="Gestão de Imóveis"
         subtitle="Gestão de contratos, faturas e manutenções"
         icon={KeySquare}
         tone="indigo"
