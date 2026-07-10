@@ -178,7 +178,7 @@ export interface GrupoModulos {
 
 export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
   {
-    label: 'Projetos',
+    label: 'Operação',
     modulos: [
       { key: 'egp', label: 'EGP', icon: '📊' },
       { key: 'obras', label: 'Obras', icon: '🏗️' },
@@ -193,7 +193,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
       { key: 'estoque', label: 'Estoque', icon: '📦' },
       { key: 'patrimonial', label: 'Patrimonial', icon: '🏛️' },
       { key: 'frotas', label: 'Frotas', icon: '🚛' },
-      { key: 'locacoes', label: 'Locação Imóveis', icon: '🏘️' },
+      { key: 'locacoes', label: 'Gestão de Imóveis', icon: '🏘️' },
     ],
   },
   {
@@ -277,10 +277,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadingRef = useRef(false)
   const userRef = useRef<User | null>(null)
   const perfilLoadedRef = useRef(false)
-  // Último auth_id cujo perfil já foi carregado — evita recarregar o perfil a
-  // cada TOKEN_REFRESHED/SIGNED_IN (dispara ao focar a aba) do MESMO usuário,
-  // o que trocava o objeto `perfil` e fazia a tela toda piscar/re-renderizar.
-  const loadedAuthIdRef = useRef<string | null>(null)
   const LOGIN_DOMAIN = 'login.teg.local'
   const LOGIN_FALLBACK_DOMAIN = 'login.teg.local.com'
   const REAL_DOMAIN = 'teguniao.com.br'
@@ -448,19 +444,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (currentSession?.user) {
-          const uid = currentSession.user.id
-          // Só recarrega o perfil quando o usuário realmente muda (login). Se é o
-          // mesmo usuário e o perfil já está carregado, é só renovação de token
-          // (ex.: foco na aba) — não refaz a busca nem re-executa RBAC/registrar_acesso.
-          if (loadedAuthIdRef.current === uid && perfilLoadedRef.current) {
-            setLoading(false)
-            return
-          }
-          loadedAuthIdRef.current = uid
           loadingRef.current = false
-          loadPerfil(uid).finally(() => setLoading(false))
+          loadPerfil(currentSession.user.id).finally(() => setLoading(false))
         } else {
-          loadedAuthIdRef.current = null
           setPerfil(null)
           setPerfilSetores([])
           setRbacV2Enabled(false)
