@@ -5,14 +5,14 @@ import { useState } from 'react'
 import {
   X, Send, CheckCircle2, XCircle, HelpCircle, FileText, ExternalLink, Loader2,
   Building2, Calendar, Briefcase, AlertTriangle, User, Users, Smartphone, Circle, MinusCircle,
-  Pencil, ShieldCheck, ChevronDown, ChevronUp,
+  Pencil, ShieldCheck, ChevronDown, ChevronUp, Upload,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
   useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao, useUploadAnexoCandidato,
-  useParecerQualificacao, useDocsRecebidos,
+  useParecerQualificacao, useDocsRecebidos, useAnexarDocMissao,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
@@ -448,8 +448,10 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
 }) {
   const enviar = useEnviarMissaoDocs()
   const uploadAnexo = useUploadAnexoCandidato()
+  const anexar = useAnexarDocMissao()
   const { data: docs = [], isLoading } = useMissoesDocsStatus(cand.id)
   const [erro, setErro] = useState<string | null>(null)
+  const [subindo, setSubindo] = useState<string | null>(null)
 
   const missaoEnviada = docs.length > 0
   // Pesquisa Histórico: documento interno do RH — não vira missão do colaborador
@@ -493,22 +495,50 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
         <span className="text-[10px] font-bold text-slate-500">{concluidos + dispensados}/{total}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        {docs.map(d => (
-          <div key={d.missao_id} className="flex items-center gap-1.5 min-w-0">
-            {d.status === 'concluida'
-              ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-              : d.status === 'dispensada'
-                ? <MinusCircle size={13} className="text-slate-300 shrink-0" />
-                : <Circle size={13} className="text-slate-300 shrink-0" />}
-            <span className={`text-[11px] truncate ${
-              d.status === 'concluida' ? 'text-slate-700 font-semibold'
-              : d.status === 'dispensada' ? 'text-slate-400 line-through'
-              : 'text-slate-500'}`}>
-              {d.titulo.replace(/^Enviar /, '')}
-            </span>
-          </div>
-        ))}
+        {docs.map(d => {
+          const nome = d.titulo.replace(/^Enviar /, '')
+          const enviando = anexar.isPending && subindo === d.missao_id
+          if (d.status === 'concluida') {
+            return (
+              <div key={d.missao_id} className="flex items-center gap-1.5 min-w-0">
+                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                <span className="text-[11px] truncate text-slate-700 font-semibold">{nome}</span>
+              </div>
+            )
+          }
+          return (
+            <label key={d.missao_id}
+              title={`Anexar ${nome}`}
+              className="flex items-center gap-1.5 min-w-0 group cursor-pointer rounded px-0.5 -mx-0.5 hover:bg-teal-50">
+              {enviando
+                ? <Loader2 size={13} className="animate-spin text-teal-600 shrink-0" />
+                : d.status === 'dispensada'
+                  ? <MinusCircle size={13} className="text-slate-300 shrink-0" />
+                  : <Circle size={13} className="text-slate-300 shrink-0 group-hover:text-teal-500" />}
+              <span className={`text-[11px] truncate ${
+                d.status === 'dispensada' ? 'text-slate-400 line-through' : 'text-slate-500'
+              } group-hover:text-teal-700`}>
+                {nome}
+              </span>
+              <Upload size={10} className="shrink-0 text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                disabled={anexar.isPending}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.currentTarget.value = ''
+                  if (!file) return
+                  setErro(null); setSubindo(d.missao_id)
+                  anexar.mutate(
+                    { missaoId: d.missao_id, admissaoId: cand.admissao_id, candidatoId: cand.id, docTipo: d.doc_tipo, file, autorId },
+                    { onError: err => setErro(err instanceof Error ? err.message : 'Falha ao anexar'), onSettled: () => setSubindo(null) },
+                  )
+                }} />
+            </label>
+          )
+        })}
       </div>
+      <p className="text-[9px] text-slate-400 mt-1">Clique em um documento pendente para anexá-lo pelo RH.</p>
+      {erro && <p className="text-[10px] text-red-600 font-semibold mt-1">{erro}</p>}
 
       {/* Pesquisa Histórico — interno do RH (o colaborador não vê) */}
       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
