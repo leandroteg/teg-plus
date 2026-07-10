@@ -15,11 +15,11 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
-import MapaImoveis from './MapaImoveis'
+import MapaImoveis, { type MapaFiltros } from './MapaImoveis'
 import {
   useAlojamentos, useLeitos, useOcupacoesAtivas, useLeitosHistorico,
   useGerarLeitos, useAlocarLeito, useLiberarLeito, useMoverLeito, useExcluirLeito,
-  useAtualizarAlojamento,
+  useAtualizarAlojamento, useImoveisMapa, useBasesMapa,
   type Leito, type LeitoOcupacao,
 } from '../../hooks/useLeitos'
 import type { LocImovel } from '../../types/locacao'
@@ -110,12 +110,26 @@ export default function ControleLeitos() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [search, setSearch] = useState('')
   const [aberto, setAberto] = useState<LocImovel | null>(null)
+  const [mf, setMf] = useState<MapaFiltros>({ busca: '', tipo: 'todos', cidade: '', ocup: '', cc: '' })
 
   const { data: alojamentos = [], isLoading: loadAloj } = useAlojamentos()
   const { data: leitos = [], isLoading: loadLeitos } = useLeitos()
   const { data: ocupacoes = [] } = useOcupacoesAtivas()
+  const { data: imoveisMapa = [] } = useImoveisMapa()
+  const { data: basesMapa = [] } = useBasesMapa()
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const mapaSel = `text-[11px] rounded-lg border px-2 py-1.5 ${isDark ? 'bg-white/[0.04] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-600'}`
+
+  // opções dos filtros do mapa (cidade + centro de custo)
+  const mapaCidades = useMemo(() =>
+    [...new Set([...imoveisMapa.map(i => i.cidade), ...basesMapa.map(b => b.cidade)].filter(Boolean))].sort() as string[],
+  [imoveisMapa, basesMapa])
+  const mapaCC = useMemo(() => {
+    const m = new Map<string, string>()
+    imoveisMapa.forEach(i => { const cc = (i as { centro_custo?: { id: string; descricao: string } }).centro_custo; if (cc?.id) m.set(cc.id, cc.descricao) })
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [imoveisMapa])
 
   // ocupação ativa por leito_id
   const ocupPorLeito = useMemo(() => {
@@ -151,19 +165,47 @@ export default function ControleLeitos() {
     <div className="space-y-4">
       {/* Toolbar: resumo + busca + toggle de sub-visão */}
       <div className="flex flex-wrap items-center gap-2">
-        <p className={`text-xs ${txtMuted}`}>
-          {alojamentos.length} alojamentos · <span className="font-semibold">{totalGeral.total}</span> leitos ·{' '}
-          <span className={totalGeral.livres > 0 ? 'text-emerald-500 font-semibold' : txtMuted}>{totalGeral.livres} livres</span> ·{' '}
-          {totalGeral.taxa}% ocupação
-        </p>
-        <div className="flex-1" />
-        {/* Busca */}
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[180px]
-          ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-          <Search size={14} className={txtMuted} />
-          <input type="text" placeholder="Buscar alojamento…" value={search} onChange={e => setSearch(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
-        </div>
+        {sub === 'mapa' ? (
+          /* Filtros do Mapa — no header, ao lado do toggle */
+          <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[150px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+              <Search size={14} className={txtMuted} />
+              <input type="text" placeholder="Buscar imóvel / base…" value={mf.busca} onChange={e => setMf(m => ({ ...m, busca: e.target.value }))}
+                className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+            </div>
+            <div className={`flex items-center gap-0.5 rounded-lg border p-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+              {([['todos', 'Todos'], ['ALOJ', 'Aloj.'], ['CANT', 'Cant.'], ['CD', 'CD'], ['ESC', 'Esc.'], ['base', 'Bases']] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setMf(m => ({ ...m, tipo: k }))}
+                  className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-colors ${mf.tipo === k
+                    ? isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700' : txtMuted}`}>{l}</button>
+              ))}
+            </div>
+            <select value={mf.cidade} onChange={e => setMf(m => ({ ...m, cidade: e.target.value }))} className={mapaSel}>
+              <option value="">Cidade</option>{mapaCidades.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={mf.ocup} onChange={e => setMf(m => ({ ...m, ocup: e.target.value }))} className={mapaSel}>
+              <option value="">Ocupação</option><option value="vaga">Com vaga</option><option value="lotado">Lotado</option><option value="sem">Sem leitos</option>
+            </select>
+            <select value={mf.cc} onChange={e => setMf(m => ({ ...m, cc: e.target.value }))} className={mapaSel}>
+              <option value="">Centro de custo</option>{mapaCC.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+            </select>
+          </div>
+        ) : (
+          <>
+            <p className={`text-xs ${txtMuted}`}>
+              {alojamentos.length} alojamentos · <span className="font-semibold">{totalGeral.total}</span> leitos ·{' '}
+              <span className={totalGeral.livres > 0 ? 'text-emerald-500 font-semibold' : txtMuted}>{totalGeral.livres} livres</span> ·{' '}
+              {totalGeral.taxa}% ocupação
+            </p>
+            <div className="flex-1" />
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[180px]
+              ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+              <Search size={14} className={txtMuted} />
+              <input type="text" placeholder="Buscar alojamento…" value={search} onChange={e => setSearch(e.target.value)}
+                className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+            </div>
+          </>
+        )}
         {/* Toggle lista/card — só na sub-visão Alojamento (padrão da aba Ativos) */}
         {sub === 'alojamento' && (
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
@@ -205,7 +247,7 @@ export default function ControleLeitos() {
           alojamentos={alojFiltrados} leitosPorImovel={leitosPorImovel}
           ocupadosSet={ocupadosSet} viewMode={viewMode} isDark={isDark} onAbrir={setAberto} />
       ) : sub === 'mapa' ? (
-        <MapaImoveis leitosPorImovel={leitosPorImovel} ocupadosSet={ocupadosSet} onAbrir={setAberto} isDark={isDark} />
+        <MapaImoveis leitosPorImovel={leitosPorImovel} ocupadosSet={ocupadosSet} onAbrir={setAberto} isDark={isDark} filtros={mf} />
       ) : (
         <HistoricoView isDark={isDark} />
       )}

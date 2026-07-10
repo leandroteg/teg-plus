@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, AttributionControl } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Search, ChevronLeft, ChevronRight, MapPin, Info as InfoIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Info as InfoIcon } from 'lucide-react'
 import type { LocImovel } from '../../types/locacao'
 import { useImoveisMapa, useBasesMapa, type Leito, type BaseMapa } from '../../hooks/useLeitos'
 
@@ -95,20 +95,19 @@ function FlyTo({ pos }: { pos: [number, number] | null }) {
 type Sel = { kind: 'imovel'; id: string } | { kind: 'base'; id: string } | null
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isDark }: {
+export interface MapaFiltros { busca: string; tipo: string; cidade: string; ocup: string; cc: string }
+
+export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isDark, filtros }: {
   leitosPorImovel: Map<string, Leito[]>
   ocupadosSet: Set<string>
   onAbrir: (a: LocImovel) => void
   isDark: boolean
+  filtros: MapaFiltros
 }) {
   const { data: imoveis = [], isLoading } = useImoveisMapa()
   const { data: bases = [] } = useBasesMapa()
 
-  const [busca, setBusca] = useState('')
-  const [fTipo, setFTipo] = useState<string>('todos')  // todos|ALOJ|CANT|CD|ESC|base
-  const [fCidade, setFCidade] = useState('')
-  const [fOcup, setFOcup] = useState('')               // ''|vaga|lotado|sem
-  const [fCC, setFCC] = useState('')
+  const { busca, tipo: fTipo, cidade: fCidade, ocup: fOcup, cc: fCC } = filtros
   const [sel, setSel] = useState<Sel>(null)
   const [sidebar, setSidebar] = useState(true)
 
@@ -117,15 +116,6 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
     const ocup = ls.filter(l => ocupadosSet.has(l.id)).length
     return { total: ls.length, livres: ls.length - ocup, ocupados: ocup }
   }
-
-  const cidades = useMemo(() =>
-    [...new Set([...imoveis.map(i => i.cidade), ...bases.map(b => b.cidade)].filter(Boolean))].sort() as string[],
-  [imoveis, bases])
-  const centrosCusto = useMemo(() => {
-    const m = new Map<string, string>()
-    imoveis.forEach(i => { const cc = (i as any).centro_custo; if (cc?.id) m.set(cc.id, cc.descricao) })
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [imoveis])
 
   // filtros
   const imoveisF = useMemo(() => {
@@ -177,47 +167,13 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
   }, [sel, imoveis, bases])
 
   const cardCls = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
-  const inputCls = isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
-  const selCls = `text-[11px] rounded-lg border px-2 py-1.5 ${inputCls}`
-
-  const TIPO_PILLS = [
-    { key: 'todos', label: 'Todos' }, { key: 'ALOJ', label: 'Alojam.' }, { key: 'CANT', label: 'Canteiro' },
-    { key: 'CD', label: 'CD' }, { key: 'ESC', label: 'Escrit.' }, { key: 'base', label: 'Bases' },
-  ]
 
   return (
-    <div className={`flex rounded-2xl overflow-hidden h-[560px] relative ${cardCls}`}>
-      {/* Sidebar */}
-      <div className={`flex flex-col shrink-0 border-r transition-all duration-300 ${sidebar ? 'w-72' : 'w-0 border-r-0 overflow-hidden'} ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-        <div className="p-3 space-y-2">
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm border ${inputCls}`}>
-            <Search size={14} className="text-slate-400 shrink-0" />
-            <input className="flex-1 bg-transparent outline-none placeholder:text-slate-400" placeholder="Buscar imóvel / base…" value={busca} onChange={e => setBusca(e.target.value)} />
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {TIPO_PILLS.map(p => (
-              <button key={p.key} onClick={() => setFTipo(p.key)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${fTipo === p.key
-                  ? isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
-                  : isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'}`}>{p.label}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <select value={fCidade} onChange={e => setFCidade(e.target.value)} className={selCls}>
-              <option value="">Cidade</option>
-              {cidades.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select value={fOcup} onChange={e => setFOcup(e.target.value)} className={selCls}>
-              <option value="">Ocupação</option>
-              <option value="vaga">Com vaga</option>
-              <option value="lotado">Lotado</option>
-              <option value="sem">Sem leitos</option>
-            </select>
-          </div>
-          <select value={fCC} onChange={e => setFCC(e.target.value)} className={`${selCls} w-full`}>
-            <option value="">Centro de custo</option>
-            {centrosCusto.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
-          </select>
+    <div className={`flex rounded-2xl overflow-hidden relative h-[calc(100vh-13rem)] min-h-[480px] ${cardCls}`}>
+      {/* Sidebar — só a lista (filtros ficam no header) */}
+      <div className={`flex flex-col shrink-0 border-r transition-all duration-300 ${sidebar ? 'w-64' : 'w-0 border-r-0 overflow-hidden'} ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <div className={`px-3 py-2 border-b text-[10px] font-bold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-500' : 'border-slate-200 text-slate-400'}`}>
+          {imoveisF.length} imóveis · {basesF.length} bases
         </div>
 
         {/* Lista */}
@@ -269,12 +225,11 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
           <div className="flex flex-wrap gap-x-2.5 gap-y-1">
             <span>● Alojamento</span><span>▲ Canteiro</span><span>■ CD</span><span>◆ Escritório</span><span>★ Base</span>
           </div>
-          <p className="mt-1">{imoveisF.length} imóveis · {basesF.length} bases</p>
         </div>
       </div>
 
       <button onClick={() => setSidebar(!sidebar)}
-        className={`absolute top-3 z-[1000] rounded-lg p-1.5 shadow-md transition-all ${sidebar ? 'left-[276px]' : 'left-3'} ${isDark ? 'bg-[#1e293b] border border-white/[0.1] text-slate-300' : 'bg-white border border-slate-200 text-slate-600'}`}>
+        className={`absolute top-3 z-[1000] rounded-lg p-1.5 shadow-md transition-all ${sidebar ? 'left-[244px]' : 'left-3'} ${isDark ? 'bg-[#1e293b] border border-white/[0.1] text-slate-300' : 'bg-white border border-slate-200 text-slate-600'}`}>
         {sidebar ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
       </button>
 
