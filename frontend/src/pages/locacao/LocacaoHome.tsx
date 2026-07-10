@@ -176,7 +176,7 @@ export default function LocacaoHome() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
-            <KeySquare size={22} className="text-indigo-500" /> Locação de Imóveis
+            <KeySquare size={22} className="text-indigo-500" /> Gestão de Imóveis
           </h1>
           <p className={`text-xs mt-0.5 ${txtMuted}`}>Gestão de contratos, faturas e manutenções</p>
         </div>
