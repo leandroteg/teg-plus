@@ -349,14 +349,16 @@ export default function Ativos() {
   const { data: vistorias = [] } = useVistorias()
 
   const [busca, setBusca] = useState('')
-  const [statusFilter, setStatusFilter] = useState('todos')
+  // Abre já sem os inativos ("Em uso" = ativo + em entrada + em saída); "Todos" mostra tudo
+  const [statusFilter, setStatusFilter] = useState('em_uso')
   const [cidadeFilter, setCidadeFilter] = useState('')
   const [ccFilter, setCcFilter] = useState('')
   const [vencFilter, setVencFilter] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [detail, setDetail] = useState<LocImovel | null>(null)
-  const [sortCol, setSortCol] = useState<string>('')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  // Padrão inicial: ordenado por NOME decrescente
+  const [sortCol, setSortCol] = useState<string>('nome')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const toggleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('asc') }
@@ -373,7 +375,8 @@ export default function Ativos() {
   const filtrados = useMemo(() => {
     let items = [...imoveis]
     if (busca) { const q = busca.toLowerCase(); items = items.filter(i => [i.descricao, i.endereco, i.locador_nome, i.cidade].some(v => v?.toLowerCase().includes(q))) }
-    if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)
+    if (statusFilter === 'em_uso') items = items.filter(i => i.status !== 'inativo')
+    else if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)
     if (cidadeFilter) items = items.filter(i => i.cidade === cidadeFilter)
     if (ccFilter) items = items.filter(i => (i as any).centro_custo?.id === ccFilter)
     if (vencFilter) {
@@ -403,6 +406,7 @@ export default function Ativos() {
   }, [imoveis, busca, statusFilter, cidadeFilter, ccFilter, vencFilter, sortCol, sortDir])
 
   const statuses = [
+    { key: 'em_uso', label: 'Em uso' },
     { key: 'todos', label: 'Todos' },
     { key: 'ativo', label: 'Ativo' },
     { key: 'inativo', label: 'Inativo' },
