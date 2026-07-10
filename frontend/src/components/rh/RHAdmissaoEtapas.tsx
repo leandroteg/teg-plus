@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  useEtapaCandidato, useAsoAgendar, useAsoSetStatus, useTreinamentos,
+  useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
@@ -232,17 +232,33 @@ function PropostaCandidato({ cand, adm, isDark }: { cand: RHAdmissaoCandidato; a
 export function ExamesCard({ adm, isDark, onClick, autorNome }: {
   adm: RHAdmissao; isDark: boolean; onClick: () => void; autorNome?: string
 }) {
+  const { perfil } = useAuth()
+  const transicao = useTransicaoAdmissao()
+  const candidatos = adm.candidatos ?? []
+  // ASO anexado (tipo='aso') em TODOS os candidatos libera o avanço para Registro
+  const todosComAso = candidatos.length > 0 && candidatos.every(c => (c.anexos ?? []).some(a => a.tipo === 'aso'))
   return (
     <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
-      {(adm.candidatos ?? []).map(c => <ExamesCandidato key={c.id} cand={c} isDark={isDark} autorNome={autorNome} />)}
+      {candidatos.map(c => <ExamesCandidato key={c.id} cand={c} isDark={isDark} autorNome={autorNome} />)}
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={() => transicao.mutate({ adm, acao: 'apto_registro', autorId: perfil?.id, autorNome })}
+          disabled={!todosComAso || transicao.isPending}
+          title={todosComAso ? 'Avançar para Registro' : 'Anexe o ASO para liberar'}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+          {transicao.isPending ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+          Concluir exames — Enviar para Registro
+        </button>
+      </div>
     </VagaCard>
   )
 }
 
 function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; isDark: boolean; autorNome?: string }) {
+  const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
   const agendar = useAsoAgendar()
-  const setStatus = useAsoSetStatus()
+  const uploadAnexo = useUploadAnexoCandidato()
   const [formAberto, setFormAberto] = useState(false)
   const [f, setF] = useState({ clinica: '', endereco: '', data: '', hora: '', instrucoes: '' })
   const [erro, setErro] = useState<string | null>(null)
@@ -250,6 +266,13 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
   const exame = data?.exame ?? null
   const status = exame?.status ?? 'pendente_agendamento'
   const st = ASO_LABEL[status]
+  const agendado = status !== 'pendente_agendamento'
+  const asos = (cand.anexos ?? []).filter(a => a.tipo === 'aso')
+  const asoAnexado = asos.length > 0
+  const abrirAso = async () => {
+    const url = await anexoSignedUrl(asos[0]?.arquivo_path)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   function abrirForm() {
     setF({
@@ -310,18 +333,36 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
             <button onClick={abrirForm} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100">
               {status === 'pendente_agendamento' ? 'Agendar ASO' : 'Reagendar'}
             </button>
-            {(status === 'agendado' || status === 'realizado') && (
-              <>
-                <button onClick={() => setStatus.mutate({ candidatoId: cand.id, status: 'apto' })}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">Apto</button>
-                <button onClick={() => setStatus.mutate({ candidatoId: cand.id, status: 'inapto' })}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">Inapto</button>
-              </>
-            )}
           </div>
         )}
       </div>
 
+      {/* Resultado do exame: anexar o ASO (vira documento tipo='aso' junto dos demais) */}
+      {agendado && (
+        <div className="flex items-center gap-2 flex-wrap pt-0.5">
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <FileText size={11} /> Resultado (ASO)
+          </span>
+          {asoAnexado ? (
+            <>
+              <button onClick={abrirAso} className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-600 hover:underline">
+                <FileText size={11} /> {asos[0]?.arquivo_nome || 'Ver ASO'}
+              </button>
+              <label className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 cursor-pointer">
+                {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} Trocar
+                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={e => { const file = e.target.files?.[0]; if (file) uploadAnexo.mutate({ admissaoId: cand.admissao_id, candidatoId: cand.id, file, tipo: 'aso', autorId: perfil?.id }); e.currentTarget.value = '' }} />
+              </label>
+            </>
+          ) : (
+            <label className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 cursor-pointer">
+              {uploadAnexo.isPending ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} Anexar ASO
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={e => { const file = e.target.files?.[0]; if (file) uploadAnexo.mutate({ admissaoId: cand.admissao_id, candidatoId: cand.id, file, tipo: 'aso', autorId: perfil?.id }); e.currentTarget.value = '' }} />
+            </label>
+          )}
+        </div>
+      )}
     </div>
   )
 }
