@@ -62,50 +62,79 @@ function QrImg({ text, size = 160 }: { text: string; size?: number }) {
 
 const esc = (s?: string | null) => (s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
 
-// Folha imprimível de QRs — papel timbrado (logo TEG), 1 cartaz grande por leito
-// (2 por A4), com o NÚMERO SEQUENCIAL em destaque + colaborador/matrícula.
-async function imprimirFolhaQrs(tituloAloj: string, itens: { l: Leito; oc?: LeitoOcupacao }[]) {
-  const logo = `${location.origin}/logo-teg-empresa.png`
-  const cards = await Promise.all(itens.map(async ({ l, oc }) => {
+const LOGO = () => `${location.origin}/logo-teg-transicao.png`
+const PRINT_CSS = `
+  @page{size:A4 portrait;margin:12mm}
+  *{box-sizing:border-box;font-family:'Segoe UI',system-ui,Arial,sans-serif}
+  body{margin:0;color:#0f172a}
+  .bar{position:sticky;top:0;background:#fff;padding:10px 0;text-align:center}
+  .bar button{padding:9px 20px;border:0;border-radius:8px;background:#0891b2;color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+  @media print{.bar{display:none}}`
+
+// FOLHA DO LEITO — 1 cartaz por leito (2 por A4), NÃO nominal (o ocupante muda):
+// só o número sequencial do leito + QR. Pra colar no leito.
+async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
+  const logo = LOGO()
+  const cards = await Promise.all(leitos.map(async l => {
     const dataUrl = await QRCode.toDataURL(leitoUrl(l.numero_seq), { width: 480, margin: 1 })
-    const ocupante = oc
-      ? `<div class="ocup"><span class="nome">${esc(oc.colaborador_nome)}</span>
-           <span class="mat">Matrícula <b>${esc(oc.colaborador?.matricula) || '—'}</b></span></div>`
-      : `<div class="livre">LEITO LIVRE</div>`
     return `<section class="card">
       <header><img src="${logo}" alt="TEG"/><div class="aloj">${esc(tituloAloj)}</div></header>
       <div class="leito"><span class="lbl">LEITO</span><span class="num">#${l.numero_seq}</span></div>
       <img class="qr" src="${dataUrl}" alt="QR"/>
-      ${ocupante}
-      <footer>Escaneie no <b>Portal TEG</b> para fazer check-in / check-out do seu leito</footer>
+      <footer>Escaneie no <b>Portal TEG</b> · Alocação · e faça o check-in / check-out do seu leito</footer>
     </section>`
   }))
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>QR Leitos — ${esc(tituloAloj)}</title>
-    <style>
-      @page{size:A4 portrait;margin:12mm}
-      *{box-sizing:border-box;font-family:'Segoe UI',system-ui,Arial,sans-serif}
-      body{margin:0;color:#0f172a}
-      .bar{position:sticky;top:0;background:#fff;padding:10px 0;text-align:center}
-      .bar button{padding:9px 20px;border:0;border-radius:8px;background:#0891b2;color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+    <style>${PRINT_CSS}
       .card{height:128mm;border:2px solid #0891b2;border-radius:14px;padding:8mm;margin:0 auto 8mm;
             display:flex;flex-direction:column;align-items:center;page-break-inside:avoid;max-width:180mm}
-      .card header{width:100%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:4mm}
-      .card header img{height:16mm;object-fit:contain}
-      .card .aloj{font-size:13pt;font-weight:800;color:#334155;text-align:right;max-width:110mm}
-      .leito{display:flex;flex-direction:column;align-items:center;margin-top:3mm}
+      .card header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8mm;border-bottom:1px solid #e2e8f0;padding-bottom:4mm}
+      .card header img{height:15mm;object-fit:contain}
+      .card .aloj{font-size:13pt;font-weight:800;color:#334155;text-align:right}
+      .leito{display:flex;flex-direction:column;align-items:center;margin-top:4mm}
       .leito .lbl{font-size:12pt;letter-spacing:.3em;color:#64748b;font-weight:700}
-      .leito .num{font-family:'Consolas',monospace;font-size:46pt;font-weight:900;color:#0891b2;line-height:1}
-      .qr{width:58mm;height:58mm;margin:3mm 0}
-      .ocup{text-align:center}
-      .ocup .nome{display:block;font-size:16pt;font-weight:800}
-      .ocup .mat{display:block;font-size:13pt;color:#475569;margin-top:1mm}
-      .ocup .mat b{font-size:16pt;color:#0f172a}
-      .livre{font-size:18pt;font-weight:800;color:#16a34a;letter-spacing:.1em}
-      footer{margin-top:auto;font-size:10pt;color:#64748b}
-      @media print{.bar{display:none}}
+      .leito .num{font-family:'Consolas',monospace;font-size:54pt;font-weight:900;color:#0891b2;line-height:1}
+      .qr{width:62mm;height:62mm;margin:4mm 0}
+      footer{margin-top:auto;font-size:10pt;color:#64748b;text-align:center}
     </style></head><body>
-    <div class="bar"><button onclick="window.print()">🖨 Imprimir (${itens.length} leito${itens.length > 1 ? 's' : ''})</button></div>
+    <div class="bar"><button onclick="window.print()">🖨 Imprimir folha do leito (${leitos.length})</button></div>
     ${cards.join('')}
+    </body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close(); w.focus() }
+}
+
+// FOLHA DO ALOJAMENTO — 1 página com o QR do alojamento (o colaborador escaneia e
+// informa o número do leito). Pra colar na entrada.
+async function imprimirFolhaAlojamento(alojamento: LocImovel, st: { total: number; ocupados: number; livres: number }) {
+  const logo = LOGO()
+  const codigo = alojamento.titulo || alojamento.nome || alojamento.descricao || 'Alojamento'
+  const dataUrl = await QRCode.toDataURL(alojamentoUrl(alojamento.id), { width: 720, margin: 1 })
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Alojamento — ${esc(codigo)}</title>
+    <style>${PRINT_CSS}
+      .page{height:262mm;border:3px solid #0891b2;border-radius:18px;padding:14mm;margin:0 auto;max-width:186mm;
+            display:flex;flex-direction:column;align-items:center;text-align:center;page-break-inside:avoid}
+      .page img.logo{height:24mm;object-fit:contain;margin-bottom:6mm}
+      .lbl{font-size:14pt;letter-spacing:.35em;color:#64748b;font-weight:700}
+      .cod{font-size:26pt;font-weight:900;color:#0f172a;margin:2mm 0}
+      .end{font-size:12pt;color:#475569;max-width:150mm}
+      .qr{width:100mm;height:100mm;margin:8mm 0}
+      .call{font-size:16pt;font-weight:800;color:#0891b2;max-width:150mm}
+      .stats{margin-top:6mm;font-size:12pt;color:#334155}
+      .stats b{color:#0f172a}
+      footer{margin-top:auto;font-size:10pt;color:#94a3b8}
+    </style></head><body>
+    <div class="bar"><button onclick="window.print()">🖨 Imprimir folha do alojamento</button></div>
+    <section class="page">
+      <img class="logo" src="${logo}" alt="TEG"/>
+      <div class="lbl">ALOJAMENTO</div>
+      <div class="cod">${esc(codigo)}</div>
+      <div class="end">${esc(fmtEndereco(alojamento))}${alojamento.cidade ? ' · ' + esc(alojamento.cidade) : ''}${alojamento.uf ? '/' + esc(alojamento.uf) : ''}</div>
+      <img class="qr" src="${dataUrl}" alt="QR"/>
+      <div class="call">Escaneie e informe o número do seu leito<br/>para fazer check-in / check-out no Portal TEG</div>
+      <div class="stats"><b>${st.total}</b> leitos · <b>${st.ocupados}</b> ocupados · <b>${st.livres}</b> livres</div>
+      <footer>Cada leito também tem o seu próprio QR</footer>
+    </section>
     </body></html>`
   const w = window.open('', '_blank')
   if (w) { w.document.write(html); w.document.close(); w.focus() }
@@ -506,13 +535,19 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
             <div className="flex items-center gap-3">
               <div className="bg-white p-2 rounded-lg shrink-0"><QrImg text={alojamentoUrl(alojamento.id)} size={92} /></div>
               <div className="min-w-0">
-                <p className={`text-xs ${txtMuted}`}>QR do alojamento — cole na entrada. Ao escanear, o colaborador informa o número do leito no Portal. Cada leito também tem o seu QR na lista abaixo.</p>
-                {leitosOrd.length > 0 && (
-                  <button onClick={() => imprimirFolhaQrs(codigoAloj(alojamento), leitosOrd.map(l => ({ l, oc: ocupPorLeito.get(l.id) })))}
-                    className={`mt-2 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
-                    <Printer size={13} /> Folha de QRs dos leitos ({leitosOrd.length})
+                <p className={`text-xs ${txtMuted}`}>QR do alojamento — cole na entrada. Ao escanear, o colaborador informa o número do leito no Portal. Cada leito também tem o seu QR.</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button onClick={() => imprimirFolhaAlojamento(alojamento, st)}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
+                    <Printer size={13} /> Folha do alojamento
                   </button>
-                )}
+                  {leitosOrd.length > 0 && (
+                    <button onClick={() => imprimirFolhaQrs(codigoAloj(alojamento), leitosOrd)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
+                      <Printer size={13} /> Folha dos leitos ({leitosOrd.length})
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -628,9 +663,9 @@ function QrLeitoModal({ leito, ocup, alojamento, isDark, onClose }: {
             ) : <p className="text-sm font-semibold text-emerald-500 mt-1">Livre</p>}
             <p className={`text-xs ${txtMuted} mt-0.5`}>{codigoAloj(alojamento)}</p>
           </div>
-          <button onClick={() => imprimirFolhaQrs(codigoAloj(alojamento), [{ l: leito, oc: ocup }])}
+          <button onClick={() => imprimirFolhaQrs(codigoAloj(alojamento), [leito])}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-700">
-            <Printer size={13} /> Imprimir
+            <Printer size={13} /> Imprimir folha do leito
           </button>
         </div>
       </div>
