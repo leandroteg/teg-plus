@@ -181,6 +181,9 @@ export interface LocImovel {
   locador_contato?: string
   prefeito_nome?: string
   prefeito_telefone?: string
+  latitude?: number | null
+  longitude?: number | null
+  geo_aprox?: boolean
   centro_custo_id?: string
   obra_id?: string
   responsavel_id?: string

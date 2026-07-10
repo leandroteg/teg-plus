@@ -10,11 +10,12 @@ import QRCode from 'qrcode'
 import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
   LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
-  LayoutList, LayoutGrid,
+  LayoutList, LayoutGrid, Map as MapIcon,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
+import MapaImoveis from './MapaImoveis'
 import {
   useAlojamentos, useLeitos, useOcupacoesAtivas, useLeitosHistorico,
   useGerarLeitos, useAlocarLeito, useLiberarLeito, useMoverLeito, useExcluirLeito,
@@ -105,7 +106,7 @@ function statsDe(leitos: Leito[], ocupadosSet: Set<string>): Stats {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function ControleLeitos() {
   const { isDark } = useTheme()
-  const [sub, setSub] = useState<'alojamento' | 'historico'>('alojamento')
+  const [sub, setSub] = useState<'alojamento' | 'historico' | 'mapa'>('alojamento')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [search, setSearch] = useState('')
   const [aberto, setAberto] = useState<LocImovel | null>(null)
@@ -186,6 +187,12 @@ export default function ControleLeitos() {
               : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
             <History size={16} />
           </button>
+          <button onClick={() => setSub('mapa')} title="Mapa de Imóveis"
+            className={`p-1.5 rounded-lg transition-colors ${sub === 'mapa'
+              ? isDark ? 'bg-white/10 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
+              : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
+            <MapIcon size={16} />
+          </button>
         </div>
       </div>
 
@@ -197,6 +204,8 @@ export default function ControleLeitos() {
         <AlojamentosView
           alojamentos={alojFiltrados} leitosPorImovel={leitosPorImovel}
           ocupadosSet={ocupadosSet} viewMode={viewMode} isDark={isDark} onAbrir={setAberto} />
+      ) : sub === 'mapa' ? (
+        <MapaImoveis leitosPorImovel={leitosPorImovel} ocupadosSet={ocupadosSet} onAbrir={setAberto} isDark={isDark} />
       ) : (
         <HistoricoView isDark={isDark} />
       )}

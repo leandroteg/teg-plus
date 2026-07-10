@@ -91,6 +91,41 @@ export function useAtualizarAlojamento() {
   })
 }
 
+// ── Mapa: imóveis (todos, com coordenadas) + bases ───────────────────────────
+export interface BaseMapa {
+  id: string; nome: string; cidade: string | null; uf: string | null
+  endereco: string | null; latitude: number | null; longitude: number | null
+  geo_aprox: boolean | null; ativa: boolean | null; eh_sede: boolean | null; tipo: string | null
+}
+
+export function useImoveisMapa() {
+  return useQuery({
+    queryKey: ['loc_imoveis_mapa'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loc_imoveis')
+        .select('*, contrato:con_contratos!loc_imoveis_contrato_fk(id, numero, data_inicio, data_fim_previsto, data_assinatura, status), centro_custo:sys_centros_custo(id, codigo, descricao)')
+        .not('latitude', 'is', null)
+      if (error) throw error
+      return (data ?? []) as LocImovel[]
+    },
+  })
+}
+
+export function useBasesMapa() {
+  return useQuery({
+    queryKey: ['est_bases_mapa'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('est_bases')
+        .select('id, nome, cidade, uf, endereco, latitude, longitude, geo_aprox, ativa, eh_sede, tipo')
+        .not('latitude', 'is', null)
+      if (error) throw error
+      return (data ?? []) as BaseMapa[]
+    },
+  })
+}
+
 // ── Ocupações ativas (data_fim null) — juntadas por leito_id no cliente ───────
 export function useOcupacoesAtivas() {
   return useQuery({
