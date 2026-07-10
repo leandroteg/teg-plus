@@ -16,7 +16,7 @@ import {
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
-import { RegistroCard, IntegracaoCard } from './RHAdmissaoEtapas'
+import { RegistroCard, IntegracaoCard, ExamesCard } from './RHAdmissaoEtapas'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const EDIT_INPUT = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -263,8 +263,10 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             <p className="text-[11px] text-slate-400">Solicitado por <span className="font-semibold text-slate-600">{adm.solicitante_nome}</span></p>
           )}
 
-          {/* Candidatos — nas etapas Registro/Integração usa o MESMO card rico da visão em cards */}
-          {etapa === 'registro' ? (
+          {/* Candidatos — nas etapas Exames/Registro/Integração usa o MESMO card rico da visão em cards */}
+          {etapa === 'exames_treinamentos' ? (
+            <ExamesCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'registro' ? (
             <RegistroCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
           ) : etapa === 'integracao' ? (
             <IntegracaoCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
@@ -354,13 +356,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 Documentação Recebida
               </button>
             )}
-            {etapa === 'exames_treinamentos' && (
-              <button onClick={() => executar('apto_registro')} disabled={transicao.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
-                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                Apto — Enviar para Registro
-              </button>
-            )}
+            {/* Exames: concluído pelo botão "Concluir exames" dentro do card (libera após anexar o ASO), não aqui */}
             {/* Registro: concluído pelo botão atualizado dentro da etapa (define matrícula), não aqui */}
             {etapa === 'mobilizacao' && (
               <button onClick={() => executar('mobilizacao_concluida')} disabled={transicao.isPending}
