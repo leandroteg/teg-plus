@@ -52,7 +52,7 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     key: 'projetos',
-    label: 'Projetos',
+    label: 'Operação',
     tagline: 'Gestão de obras e segurança',
     Icon: FolderKanban,
     grad: 'from-blue-500/20 to-indigo-600/20',
@@ -80,7 +80,7 @@ const PILLARS: Pillar[] = [
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
       { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
       { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
-      { key: 'locacoes', label: 'Locação Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
+      { key: 'locacoes', label: 'Gestão de Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
     ],
   },
   {
