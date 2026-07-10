@@ -236,6 +236,7 @@ export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'comprovante', label: 'Comprovante de Endereço', obrigatorio: false },
   { value: 'certidao', label: 'Certidão Nasc./Casamento', obrigatorio: false },
   { value: 'reservista', label: 'Reservista', obrigatorio: false },
+  { value: 'aso', label: 'Exame Admissional (ASO)', obrigatorio: false },
   { value: 'declaracao_etnia', label: 'Declaração de Etnia', obrigatorio: false },
   { value: 'pesquisa_historico', label: 'Pesquisa Histórico', obrigatorio: false },
   { value: 'proposta', label: 'Proposta', obrigatorio: false },
