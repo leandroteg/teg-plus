@@ -135,7 +135,7 @@ export default function LocacaoLayout() {
       <VistoriaSyncBanner />
       <ModuleLayout
         moduleKey="locacoes"
-        moduleName="Locação Imóveis"
+        moduleName="Gestão de Imóveis"
         moduleEmoji="🏘️"
         accent="indigo"
         nav={NAV}
