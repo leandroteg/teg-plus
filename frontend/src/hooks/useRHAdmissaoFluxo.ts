@@ -698,6 +698,40 @@ export function useUploadAnexoCandidato() {
   })
 }
 
+// RH anexa um documento pelo TEG+ no lugar do colaborador: sobe o arquivo e
+// conclui a missão correspondente do Portal (o pedido some do celular dele).
+export function useAnexarDocMissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: {
+      missaoId: string; admissaoId: string; candidatoId: string
+      docTipo: string; file: File; autorId?: string
+    }) => {
+      const safeName = i.file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `${i.admissaoId}/${i.candidatoId}/rh_${i.docTipo}_${Date.now()}_${safeName}`
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, i.file, { upsert: false })
+      if (upErr) throw upErr
+      const { data, error } = await supabase.rpc('rh_admissao_doc_anexar', {
+        p_missao_id: i.missaoId,
+        p_arquivo_path: path,
+        p_arquivo_nome: i.file.name,
+        p_mime: i.file.type || null,
+        p_tamanho: i.file.size,
+        p_autor_id: i.autorId ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao anexar o documento')
+      return r
+    },
+    onSuccess: (_r, i) => {
+      qc.invalidateQueries({ queryKey: ['rh-admissao-missoes-docs', i.candidatoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissao-docs-recebidos', i.admissaoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
 function invalidateEtapa(qc: ReturnType<typeof useQueryClient>, candidatoId: string) {
   qc.invalidateQueries({ queryKey: ['rh-admissao-etapa-cand', candidatoId] })
 }
