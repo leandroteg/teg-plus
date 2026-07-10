@@ -18,6 +18,7 @@ export interface LeitoOcupacao {
   checkout_em: string | null
   origem: 'admin' | 'portal_qr'
   observacao: string | null
+  colaborador?: { matricula: string | null } | null
 }
 
 export interface Leito {
@@ -133,10 +134,10 @@ export function useOcupacoesAtivas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loc_leito_ocupacoes')
-        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao')
+        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao, colaborador:rh_colaboradores(matricula)')
         .is('data_fim', null)
       if (error) throw error
-      return (data ?? []) as LeitoOcupacao[]
+      return (data ?? []) as unknown as LeitoOcupacao[]
     },
   })
 }
