@@ -51,7 +51,7 @@ export function useAlojamentos() {
       const { data, error } = await supabase
         .from('loc_imoveis')
         .select('*, contrato:con_contratos!loc_imoveis_contrato_fk(id, numero, data_inicio, data_fim_previsto, data_assinatura, status), centro_custo:sys_centros_custo(id, codigo, descricao)')
-        .eq('tipo', 'ALOJ')
+        .in('tipo', ['ALOJ', 'HTL'])
         .neq('status', 'inativo')
         .order('cidade', { ascending: true })
         .order('descricao', { ascending: true })

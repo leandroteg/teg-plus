@@ -174,7 +174,7 @@ export default function ControleLeitos() {
                 className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
             </div>
             <div className={`flex items-center gap-0.5 rounded-lg border p-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-              {([['todos', 'Todos'], ['ALOJ', 'Aloj.'], ['CANT', 'Cant.'], ['CD', 'CD'], ['ESC', 'Esc.'], ['base', 'Bases']] as const).map(([k, l]) => (
+              {([['todos', 'Todos'], ['ALOJ', 'Aloj.'], ['HTL', 'Hotel'], ['CANT', 'Cant.'], ['CD', 'CD'], ['ESC', 'Esc.'], ['base', 'Bases']] as const).map(([k, l]) => (
                 <button key={k} onClick={() => setMf(m => ({ ...m, tipo: k }))}
                   className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-colors ${mf.tipo === k
                     ? isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700' : txtMuted}`}>{l}</button>

@@ -15,8 +15,9 @@ const fmtCur = (v?: number | null) => v != null ? v.toLocaleString('pt-BR', { st
 const nomeImovel = (i: LocImovel) => i.titulo || i.nome || i.descricao || 'Imóvel'
 
 // tipos: forma geométrica + rótulo
-const TIPO_INFO: Record<string, { shape: 'circle' | 'triangle' | 'square' | 'diamond'; label: string }> = {
+const TIPO_INFO: Record<string, { shape: 'circle' | 'triangle' | 'square' | 'diamond' | 'hex'; label: string }> = {
   ALOJ: { shape: 'circle',   label: 'Alojamento' },
+  HTL:  { shape: 'hex',      label: 'Hotel' },
   CANT: { shape: 'triangle', label: 'Canteiro' },
   CD:   { shape: 'square',   label: 'Centro de Distribuição' },
   ESC:  { shape: 'diamond',  label: 'Escritório' },
@@ -24,7 +25,7 @@ const TIPO_INFO: Record<string, { shape: 'circle' | 'triangle' | 'square' | 'dia
 
 // Cor por vagas (alojamento) ou status (demais)
 function corImovel(i: LocImovel, vagas?: { total: number; livres: number }): { cor: string; rotulo: string } {
-  if (i.tipo === 'ALOJ') {
+  if (i.tipo === 'ALOJ' || i.tipo === 'HTL') {
     if (!vagas || vagas.total === 0) return { cor: '#94a3b8', rotulo: 'Sem leitos' }
     if (vagas.livres > 0) return { cor: '#22c55e', rotulo: `${vagas.livres} vaga${vagas.livres > 1 ? 's' : ''}` }
     return { cor: '#ef4444', rotulo: 'Lotado' }
@@ -50,6 +51,11 @@ function shapeSvg(shape: string, cor: string, size = 22): string {
   if (shape === 'star') {
     const pts = starPoints(c, c, c - 2, (c - 2) * 0.45, 5)
     return `<polygon points="${pts}" fill="${cor}" ${st}/>`
+  }
+  if (shape === 'hex') {
+    const out: string[] = []
+    for (let i = 0; i < 6; i++) { const a = (Math.PI / 3) * i - Math.PI / 6; out.push(`${(c + (c - 2) * Math.cos(a)).toFixed(1)},${(c + (c - 2) * Math.sin(a)).toFixed(1)}`) }
+    return `<polygon points="${out.join(' ')}" fill="${cor}" ${st}/>`
   }
   return `<circle cx="${c}" cy="${c}" r="${c - 2}" fill="${cor}" ${st}/>`
 }
@@ -127,9 +133,10 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
       if (fCC && (i as any).centro_custo?.id !== fCC) return false
       if (fOcup) {
         const v = vagasDe(i.id)
-        if (fOcup === 'vaga' && !(i.tipo === 'ALOJ' && v.livres > 0)) return false
-        if (fOcup === 'lotado' && !(i.tipo === 'ALOJ' && v.total > 0 && v.livres === 0)) return false
-        if (fOcup === 'sem' && !(i.tipo === 'ALOJ' && v.total === 0)) return false
+        const aloj = i.tipo === 'ALOJ' || i.tipo === 'HTL'
+        if (fOcup === 'vaga' && !(aloj && v.livres > 0)) return false
+        if (fOcup === 'lotado' && !(aloj && v.total > 0 && v.livres === 0)) return false
+        if (fOcup === 'sem' && !(aloj && v.total === 0)) return false
       }
       if (q && !(nomeImovel(i).toLowerCase().includes(q) || i.endereco?.toLowerCase().includes(q) || i.cidade?.toLowerCase().includes(q))) return false
       return true
@@ -183,7 +190,7 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
           )) : (
             <>
               {imoveisF.map(i => {
-                const v = i.tipo === 'ALOJ' ? vagasDe(i.id) : undefined
+                const v = (i.tipo === 'ALOJ' || i.tipo === 'HTL') ? vagasDe(i.id) : undefined
                 const { cor, rotulo } = corImovel(i, v)
                 const ativo = sel?.kind === 'imovel' && sel.id === i.id
                 return (
@@ -223,7 +230,7 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
         {/* Legenda de formas */}
         <div className={`px-3 py-2 border-t text-[9px] ${isDark ? 'border-white/[0.06] text-slate-400' : 'border-slate-200 text-slate-500'}`}>
           <div className="flex flex-wrap gap-x-2.5 gap-y-1">
-            <span>● Alojamento</span><span>▲ Canteiro</span><span>■ CD</span><span>◆ Escritório</span><span>★ Base</span>
+            <span>● Alojamento</span><span>⬡ Hotel</span><span>▲ Canteiro</span><span>■ CD</span><span>◆ Escritório</span><span>★ Base</span>
           </div>
         </div>
       </div>
@@ -242,7 +249,7 @@ export default function MapaImoveis({ leitosPorImovel, ocupadosSet, onAbrir, isD
           <FlyTo pos={flyPos} />
 
           {imoveisF.map(i => {
-            const v = i.tipo === 'ALOJ' ? vagasDe(i.id) : undefined
+            const v = (i.tipo === 'ALOJ' || i.tipo === 'HTL') ? vagasDe(i.id) : undefined
             const { cor, rotulo } = corImovel(i, v)
             const shape = TIPO_INFO[i.tipo || '']?.shape ?? 'circle'
             const selected = sel?.kind === 'imovel' && sel.id === i.id

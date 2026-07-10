@@ -373,7 +373,8 @@ export default function Ativos() {
   }, [imoveis])
 
   const filtrados = useMemo(() => {
-    let items = [...imoveis]
+    // Hotéis (tipo HTL) são hospedagem temporária: aparecem no Controle de Leitos, não aqui
+    let items = imoveis.filter(i => (i as { tipo?: string }).tipo !== 'HTL')
     if (busca) { const q = busca.toLowerCase(); items = items.filter(i => [i.descricao, i.endereco, i.locador_nome, i.cidade].some(v => v?.toLowerCase().includes(q))) }
     if (statusFilter === 'em_uso') items = items.filter(i => i.status !== 'inativo')
     else if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)

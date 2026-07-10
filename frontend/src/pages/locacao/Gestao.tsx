@@ -48,7 +48,7 @@ export default function Gestao() {
   const { data: leitos = [] } = useLeitos()
 
   const counts: Record<Tab, number> = useMemo(() => ({
-    ativos: imoveis.length,
+    ativos: imoveis.filter(i => (i as { tipo?: string }).tipo !== 'HTL').length,
     faturas: faturas.length,
     servicos: solicitacoes.length,
     aditivos: aditivos.length,
