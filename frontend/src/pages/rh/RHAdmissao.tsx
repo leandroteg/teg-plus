@@ -8,10 +8,13 @@ import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
   HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
   ChevronRight as ChevR, Paperclip, AlertTriangle, XCircle, HelpCircle, Loader2,
-  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake,
+  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake, Upload,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao } from '../../hooks/useRHAdmissaoFluxo'
+import {
+  useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao,
+  useAnexarDocMissao, useUploadAnexoCandidato,
+} from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
@@ -198,8 +201,10 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
   const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
   const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
   return (
-    <button onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all group ${
+    // <div>, e não <button>: os itens de documento carregam <input type="file"> dentro.
+    <div role="button" tabIndex={0} onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      className={`w-full text-left rounded-2xl border p-4 transition-all group cursor-pointer ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-violet-400/40 hover:bg-violet-500/5'
           : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-md'
@@ -227,22 +232,27 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
       {/* Progresso de docs por candidato */}
       <div className="space-y-1.5">
         {candidatos.map(c => (
-          <DocCandidatoProgress key={c.id} candidatoId={c.id} nome={c.nome} isDark={isDark}
+          <DocCandidatoProgress key={c.id} candidatoId={c.id} admissaoId={adm.id} nome={c.nome} isDark={isDark}
             temPesquisaHistorico={(c.anexos ?? []).some(a => a.tipo === 'pesquisa_historico')} />
         ))}
         {candidatos.length === 0 && (
           <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum candidato.</p>
         )}
       </div>
-    </button>
+    </div>
   )
 }
 
-function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico }: {
-  candidatoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
+function DocCandidatoProgress({ candidatoId, admissaoId, nome, isDark, temPesquisaHistorico }: {
+  candidatoId: string; admissaoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
 }) {
+  const { perfil } = useAuth()
   const { data: docs = [], isLoading } = useMissoesDocsStatus(candidatoId)
   const { data: parecer } = useParecerQualificacao(candidatoId)
+  const anexar = useAnexarDocMissao()
+  const uploadAnexo = useUploadAnexoCandidato()
+  const [subindo, setSubindo] = useState<string | null>(null)
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null)
   const total = docs.length
   const ok = docs.filter(d => d.status === 'concluida' || d.status === 'dispensada').length
   const completo = total > 0 && ok === total && !!temPesquisaHistorico
@@ -273,37 +283,88 @@ function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico 
       </div>
       {total > 0 && (
         <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap mt-1.5">
-          {docs.map(d => (
-            <span key={d.missao_id} className="flex items-center gap-1 min-w-0">
-              {d.status === 'concluida'
-                ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-                : d.status === 'dispensada'
-                  ? <MinusCircle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
-                  : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
-              <span className={`text-[10px] truncate ${
-                d.status === 'concluida'
-                  ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
+          {docs.map(d => {
+            const rotulo = d.titulo.replace(/^Enviar /, '').replace(/ \(se aplicável\)$/, '')
+            if (d.status === 'concluida') {
+              return (
+                <span key={d.missao_id} className="flex items-center gap-1 min-w-0">
+                  <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                  <span className={`text-[10px] truncate ${isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold'}`}>{rotulo}</span>
+                </span>
+              )
+            }
+            const enviando = anexar.isPending && subindo === d.missao_id
+            return (
+              <label key={d.missao_id}
+                title={`Anexar ${rotulo}`}
+                onClick={e => e.stopPropagation()}
+                className={`flex items-center gap-1 min-w-0 group/doc cursor-pointer rounded px-0.5 -mx-0.5 ${
+                  isDark ? 'hover:bg-teal-500/10' : 'hover:bg-teal-50'}`}>
+                {enviando
+                  ? <Loader2 size={11} className="animate-spin text-teal-500 shrink-0" />
                   : d.status === 'dispensada'
+                    ? <MinusCircle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'} group-hover/doc:text-teal-500`} />}
+                <span className={`text-[10px] truncate ${
+                  d.status === 'dispensada'
                     ? (isDark ? 'text-slate-600 line-through' : 'text-slate-400 line-through')
                     : (isDark ? 'text-slate-500' : 'text-slate-400')
-              }`}>
-                {d.titulo.replace(/^Enviar /, '').replace(/ \(se aplicável\)$/, '')}
+                } group-hover/doc:text-teal-600`}>
+                  {rotulo}
+                </span>
+                <Upload size={9} className="shrink-0 text-teal-500 opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                  disabled={anexar.isPending}
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    e.currentTarget.value = ''
+                    if (!file) return
+                    setErroAnexo(null); setSubindo(d.missao_id)
+                    anexar.mutate(
+                      { missaoId: d.missao_id, admissaoId, candidatoId, docTipo: d.doc_tipo, file, autorId: perfil?.id },
+                      { onError: err => setErroAnexo(err instanceof Error ? err.message : 'Falha ao anexar'), onSettled: () => setSubindo(null) },
+                    )
+                  }} />
+              </label>
+            )
+          })}
+          {/* Pesquisa Histórico — interno do RH (não vira missão do colaborador) */}
+          {temPesquisaHistorico ? (
+            <span className="flex items-center gap-1 min-w-0">
+              <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+              <span className={`text-[10px] truncate ${isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold'}`}>
+                Pesquisa Histórico 🔒
               </span>
             </span>
-          ))}
-          {/* Pesquisa Histórico — interno do RH */}
-          <span className="flex items-center gap-1 min-w-0">
-            {temPesquisaHistorico
-              ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-              : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
-            <span className={`text-[10px] truncate ${temPesquisaHistorico
-              ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
-              : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
-              Pesquisa Histórico 🔒
-            </span>
-          </span>
+          ) : (
+            <label title="Anexar Pesquisa Histórico"
+              onClick={e => e.stopPropagation()}
+              className={`flex items-center gap-1 min-w-0 group/doc cursor-pointer rounded px-0.5 -mx-0.5 ${
+                isDark ? 'hover:bg-teal-500/10' : 'hover:bg-teal-50'}`}>
+              {uploadAnexo.isPending
+                ? <Loader2 size={11} className="animate-spin text-teal-500 shrink-0" />
+                : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'} group-hover/doc:text-teal-500`} />}
+              <span className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'} group-hover/doc:text-teal-600`}>
+                Pesquisa Histórico 🔒
+              </span>
+              <Upload size={9} className="shrink-0 text-teal-500 opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                disabled={uploadAnexo.isPending}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.currentTarget.value = ''
+                  if (!file) return
+                  setErroAnexo(null)
+                  uploadAnexo.mutate(
+                    { admissaoId, candidatoId, file, tipo: 'pesquisa_historico', autorId: perfil?.id },
+                    { onError: err => setErroAnexo(err instanceof Error ? err.message : 'Falha ao anexar') },
+                  )
+                }} />
+            </label>
+          )}
         </div>
       )}
+      {erroAnexo && <p className="text-[10px] text-red-500 font-semibold mt-1">{erroAnexo}</p>}
     </div>
   )
 }
