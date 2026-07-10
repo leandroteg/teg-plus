@@ -9,7 +9,7 @@ import type { Pilar } from '../pages/paineis/registry'
 // Ordem dos pilares no menu lateral de Painéis.
 const PILARES: { label: Pilar; icon: LucideIcon }[] = [
   { label: 'Governança',  icon: Scale },
-  { label: 'Projetos',    icon: FolderKanban },
+  { label: 'Operação',    icon: FolderKanban },
   { label: 'Suprimentos', icon: Layers },
   { label: 'Backoffice',  icon: Wallet },
   { label: 'RH',          icon: Users },
