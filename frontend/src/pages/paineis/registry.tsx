@@ -24,7 +24,7 @@ import {
 //  `Painel` = desktop (lg+) · `Mobile` = versão mobile-native (<lg).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type Pilar = 'Projetos' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão' | 'RH'
+export type Pilar = 'Operação' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão' | 'RH'
 
 export interface PainelDef {
   key: string
@@ -46,16 +46,16 @@ export const PAINEIS: PainelDef[] = [
   { key: 'contratos',     label: 'Contratos',      desc: 'Gestão de contratos e SLAs',              emoji: '📋', Icon: FileText,       accent: '#34D399', route: '/contratos',     pilar: 'Backoffice',  Painel: lazy(() => import('../contratos/DashboardContratos')),    Mobile: lazy(() => import('../contratos/DashboardContratosMobile')) },
   { key: 'fiscal',        label: 'Fiscal',         desc: 'Notas fiscais e créditos',                emoji: '🧾', Icon: Receipt,        accent: '#34D399', route: '/fiscal',        pilar: 'Backoffice',  Painel: lazy(() => import('../fiscal/FiscalHome')),               Mobile: lazy(() => import('../fiscal/FiscalHomeMobile')) },
   // Projetos
-  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Projetos',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')) },
-  { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Projetos',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainelMobile')) },
-  { key: 'qsma',          label: 'QSMA',           desc: 'Inspeções, ocorrências, EPIs e ambiental', emoji: '🦺', Icon: ShieldAlert,   accent: '#818CF8', route: '/qsma',          pilar: 'Projetos',    Painel: lazy(() => import('../qsma/QsmaPainel')),                 Mobile: lazy(() => import('../qsma/QsmaPainel')) },
+  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Operação',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')) },
+  { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Operação',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainelMobile')) },
+  { key: 'qsma',          label: 'QSMA',           desc: 'Inspeções, ocorrências, EPIs e ambiental', emoji: '🦺', Icon: ShieldAlert,   accent: '#818CF8', route: '/qsma',          pilar: 'Operação',    Painel: lazy(() => import('../qsma/QsmaPainel')),                 Mobile: lazy(() => import('../qsma/QsmaPainel')) },
   // Suprimentos
   { key: 'compras',       label: 'Compras',        desc: 'Requisições, cotações e pedidos',         emoji: '🛒', Icon: ShoppingCart,   accent: '#2DD4BF', route: '/compras',       pilar: 'Suprimentos', Painel: lazy(() => import('../Dashboard')),                       Mobile: lazy(() => import('../DashboardMobile')) },
   { key: 'logistica',     label: 'Logística',      desc: 'Transportes e expedição',                 emoji: '🚚', Icon: Truck,          accent: '#2DD4BF', route: '/logistica',     pilar: 'Suprimentos', Painel: lazy(() => import('../logistica/LogisticaHome')),         Mobile: lazy(() => import('../logistica/LogisticaHomeMobile')) },
   { key: 'estoque',       label: 'Estoque',        desc: 'Almoxarifado e inventário',               emoji: '📦', Icon: Package,        accent: '#2DD4BF', route: '/estoque',       pilar: 'Suprimentos', Painel: lazy(() => import('../estoque/EstoqueHome')),             Mobile: lazy(() => import('../estoque/EstoqueHomeMobile')) },
   { key: 'patrimonial',   label: 'Patrimonial',    desc: 'Ativos e depreciação',                    emoji: '🏛️', Icon: Building2,      accent: '#2DD4BF', route: '/patrimonial',   pilar: 'Suprimentos', Painel: lazy(() => import('../patrimonial/PatrimonialHome')),     Mobile: lazy(() => import('../patrimonial/PatrimonialHomeMobile')) },
   { key: 'frotas',        label: 'Frotas',         desc: 'Veículos, OS e telemetria',               emoji: '🚛', Icon: Car,            accent: '#2DD4BF', route: '/frotas',        pilar: 'Suprimentos', Painel: lazy(() => import('../frotas/FrotasHome')),               Mobile: lazy(() => import('../frotas/FrotasHomeMobile')) },
-  { key: 'locacoes',      label: 'Locação Imóveis',desc: 'Imóveis, aditivos e faturas',             emoji: '🏘️', Icon: KeySquare,     accent: '#2DD4BF', route: '/locacoes',      pilar: 'Suprimentos', Painel: lazy(() => import('../locacao/LocacaoHome')),             Mobile: lazy(() => import('../locacao/LocacaoHomeMobile')) },
+  { key: 'locacoes',      label: 'Gestão de Imóveis',desc: 'Imóveis, aditivos e faturas',             emoji: '🏘️', Icon: KeySquare,     accent: '#2DD4BF', route: '/locacoes',      pilar: 'Suprimentos', Painel: lazy(() => import('../locacao/LocacaoHome')),             Mobile: lazy(() => import('../locacao/LocacaoHomeMobile')) },
   // Expansão
   { key: 'orcamentacao',  label: 'Orçamentação',   desc: 'Estimativa de LT por KMZ',                emoji: '📐', Icon: Calculator,     accent: '#FBBF24', route: '/orcamentacao',  pilar: 'Expansão',    Painel: lazy(() => import('../orcamentacao/OrcamentacaoHome')),   Mobile: lazy(() => import('../orcamentacao/OrcamentacaoHomeMobile')) },
   // Governança
