@@ -831,6 +831,59 @@ const TRANSPORTES = [
   { value: 'veiculo_proprio', label: 'Veículo próprio' }, { value: 'aereo', label: 'Aéreo' }, { value: 'outro', label: 'Outro' },
 ]
 
+// "Quem vai receber": sugestões curadas + busca livre em todo o headcount ativo.
+type RecepOpt = { id: string; nome: string; cargo: string | null; base_id: string | null }
+function ReceptorPicker({ valorId, sugeridos, todos, onSelect }: {
+  valorId: string | null; sugeridos: RecepOpt[]; todos: RecepOpt[]; onSelect: (id: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const sel = todos.find(x => x.id === valorId) || sugeridos.find(x => x.id === valorId) || null
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const termo = norm(q.trim())
+  const fonte = termo ? todos : sugeridos
+  const lista = (termo ? fonte.filter(x => norm(x.nome).includes(termo) || norm(x.cargo || '').includes(termo)) : fonte).slice(0, 40)
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => { setOpen(o => !o); setQ('') }}
+        className={`${IN} text-left flex items-center justify-between gap-1`}>
+        <span className={`truncate ${sel ? '' : 'text-slate-400'}`}>{sel ? sel.nome : 'Selecionar…'}</span>
+        <ChevR size={12} className="text-slate-400 shrink-0 rotate-90" />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-60 overflow-auto">
+          <div className="p-1.5 sticky top-0 bg-white border-b border-slate-100">
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+              placeholder="Pesquisar no headcount…" className={IN} onKeyDown={e => e.stopPropagation()} />
+          </div>
+          {sel && (
+            <button type="button" onClick={() => { onSelect(null); setOpen(false) }}
+              className="w-full text-left px-2.5 py-1.5 text-[11px] text-slate-400 hover:bg-slate-50">Limpar seleção</button>
+          )}
+          {lista.map(x => (
+            <button key={x.id} type="button" onClick={() => { onSelect(x.id); setOpen(false) }}
+              className={`w-full text-left px-2.5 py-1.5 text-[11px] hover:bg-teal-50 ${x.id === valorId ? 'bg-teal-50 font-semibold' : ''}`}>
+              {x.nome}{x.cargo ? <span className="text-slate-400"> — {x.cargo}</span> : null}
+            </button>
+          ))}
+          {lista.length === 0 && <p className="px-2.5 py-2 text-[11px] text-slate-400">Nenhum encontrado.</p>}
+          {!termo && <p className="px-2.5 py-1 text-[9px] text-slate-300">Digite para buscar qualquer colaborador ativo.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ToggleSN({ value, onChange }: { value: boolean | null | undefined; onChange: (v: boolean) => void }) {
   return (
     <span className="inline-flex gap-1">
@@ -902,11 +955,12 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
         </div>
         <div>
           <label className="text-[9px] font-bold uppercase text-slate-400">Quem vai receber</label>
-          <select value={mob?.recebido_por_id ?? ''} className={IN}
-            onChange={e => upd({ recebido_por_id: e.target.value || null })}>
-            <option value="">Selecionar…</option>
-            {receptores.map(x => <option key={x.id} value={x.id}>{x.nome}{x.cargo ? ` — ${x.cargo}` : ''}</option>)}
-          </select>
+          <ReceptorPicker
+            valorId={mob?.recebido_por_id ?? null}
+            sugeridos={receptores}
+            todos={apoio?.todos ?? []}
+            onSelect={id => upd({ recebido_por_id: id })}
+          />
         </div>
       </div>
 
