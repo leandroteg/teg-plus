@@ -175,7 +175,13 @@ export interface ContaReceber {
   osc_id?: string | null
   pmo_medicao_id?: string | null
   osc?: { numero_os: string } | null // embed via osc_id
+  obra?: { nome: string; codigo?: string | null } | null // embed via projeto_id
+  bloqueio_tipo?: BloqueioCR
 }
+
+export type BloqueioCR =
+  | 'tecnico' | 'contratual' | 'rh' | 'financeiro'
+  | 'em_identificacao' | 'resolvido' | 'sem_bloqueio'
 
 export interface DocumentoFinanceiro {
   id: string
