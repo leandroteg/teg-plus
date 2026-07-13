@@ -619,6 +619,8 @@ export interface RHProposta {
   deslocamento_detalhes: string | null
   responsavel_recebimento: string | null
   observacoes: string | null
+  // Recursos/necessidades definidos pelo RH (Alinhamento; editável tb em Mob/Integração)
+  recursos: Record<string, string> | null
 }
 
 // Dados de etapa por candidato (1 fetch por card)
