@@ -9,14 +9,14 @@ import { supabase } from '../../services/supabase'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop,
+  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
-  useExcluirAnexoAdmissao,
+  useExcluirAnexoAdmissao, useGesetLiberacao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -1102,13 +1102,37 @@ export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark
 
 function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark: boolean }) {
   const { data } = useEtapaCandidato(cand.id)
+  const geset = useGesetLiberacao()
+  const aguardando = (cand.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao'
+
+  const toggle = () => {
+    if (geset.isPending) return
+    geset.mutate({ candidatoId: cand.id, status: aguardando ? 'liberado' : 'aguardando_liberacao' })
+  }
+
   return (
     <div className={`rounded-xl border px-3 py-2 space-y-1.5 ${
-      isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50'}`}>
+      aguardando
+        ? (isDark ? 'border-amber-400/20 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50/60')
+        : (isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50')}`}>
       <div className="flex items-center gap-2">
-        <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-        <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Colaborador apto e liberado para atividades</span>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Ativo · Portal liberado</span>
+        {aguardando
+          ? <Clock size={14} className="text-amber-500 shrink-0" />
+          : <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
+        <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
+          {aguardando ? 'Aguardando liberação no GESET (não pode ir a campo)' : 'Colaborador apto e liberado para atividades'}
+        </span>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={geset.isPending}
+          title={aguardando ? 'Marcar como liberado' : 'Marcar como aguardando liberação no GESET'}
+          className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors disabled:opacity-50 ${
+            aguardando
+              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
+          {geset.isPending ? '…' : aguardando ? 'Aguardando liberação' : 'Ativo · Portal liberado'}
+        </button>
       </div>
       <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable={false} />
     </div>
