@@ -16,7 +16,7 @@ import {
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
-import { RegistroCard, IntegracaoCard, ExamesCard } from './RHAdmissaoEtapas'
+import { RegistroCard, IntegracaoCard, ExamesCard, LiberadoCard } from './RHAdmissaoEtapas'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const EDIT_INPUT = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -278,6 +278,8 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             <RegistroCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
           ) : etapa === 'integracao' ? (
             <IntegracaoCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'liberado' ? (
+            <LiberadoCard adm={adm} isDark={false} onClick={() => {}} />
           ) : (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1">
