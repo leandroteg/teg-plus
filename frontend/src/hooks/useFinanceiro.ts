@@ -781,7 +781,7 @@ export function useCompartilharNFEmail() {
   })
 }
 
-// ── Bloqueio do recebimento (preenchido manual no modal) ─────────────────────
+// ── Bloqueio do recebimento (preenchido manual no modal) + histórico ─────────
 export function useAtualizarBloqueioCR() {
   const qc = useQueryClient()
   return useMutation({
@@ -791,8 +791,31 @@ export function useAtualizarBloqueioCR() {
         .update({ bloqueio_tipo: bloqueio, updated_at: new Date().toISOString() })
         .eq('id', crId)
       if (error) throw error
+      // linha do tempo: registra a alteração (pra medir tempo de solução)
+      const { data: { user } } = await supabase.auth.getUser()
+      const nome = (user?.user_metadata as { nome?: string })?.nome || user?.email || 'Financeiro'
+      await supabase.from('fin_cr_bloqueio_hist').insert({ cr_id: crId, bloqueio_tipo: bloqueio, alterado_por_nome: nome })
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contas-receber'] }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['cr-bloqueio-hist', v.crId] })
+    },
+  })
+}
+
+export interface BloqueioHistRow { id: string; bloqueio_tipo: string; alterado_por_nome: string | null; created_at: string }
+export function useBloqueioHist(crId?: string) {
+  return useQuery<BloqueioHistRow[]>({
+    queryKey: ['cr-bloqueio-hist', crId],
+    enabled: !!crId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_cr_bloqueio_hist')
+        .select('id, bloqueio_tipo, alterado_por_nome, created_at')
+        .eq('cr_id', crId!).order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as BloqueioHistRow[]
+    },
   })
 }
 
