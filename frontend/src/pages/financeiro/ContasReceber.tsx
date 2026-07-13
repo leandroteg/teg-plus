@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, X, ShieldCheck,
@@ -17,8 +18,8 @@ import {
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
-import { MedicaoDocLink } from '../../components/MedicaoDocLink'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
+import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
 import type { ContaReceber, StatusCR } from '../../types/financeiro'
 import { CR_PIPELINE_STAGES } from '../../types/financeiro'
@@ -350,12 +351,125 @@ function RegistrarRecebimentoModal({ cr, onClose, isDark }: { cr: ContaReceber; 
   )
 }
 
+// ── MedicaoDetailModal (medição do EGP a partir da CR) ───────────────────────
+
+function MedicaoDetailModal({ numeroOs, medicaoId, isDark, onClose }: {
+  numeroOs: string; medicaoId?: string | null; isDark: boolean; onClose: () => void
+}) {
+  const { data: espelhos = [], isLoading: loadEsp } = useEspelhosDaOSC(numeroOs)
+  const { data: osc } = useQuery({
+    queryKey: ['osc-info-cr', numeroOs],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_fluxo_os')
+        .select('numero_os, valor, saldo_reais, vencimento, tipo, data_osc').eq('numero_os', numeroOs).maybeSingle()
+      return data
+    },
+  })
+  const { data: mensal = [] } = useQuery({
+    queryKey: ['medicao-mensal-cr', numeroOs],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_medicao_mensal')
+        .select('competencia, realizado, acumulado, n_medicoes, subcontratada')
+        .eq('numero_os', numeroOs).order('competencia', { ascending: false })
+      return data ?? []
+    },
+  })
+  const [abrindo, setAbrindo] = useState<string | null>(null)
+  const abrirPdf = async (path: string) => {
+    setAbrindo(path)
+    try { const url = await getEspelhoUrl(path); if (url) window.open(url, '_blank') } finally { setAbrindo(null) }
+  }
+  const compLabel = (c: string | null) => { if (!c) return '—'; const [y, m] = c.slice(0, 7).split('-'); return `${m}/${y}` }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Layers size={18} className="text-indigo-500 shrink-0" />
+            <div className="min-w-0">
+              <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>Medição · {numeroOs}</h3>
+              <p className="text-[11px] text-slate-400">Origem no EGP (Gestão de Projetos)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Resumo da OSC */}
+          <div className={`rounded-xl p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <div><span className="text-slate-400">OSC:</span> <span className="font-mono font-semibold">{numeroOs}</span></div>
+            <div><span className="text-slate-400">Tipo:</span> <span className="font-semibold capitalize">{osc?.tipo ?? '—'}</span></div>
+            <div><span className="text-slate-400">Valor contratado:</span> <span className="font-semibold">{osc?.valor != null ? fmtFull(osc.valor) : '—'}</span></div>
+            <div><span className="text-slate-400">Saldo:</span> <span className="font-semibold">{osc?.saldo_reais != null ? fmtFull(osc.saldo_reais) : '—'}</span></div>
+            {osc?.vencimento && <div><span className="text-slate-400">Vencimento OSC:</span> <span>{fmtData(osc.vencimento)}</span></div>}
+          </div>
+
+          {/* Medição mensal (realizado/acumulado) */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Medições por competência</p>
+            {mensal.length === 0 ? (
+              <p className="text-xs text-slate-400">Sem medição mensal registrada no EGP.</p>
+            ) : (
+              <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <div className={`grid grid-cols-[1fr_1fr_1fr] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+                  <span>Competência</span><span className="text-right">Realizado</span><span className="text-right">Acumulado</span>
+                </div>
+                {mensal.slice(0, 12).map((m, i) => (
+                  <div key={i} className={`grid grid-cols-[1fr_1fr_1fr] px-3 py-1.5 text-[11px] border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+                    <span className="font-semibold">{compLabel(m.competencia)}{m.subcontratada ? ' · sub' : ''}</span>
+                    <span className="text-right tabular-nums text-emerald-600">{m.realizado != null ? fmt(m.realizado) : '—'}</span>
+                    <span className="text-right tabular-nums text-slate-500">{m.acumulado != null ? fmt(m.acumulado) : '—'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Espelhos PDF */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><FileText size={9} /> Espelhos de medição (PDF)</p>
+            {loadEsp ? (
+              <div className="flex items-center justify-center py-4"><div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+            ) : espelhos.length === 0 ? (
+              <p className="text-xs text-slate-400">Nenhum PDF de medição anexado no EGP para esta OSC.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {espelhos.map(e => {
+                  const destaque = e.id === medicaoId
+                  return (
+                    <button key={e.id} onClick={() => abrirPdf(e.storage_path)}
+                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
+                        destaque ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-400/30'
+                        : isDark ? 'border-white/[0.06] bg-white/[0.02] hover:border-indigo-400/40' : 'border-slate-200 bg-white hover:border-indigo-300'
+                      }`}>
+                      <FileText size={14} className="text-indigo-500 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{e.arquivo_nome ?? 'Medição.pdf'}</p>
+                        <p className="text-[10px] text-slate-500">{compLabel(e.competencia)}{destaque ? ' · faturada nesta NF' : ''}</p>
+                      </div>
+                      {abrindo === e.storage_path
+                        ? <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                        : <ExternalLink size={12} className="text-slate-400 shrink-0" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CRDetailModal ──────────────────────────────────────────────────────────
 
-function CRDetailModal({ cr, onClose, onAction, isDark }: {
+function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
   cr: ContaReceber
   onClose: () => void
   onAction: (action: string, cr: ContaReceber) => void
+  onOpenMedicao: (numeroOs: string, medicaoId?: string | null) => void
   isDark: boolean
 }) {
   const urgency = getUrgency(cr)
@@ -417,8 +531,19 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
             {cr.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cr.descricao}</p>}
           </div>
 
-          {/* Documento da medição (contas geradas por con_faturar_medicao via medicao_id) */}
-          {cr.medicao_id && <MedicaoDocLink medicaoId={cr.medicao_id} />}
+          {/* Vínculo com a medição do EGP (clicável) */}
+          {cr.osc?.numero_os && (
+            <button onClick={() => onOpenMedicao(cr.osc!.numero_os, cr.pmo_medicao_id)}
+              className={`w-full flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                isDark ? 'border-indigo-500/30 bg-indigo-500/[0.06] hover:bg-indigo-500/[0.12]' : 'border-indigo-200 bg-indigo-50/60 hover:bg-indigo-50'}`}>
+              <Layers size={16} className="text-indigo-500 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Medição / OSC (EGP)</p>
+                <p className={`text-sm font-bold font-mono ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{cr.osc.numero_os}</p>
+              </div>
+              <span className="text-[10px] font-semibold text-indigo-500 flex items-center gap-1 shrink-0">ver detalhes <ArrowRight size={11} /></span>
+            </button>
+          )}
 
           {cr.chave_nfe && (
             <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
@@ -767,6 +892,7 @@ export default function ContasReceber() {
   const [activeTab, setActiveTab] = useState<StatusCR>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCR, setDetailCR] = useState<ContaReceber | null>(null)
+  const [medicaoView, setMedicaoView] = useState<{ numeroOs: string; medicaoId?: string | null } | null>(null)
   const [faturarModal, setFaturarModal] = useState<ContaReceber | null>(null)
   const [recebimentoModal, setRecebimentoModal] = useState<ContaReceber | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -1283,7 +1409,18 @@ export default function ContasReceber() {
           cr={detailCR}
           onClose={() => setDetailCR(null)}
           onAction={handleDetailAction}
+          onOpenMedicao={(numeroOs, medicaoId) => setMedicaoView({ numeroOs, medicaoId })}
           isDark={isDark}
+        />
+      )}
+
+      {/* Detalhe da medição (EGP) */}
+      {medicaoView && (
+        <MedicaoDetailModal
+          numeroOs={medicaoView.numeroOs}
+          medicaoId={medicaoView.medicaoId}
+          isDark={isDark}
+          onClose={() => setMedicaoView(null)}
         />
       )}
 
