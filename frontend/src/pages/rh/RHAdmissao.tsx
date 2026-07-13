@@ -154,7 +154,11 @@ export default function RHAdmissao() {
 
   const ativa = ETAPAS.find(e => e.key === etapa) ?? ETAPAS[0]
   const counts = ETAPAS.reduce((acc, e) => {
-    acc[e.key] = admissoes.filter(a => (a.etapa ?? 'requisicao') === e.key).length
+    const naEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === e.key)
+    // Liberação: o badge conta só quem ainda está "Aguardando liberação" no GESET
+    acc[e.key] = e.key === 'liberado'
+      ? naEtapa.filter(a => admStatus(a).key === 'aguardando').length
+      : naEtapa.length
     return acc
   }, {} as Record<EtapaAdmissao, number>)
   const itensEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === etapa)
