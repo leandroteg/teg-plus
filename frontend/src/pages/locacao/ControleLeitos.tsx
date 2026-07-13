@@ -106,9 +106,11 @@ async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
 
 // FOLHA DO ALOJAMENTO — 1 página com o QR do alojamento (o colaborador escaneia e
 // informa o número do leito). Pra colar na entrada.
-async function imprimirFolhaAlojamento(alojamento: LocImovel, st: { total: number; ocupados: number; livres: number }) {
+async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
   const logo = LOGO()
   const codigo = alojamento.titulo || alojamento.nome || alojamento.descricao || 'Alojamento'
+  const nums = leitos.map(l => l.numero_seq).sort((a, b) => a - b)
+  const faixa = nums.length ? (nums.length === 1 ? `leito #${nums[0]}` : `${nums.length} leitos · #${nums[0]} a #${nums[nums.length - 1]}`) : ''
   const dataUrl = await QRCode.toDataURL(alojamentoUrl(alojamento.id), { width: 720, margin: 1 })
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Alojamento — ${esc(codigo)}</title>
     <style>${PRINT_CSS}
@@ -132,7 +134,7 @@ async function imprimirFolhaAlojamento(alojamento: LocImovel, st: { total: numbe
       <div class="end">${esc(fmtEndereco(alojamento))}${alojamento.cidade ? ' · ' + esc(alojamento.cidade) : ''}${alojamento.uf ? '/' + esc(alojamento.uf) : ''}</div>
       <img class="qr" src="${dataUrl}" alt="QR"/>
       <div class="call">Escaneie e informe o número do seu leito<br/>para fazer check-in / check-out no Portal TEG</div>
-      <div class="stats"><b>${st.total}</b> leitos · <b>${st.ocupados}</b> ocupados · <b>${st.livres}</b> livres</div>
+      ${faixa ? `<div class="stats">${faixa}</div>` : ''}
       <footer>Cada leito também tem o seu próprio QR</footer>
     </section>
     </body></html>`
@@ -537,7 +539,7 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
               <div className="min-w-0">
                 <p className={`text-xs ${txtMuted}`}>QR do alojamento — cole na entrada. Ao escanear, o colaborador informa o número do leito no Portal. Cada leito também tem o seu QR.</p>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <button onClick={() => imprimirFolhaAlojamento(alojamento, st)}
+                  <button onClick={() => imprimirFolhaAlojamento(alojamento, leitosOrd)}
                     className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
                     <Printer size={13} /> Folha do alojamento
                   </button>
