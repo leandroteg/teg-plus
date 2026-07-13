@@ -13,7 +13,7 @@ import {
   useContasReceber, useAutorizarCR, useFaturarCR,
   useAvancarStatusCR, useRegistrarRecebimentoCR,
   useCompartilharNFEmail, useConciliarCRBatch,
-  useExtratoCandidatos, useAplicarConciliacaoAuto, useAtualizarBloqueioCR,
+  useExtratoCandidatos, useAplicarConciliacaoAuto, useAtualizarBloqueioCR, useBloqueioHist,
 } from '../../hooks/useFinanceiro'
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
@@ -67,6 +67,10 @@ function vencInfo(cr: ContaReceber): { cls: string; bold: boolean } {
   if (d <= 3) return { cls: 'text-red-500', bold: true }
   return { cls: '', bold: false }
 }
+// bloqueio ATIVO (não conta sem_bloqueio nem resolvido)
+const isBloqueado = (b?: BloqueioCR) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
+const diasEntre = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000))
+const fmtDur = (dias: number) => dias === 0 ? 'hoje' : dias === 1 ? '1 dia' : `${dias} dias`
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -499,6 +503,7 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
   const stage = CR_PIPELINE_STAGES.find(s => s.status === cr.status)
   const [selExtratoMovId, setSelExtratoMovId] = useState<string | null>(null)
   const atualizarBloqueio = useAtualizarBloqueioCR()
+  const { data: bloqHist = [] } = useBloqueioHist(cr.id)
   const aplicarConcil = useAplicarConciliacaoAuto()
   const { data: extratoCandidatos = [], isLoading: loadingExtrato } = useExtratoCandidatos({
     tipo: 'cr',
@@ -569,16 +574,28 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
             </button>
           )}
 
-          {/* Bloqueio do recebimento (preenchido manual) */}
+          {/* Bloqueio do recebimento (preenchido manual) + linha do tempo */}
           {(() => {
             const atual = cr.bloqueio_tipo ?? 'sem_bloqueio'
             const b = BLOQUEIOS[atual]
-            const bloqueado = atual !== 'sem_bloqueio' && atual !== 'resolvido'
+            const bloqueado = isBloqueado(atual)
+            // tempo de solução: do 1º bloqueio até resolvido (ou até agora, se ainda bloqueado)
+            const primeiroBloqueio = bloqHist.find(h => isBloqueado(h.bloqueio_tipo as BloqueioCR))
+            const resolvidoEm = [...bloqHist].reverse().find(h => h.bloqueio_tipo === 'resolvido')
+            const agora = new Date().toISOString()
+            let metrica: { txt: string; cls: string } | null = null
+            if (primeiroBloqueio) {
+              if (bloqueado) metrica = { txt: `Bloqueado há ${fmtDur(diasEntre(primeiroBloqueio.created_at, agora))}`, cls: 'text-rose-600' }
+              else if (atual === 'resolvido' && resolvidoEm) metrica = { txt: `Resolvido em ${fmtDur(diasEntre(primeiroBloqueio.created_at, resolvidoEm.created_at))}`, cls: 'text-emerald-600' }
+            }
             return (
-              <div className={`rounded-xl border p-3 ${bloqueado ? 'border-rose-300 bg-rose-50/60' : (isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-200 bg-slate-50')}`}>
-                <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1 ${bloqueado ? 'text-rose-500' : 'text-slate-400'}`}>
-                  {b.Icon ? <b.Icon size={9} /> : <Lock size={9} />} Bloqueio do recebimento
-                </p>
+              <div className={`rounded-xl border p-3 ${bloqueado ? (isDark ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-rose-300 bg-rose-50/60') : (isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-200 bg-slate-50')}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${bloqueado ? 'text-rose-500' : 'text-slate-400'}`}>
+                    {b.Icon ? <b.Icon size={9} /> : <Lock size={9} />} Bloqueio do recebimento
+                  </p>
+                  {metrica && <span className={`text-[10px] font-bold ${metrica.cls}`}>{metrica.txt}</span>}
+                </div>
                 <select
                   value={atual}
                   onChange={e => atualizarBloqueio.mutate({ crId: cr.id, bloqueio: e.target.value })}
@@ -586,6 +603,25 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
                 >
                   {BLOQUEIO_ORDER.map(k => <option key={k} value={k}>{BLOQUEIOS[k].label}</option>)}
                 </select>
+
+                {/* Linha do tempo das alterações */}
+                {bloqHist.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><Clock size={9} /> Linha do tempo</p>
+                    {[...bloqHist].reverse().map((h, i) => {
+                      const bh = BLOQUEIOS[h.bloqueio_tipo as BloqueioCR] ?? BLOQUEIOS.sem_bloqueio
+                      return (
+                        <div key={h.id} className="flex items-center gap-2 text-[11px]">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? (bloqueado ? 'bg-rose-500' : 'bg-emerald-500') : 'bg-slate-300'}`} />
+                          {bh.Icon && <bh.Icon size={11} className={`${bh.cls} shrink-0`} />}
+                          <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{bh.label}</span>
+                          <span className="text-slate-400 flex-1 truncate">· {h.alterado_por_nome ?? '—'}</span>
+                          <span className="text-slate-400 shrink-0">{new Date(h.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })()}
@@ -776,14 +812,18 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
   const overdue = getUrgency(cr) === 'overdue'
   const v = vencInfo(cr)
   const bloq = BLOQUEIOS[cr.bloqueio_tipo ?? 'sem_bloqueio']
+  const blocked = isBloqueado(cr.bloqueio_tipo)
 
   return (
     <div
       onClick={onClick}
       className={`grid items-center gap-x-3 px-3 py-2 border-b cursor-pointer transition-all ${
-        isDark
-          ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
-          : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
+        blocked
+          ? (isDark ? `bg-rose-500/[0.08] border-rose-500/20 hover:bg-rose-500/[0.14] ${isSelected ? 'bg-rose-500/20' : ''}`
+                    : `bg-rose-50 border-rose-100 hover:bg-rose-100/70 ${isSelected ? 'bg-rose-100' : ''}`)
+          : (isDark
+              ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
+              : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`)
       }`}
       style={{ gridTemplateColumns: CR_COLS }}
     >
@@ -845,19 +885,25 @@ function CRCard({ cr, onClick, isDark, isSelected, onSelect }: {
   isSelected: boolean
   onSelect: (id: string) => void
 }) {
-  const urgency = getUrgency(cr)
+  const overdue = getUrgency(cr) === 'overdue'
+  const v = vencInfo(cr)
+  const bloq = BLOQUEIOS[cr.bloqueio_tipo ?? 'sem_bloqueio']
+  const blocked = isBloqueado(cr.bloqueio_tipo)
 
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
-        isDark
-          ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
-          : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
+      className={`rounded-2xl border p-4 cursor-pointer transition-all ${
+        blocked
+          ? (isDark ? `bg-rose-500/[0.08] border-rose-500/30 hover:border-rose-500/50 ${isSelected ? 'ring-2 ring-rose-500/30' : ''}`
+                    : `bg-rose-50 border-rose-200 hover:border-rose-300 ${isSelected ? 'ring-2 ring-rose-300' : ''}`)
+          : (isDark
+              ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
+              : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`)
       }`}
     >
-      {/* Linha 1: checkbox + cliente + urgency + valor */}
-      <div className="flex items-center gap-3">
+      {/* Linha 1: checkbox + NF + emissão + bloqueio + valor */}
+      <div className="flex items-center gap-2.5">
         <input
           type="checkbox"
           checked={isSelected}
@@ -865,52 +911,29 @@ function CRCard({ cr, onClick, isDark, isSelected, onSelect }: {
           onClick={e => e.stopPropagation()}
           className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
         />
-        <div className={`w-1 h-6 rounded-full shrink-0 ${
-          urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
-        }`} />
-        <p className={`text-sm font-bold truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          {cr.cliente_nome}
-        </p>
-        {urgency === 'overdue' && (
-          <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
+        <span className={`text-xs font-mono font-bold shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{cr.numero_nf ? `NF ${cr.numero_nf}` : '—'}</span>
+        <span className={`text-[10px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cr.data_emissao ? fmtData(cr.data_emissao) : ''}</span>
+        <span className="flex-1" />
+        {bloq.Icon && (
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${blocked ? 'bg-rose-100 text-rose-700' : cr.bloqueio_tipo === 'resolvido' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`} title={bloq.label}>
+            <bloq.Icon size={10} /> {bloq.label.replace('Bloqueio ', '')}
+          </span>
         )}
-        <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
-          {fmt(cr.valor_original)}
-        </p>
+        <p className={`text-sm font-extrabold shrink-0 ${overdue ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(cr.valor_original)}</p>
       </div>
 
-      {/* Linha 2: descricao */}
-      {cr.descricao && (
-        <p className={`text-xs truncate mt-1.5 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cr.descricao}</p>
-      )}
-
-      {/* Linha 3: tags + data */}
-      <div className="flex items-center justify-between mt-2 ml-10">
-        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-          {cr.numero_nf && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-semibold shrink-0 ${isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-700'}`}>
-              <FileText size={9} /> NF {cr.numero_nf}
-            </span>
-          )}
-          {cr.centro_custo && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-              <Briefcase size={9} /> {cr.centro_custo}
-            </span>
-          )}
-          {cr.classe_financeira && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-              <Tag size={9} /> {cr.classe_financeira}
-            </span>
-          )}
-          {cr.natureza && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-              {cr.natureza}
-            </span>
-          )}
+      {/* Linha 2: OSC (destaque) · obra · CC */}
+      <div className="mt-2 ml-6">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-bold font-mono text-indigo-600 shrink-0">{cr.osc?.numero_os ?? '—'}</span>
+          <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{[cr.obra?.nome, cr.centro_custo].filter(Boolean).join(' · ')}</span>
         </div>
-        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
-          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
-        }`}>
+      </div>
+
+      {/* Linha 3: cliente + vencimento */}
+      <div className="flex items-center justify-between mt-1.5 ml-6">
+        <span className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cr.cliente_nome}</span>
+        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 whitespace-nowrap ${v.cls || (isDark ? 'text-slate-400' : 'text-slate-500')} ${v.bold ? 'font-bold' : 'font-semibold'}`}>
           <Calendar size={10} /> {fmtData(cr.data_vencimento)}
         </span>
       </div>
