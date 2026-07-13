@@ -914,17 +914,20 @@ export function useMobApoio() {
     queryKey: ['rh-mob-apoio'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const [aloj, bases, rec] = await Promise.all([
+      const [aloj, bases, rec, todos] = await Promise.all([
         supabase.from('loc_imoveis').select('id, titulo, nome, cidade').eq('tipo', 'ALOJ').eq('status', 'ativo').order('cidade'),
         supabase.from('est_bases').select('id, nome, cidade, endereco').eq('ativa', true).order('nome'),
         supabase.from('rh_colaboradores').select('id, nome, cargo, base_id').eq('ativo', true)
           .or('cargo.ilike.%engenheir%,cargo.ilike.%supervisor%,cargo.ilike.%administrat%,cargo.ilike.%gerente%,departamento.ilike.rh,departamento.ilike.adm%,departamento.ilike.dp')
           .order('nome'),
+        // headcount completo (ativos) — para busca livre de "quem vai receber"
+        supabase.from('rh_colaboradores').select('id, nome, cargo, base_id').eq('ativo', true).order('nome'),
       ])
       return {
         alojamentos: (aloj.data ?? []) as { id: string; titulo: string | null; nome: string | null; cidade: string | null }[],
         bases: (bases.data ?? []) as { id: string; nome: string; cidade: string | null; endereco: string | null }[],
         receptores: (rec.data ?? []) as { id: string; nome: string; cargo: string | null; base_id: string | null }[],
+        todos: (todos.data ?? []) as { id: string; nome: string; cargo: string | null; base_id: string | null }[],
       }
     },
   })
