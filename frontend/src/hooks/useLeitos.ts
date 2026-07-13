@@ -24,6 +24,7 @@ export interface LeitoOcupacao {
 export interface Leito {
   id: string
   numero_seq: number
+  codigo_leito: string
   imovel_id: string
   codigo: string
   quarto: string | null
@@ -32,11 +33,13 @@ export interface Leito {
   observacao: string | null
   ordem: number
   qr_token: string
+  imovel?: { id: string; titulo: string | null; nome: string | null; descricao: string | null; cidade: string | null; uf: string | null; tipo: string | null } | null
 }
 
 export interface OcupacaoHistorico extends LeitoOcupacao {
   leito: {
     numero_seq: number
+    codigo_leito: string
     codigo: string
     quarto: string | null
     imovel_id: string
@@ -69,7 +72,7 @@ export function useLeitos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loc_leitos')
-        .select('*')
+        .select('*, imovel:loc_imoveis(id, titulo, nome, descricao, cidade, uf, tipo)')
         .order('ordem', { ascending: true })
       if (error) throw error
       return (data ?? []) as Leito[]
@@ -149,7 +152,7 @@ export function useLeitosHistorico(filtros?: { imovel_id?: string; colaborador_i
     queryFn: async () => {
       let q = supabase
         .from('loc_leito_ocupacoes')
-        .select('*, leito:loc_leitos(numero_seq, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome))')
+        .select('*, leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome))')
         .order('data_inicio', { ascending: false })
         .limit(500)
       if (filtros?.colaborador_id) q = q.eq('colaborador_id', filtros.colaborador_id)

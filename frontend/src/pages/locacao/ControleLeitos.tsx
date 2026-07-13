@@ -10,7 +10,7 @@ import QRCode from 'qrcode'
 import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
   LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
-  LayoutList, LayoutGrid, Map as MapIcon,
+  LayoutList, LayoutGrid, Map as MapIcon, Users,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
@@ -42,10 +42,28 @@ const nomeAloj = (im?: { nome?: string | null; descricao?: string | null; titulo
 // Código do alojamento (ALOJ-…) vive em titulo; fallback codigo
 const codigoAloj = (a: { titulo?: string | null; codigo?: string | null }) => a.titulo || a.codigo || '—'
 
-// URL que o QR codifica → o Portal TEG lê o número do leito e chama a RPC de check-in
+// URL que o QR codifica → o Portal TEG lê o código do leito e chama a RPC de check-in
 const PORTAL_BASE = 'https://portal.teguniao.com.br'
-const leitoUrl = (numeroSeq: number) => `${PORTAL_BASE}/leito/${numeroSeq}`
+const leitoUrl = (codigo: string) => `${PORTAL_BASE}/leito/${codigo}`
 const alojamentoUrl = (imovelId: string) => `${PORTAL_BASE}/alojamento/${imovelId}`
+
+// Código público do leito: alojamentos = número (#5); hotéis = H5 (contagem separada)
+const leitoLbl = (codigo?: string | null) => {
+  const c = (codigo ?? '').trim()
+  return /^h/i.test(c) ? c.toUpperCase() : `#${c}`
+}
+// Faixa de leitos de um alojamento (para a folha do alojamento) — respeita o prefixo H
+function faixaLeitos(leitos: Leito[]): string {
+  const codes = leitos.map(l => (l.codigo_leito ?? '').trim()).filter(Boolean)
+  if (!codes.length) return ''
+  const isH = codes.some(c => /^h/i.test(c))
+  const pfx = isH ? 'H' : '#'
+  const nums = codes.map(c => parseInt(c.replace(/\D/g, ''), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
+  if (!nums.length) return ''
+  return nums.length === 1
+    ? `leito ${pfx}${nums[0]}`
+    : `${nums.length} leitos · ${pfx}${nums[0]} a ${pfx}${nums[nums.length - 1]}`
+}
 
 // Imagem de QR gerada no cliente (lib qrcode, sem chamada externa)
 function QrImg({ text, size = 160 }: { text: string; size?: number }) {
@@ -76,10 +94,10 @@ const PRINT_CSS = `
 async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
   const logo = LOGO()
   const cards = await Promise.all(leitos.map(async l => {
-    const dataUrl = await QRCode.toDataURL(leitoUrl(l.numero_seq), { width: 480, margin: 1 })
+    const dataUrl = await QRCode.toDataURL(leitoUrl(l.codigo_leito), { width: 480, margin: 1 })
     return `<section class="card">
       <header><img src="${logo}" alt="TEG"/><div class="aloj">${esc(tituloAloj)}</div></header>
-      <div class="leito"><span class="lbl">LEITO</span><span class="num">#${l.numero_seq}</span></div>
+      <div class="leito"><span class="lbl">LEITO</span><span class="num">${esc(leitoLbl(l.codigo_leito))}</span></div>
       <img class="qr" src="${dataUrl}" alt="QR"/>
       <footer>Escaneie no <b>Portal TEG</b> · Alocação · e faça o check-in / check-out do seu leito</footer>
     </section>`
@@ -109,8 +127,7 @@ async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
 async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
   const logo = LOGO()
   const codigo = alojamento.titulo || alojamento.nome || alojamento.descricao || 'Alojamento'
-  const nums = leitos.map(l => l.numero_seq).sort((a, b) => a - b)
-  const faixa = nums.length ? (nums.length === 1 ? `leito #${nums[0]}` : `${nums.length} leitos · #${nums[0]} a #${nums[nums.length - 1]}`) : ''
+  const faixa = faixaLeitos(leitos)
   const dataUrl = await QRCode.toDataURL(alojamentoUrl(alojamento.id), { width: 720, margin: 1 })
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Alojamento — ${esc(codigo)}</title>
     <style>${PRINT_CSS}
@@ -155,7 +172,7 @@ function statsDe(leitos: Leito[], ocupadosSet: Set<string>): Stats {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function ControleLeitos() {
   const { isDark } = useTheme()
-  const [sub, setSub] = useState<'alojamento' | 'historico' | 'mapa'>('alojamento')
+  const [sub, setSub] = useState<'alojamento' | 'pessoas' | 'historico' | 'mapa'>('alojamento')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [search, setSearch] = useState('')
   const [aberto, setAberto] = useState<LocImovel | null>(null)
@@ -196,6 +213,8 @@ export default function ControleLeitos() {
     }
     return m
   }, [leitos])
+
+  const leitosById = useMemo(() => new Map(leitos.map(l => [l.id, l])), [leitos])
 
   const totalGeral = useMemo(() => statsDe(leitos, ocupadosSet), [leitos, ocupadosSet])
 
@@ -239,7 +258,7 @@ export default function ControleLeitos() {
               <option value="">Centro de custo</option>{mapaCC.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
             </select>
           </div>
-        ) : (
+        ) : sub === 'alojamento' ? (
           <>
             <p className={`text-xs ${txtMuted}`}>
               {alojamentos.length} alojamentos · <span className="font-semibold">{totalGeral.total}</span> leitos ·{' '}
@@ -254,7 +273,7 @@ export default function ControleLeitos() {
                 className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
             </div>
           </>
-        )}
+        ) : <div className="flex-1" />}
         {/* Toggle lista/card — só na sub-visão Alojamento (padrão da aba Ativos) */}
         {sub === 'alojamento' && (
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
@@ -271,6 +290,12 @@ export default function ControleLeitos() {
               ? isDark ? 'bg-white/10 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
               : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
             <BedDouble size={16} />
+          </button>
+          <button onClick={() => setSub('pessoas')} title="Pessoas — quem está em qual leito"
+            className={`p-1.5 rounded-lg transition-colors ${sub === 'pessoas'
+              ? isDark ? 'bg-white/10 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
+              : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Users size={16} />
           </button>
           <button onClick={() => setSub('historico')} title="Histórico"
             className={`p-1.5 rounded-lg transition-colors ${sub === 'historico'
@@ -295,6 +320,9 @@ export default function ControleLeitos() {
         <AlojamentosView
           alojamentos={alojFiltrados} leitosPorImovel={leitosPorImovel}
           ocupadosSet={ocupadosSet} viewMode={viewMode} isDark={isDark} onAbrir={setAberto} />
+      ) : sub === 'pessoas' ? (
+        <PessoasView ocupacoes={ocupacoes} leitosById={leitosById} isDark={isDark}
+          onAbrir={id => { const a = alojamentos.find(x => x.id === id); if (a) setAberto(a) }} />
       ) : sub === 'mapa' ? (
         <MapaImoveis leitosPorImovel={leitosPorImovel} ocupadosSet={ocupadosSet} onAbrir={setAberto} isDark={isDark} filtros={mf} />
       ) : (
@@ -577,8 +605,8 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                     <div key={l.id} className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          {/* Leito = número sequencial global (em destaque) */}
-                          <span className={`shrink-0 text-base font-mono font-extrabold px-2.5 py-1 rounded-lg ${isDark ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-50 text-cyan-700'}`}>#{l.numero_seq}</span>
+                          {/* Leito = código público (alojamento #N · hotel HN), em destaque */}
+                          <span className={`shrink-0 text-base font-mono font-extrabold px-2.5 py-1 rounded-lg ${isDark ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-50 text-cyan-700'}`}>{leitoLbl(l.codigo_leito)}</span>
                           <div className="min-w-0">
                             {oc ? (
                               <>
@@ -611,7 +639,7 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                                 className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
                                 <UserPlus size={13} /> Alocar
                               </button>
-                              <button onClick={() => { if (confirm(`Remover o leito ${l.codigo}?`)) excluir.mutate(l.id) }} title="Remover leito"
+                              <button onClick={() => { if (confirm(`Remover o leito ${leitoLbl(l.codigo_leito)}?`)) excluir.mutate(l.id) }} title="Remover leito"
                                 className={`p-1.5 rounded-lg ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-white/[0.06]' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}>
                                 <Trash2 size={13} />
                               </button>
@@ -655,10 +683,10 @@ function QrLeitoModal({ leito, ocup, alojamento, isDark, onClose }: {
         </div>
         <div className="p-5 flex flex-col items-center gap-3">
           <div className="bg-white p-3 rounded-xl">
-            <QrImg text={leitoUrl(leito.numero_seq)} size={180} />
+            <QrImg text={leitoUrl(leito.codigo_leito)} size={180} />
           </div>
           <div className="text-center">
-            <p className={`text-2xl font-mono font-extrabold text-cyan-500 leading-none`}>#{leito.numero_seq}</p>
+            <p className={`text-2xl font-mono font-extrabold text-cyan-500 leading-none`}>{leitoLbl(leito.codigo_leito)}</p>
             <p className={`text-[10px] uppercase tracking-widest ${txtMuted} mt-0.5`}>Leito</p>
             {ocup ? (
               <p className={`text-sm font-semibold mt-1 ${txt}`}>{ocup.colaborador_nome}<br/><span className={`text-xs ${txtMuted}`}>Matrícula {ocup.colaborador?.matricula || '—'}</span></p>
@@ -719,7 +747,7 @@ function AlocarModal({ leito, isDark, onClose }: { leito: Leito; isDark: boolean
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
-          <h3 className={`text-base font-bold ${txt}`}>Alocar em {leito.codigo} <span className={`text-xs font-normal ${txtMuted}`}>#{leito.numero_seq}</span></h3>
+          <h3 className={`text-base font-bold ${txt}`}>Alocar em <span className="font-mono">{leitoLbl(leito.codigo_leito)}</span></h3>
           <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
         </div>
         <div className="p-5 space-y-3">
@@ -793,14 +821,14 @@ function MoverModal({ ocup, leitoAtual, leitosLivres, isDark, onClose }: {
         </div>
         <div className="p-5 space-y-3">
           <p className={`text-xs ${txtMuted}`}>
-            <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>{ocup.colaborador_nome}</span> — sair de <span className="font-semibold">{leitoAtual.codigo}</span>
+            <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>{ocup.colaborador_nome}</span> — sair de <span className="font-semibold font-mono">{leitoLbl(leitoAtual.codigo_leito)}</span>
           </p>
           <div>
             <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Para o leito</label>
             <select value={destino} onChange={e => setDestino(e.target.value)}
               className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`}>
               <option value="">Selecionar leito livre…</option>
-              {leitosLivres.map(l => <option key={l.id} value={l.id}>#{l.numero_seq} · {l.codigo}{l.quarto ? ` · ${l.quarto}` : ''}</option>)}
+              {leitosLivres.map(l => <option key={l.id} value={l.id}>{leitoLbl(l.codigo_leito)}{l.quarto ? ` · ${l.quarto}` : ''}</option>)}
             </select>
             {leitosLivres.length === 0 && <p className="text-xs text-amber-500 mt-1">Não há leitos livres neste alojamento.</p>}
           </div>
@@ -814,6 +842,90 @@ function MoverModal({ ocup, leitoAtual, leitosLivres, isDark, onClose }: {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Sub-visão Pessoas — busca por nome → em qual leito/alojamento está ────────
+function PessoasView({ ocupacoes, leitosById, isDark, onAbrir }: {
+  ocupacoes: LeitoOcupacao[]; leitosById: Map<string, Leito>; isDark: boolean; onAbrir: (imovelId: string) => void
+}) {
+  const [busca, setBusca] = useState('')
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const linhas = useMemo(() => {
+    return ocupacoes.map(o => {
+      const leito = leitosById.get(o.leito_id)
+      const im = leito?.imovel
+      return {
+        id: o.id,
+        nome: o.colaborador_nome,
+        matricula: o.colaborador?.matricula ?? null,
+        leitoLabel: leitoLbl(leito?.codigo_leito),
+        alojamento: nomeAloj(im),
+        cidade: im?.cidade ?? null,
+        uf: im?.uf ?? null,
+        imovelId: im?.id ?? leito?.imovel_id ?? null,
+        desde: o.data_inicio,
+      }
+    }).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [ocupacoes, leitosById])
+
+  const filtrado = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    if (!q) return linhas
+    return linhas.filter(l =>
+      l.nome.toLowerCase().includes(q) ||
+      (l.matricula ?? '').toLowerCase().includes(q) ||
+      l.alojamento.toLowerCase().includes(q) ||
+      l.leitoLabel.toLowerCase().includes(q) ||
+      (l.cidade ?? '').toLowerCase().includes(q))
+  }, [linhas, busca])
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[220px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input autoFocus type="text" placeholder="Buscar pessoa por nome, matrícula, alojamento…" value={busca} onChange={e => setBusca(e.target.value)}
+            className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+        </div>
+        <p className={`text-xs ${txtMuted}`}><span className="font-semibold">{filtrado.length}</span> {filtrado.length === 1 ? 'pessoa alojada' : 'pessoas alojadas'}</p>
+      </div>
+      {filtrado.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Users size={40} className={txtMuted} />
+          <p className={`text-sm ${txtMuted}`}>{busca ? 'Ninguém encontrado' : 'Nenhuma pessoa alojada'}</p>
+        </div>
+      ) : (
+        <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                  {['Colaborador', 'Matrícula', 'Leito', 'Alojamento', 'Cidade', 'Desde'].map(h => (
+                    <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtrado.map(l => (
+                  <tr key={l.id} onClick={() => l.imovelId && onAbrir(l.imovelId)}
+                    className={`border-b cursor-pointer ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-4 py-3 text-sm font-medium ${txt}`}><span className="block truncate max-w-[220px]">{l.nome}</span></td>
+                    <td className={`px-4 py-3 text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{l.matricula || '—'}</td>
+                    <td className={`px-4 py-3 text-sm font-mono font-bold ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{l.leitoLabel}</td>
+                    <td className={`px-4 py-3 text-sm ${txtMuted}`}><span className="block truncate max-w-[200px]">{l.alojamento}</span></td>
+                    <td className={`px-4 py-3 text-sm ${txtMuted}`}>{l.cidade || '—'}{l.uf ? `/${l.uf}` : ''}</td>
+                    <td className={`px-4 py-3 text-sm ${txtMuted}`}>{fmtDate(l.desde)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -832,7 +944,7 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
       h.colaborador_nome.toLowerCase().includes(q) ||
       h.leito?.imovel?.descricao?.toLowerCase().includes(q) ||
       h.leito?.imovel?.nome?.toLowerCase().includes(q) ||
-      h.leito?.codigo?.toLowerCase().includes(q))
+      h.leito?.codigo_leito?.toLowerCase().includes(q))
   }, [hist, busca])
 
   if (isLoading) {
@@ -867,7 +979,7 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
                   <tr key={h.id} className={`border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
                     <td className={`px-4 py-3 text-sm font-medium ${txt}`}><span className="block truncate max-w-[180px]">{h.colaborador_nome}</span></td>
                     <td className={`px-4 py-3 text-sm ${txtMuted}`}><span className="block truncate max-w-[160px]">{nomeAloj(h.leito?.imovel)}</span></td>
-                    <td className={`px-4 py-3 text-sm ${txtMuted}`}>{h.leito ? <>#{h.leito.numero_seq} · {h.leito.codigo}</> : '—'}</td>
+                    <td className={`px-4 py-3 text-sm font-mono ${txtMuted}`}>{h.leito ? leitoLbl(h.leito.codigo_leito) : '—'}</td>
                     <td className={`px-4 py-3 text-sm ${txtMuted}`}>{fmtDate(h.data_inicio)}</td>
                     <td className="px-4 py-3 text-sm">
                       {h.data_fim
