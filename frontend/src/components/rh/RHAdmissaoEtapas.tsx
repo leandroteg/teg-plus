@@ -551,10 +551,9 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
 }) {
   const { perfil } = useAuth()
   const { data, isLoading } = useEtapaCandidato(cand.id)
-  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro, assinarPelaEmpresa } = useRegistro()
+  const { gerarFicha, enviarAssinaturaAnexo, setMatricula, enviarEmail, finalizarRegistro, assinarPelaEmpresa } = useRegistro()
   const { data: colabReg } = useMatriculaColaborador(cand.colaborador_id)
   const matricula = colabReg?.matricula ?? null
-  const lotacao = colabReg?.lotacao ?? null
   const uploadAnexo = useUploadAnexoCandidato()
   const excluirAnexo = useExcluirAnexoAdmissao()
   const contratoRef = useRef<HTMLInputElement>(null)
@@ -749,22 +748,13 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
       </Passo>
 
       {/* 3 · Matrícula e lotação */}
-      <Passo n={3} titulo="Matrícula e lotação" icon={User} isDark={isDark}>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <CampoTexto valor={matricula} onSave={v => {
-              if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
-            }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[260px]`} />
-            {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
-            {matricula && !setMatricula.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
-          </div>
-          <div className="flex items-center gap-2">
-            <CampoTexto valor={lotacao} onSave={v => {
-              if (cand.colaborador_id) setLotacao.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, lotacao: v.trim() })
-            }} placeholder="Lotação no Secullum (ex.: base / obra)" className={`${IN} max-w-[260px]`} />
-            {setLotacao.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
-            {lotacao && !setLotacao.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
-          </div>
+      <Passo n={3} titulo="Matrícula" icon={User} isDark={isDark}>
+        <div className="flex items-center gap-2">
+          <CampoTexto valor={matricula} onSave={v => {
+            if (cand.colaborador_id) setMatricula.mutate({ colaboradorId: cand.colaborador_id, candidatoId: cand.id, matricula: v.trim() })
+          }} placeholder="Nº de matrícula (após registro na contabilidade)" className={`${IN} max-w-[260px]`} />
+          {setMatricula.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
+          {matricula && !setMatricula.isPending && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={13} /> salva</span>}
         </div>
       </Passo>
 
@@ -808,14 +798,14 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
           ) : (
             <button
               onClick={() => { if (cand.colaborador_id) finalizarRegistro.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome }) }}
-              disabled={!todosAssinados || !todaEmpresaAssinada || !matricula || !lotacao || finalizarRegistro.isPending}
+              disabled={!todosAssinados || !todaEmpresaAssinada || !matricula || finalizarRegistro.isPending}
               className="self-end sm:self-auto shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {finalizarRegistro.isPending ? <><Loader2 size={13} className="animate-spin" /> Finalizando…</> : <><CheckCircle2 size={13} /> Finalizar registro</>}
             </button>
           )}
         </div>
-        {(!todosAssinados || !todaEmpresaAssinada || !matricula || !lotacao) && !finalizarRegistro.isSuccess && (
-          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os documentos estiverem assinados (colaborador e empresa) e a matrícula + lotação preenchidas.</p>
+        {(!todosAssinados || !todaEmpresaAssinada || !matricula) && !finalizarRegistro.isSuccess && (
+          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os documentos estiverem assinados (colaborador e empresa) e a matrícula preenchida.</p>
         )}
         {finalizarRegistro.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(finalizarRegistro.error as Error)?.message}</p>}
       </div>
