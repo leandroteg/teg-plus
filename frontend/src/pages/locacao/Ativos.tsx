@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
-  Pencil, Save, Loader2,
+  Pencil, Save, Loader2, Plus,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useVistorias, useAtualizarImovel } from '../../hooks/useLocacao'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import NovoImovelModal from '../../components/locacao/NovoImovelModal'
 import { UpperInput } from '../../components/UpperInput'
 import { fmtEndereco } from '../../types/locacao'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
@@ -356,6 +357,7 @@ export default function Ativos() {
   const [vencFilter, setVencFilter] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [detail, setDetail] = useState<LocImovel | null>(null)
+  const [showNovo, setShowNovo] = useState(false)
   // Padrão inicial: ordenado por NOME decrescente
   const [sortCol, setSortCol] = useState<string>('nome')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -462,8 +464,14 @@ export default function Ativos() {
           <option value="90d">Próximos 90 dias</option>
         </select>
 
+        {/* Novo Imóvel */}
+        <button onClick={() => setShowNovo(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+          <Plus size={14} /> Novo Imóvel
+        </button>
+
         {/* Toggle */}
-        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('table')} className={`p-1.5 ${viewMode === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
           <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
         </div>
@@ -570,6 +578,7 @@ export default function Ativos() {
 
       {/* Modal */}
       {detail && <ImovelDetailModal key={detail.id} imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
+      {showNovo && <NovoImovelModal onClose={() => setShowNovo(false)} />}
     </div>
   )
 }
