@@ -15,15 +15,16 @@ const TIPOS: { key: TipoSolicitacao; label: string; desc: string; icon: typeof W
 
 interface Props {
   onClose: () => void
+  tipoInicial?: TipoSolicitacao
 }
 
-export default function NovaSolicitacaoModal({ onClose }: Props) {
+export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
   const { isDark } = useTheme()
   const { data: imoveis = [] } = useImoveis({ status: 'ativo' })
   const criar = useCriarSolicitacaoLocacao()
 
-  const [step, setStep] = useState<'tipo' | 'form'>('tipo')
-  const [tipo, setTipo] = useState<TipoSolicitacao | null>(null)
+  const [step, setStep] = useState<'tipo' | 'form'>(tipoInicial ? 'form' : 'tipo')
+  const [tipo, setTipo] = useState<TipoSolicitacao | null>(tipoInicial ?? null)
   const [imovelId, setImovelId] = useState('')
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
