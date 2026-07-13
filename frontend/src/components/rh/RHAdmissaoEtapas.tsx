@@ -9,7 +9,7 @@ import { supabase } from '../../services/supabase'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine, Handshake, Upload, FileText, Download,
+  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -138,6 +138,74 @@ function CheckRow({ checked, label, onToggle, disabled }: { checked: boolean; la
 // RH contata o candidato fora do sistema: envia a proposta de contratação
 // (condições de trabalho), registra o aceite e alinha chegada/deslocamento/
 // responsável pelo recebimento. Anexos (ex.: proposta assinada) entram aqui.
+// ── Recursos / Necessidades (definidos pelo RH; guardados em rh_admissao_proposta.recursos) ──
+const RECURSO_COMPUTADOR = [
+  { v: 'nao', label: 'Não é necessário' },
+  { v: 'desktop', label: 'Desktop' },
+  { v: 'notebook', label: 'Notebook' },
+  { v: 'notebook_potente', label: 'Notebook potente' },
+]
+const UNIFORME_TAM = ['P', 'M', 'G', 'GG', 'XG', 'XXG']
+const CALCADO_NUM = Array.from({ length: 15 }, (_, i) => String(33 + i)) // 33..47
+const compLabel = (v?: string) => RECURSO_COMPUTADOR.find(x => x.v === v)?.label
+
+// Editável no Alinhamento/Mobilização/Integração; só-leitura na Liberação.
+function RecursosBloco({ cand, recursos, editable }: {
+  cand: RHAdmissaoCandidato; recursos?: Record<string, string> | null; editable: boolean
+}) {
+  const { atualizar } = useProposta()
+  const r = recursos ?? {}
+  const set = (k: string, v: string) => atualizar.mutate({ candidatoId: cand.id, patch: { recursos: { ...r, [k]: v } } })
+  const sn = (v?: string) => v === 'sim' ? true : v === 'nao' ? false : null
+
+  if (!editable) {
+    if (!(r.computador || r.celular || r.dirigir || r.uniforme || r.calcado)) return null
+    return (
+      <p className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-500">
+        <Laptop size={11} className="text-slate-400 shrink-0" />
+        {compLabel(r.computador) && <span>Computador: <b className="text-slate-700">{compLabel(r.computador)}</b></span>}
+        {r.celular && <span>· Celular: <b className="text-slate-700">{r.celular === 'sim' ? 'Sim' : 'Não'}</b></span>}
+        {r.dirigir && <span>· Dirige: <b className="text-slate-700">{r.dirigir === 'sim' ? 'Sim' : 'Não'}</b></span>}
+        {r.uniforme && <span>· Uniforme: <b className="text-slate-700">{r.uniforme}</b></span>}
+        {r.calcado && <span>· Calçado: <b className="text-slate-700">{r.calcado}</b></span>}
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><Laptop size={11} /> Recursos / Necessidades</span>
+      <div className="grid grid-cols-3 gap-1.5">
+        <div>
+          <label className="text-[9px] font-bold uppercase text-slate-400">Computador</label>
+          <select value={r.computador ?? ''} onChange={e => set('computador', e.target.value)} className={IN}>
+            <option value="">—</option>
+            {RECURSO_COMPUTADOR.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[9px] font-bold uppercase text-slate-400">Uniforme</label>
+          <select value={r.uniforme ?? ''} onChange={e => set('uniforme', e.target.value)} className={IN}>
+            <option value="">—</option>
+            {UNIFORME_TAM.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[9px] font-bold uppercase text-slate-400">Calçado</label>
+          <select value={r.calcado ?? ''} onChange={e => set('calcado', e.target.value)} className={IN}>
+            <option value="">—</option>
+            {CALCADO_NUM.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 flex-wrap">
+        <span className="flex items-center gap-1.5 text-[10px] text-slate-500">Celular <ToggleSN value={sn(r.celular)} onChange={v => set('celular', v ? 'sim' : 'nao')} /></span>
+        <span className="flex items-center gap-1.5 text-[10px] text-slate-500">Vai dirigir <ToggleSN value={sn(r.dirigir)} onChange={v => set('dirigir', v ? 'sim' : 'nao')} /></span>
+      </div>
+    </div>
+  )
+}
+
 export function PropostaCard({ adm, isDark, onClick }: {
   adm: RHAdmissao; isDark: boolean; onClick: () => void
 }) {
@@ -198,6 +266,9 @@ function PropostaCandidato({ cand, adm, isDark }: { cand: RHAdmissaoCandidato; a
         <CampoTexto valor={prop?.deslocamento_detalhes} onSave={v => upd({ deslocamento_detalhes: v || null })}
           placeholder="Detalhes do deslocamento (como chega, quem busca, horário...)" className={IN} />
       </div>
+
+      {/* Recursos / Necessidades */}
+      <RecursosBloco cand={cand} recursos={prop?.recursos} editable />
 
       {/* Anexos do RH nesta etapa */}
       <div className="space-y-1">
@@ -875,6 +946,9 @@ function MobCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidato; 
           </div>
         </>)}
       </div>
+
+      {/* Recursos / Necessidades (editável aqui caso não tenha sido no Alinhamento) */}
+      <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable />
     </div>
   )
 }
@@ -916,6 +990,9 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
       {/* Treinamentos obrigatórios (dirigido pela Matriz QSMA do cargo) */}
       <TreinamentosBlock cand={cand} cargo={cargoVaga} treinamentos={data?.treinamentos ?? []} />
 
+      {/* Recursos / Necessidades (editável aqui caso não tenha sido no Alinhamento) */}
+      <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable />
+
       {/* Rodapé: missões do Portal (Decl. de Ciência + Treinamentos) */}
       <div className={`flex items-center justify-between gap-2 pt-2 mt-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
@@ -955,14 +1032,22 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
 export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boolean; onClick: () => void }) {
   return (
     <VagaCard adm={adm} isDark={isDark} onClick={onClick}>
-      {(adm.candidatos ?? []).map(c => (
-        <div key={c.id} className={`rounded-xl border px-3 py-2 flex items-center gap-2 ${
-          isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50'}`}>
-          <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-          <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Colaborador apto e liberado para atividades</span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Ativo · Portal liberado</span>
-        </div>
-      ))}
+      {(adm.candidatos ?? []).map(c => <LiberadoCandidato key={c.id} cand={c} isDark={isDark} />)}
     </VagaCard>
+  )
+}
+
+function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark: boolean }) {
+  const { data } = useEtapaCandidato(cand.id)
+  return (
+    <div className={`rounded-xl border px-3 py-2 space-y-1.5 ${
+      isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50'}`}>
+      <div className="flex items-center gap-2">
+        <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+        <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Colaborador apto e liberado para atividades</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Ativo · Portal liberado</span>
+      </div>
+      <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable={false} />
+    </div>
   )
 }
