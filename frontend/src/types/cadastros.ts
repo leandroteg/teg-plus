@@ -91,6 +91,7 @@ export interface Colaborador {
   telefone?: string
   data_admissao?: string
   ativo: boolean
+  cargo_confianca?: boolean
   foto_url?: string
   created_at: string
   updated_at: string
