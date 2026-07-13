@@ -1240,6 +1240,8 @@ function TabProvisionado() {
   const { perfil, hasSetorPapel } = useAuth()
   const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [statusFilter, setStatusFilter] = useState('')
+  const [busca, setBusca] = useState('')
+  const [grupoFilter, setGrupoFilter] = useState('')
   const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
   const [ate, setAte] = useState(ymMais(36))
   const [quick, setQuick] = useState<'7d' | null>(null)   // atalho "próximos 7 dias" (precisão de dia)
@@ -1280,6 +1282,12 @@ function TabProvisionado() {
 
   const filtered = compromissos.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false
+    if (grupoFilter && ((p.contrato as any)?.grupo_contrato ?? '') !== grupoFilter) return false
+    if (busca) {
+      const q = busca.toLowerCase()
+      const hay = `${p.contrato?.objeto ?? ''} ${p.contrato?.numero ?? ''} ${(p.contrato as any)?.contraparte_nome ?? ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
     return true
   })
 
@@ -1347,12 +1355,25 @@ function TabProvisionado() {
         </div>
       </div>
 
-      {/* Filtros numa linha só (padrão da aba Contratos): status vira dropdown; atalhos + período à direita */}
+      {/* Filtros no padrão da aba Contratos, numa linha só (rola na horizontal se faltar espaço) */}
       <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar numero, objeto, contraparte..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
+        </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="shrink-0 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-600">
+          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
           {FILTROS.map(f => (
-            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os status' : f.label}</option>
+            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
+          ))}
+        </select>
+        <select value={grupoFilter} onChange={e => setGrupoFilter(e.target.value)}
+          className="shrink-0 min-w-[150px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+          <option value="">Todos os Grupos</option>
+          {GRUPO_CONTRATO_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         {ATALHOS.map(([label, active, onClick]) => (
@@ -1362,7 +1383,7 @@ function TabProvisionado() {
             {label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
           <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
           <span className="text-xs text-slate-400">→</span>
