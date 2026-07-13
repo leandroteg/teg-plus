@@ -347,11 +347,12 @@ export default function DashboardFinanceiro() {
         </section>
       </div>
 
-      {/* ── Pulso Financeiro ── */}
+      {/* ── Pulsos: Pagamentos (CP) + Recebimentos (CR) — 50/50 ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-stretch">
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <TrendingUp size={14} className="text-emerald-500" /> Pulso Financeiro
+            <TrendingUp size={14} className="text-emerald-500" /> Pulso Pagamentos
           </h2>
           <div className="flex items-center gap-3">
             {ordered.slice(0, 4).map((s: any) => (
@@ -438,6 +439,7 @@ export default function DashboardFinanceiro() {
           </section>
         )
       })()}
+      </div>
 
       {/* ── Row: Proximos Vencimentos + Por Centro de Custo ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
