@@ -1,9 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useMemo } from 'react'
 import {
-  DollarSign, TrendingDown, TrendingUp, AlertTriangle,
+  DollarSign, TrendingUp, AlertTriangle,
   Clock, CheckCircle2, RefreshCw, ArrowRight,
-  Receipt, Zap, CalendarClock, ChevronRight, ChevronDown,
+  Receipt, Zap, CalendarClock, ChevronRight, ChevronDown, Lock, Scale,
 } from 'lucide-react'
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
@@ -16,8 +17,8 @@ const REL_TIPO: Record<string, 'fluxo' | 'aging'> = {
   rel_fluxo: 'fluxo', rel_aging: 'aging',
 }
 import { useTheme } from '../../contexts/ThemeContext'
-import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
-import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
+import { useFinanceiroDashboard, useContasReceber } from '../../hooks/useFinanceiro'
+import type { ContaPagar, FinanceiroKPIs, ContaReceber } from '../../types/financeiro'
 
 const fmt = (v: number) => {
   if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -89,6 +90,49 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
   )
 }
 
+// ── DualMetric (par de valores: ex. Recebido / A Receber) ────────────────────
+function DualMetric({ label, a, b, aTone, bTone, isDark, aNote, bNote }: {
+  label: string; a: string; b: string; aTone: string; bTone: string; isDark: boolean; aNote: string; bNote: string
+}) {
+  const tones: Record<string, string> = {
+    emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    teal: isDark ? 'text-teal-400' : 'text-teal-600',
+    amber: isDark ? 'text-amber-400' : 'text-amber-600',
+    red: isDark ? 'text-red-400' : 'text-red-600',
+    slate: isDark ? 'text-slate-300' : 'text-slate-600',
+  }
+  return (
+    <div className={`rounded-2xl p-3 flex flex-col ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className="leading-none flex items-baseline gap-1 flex-wrap">
+        <span className={`text-[1.55rem] font-extrabold ${tones[aTone] || tones.slate}`}>{a}</span>
+        <span className={`text-lg font-bold ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>/</span>
+        <span className={`text-[1.55rem] font-extrabold ${tones[bTone] || tones.slate}`}>{b}</span>
+      </p>
+      <p className={`text-[9px] mt-1.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+        <span className={tones[aTone]}>●</span> {aNote} · <span className={tones[bTone]}>●</span> {bNote}
+      </p>
+    </div>
+  )
+}
+
+// ── SingleMetric (Diferenca: 1 valor, cor pelo sinal) ────────────────────────
+function SingleMetric({ label, value, tone, note, isDark }: {
+  label: string; value: string; tone: string; note: string; isDark: boolean
+}) {
+  const tones: Record<string, string> = {
+    emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    red: isDark ? 'text-red-400' : 'text-red-600',
+  }
+  return (
+    <div className={`rounded-2xl p-3 flex flex-col justify-center ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.emerald}`}>{value}</p>
+      <p className={`text-[9px] mt-1.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>
+    </div>
+  )
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardFinanceiro() {
   const { isDark } = useTheme()
@@ -112,6 +156,40 @@ export default function DashboardFinanceiro() {
   const porCC = data?.por_centro_custo ?? []
   const proximos = data?.vencimentos_proximos ?? []
   const recentes = data?.recentes ?? []
+
+  // Contas a Receber (para os blocos de recebimento)
+  const { data: crList = [] } = useContasReceber()
+  const cr = useMemo(() => {
+    const isBloq = (b?: string) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const a = { recebido: 0, aReceber: 0, bloqueado: 0, vencido: 0, emAberto: 0 }
+    const ccReceita: Record<string, number> = {}
+    for (const c of crList as ContaReceber[]) {
+      const v = c.valor_original
+      if (['recebido', 'conciliado'].includes(c.status)) { a.recebido += v; continue }
+      a.aReceber += v
+      const k = c.centro_custo || '—'; ccReceita[k] = (ccReceita[k] || 0) + v
+      if (isBloq(c.bloqueio_tipo)) a.bloqueado += v
+      else if (new Date(c.data_vencimento + 'T00:00:00') < hoje) a.vencido += v
+      else a.emAberto += v
+    }
+    return { ...a, ccReceita }
+  }, [crList])
+
+  // KPIs consolidados
+  const cpPago = kpis.valor_pago_periodo
+  const cpAPagar = kpis.valor_total_aberto
+  const diferenca = cr.aReceber - cpAPagar
+
+  // Por Centro de Custo: receita (CR) + despesa (CP) por CC
+  const ccRows = useMemo(() => {
+    const m: Record<string, { receita: number; despesa: number }> = {}
+    for (const [k, v] of Object.entries(cr.ccReceita)) { (m[k] ??= { receita: 0, despesa: 0 }).receita += v }
+    for (const c of porCC as { centro_custo: string; valor: number }[]) { (m[c.centro_custo || '—'] ??= { receita: 0, despesa: 0 }).despesa += c.valor }
+    return Object.entries(m).map(([cc, v]) => ({ cc, ...v }))
+      .sort((a, b) => (b.receita + b.despesa) - (a.receita + a.despesa)).slice(0, 8)
+  }, [cr.ccReceita, porCC])
+  const maxCC = Math.max(1, ...ccRows.flatMap(r => [r.receita, r.despesa]))
 
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
@@ -229,9 +307,12 @@ export default function DashboardFinanceiro() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric label="Saldo em Aberto" value={fmt(kpis.valor_total_aberto)} tone="emerald" isDark={isDark} note={`${kpis.total_cp} titulos`} />
-              <SpotlightMetric label="Pago no Periodo" value={fmt(kpis.valor_pago_periodo)} tone="teal" isDark={isDark} note={`${kpis.cp_pagas_periodo} pagamentos`} />
-              <SpotlightMetric label="Vence em 7 dias" value={fmt(kpis.valor_a_vencer_7d)} tone={kpis.cp_a_vencer > 0 ? 'amber' : 'slate'} isDark={isDark} note={`${kpis.cp_a_vencer} titulos`} />
+              <DualMetric label="Recebido / A Receber" a={fmt(cr.recebido)} b={fmt(cr.aReceber)}
+                aTone="emerald" bTone="amber" isDark={isDark} aNote="recebido" bNote="a receber" />
+              <DualMetric label="Pago / A Pagar" a={fmt(cpPago)} b={fmt(cpAPagar)}
+                aTone="teal" bTone="red" isDark={isDark} aNote="pago" bNote="a pagar" />
+              <SingleMetric label="Diferenca" value={fmt(diferenca)} tone={diferenca >= 0 ? 'emerald' : 'red'} isDark={isDark}
+                note={diferenca >= 0 ? 'a receber supera a pagar' : 'a pagar supera a receber'} />
             </div>
           </div>
         </section>
@@ -249,18 +330,18 @@ export default function DashboardFinanceiro() {
                 </h2>
               </div>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                kpis.cp_vencidas > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'
+                cr.bloqueado > 0 || kpis.cp_vencidas > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'
               }`}>
-                <Zap size={14} className={kpis.cp_vencidas > 0 ? 'text-red-500' : 'text-slate-400'} />
+                <Zap size={14} className={cr.bloqueado > 0 || kpis.cp_vencidas > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard label="Vencidas" value={kpis.cp_vencidas} icon={AlertTriangle}
+              <MiniInfoCard label="Recebimentos Bloqueados" value={fmt(cr.bloqueado)} icon={Lock}
+                iconTone={cr.bloqueado > 0 ? 'text-rose-500' : 'text-slate-400'}
+                note={cr.bloqueado > 0 ? 'retidos' : 'nenhum'} isDark={isDark} />
+              <MiniInfoCard label="Pagamentos Vencidos" value={kpis.cp_vencidas} icon={AlertTriangle}
                 iconTone={kpis.cp_vencidas > 0 ? 'text-red-500' : 'text-slate-400'}
                 note={kpis.cp_vencidas > 0 ? 'Atencao!' : 'tudo ok'} isDark={isDark} />
-              <MiniInfoCard label="Aguard. Aprovacao" value={kpis.aguardando_aprovacao} icon={CalendarClock}
-                iconTone={kpis.aguardando_aprovacao > 0 ? 'text-amber-500' : 'text-slate-400'}
-                note="pagamentos pendentes" isDark={isDark} />
             </div>
           </div>
         </section>
@@ -306,6 +387,58 @@ export default function DashboardFinanceiro() {
         </div>
       </section>
 
+      {/* ── Pulso de Recebimentos (Contas a Receber) ── */}
+      {(() => {
+        const segs = [
+          { key: 'recebido', label: 'Recebido', val: cr.recebido, color: 'bg-emerald-500' },
+          { key: 'bloqueado', label: 'Bloqueado', val: cr.bloqueado, color: 'bg-rose-500' },
+          { key: 'vencido', label: 'Vencido', val: cr.vencido, color: 'bg-orange-500' },
+          { key: 'aberto', label: 'Em aberto', val: cr.emAberto, color: 'bg-sky-500' },
+        ]
+        const total = segs.reduce((s, x) => s + x.val, 0)
+        const active = segs.filter(s => s.val > 0)
+        return (
+          <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+            <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                <Receipt size={14} className="text-sky-500" /> Pulso de Recebimentos
+              </h2>
+              <div className="flex items-center gap-3">
+                {segs.map(s => (
+                  <span key={s.key} className="flex items-center gap-1">
+                    <span className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
+                    <span className="text-[10px] text-slate-500">{s.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              {total === 0 ? (
+                <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+                  Nenhum recebimento no periodo
+                </div>
+              ) : (
+                <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                  {active.map(s => {
+                    const pct = (s.val / total) * 100
+                    return (
+                      <div key={s.key} className={`${s.color} relative flex items-center justify-center transition-all`}
+                        style={{ width: `${Math.max(pct, 4)}%` }} title={`${s.label}: ${fmt(s.val)}`}>
+                        {pct >= 14 && (
+                          <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">
+                            {s.label}{pct >= 22 ? ` · ${fmt(s.val)}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+        )
+      })()}
+
       {/* ── Row: Proximos Vencimentos + Por Centro de Custo ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {/* Proximos Vencimentos */}
@@ -344,31 +477,41 @@ export default function DashboardFinanceiro() {
           </div>
         </section>
 
-        {/* Por Centro de Custo */}
+        {/* Por Centro de Custo — receita (CR) x despesa (CP) */}
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <TrendingDown size={14} className="text-emerald-500" /> Por Centro de Custo
+              <Scale size={14} className="text-emerald-500" /> Por Centro de Custo
             </h2>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-[10px] text-slate-500">Receita</span></span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-500" /><span className="text-[10px] text-slate-500">Despesa</span></span>
+            </div>
           </div>
-          <div className="p-4 space-y-2.5">
-            {porCC.length === 0 ? (
+          <div className="p-4 space-y-3">
+            {ccRows.length === 0 ? (
               <p className={`text-center text-sm py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum dado por CC</p>
-            ) : porCC.slice(0, 8).map((cc: any) => {
-              const maxVal = Math.max(...porCC.map((c: any) => c.valor), 1)
-              return (
-                <div key={cc.centro_custo} className="flex items-center gap-3">
-                  <p className={`text-[11px] font-semibold text-right shrink-0 w-[80px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.centro_custo}</p>
-                  <div className="flex-1 relative">
-                    <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            ) : ccRows.map((cc) => (
+              <div key={cc.cc} className="flex items-center gap-3">
+                <p className={`text-[11px] font-semibold text-right shrink-0 w-[84px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={cc.cc}>{cc.cc}</p>
+                <div className="flex-1 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`flex-1 h-4 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                       <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-600 transition-all duration-500"
-                        style={{ width: `${Math.max((cc.valor / maxVal) * 100, 4)}%` }} />
+                        style={{ width: `${Math.max((cc.receita / maxCC) * 100, cc.receita > 0 ? 3 : 0)}%` }} />
                     </div>
+                    <p className={`text-[10px] font-bold shrink-0 w-[62px] text-right ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{cc.receita > 0 ? fmt(cc.receita) : '—'}</p>
                   </div>
-                  <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{fmt(cc.valor)}</p>
+                  <div className="flex items-center gap-2">
+                    <div className={`flex-1 h-4 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                      <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-red-600 transition-all duration-500"
+                        style={{ width: `${Math.max((cc.despesa / maxCC) * 100, cc.despesa > 0 ? 3 : 0)}%` }} />
+                    </div>
+                    <p className={`text-[10px] font-bold shrink-0 w-[62px] text-right ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>{cc.despesa > 0 ? fmt(cc.despesa) : '—'}</p>
+                  </div>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </section>
       </div>
