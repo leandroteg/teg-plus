@@ -9,6 +9,7 @@ import {
   HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
   ChevronRight as ChevR, Paperclip, AlertTriangle, XCircle, HelpCircle, Loader2,
   Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake, Upload,
+  ChevronDown, Check,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -109,6 +110,67 @@ function FiltroSelect({ value, onChange, options, placeholder, isDark }: {
   )
 }
 
+// ── Filtro multi-seleção (caixas selecionáveis num popover) ────────────────────
+function MultiFiltro({ label, selected, onChange, options, isDark }: {
+  label: string; selected: string[]; onChange: (v: string[]) => void
+  options: { value: string; label: string }[]; isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const active = selected.length > 0
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+          active
+            ? isDark ? 'bg-white/10 text-white border-white/10' : 'bg-slate-100 text-slate-800 border-slate-200'
+            : isDark ? 'bg-transparent text-slate-400 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+        }`}>
+        {label}{active && ` (${selected.length})`}
+        <ChevronDown size={11} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+      </button>
+      {open && (
+        <div className={`absolute z-30 mt-1 min-w-[190px] max-h-64 overflow-y-auto rounded-lg border shadow-lg p-1 ${
+          isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
+        }`}>
+          {options.length === 0 && <p className="px-2 py-1.5 text-[11px] text-slate-400">Sem opções</p>}
+          {options.map(o => {
+            const on = selected.includes(o.value)
+            return (
+              <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-left transition-colors ${
+                  isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                }`}>
+                <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                  on ? 'bg-teal-500 border-teal-500' : isDark ? 'border-white/20' : 'border-slate-300'
+                }`}>
+                  {on && <Check size={10} className="text-white" />}
+                </span>
+                <span className="truncate">{o.label}</span>
+              </button>
+            )
+          })}
+          {active && (
+            <button type="button" onClick={() => onChange([])}
+              className={`w-full text-left px-2 py-1.5 mt-0.5 rounded text-[11px] font-medium border-t ${
+                isDark ? 'text-slate-400 hover:bg-white/5 border-white/10' : 'text-slate-500 hover:bg-slate-50 border-slate-100'
+              }`}>
+              Limpar seleção
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tela principal ────────────────────────────────────────────────────────────
 export default function RHAdmissao() {
   const { isLightSidebar: isLight } = useTheme()
@@ -131,7 +193,8 @@ export default function RHAdmissao() {
   const [sortField, setSortField] = useState('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
-  const [fBase, setFBase] = useState('')
+  const [fBase, setFBase] = useState<string[]>([])
+  const [fDepto, setFDepto] = useState<string[]>([])
   const [fMes, setFMes] = useState('')
   const [fUrg, setFUrg] = useState('')
   const [fStatus, setFStatus] = useState('')
@@ -169,6 +232,15 @@ export default function RHAdmissao() {
       .map(b => ({ value: b, label: b })),
     [admissoes],
   )
+  // Departamento vem do organograma (colaborador vinculado). Dedup case-insensitive.
+  const deptoOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    admissoes.forEach(a => (a.candidatos ?? []).forEach(c => {
+      const d = (c.colaborador?.departamento ?? '').trim()
+      if (d && !seen.has(d.toLowerCase())) seen.set(d.toLowerCase(), d)
+    }))
+    return Array.from(seen, ([value, label]) => ({ value, label })).sort((x, y) => x.label.localeCompare(y.label))
+  }, [admissoes])
   const mesOptions = useMemo(
     () => Array.from(new Set(admissoes.map(a => (a.created_at ?? '').slice(0, 7)).filter(Boolean)))
       .sort().reverse().map(m => ({ value: m, label: mesLabel(m) })),
@@ -192,7 +264,11 @@ export default function RHAdmissao() {
           || (a.motivo ?? '').toLowerCase().includes(q)
       })
     }
-    if (fBase) l = l.filter(a => (a.base ?? '') === fBase)
+    if (fBase.length) l = l.filter(a => fBase.includes(a.base ?? ''))
+    if (fDepto.length) l = l.filter(a => (a.candidatos ?? []).some(c => {
+      const d = (c.colaborador?.departamento ?? '').trim().toLowerCase()
+      return !!d && fDepto.includes(d)
+    }))
     if (fMes) l = l.filter(a => (a.created_at ?? '').slice(0, 7) === fMes)
     if (fUrg) l = l.filter(a => (fUrg === 'sim' ? !!a.urgente : !a.urgente))
     if (fStatus && temFiltroStatus) l = l.filter(a => admStatus(a).key === fStatus)
@@ -205,7 +281,7 @@ export default function RHAdmissao() {
       }
       return (new Date(x.created_at).getTime() - new Date(y.created_at).getTime()) * dir
     })
-  }, [itensEtapa, busca, sortField, sortDir, fBase, fMes, fUrg, fStatus, temFiltroStatus])
+  }, [itensEtapa, busca, sortField, sortDir, fBase, fDepto, fMes, fUrg, fStatus, temFiltroStatus])
 
   if (view === 'nova') {
     return (
@@ -246,7 +322,8 @@ export default function RHAdmissao() {
               viewMode={viewMode} setViewMode={setViewMode}
               count={filtrados.length} total={itensEtapa.length}
             >
-              <FiltroSelect value={fBase} onChange={setFBase} options={baseOptions} placeholder="Base" isDark={isDark} />
+              <MultiFiltro label="Base" selected={fBase} onChange={setFBase} options={baseOptions} isDark={isDark} />
+              <MultiFiltro label="Departamento" selected={fDepto} onChange={setFDepto} options={deptoOptions} isDark={isDark} />
               <FiltroSelect value={fMes} onChange={setFMes} options={mesOptions} placeholder="Mês da solicitação" isDark={isDark} />
               <FiltroSelect value={fUrg} onChange={setFUrg}
                 options={[{ value: 'sim', label: 'Urgente' }, { value: 'nao', label: 'Não urgente' }]}
