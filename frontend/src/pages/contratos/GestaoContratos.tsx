@@ -1347,27 +1347,23 @@ function TabProvisionado() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+      {/* Filtros numa linha só (padrão da aba Contratos): status vira dropdown; atalhos + período à direita */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="shrink-0 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-600">
           {FILTROS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {f.label}
-            </button>
+            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os status' : f.label}</option>
           ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
-          {ATALHOS.map(([label, active, onClick]) => (
-            <button key={label} onClick={onClick}
-              className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${active ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {label}
-            </button>
-          ))}
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Período</span>
+        </select>
+        {ATALHOS.map(([label, active, onClick]) => (
+          <button key={label} onClick={onClick}
+            className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${active ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {label}
+          </button>
+        ))}
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
           <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
           <span className="text-xs text-slate-400">→</span>
           <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
