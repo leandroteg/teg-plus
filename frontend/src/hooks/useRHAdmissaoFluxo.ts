@@ -700,6 +700,27 @@ export function useUploadAnexoCandidato() {
   })
 }
 
+// Exclui um anexo da admissão (ex.: documento duplicado): limpa missão de
+// assinatura + registros sig no banco (RPC) e apaga os arquivos do storage.
+export function useExcluirAnexoAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { anexoId: string; candidatoId: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_anexo_excluir', { p_anexo_id: i.anexoId })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; paths?: string[] }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao excluir o documento')
+      const paths = (r.paths ?? []).filter(Boolean)
+      if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
+      return r
+    },
+    onSuccess: (_r, i) => {
+      qc.invalidateQueries({ queryKey: ['rh-admissao-etapa-cand', i.candidatoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
 // RH anexa um documento pelo TEG+ no lugar do colaborador: sobe o arquivo e
 // conclui a missão correspondente do Portal (o pedido some do celular dele).
 export function useAnexarDocMissao() {
