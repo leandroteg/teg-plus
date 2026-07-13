@@ -204,6 +204,7 @@ export interface RHAdmissao {
 
   // Fluxo de admissão (RH-only)
   etapa?: EtapaAdmissaoFluxo
+  arquivada?: boolean
   status_aprovacao?: StatusAprovacaoAdmissao | null
   motivo?: string
   tipo_movimentacao?: TipoMovimentacaoAdmissao
