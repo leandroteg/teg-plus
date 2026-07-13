@@ -17,6 +17,9 @@ export interface RHColaborador {
   foto_url?: string
 
   // Flag de processo trabalhista (fonte: planilha RH/Processos)
+  // Cargo de confiança: não bate ponto, não é cadastrado no Secullum
+  cargo_confianca?: boolean
+
   tem_processo_trabalhista?: boolean
   processo_trabalhista_info?: string | null
 
@@ -172,6 +175,7 @@ export interface RHAdmissaoCandidato {
   data_nascimento?: string
   cargo?: string
   salario?: number
+  cargo_confianca?: boolean
   colaborador_id?: string
   dados_extras?: Record<string, unknown>
   created_at: string
