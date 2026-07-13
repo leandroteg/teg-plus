@@ -83,6 +83,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
         data_nascimento: cand.data_nascimento ? cand.data_nascimento.slice(0, 10) : '',
         cargo: cand.cargo ?? '',
         salario: cand.salario != null ? String(cand.salario) : '',
+        cargo_confianca: cand.cargo_confianca ? 'true' : 'false',
       }
     }
     setEdCands(c)
@@ -102,6 +103,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
           data_nascimento: edCands[c.id]?.data_nascimento ?? '',
           cargo: edCands[c.id]?.cargo ?? '',
           salario: edCands[c.id]?.salario ? Number(edCands[c.id].salario) : '',
+          cargo_confianca: edCands[c.id]?.cargo_confianca === 'true',
         },
       })),
       autorId: perfil?.id,
@@ -237,6 +239,12 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                     <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Salário</label>
                     <input type="number" step="0.01" value={edCands[c.id]?.salario ?? ''} onChange={e => setEdCands(p => ({ ...p, [c.id]: { ...p[c.id], salario: e.target.value } }))} className={EDIT_INPUT} />
                   </div>
+                  <label className="col-span-2 flex items-center gap-2 cursor-pointer mt-0.5" title="Não bate ponto e não é cadastrado no Secullum">
+                    <input type="checkbox" checked={edCands[c.id]?.cargo_confianca === 'true'}
+                      onChange={e => setEdCands(p => ({ ...p, [c.id]: { ...p[c.id], cargo_confianca: e.target.checked ? 'true' : 'false' } }))}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                    <span className="text-xs font-semibold text-slate-600">Cargo de confiança <span className="text-[10px] text-slate-400">(sem ponto/Secullum)</span></span>
+                  </label>
                 </div>
               ))}
             </div>
