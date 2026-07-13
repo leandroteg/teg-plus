@@ -1087,27 +1087,18 @@ function TabRecebiveis() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-indigo-500 uppercase">Saldo</p>
-          <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmt(saldoEgp)}</p>
-        </div>
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Faturado</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalFaturado)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Recebido</p>
-          <p className="text-lg font-extrabold text-blue-700 mt-1">{fmt(totalRecebido)}</p>
-        </div>
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasado</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
-        </div>
-      </div>
-
+      {/* Filtros numa linha + resumo inline (parcelas + saldo EGP + medições) que atualiza c/ os filtros */}
       <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
-        <div className="relative flex-1 min-w-[180px]">
+        {(() => {
+          const n = filtered.length + egpRows.length + medsJanela.length
+          const total = filtered.reduce((s, p) => s + p.aReceber, 0) + egpRows.reduce((s, e) => s + e.projecao, 0) + medsJanela.reduce((s, m) => s + (m.valor || 0), 0)
+          return (
+            <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+              <b className="text-slate-700">{n}</b> {n === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(total)}</b>
+            </span>
+          )
+        })()}
+        <div className="relative flex-1 min-w-[160px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar numero, objeto, contraparte..."
@@ -1341,28 +1332,12 @@ function TabProvisionado() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-600 uppercase">Compromissado</p>
-          <p className="text-lg font-extrabold text-amber-700 mt-1">{fmt(totalEmAberto)}</p>
-        </div>
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Pago</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalPago)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Pendentes</p>
-          <p className="text-xl font-extrabold text-blue-700 mt-1">{pendentes}</p>
-        </div>
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasados</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
-        </div>
-      </div>
-
-      {/* Filtros no padrão da aba Contratos, numa linha só (rola na horizontal se faltar espaço) */}
+      {/* Filtros numa linha (padrão Contratos) + resumo inline que atualiza conforme os filtros */}
       <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
-        <div className="relative flex-1 min-w-[180px]">
+        <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+          <b className="text-slate-700">{filtered.length}</b> {filtered.length === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(filtered.reduce((s, p) => s + p.aPagar, 0))}</b>
+        </span>
+        <div className="relative flex-1 min-w-[160px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar numero, objeto, contraparte..."
@@ -1988,27 +1963,12 @@ function TabMedicoes() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Aprovadas</p>
-          <p className="text-xl font-extrabold text-emerald-700 mt-1">{aprovadas}</p>
-        </div>
-        <div className="bg-fuchsia-50 rounded-2xl border border-fuchsia-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-fuchsia-600 uppercase">A Faturar</p>
-          <p className="text-lg font-extrabold text-fuchsia-700 mt-1">{fmt(totalAFaturar)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">No Financeiro</p>
-          <p className="text-xl font-extrabold text-blue-700 mt-1">{faturadas}</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-slate-500 uppercase">Total Enviado</p>
-          <p className="text-lg font-extrabold text-slate-700 mt-1">{fmt(totalFaturado)}</p>
-        </div>
-      </div>
-
+      {/* Filtros numa linha + resumo inline que atualiza conforme os filtros */}
       <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
-        <div className="relative flex-1 min-w-[180px]">
+        <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+          <b className="text-slate-700">{filtered.length}</b> {filtered.length === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(filtered.reduce((s, m) => s + m.valor_liquido, 0))}</b>
+        </span>
+        <div className="relative flex-1 min-w-[160px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar BM, contrato..."
