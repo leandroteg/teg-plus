@@ -1850,10 +1850,14 @@ function MedicaoAnexoInline({ medicao, onToast }: {
 }
 
 function TabMedicoes() {
+  const { isDark } = useTheme()
   const { perfil, isAdmin, hasSetorPapel } = useAuth()
   const podeAprovar = isAdmin || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [busca, setBusca] = useState('')
+  const [grupoFilter, setGrupoFilter] = useState('')
+  const [de, setDe] = useState(ymMais(-36))   // default amplo: 3 anos atrás → +12m (mostra tudo)
+  const [ate, setAte] = useState(ymMais(12))
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
   const [enviarMedicao, setEnviarMedicao] = useState<ContratoMedicao | null>(null)
@@ -1878,6 +1882,9 @@ function TabMedicoes() {
 
   const filtered = medicoes.filter(m => {
     if (statusFilter && m.status !== statusFilter) return false
+    if (grupoFilter && (contratoMap.get(m.contrato_id)?.grupo_contrato ?? '') !== grupoFilter) return false
+    const ym = (m.periodo_fim || m.created_at || '').slice(0, 7)
+    if (ym && (ym < de || ym > ate)) return false
     if (busca) {
       const q = busca.toLowerCase()
       return (
@@ -1980,6 +1987,19 @@ function TabMedicoes() {
             <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
           ))}
         </select>
+        <select value={grupoFilter} onChange={e => setGrupoFilter(e.target.value)}
+          className="shrink-0 min-w-[150px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30">
+          <option value="">Todos os Grupos</option>
+          {GRUPO_CONTRATO_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className="text-xs text-slate-400">→</span>
+          <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        </div>
       </div>
 
       <NovaMedicaoModal
