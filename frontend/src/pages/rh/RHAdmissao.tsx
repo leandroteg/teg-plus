@@ -199,7 +199,9 @@ export default function RHAdmissao() {
   const [fUrg, setFUrg] = useState('')
   const [fStatus, setFStatus] = useState('')
 
-  const { data: admissoes = [], isLoading } = useAdmissoesFluxo()
+  const { data: admissoesRaw = [], isLoading } = useAdmissoesFluxo()
+  // Encerradas (arquivadas) saem do board por completo
+  const admissoes = useMemo(() => admissoesRaw.filter(a => !a.arquivada), [admissoesRaw])
 
   // Status é específico da etapa (Integração/Liberação) — zera ao trocar de aba
   useEffect(() => { setFStatus('') }, [etapa])
