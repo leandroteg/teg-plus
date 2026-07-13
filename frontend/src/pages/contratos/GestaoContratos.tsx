@@ -956,10 +956,13 @@ function TabRecebiveis() {
   const nav = useNavigate()
   const { isDark } = useTheme()
   const [statusFilter, setStatusFilter] = useState('')
+  const [busca, setBusca] = useState('')
   const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses
   const [ate, setAte] = useState(ymMais(36))
   const [quick, setQuick] = useState<'7d' | null>(null)
   const { data: parcelas = [], isLoading } = useParcelas()
+  const bq = busca.trim().toLowerCase()
+  const matchBusca = (...vals: (string | null | undefined)[]) => !bq || vals.some(v => (v ?? '').toLowerCase().includes(bq))
 
   const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0)
   const lim7d = new Date(hoje0); lim7d.setDate(lim7d.getDate() + 7)
@@ -992,7 +995,7 @@ function TabRecebiveis() {
   }
   const egpRows = (extra?.egp ?? [])
     .map(e => ({ ...e, projecao: egpProjecao(e) }))
-    .filter(e => e.saldo > 0 && e.projecao > 0)
+    .filter(e => e.saldo > 0 && e.projecao > 0 && matchBusca(e.objeto, e.numero))
 
   // Medições: entram pela data (vencimento no Financeiro; senão fim do período medido)
   const medNaJanela = (m: RecMed): boolean => {
@@ -1005,7 +1008,7 @@ function TabRecebiveis() {
     const ym = ref.slice(0, 7)
     return ym >= de && ym <= ate
   }
-  const medsJanela = meds.filter(medNaJanela)
+  const medsJanela = meds.filter(m => medNaJanela(m) && matchBusca(m.contrato, m.objeto, m.numero_bm))
 
   // Parcelas de receita: recorrente = valor_mensal × meses ativos na janela
   const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
@@ -1037,6 +1040,7 @@ function TabRecebiveis() {
 
   const filtered = parcelasJanela.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false
+    if (!matchBusca(p.contrato?.objeto, p.contrato?.numero, (p.contrato as any)?.contraparte_nome)) return false
     return true
   })
 
@@ -1102,27 +1106,28 @@ function TabRecebiveis() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-          {FILTROS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {f.label}
-            </button>
-          ))}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar numero, objeto, contraparte..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
         </div>
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
-          {ATALHOS.map(([label, active, onClick]) => (
-            <button key={label} onClick={onClick}
-              className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {label}
-            </button>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+          {FILTROS.map(f => (
+            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
           ))}
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Período</span>
+        </select>
+        {ATALHOS.map(([label, active, onClick]) => (
+          <button key={label} onClick={onClick}
+            className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {label}
+          </button>
+        ))}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
           <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
           <span className="text-xs text-slate-400">→</span>
           <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
@@ -2002,24 +2007,19 @@ function TabMedicoes() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar BM, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-fuchsia-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar BM, contrato..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
+        </div>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30">
+          {FILTROS.map(f => (
+            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
+          ))}
+        </select>
       </div>
 
       <NovaMedicaoModal
