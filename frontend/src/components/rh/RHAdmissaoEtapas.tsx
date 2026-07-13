@@ -16,6 +16,7 @@ import {
   useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
+  useExcluirAnexoAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -555,12 +556,14 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
   const matricula = colabReg?.matricula ?? null
   const lotacao = colabReg?.lotacao ?? null
   const uploadAnexo = useUploadAnexoCandidato()
+  const excluirAnexo = useExcluirAnexoAdmissao()
   const contratoRef = useRef<HTMLInputElement>(null)
   const docRef = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
   const [destinatario, setDestinatario] = useState('dp@eloocontabilidade.com.br')
   const [emailOk, setEmailOk] = useState(false)
+  const [confirmaExcluir, setConfirmaExcluir] = useState<string | null>(null)
 
   const registro = data?.registro ?? null
   const fichas = (cand.anexos ?? []).filter(a => a.tipo === 'ficha_registro')
@@ -699,7 +702,15 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
                     <p className={`text-[11px] font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{tituloDoc(a)}</p>
                     {a.tipo === 'contrato' && <p className="text-[9px] text-slate-400 truncate">{a.arquivo_nome}</p>}
                   </div>
-                  {docAssinado ? (
+                  {confirmaExcluir === a.id ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-bold text-red-600">Excluir?</span>
+                      <button onClick={() => { setConfirmaExcluir(null); excluirAnexo.mutate({ anexoId: a.id, candidatoId: cand.id }, { onError: e => setErro(e instanceof Error ? e.message : 'Falha ao excluir') }) }}
+                        disabled={excluirAnexo.isPending}
+                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">Sim, excluir</button>
+                      <button onClick={() => setConfirmaExcluir(null)} className="text-[10px] font-semibold px-2 py-1 rounded-lg text-slate-500 hover:bg-slate-100">Cancelar</button>
+                    </div>
+                  ) : docAssinado ? (
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
                         <CheckCircle2 size={12} /> assinado{miss?.concluida_em ? ` · ${new Date(miss.concluida_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}
@@ -714,12 +725,20 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
                           <Download size={12} /> Assinado
                         </button>
                       )}
+                      <button onClick={() => setConfirmaExcluir(a.id)} disabled={excluirAnexo.isPending}
+                        className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" title="Excluir documento">
+                        {excluirAnexo.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      </button>
                     </div>
                   ) : (<>
                     {enviado && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 shrink-0">aguardando</span>}
                     <button onClick={() => handleEnviarDoc(a)} disabled={enviarAssinaturaAnexo.isPending} className={BTN_PRI}>
                       {enviarAssinaturaAnexo.isPending ? <Loader2 size={12} className="animate-spin" /> : <Smartphone size={12} />}
                       {enviado ? 'Reenviar' : 'Enviar p/ assinatura'}
+                    </button>
+                    <button onClick={() => setConfirmaExcluir(a.id)} disabled={excluirAnexo.isPending}
+                      className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" title="Excluir documento">
+                      {excluirAnexo.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                     </button>
                   </>)}
                 </div>
