@@ -66,7 +66,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
       }
       return data as FinanceiroDashboardData
     },
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   })
 }
 
@@ -116,7 +116,7 @@ export function useContasReceber() {
       for (let from = 0; from < 50_000; from += PAGE) {
         const { data, error } = await supabase
           .from('fin_contas_receber')
-          .select('*')
+          .select('*, osc:osc_id(numero_os)')
           .order('data_vencimento', { ascending: true })
           .range(from, from + PAGE - 1)
         if (error) throw error
