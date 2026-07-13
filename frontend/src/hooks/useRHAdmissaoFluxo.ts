@@ -1113,6 +1113,24 @@ export function useLiberarAdmissao() {
   })
 }
 
+// Sub-status GESET na etapa Liberação (aguardando liberação de campo × liberado).
+// Fica na MESMA aba; só troca o selo por candidato. p_status vazio/'liberado' volta ao padrão.
+export function useGesetLiberacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { candidatoId: string; status: 'aguardando_liberacao' | 'liberado' }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_geset_status', {
+        p_cand_id: i.candidatoId, p_status: i.status,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao alterar status')
+      return r
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
+  })
+}
+
 /** Gera uma URL temporária (10 min) para visualizar um anexo do bucket privado. */
 export async function getAnexoSignedUrl(path: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 600)
