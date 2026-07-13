@@ -116,7 +116,7 @@ export function useContasReceber() {
       for (let from = 0; from < 50_000; from += PAGE) {
         const { data, error } = await supabase
           .from('fin_contas_receber')
-          .select('*, osc:osc_id(numero_os)')
+          .select('*, osc:osc_id(numero_os), obra:projeto_id(nome, codigo)')
           .order('data_vencimento', { ascending: true })
           .range(from, from + PAGE - 1)
         if (error) throw error
@@ -778,6 +778,21 @@ export function useCompartilharNFEmail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-receber'] })
     },
+  })
+}
+
+// ── Bloqueio do recebimento (preenchido manual no modal) ─────────────────────
+export function useAtualizarBloqueioCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, bloqueio }: { crId: string; bloqueio: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({ bloqueio_tipo: bloqueio, updated_at: new Date().toISOString() })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contas-receber'] }),
   })
 }
 
