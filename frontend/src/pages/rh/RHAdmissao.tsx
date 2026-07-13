@@ -64,6 +64,51 @@ const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgA
   liberado:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200', icon: 'text-emerald-400' },
 }
 
+// ── Status derivado por admissão (etapa-aware; reflete o sub-status GESET) ─────
+type StatusInfo = { key: string; label: string; cls: string }
+function admStatus(a: RHAdmissao): StatusInfo {
+  if (a.status_aprovacao === 'rejeitado') return { key: 'rejeitado', label: 'Rejeitado', cls: 'bg-red-100 text-red-700' }
+  if (a.status_aprovacao === 'esclarecimento') return { key: 'esclarecer', label: 'Esclarecer', cls: 'bg-amber-100 text-amber-700' }
+  const aguardandoGeset = (a.candidatos ?? []).some(
+    c => (c.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao',
+  )
+  if (a.etapa === 'liberado') {
+    return aguardandoGeset
+      ? { key: 'aguardando', label: 'Aguardando liberação', cls: 'bg-amber-100 text-amber-700' }
+      : { key: 'liberado', label: 'Liberado', cls: 'bg-emerald-100 text-emerald-700' }
+  }
+  if (a.etapa === 'integracao') {
+    return aguardandoGeset
+      ? { key: 'aguardando', label: 'Aguardando liberação', cls: 'bg-amber-100 text-amber-700' }
+      : { key: 'em_integracao', label: 'Em integração', cls: 'bg-teal-100 text-teal-700' }
+  }
+  if (a.etapa === 'aprovacao') return { key: 'aprovacao', label: 'Aguardando aprovação', cls: 'bg-amber-100 text-amber-700' }
+  return { key: 'pendente', label: 'Pendente', cls: 'bg-amber-100 text-amber-700' }
+}
+
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const mesLabel = (ym: string) => {
+  const [y, m] = ym.split('-')
+  return `${MESES_ABREV[Number(m) - 1] ?? m}/${y}`
+}
+
+// ── Dropdown de filtro compacto (padrão da linha de filtros) ───────────────────
+function FiltroSelect({ value, onChange, options, placeholder, isDark }: {
+  value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder: string; isDark: boolean
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border outline-none transition-all cursor-pointer ${
+        value
+          ? isDark ? 'bg-white/10 text-white border-white/10' : 'bg-slate-100 text-slate-800 border-slate-200'
+          : isDark ? 'bg-transparent text-slate-400 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+      }`}>
+      <option value="">{placeholder}</option>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  )
+}
+
 // ── Tela principal ────────────────────────────────────────────────────────────
 export default function RHAdmissao() {
   const { isLightSidebar: isLight } = useTheme()
@@ -86,8 +131,17 @@ export default function RHAdmissao() {
   const [sortField, setSortField] = useState('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [fBase, setFBase] = useState('')
+  const [fMes, setFMes] = useState('')
+  const [fUrg, setFUrg] = useState('')
+  const [fStatus, setFStatus] = useState('')
 
   const { data: admissoes = [], isLoading } = useAdmissoesFluxo()
+
+  // Status é específico da etapa (Integração/Liberação) — zera ao trocar de aba
+  useEffect(() => { setFStatus('') }, [etapa])
+
+  const temFiltroStatus = etapa === 'integracao' || etapa === 'liberado'
 
   // Abertura via ?nova=1 (menu Nova Solicitação → Admissão)
   useEffect(() => {
@@ -105,6 +159,23 @@ export default function RHAdmissao() {
   }, {} as Record<EtapaAdmissao, number>)
   const itensEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === etapa)
 
+  // Opções de filtro — base/mês são globais (consistentes entre abas); status é da etapa
+  const baseOptions = useMemo(
+    () => Array.from(new Set(admissoes.map(a => a.base).filter(Boolean) as string[])).sort()
+      .map(b => ({ value: b, label: b })),
+    [admissoes],
+  )
+  const mesOptions = useMemo(
+    () => Array.from(new Set(admissoes.map(a => (a.created_at ?? '').slice(0, 7)).filter(Boolean)))
+      .sort().reverse().map(m => ({ value: m, label: mesLabel(m) })),
+    [admissoes],
+  )
+  const statusOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    itensEtapa.forEach(a => { const s = admStatus(a); if (!seen.has(s.key)) seen.set(s.key, s.label) })
+    return Array.from(seen, ([value, label]) => ({ value, label }))
+  }, [itensEtapa])
+
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
     let l = itensEtapa
@@ -117,6 +188,10 @@ export default function RHAdmissao() {
           || (a.motivo ?? '').toLowerCase().includes(q)
       })
     }
+    if (fBase) l = l.filter(a => (a.base ?? '') === fBase)
+    if (fMes) l = l.filter(a => (a.created_at ?? '').slice(0, 7) === fMes)
+    if (fUrg) l = l.filter(a => (fUrg === 'sim' ? !!a.urgente : !a.urgente))
+    if (fStatus && temFiltroStatus) l = l.filter(a => admStatus(a).key === fStatus)
     const dir = sortDir === 'asc' ? 1 : -1
     return [...l].sort((x, y) => {
       if (sortField === 'candidato') {
@@ -126,7 +201,7 @@ export default function RHAdmissao() {
       }
       return (new Date(x.created_at).getTime() - new Date(y.created_at).getTime()) * dir
     })
-  }, [itensEtapa, busca, sortField, sortDir])
+  }, [itensEtapa, busca, sortField, sortDir, fBase, fMes, fUrg, fStatus, temFiltroStatus])
 
   if (view === 'nova') {
     return (
@@ -166,7 +241,16 @@ export default function RHAdmissao() {
               sortField={sortField} setSortField={setSortField} sortDir={sortDir} setSortDir={setSortDir}
               viewMode={viewMode} setViewMode={setViewMode}
               count={filtrados.length} total={itensEtapa.length}
-            />
+            >
+              <FiltroSelect value={fBase} onChange={setFBase} options={baseOptions} placeholder="Base" isDark={isDark} />
+              <FiltroSelect value={fMes} onChange={setFMes} options={mesOptions} placeholder="Mês da solicitação" isDark={isDark} />
+              <FiltroSelect value={fUrg} onChange={setFUrg}
+                options={[{ value: 'sim', label: 'Urgente' }, { value: 'nao', label: 'Não urgente' }]}
+                placeholder="Urgência" isDark={isDark} />
+              {temFiltroStatus && (
+                <FiltroSelect value={fStatus} onChange={setFStatus} options={statusOptions} placeholder="Status" isDark={isDark} />
+              )}
+            </RHFluxoToolbar>
             {filtrados.length === 0 ? (
               <PlaceholderVazio etapa={ativa} isDark={isDark} />
             ) : viewMode !== 'cards' ? (
@@ -442,12 +526,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
             const cands = a.candidatos ?? []
             const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
             const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
-            const statusTxt = a.status_aprovacao === 'rejeitado' ? 'Rejeitado'
-              : a.status_aprovacao === 'esclarecimento' ? 'Esclarecer'
-              : a.etapa === 'aprovacao' ? 'Aguardando aprovação' : 'Pendente'
-            const statusCls = a.status_aprovacao === 'rejeitado' ? 'bg-red-100 text-red-700'
-              : a.status_aprovacao === 'esclarecimento' ? 'bg-amber-100 text-amber-700'
-              : 'bg-amber-100 text-amber-700'
+            const status = admStatus(a)
             return (
               <tr key={a.id} onClick={() => onSelect(a)}
                 className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
@@ -457,7 +536,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.base || '—'}</td>
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
                 <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
-                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusCls}`}>{statusTxt}</span></td>
+                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span></td>
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(a.created_at).toLocaleDateString('pt-BR')}</td>
                 <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
               </tr>
