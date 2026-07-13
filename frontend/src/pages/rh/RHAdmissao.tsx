@@ -203,8 +203,8 @@ export default function RHAdmissao() {
   // Encerradas (arquivadas) saem do board por completo
   const admissoes = useMemo(() => admissoesRaw.filter(a => !a.arquivada), [admissoesRaw])
 
-  // Status é específico da etapa (Integração/Liberação) — zera ao trocar de aba
-  useEffect(() => { setFStatus('') }, [etapa])
+  // Status é específico da etapa. Liberação já entra pré-filtrada em "Aguardando liberação".
+  useEffect(() => { setFStatus(etapa === 'liberado' ? 'aguardando' : '') }, [etapa])
 
   const temFiltroStatus = etapa === 'integracao' || etapa === 'liberado'
 
