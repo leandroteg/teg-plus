@@ -9,14 +9,14 @@ import { supabase } from '../../services/supabase'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock,
+  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock, Archive,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
-  useExcluirAnexoAdmissao, useGesetLiberacao,
+  useExcluirAnexoAdmissao, useGesetLiberacao, useEncerrarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -1103,15 +1103,24 @@ export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark
 function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark: boolean }) {
   const { data } = useEtapaCandidato(cand.id)
   const geset = useGesetLiberacao()
+  const encerrar = useEncerrarAdmissao()
+  const { perfil } = useAuth()
   const aguardando = (cand.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao'
 
-  const toggle = () => {
+  const marcarLiberado = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (geset.isPending) return
-    geset.mutate({ candidatoId: cand.id, status: aguardando ? 'liberado' : 'aguardando_liberacao' })
+    geset.mutate({ candidatoId: cand.id, status: 'liberado' })
+  }
+  const encerrarAdm = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (encerrar.isPending) return
+    if (!window.confirm('Encerrar a admissão? Ela sai do fluxo e é arquivada.')) return
+    encerrar.mutate({ admissaoId: cand.admissao_id, autorNome: perfil?.nome || perfil?.email || undefined })
   }
 
   return (
-    <div className={`rounded-xl border px-3 py-2 space-y-1.5 ${
+    <div className={`rounded-xl border px-3 py-2 space-y-2 ${
       aguardando
         ? (isDark ? 'border-amber-400/20 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50/60')
         : (isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-emerald-100 bg-emerald-50/50')}`}>
@@ -1122,19 +1131,26 @@ function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark
         <span className={`text-xs font-semibold flex-1 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
           {aguardando ? 'Aguardando liberação no GESET (não pode ir a campo)' : 'Colaborador apto e liberado para atividades'}
         </span>
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={geset.isPending}
-          title={aguardando ? 'Marcar como liberado' : 'Marcar como aguardando liberação no GESET'}
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors disabled:opacity-50 ${
-            aguardando
-              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
-          {geset.isPending ? '…' : aguardando ? 'Aguardando liberação' : 'Ativo · Portal liberado'}
-        </button>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          aguardando ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+          {aguardando ? 'Aguardando liberação' : 'Ativo · Portal liberado'}
+        </span>
       </div>
       <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable={false} />
+      <div className="flex justify-end">
+        {aguardando ? (
+          <button type="button" onClick={marcarLiberado} disabled={geset.isPending}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            {geset.isPending ? <><Loader2 size={13} className="animate-spin" /> Liberando…</> : <><CheckCircle2 size={13} /> Liberado</>}
+          </button>
+        ) : (
+          <button type="button" onClick={encerrarAdm} disabled={encerrar.isPending}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              isDark ? 'bg-white/[0.06] hover:bg-white/[0.10] text-slate-200' : 'bg-slate-600 hover:bg-slate-700 text-white'}`}>
+            {encerrar.isPending ? <><Loader2 size={13} className="animate-spin" /> Encerrando…</> : <><Archive size={13} /> Encerrar</>}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
