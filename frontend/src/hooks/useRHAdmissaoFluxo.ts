@@ -1113,6 +1113,23 @@ export function useLiberarAdmissao() {
   })
 }
 
+// Encerrar (arquivar) uma admissão já liberada — sai do board.
+export function useEncerrarAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { admissaoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_encerrar', {
+        p_admissao_id: i.admissaoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao encerrar')
+      return r
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
+  })
+}
+
 // Sub-status GESET na etapa Liberação (aguardando liberação de campo × liberado).
 // Fica na MESMA aba; só troca o selo por candidato. p_status vazio/'liberado' volta ao padrão.
 export function useGesetLiberacao() {
