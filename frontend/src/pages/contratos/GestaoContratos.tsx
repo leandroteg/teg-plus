@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
@@ -58,6 +58,62 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
     </span>
   )
 }
+
+// ── MultiSelect (checkboxes + Selecionar Todos) ──────────────────────────────
+// selected[] = valores marcados. "Todos marcados" (length === options) equivale a
+// SEM filtro (mostra tudo, inclusive status fora da lista). Nada marcado = mostra nada.
+function MultiSelect({ label, options, selected, onChange, minW = 150 }: {
+  label: string
+  options: { value: string; label: string }[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  minW?: number
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+  const allValues = options.map(o => o.value)
+  const allChecked = selected.length === allValues.length
+  const display = allChecked ? label : selected.length === 0 ? `${label} · nenhum` : `${label} · ${selected.length}`
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  return (
+    <div ref={ref} className="relative shrink-0" style={{ minWidth: minW }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 hover:border-slate-300">
+        <span className="truncate">{display}</span>
+        <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full min-w-[210px] max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+          <label className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100">
+            <input type="checkbox" checked={allChecked} onChange={() => onChange(allChecked ? [] : allValues)}
+              className="w-4 h-4 accent-indigo-600" />
+            <span className="text-sm font-semibold text-slate-700">Selecionar Todos</span>
+          </label>
+          {options.map(o => (
+            <label key={o.value} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)}
+                className="w-4 h-4 accent-indigo-600" />
+              <span className="text-sm text-slate-600 truncate">{o.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Opções de status do Provisionado (parcelas) — usadas no MultiSelect
+const STATUS_PROV_OPTIONS: { value: string; label: string }[] = [
+  { value: 'previsto', label: 'Previsto' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'liberado', label: 'Liberado' },
+  { value: 'pago',     label: 'Pago' },
+]
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado' | 'modelos'
@@ -1235,11 +1291,11 @@ function TabProvisionado() {
   const nav = useNavigate()
   const { perfil, hasSetorPapel } = useAuth()
   const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_PROV_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
-  const [grupoFilter, setGrupoFilter] = useState('')
-  const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
-  const [ate, setAte] = useState(ymMais(36))
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [de, setDe] = useState(ymMais(1))          // inicia no PRÓXIMO mês (atalho "Próx. mês" ativo)
+  const [ate, setAte] = useState(ymMais(1))
   const [quick, setQuick] = useState<'7d' | null>(null)   // atalho "próximos 7 dias" (precisão de dia)
   const { data: parcelas = [], isLoading } = useParcelas()
 
@@ -1276,9 +1332,11 @@ function TabProvisionado() {
     .map(p => ({ ...p, aPagar: aPagarDe(p) }))
     .filter(p => p.aPagar > 0)
 
+  const statusAll = statusSel.length === STATUS_PROV_OPTIONS.length
+  const grupoAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
   const filtered = compromissos.filter(p => {
-    if (statusFilter && p.status !== statusFilter) return false
-    if (grupoFilter && ((p.contrato as any)?.grupo_contrato ?? '') !== grupoFilter) return false
+    if (!statusAll && !statusSel.includes(p.status)) return false
+    if (!grupoAll && !grupoSel.includes((p.contrato as any)?.grupo_contrato ?? '')) return false
     if (busca) {
       const q = busca.toLowerCase()
       const hay = `${p.contrato?.objeto ?? ''} ${p.contrato?.numero ?? ''} ${(p.contrato as any)?.contraparte_nome ?? ''}`.toLowerCase()
@@ -1312,14 +1370,6 @@ function TabProvisionado() {
     cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' },
-    { label: 'Previsto', value: 'previsto' },
-    { label: 'Pendente', value: 'pendente' },
-    { label: 'Liberado', value: 'liberado' },
-    { label: 'Pago', value: 'pago' },
-  ]
-
   // atalhos de período
   const mesAtual = ymHoje(), mesProx = ymMais(1)
   const anoFim = `${new Date().getFullYear()}-12`
@@ -1343,19 +1393,10 @@ function TabProvisionado() {
             placeholder="Buscar numero, objeto, contraparte..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-          {FILTROS.map(f => (
-            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
-          ))}
-        </select>
-        <select value={grupoFilter} onChange={e => setGrupoFilter(e.target.value)}
-          className="shrink-0 min-w-[150px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-          <option value="">Todos os Grupos</option>
-          {GRUPO_CONTRATO_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <MultiSelect label="Todos os Status" options={STATUS_PROV_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={140} />
+        <MultiSelect label="Todos os Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={160} />
         {ATALHOS.map(([label, active, onClick]) => (
           <button key={label} onClick={onClick}
             className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
