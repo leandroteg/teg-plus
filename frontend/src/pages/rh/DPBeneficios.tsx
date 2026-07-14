@@ -1,6 +1,7 @@
 // pages/rh/DPBeneficios.tsx — DP > Benefícios
 import { HeartPulse, UtensilsCrossed, Bus, Home, MoreHorizontal, Gift } from 'lucide-react'
 import DPFluxoPage from '../../components/rh/DPFluxoPage'
+import DPPlanoSaudePanel from '../../components/rh/DPPlanoSaudePanel'
 import type { RHTab } from '../../components/rh/RHTabRail'
 
 const TABS: RHTab[] = [
@@ -12,5 +13,8 @@ const TABS: RHTab[] = [
 ]
 
 export default function DPBeneficios() {
-  return <DPFluxoPage titulo="Benefícios" subtitulo="Gestão dos benefícios dos colaboradores" icon={Gift} iconColor="text-amber-400" tabs={TABS} />
+  return (
+    <DPFluxoPage titulo="Benefícios" subtitulo="Gestão dos benefícios dos colaboradores" icon={Gift} iconColor="text-amber-400" tabs={TABS}
+      renderPanel={k => k === 'plano_saude' ? <DPPlanoSaudePanel /> : null} />
+  )
 }
