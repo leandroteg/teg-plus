@@ -157,6 +157,17 @@ const STATUS_MEDICAO_OPTIONS: { value: string; label: string }[] = [
   { value: 'rejeitado',    label: 'Rejeitadas' },
   { value: 'rascunho',     label: 'Rascunho' },
 ]
+// Tipo/status (aba Aditivos e Reajustes)
+const TIPO_ADITIVO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'aditivo',  label: 'Aditivos' },
+  { value: 'reajuste', label: 'Reajustes' },
+]
+const STATUS_ADITIVO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'rascunho',     label: 'Rascunho' },
+  { value: 'em_aprovacao', label: 'Em Aprovação' },
+  { value: 'aprovado',     label: 'Aprovado' },
+  { value: 'rejeitado',    label: 'Rejeitado' },
+]
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado' | 'modelos'
@@ -690,7 +701,8 @@ function TabContratos() {
 // ── Tab: Aditivos ───────────────────────────────────────────────────────────
 function TabAditivosReajustes() {
   const { perfil } = useAuth()
-  const [statusFilter, setStatusFilter] = useState('')
+  const [tipoSel, setTipoSel] = useState<string[]>(TIPO_ADITIVO_OPTIONS.map(o => o.value))
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_ADITIVO_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
   const [view, setView] = useState<'table' | 'card'>('table')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -707,11 +719,14 @@ function TabAditivosReajustes() {
     ...reajustes.map(r => ({ kind: 'reajuste' as const, key: `r-${r.id}`, data: r.data_base ?? '', a: undefined, r })),
   ]
 
+  const tipoAll = tipoSel.length === TIPO_ADITIVO_OPTIONS.length
+  const statusAll = statusSel.length === STATUS_ADITIVO_OPTIONS.length
   const filtered = linhas.filter(l => {
-    if (statusFilter === 'aditivo' && l.kind !== 'aditivo') return false
-    if (statusFilter === 'reajuste' && l.kind !== 'reajuste') return false
-    if (['rascunho', 'em_aprovacao', 'aprovado', 'rejeitado'].includes(statusFilter) &&
-        (l.kind !== 'aditivo' || l.a!.status !== statusFilter)) return false
+    if (!tipoAll && !tipoSel.includes(l.kind)) return false
+    // status só existe em aditivos; filtrar por status oculta reajustes (que não têm status)
+    if (!statusAll) {
+      if (l.kind !== 'aditivo' || !statusSel.includes(l.a!.status)) return false
+    }
     if (busca) {
       const q = busca.toLowerCase()
       if (l.kind === 'aditivo') {
@@ -734,9 +749,6 @@ function TabAditivosReajustes() {
     return true
   }).sort((x, y) => (y.data || '').localeCompare(x.data || ''))
 
-  const impacto = filtered.reduce((s, l) =>
-    s + (l.kind === 'aditivo' ? (l.a!.valor_acrescimo || 0) : (l.r!.valor_depois - l.r!.valor_antes)), 0)
-
   const handleStatusChange = (id: string, status: StatusAditivo) => {
     const label = status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : status
     if (!confirm(`Deseja ${label} este aditivo?`)) return
@@ -752,13 +764,6 @@ function TabAditivosReajustes() {
     )
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' },
-    { label: 'Aditivos', value: 'aditivo' }, { label: 'Reajustes', value: 'reajuste' },
-    { label: 'Rascunho', value: 'rascunho' }, { label: 'Em Aprovação', value: 'em_aprovacao' },
-    { label: 'Aprovados', value: 'aprovado' }, { label: 'Rejeitados', value: 'rejeitado' },
-  ]
-
   return (
     <div className="space-y-4">
       {toast && (
@@ -770,22 +775,6 @@ function TabAditivosReajustes() {
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-violet-500 uppercase tracking-widest">Aditivos</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{aditivos.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest">Reajustes</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{reajustes.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest">Impacto</p>
-          <p className={`text-lg font-extrabold mt-1 ${impacto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(impacto)}</p>
-        </div>
-      </div>
-
       {/* Toolbar: busca + filtros + toggle (1 linha, padrão Locações) */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px]">
@@ -795,17 +784,10 @@ function TabAditivosReajustes() {
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-          {FILTROS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <MultiSelect label="Tipo" options={TIPO_ADITIVO_OPTIONS}
+          selected={tipoSel} onChange={setTipoSel} minW={110} />
+        <MultiSelect label="Status" options={STATUS_ADITIVO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
         <div className="flex items-center gap-1">
           <button onClick={() => setView('table')} title="Tabela"
             className={`p-1.5 rounded-lg transition-colors ${view === 'table' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}>
