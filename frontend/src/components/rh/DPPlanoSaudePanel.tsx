@@ -98,18 +98,17 @@ export default function DPPlanoSaudePanel() {
             {contrato.quantitativo != null && <> · q. <b className={txt}>{contrato.quantitativo}</b></>}
           </span>
         )}
-        <div className="flex-1" />
+        <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[140px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={13} className={txtMuted} />
+          <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
+            className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${inputCls.split(' ').filter(c => c.startsWith('text-') || c.startsWith('placeholder-')).join(' ')}`} />
+        </div>
         <button onClick={() => setSoPlano(v => !v)}
-          className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${soPlano
+          className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${soPlano
             ? isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
             : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
           <Users size={11} className="inline mr-1" />Só quem está no plano
         </button>
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[170px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-          <Search size={13} className={txtMuted} />
-          <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none ${inputCls.split(' ').filter(c => c.startsWith('text-') || c.startsWith('placeholder-')).join(' ')}`} />
-        </div>
       </div>
 
       {/* Matriz */}
