@@ -9,7 +9,7 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { supabase } from '../../../services/supabase'
 
 type Pulso = { etapa: string; label: string; qt: number }
-type Fase = { etapa: string; label: string; dias: number; qt: number }
+type Fase = { etapa: string; label: string; dias: number | null; qt: number }
 type Atraso = { nome: string; funcao: string; dt: string; estagio: string; dias: number }
 type Painel = {
   admitidos: number; liberados: number; tempo_medio_integracao: number | null
@@ -53,7 +53,7 @@ export default function LiberacaoHeadcount({ de, ate }: { de: string; ate: strin
   // Pulso: na Liberação conta só quem está "aguardando" (os já liberados saíram da fila)
   const pulsoDisplay = data.pulso.map(p => ({ ...p, qt: p.etapa === 'liberado' ? data.aguardando : p.qt }))
   const pulsoMax = Math.max(...pulsoDisplay.map(p => p.qt), 1)
-  const faseMax = Math.max(...data.fases.map(f => f.dias), 1)
+  const faseMax = Math.max(...data.fases.map(f => f.dias ?? 0), 1)
 
   return (
     <div className="space-y-3">
@@ -133,18 +133,23 @@ export default function LiberacaoHeadcount({ de, ate }: { de: string; ate: strin
             </h2>
             <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>dias na etapa</span>
           </div>
-          <div className="h-[288px] flex flex-col justify-center gap-3 px-4">
-            {data.fases.map(f => (
-              <div key={f.etapa} className="grid grid-cols-[96px_1fr_46px] items-center gap-2">
-                <div className={`text-[11px] font-bold text-right truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{f.label}</div>
-                <div className={`h-4 rounded-lg overflow-hidden ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
-                  <div className="h-full rounded-lg" style={{ width: `${Math.max((f.dias / faseMax) * 100, 4)}%`, background: ETAPA_COR[f.etapa] }} />
+          <div className="h-[288px] flex flex-col justify-center gap-2 px-4">
+            {data.fases.map(f => {
+              const vazio = f.qt === 0 || f.dias == null
+              return (
+                <div key={f.etapa} className="grid grid-cols-[96px_1fr_46px] items-center gap-2">
+                  <div className={`text-[11px] font-bold text-right truncate ${vazio ? (isDark ? 'text-slate-600' : 'text-slate-300') : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>{f.label}</div>
+                  <div className={`h-4 rounded-lg overflow-hidden ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
+                    {!vazio && <div className="h-full rounded-lg" style={{ width: `${Math.max(((f.dias ?? 0) / faseMax) * 100, 4)}%`, background: ETAPA_COR[f.etapa] }} />}
+                  </div>
+                  <div className={`text-[11px] font-extrabold ${vazio ? (isDark ? 'text-slate-600' : 'text-slate-300') : (isDark ? 'text-white' : 'text-slate-800')}`}>
+                    {vazio ? '—' : `${(f.dias ?? 0).toLocaleString('pt-BR')}d`}
+                  </div>
                 </div>
-                <div className={`text-[11px] font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{f.dias.toLocaleString('pt-BR')}d</div>
-              </div>
-            ))}
-            <p className={`text-[10px] mt-1 leading-relaxed ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-              * tempo médio parado na etapa atual — amadurece conforme o fluxo roda.
+              )
+            })}
+            <p className={`text-[10px] mt-0.5 leading-relaxed ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+              * tempo médio parado na etapa atual · “—” = ninguém na etapa. Amadurece conforme o fluxo roda.
             </p>
           </div>
         </section>
