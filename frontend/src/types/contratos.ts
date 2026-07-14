@@ -336,6 +336,7 @@ export type CategoriaContrato =
 export type GrupoContrato =
   | 'locacao_imovel' | 'locacao_veiculos' | 'locacao_equipamentos'
   | 'equipe_pj' | 'prestacao_servicos' | 'servico_recorrente'
+  | 'telefonia_internet'
   | 'aquisicao' | 'subcontratacao_empreitada' | 'consultoria_juridico'
   | 'apoio_operacional' | 'seguros' | 'fornecimento' | 'outro'
 
