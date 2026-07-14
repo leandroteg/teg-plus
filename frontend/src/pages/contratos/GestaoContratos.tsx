@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import {
-  Briefcase, Search, FileText, FileSignature, TrendingUp,
+  Briefcase, Search, FileText, FileSignature, TrendingUp, Check,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Clock, Banknote, CreditCard,
@@ -72,59 +72,51 @@ function MultiSelect({ label, options, selected, onChange, minW = 150 }: {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
 
-  // Painel em position:fixed p/ escapar do overflow-x-auto da barra de filtros (senão fica recortado).
+  // Padrão EGP (ProjetosFilterBar): fecha por backdrop (fixed inset-0), SEM listener de scroll
+  // — assim rolar dentro do painel não fecha. Painel em position:fixed p/ escapar do overflow-x da barra.
   const openMenu = () => {
     const r = btnRef.current?.getBoundingClientRect()
-    if (r) setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 210) })
+    if (r) setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 224) })
     setOpen(true)
   }
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => {
-      if (btnRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) return
-      setOpen(false)
-    }
-    const onScroll = () => setOpen(false)
-    document.addEventListener('mousedown', close)
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
-    }
-  }, [open])
-
   const allValues = options.map(o => o.value)
-  const allChecked = selected.length === allValues.length
-  const display = allChecked ? label : selected.length === 0 ? `${label} · nenhum` : `${label} · ${selected.length}`
+  const total = allValues.length
+  const sel = selected.length
+  const allChecked = sel === total
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const box = (on: boolean) => `shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : 'border-slate-300'}`
+  const btnCls = 'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ' +
+    (allChecked ? 'border-slate-200 bg-white text-slate-600' : 'border-teal-300 bg-teal-50 text-teal-700 font-semibold')
   return (
     <div className="relative shrink-0" style={{ minWidth: minW }}>
-      <button ref={btnRef} type="button" onClick={() => (open ? setOpen(false) : openMenu())}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 hover:border-slate-300">
-        <span className="truncate">{display}</span>
-        <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      <button ref={btnRef} type="button" onClick={() => (open ? setOpen(false) : openMenu())} className={btnCls}>
+        <span className="truncate">{label}: {sel}/{total}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && pos && (
-        <div ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 60 }}
-          className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl py-1">
-          <label className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100">
-            <input type="checkbox" checked={allChecked} onChange={() => onChange(allChecked ? [] : allValues)}
-              className="w-4 h-4 accent-indigo-600" />
-            <span className="text-sm font-semibold text-slate-700">Selecionar Todos</span>
-          </label>
-          {options.map(o => (
-            <label key={o.value} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)}
-                className="w-4 h-4 accent-indigo-600" />
-              <span className="text-sm text-slate-600 truncate">{o.label}</span>
-            </label>
-          ))}
-        </div>
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 50 }}
+            className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5">
+            <button type="button" onClick={() => onChange(allChecked ? [] : allValues)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-100">
+              <span className={box(allChecked)}>{allChecked && <Check size={11} />}</span>
+              Selecionar todos
+            </button>
+            <div className="my-1 border-t border-slate-100" />
+            {options.map(o => {
+              const on = selected.includes(o.value)
+              return (
+                <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100">
+                  <span className={box(on)}>{on && <Check size={11} />}</span>
+                  <span className="truncate text-left">{o.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )
@@ -1416,10 +1408,10 @@ function TabProvisionado() {
             placeholder="Buscar numero, objeto, contraparte..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
         </div>
-        <MultiSelect label="Todos os Status" options={STATUS_PROV_OPTIONS}
-          selected={statusSel} onChange={setStatusSel} minW={140} />
-        <MultiSelect label="Todos os Grupos" options={GRUPO_CONTRATO_OPTIONS}
-          selected={grupoSel} onChange={setGrupoSel} minW={160} />
+        <MultiSelect label="Status" options={STATUS_PROV_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
         {ATALHOS.map(([label, active, onClick]) => (
           <button key={label} onClick={onClick}
             className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
