@@ -120,9 +120,9 @@ export default function DPPlanoSaudePanel() {
               <tr className={isDark ? 'bg-[#101826] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 <th className="text-left px-3 py-2 font-semibold">COLABORADOR</th>
                 <th className="text-center px-3 py-2 font-semibold w-[90px]">NO PLANO</th>
-                <th className="text-right px-3 py-2 font-semibold w-[110px]">PREÇO (R$)</th>
-                <th className="text-right px-3 py-2 font-semibold w-[100px]">DESCONTO (R$)</th>
-                <th className="text-right px-3 py-2 font-semibold w-[110px]">CUSTO EMPRESA</th>
+                <th className="text-right px-3 py-2 font-semibold w-[120px] whitespace-nowrap">PREÇO (R$)</th>
+                <th className="text-right px-3 py-2 font-semibold w-[130px] whitespace-nowrap">DESCONTO (R$)</th>
+                <th className="text-right px-3 py-2 font-semibold w-[140px] whitespace-nowrap">CUSTO EMPRESA</th>
                 <th className="text-center px-3 py-2 font-semibold w-[130px]">ENTRADA</th>
                 <th className="text-center px-3 py-2 font-semibold w-[110px]">DEPENDENTES</th>
                 <th className="text-center px-3 py-2 font-semibold w-[70px]">VIDAS</th>
