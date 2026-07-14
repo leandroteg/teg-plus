@@ -18,13 +18,15 @@ import type { RHAdmissao } from '../../types/rh'
 const EvolucaoHeadcount = lazy(() => import('./paineis/EvolucaoHeadcount'))
 const ComposicaoHeadcount = lazy(() => import('./paineis/ComposicaoHeadcount'))
 const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
+const LiberacaoHeadcount = lazy(() => import('./paineis/LiberacaoHeadcount'))
 
-type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
+type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover' | 'liberacao'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
   { key: 'geral', label: 'Visão Geral' },
   { key: 'composicao', label: 'Composição' },
   { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
+  { key: 'liberacao', label: 'Liberação' },
 ]
 
 const EM_ANDAMENTO = ['requisicao', 'aprovacao', 'documentacao', 'exames_treinamentos', 'mobilizacao', 'integracao']
@@ -168,7 +170,7 @@ export default function RHPainel() {
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
         </div>
-        {painel === 'geral' ? (
+        {painel === 'geral' || painel === 'liberacao' ? (
           <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
             <RefreshCw size={16} />
           </button>
@@ -184,6 +186,7 @@ export default function RHPainel() {
       {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount de={de} ate={ate} /></Suspense>}
+      {painel === 'liberacao' && <Suspense fallback={<PainelSpinner />}><LiberacaoHeadcount /></Suspense>}
       {painel === 'geral' && (
         (isLoading || !stats) ? <PainelSpinner /> : <VisaoGeral stats={stats} admissoes={admissoes} isDark={isDark} />
       )}
