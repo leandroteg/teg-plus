@@ -70,25 +70,48 @@ function MultiSelect({ label, options, selected, onChange, minW = 150 }: {
   minW?: number
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Painel em position:fixed p/ escapar do overflow-x-auto da barra de filtros (senão fica recortado).
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 210) })
+    setOpen(true)
+  }
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (btnRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    const onScroll = () => setOpen(false)
+    document.addEventListener('mousedown', close)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [open])
+
   const allValues = options.map(o => o.value)
   const allChecked = selected.length === allValues.length
   const display = allChecked ? label : selected.length === 0 ? `${label} · nenhum` : `${label} · ${selected.length}`
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
   return (
-    <div ref={ref} className="relative shrink-0" style={{ minWidth: minW }}>
-      <button type="button" onClick={() => setOpen(o => !o)}
+    <div className="relative shrink-0" style={{ minWidth: minW }}>
+      <button ref={btnRef} type="button" onClick={() => (open ? setOpen(false) : openMenu())}
         className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 hover:border-slate-300">
         <span className="truncate">{display}</span>
         <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full min-w-[210px] max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+      {open && pos && (
+        <div ref={panelRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 60 }}
+          className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl py-1">
           <label className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100">
             <input type="checkbox" checked={allChecked} onChange={() => onChange(allChecked ? [] : allValues)}
               className="w-4 h-4 accent-indigo-600" />
