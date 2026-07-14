@@ -12,7 +12,8 @@ type Pulso = { etapa: string; label: string; qt: number }
 type Fase = { etapa: string; label: string; dias: number; qt: number }
 type Atraso = { nome: string; funcao: string; dt: string; estagio: string; dias: number }
 type Painel = {
-  liberados: number; aguardando: number; em_andamento: number; em_atraso: number
+  admitidos: number; liberados: number; tempo_medio_integracao: number | null
+  aguardando: number; em_andamento: number; em_atraso: number
   pulso: Pulso[]; fases: Fase[]; atraso: Atraso[]
 }
 
@@ -27,20 +28,22 @@ const ETAPA_COR: Record<string, string> = {
   mobilizacao: '#f97316', integracao: '#0d9488', liberado: '#059669',
 }
 
-function useLiberacaoPainel() {
+function useLiberacaoPainel(de: string, ate: string) {
   return useQuery<Painel>({
-    queryKey: ['rh-liberacao-painel'],
+    queryKey: ['rh-liberacao-painel', de, ate],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rh_admissao_liberacao_painel')
+      const { data, error } = await supabase.rpc('rh_admissao_liberacao_painel', {
+        p_de: `${de}-01`, p_ate: `${ate}-01`,
+      })
       if (error) throw error
       return data as Painel
     },
   })
 }
 
-export default function LiberacaoHeadcount() {
+export default function LiberacaoHeadcount({ de, ate }: { de: string; ate: string }) {
   const { isDark } = useTheme()
-  const { data, isLoading } = useLiberacaoPainel()
+  const { data, isLoading } = useLiberacaoPainel(de, ate)
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
   if (isLoading || !data) {
@@ -68,9 +71,11 @@ export default function LiberacaoHeadcount() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <Indicador label="Liberados" value={data.liberados} tone="emerald" note="ativos no fluxo" isDark={isDark} />
-              <Indicador label="Aguardando" value={data.aguardando} tone="amber" note="travado no GESET" isDark={isDark} />
-              <Indicador label="Em andamento" value={data.em_andamento} tone="violet" note="antes da liberação" isDark={isDark} />
+              <Indicador label="Admitidos" value={data.admitidos} tone="violet" note="no período" isDark={isDark} />
+              <Indicador label="Liberados" value={data.liberados} tone="emerald" note="efetivados p/ campo" isDark={isDark} />
+              <Indicador label="Tempo médio integração"
+                value={data.tempo_medio_integracao != null ? `${data.tempo_medio_integracao.toLocaleString('pt-BR')}d` : '—'}
+                tone="amber" note="registro → liberação" isDark={isDark} />
             </div>
           </div>
         </section>
@@ -180,7 +185,7 @@ export default function LiberacaoHeadcount() {
   )
 }
 
-function Indicador({ label, value, tone, note, isDark }: { label: string; value: number; tone: string; note?: string; isDark: boolean }) {
+function Indicador({ label, value, tone, note, isDark }: { label: string; value: number | string; tone: string; note?: string; isDark: boolean }) {
   const tones: Record<string, string> = {
     violet: isDark ? 'text-violet-400' : 'text-violet-600',
     emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
