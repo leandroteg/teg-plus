@@ -93,9 +93,9 @@ export default function DPPlanoSaudePanel() {
           </span>
         )}
         {contrato && (
-          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-            <FileText size={12} /> Contrato <b className={txt}>{contrato.numero}</b> · {contrato.contraparte_nome} · {fmtCur(contrato.valor_mensal)}/mês
-            {contrato.quantitativo != null && <> · quant. <b className={txt}>{contrato.quantitativo}</b></>}
+          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+            <FileText size={12} /> <b className={txt}>{contrato.numero}</b> · {(contrato.contraparte_nome ?? '').split('(')[0].trim()} · {(contrato.valor_mensal ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}/mês
+            {contrato.quantitativo != null && <> · q. <b className={txt}>{contrato.quantitativo}</b></>}
           </span>
         )}
         <div className="flex-1" />
