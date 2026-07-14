@@ -47,7 +47,9 @@ export default function LiberacaoHeadcount() {
     return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
   }
 
-  const pulsoMax = Math.max(...data.pulso.map(p => p.qt), 1)
+  // Pulso: na Liberação conta só quem está "aguardando" (os já liberados saíram da fila)
+  const pulsoDisplay = data.pulso.map(p => ({ ...p, qt: p.etapa === 'liberado' ? data.aguardando : p.qt }))
+  const pulsoMax = Math.max(...pulsoDisplay.map(p => p.qt), 1)
   const faseMax = Math.max(...data.fases.map(f => f.dias), 1)
 
   return (
@@ -100,18 +102,17 @@ export default function LiberacaoHeadcount() {
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Activity size={14} className="text-violet-500" /> Pulso por etapa
           </h2>
-          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>colaboradores em cada fase · hoje</span>
+          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>pessoas em cada fase · hoje · Liberação = aguardando</span>
         </div>
-        <div className="flex gap-1 px-4 py-3.5">
-          {data.pulso.map(p => {
+        <div className="flex items-end gap-1.5 px-4 pt-5 pb-2" style={{ height: 176 }}>
+          {pulsoDisplay.map(p => {
             const vazio = p.qt === 0
-            const h = 22 + Math.round((p.qt / pulsoMax) * 18)
+            const barH = vazio ? 3 : Math.max(Math.round((p.qt / pulsoMax) * 116), 10)
             return (
-              <div key={p.etapa} className="flex-1 min-w-0 text-center">
-                <div className="rounded-lg flex items-center justify-center font-black text-[13px] text-white"
-                  style={{ height: 40, background: ETAPA_COR[p.etapa], opacity: vazio ? 0.35 : 1, marginTop: 40 - h, minHeight: h }}
-                  title={`${p.label}: ${p.qt}`}>{p.qt}</div>
-                <div className={`text-[9px] font-bold uppercase tracking-tight mt-1.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.label}</div>
+              <div key={p.etapa} className="flex-1 min-w-0 h-full flex flex-col items-center justify-end gap-1.5" title={`${p.label}: ${p.qt}`}>
+                <span className={`text-[13px] font-black leading-none ${vazio ? (isDark ? 'text-slate-600' : 'text-slate-300') : (isDark ? 'text-white' : 'text-slate-700')}`}>{p.qt}</span>
+                <div className="w-full rounded-t-lg transition-all" style={{ height: barH, background: ETAPA_COR[p.etapa], opacity: vazio ? 0.3 : 1 }} />
+                <div className={`text-[9px] font-bold uppercase tracking-tight truncate w-full text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.label}</div>
               </div>
             )
           })}
