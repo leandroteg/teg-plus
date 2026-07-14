@@ -176,7 +176,7 @@ export default function RHPainel() {
             <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
         </div>
-        {painel === 'geral' || painel === 'liberacao' ? (
+        {painel === 'geral' ? (
           <button onClick={atualizar} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
             <RefreshCw size={16} />
           </button>
@@ -192,7 +192,7 @@ export default function RHPainel() {
       {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount de={de} ate={ate} /></Suspense>}
-      {painel === 'liberacao' && <Suspense fallback={<PainelSpinner />}><LiberacaoHeadcount /></Suspense>}
+      {painel === 'liberacao' && <Suspense fallback={<PainelSpinner />}><LiberacaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'geral' && (
         (isLoading || !stats) ? <PainelSpinner /> : <VisaoGeral stats={stats} admissoes={admissoes} isDark={isDark} />
       )}
