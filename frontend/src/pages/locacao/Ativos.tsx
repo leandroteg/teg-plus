@@ -386,6 +386,7 @@ export default function Ativos() {
       items.sort((a, b) => {
         let va: any, vb: any
         switch (sortCol) {
+          case 'nome': va = a.descricao || ''; vb = b.descricao || ''; break
           case 'imovel': va = a.endereco || a.descricao || ''; vb = b.endereco || b.descricao || ''; break
           case 'locador': va = a.locador_nome || ''; vb = b.locador_nome || ''; break
           case 'cc': va = (a as any).centro_custo?.descricao || ''; vb = (b as any).centro_custo?.descricao || ''; break
@@ -477,6 +478,7 @@ export default function Ativos() {
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 {[
+                  { key: 'nome', label: 'NOME', align: 'text-left' },
                   { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
                   { key: 'locador', label: 'LOCADOR', align: 'text-left' },
@@ -506,6 +508,7 @@ export default function Ativos() {
                 return (
                   <tr key={imo.id} onClick={() => setDetail(imo)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-3 py-2.5 font-semibold whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.descricao || '—'}</td>
                     <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
                     <td className="px-3 py-2.5">
                       <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtEndereco(imo)}</p>
