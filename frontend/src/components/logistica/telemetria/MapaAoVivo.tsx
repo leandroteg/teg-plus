@@ -161,16 +161,16 @@ export default function MapaAoVivo() {
     return pos ? [pos.latitude, pos.longitude] : null
   }, [selecionado, posicoes])
 
-  // Status counters
+  // Status counters — seguem os filtros ativos (provedor + busca), igual à lista
   const contadores = useMemo(() => {
     let movendo = 0, ocioso = 0, desligado = 0
-    for (const p of posicoes) {
+    for (const p of posicoesFiltradas) {
       if (!p.ignicao) desligado++
       else if (p.velocidade > 0) movendo++
       else ocioso++
     }
     return { movendo, ocioso, desligado }
-  }, [posicoes])
+  }, [posicoesFiltradas])
 
   // ── Empty state ─────────────────────────────────────────────────────────
   if (!isLoading && posicoes.length === 0) {
