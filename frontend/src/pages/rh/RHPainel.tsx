@@ -3,6 +3,7 @@
 // Seletor de painel (Visão Geral · Evolução · Composição · Turnover), igual ao Frotas.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, lazy, Suspense } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Users, UserPlus, TrendingUp, RefreshCw, ChevronRight,
   Zap, AlertTriangle, Activity, Building2, ChevronDown,
@@ -150,6 +151,11 @@ export default function RHPainel() {
   const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
   const { data: admissoes = [] } = useAdmissoesFluxo()
+  const qc = useQueryClient()
+  const atualizar = () => {
+    if (painel === 'liberacao') qc.invalidateQueries({ queryKey: ['rh-liberacao-painel'] })
+    else refetch()
+  }
 
   return (
     <div className="space-y-3">
@@ -171,7 +177,7 @@ export default function RHPainel() {
           </div>
         </div>
         {painel === 'geral' || painel === 'liberacao' ? (
-          <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+          <button onClick={atualizar} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
             <RefreshCw size={16} />
           </button>
         ) : (
