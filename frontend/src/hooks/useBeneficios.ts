@@ -13,6 +13,7 @@ export interface BeneficioAdesao {
   contrato_id: string | null
   dependentes: number
   valor_mensal: number | null
+  desconto_mensal: number | null
   data_inicio: string
   data_fim: string | null
   observacao: string | null
@@ -83,6 +84,7 @@ export function useAderirBeneficio() {
         contrato_id: p.contratoId ?? null,
         dependentes: p.dependentes ?? 0,
         valor_mensal: (p as { valorMensal?: number }).valorMensal ?? null,
+        desconto_mensal: 60,  // padrão da rubrica 8111 (editável na matriz)
         criado_por_nome: p.criadoPor ?? null,
       })
       if (error) throw error
@@ -94,7 +96,7 @@ export function useAderirBeneficio() {
 export function useAtualizarAdesao() {
   const invalidar = useInvalidarBeneficios()
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; dependentes?: number; valor_mensal?: number | null; data_inicio?: string }) => {
+    mutationFn: async ({ id, ...patch }: { id: string; dependentes?: number; valor_mensal?: number | null; desconto_mensal?: number | null; data_inicio?: string }) => {
       const { error } = await supabase
         .from('rh_beneficio_adesoes')
         .update({ ...patch, updated_at: new Date().toISOString() })

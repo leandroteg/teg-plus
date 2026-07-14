@@ -58,6 +58,8 @@ export default function DPPlanoSaudePanel() {
   const dependentes = adesoes.reduce((s, a) => s + (a.dependentes || 0), 0)
   const vidas = titulares + dependentes
   const somaPrecos = adesoes.reduce((s, a) => s + (a.valor_mensal || 0), 0)
+  const somaDescontos = adesoes.reduce((s, a) => s + (a.desconto_mensal || 0), 0)
+  const custoLiquido = somaPrecos - somaDescontos
 
   const toggle = async (colabId: string, nome: string) => {
     const ades = adesaoPorColab.get(colabId)
@@ -87,7 +89,7 @@ export default function DPPlanoSaudePanel() {
         </span>
         {somaPrecos > 0 && (
           <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            soma dos preços: {fmtCur(somaPrecos)}/mês
+            preços: {fmtCur(somaPrecos)} · descontos: {fmtCur(somaDescontos)} · <b className={isDark ? 'text-amber-300' : 'text-amber-700'}>custo empresa: {fmtCur(custoLiquido)}/mês</b>
           </span>
         )}
         {contrato && (
@@ -118,7 +120,9 @@ export default function DPPlanoSaudePanel() {
               <tr className={isDark ? 'bg-[#101826] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 <th className="text-left px-3 py-2 font-semibold">COLABORADOR</th>
                 <th className="text-center px-3 py-2 font-semibold w-[90px]">NO PLANO</th>
-                <th className="text-right px-3 py-2 font-semibold w-[120px]">PREÇO (R$)</th>
+                <th className="text-right px-3 py-2 font-semibold w-[110px]">PREÇO (R$)</th>
+                <th className="text-right px-3 py-2 font-semibold w-[100px]">DESCONTO (R$)</th>
+                <th className="text-right px-3 py-2 font-semibold w-[110px]">CUSTO EMPRESA</th>
                 <th className="text-center px-3 py-2 font-semibold w-[130px]">ENTRADA</th>
                 <th className="text-center px-3 py-2 font-semibold w-[110px]">DEPENDENTES</th>
                 <th className="text-center px-3 py-2 font-semibold w-[70px]">VIDAS</th>
@@ -147,8 +151,19 @@ export default function DPPlanoSaudePanel() {
                         <input type="number" min={0} step="0.01" defaultValue={a.valor_mensal ?? ''} placeholder="0,00"
                           key={`${a.id}-preco-${a.valor_mensal ?? ''}`}
                           onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (a.valor_mensal ?? null)) atualizar.mutate({ id: a.id, valor_mensal: v }) }}
-                          className={`w-[90px] text-right text-xs rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
+                          className={`w-[85px] text-right text-xs rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
                       ) : <span className={txtMuted}>—</span>}
+                    </td>
+                    <td className="text-right px-3 py-2">
+                      {a ? (
+                        <input type="number" min={0} step="0.01" defaultValue={a.desconto_mensal ?? ''} placeholder="0,00"
+                          key={`${a.id}-desc-${a.desconto_mensal ?? ''}`}
+                          onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (a.desconto_mensal ?? null)) atualizar.mutate({ id: a.id, desconto_mensal: v }) }}
+                          className={`w-[75px] text-right text-xs rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
+                      ) : <span className={txtMuted}>—</span>}
+                    </td>
+                    <td className={`text-right px-3 py-2 font-bold ${a ? (isDark ? 'text-amber-300' : 'text-amber-700') : txtMuted}`}>
+                      {a && a.valor_mensal != null ? fmtCur((a.valor_mensal || 0) - (a.desconto_mensal || 0)) : '—'}
                     </td>
                     <td className="text-center px-3 py-2">
                       {a ? (
@@ -173,7 +188,7 @@ export default function DPPlanoSaudePanel() {
                 )
               })}
               {lista.length === 0 && (
-                <tr><td colSpan={6} className={`text-center py-10 text-sm ${txtMuted}`}>Nenhum colaborador encontrado</td></tr>
+                <tr><td colSpan={8} className={`text-center py-10 text-sm ${txtMuted}`}>Nenhum colaborador encontrado</td></tr>
               )}
             </tbody>
           </table>
