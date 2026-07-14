@@ -129,6 +129,34 @@ const STATUS_PROV_OPTIONS: { value: string; label: string }[] = [
   { value: 'liberado', label: 'Liberado' },
   { value: 'pago',     label: 'Pago' },
 ]
+// Status/tipo de contrato (aba Contratos)
+const STATUS_CONTRATO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'em_negociacao', label: 'Em Negociação' },
+  { value: 'assinado',      label: 'Assinado' },
+  { value: 'vigente',       label: 'Vigente' },
+  { value: 'suspenso',      label: 'Suspenso' },
+  { value: 'encerrado',     label: 'Encerrado' },
+  { value: 'rescindido',    label: 'Rescindido' },
+]
+const TIPO_CONTRATO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'receita', label: 'Receita' },
+  { value: 'despesa', label: 'Despesa' },
+]
+// Status das parcelas a receber (aba Recebíveis)
+const STATUS_RECEB_OPTIONS: { value: string; label: string }[] = [
+  { value: 'previsto', label: 'Previsto' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'liberado', label: 'Liberado' },
+  { value: 'pago',     label: 'Recebido' },
+]
+// Status das medições (aba Medições)
+const STATUS_MEDICAO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'em_aprovacao', label: 'Em Aprovação' },
+  { value: 'aprovado',     label: 'Aprovadas' },
+  { value: 'faturado',     label: 'No Financeiro' },
+  { value: 'rejeitado',    label: 'Rejeitadas' },
+  { value: 'rascunho',     label: 'Rascunho' },
+]
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado' | 'modelos'
@@ -463,9 +491,9 @@ function TabContratos() {
   const { hasSetorPapel, perfil } = useAuth()
   const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
-  const [statusFilter, setStatusFilter] = useState('vigente')   // pré-filtrado: só vigentes
-  const [tipoFilter, setTipoFilter] = useState('')
-  const [filtroGrupo, setFiltroGrupo] = useState<string>('')
+  const [statusSel, setStatusSel] = useState<string[]>(['vigente'])   // pré-filtrado: só vigentes
+  const [tipoSel, setTipoSel] = useState<string[]>(TIPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
   const [vencFilter, setVencFilter] = useState('')   // absorve a antiga aba Vencimentos
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -475,12 +503,12 @@ function TabContratos() {
     setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const { data: contratos = [], isLoading } = useContratos(
-    (statusFilter || tipoFilter) ? {
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(tipoFilter ? { tipo_contrato: tipoFilter } : {}),
-    } : undefined
-  )
+  // Busca tudo e filtra no cliente (multi-select). Status/tipo/grupo com semântica "tudo marcado = sem filtro".
+  const { data: contratos = [], isLoading } = useContratos(undefined)
+
+  const statusAll = statusSel.length === STATUS_CONTRATO_OPTIONS.length
+  const tipoAll = tipoSel.length === TIPO_CONTRATO_OPTIONS.length
+  const grupoAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
 
   let filtered = contratos.filter(c =>
     !busca
@@ -489,9 +517,9 @@ function TabContratos() {
     || c.cliente?.nome.toLowerCase().includes(busca.toLowerCase())
     || c.fornecedor?.razao_social?.toLowerCase().includes(busca.toLowerCase())
   )
-  if (filtroGrupo) {
-    filtered = filtered.filter(c => c.grupo_contrato === filtroGrupo)
-  }
+  if (!statusAll) filtered = filtered.filter(c => statusSel.includes(c.status))
+  if (!tipoAll) filtered = filtered.filter(c => tipoSel.includes((c as any).tipo_contrato))
+  if (!grupoAll) filtered = filtered.filter(c => grupoSel.includes(c.grupo_contrato ?? ''))
   if (vencFilter) {
     const hoje = Date.now()
     const dias = (c: Contrato) => Math.ceil((new Date(c.data_fim_previsto).getTime() - hoje) / 86400000)
@@ -523,40 +551,12 @@ function TabContratos() {
               focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-        >
-          <option value="">Todos os Status</option>
-          <option value="em_negociacao">Em Negociacao</option>
-          <option value="assinado">Assinado</option>
-          <option value="vigente">Vigente</option>
-          <option value="suspenso">Suspenso</option>
-          <option value="encerrado">Encerrado</option>
-          <option value="rescindido">Rescindido</option>
-        </select>
-
-        <select
-          value={tipoFilter}
-          onChange={e => setTipoFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-        >
-          <option value="">Todos os Tipos</option>
-          <option value="receita">Receita</option>
-          <option value="despesa">Despesa</option>
-        </select>
-
-        <select
-          value={filtroGrupo}
-          onChange={e => setFiltroGrupo(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 min-w-[180px]"
-        >
-          <option value="">Todos os Grupos</option>
-          {GRUPO_CONTRATO_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <MultiSelect label="Status" options={STATUS_CONTRATO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        <MultiSelect label="Tipo" options={TIPO_CONTRATO_OPTIONS}
+          selected={tipoSel} onChange={setTipoSel} minW={110} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
 
         <select
           value={vencFilter}
@@ -1026,7 +1026,7 @@ function TabAditivosReajustes() {
 function TabRecebiveis() {
   const nav = useNavigate()
   const { isDark } = useTheme()
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_RECEB_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
   const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses
   const [ate, setAte] = useState(ymMais(36))
@@ -1109,8 +1109,9 @@ function TabRecebiveis() {
     .map(p => ({ ...p, aReceber: aReceberDe(p) }))
     .filter(p => p.aReceber > 0)
 
+  const statusRecebAll = statusSel.length === STATUS_RECEB_OPTIONS.length
   const filtered = parcelasJanela.filter(p => {
-    if (statusFilter && p.status !== statusFilter) return false
+    if (!statusRecebAll && !statusSel.includes(p.status)) return false
     if (!matchBusca(p.contrato?.objeto, p.contrato?.numero, (p.contrato as any)?.contraparte_nome)) return false
     return true
   })
@@ -1148,14 +1149,6 @@ function TabRecebiveis() {
     cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' },
-    { label: 'Previsto', value: 'previsto' },
-    { label: 'Pendente', value: 'pendente' },
-    { label: 'Liberado', value: 'liberado' },
-    { label: 'Recebido', value: 'pago' },
-  ]
-
   return (
     <div className="space-y-4">
       {/* Filtros numa linha + resumo inline (parcelas + saldo EGP + medições) que atualiza c/ os filtros */}
@@ -1175,12 +1168,8 @@ function TabRecebiveis() {
             placeholder="Buscar numero, objeto, contraparte..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
-          {FILTROS.map(f => (
-            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
-          ))}
-        </select>
+        <MultiSelect label="Status" options={STATUS_RECEB_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
         {ATALHOS.map(([label, active, onClick]) => (
           <button key={label} onClick={onClick}
             className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
@@ -1909,9 +1898,9 @@ function TabMedicoes() {
   const { isDark } = useTheme()
   const { perfil, isAdmin, hasSetorPapel } = useAuth()
   const podeAprovar = isAdmin || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_MEDICAO_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
-  const [grupoFilter, setGrupoFilter] = useState('')
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
   const [de, setDe] = useState(ymMais(-36))   // default amplo: 3 anos atrás → +12m (mostra tudo)
   const [ate, setAte] = useState(ymMais(12))
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1936,9 +1925,11 @@ function TabMedicoes() {
 
   const contratoMap = new Map(contratos.map(c => [c.id, c]))
 
+  const statusMedAll = statusSel.length === STATUS_MEDICAO_OPTIONS.length
+  const grupoMedAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
   const filtered = medicoes.filter(m => {
-    if (statusFilter && m.status !== statusFilter) return false
-    if (grupoFilter && (contratoMap.get(m.contrato_id)?.grupo_contrato ?? '') !== grupoFilter) return false
+    if (!statusMedAll && !statusSel.includes(m.status)) return false
+    if (!grupoMedAll && !grupoSel.includes(contratoMap.get(m.contrato_id)?.grupo_contrato ?? '')) return false
     const ym = (m.periodo_fim || m.created_at || '').slice(0, 7)
     if (ym && (ym < de || ym > ate)) return false
     if (busca) {
@@ -2006,15 +1997,6 @@ function TabMedicoes() {
     })
   }
 
-  const FILTROS = [
-    { label: 'Todas',         value: '' },
-    { label: 'Em Aprovação',  value: 'em_aprovacao' },
-    { label: 'Aprovadas',     value: 'aprovado' },
-    { label: 'No Financeiro', value: 'faturado' },
-    { label: 'Rejeitadas',    value: 'rejeitado' },
-    { label: 'Rascunho',      value: 'rascunho' },
-  ]
-
   return (
     <div className="space-y-4">
       {toast && (
@@ -2037,19 +2019,10 @@ function TabMedicoes() {
             placeholder="Buscar BM, contrato..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="shrink-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30">
-          {FILTROS.map(f => (
-            <option key={f.value} value={f.value}>{f.value === '' ? 'Todos os Status' : f.label}</option>
-          ))}
-        </select>
-        <select value={grupoFilter} onChange={e => setGrupoFilter(e.target.value)}
-          className="shrink-0 min-w-[150px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30">
-          <option value="">Todos os Grupos</option>
-          {GRUPO_CONTRATO_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <MultiSelect label="Status" options={STATUS_MEDICAO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={130} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
           <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
