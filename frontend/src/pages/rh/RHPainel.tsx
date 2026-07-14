@@ -24,10 +24,10 @@ const LiberacaoHeadcount = lazy(() => import('./paineis/LiberacaoHeadcount'))
 type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover' | 'liberacao'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
   { key: 'geral', label: 'Visão Geral' },
+  { key: 'liberacao', label: 'Liberação' },
   { key: 'composicao', label: 'Composição' },
   { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
-  { key: 'liberacao', label: 'Liberação' },
 ]
 
 const EM_ANDAMENTO = ['requisicao', 'aprovacao', 'documentacao', 'exames_treinamentos', 'mobilizacao', 'integracao']
