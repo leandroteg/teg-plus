@@ -23,6 +23,7 @@ import {
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
+  useEstoqueEpi, useCriarMovEstoque,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -79,7 +80,7 @@ export default function QsmaSeguranca() {
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
-  const [subEpi, setSubEpi] = useState<'controle' | 'matriz' | 'fichas'>('controle')
+  const [subEpi, setSubEpi] = useState<'controle' | 'matriz' | 'epis'>('controle')
   const [modalTreinamento, setModalTreinamento] = useState<QsmaTreinamento | 'novo' | null>(null)
   const [modalOcorrencia, setModalOcorrencia] = useState<QsmaOcorrencia | 'novo' | null>(null)
 
@@ -87,7 +88,7 @@ export default function QsmaSeguranca() {
   useEffect(() => {
     if (!novoParam) return
     if (novoParam === 'ocorrencia') { setAba('ocorrencias'); setModalOcorrencia('novo') }
-    if (novoParam === 'epi') { setAba('epis'); setSubEpi('fichas'); setModalFicha(true) }
+    if (novoParam === 'epi') { setAba('epis'); setSubEpi('controle'); setModalFicha(true) }
     if (novoParam === 'treinamento') { setAba('treinamentos'); setModalTreinamento('novo') }
     if (novoParam === 'risco') { setAba('riscos'); setModalRisco('novo') }
     setParams({}, { replace: true })
@@ -194,7 +195,7 @@ export default function QsmaSeguranca() {
         // Toggle das sub-visões — mesmo padrão dos Treinamentos (Controle | Matriz | Fichas)
         const subTabsEpi = (
           <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-            {([['controle', 'Controle'], ['matriz', 'Matriz'], ['fichas', 'Fichas']] as const).map(([k, lbl]) => (
+            {([['controle', 'Controle'], ['matriz', 'Matriz'], ['epis', 'EPIs']] as const).map(([k, lbl]) => (
               <button key={k} onClick={() => setSubEpi(k)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   subEpi === k
@@ -205,139 +206,13 @@ export default function QsmaSeguranca() {
           </div>
         )
         if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
-        if (subEpi === 'controle') return <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />
+        if (subEpi === 'controle') return (
+          <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+            obraNome={obraNome} onNovaFicha={() => setModalFicha(true)} />
+        )
         return (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">{subTabsEpi}</div>
-          <QsmaToolbar
-            isDark={isDark}
-            contagem={`${fichasF.length} ficha${fichasF.length !== 1 ? 's' : ''}`}
-            busca={busca} onBusca={setBusca} placeholder="Buscar colaborador, ficha ou EPI…"
-            acoes={
-              <>
-                <BotaoNovo label="EPI no catálogo" onClick={() => setModalEpi('novo')} secundario isDark={isDark} />
-                <BotaoNovo label="Nova Ficha de Entrega" onClick={() => setModalFicha(true)} />
-              </>
-            }
-          >
-            <QuickChips
-              isDark={isDark} value={quickFicha} onChange={setQuickFicha}
-              chips={[{ k: 'aguardando', label: 'Só aguardando assinatura', icon: FileSignature }]}
-            />
-          </QsmaToolbar>
-
-          {/* Catálogo */}
-          <div className={card}>
-            <p className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider border-b ${txtMuted} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-              Catálogo ({epis.length})
-            </p>
-            {epis.length === 0 ? (
-              <p className={`px-4 py-4 text-xs italic ${txtMuted}`}>Nenhum EPI cadastrado — cadastre pelo nº do CA</p>
-            ) : (
-              <div className="p-3 flex flex-wrap gap-1.5">
-                {epis.map(e => {
-                  const caVencido = e.validade_ca && e.validade_ca < hoje
-                  return (
-                    <button key={e.id} onClick={() => setModalEpi(e)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                      caVencido
-                        ? isDark ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-red-200 bg-red-50 text-red-600'
-                        : isDark ? 'border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                    }`} title={caVencido ? 'CA vencido!' : undefined}>
-                      {e.nome}{e.ca ? ` · CA ${e.ca}` : ''}{caVencido ? ' ⚠' : ''}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Fichas de entrega (1 ficha → N EPIs) */}
-          <div className="space-y-2">
-            {fichasF.length === 0 ? (
-              <Vazio isDark={isDark} texto="Nenhuma ficha de entrega — crie a primeira" />
-            ) : fichasF.map(f => {
-              const st = STATUS_FICHA_EPI_LABEL[f.status]
-              const itens = f.itens ?? []
-              return (
-                <div key={f.id} className={`${card} p-3.5`}>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-bold ${txtMain}`}>
-                        <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{f.codigo}</span>
-                        {f.colaborador_nome ?? '—'}
-                      </p>
-                      <p className={`text-[11px] ${txtMuted}`}>
-                        {itens.length} item(ns) · {fmtData(f.data_entrega)} · {obraNome(f.obra_id)}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
-                    <button
-                      onClick={() => gerarFichaEpiPdf({
-                        codigo: f.codigo,
-                        colaboradorNome: f.colaborador_nome ?? '—',
-                        obraNome: obraNome(f.obra_id),
-                        dataEntrega: f.data_entrega,
-                        motivo: f.motivo,
-                        observacoes: f.observacoes,
-                        entreguePorNome: f.entregue_por_nome,
-                        itens: itens.map(it => ({
-                          nome: it.epi?.nome ?? 'EPI',
-                          ca: it.epi?.ca,
-                          quantidade: it.quantidade,
-                          tamanho: it.tamanho,
-                          trocaPrevista: it.data_troca_prevista,
-                        })),
-                      })}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${
-                        isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                      title="Gerar a ficha em PDF para colher a assinatura"
-                    >
-                      <FileDown size={11} /> PDF
-                    </button>
-                    {f.status === 'aguardando_assinatura' && (
-                      <label className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors ${
-                        isDark ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`} title="Anexar a ficha assinada (foto/scan) e arquivar">
-                        <Paperclip size={11} /> Arquivar assinada
-                        <input
-                          type="file" className="hidden" accept="application/pdf,image/png,image/jpeg,image/webp"
-                          onChange={async ev => {
-                            const file = ev.target.files?.[0]
-                            if (!file) return
-                            try {
-                              const path = await uploadEvidencia(`fichas-epi/${f.id}`, file)
-                              await arquivarFicha.mutateAsync({ fichaId: f.id, arquivoPath: path })
-                            } catch (err: any) {
-                              alert(`Erro ao arquivar: ${err?.message ?? 'desconhecido'}`)
-                            }
-                          }}
-                        />
-                      </label>
-                    )}
-                    {f.arquivo_assinado_path && (
-                      <button
-                        onClick={async () => {
-                          const url = await evidenciaUrl(f.arquivo_assinado_path)
-                          if (url) window.open(url, '_blank')
-                        }}
-                        className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
-                        title="Abrir ficha assinada arquivada"
-                      >
-                        <ShieldCheck size={13} />
-                      </button>
-                    )}
-                  </div>
-                  {itens.length > 0 && (
-                    <p className={`mt-1.5 text-[10px] ${txtMuted}`}>
-                      {itens.map(it => `${it.quantidade}× ${it.epi?.nome ?? 'EPI'}${it.epi?.ca ? ` (CA ${it.epi.ca})` : ''}`).join(' · ')}
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+          <ListaEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+            onNovoEpi={() => setModalEpi('novo')} onEditEpi={e => setModalEpi(e)} perfilNome={perfil?.nome ?? null} />
         )
       })()}
 
@@ -1898,18 +1773,108 @@ function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
   )
 }
 
-// ── Controle de EPIs: colaborador × EPIs obrigatórios com farol de troca ──────
-function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted }: {
+// ── Card de uma ficha de entrega (PDF + arquivar assinada) ────────────────────
+function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
+  f: QsmaEpiFicha; isDark: boolean; card: string; txtMain: string; txtMuted: string
+  obraNome: (id?: string) => string
+}) {
+  const arquivarFicha = useArquivarFichaEpi()
+  const st = STATUS_FICHA_EPI_LABEL[f.status]
+  const itens = f.itens ?? []
+  return (
+    <div className={`${card} p-3.5`}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-bold ${txtMain}`}>
+            <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{f.codigo}</span>
+            {f.colaborador_nome ?? '—'}
+          </p>
+          <p className={`text-[11px] ${txtMuted}`}>
+            {itens.length} item(ns) · {fmtData(f.data_entrega)} · {obraNome(f.obra_id)}
+          </p>
+        </div>
+        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+        <button
+          onClick={() => gerarFichaEpiPdf({
+            codigo: f.codigo,
+            colaboradorNome: f.colaborador_nome ?? '—',
+            obraNome: obraNome(f.obra_id),
+            dataEntrega: f.data_entrega,
+            motivo: f.motivo,
+            observacoes: f.observacoes,
+            entreguePorNome: f.entregue_por_nome,
+            itens: itens.map(it => ({
+              nome: it.epi?.nome ?? 'EPI',
+              ca: it.epi?.ca,
+              quantidade: it.quantidade,
+              tamanho: it.tamanho,
+              trocaPrevista: it.data_troca_prevista,
+            })),
+          })}
+          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${
+            isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+          title="Gerar a ficha em PDF para colher a assinatura"
+        >
+          <FileDown size={11} /> PDF
+        </button>
+        {f.status === 'aguardando_assinatura' && (
+          <label className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors ${
+            isDark ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+          }`} title="Anexar a ficha assinada (foto/scan) e arquivar">
+            <Paperclip size={11} /> Arquivar assinada
+            <input
+              type="file" className="hidden" accept="application/pdf,image/png,image/jpeg,image/webp"
+              onChange={async ev => {
+                const file = ev.target.files?.[0]
+                if (!file) return
+                try {
+                  const path = await uploadEvidencia(`fichas-epi/${f.id}`, file)
+                  await arquivarFicha.mutateAsync({ fichaId: f.id, arquivoPath: path })
+                } catch (err: any) {
+                  alert(`Erro ao arquivar: ${err?.message ?? 'desconhecido'}`)
+                }
+              }}
+            />
+          </label>
+        )}
+        {f.arquivo_assinado_path && (
+          <button
+            onClick={async () => {
+              const url = await evidenciaUrl(f.arquivo_assinado_path)
+              if (url) window.open(url, '_blank')
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
+            title="Abrir ficha assinada arquivada"
+          >
+            <ShieldCheck size={13} />
+          </button>
+        )}
+      </div>
+      {itens.length > 0 && (
+        <p className={`mt-1.5 text-[10px] ${txtMuted}`}>
+          {itens.map(it => `${it.quantidade}× ${it.epi?.nome ?? 'EPI'}${it.epi?.ca ? ` (CA ${it.epi.ca})` : ''}`).join(' · ')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Controle de EPIs por COLABORADOR: kit × matriz do cargo → ficha viva ──────
+function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, obraNome, onNovaFicha }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+  obraNome: (id?: string) => string; onNovaFicha: () => void
 }) {
   const { data: colabs = [], isLoading } = useColaboradoresTreino()
   const { data: epis = [] } = useEpis()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: entregas = [] } = useEpiEntregas()
+  const { data: fichas = [] } = useFichasEpi()
   const [busca, setBusca] = useState('')
-  const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+  const [quick, setQuick] = useState<'todos' | 'incompleto'>('todos')
   const [fBase, setFBase] = useState<Set<string> | null>(null)
   const [fCargo, setFCargo] = useState<Set<string> | null>(null)
+  const [aberto, setAberto] = useState<string | null>(null)
 
   const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
   const cargos = [...new Set(colabs.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
@@ -1921,46 +1886,39 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted }: {
     }
   }, [colabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cols = epis.filter(e => e.ativo)
-  const reqPorCargo = new Map<string, Set<string>>()
+  const epiById = new Map(epis.map(e => [e.id, e]))
+  // exigido por cargo-base: epi_id → quantidade
+  const reqPorCargo = new Map<string, Map<string, number>>()
   matriz.forEach(m => {
     if (m.exigencia !== 'obrigatorio') return
     const k = cargoBase(m.cargo)
-    if (!reqPorCargo.has(k)) reqPorCargo.set(k, new Set())
-    reqPorCargo.get(k)!.add(m.epi_id)
+    if (!reqPorCargo.has(k)) reqPorCargo.set(k, new Map())
+    reqPorCargo.get(k)!.set(m.epi_id, m.quantidade)
   })
   const entPorColab = new Map<string, typeof entregas>()
   entregas.forEach(e => { if (e.colaborador_id) entPorColab.set(e.colaborador_id, [...(entPorColab.get(e.colaborador_id) ?? []), e]) })
-
-  const hoje = new Date().toISOString().slice(0, 10)
-  const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10)
-  const statusCel = (colabId: string, req: Set<string>, epiId: string): 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' => {
-    if (!req.has(epiId)) return 'na'
-    const ent = (entPorColab.get(colabId) ?? []).filter(e => e.epi_id === epiId)
-      .sort((a, b) => (b.data_entrega ?? '').localeCompare(a.data_entrega ?? ''))[0]
-    if (!ent) return 'faltando'
-    if (ent.data_troca_prevista && ent.data_troca_prevista < hoje) return 'vencido'
-    if (ent.data_troca_prevista && ent.data_troca_prevista <= lim60) return 'vencendo'
-    return 'ok'
-  }
+  const fichasPorColab = new Map<string, typeof fichas>()
+  fichas.forEach(f => { if (f.colaborador_id) fichasPorColab.set(f.colaborador_id, [...(fichasPorColab.get(f.colaborador_id) ?? []), f]) })
 
   const q = busca.trim().toLowerCase()
   const linhas = colabs.map(c => {
-    const req = reqPorCargo.get(cargoBase(c.cargo)) ?? new Set<string>()
-    let ok = 0, vencendo = 0, vencido = 0, faltando = 0
-    req.forEach(eid => {
-      const s = statusCel(c.id, req, eid)
-      if (s === 'ok') ok++; else if (s === 'vencendo') vencendo++; else if (s === 'vencido') vencido++; else if (s === 'faltando') faltando++
-    })
-    return { c, total: req.size, ok, vencendo, vencido, faltando }
+    const req = reqPorCargo.get(cargoBase(c.cargo)) ?? new Map<string, number>()
+    const ent = entPorColab.get(c.id) ?? []
+    const entregueIds = new Set(ent.map(e => e.epi_id))
+    const okItens = [...req.keys()].filter(eid => entregueIds.has(eid))
+    const faltantes = [...req.keys()].filter(eid => !entregueIds.has(eid))
+    const fchs = fichasPorColab.get(c.id) ?? []
+    const aguardando = fchs.filter(f => f.status === 'aguardando_assinatura').length
+    const ultima = ent.map(e => e.data_entrega).filter(Boolean).sort().slice(-1)[0] ?? null
+    return { c, total: req.size, ok: okItens.length, faltantes, fichas: fchs, aguardando, ultima }
   })
   const filt = linhas.filter(l =>
     (!q || l.c.nome.toLowerCase().includes(q))
     && (fBase === null || (l.c.base ? fBase.has(l.c.base) : true))
     && (fCargo === null || fCargo.has(cargoBase(l.c.cargo)))
-    && (quick !== 'pendencia' || l.faltando > 0 || l.vencido > 0)
+    && (quick !== 'incompleto' || (l.total > 0 && l.ok < l.total))
   )
-  const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
+  const incompletos = linhas.filter(l => l.total > 0 && l.ok < l.total).length
 
   const grupos = [...filt.reduce((m, l) => {
     const k = cargoBase(l.c.cargo) || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
@@ -1968,12 +1926,7 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted }: {
     .map(([k, arr]) => [k, arr.sort((a, b) => a.c.nome.localeCompare(b.c.nome, 'pt-BR'))] as [string, typeof filt])
     .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
 
-  const IconeStatus = ({ s }: { s: 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' }) =>
-    s === 'ok' ? <CheckCircle2 size={16} className="text-emerald-500" />
-    : s === 'vencendo' ? <AlertTriangle size={15} className="text-amber-500" />
-    : s === 'vencido' ? <XCircle size={16} className="text-red-500" />
-    : s === 'faltando' ? <Circle size={14} className={isDark ? 'text-red-400/70' : 'text-red-400'} />
-    : <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
   return (
     <div className="space-y-3">
@@ -1985,73 +1938,279 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted }: {
         </div>
         <CheckDropdown label="Bases" options={bases} selected={fBase} onChange={setFBase} isDark={isDark} />
         <CheckDropdown label="Posições" options={cargos} selected={fCargo} onChange={setFCargo} isDark={isDark} />
-        <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
-          className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'pendencia' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
-          <AlertTriangle size={12} /> Com pendência
+        <button onClick={() => setQuick(quick === 'incompleto' ? 'todos' : 'incompleto')}
+          className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'incompleto' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
+          <AlertTriangle size={12} /> Kit incompleto
         </button>
+        <BotaoNovo label="Nova Ficha de Entrega" onClick={onNovaFicha} />
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
-        <div className="flex items-center gap-3 text-[11px] flex-wrap">
-          <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Entregue</span>
-          <span className={`flex items-center gap-1 ${txtMuted}`}><AlertTriangle size={13} className="text-amber-500" /> Troca vencendo (60d)</span>
-          <span className={`flex items-center gap-1 ${txtMuted}`}><XCircle size={14} className="text-red-500" /> Troca vencida</span>
-          <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Não entregue</span>
-          <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
-        </div>
+        <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{incompletos ? ` · ${incompletos} com kit incompleto` : ''}</p>
+        <p className={`text-[11px] ${txtMuted}`}>Kit = itens da matriz do cargo já entregues · clique no colaborador para abrir a ficha</p>
       </div>
 
       {isLoading ? (
         <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
       ) : filt.length === 0 ? (
-        <div className={`${card} p-8 text-center text-sm ${txtMuted}`}>Nenhum colaborador encontrado</div>
+        <Vazio isDark={isDark} texto="Nenhum colaborador encontrado" />
       ) : (
-        <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-          <table className="w-full min-w-[900px] table-fixed border-collapse text-xs">
+        <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          {grupos.map(([cargo, ls]) => (
+            <Fragment key={cargo}>
+              <div className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                {cargo} <span className="font-normal opacity-70">· {ls.length}</span>
+              </div>
+              {ls.map((l, i) => {
+                const expandido = aberto === l.c.id
+                const completo = l.total > 0 && l.ok === l.total
+                return (
+                  <div key={l.c.id} className={`${i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}`}>
+                    <button onClick={() => setAberto(expandido ? null : l.c.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                      {expandido ? <ChevronDown size={14} className={txtMuted} /> : <ChevronRight size={14} className={txtMuted} />}
+                      <p className={`text-xs font-bold flex-1 truncate ${txtMain}`}>{l.c.nome}</p>
+                      {l.total === 0 ? (
+                        <span className={`text-[10px] ${txtMuted}`}>sem matriz p/ o cargo</span>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${completo
+                          ? 'bg-emerald-500 text-white'
+                          : l.ok === 0 ? (isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')}`}>
+                          Kit {l.ok}/{l.total}
+                        </span>
+                      )}
+                      {l.aguardando > 0 && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
+                          {l.aguardando} aguard. assinatura
+                        </span>
+                      )}
+                      <span className={`text-[10px] w-[110px] text-right ${txtMuted}`}>{l.ultima ? `últ. entrega ${fmt(l.ultima)}` : 'sem entrega'}</span>
+                    </button>
+                    {expandido && (
+                      <div className={`px-9 pb-3 space-y-2 ${isDark ? '' : ''}`}>
+                        {l.faltantes.length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[10px] font-bold uppercase ${txtMuted}`}>Faltam:</span>
+                            {l.faltantes.map(eid => {
+                              const e = epiById.get(eid)
+                              return (
+                                <span key={eid} className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-600'}`}>
+                                  {e?.nome ?? 'EPI'}{e?.ca ? ` · CA ${e.ca}` : ''}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {l.fichas.length === 0 ? (
+                          <p className={`text-[11px] italic ${txtMuted}`}>Nenhuma ficha de entrega ainda — crie pela ação "Nova Ficha de Entrega".</p>
+                        ) : (
+                          l.fichas.map(f => <FichaCard key={f.id} f={f} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} obraNome={obraNome} />)
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Lista de EPIs (catálogo padrão lista/cards + estoque) ─────────────────────
+function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEditEpi, perfilNome }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+  onNovoEpi: () => void; onEditEpi: (e: QsmaEpi) => void; perfilNome: string | null
+}) {
+  const { data: epis = [], isLoading } = useEpis()
+  const { data: estoque } = useEstoqueEpi()
+  const [busca, setBusca] = useState('')
+  const [quick, setQuick] = useState<'todos' | 'ca_vencido' | 'inativos'>('todos')
+  const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
+  const [modalEntrada, setModalEntrada] = useState(false)
+
+  const hoje = new Date().toISOString().slice(0, 10)
+  const saldoDe = (id: string) => estoque?.saldo.get(id) ?? 0
+  const q = busca.trim().toLowerCase()
+  const filt = epis.filter(e =>
+    (!q || e.nome.toLowerCase().includes(q) || (e.ca ?? '').includes(q) || (e.fabricante ?? '').toLowerCase().includes(q))
+    && (quick === 'inativos' ? !e.ativo : e.ativo || quick === 'ca_vencido')
+    && (quick !== 'ca_vencido' || (e.validade_ca && e.validade_ca < hoje))
+  )
+  const caVencidos = epis.filter(e => e.ativo && e.validade_ca && e.validade_ca < hoje).length
+
+  const fmtD = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+  const badgeEstoque = (e: QsmaEpi) => {
+    const s = saldoDe(e.id)
+    const min = (e as { estoque_minimo?: number }).estoque_minimo ?? 0
+    const cls = s <= 0
+      ? (isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700')
+      : min > 0 && s < min
+        ? (isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')
+        : (isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600')
+    return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cls}`}>{s}</span>
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        {subTabs}
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar EPI, CA ou fabricante…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+        <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {([['todos', 'Ativos'], ['ca_vencido', `CA vencido${caVencidos ? ` (${caVencidos})` : ''}`], ['inativos', 'Inativos']] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setQuick(k)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${quick === k ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}>{l}</button>
+          ))}
+        </div>
+        <div className={`inline-flex p-0.5 rounded-lg ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+          <button onClick={() => setVista('tabela')} title="Lista"
+            className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
+          <button onClick={() => setVista('cards')} title="Cards"
+            className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
+        </div>
+        <BotaoNovo label="Entrada de estoque" onClick={() => setModalEntrada(true)} secundario isDark={isDark} />
+        <BotaoNovo label="EPI no catálogo" onClick={onNovoEpi} />
+      </div>
+
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+      ) : filt.length === 0 ? (
+        <Vazio isDark={isDark} texto="Nenhum EPI encontrado" />
+      ) : vista === 'tabela' ? (
+        <div className={`rounded-2xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full text-xs">
             <thead>
-              <tr>
-                <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
-                {cols.map(e => (
-                  <th key={e.id} title={`${e.nome}${e.ca ? ' · CA ' + e.ca : ''}`}
-                    className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-                    <div className="relative h-full">
-                      <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{e.nome}</span>
-                    </div>
-                  </th>
-                ))}
+              <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                <th className="text-left px-3 py-2 font-semibold">EPI</th>
+                <th className="text-left px-3 py-2 font-semibold w-[90px]">CA</th>
+                <th className="text-left px-3 py-2 font-semibold w-[110px]">VALIDADE CA</th>
+                <th className="text-left px-3 py-2 font-semibold">FABRICANTE</th>
+                <th className="text-center px-3 py-2 font-semibold w-[90px]">ESTOQUE</th>
+                <th className="text-left px-3 py-2 font-semibold w-[110px]">STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {grupos.map(([cargo, ls]) => (
-                <Fragment key={cargo}>
-                  <tr>
-                    <td colSpan={cols.length + 1}
-                      className={`sticky left-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                      {cargo} <span className="font-normal opacity-70">· {ls.length}</span>
+              {filt.map(e => {
+                const vencido = e.validade_ca && e.validade_ca < hoje
+                return (
+                  <tr key={e.id} onClick={() => onEditEpi(e)}
+                    className={`cursor-pointer border-t transition-colors ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-3 py-2 font-semibold ${txtMain}`}>{e.nome}</td>
+                    <td className={`px-3 py-2 font-mono ${txtMuted}`}>{e.ca ?? '—'}</td>
+                    <td className={`px-3 py-2 ${vencido ? 'text-red-500 font-bold' : txtMuted}`}>{fmtD(e.validade_ca)}</td>
+                    <td className={`px-3 py-2 truncate max-w-[220px] ${txtMuted}`}>{e.fabricante ?? '—'}</td>
+                    <td className="px-3 py-2 text-center">{badgeEstoque(e)}</td>
+                    <td className="px-3 py-2">
+                      {vencido
+                        ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700'}`}>CA vencido</span>
+                        : e.ativo
+                          ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>Ativo</span>
+                          : <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>Inativo</span>}
                     </td>
                   </tr>
-                  {ls.map((l, i) => {
-                    const req = reqPorCargo.get(cargoBase(l.c.cargo)) ?? new Set<string>()
-                    return (
-                      <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
-                        <td title={l.c.nome} className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
-                          <p className={`text-xs font-bold truncate ${txtMain}`}>{l.c.nome}</p>
-                        </td>
-                        {cols.map(e => (
-                          <td key={e.id} className="text-center">
-                            <div className="flex items-center justify-center h-7"><IconeStatus s={statusCel(l.c.id, req, e.id)} /></div>
-                          </td>
-                        ))}
-                      </tr>
-                    )
-                  })}
-                </Fragment>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filt.map(e => {
+            const vencido = e.validade_ca && e.validade_ca < hoje
+            return (
+              <button key={e.id} onClick={() => onEditEpi(e)} className={`${card} p-3.5 text-left transition-all hover:border-sky-400/50`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className={`text-sm font-bold ${txtMain}`}>{e.nome}</p>
+                  {badgeEstoque(e)}
+                </div>
+                <p className={`text-[11px] mt-0.5 ${vencido ? 'text-red-500 font-semibold' : txtMuted}`}>
+                  {e.ca ? `CA ${e.ca} · val. ${fmtD(e.validade_ca)}` : 'sem CA'}{vencido ? ' ⚠ vencido' : ''}
+                </p>
+                <p className={`text-[11px] truncate ${txtMuted}`}>{e.fabricante ?? '—'}</p>
+              </button>
+            )
+          })}
+        </div>
       )}
+
+      {modalEntrada && (
+        <EntradaEstoqueModal isDark={isDark} epis={epis.filter(e => e.ativo)} perfilNome={perfilNome} onClose={() => setModalEntrada(false)} />
+      )}
+    </div>
+  )
+}
+
+// ── Modal: entrada/ajuste de estoque ──────────────────────────────────────────
+function EntradaEstoqueModal({ isDark, epis, perfilNome, onClose }: {
+  isDark: boolean; epis: QsmaEpi[]; perfilNome: string | null; onClose: () => void
+}) {
+  const criar = useCriarMovEstoque()
+  const [epiId, setEpiId] = useState('')
+  const [tipo, setTipo] = useState<'entrada' | 'ajuste'>('entrada')
+  const [qtd, setQtd] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [erro, setErro] = useState('')
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const inputCls = `w-full text-sm rounded-xl px-3 py-2 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`
+
+  const salvar = async () => {
+    setErro('')
+    const n = Number(qtd)
+    if (!epiId || !n || (tipo === 'entrada' && n <= 0)) { setErro('Selecione o EPI e informe a quantidade.'); return }
+    try {
+      await criar.mutateAsync({ epi_id: epiId, tipo, quantidade: n, motivo: motivo || undefined, criadoPor: perfilNome })
+      onClose()
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao lançar') }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <h3 className={`text-base font-bold ${txt}`}>Movimentar estoque</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>EPI</label>
+            <select value={epiId} onChange={e => setEpiId(e.target.value)} className={inputCls}>
+              <option value="">Selecionar…</option>
+              {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Tipo</label>
+              <select value={tipo} onChange={e => setTipo(e.target.value as 'entrada' | 'ajuste')} className={inputCls}>
+                <option value="entrada">Entrada (compra/recebimento)</option>
+                <option value="ajuste">Ajuste (+/−)</option>
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Quantidade</label>
+              <input type="number" value={qtd} onChange={e => setQtd(e.target.value)} placeholder={tipo === 'ajuste' ? 'ex.: -3' : 'ex.: 50'} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Motivo</label>
+            <input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="NF, fornecedor, inventário…" className={inputCls} />
+          </div>
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
+            <button onClick={salvar} disabled={criar.isPending}
+              className="flex-1 py-2 rounded-xl text-sm font-semibold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50">
+              {criar.isPending ? 'Lançando…' : 'Lançar'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

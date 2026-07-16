@@ -588,6 +588,42 @@ export function useSetMatrizCelula() {
   })
 }
 
+// ── Estoque de EPIs (movimentos + saldo) ─────────────────────────────────────
+export interface QsmaEpiEstoqueMov {
+  id: string; epi_id: string; tipo: 'entrada' | 'saida' | 'ajuste'
+  quantidade: number; motivo: string | null; ficha_id: string | null; created_at: string
+}
+export function useEstoqueEpi() {
+  return useQuery({
+    queryKey: ['qsma_epi_estoque_mov'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_epi_estoque_mov')
+        .select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      const movs = (data ?? []) as QsmaEpiEstoqueMov[]
+      const saldo = new Map<string, number>()
+      for (const m of movs) {
+        const delta = m.tipo === 'saida' ? -Math.abs(m.quantidade) : m.tipo === 'entrada' ? Math.abs(m.quantidade) : m.quantidade
+        saldo.set(m.epi_id, (saldo.get(m.epi_id) ?? 0) + delta)
+      }
+      return { movs, saldo }
+    },
+  })
+}
+export function useCriarMovEstoque() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { epi_id: string; tipo: 'entrada' | 'ajuste'; quantidade: number; motivo?: string; criadoPor?: string | null }) => {
+      const { error } = await supabase.from('qsma_epi_estoque_mov').insert({
+        epi_id: p.epi_id, tipo: p.tipo, quantidade: p.quantidade,
+        motivo: p.motivo ?? null, criado_por_nome: p.criadoPor ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_epi_estoque_mov'] }),
+  })
+}
+
 // ── Matriz de EPIs por cargo (espelho da matriz de treinamentos, c/ quantidade) ──
 export interface QsmaMatrizEpiCelula {
   id: string; cargo: string; epi_id: string
