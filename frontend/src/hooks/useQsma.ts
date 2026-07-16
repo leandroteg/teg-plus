@@ -588,6 +588,33 @@ export function useSetMatrizCelula() {
   })
 }
 
+// ── Matriz de EPIs por cargo (espelho da matriz de treinamentos, c/ quantidade) ──
+export interface QsmaMatrizEpiCelula {
+  id: string; cargo: string; epi_id: string
+  exigencia: 'obrigatorio' | 'na'; quantidade: number
+}
+export function useMatrizEpi() {
+  return useQuery({
+    queryKey: ['qsma_matriz_epi'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_matriz_epi').select('*')
+      if (error) throw error
+      return (data ?? []) as QsmaMatrizEpiCelula[]
+    },
+  })
+}
+export function useSetMatrizEpiCelula() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { cargo: string; epi_id: string; exigencia: 'obrigatorio' | 'na'; quantidade: number }) => {
+      const { error } = await supabase.from('qsma_matriz_epi')
+        .upsert({ ...p, updated_at: new Date().toISOString() }, { onConflict: 'cargo,epi_id' })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_matriz_epi'] }),
+  })
+}
+
 export interface ColabTreino {
   id: string; nome: string; cargo: string | null; setor: string | null
   departamento: string | null; data_admissao: string | null; base: string | null

@@ -22,6 +22,7 @@ import {
   useAcoesQsma, useEnviarOcorrenciaSgi,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
+  useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -78,6 +79,7 @@ export default function QsmaSeguranca() {
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
+  const [subEpi, setSubEpi] = useState<'controle' | 'matriz' | 'fichas'>('controle')
   const [modalTreinamento, setModalTreinamento] = useState<QsmaTreinamento | 'novo' | null>(null)
   const [modalOcorrencia, setModalOcorrencia] = useState<QsmaOcorrencia | 'novo' | null>(null)
 
@@ -85,7 +87,7 @@ export default function QsmaSeguranca() {
   useEffect(() => {
     if (!novoParam) return
     if (novoParam === 'ocorrencia') { setAba('ocorrencias'); setModalOcorrencia('novo') }
-    if (novoParam === 'epi') { setAba('epis'); setModalFicha(true) }
+    if (novoParam === 'epi') { setAba('epis'); setSubEpi('fichas'); setModalFicha(true) }
     if (novoParam === 'treinamento') { setAba('treinamentos'); setModalTreinamento('novo') }
     if (novoParam === 'risco') { setAba('riscos'); setModalRisco('novo') }
     setParams({}, { replace: true })
@@ -188,8 +190,25 @@ export default function QsmaSeguranca() {
       )}
 
       {/* ── EPIs ── */}
-      {aba === 'epis' && (
+      {aba === 'epis' && (() => {
+        // Toggle das sub-visões — mesmo padrão dos Treinamentos (Controle | Matriz | Fichas)
+        const subTabsEpi = (
+          <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            {([['controle', 'Controle'], ['matriz', 'Matriz'], ['fichas', 'Fichas']] as const).map(([k, lbl]) => (
+              <button key={k} onClick={() => setSubEpi(k)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  subEpi === k
+                    ? isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}>{lbl}</button>
+            ))}
+          </div>
+        )
+        if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
+        if (subEpi === 'controle') return <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />
+        return (
         <div className="space-y-4">
+          <div className="flex items-center gap-2">{subTabsEpi}</div>
           <QsmaToolbar
             isDark={isDark}
             contagem={`${fichasF.length} ficha${fichasF.length !== 1 ? 's' : ''}`}
@@ -319,7 +338,8 @@ export default function QsmaSeguranca() {
             })}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── Treinamentos ── */}
       {aba === 'treinamentos' && (() => {
@@ -1774,5 +1794,264 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
         onSave={handleSave}
       />
     </QsmaModal>
+  )
+}
+
+// ── Matriz de EPIs: cargo × EPI obrigatório (célula cicla · → 1 → 2 → ·) ──────
+function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
+  subTabs?: ReactNode; isDark: boolean; txtMain: string; txtMuted: string; isAdmin: boolean
+}) {
+  const { data: epis = [], isLoading: le } = useEpis()
+  const { data: matriz = [], isLoading: lm } = useMatrizEpi()
+  const { data: matrizTreino = [] } = useMatrizTreinamentos()
+  const setCel = useSetMatrizEpiCelula()
+  const [busca, setBusca] = useState('')
+
+  const cols = epis.filter(e => e.ativo)
+  // linhas: cargos já presentes na matriz de EPI + todos os da matriz de treinamentos (mesma população de funções)
+  const cargos = [...new Set([...matriz.map(m => m.cargo), ...matrizTreino.map(m => cargoBase(m.cargo))])]
+    .filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const q = busca.trim().toLowerCase()
+  const cargosF = q ? cargos.filter(c => c.toLowerCase().includes(q)) : cargos
+  const qtdCel = (cargo: string, eid: string) => {
+    const m = matriz.find(x => x.cargo === cargo && x.epi_id === eid)
+    return m && m.exigencia === 'obrigatorio' ? m.quantidade : 0
+  }
+  const onCel = (cargo: string, eid: string) => {
+    if (!isAdmin || setCel.isPending) return
+    const atual = qtdCel(cargo, eid)
+    const prox = atual === 0 ? 1 : atual === 1 ? 2 : 0
+    setCel.mutate({ cargo, epi_id: eid, exigencia: prox === 0 ? 'na' : 'obrigatorio', quantidade: Math.max(1, prox) })
+  }
+  const cellStyle = (n: number) =>
+    n > 0 ? (isDark ? 'bg-emerald-500/25 text-emerald-300' : 'bg-emerald-500 text-white')
+      : (isDark ? 'text-slate-700' : 'text-slate-200')
+
+  if (le || lm) return (
+    <div className="space-y-3">
+      {subTabs && <div className="flex items-center gap-2 flex-wrap">{subTabs}</div>}
+      <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        {subTabs}
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cargo…"
+            className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs ${txtMuted}`}>
+          <span className="font-semibold">{cargosF.length} cargo{cargosF.length !== 1 ? 's' : ''} · {cols.length} EPIs</span>
+          {isAdmin && <span className="ml-2 opacity-80">· Clique na célula para alternar a quantidade (· → 1 → 2). Base: kit de admissão TEG (fichas assinadas).</span>}
+        </p>
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center font-bold ${cellStyle(1)}`}>1</span> Qtd. obrigatória</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className={`w-4 h-4 rounded flex items-center justify-center ${cellStyle(0)}`}>·</span> Não se aplica</span>
+        </div>
+      </div>
+
+      <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <table className="w-full min-w-[900px] table-fixed border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
+              {cols.map(e => (
+                <th key={e.id} title={`${e.nome}${e.ca ? ' · CA ' + e.ca : ''}${e.fabricante ? ' · ' + e.fabricante : ''}`}
+                  className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                  <div className="relative h-full">
+                    <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{e.nome}</span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {cargosF.map((cargo, i) => (
+              <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                <td title={cargo} className={`sticky left-0 z-10 px-3 py-1.5 font-semibold truncate max-w-[240px] ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                {cols.map(e => {
+                  const n = qtdCel(cargo, e.id)
+                  return (
+                    <td key={e.id} className="text-center">
+                      <button disabled={!isAdmin} onClick={() => onCel(cargo, e.id)}
+                        className={`w-7 h-7 m-0.5 rounded font-bold text-[11px] transition-all ${cellStyle(n)} ${isAdmin ? 'hover:ring-2 hover:ring-sky-400 cursor-pointer' : 'cursor-default'}`}>
+                        {n > 0 ? n : '·'}
+                      </button>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+            {cargosF.length === 0 && (
+              <tr><td colSpan={cols.length + 1} className={`px-3 py-8 text-center ${txtMuted}`}>Nenhum cargo encontrado.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Controle de EPIs: colaborador × EPIs obrigatórios com farol de troca ──────
+function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+}) {
+  const { data: colabs = [], isLoading } = useColaboradoresTreino()
+  const { data: epis = [] } = useEpis()
+  const { data: matriz = [] } = useMatrizEpi()
+  const { data: entregas = [] } = useEpiEntregas()
+  const [busca, setBusca] = useState('')
+  const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+  const [fBase, setFBase] = useState<Set<string> | null>(null)
+  const [fCargo, setFCargo] = useState<Set<string> | null>(null)
+
+  const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
+  const cargos = [...new Set(colabs.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
+
+  useEffect(() => {
+    if (colabs.length && fBase === null) {
+      setFBase(new Set(bases.filter(b => cargoBase(b) !== 'ESCRITORIO CENTRAL' && b !== 'Escritório Central')))
+      setFCargo(new Set(cargos))
+    }
+  }, [colabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cols = epis.filter(e => e.ativo)
+  const reqPorCargo = new Map<string, Set<string>>()
+  matriz.forEach(m => {
+    if (m.exigencia !== 'obrigatorio') return
+    const k = cargoBase(m.cargo)
+    if (!reqPorCargo.has(k)) reqPorCargo.set(k, new Set())
+    reqPorCargo.get(k)!.add(m.epi_id)
+  })
+  const entPorColab = new Map<string, typeof entregas>()
+  entregas.forEach(e => { if (e.colaborador_id) entPorColab.set(e.colaborador_id, [...(entPorColab.get(e.colaborador_id) ?? []), e]) })
+
+  const hoje = new Date().toISOString().slice(0, 10)
+  const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10)
+  const statusCel = (colabId: string, req: Set<string>, epiId: string): 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' => {
+    if (!req.has(epiId)) return 'na'
+    const ent = (entPorColab.get(colabId) ?? []).filter(e => e.epi_id === epiId)
+      .sort((a, b) => (b.data_entrega ?? '').localeCompare(a.data_entrega ?? ''))[0]
+    if (!ent) return 'faltando'
+    if (ent.data_troca_prevista && ent.data_troca_prevista < hoje) return 'vencido'
+    if (ent.data_troca_prevista && ent.data_troca_prevista <= lim60) return 'vencendo'
+    return 'ok'
+  }
+
+  const q = busca.trim().toLowerCase()
+  const linhas = colabs.map(c => {
+    const req = reqPorCargo.get(cargoBase(c.cargo)) ?? new Set<string>()
+    let ok = 0, vencendo = 0, vencido = 0, faltando = 0
+    req.forEach(eid => {
+      const s = statusCel(c.id, req, eid)
+      if (s === 'ok') ok++; else if (s === 'vencendo') vencendo++; else if (s === 'vencido') vencido++; else if (s === 'faltando') faltando++
+    })
+    return { c, total: req.size, ok, vencendo, vencido, faltando }
+  })
+  const filt = linhas.filter(l =>
+    (!q || l.c.nome.toLowerCase().includes(q))
+    && (fBase === null || (l.c.base ? fBase.has(l.c.base) : true))
+    && (fCargo === null || fCargo.has(cargoBase(l.c.cargo)))
+    && (quick !== 'pendencia' || l.faltando > 0 || l.vencido > 0)
+  )
+  const comPend = linhas.filter(l => l.faltando > 0 || l.vencido > 0).length
+
+  const grupos = [...filt.reduce((m, l) => {
+    const k = cargoBase(l.c.cargo) || '—'; m.set(k, [...(m.get(k) ?? []), l]); return m
+  }, new Map<string, typeof filt>()).entries()]
+    .map(([k, arr]) => [k, arr.sort((a, b) => a.c.nome.localeCompare(b.c.nome, 'pt-BR'))] as [string, typeof filt])
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+
+  const IconeStatus = ({ s }: { s: 'na' | 'ok' | 'vencendo' | 'vencido' | 'faltando' }) =>
+    s === 'ok' ? <CheckCircle2 size={16} className="text-emerald-500" />
+    : s === 'vencendo' ? <AlertTriangle size={15} className="text-amber-500" />
+    : s === 'vencido' ? <XCircle size={16} className="text-red-500" />
+    : s === 'faltando' ? <Circle size={14} className={isDark ? 'text-red-400/70' : 'text-red-400'} />
+    : <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        {subTabs}
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+        </div>
+        <CheckDropdown label="Bases" options={bases} selected={fBase} onChange={setFBase} isDark={isDark} />
+        <CheckDropdown label="Posições" options={cargos} selected={fCargo} onChange={setFCargo} isDark={isDark} />
+        <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
+          className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'pendencia' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
+          <AlertTriangle size={12} /> Com pendência
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{comPend ? ` · ${comPend} com pendência` : ''}</p>
+        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+          <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Entregue</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><AlertTriangle size={13} className="text-amber-500" /> Troca vencendo (60d)</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><XCircle size={14} className="text-red-500" /> Troca vencida</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Não entregue</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+      ) : filt.length === 0 ? (
+        <div className={`${card} p-8 text-center text-sm ${txtMuted}`}>Nenhum colaborador encontrado</div>
+      ) : (
+        <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full min-w-[900px] table-fixed border-collapse text-xs">
+            <thead>
+              <tr>
+                <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                {cols.map(e => (
+                  <th key={e.id} title={`${e.nome}${e.ca ? ' · CA ' + e.ca : ''}`}
+                    className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                    <div className="relative h-full">
+                      <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">{e.nome}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map(([cargo, ls]) => (
+                <Fragment key={cargo}>
+                  <tr>
+                    <td colSpan={cols.length + 1}
+                      className={`sticky left-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      {cargo} <span className="font-normal opacity-70">· {ls.length}</span>
+                    </td>
+                  </tr>
+                  {ls.map((l, i) => {
+                    const req = reqPorCargo.get(cargoBase(l.c.cargo)) ?? new Set<string>()
+                    return (
+                      <tr key={l.c.id} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                        <td title={l.c.nome} className={`sticky left-0 z-10 px-3 py-1.5 pl-5 overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                          <p className={`text-xs font-bold truncate ${txtMain}`}>{l.c.nome}</p>
+                        </td>
+                        {cols.map(e => (
+                          <td key={e.id} className="text-center">
+                            <div className="flex items-center justify-center h-7"><IconeStatus s={statusCel(l.c.id, req, e.id)} /></div>
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 }
