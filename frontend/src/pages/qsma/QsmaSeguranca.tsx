@@ -48,16 +48,16 @@ const STEPS: FlowStep[] = [
     accent: { bg: 'hover:bg-sky-50', bgActive: 'bg-sky-50', text: 'text-sky-600', textActive: 'text-sky-800', border: 'border-sky-500', badge: 'bg-sky-100 text-sky-700' },
   },
   {
-    key: 'riscos', label: 'Riscos (PGR/APR)',
-    description: 'Inventário de riscos por GHE e análise preliminar por tarefa — matriz 5×5.',
-    icon: AlertTriangle,
-    accent: { bg: 'hover:bg-amber-50', bgActive: 'bg-amber-50', text: 'text-amber-600', textActive: 'text-amber-800', border: 'border-amber-500', badge: 'bg-amber-100 text-amber-700' },
-  },
-  {
     key: 'epis', label: 'EPIs',
     description: 'Catálogo com CA e fichas de entrega assinadas via PortalTEG.',
     icon: ShieldCheck,
     accent: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', badge: 'bg-violet-100 text-violet-700' },
+  },
+  {
+    key: 'riscos', label: 'Riscos (PGR/APR)',
+    description: 'Inventário de riscos por GHE e análise preliminar por tarefa — matriz 5×5.',
+    icon: AlertTriangle,
+    accent: { bg: 'hover:bg-amber-50', bgActive: 'bg-amber-50', text: 'text-amber-600', textActive: 'text-amber-800', border: 'border-amber-500', badge: 'bg-amber-100 text-amber-700' },
   },
   {
     key: 'ocorrencias', label: 'Ocorrências',
