@@ -2,21 +2,31 @@ import { useState, useMemo, useRef } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
-  Sparkles, Paperclip, AlertTriangle,
+  Sparkles, Paperclip, AlertTriangle, Percent, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   useImoveis, useFaturas, useCriarFatura, useAtualizarFatura,
   useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura,
   parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
   removerFaturaAnexoStorage, useExcluirFatura,
+  useDescontosFatura, useCriarDescontoFatura, useRemoverDescontoFatura, uploadDescontoAnexo,
 } from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TIPOS: TipoFatura[] = ['energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
+const TIPOS: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
+
+// Vencimento padrão do aluguel = mês seguinte à competência, no dia de vencimento do contrato
+function aluguelVencDefault(competenciaYYYYMM: string, diaVenc?: number) {
+  const [y, m] = competenciaYYYYMM.split('-').map(Number)
+  const dia = Math.min(Math.max(diaVenc || 5, 1), 28)
+  const d = new Date(y, m, dia) // m (0-based+1) = mês seguinte
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const STATUS_FILTERS = [
   { value: 'todos',     label: 'Todos' },
@@ -88,14 +98,14 @@ function isOverdue(f: LocFatura) {
 function InlineEditForm({
   tipo,
   fatura,
-  imovelId,
+  imovel,
   competencia,
   isDark,
   onClose,
 }: {
   tipo: TipoFatura
   fatura: LocFatura | null
-  imovelId: string
+  imovel: LocImovel
   competencia: string
   isDark: boolean
   onClose: () => void
@@ -105,10 +115,15 @@ function InlineEditForm({
   const excluirFatura = useExcluirFatura()
   const isEdit = !!fatura?.id
   const podeExcluir = isEdit && ['previsto', 'lancado'].includes(fatura!.status)
+  // Aluguel novo: pré-preenche valor + vencimento a partir do contrato/imóvel
+  const isAluguelNovo = tipo === 'aluguel' && !fatura
 
-  const [vencimento, setVencimento] = useState(fatura?.vencimento ?? '')
+  const [vencimento, setVencimento] = useState(
+    fatura?.vencimento ?? (isAluguelNovo ? aluguelVencDefault(competencia, imovel.dia_vencimento) : '')
+  )
   const [valor, setValor] = useState<string>(
-    (fatura?.valor_confirmado ?? fatura?.valor_previsto)?.toString() ?? ''
+    (fatura?.valor_confirmado ?? fatura?.valor_previsto)?.toString()
+    ?? (isAluguelNovo && imovel.valor_aluguel_mensal ? String(imovel.valor_aluguel_mensal) : '')
   )
   const [status, setStatus] = useState<StatusFatura>(fatura?.status ?? 'previsto')
 
@@ -130,7 +145,7 @@ function InlineEditForm({
     } else {
       criarFatura.mutate(
         {
-          imovel_id: imovelId,
+          imovel_id: imovel.id,
           tipo,
           competencia: competencia + '-01',
           vencimento: vencimento || undefined,
@@ -208,6 +223,115 @@ function InlineEditForm({
             )}
           </div>
         </div>
+      </td>
+    </tr>
+  )
+}
+
+// ── Descontos do Aluguel (sub-linha) ─────────────────────────────────────────
+// Cada desconto: Descrição + Valor + Anexo OBRIGATÓRIO. Líquido = aluguel − descontos.
+function DescontosAluguel({ fatura, isDark }: { fatura: LocFatura; isDark: boolean }) {
+  const { perfil } = useAuth()
+  const { data: descontos = [] } = useDescontosFatura(fatura.id)
+  const criar = useCriarDescontoFatura()
+  const remover = useRemoverDescontoFatura()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [desc, setDesc] = useState('')
+  const [valor, setValor] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const editavel = ['previsto', 'lancado'].includes(fatura.status)
+  const bruto = fatura.valor_confirmado ?? fatura.valor_previsto ?? 0
+  const totalDesc = descontos.reduce((s, d) => s + d.valor, 0)
+  const liquido = bruto - totalDesc
+
+  const inputCls = `rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
+    isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+  }`
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  async function abrir(path: string) { const url = await faturaAnexoUrl(path); if (url) window.open(url, '_blank') }
+
+  async function salvar() {
+    const v = parseFloat(valor)
+    if (!desc.trim()) { alert('Informe a descrição do desconto.'); return }
+    if (!v || v <= 0) { alert('Informe um valor de desconto válido.'); return }
+    if (!file) { alert('O anexo do desconto é obrigatório.'); return }
+    setSaving(true)
+    try {
+      const path = await uploadDescontoAnexo(fatura.id, file)
+      await criar.mutateAsync({ fatura_id: fatura.id, descricao: desc.trim(), valor: v, anexo_url: path, criado_por_nome: perfil?.nome })
+      setDesc(''); setValor(''); setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    } catch (e: any) { alert('Erro ao salvar desconto: ' + (e?.message ?? 'desconhecido')) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <tr className={isDark ? 'bg-amber-500/[0.05]' : 'bg-amber-50/50'}>
+      <td colSpan={4} className="px-4 py-3">
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+          Descontos no aluguel
+        </p>
+
+        {descontos.length === 0 ? (
+          <p className={`text-[11px] italic mb-2 ${txtMuted}`}>Nenhum desconto lançado.</p>
+        ) : (
+          <div className="space-y-1 mb-2">
+            {descontos.map(d => (
+              <div key={d.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-white border border-slate-100'}`}>
+                <span className={`flex-1 truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{d.descricao}</span>
+                <span className="font-semibold text-red-500">− {fmtCurrency(d.valor)}</span>
+                <button onClick={() => abrir(d.anexo_url)} title="Abrir anexo do desconto"
+                  className={`p-1 rounded ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}>
+                  <Paperclip size={12} />
+                </button>
+                {editavel && (
+                  <button onClick={() => { if (confirm('Remover este desconto? O anexo será apagado.')) remover.mutate({ id: d.id, fatura_id: fatura.id, anexo_url: d.anexo_url }) }}
+                    title="Remover desconto"
+                    className={`p-1 rounded ${isDark ? 'hover:bg-red-500/10 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}>
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Líquido */}
+        <div className={`flex items-center justify-end gap-3 text-xs mb-2 ${txtMuted}`}>
+          <span>Bruto {fmtCurrency(bruto)}</span>
+          <span className="text-red-500">Descontos − {fmtCurrency(totalDesc)}</span>
+          <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Líquido {fmtCurrency(liquido)}</span>
+        </div>
+
+        {/* Novo desconto */}
+        {editavel && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[140px]">
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Descrição</label>
+              <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex.: reparo custeado pelo locatário" className={`${inputCls} w-full`} />
+            </div>
+            <div className="w-24">
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Valor (R$)</label>
+              <input type="number" step="0.01" value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" className={`${inputCls} w-full`} />
+            </div>
+            <div>
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Anexo <span className="text-red-500">*</span></label>
+              <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp"
+                onChange={e => setFile(e.target.files?.[0] ?? null)}
+                className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`} />
+            </div>
+            <button onClick={salvar} disabled={saving}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Salvando…' : '+ Desconto'}
+            </button>
+          </div>
+        )}
+        {!editavel && (
+          <p className={`text-[10px] ${txtMuted}`}>Fatura já enviada/paga — descontos bloqueados.</p>
+        )}
       </td>
     </tr>
   )
@@ -392,7 +516,13 @@ function ImovelFaturasModal({
     return map
   }, [mesFaturas])
 
-  const totalMes = mesFaturas.reduce((s, f) => s + getFaturaValor(f), 0)
+  // Descontos do aluguel do mês (afetam o líquido enviado ao Financeiro)
+  const aluguelFat = faturaByTipo['aluguel']
+  const { data: descAluguel = [] } = useDescontosFatura(aluguelFat?.id)
+  const totalDescAluguel = descAluguel.reduce((s, d) => s + d.valor, 0)
+  const [showDescAluguel, setShowDescAluguel] = useState(false)
+
+  const totalMes = mesFaturas.reduce((s, f) => s + getFaturaValor(f), 0) - totalDescAluguel
 
   // Historico: last 10 faturas for this imovel (excluding current month)
   const historico = useMemo(
@@ -536,9 +666,29 @@ function ImovelFaturasModal({
                       {fat ? (
                         <>
                           <td className={`text-center px-2 py-2.5 ${txtMuted}`}>{fmtDate(fat.vencimento)}</td>
-                          <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>{fmtCurrency(getFaturaValor(fat))}</td>
+                          <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>
+                            {tipo === 'aluguel' && totalDescAluguel > 0 ? (
+                              <span className="inline-flex flex-col items-end leading-tight">
+                                <span className={`text-[10px] line-through ${txtMuted}`}>{fmtCurrency(getFaturaValor(fat))}</span>
+                                <span>{fmtCurrency(getFaturaValor(fat) - totalDescAluguel)}</span>
+                              </span>
+                            ) : fmtCurrency(getFaturaValor(fat))}
+                          </td>
                           <td className="text-right px-4 py-2.5">
                             <div className="flex items-center justify-end gap-2">
+                              {tipo === 'aluguel' && (
+                                <button
+                                  onClick={() => setShowDescAluguel(v => !v)}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold transition-colors ${
+                                    descAluguel.length
+                                      ? (isDark ? 'text-amber-300 bg-amber-500/10' : 'text-amber-700 bg-amber-50')
+                                      : (isDark ? 'text-slate-500 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100')
+                                  }`}
+                                  title="Descontos do aluguel"
+                                >
+                                  <Percent size={11} /> {descAluguel.length ? `${descAluguel.length}` : 'desc.'}
+                                </button>
+                              )}
                               {fat.boleto_url && (
                                 <span className="inline-flex items-center">
                                   <button
@@ -620,11 +770,14 @@ function ImovelFaturasModal({
                       <InlineEditForm
                         tipo={tipo}
                         fatura={fat}
-                        imovelId={imovel.id}
+                        imovel={imovel}
                         competencia={modalCompetencia}
                         isDark={isDark}
                         onClose={closeEditing}
                       />
+                    )}
+                    {tipo === 'aluguel' && fat && showDescAluguel && (
+                      <DescontosAluguel fatura={fat} isDark={isDark} />
                     )}
                   </tbody>
                 )

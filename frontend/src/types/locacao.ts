@@ -22,6 +22,7 @@ export type TipoVistoria = 'entrada' | 'saida'
 export type EstadoItem = 'otimo' | 'bom' | 'regular' | 'ruim' | 'nao_se_aplica'
 
 export type TipoFatura =
+  | 'aluguel'
   | 'energia'
   | 'agua'
   | 'internet'
@@ -306,6 +307,16 @@ export interface LocFatura {
   updated_at: string
 }
 
+export interface LocFaturaDesconto {
+  id: string
+  fatura_id: string
+  descricao: string
+  valor: number
+  anexo_url: string
+  created_at: string
+  criado_por_nome?: string
+}
+
 export interface LocSolicitacao {
   id: string
   imovel_id?: string
@@ -388,6 +399,7 @@ export interface CriarSolicitacaoPayload {
 // ── Label Maps ────────────────────────────────────────────────────────────────
 
 export const TIPO_FATURA_LABEL: Record<TipoFatura, string> = {
+  aluguel: 'Aluguel',
   energia: 'Energia',
   agua: 'Agua',
   internet: 'Internet',

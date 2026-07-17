@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   LocImovel, LocEntrada, LocSaida, LocVistoria, LocVistoriaFoto,
-  LocFatura, LocSolicitacao, LocAcordo, LocAditivo,
+  LocFatura, LocFaturaDesconto, LocSolicitacao, LocAcordo, LocAditivo,
   StatusEntrada, StatusSaida, StatusFatura, StatusVistoria, TipoVistoria,
   CriarEntradaPayload, CriarSolicitacaoPayload,
 } from '../types/locacao'
@@ -415,6 +415,67 @@ export function useAtualizarFatura() {
       return data as LocFatura
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_faturas'] }),
+  })
+}
+
+// ── Descontos da fatura (ex.: desconto no aluguel) ──────────────────────────
+// Cada desconto tem descrição + valor + anexo OBRIGATÓRIO. O valor líquido
+// (fatura − descontos) é o que a RPC de envio manda pro Financeiro.
+export function useDescontosFatura(faturaId?: string) {
+  return useQuery({
+    queryKey: ['loc_fatura_descontos', faturaId],
+    enabled: !!faturaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loc_fatura_descontos')
+        .select('*')
+        .eq('fatura_id', faturaId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as LocFaturaDesconto[]
+    },
+  })
+}
+
+// upload do anexo do desconto (bucket privado locacao-faturas, pasta descontos/)
+export async function uploadDescontoAnexo(faturaId: string, file: File): Promise<string> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `descontos/${faturaId}/${Date.now()}_${safe}`
+  const { error } = await supabase.storage.from(FATURAS_BUCKET).upload(path, file, {
+    upsert: true, contentType: file.type || undefined,
+  })
+  if (error) throw error
+  return path
+}
+
+export function useCriarDescontoFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { fatura_id: string; descricao: string; valor: number; anexo_url: string; criado_por_nome?: string }) => {
+      const { error } = await supabase.from('loc_fatura_descontos').insert(p)
+      if (error) throw error
+    },
+    onSuccess: (_d, { fatura_id }) => {
+      qc.invalidateQueries({ queryKey: ['loc_fatura_descontos', fatura_id] })
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+    },
+  })
+}
+
+export function useRemoverDescontoFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, fatura_id, anexo_url }: { id: string; fatura_id: string; anexo_url?: string }) => {
+      if (anexo_url && !/^https?:\/\//.test(anexo_url)) {
+        await supabase.storage.from(FATURAS_BUCKET).remove([anexo_url])
+      }
+      const { error } = await supabase.from('loc_fatura_descontos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: (_d, { fatura_id }) => {
+      qc.invalidateQueries({ queryKey: ['loc_fatura_descontos', fatura_id] })
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+    },
   })
 }
 
