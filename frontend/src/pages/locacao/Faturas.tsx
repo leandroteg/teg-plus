@@ -747,6 +747,27 @@ function ImovelFaturasModal({
                             </div>
                           </td>
                         </>
+                      ) : tipo === 'aluguel' && imovel.valor_aluguel_mensal ? (
+                        /* Aluguel ainda não lançado: prévia com valor + vencimento do contrato */
+                        <>
+                          <td className="text-center px-2 py-2.5">
+                            <span className="text-amber-500" title="Vencimento do contrato">{fmtDate(aluguelVencDefault(modalCompetencia, imovel.dia_vencimento))}</span>
+                          </td>
+                          <td className="text-right px-2 py-2.5">
+                            <span className="text-amber-500 font-semibold" title="Valor do contrato">{fmtCurrency(imovel.valor_aluguel_mensal)}</span>
+                          </td>
+                          <td className="text-right px-4 py-2.5">
+                            <button
+                              onClick={() => setEditingRow(isEditing ? null : { tipo, fatura: null })}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                                isDark ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20' : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
+                              }`}
+                              title="Lançar o aluguel (valor e vencimento já vêm do contrato)"
+                            >
+                              <Plus size={10} /> Lancar
+                            </button>
+                          </td>
+                        </>
                       ) : (
                         <>
                           <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
