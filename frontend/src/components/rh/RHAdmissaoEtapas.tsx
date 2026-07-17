@@ -571,7 +571,9 @@ function RegistroCandidato({ cand, adm, isDark, autorNome }: {
   const assinaturasByAnexo = new Map(
     (data?.assinaturasDocs ?? []).filter(m => m.metadata?.anexo_id).map(m => [m.metadata!.anexo_id!, m])
   )
-  const tituloDoc = (a: typeof signaveis[number]) => a.tipo === 'contrato' ? 'Contrato de Trabalho' : a.arquivo_nome
+  // Título da assinatura = nome real do arquivo (limpo), não um rótulo fixo.
+  const limpaNome = (nm: string) => nm.replace(/\.(pdf|jpe?g|png|docx?)$/i, '').replace(/^\s*\d+(\.\d+)*\s*[.)\-–]?\s*/, '').trim()
+  const tituloDoc = (a: typeof signaveis[number]) => limpaNome(a.arquivo_nome) || 'Documento'
   const assinados = signaveis.filter(a => assinaturasByAnexo.get(a.id)?.status === 'concluida').length
   const todosAssinados = signaveis.length > 0 && assinados === signaveis.length
   const algumEnviado = signaveis.some(a => assinaturasByAnexo.has(a.id))
