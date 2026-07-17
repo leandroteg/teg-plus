@@ -105,6 +105,10 @@ export default function QsmaSeguranca() {
   const { data: acoes = [] } = useAcoesQsma()
   const { data: obras = [] } = useObrasComProjeto()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
+  // data no formato da planilha/pastas do OneDrive: DD.MM.AAAA
+  const fmtDataPlanilha = (d?: string) => d
+    ? new Date(d.includes('T') ? d : d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')
+    : '—'
 
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
@@ -292,16 +296,16 @@ export default function QsmaSeguranca() {
                   return (
                     <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left ${card} p-3.5 flex items-center gap-3 flex-wrap hover:shadow-md transition-all`}>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-bold ${txtMain}`}>
-                          <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{o.codigo}</span>
-                          {TIPO_OCORRENCIA_LABEL[o.tipo]}
+                        <p className={`text-sm font-bold ${txtMain} flex items-center gap-1.5 flex-wrap`}>
+                          <span className={`font-mono text-[10px] ${txtMuted}`}>{o.codigo}</span>
+                          <span>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                         </p>
                         <p className={`text-[11px] truncate ${txtMuted}`}>
-                          {o.descricao} · {obraNome(o.obra_id)} · {fmtData(o.data_ocorrencia)}
+                          {TIPO_OCORRENCIA_LABEL[o.tipo]} · {o.descricao}
                           {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={9} />{nAcoes} ação(ões)</span>}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
                       {o.sgi_registro_id && (
                         <span className={`inline-flex items-center gap-1 text-[9px] font-bold ${isDark ? 'text-violet-400' : 'text-violet-600'}`} title="Em tratamento no módulo Gestão (SGI)">
@@ -338,10 +342,10 @@ export default function QsmaSeguranca() {
                               <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
                               <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                             </div>
-                            <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</p>
+                            <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
                             <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
                             <p className={`text-[9px] mt-1 ${txtMuted}`}>
-                              {obraNome(o.obra_id)} · {fmtData(o.data_ocorrencia)}
+                              {TIPO_OCORRENCIA_LABEL[o.tipo]}
                               {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{nAcoes} ação(ões)</span>}
                             </p>
                           </button>
