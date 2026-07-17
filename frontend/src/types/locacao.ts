@@ -191,6 +191,15 @@ export interface LocImovel {
   status: StatusImovel
   created_at: string
   updated_at: string
+  // join opcional (useAlojamentos) — contrato de locação vinculado
+  contrato?: {
+    id: string
+    numero?: string | null
+    data_inicio?: string | null
+    data_fim_previsto?: string | null
+    data_assinatura?: string | null
+    status?: string | null
+  } | null
 }
 
 export interface LocEntrada {
