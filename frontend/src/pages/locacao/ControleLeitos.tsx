@@ -503,20 +503,23 @@ function AlojamentosView({ alojamentos, leitosPorImovel, ocupadosSet, viewMode, 
             </thead>
             <tbody>
               {rows.map(({ a, st }) => {
+                const isHotel = a.tipo === 'HTL'
                 const semLeitos = st.total === 0
+                const na = <span className={`text-[10px] italic ${txtMuted}`}>n/a</span>
                 return (
                   <tr key={a.id} onClick={() => onAbrir(a)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
                     <td className={`px-3 py-2.5 font-bold whitespace-nowrap ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{codigoAloj(a)}</td>
                     <td className={`px-3 py-2.5 font-semibold ${txt}`}>{a.cidade || '—'}</td>
                     <td className="px-3 py-2.5"><p className={`truncate max-w-[240px] ${txtMuted}`}>{fmtEndereco(a)}</p></td>
-                    <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{semLeitos ? '—' : st.total}</td>
-                    <td className={`px-3 py-2.5 text-right ${txtMuted}`}>{semLeitos ? '—' : st.ocupados}</td>
-                    <td className={`px-3 py-2.5 text-right font-semibold ${semLeitos ? txtMuted : st.livres > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{semLeitos ? '—' : st.livres}</td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{isHotel ? na : semLeitos ? '—' : st.total}</td>
+                    <td className={`px-3 py-2.5 text-right ${txtMuted}`}>{semLeitos && !isHotel ? '—' : st.ocupados}</td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${semLeitos ? txtMuted : st.livres > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{isHotel ? na : semLeitos ? '—' : st.livres}</td>
                     <td className="px-3 py-2.5 text-right">
-                      {semLeitos
-                        ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
-                        : <span className={`font-bold ${taxaCor(st.taxa)}`}>{st.taxa}%</span>}
+                      {isHotel ? na
+                        : semLeitos
+                          ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
+                          : <span className={`font-bold ${taxaCor(st.taxa)}`}>{st.taxa}%</span>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">{contratoBadge(a, isDark)}</td>
                   </tr>
@@ -534,19 +537,24 @@ function AlojamentosView({ alojamentos, leitosPorImovel, ocupadosSet, viewMode, 
     <div className="space-y-2">
       {alojamentos.map(a => {
         const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
+        const isHotel = a.tipo === 'HTL'
         const semLeitos = st.total === 0
         return (
           <button key={a.id} type="button" onClick={() => onAbrir(a)}
             className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}>
             <div className="flex items-start justify-between gap-2 mb-1">
               <p className={`text-sm font-bold truncate ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{codigoAloj(a)}</p>
-              {semLeitos
-                ? <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
-                : <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.livres > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{st.livres > 0 ? `${st.livres} livre${st.livres > 1 ? 's' : ''}` : 'lotado'}</span>}
+              {isHotel
+                ? <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">hotel</span>
+                : semLeitos
+                  ? <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">sem leitos</span>
+                  : <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.livres > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{st.livres > 0 ? `${st.livres} livre${st.livres > 1 ? 's' : ''}` : 'lotado'}</span>}
             </div>
             <p className={`text-xs flex items-center gap-1 mb-0.5 ${txtMuted}`}><MapPin size={11} /> {a.cidade || '—'}{a.uf ? `/${a.uf}` : ''}</p>
             <p className={`text-xs truncate mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtEndereco(a)}</p>
-            {semLeitos ? (
+            {isHotel ? (
+              <p className={`text-xs ${txtMuted}`}>{st.ocupados} hóspede{st.ocupados !== 1 ? 's' : ''} · capacidade/saldo não se aplica</p>
+            ) : semLeitos ? (
               <p className={`text-xs ${txtMuted}`}>Clique para definir a capacidade</p>
             ) : (
               <>
