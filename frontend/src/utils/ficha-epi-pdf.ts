@@ -226,8 +226,8 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
 export async function gerarFichaEpiPdf(data: FichaEpiPdfData): Promise<void> {
   let empresa: EmpresaData = EMPRESA_FALLBACK
   try { empresa = await getEmpresa() } catch { /* fallback */ }
-  // Logo institucional nova (transição) — fixa para a ficha de EPI
-  const logo = await loadLogoBase64('/logo-teg-transicao.png') ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
+  // Logo institucional (transição) versão BRANCA — cabeçalho escuro da ficha de EPI
+  const logo = await loadLogoBase64('/logo-teg-transicao-branca.png') ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
   const doc = buildDoc(data, empresa, logo)
   const nome = `Ficha_EPI_${(data.codigo ?? 'nova').replace(/[^\w\-]+/g, '_')}_${data.colaboradorNome.split(' ')[0]}.pdf`
   doc.save(nome)
