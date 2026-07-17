@@ -292,11 +292,13 @@ export const TIPO_OCORRENCIA_LABEL: Record<TipoOcorrencia, string> = {
   ambiental: 'Ocorrência ambiental',
 }
 
+// Potencial de Gravidade — escala do padrão de investigação de acidentes (RIIA/CIS/IP 10.2):
+// Leve (baixíssima gravidade) → Moderada → Grave → Gravíssima. Chaves mantidas p/ compat.
 export const GRAVIDADE_LABEL: Record<Gravidade, { label: string; light: string; dark: string }> = {
-  baixa:   { label: 'Baixa',   light: 'bg-slate-100 text-slate-600',     dark: 'bg-slate-500/15 text-slate-400' },
-  media:   { label: 'Média',   light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-400' },
-  alta:    { label: 'Alta',    light: 'bg-orange-100 text-orange-700',   dark: 'bg-orange-500/15 text-orange-400' },
-  critica: { label: 'Crítica', light: 'bg-red-100 text-red-700',         dark: 'bg-red-500/15 text-red-400' },
+  baixa:   { label: 'Leve',      light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
+  media:   { label: 'Moderada',  light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-400' },
+  alta:    { label: 'Grave',     light: 'bg-orange-100 text-orange-700',   dark: 'bg-orange-500/15 text-orange-400' },
+  critica: { label: 'Gravíssima', light: 'bg-red-100 text-red-700',        dark: 'bg-red-500/15 text-red-400' },
 }
 
 export const STATUS_OCORRENCIA_LABEL: Record<StatusOcorrencia, { label: string; light: string; dark: string }> = {
