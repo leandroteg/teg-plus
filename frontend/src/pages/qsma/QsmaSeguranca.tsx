@@ -613,7 +613,9 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
 
 function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
   const criar = useCriarFichaEpi()
+  const { data: matriz = [] } = useMatrizEpi()
   const { perfil } = useAuth()
+  const [cargoSel, setCargoSel] = useState('')
   const hoje = new Date().toISOString().split('T')[0]
   const [colabId, setColabId] = useState('')
   const [colabNome, setColabNome] = useState('')
@@ -691,7 +693,21 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
 
   return (
     <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — gere o PDF, colha a assinatura e arquive" onClose={onClose}>
-      <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => { setColabId(id); setColabNome(c?.nome ?? '') }} required />
+      <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => {
+        setColabId(id); setColabNome(c?.nome ?? ''); setCargoSel(c?.cargo ?? '')
+        // Auto-carrega o kit do cargo pela matriz de EPI
+        const kit = matriz
+          .filter(m => m.exigencia === 'obrigatorio' && cargoBase(m.cargo) === cargoBase(c?.cargo))
+          .map(m => ({ epi_id: m.epi_id, quantidade: String(m.quantidade), tamanho: '' }))
+        setItens(kit.length ? kit : [{ epi_id: '', quantidade: '1', tamanho: '' }])
+      }} required />
+      {colabId && (
+        <p className={`-mt-1 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          {cargoSel || '—'} · {itens.filter(it => it.epi_id).length > 0
+            ? `kit do cargo carregado (${itens.filter(it => it.epi_id).length} EPIs) — ajuste se precisar`
+            : 'sem matriz de EPI para este cargo — adicione os itens manualmente'}
+        </p>
+      )}
       <ObraPicker isDark={isDark} value={obraId} onChange={setObraId} />
       <div className="grid grid-cols-2 gap-2">
         <div>
