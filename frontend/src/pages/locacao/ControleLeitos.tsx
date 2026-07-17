@@ -177,6 +177,7 @@ export default function ControleLeitos() {
   const [search, setSearch] = useState('')
   const [fCidade, setFCidade] = useState('')
   const [fTipo, setFTipo] = useState<'todos' | 'ALOJ' | 'HTL'>('todos')
+  const [fFaixas, setFFaixas] = useState<Set<string>>(new Set())
   const [aberto, setAberto] = useState<LocImovel | null>(null)
   const [mf, setMf] = useState<MapaFiltros>({ busca: '', tipo: 'todos', cidade: '', ocup: '', cc: '' })
 
@@ -225,14 +226,21 @@ export default function ControleLeitos() {
 
   const alojFiltrados = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return alojamentos.filter(a =>
-      (!fCidade || a.cidade === fCidade) &&
-      (fTipo === 'todos' || a.tipo === fTipo) &&
-      (!q ||
+    return alojamentos.filter(a => {
+      if (fCidade && a.cidade !== fCidade) return false
+      if (fTipo !== 'todos' && a.tipo !== fTipo) return false
+      if (fFaixas.size > 0) {
+        const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
+        const fx = faixaOcup(st.taxa, st.total)
+        if (!fx || !fFaixas.has(fx)) return false
+      }
+      if (q && !(
         nomeAloj(a).toLowerCase().includes(q) ||
         a.cidade?.toLowerCase().includes(q) ||
-        a.endereco?.toLowerCase().includes(q)))
-  }, [alojamentos, search, fCidade, fTipo])
+        a.endereco?.toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [alojamentos, search, fCidade, fTipo, fFaixas, leitosPorImovel, ocupadosSet])
 
   // estatísticas do topo refletem o filtro aplicado
   const statsFiltrado = useMemo(() => {
@@ -292,6 +300,8 @@ export default function ControleLeitos() {
               <option value="">Todas cidades</option>
               {alojCidades.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            {/* Filtro por faixa de ocupação (multi-seleção) */}
+            <FaixaFilter sel={fFaixas} onChange={setFFaixas} isDark={isDark} cls={mapaSel} />
             <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[180px]
               ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
               <Search size={14} className={txtMuted} />
@@ -365,6 +375,45 @@ export default function ControleLeitos() {
   )
 }
 
+// ── Faixas de ocupação (filtro) ───────────────────────────────────────────────
+const FAIXAS: [string, string][] = [
+  ['0', '0%'], ['1-25', '1 a 25%'], ['26-50', '26 a 50%'],
+  ['51-75', '51 a 75%'], ['76-99', '76 a 99%'], ['100', '100%'],
+]
+function faixaOcup(taxa: number, total: number): string | null {
+  if (total === 0) return null      // sem leitos — fora das faixas
+  if (taxa === 0) return '0'
+  if (taxa <= 25) return '1-25'
+  if (taxa <= 50) return '26-50'
+  if (taxa <= 75) return '51-75'
+  if (taxa <= 99) return '76-99'
+  return '100'
+}
+function FaixaFilter({ sel, onChange, isDark, cls }: {
+  sel: Set<string>; onChange: (s: Set<string>) => void; isDark: boolean; cls: string
+}) {
+  const [open, setOpen] = useState(false)
+  const toggle = (k: string) => { const n = new Set(sel); n.has(k) ? n.delete(k) : n.add(k); onChange(n) }
+  const resumo = sel.size === 0 ? 'Todas' : `${sel.size} faixa${sel.size > 1 ? 's' : ''}`
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)} className={`${cls} inline-flex items-center gap-1`}>
+        Ocupação: <span className="font-bold">{resumo}</span>
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+        <div className={`absolute z-40 mt-1 right-0 w-36 rounded-xl border p-1 shadow-xl ${isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'}`}>
+          {FAIXAS.map(([k, l]) => (
+            <label key={k} className={`flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer text-xs ${isDark ? 'text-slate-300 hover:bg-white/[0.05]' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} /> {l}
+            </label>
+          ))}
+        </div>
+      </>)}
+    </div>
+  )
+}
+
 // ── Alojamentos: lista (tabela) ou cards — padrão da aba Ativos ───────────────
 function taxaCor(taxa: number) {
   return taxa >= 100 ? 'text-rose-500' : taxa >= 80 ? 'text-amber-500' : 'text-cyan-500'
@@ -390,6 +439,36 @@ function AlojamentosView({ alojamentos, leitosPorImovel, ocupadosSet, viewMode, 
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const clickSort = (k: string) => {
+    if (sortCol === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortCol(k); setSortDir('asc') }
+  }
+  const rows = useMemo(() => {
+    const arr = alojamentos.map(a => ({ a, st: statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet) }))
+    if (!sortCol) return arr
+    const val = (x: { a: LocImovel; st: ReturnType<typeof statsDe> }): string | number => {
+      switch (sortCol) {
+        case 'codigo': return codigoAloj(x.a).toLowerCase()
+        case 'cidade': return (x.a.cidade || '').toLowerCase()
+        case 'imovel': return fmtEndereco(x.a).toLowerCase()
+        case 'leitos': return x.st.total
+        case 'ocupados': return x.st.ocupados
+        case 'livres': return x.st.livres
+        case 'ocupacao': return x.st.taxa
+        case 'contrato': return x.a.tipo === 'HTL' ? '~' : (STATUS_CFG[x.a.status]?.label || '').toLowerCase()
+        default: return ''
+      }
+    }
+    return [...arr].sort((p, q) => {
+      const va = val(p), vb = val(q)
+      const c = typeof va === 'number' && typeof vb === 'number'
+        ? va - vb : String(va).localeCompare(String(vb), 'pt-BR')
+      return sortDir === 'asc' ? c : -c
+    })
+  }, [alojamentos, leitosPorImovel, ocupadosSet, sortCol, sortDir])
+
   if (alojamentos.length === 0) {
     return (
       <div className={`flex flex-col items-center justify-center py-12 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
@@ -405,21 +484,25 @@ function AlojamentosView({ alojamentos, leitosPorImovel, ocupadosSet, viewMode, 
           <table className="w-full text-xs">
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                {[
-                  { label: 'CÓDIGO', align: 'text-left' },
-                  { label: 'CIDADE', align: 'text-left' },
-                  { label: 'IMÓVEL', align: 'text-left' },
-                  { label: 'LEITOS', align: 'text-right' },
-                  { label: 'OCUPADOS', align: 'text-right' },
-                  { label: 'LIVRES', align: 'text-right' },
-                  { label: 'OCUPAÇÃO', align: 'text-right' },
-                  { label: 'CONTRATO', align: 'text-left' },
-                ].map(c => <th key={c.label} className={`${c.align} px-3 py-2 font-semibold`}>{c.label}</th>)}
+                {([
+                  { key: 'codigo', label: 'CÓDIGO', align: 'text-left' },
+                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
+                  { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
+                  { key: 'leitos', label: 'LEITOS', align: 'text-right' },
+                  { key: 'ocupados', label: 'OCUPADOS', align: 'text-right' },
+                  { key: 'livres', label: 'LIVRES', align: 'text-right' },
+                  { key: 'ocupacao', label: 'OCUPAÇÃO', align: 'text-right' },
+                  { key: 'contrato', label: 'CONTRATO', align: 'text-left' },
+                ] as const).map(c => (
+                  <th key={c.key} onClick={() => clickSort(c.key)}
+                    className={`${c.align} px-3 py-2 font-semibold cursor-pointer select-none whitespace-nowrap ${isDark ? 'hover:text-slate-300' : 'hover:text-slate-600'}`}>
+                    {c.label}{sortCol === c.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {alojamentos.map(a => {
-                const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
+              {rows.map(({ a, st }) => {
                 const semLeitos = st.total === 0
                 return (
                   <tr key={a.id} onClick={() => onAbrir(a)}
