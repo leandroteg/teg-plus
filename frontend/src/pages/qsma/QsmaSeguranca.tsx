@@ -1578,7 +1578,7 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
           </select>
         </div>
         <div>
-          <label className={pickerLabelCls(isDark)}>Gravidade</label>
+          <label className={pickerLabelCls(isDark)}>Potencial de gravidade</label>
           <select value={gravidade} onChange={e => setGravidade(e.target.value as Gravidade)} className={pickerInputCls(isDark)}>
             {(Object.keys(GRAVIDADE_LABEL) as Gravidade[]).map(g => <option key={g} value={g}>{GRAVIDADE_LABEL[g].label}</option>)}
           </select>
