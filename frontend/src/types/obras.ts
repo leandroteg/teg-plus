@@ -155,6 +155,9 @@ export interface ColaboradorAtivo {
   base_nome?: string
   foto_url?: string
   tipo_contrato?: string
+  tamanho_camisa?: string
+  tamanho_calca?: string
+  tamanho_calcado?: string
   papel_sugerido: PapelEquipe
 }
 

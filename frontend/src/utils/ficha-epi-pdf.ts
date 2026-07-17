@@ -21,7 +21,7 @@ export interface FichaEpiPdfItem {
 export interface FichaEpiPdfData {
   codigo?: string
   colaboradorNome: string
-  obraNome?: string
+  baseNome?: string
   dataEntrega?: string
   motivo?: string
   observacoes?: string
@@ -108,19 +108,16 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
   // ── Header bar ──────────────────────────────────────────────────────────────
   doc.setFillColor(...DARK)
   doc.rect(0, 0, W, 34, 'F')
+  // Logo institucional (larga ~3.84:1) — proporcional, alinhada à esquerda
   if (logo) {
-    try { doc.addImage(logo, 'PNG', M, 3, 18, 28) } catch { /* ignore */ }
+    try { doc.addImage(logo, 'PNG', M, 7, 46, 12) } catch { /* ignore */ }
   }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(255, 255, 255)
-  doc.text(empresa.fantasia, M + 22, 11)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(180, 190, 200)
-  doc.text(`CNPJ: ${empresa.cnpj}`, M + 22, 16)
+  doc.text(`CNPJ: ${empresa.cnpj}`, M, 24)
   if (empresa.endereco) {
-    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 22, 21)
+    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M, 28)
   }
 
   doc.setFont('helvetica', 'bold')
@@ -136,7 +133,7 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
 
   // ── Dados da entrega ────────────────────────────────────────────────────────
   sectionTitle('DADOS DA ENTREGA')
-  addFieldPair('Colaborador', data.colaboradorNome, 'Obra / Local', data.obraNome ?? '—')
+  addFieldPair('Colaborador', data.colaboradorNome, 'Base', data.baseNome ?? '—')
   addFieldPair('Data da Entrega', fmtDate(data.dataEntrega), 'Motivo', (data.motivo ?? 'entrega').toUpperCase())
   if (data.observacoes) {
     doc.setFont('helvetica', 'normal')
@@ -229,7 +226,8 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
 export async function gerarFichaEpiPdf(data: FichaEpiPdfData): Promise<void> {
   let empresa: EmpresaData = EMPRESA_FALLBACK
   try { empresa = await getEmpresa() } catch { /* fallback */ }
-  const logo = empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null
+  // Logo institucional nova (transição) — fixa para a ficha de EPI
+  const logo = await loadLogoBase64('/logo-teg-transicao.png') ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
   const doc = buildDoc(data, empresa, logo)
   const nome = `Ficha_EPI_${(data.codigo ?? 'nova').replace(/[^\w\-]+/g, '_')}_${data.colaboradorNome.split(' ')[0]}.pdf`
   doc.save(nome)

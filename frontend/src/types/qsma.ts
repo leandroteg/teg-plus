@@ -164,6 +164,7 @@ export interface QsmaEpiFicha {
   colaborador_id: string
   colaborador_nome?: string
   obra_id?: string
+  base_id?: string
   data_entrega: string
   motivo?: MotivoEntregaEpi
   observacoes?: string

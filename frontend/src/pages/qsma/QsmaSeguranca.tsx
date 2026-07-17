@@ -209,7 +209,7 @@ export default function QsmaSeguranca() {
         if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
         if (subEpi === 'controle') return (
           <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
-            obraNome={obraNome} onNovaFicha={() => setModalFicha(true)} />
+            onNovaFicha={() => setModalFicha(true)} />
         )
         return (
           <ListaEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
@@ -612,6 +612,16 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
 
 // ── Modal: Ficha de Entrega de EPI (multi-item, padrão SOC/NR-06) ────────────
 
+// Sugere o tamanho do colaborador conforme o tipo de EPI (roupa × calçado)
+function tamanhoSugerido(epi: QsmaEpi | undefined, c?: { tamanho_camisa?: string; tamanho_calca?: string; tamanho_calcado?: string }): string {
+  if (!epi || !c) return ''
+  const n = epi.nome.toLowerCase()
+  if (/cal[çc]a|bermuda/.test(n)) return c.tamanho_calca ?? ''
+  if (/botina|bota|cal[çc]ado|perneira|sapat/.test(n)) return c.tamanho_calcado ?? ''
+  if (/camisa|blus|jaqueta|colete|balaclava|anti-?chama|macac/.test(n)) return c.tamanho_camisa ?? ''
+  return ''
+}
+
 function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
   const criar = useCriarFichaEpi()
   const { data: matriz = [] } = useMatrizEpi()
@@ -671,6 +681,7 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
         await gerarFichaEpiPdf({
           codigo: r.codigo,
           colaboradorNome: colabNome,
+          baseNome: bases.find(b => b.id === baseId)?.nome,
           dataEntrega,
           motivo,
           observacoes: obs || undefined,
@@ -698,10 +709,10 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
       <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => {
         setColabId(id); setColabNome(c?.nome ?? ''); setCargoSel(c?.cargo ?? '')
         if ((c as { base_id?: string })?.base_id) setBaseId((c as { base_id?: string }).base_id!)
-        // Auto-carrega o kit do cargo pela matriz de EPI
+        // Auto-carrega o kit do cargo pela matriz de EPI (com tamanho da pessoa)
         const kit = matriz
           .filter(m => m.exigencia === 'obrigatorio' && cargoBase(m.cargo) === cargoBase(c?.cargo))
-          .map(m => ({ epi_id: m.epi_id, quantidade: String(m.quantidade), tamanho: '' }))
+          .map(m => ({ epi_id: m.epi_id, quantidade: String(m.quantidade), tamanho: tamanhoSugerido(epis.find(e => e.id === m.epi_id), c) }))
         setItens(kit.length ? kit : [{ epi_id: '', quantidade: '1', tamanho: '' }])
       }} required />
       {colabId && (
@@ -1794,9 +1805,9 @@ function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
 }
 
 // ── Card de uma ficha de entrega (PDF + arquivar assinada) ────────────────────
-function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
+function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
   f: QsmaEpiFicha; isDark: boolean; card: string; txtMain: string; txtMuted: string
-  obraNome: (id?: string) => string
+  baseNome: (id?: string) => string
 }) {
   const arquivarFicha = useArquivarFichaEpi()
   const st = STATUS_FICHA_EPI_LABEL[f.status]
@@ -1810,7 +1821,7 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
             {f.colaborador_nome ?? '—'}
           </p>
           <p className={`text-[11px] ${txtMuted}`}>
-            {itens.length} item(ns) · {fmtData(f.data_entrega)} · {obraNome(f.obra_id)}
+            {itens.length} item(ns) · {fmtData(f.data_entrega)} · {baseNome(f.base_id)}
           </p>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
@@ -1818,7 +1829,7 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
           onClick={() => gerarFichaEpiPdf({
             codigo: f.codigo,
             colaboradorNome: f.colaborador_nome ?? '—',
-            obraNome: obraNome(f.obra_id),
+            baseNome: baseNome(f.base_id),
             dataEntrega: f.data_entrega,
             motivo: f.motivo,
             observacoes: f.observacoes,
@@ -1887,15 +1898,17 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
 }
 
 // ── Controle de EPIs por COLABORADOR: kit × matriz do cargo → ficha viva ──────
-function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, obraNome, onNovaFicha }: {
+function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
-  obraNome: (id?: string) => string; onNovaFicha: () => void
+  onNovaFicha: () => void
 }) {
   const { data: colabs = [], isLoading } = useColaboradoresTreino()
   const { data: epis = [] } = useEpis()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: entregas = [] } = useEpiEntregas()
   const { data: fichas = [] } = useFichasEpi()
+  const { data: estBases = [] } = useBases()
+  const baseNome = (id?: string) => estBases.find(b => b.id === id)?.nome ?? '—'
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'incompleto'>('todos')
   const [fBase, setFBase] = useState<Set<string> | null>(null)
@@ -2030,7 +2043,7 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, obraNome, onNo
                         {l.fichas.length === 0 ? (
                           <p className={`text-[11px] italic ${txtMuted}`}>Nenhuma ficha de entrega ainda — crie pela ação "Nova Ficha de Entrega".</p>
                         ) : (
-                          l.fichas.map(f => <FichaCard key={f.id} f={f} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} obraNome={obraNome} />)
+                          l.fichas.map(f => <FichaCard key={f.id} f={f} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} baseNome={baseNome} />)
                         )}
                       </div>
                     )}
