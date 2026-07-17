@@ -229,10 +229,9 @@ export default function ControleLeitos() {
     return alojamentos.filter(a => {
       if (fCidade && a.cidade !== fCidade) return false
       if (fTipo !== 'todos' && a.tipo !== fTipo) return false
-      if (fFaixas.size > 0) {
+      if (fFaixas.size > 0 && fFaixas.size < FAIXAS.length) {
         const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
-        const fx = faixaOcup(st.taxa, st.total)
-        if (!fx || !fFaixas.has(fx)) return false
+        if (!fFaixas.has(faixaOcup(st.taxa, st.total))) return false
       }
       if (q && !(
         nomeAloj(a).toLowerCase().includes(q) ||
@@ -379,9 +378,11 @@ export default function ControleLeitos() {
 const FAIXAS: [string, string][] = [
   ['0', '0%'], ['1-25', '1 a 25%'], ['26-50', '26 a 50%'],
   ['51-75', '51 a 75%'], ['76-99', '76 a 99%'], ['100', '100%'],
+  ['sem', 'Sem leitos'],
 ]
-function faixaOcup(taxa: number, total: number): string | null {
-  if (total === 0) return null      // sem leitos — fora das faixas
+const FAIXA_KEYS = FAIXAS.map(f => f[0])
+function faixaOcup(taxa: number, total: number): string {
+  if (total === 0) return 'sem'    // imóvel sem leitos cadastrados
   if (taxa === 0) return '0'
   if (taxa <= 25) return '1-25'
   if (taxa <= 50) return '26-50'
@@ -394,7 +395,8 @@ function FaixaFilter({ sel, onChange, isDark, cls }: {
 }) {
   const [open, setOpen] = useState(false)
   const toggle = (k: string) => { const n = new Set(sel); n.has(k) ? n.delete(k) : n.add(k); onChange(n) }
-  const resumo = sel.size === 0 ? 'Todas' : `${sel.size} faixa${sel.size > 1 ? 's' : ''}`
+  const allSel = sel.size === 0 || sel.size === FAIXAS.length
+  const resumo = allSel ? 'Todas' : `${sel.size} faixa${sel.size > 1 ? 's' : ''}`
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen(o => !o)} className={`${cls} inline-flex items-center gap-1`}>
@@ -402,7 +404,11 @@ function FaixaFilter({ sel, onChange, isDark, cls }: {
       </button>
       {open && (<>
         <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-        <div className={`absolute z-40 mt-1 right-0 w-36 rounded-xl border p-1 shadow-xl ${isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'}`}>
+        <div className={`absolute z-40 mt-1 right-0 w-40 rounded-xl border p-1 shadow-xl ${isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'}`}>
+          <div className={`flex items-center justify-between px-2 py-1 mb-1 border-b text-[10px] font-bold ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+            <button onClick={() => onChange(new Set(FAIXA_KEYS))} className={isDark ? 'text-cyan-300' : 'text-cyan-700'}>Selecionar todos</button>
+            <button onClick={() => onChange(new Set())} className={isDark ? 'text-slate-400' : 'text-slate-500'}>Limpar</button>
+          </div>
           {FAIXAS.map(([k, l]) => (
             <label key={k} className={`flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer text-xs ${isDark ? 'text-slate-300 hover:bg-white/[0.05]' : 'text-slate-600 hover:bg-slate-50'}`}>
               <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} /> {l}
