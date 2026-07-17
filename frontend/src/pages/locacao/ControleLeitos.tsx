@@ -175,6 +175,8 @@ export default function ControleLeitos() {
   const [sub, setSub] = useState<'alojamento' | 'pessoas' | 'historico' | 'mapa'>('alojamento')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [search, setSearch] = useState('')
+  const [fCidade, setFCidade] = useState('')
+  const [fTipo, setFTipo] = useState<'todos' | 'ALOJ' | 'HTL'>('todos')
   const [aberto, setAberto] = useState<LocImovel | null>(null)
   const [mf, setMf] = useState<MapaFiltros>({ busca: '', tipo: 'todos', cidade: '', ocup: '', cc: '' })
 
@@ -216,16 +218,27 @@ export default function ControleLeitos() {
 
   const leitosById = useMemo(() => new Map(leitos.map(l => [l.id, l])), [leitos])
 
-  const totalGeral = useMemo(() => statsDe(leitos, ocupadosSet), [leitos, ocupadosSet])
+  // cidades disponíveis nos alojamentos (para o filtro)
+  const alojCidades = useMemo(() =>
+    [...new Set(alojamentos.map(a => a.cidade).filter(Boolean))].sort() as string[],
+  [alojamentos])
 
   const alojFiltrados = useMemo(() => {
-    if (!search) return alojamentos
-    const q = search.toLowerCase()
+    const q = search.trim().toLowerCase()
     return alojamentos.filter(a =>
-      nomeAloj(a).toLowerCase().includes(q) ||
-      a.cidade?.toLowerCase().includes(q) ||
-      a.endereco?.toLowerCase().includes(q))
-  }, [alojamentos, search])
+      (!fCidade || a.cidade === fCidade) &&
+      (fTipo === 'todos' || a.tipo === fTipo) &&
+      (!q ||
+        nomeAloj(a).toLowerCase().includes(q) ||
+        a.cidade?.toLowerCase().includes(q) ||
+        a.endereco?.toLowerCase().includes(q)))
+  }, [alojamentos, search, fCidade, fTipo])
+
+  // estatísticas do topo refletem o filtro aplicado
+  const statsFiltrado = useMemo(() => {
+    const ids = new Set(alojFiltrados.map(a => a.id))
+    return statsDe(leitos.filter(l => ids.has(l.imovel_id)), ocupadosSet)
+  }, [alojFiltrados, leitos, ocupadosSet])
 
   const isLoading = loadAloj || loadLeitos
 
@@ -261,11 +274,24 @@ export default function ControleLeitos() {
         ) : sub === 'alojamento' ? (
           <>
             <p className={`text-xs ${txtMuted}`}>
-              {alojamentos.length} alojamentos · <span className="font-semibold">{totalGeral.total}</span> leitos ·{' '}
-              <span className={totalGeral.livres > 0 ? 'text-emerald-500 font-semibold' : txtMuted}>{totalGeral.livres} livres</span> ·{' '}
-              {totalGeral.taxa}% ocupação
+              {alojFiltrados.length} alojamentos · <span className="font-semibold">{statsFiltrado.total}</span> leitos ·{' '}
+              <span className={statsFiltrado.livres > 0 ? 'text-emerald-500 font-semibold' : txtMuted}>{statsFiltrado.livres} livres</span> ·{' '}
+              {statsFiltrado.taxa}% ocupação
             </p>
             <div className="flex-1" />
+            {/* Filtro por tipo de instalação */}
+            <div className={`flex items-center gap-0.5 rounded-lg border p-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+              {([['todos', 'Todos'], ['ALOJ', 'Aloj.'], ['HTL', 'Hotel']] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setFTipo(k)}
+                  className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-colors ${fTipo === k
+                    ? isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700' : txtMuted}`}>{l}</button>
+              ))}
+            </div>
+            {/* Filtro por cidade */}
+            <select value={fCidade} onChange={e => setFCidade(e.target.value)} className={mapaSel}>
+              <option value="">Todas cidades</option>
+              {alojCidades.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
             <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[180px]
               ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
               <Search size={14} className={txtMuted} />
