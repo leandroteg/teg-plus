@@ -178,6 +178,7 @@ export default function ControleLeitos() {
   const [fCidade, setFCidade] = useState('')
   const [fTipo, setFTipo] = useState<'todos' | 'ALOJ' | 'HTL'>('todos')
   const [fFaixas, setFFaixas] = useState<Set<string>>(new Set())
+  const [fStatus, setFStatus] = useState<Set<string>>(new Set())
   const [aberto, setAberto] = useState<LocImovel | null>(null)
   const [mf, setMf] = useState<MapaFiltros>({ busca: '', tipo: 'todos', cidade: '', ocup: '', cc: '' })
 
@@ -233,13 +234,16 @@ export default function ControleLeitos() {
         const st = statsDe(leitosPorImovel.get(a.id) ?? [], ocupadosSet)
         if (!fFaixas.has(faixaOcup(st.taxa, st.total))) return false
       }
+      if (fStatus.size > 0 && fStatus.size < STATUS_OPCOES.length) {
+        if (!fStatus.has(statusKey(a))) return false
+      }
       if (q && !(
         nomeAloj(a).toLowerCase().includes(q) ||
         a.cidade?.toLowerCase().includes(q) ||
         a.endereco?.toLowerCase().includes(q))) return false
       return true
     })
-  }, [alojamentos, search, fCidade, fTipo, fFaixas, leitosPorImovel, ocupadosSet])
+  }, [alojamentos, search, fCidade, fTipo, fFaixas, fStatus, leitosPorImovel, ocupadosSet])
 
   // estatísticas do topo refletem o filtro aplicado
   const statsFiltrado = useMemo(() => {
@@ -300,7 +304,9 @@ export default function ControleLeitos() {
               {alojCidades.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             {/* Filtro por faixa de ocupação (multi-seleção) */}
-            <FaixaFilter sel={fFaixas} onChange={setFFaixas} isDark={isDark} cls={mapaSel} />
+            <MultiCheckFilter label="Ocupação" options={FAIXAS} sel={fFaixas} onChange={setFFaixas} isDark={isDark} cls={mapaSel} />
+            {/* Filtro por status do contrato (multi-seleção) */}
+            <MultiCheckFilter label="Contrato" options={STATUS_OPCOES} sel={fStatus} onChange={setFStatus} isDark={isDark} cls={mapaSel} />
             <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[180px]
               ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
               <Search size={14} className={txtMuted} />
@@ -380,7 +386,6 @@ const FAIXAS: [string, string][] = [
   ['51-75', '51 a 75%'], ['76-99', '76 a 99%'], ['100', '100%'],
   ['sem', 'Sem leitos'],
 ]
-const FAIXA_KEYS = FAIXAS.map(f => f[0])
 function faixaOcup(taxa: number, total: number): string {
   if (total === 0) return 'sem'    // imóvel sem leitos cadastrados
   if (taxa === 0) return '0'
@@ -390,26 +395,37 @@ function faixaOcup(taxa: number, total: number): string {
   if (taxa <= 99) return '76-99'
   return '100'
 }
-function FaixaFilter({ sel, onChange, isDark, cls }: {
-  sel: Set<string>; onChange: (s: Set<string>) => void; isDark: boolean; cls: string
+// Status do imóvel/contrato para o filtro (hotel = não se aplica)
+const STATUS_OPCOES: [string, string][] = [
+  ['ativo', 'Ativo'], ['inativo', 'Inativo'], ['em_entrada', 'Em Entrada'], ['em_saida', 'Em Saída'], ['na', 'Não se aplica'],
+]
+function statusKey(a: LocImovel): string {
+  return a.tipo === 'HTL' ? 'na' : (a.status || 'ativo')
+}
+
+// Dropdown genérico de multi-seleção (checkboxes + Selecionar todos / Limpar)
+function MultiCheckFilter({ label, options, sel, onChange, isDark, cls }: {
+  label: string; options: [string, string][]; sel: Set<string>
+  onChange: (s: Set<string>) => void; isDark: boolean; cls: string
 }) {
   const [open, setOpen] = useState(false)
+  const keys = options.map(o => o[0])
   const toggle = (k: string) => { const n = new Set(sel); n.has(k) ? n.delete(k) : n.add(k); onChange(n) }
-  const allSel = sel.size === 0 || sel.size === FAIXAS.length
-  const resumo = allSel ? 'Todas' : `${sel.size} faixa${sel.size > 1 ? 's' : ''}`
+  const allSel = sel.size === 0 || sel.size === options.length
+  const resumo = allSel ? 'Todos' : `${sel.size}`
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen(o => !o)} className={`${cls} inline-flex items-center gap-1`}>
-        Ocupação: <span className="font-bold">{resumo}</span>
+        {label}: <span className="font-bold">{resumo}</span>
       </button>
       {open && (<>
         <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
         <div className={`absolute z-40 mt-1 right-0 w-40 rounded-xl border p-1 shadow-xl ${isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'}`}>
           <div className={`flex items-center justify-between px-2 py-1 mb-1 border-b text-[10px] font-bold ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-            <button onClick={() => onChange(new Set(FAIXA_KEYS))} className={isDark ? 'text-cyan-300' : 'text-cyan-700'}>Selecionar todos</button>
+            <button onClick={() => onChange(new Set(keys))} className={isDark ? 'text-cyan-300' : 'text-cyan-700'}>Selecionar todos</button>
             <button onClick={() => onChange(new Set())} className={isDark ? 'text-slate-400' : 'text-slate-500'}>Limpar</button>
           </div>
-          {FAIXAS.map(([k, l]) => (
+          {options.map(([k, l]) => (
             <label key={k} className={`flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer text-xs ${isDark ? 'text-slate-300 hover:bg-white/[0.05]' : 'text-slate-600 hover:bg-slate-50'}`}>
               <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} /> {l}
             </label>
