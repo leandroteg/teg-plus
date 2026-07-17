@@ -15,7 +15,7 @@ import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes, useDepartamentos } from '../../hooks/useRH'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus,
-  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi } from '../../hooks/useQsma'
+  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi, evidenciaUrl } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { HardHat, Ruler } from 'lucide-react'
 import { useCadObras } from '../../hooks/useCadastros'
@@ -648,6 +648,20 @@ function EpisColaborador({ colaborador, sectionCls, isLight }: {
                       </p>
                       <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(f.data_entrega)} · {baseNome(f.base_id)}</p>
                     </div>
+                    {/* Ficha assinada arquivada: prioriza o documento real no OneDrive */}
+                    {f.onedrive_web_url ? (
+                      <a href={f.onedrive_web_url} target="_blank" rel="noreferrer"
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'}`}
+                        title="Abrir a ficha assinada no OneDrive">
+                        <ShieldCheck size={11} /> OneDrive
+                      </a>
+                    ) : f.arquivo_assinado_path ? (
+                      <button onClick={async () => { const url = await evidenciaUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank') }}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'}`}
+                        title="Abrir ficha assinada arquivada">
+                        <ShieldCheck size={11} /> Assinada
+                      </button>
+                    ) : null}
                     <button onClick={() => gerarFichaEpiPdf({
                       codigo: f.codigo,
                       colaboradorNome: f.colaborador_nome ?? colaborador.nome,
@@ -658,7 +672,8 @@ function EpisColaborador({ colaborador, sectionCls, isLight }: {
                       entreguePorNome: f.entregue_por_nome,
                       itens: (f.itens ?? []).map(it => ({ nome: it.epi?.nome ?? 'EPI', ca: it.epi?.ca, quantidade: it.quantidade, tamanho: it.tamanho, trocaPrevista: it.data_troca_prevista })),
                     })}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border ${isLight ? 'border-slate-200 text-slate-600 hover:bg-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.05]'}`}>
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border ${isLight ? 'border-slate-200 text-slate-600 hover:bg-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.05]'}`}
+                      title="Gerar o PDF em branco da ficha">
                       <Download size={11} /> PDF
                     </button>
                   </div>
