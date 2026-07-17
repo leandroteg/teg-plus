@@ -2,6 +2,7 @@
 // pages/rh/RHColaboradorDetalhe.tsx — Ficha completa do colaborador
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Save, User, Briefcase, MapPin, Building2, CreditCard,
   FileText, Users2, Phone, Mail, Calendar, Hash, Edit3, Plus, Trash2,
@@ -13,14 +14,17 @@ import {
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes, useDepartamentos } from '../../hooks/useRH'
-import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus } from '../../hooks/useQsma'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus,
+  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi } from '../../hooks/useQsma'
+import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
+import { HardHat, Ruler } from 'lucide-react'
 import { useCadObras } from '../../hooks/useCadastros'
 import { useBases } from '../../hooks/useEstoque'
 import { Lock } from 'lucide-react'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
 
-export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { id: string; onBack: () => void; soTreinamentos?: boolean }) {
+export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostrarEpi }: { id: string; onBack: () => void; soTreinamentos?: boolean; mostrarEpi?: boolean }) {
   const { isLightSidebar: isLight } = useTheme()
   const { data: colab, isLoading } = useRHColaborador(id)
   const { data: dependentes = [] } = useRHDependentes(id)
@@ -437,6 +441,11 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos }: { i
       {/* Treinamentos & Saúde (matriz QSMA + ASO) */}
       <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />
 
+      {/* EPIs — ficha do colaborador + tamanhos (aberto pela tela QSMA › EPIs › Controle) */}
+      {mostrarEpi && (
+        <EpisColaborador colaborador={colab} sectionCls={sectionCls} isLight={isLight} />
+      )}
+
       {!soTreinamentos && (<>
       {/* Missões & Assinaturas (Portal TEG) */}
       <MissoesColaborador
@@ -492,6 +501,175 @@ function fmtTam(bytes: number | null) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ── Bloco EPIs do colaborador: tamanhos editáveis + kit da matriz + fichas ─────
+function EpisColaborador({ colaborador, sectionCls, isLight }: {
+  colaborador: RHColaborador; sectionCls: string; isLight: boolean
+}) {
+  const qc = useQueryClient()
+  const [aberto, setAberto] = useState(true)
+  const { data: epis = [] } = useEpis()
+  const { data: matriz = [] } = useMatrizEpi()
+  const { data: entregas = [] } = useEpiEntregas()
+  const { data: fichas = [] } = useFichasEpi()
+  const { data: bases = [] } = useBases()
+  const salvar = useSalvarRHColaborador()
+
+  const [editSz, setEditSz] = useState(false)
+  const [salvandoSz, setSalvandoSz] = useState(false)
+  const [sz, setSz] = useState({
+    camisa: colaborador.tamanho_camisa ?? '',
+    calca: colaborador.tamanho_calca ?? '',
+    calcado: colaborador.tamanho_calcado ?? '',
+  })
+
+  const epiById = new Map(epis.map(e => [e.id, e]))
+  const cargoNorm = cargoBase(colaborador.cargo)
+  const req = matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio')
+  const entregueIds = new Set(entregas.filter(e => e.colaborador_id === colaborador.id).map(e => e.epi_id))
+  const kit = req.map(m => ({ epi: epiById.get(m.epi_id), entregue: entregueIds.has(m.epi_id) }))
+  const ok = kit.filter(k => k.entregue).length
+  const total = kit.length
+  const minhasFichas = fichas
+    .filter(f => f.colaborador_id === colaborador.id)
+    .sort((a, b) => (b.data_entrega ?? '').localeCompare(a.data_entrega ?? ''))
+  const baseNome = (bid?: string) => bases.find(b => b.id === bid)?.nome ?? '—'
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+
+  async function salvarTamanhos() {
+    setSalvandoSz(true)
+    try {
+      await salvar.mutateAsync({
+        id: colaborador.id,
+        tamanho_camisa: sz.camisa || undefined,
+        tamanho_calca: sz.calca || undefined,
+        tamanho_calcado: sz.calcado || undefined,
+      })
+      qc.invalidateQueries({ queryKey: ['rh-colaborador', colaborador.id] })
+      setEditSz(false)
+    } catch (e) {
+      alert('Erro ao salvar tamanhos: ' + (e instanceof Error ? e.message : 'desconhecido'))
+    } finally { setSalvandoSz(false) }
+  }
+
+  const inCls = `w-full px-2.5 py-1.5 rounded-lg border text-sm ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
+  const szBox = (label: string, val: string) => (
+    <div className={`px-3 py-2 rounded-xl ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+      <p className={`text-[10px] font-semibold uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</p>
+      <p className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{val || '—'}</p>
+    </div>
+  )
+
+  return (
+    <div className={sectionCls}>
+      <button onClick={() => setAberto(a => !a)} className="w-full px-5 py-3 flex items-center justify-between">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <HardHat size={16} className="text-amber-500" /> EPIs
+          {total > 0 && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ok === total ? 'bg-emerald-100 text-emerald-700' : ok === 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+              Kit {ok}/{total}
+            </span>
+          )}
+        </h3>
+        {aberto ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {aberto && (
+        <div className="px-5 pb-4 space-y-4">
+          {/* Tamanhos (uniforme / EPI) — editáveis */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className={`text-xs font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                <Ruler size={13} className="text-slate-400" /> Tamanhos (uniforme / EPI)
+              </p>
+              {editSz ? (
+                <div className="flex gap-1.5">
+                  <button onClick={() => { setEditSz(false); setSz({ camisa: colaborador.tamanho_camisa ?? '', calca: colaborador.tamanho_calca ?? '', calcado: colaborador.tamanho_calcado ?? '' }) }}
+                    className={`text-[11px] px-2 py-1 rounded-lg border ${isLight ? 'border-slate-200 text-slate-500' : 'border-slate-700 text-slate-400'}`}>Cancelar</button>
+                  <button onClick={salvarTamanhos} disabled={salvandoSz}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-violet-600 text-white font-semibold disabled:opacity-50 inline-flex items-center gap-1">
+                    <Save size={12} /> {salvandoSz ? 'Salvando…' : 'Salvar'}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => setEditSz(true)} className={`text-[11px] px-2 py-1 rounded-lg inline-flex items-center gap-1 ${isLight ? 'text-violet-600 hover:bg-violet-50' : 'text-violet-400 hover:bg-white/[0.04]'}`}>
+                  <Edit3 size={12} /> Editar
+                </button>
+              )}
+            </div>
+            {editSz ? (
+              <div className="grid grid-cols-3 gap-2">
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Camisa</label>
+                  <input value={sz.camisa} onChange={e => setSz(s => ({ ...s, camisa: e.target.value }))} placeholder="P/M/G/GG" className={inCls} /></div>
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Calça</label>
+                  <input value={sz.calca} onChange={e => setSz(s => ({ ...s, calca: e.target.value }))} placeholder="38/40…" className={inCls} /></div>
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Calçado</label>
+                  <input value={sz.calcado} onChange={e => setSz(s => ({ ...s, calcado: e.target.value }))} placeholder="42" className={inCls} /></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {szBox('Camisa', sz.camisa)}
+                {szBox('Calça', sz.calca)}
+                {szBox('Calçado', sz.calcado)}
+              </div>
+            )}
+          </div>
+
+          {/* Kit da matriz do cargo */}
+          <div>
+            <p className={`text-xs font-bold mb-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Kit do cargo{total > 0 ? ` · ${ok}/${total} entregues` : ''}</p>
+            {total === 0 ? (
+              <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem matriz de EPI para o cargo "{colaborador.cargo || '—'}". Configure em QSMA › Segurança › EPIs › Matriz.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {kit.map((k, idx) => (
+                  <span key={idx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${k.entregue ? (isLight ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-500/15 text-emerald-300') : (isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/15 text-red-300')}`}>
+                    {k.entregue ? <Check size={10} /> : <AlertCircle size={10} />}
+                    {k.epi?.nome ?? 'EPI'}{k.epi?.ca ? ` · CA ${k.epi.ca}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fichas de entrega */}
+          <div>
+            <p className={`text-xs font-bold mb-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Fichas de entrega</p>
+            {minhasFichas.length === 0 ? (
+              <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma ficha registrada. Registre em QSMA › <b>+ Novo Registro</b>.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {minhasFichas.map(f => (
+                  <div key={f.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                        <span className={`font-mono text-[10px] mr-1.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{f.codigo}</span>
+                        {(f.itens?.length ?? 0)} item(ns)
+                      </p>
+                      <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(f.data_entrega)} · {baseNome(f.base_id)}</p>
+                    </div>
+                    <button onClick={() => gerarFichaEpiPdf({
+                      codigo: f.codigo,
+                      colaboradorNome: f.colaborador_nome ?? colaborador.nome,
+                      baseNome: baseNome(f.base_id),
+                      dataEntrega: f.data_entrega,
+                      motivo: f.motivo,
+                      observacoes: f.observacoes,
+                      entreguePorNome: f.entregue_por_nome,
+                      itens: (f.itens ?? []).map(it => ({ nome: it.epi?.nome ?? 'EPI', ca: it.epi?.ca, quantidade: it.quantidade, tamanho: it.tamanho, trocaPrevista: it.data_troca_prevista })),
+                    })}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border ${isLight ? 'border-slate-200 text-slate-600 hover:bg-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.05]'}`}>
+                      <Download size={11} /> PDF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Bloco Treinamentos & ASO (matriz QSMA do cargo × registros do colaborador) ──

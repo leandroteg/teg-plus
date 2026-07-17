@@ -55,6 +55,11 @@ export interface RHColaborador {
   tipo_conta?: string
   pix_chave?: string
 
+  // Tamanhos de uniforme/EPI (fonte: etapa de Mobilização do Headcount)
+  tamanho_camisa?: string
+  tamanho_calca?: string
+  tamanho_calcado?: string
+
   // Contrato
   tipo_contrato?: string   // CLT | PJ | Estagiário | Temporário | Aprendiz
   cnpj_pj?: string

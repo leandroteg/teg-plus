@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight, ChevronDown,
-  CheckCircle2, XCircle, Circle, Upload,
+  CheckCircle2, XCircle, Circle, Upload, User,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -23,7 +23,7 @@ import {
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
-  useEstoqueEpi, useCriarMovEstoque,
+  useEstoqueEpi,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -81,6 +81,7 @@ export default function QsmaSeguranca() {
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
+  const [epiColab, setEpiColab] = useState<string | null>(null)
   const [subEpi, setSubEpi] = useState<'controle' | 'matriz' | 'epis'>('controle')
   const [modalTreinamento, setModalTreinamento] = useState<QsmaTreinamento | 'novo' | null>(null)
   const [modalOcorrencia, setModalOcorrencia] = useState<QsmaOcorrencia | 'novo' | null>(null)
@@ -208,12 +209,14 @@ export default function QsmaSeguranca() {
         )
         if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
         if (subEpi === 'controle') return (
-          <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
-            onNovaFicha={() => setModalFicha(true)} />
+          epiColab
+            ? <RHColaboradorDetalhe id={epiColab} onBack={() => setEpiColab(null)} soTreinamentos mostrarEpi />
+            : <ControleEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+                onSelect={setEpiColab} />
         )
         return (
           <ListaEpis subTabs={subTabsEpi} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
-            onNovoEpi={() => setModalEpi('novo')} onEditEpi={e => setModalEpi(e)} perfilNome={perfil?.nome ?? null} />
+            onNovoEpi={() => setModalEpi('novo')} onEditEpi={e => setModalEpi(e)} />
         )
       })()}
 
@@ -1898,9 +1901,9 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
 }
 
 // ── Controle de EPIs por COLABORADOR: kit × matriz do cargo → ficha viva ──────
-function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }: {
+function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onSelect }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
-  onNovaFicha: () => void
+  onSelect: (id: string) => void
 }) {
   const { data: colabs = [], isLoading } = useColaboradoresTreino()
   const { data: epis = [] } = useEpis()
@@ -1984,12 +1987,11 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
           className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'incompleto' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
           <AlertTriangle size={12} /> Kit incompleto
         </button>
-        <BotaoNovo label="Nova Ficha de Entrega" onClick={onNovaFicha} />
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className={`text-xs font-semibold ${txtMuted}`}>{filt.length} colaborador{filt.length !== 1 ? 'es' : ''}{incompletos ? ` · ${incompletos} com kit incompleto` : ''}</p>
-        <p className={`text-[11px] ${txtMuted}`}>Kit = itens da matriz do cargo já entregues · clique no colaborador para abrir a ficha</p>
+        <p className={`text-[11px] ${txtMuted}`}>Clique no nome para abrir a ficha do colaborador · clique no badge <b>Kit</b> para ver as pendências</p>
       </div>
 
       {isLoading ? (
@@ -2008,18 +2010,24 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
                 const completo = l.total > 0 && l.ok === l.total
                 return (
                   <div key={l.c.id} className={`${i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}`}>
-                    <button onClick={() => setAberto(expandido ? null : l.c.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
-                      {expandido ? <ChevronDown size={14} className={txtMuted} /> : <ChevronRight size={14} className={txtMuted} />}
-                      <p className={`text-xs font-bold flex-1 truncate ${txtMain}`}>{l.c.nome}</p>
+                    <div className={`w-full flex items-center gap-3 px-3 py-2 transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                      {/* Nome → abre a ficha de segurança do colaborador */}
+                      <button onClick={() => onSelect(l.c.id)}
+                        className={`flex items-center gap-2 flex-1 min-w-0 text-left group`} title="Abrir ficha do colaborador">
+                        <User size={13} className={txtMuted} />
+                        <span className={`text-xs font-bold truncate ${txtMain} group-hover:underline`}>{l.c.nome}</span>
+                      </button>
                       {l.total === 0 ? (
                         <span className={`text-[10px] ${txtMuted}`}>sem matriz p/ o cargo</span>
                       ) : (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${completo
-                          ? 'bg-emerald-500 text-white'
-                          : l.ok === 0 ? (isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')}`}>
+                        /* Badge "Kit" → expande as pendências inline */
+                        <button onClick={() => setAberto(expandido ? null : l.c.id)} title="Ver pendências do kit"
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${completo
+                            ? 'bg-emerald-500 text-white'
+                            : l.ok === 0 ? (isDark ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' : 'bg-red-100 text-red-700 hover:bg-red-200') : (isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200')}`}>
                           Kit {l.ok}/{l.total}
-                        </span>
+                          {expandido ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </button>
                       )}
                       {l.aguardando > 0 && (
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
@@ -2027,7 +2035,7 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
                         </span>
                       )}
                       <span className={`text-[10px] w-[110px] text-right ${txtMuted}`}>{l.ultima ? `últ. entrega ${fmt(l.ultima)}` : 'sem entrega'}</span>
-                    </button>
+                    </div>
                     {expandido && (
                       <div className={`px-9 pb-3 space-y-2 ${isDark ? '' : ''}`}>
                         {l.faltantes.length > 0 && (
@@ -2044,7 +2052,7 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
                           </div>
                         )}
                         {l.fichas.length === 0 ? (
-                          <p className={`text-[11px] italic ${txtMuted}`}>Nenhuma ficha de entrega ainda — crie pela ação "Nova Ficha de Entrega".</p>
+                          <p className={`text-[11px] italic ${txtMuted}`}>Nenhuma ficha de entrega ainda — registre em "+ Novo Registro".</p>
                         ) : (
                           l.fichas.map(f => <FichaCard key={f.id} f={f} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} baseNome={baseNome} />)
                         )}
@@ -2062,16 +2070,15 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
 }
 
 // ── Lista de EPIs (catálogo padrão lista/cards + estoque) ─────────────────────
-function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEditEpi, perfilNome }: {
+function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEditEpi }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
-  onNovoEpi: () => void; onEditEpi: (e: QsmaEpi) => void; perfilNome: string | null
+  onNovoEpi: () => void; onEditEpi: (e: QsmaEpi) => void
 }) {
   const { data: epis = [], isLoading } = useEpis()
   const { data: estoque } = useEstoqueEpi()
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'ca_vencido' | 'inativos'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
-  const [modalEntrada, setModalEntrada] = useState(false)
 
   const hoje = new Date().toISOString().slice(0, 10)
   const saldoDe = (id: string) => estoque?.saldo.get(id) ?? 0
@@ -2115,7 +2122,6 @@ function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEdit
           <button onClick={() => setVista('cards')} title="Cards"
             className={`p-1.5 rounded-md ${vista === 'cards' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><LayoutGrid size={15} /></button>
         </div>
-        <BotaoNovo label="Entrada de estoque" onClick={() => setModalEntrada(true)} secundario isDark={isDark} />
         <BotaoNovo label="EPI no catálogo" onClick={onNovoEpi} />
       </div>
 
@@ -2179,80 +2185,6 @@ function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEdit
           })}
         </div>
       )}
-
-      {modalEntrada && (
-        <EntradaEstoqueModal isDark={isDark} epis={epis.filter(e => e.ativo)} perfilNome={perfilNome} onClose={() => setModalEntrada(false)} />
-      )}
-    </div>
-  )
-}
-
-// ── Modal: entrada/ajuste de estoque ──────────────────────────────────────────
-function EntradaEstoqueModal({ isDark, epis, perfilNome, onClose }: {
-  isDark: boolean; epis: QsmaEpi[]; perfilNome: string | null; onClose: () => void
-}) {
-  const criar = useCriarMovEstoque()
-  const [epiId, setEpiId] = useState('')
-  const [tipo, setTipo] = useState<'entrada' | 'ajuste'>('entrada')
-  const [qtd, setQtd] = useState('')
-  const [motivo, setMotivo] = useState('')
-  const [erro, setErro] = useState('')
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const inputCls = `w-full text-sm rounded-xl px-3 py-2 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`
-
-  const salvar = async () => {
-    setErro('')
-    const n = Number(qtd)
-    if (!epiId || !n || (tipo === 'entrada' && n <= 0)) { setErro('Selecione o EPI e informe a quantidade.'); return }
-    try {
-      await criar.mutateAsync({ epi_id: epiId, tipo, quantidade: n, motivo: motivo || undefined, criadoPor: perfilNome })
-      onClose()
-    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao lançar') }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          <h3 className={`text-base font-bold ${txt}`}>Movimentar estoque</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-        <div className="p-5 space-y-3">
-          <div>
-            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>EPI</label>
-            <select value={epiId} onChange={e => setEpiId(e.target.value)} className={inputCls}>
-              <option value="">Selecionar…</option>
-              {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Tipo</label>
-              <select value={tipo} onChange={e => setTipo(e.target.value as 'entrada' | 'ajuste')} className={inputCls}>
-                <option value="entrada">Entrada (compra/recebimento)</option>
-                <option value="ajuste">Ajuste (+/−)</option>
-              </select>
-            </div>
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Quantidade</label>
-              <input type="number" value={qtd} onChange={e => setQtd(e.target.value)} placeholder={tipo === 'ajuste' ? 'ex.: -3' : 'ex.: 50'} className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Motivo</label>
-            <input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="NF, fornecedor, inventário…" className={inputCls} />
-          </div>
-          {erro && <p className="text-xs text-rose-500">{erro}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
-            <button onClick={salvar} disabled={criar.isPending}
-              className="flex-1 py-2 rounded-xl text-sm font-semibold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50">
-              {criar.isPending ? 'Lançando…' : 'Lançar'}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
