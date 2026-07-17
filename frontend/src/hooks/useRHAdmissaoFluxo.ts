@@ -1072,9 +1072,17 @@ export function useRegistro() {
       const { data, error } = await supabase.functions.invoke('sig-assinatura', {
         body: { action: 'assinar-empresa', candidato_id: i.candidatoId },
       })
-      if (error) throw error
+      if (error) {
+        // 403 = usuário sem papel de assinatura pela empresa
+        const status = (error as { context?: { status?: number } })?.context?.status
+        if (status === 403) throw new Error('Sem permissões para assinatura')
+        throw error
+      }
       const r = data as { ok: boolean; erro?: string; assinados?: number; aguardando_colaborador?: number; falhas?: string[] }
-      if (!r.ok) throw new Error(r.erro || 'Falha ao assinar pela empresa')
+      if (!r.ok) {
+        if (/permiss/i.test(r.erro ?? '')) throw new Error('Sem permissões para assinatura')
+        throw new Error(r.erro || 'Falha ao assinar pela empresa')
+      }
       return r
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
