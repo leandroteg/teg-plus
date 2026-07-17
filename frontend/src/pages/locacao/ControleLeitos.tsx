@@ -372,26 +372,14 @@ function taxaCor(taxa: number) {
 function taxaBar(taxa: number) {
   return taxa >= 100 ? 'bg-rose-500' : taxa >= 80 ? 'bg-amber-500' : 'bg-cyan-500'
 }
-// Badge do status do contrato de locação do imóvel (hotéis não têm contrato)
+// Status do contrato/imóvel — mesmo badge da tela Ativos (STATUS_CFG). Hotel: n/a.
 function contratoBadge(a: LocImovel, isDark: boolean) {
-  const c = a.contrato
-  if (a.tipo === 'HTL') return <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>hotel · s/ contrato</span>
-  if (!c) return <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>— sem contrato</span>
-  const s = (c.status ?? '').toLowerCase()
-  const map: Record<string, string> = {
-    vigente: isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-700',
-    encerrado: isDark ? 'bg-slate-500/20 text-slate-300' : 'bg-slate-200 text-slate-600',
-    inativo: isDark ? 'bg-slate-500/20 text-slate-300' : 'bg-slate-200 text-slate-600',
-    rascunho: isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700',
-    suspenso: isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-100 text-rose-700',
-  }
-  const cls = map[s] ?? (isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600')
-  const label = s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Sem status'
+  if (a.tipo === 'HTL') return <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Não se aplica</span>
+  const st = STATUS_CFG[a.status] || STATUS_CFG.ativo
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
-      {c.numero && <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{c.numero}</span>}
-    </div>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.bg} ${st.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+    </span>
   )
 }
 
