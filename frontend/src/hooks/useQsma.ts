@@ -432,7 +432,7 @@ export function useCriarFichaEpi() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (p: {
-      colaborador_id: string; colaborador_nome?: string; obra_id?: string
+      colaborador_id: string; colaborador_nome?: string; obra_id?: string; base_id?: string
       data_entrega: string; motivo?: MotivoEntregaEpi; observacoes?: string
       entregue_por_nome?: string; itens: ItemFichaEpi[]
     }) => {

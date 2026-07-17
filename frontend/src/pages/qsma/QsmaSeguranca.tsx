@@ -32,6 +32,7 @@ import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips } from 
 import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
+import { useBases } from '../../hooks/useEstoque'
 import type {
   QsmaRisco, QsmaEpi, QsmaEpiFicha, QsmaTreinamento, QsmaOcorrencia,
   EscopoRisco, TipoOcorrencia, Gravidade, Envolvido, StatusOcorrencia, MotivoEntregaEpi,
@@ -614,12 +615,13 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
 function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
   const criar = useCriarFichaEpi()
   const { data: matriz = [] } = useMatrizEpi()
+  const { data: bases = [] } = useBases()
   const { perfil } = useAuth()
   const [cargoSel, setCargoSel] = useState('')
   const hoje = new Date().toISOString().split('T')[0]
   const [colabId, setColabId] = useState('')
   const [colabNome, setColabNome] = useState('')
-  const [obraId, setObraId] = useState('')
+  const [baseId, setBaseId] = useState('')
   const [dataEntrega, setDataEntrega] = useState(hoje)
   const [motivo, setMotivo] = useState<MotivoEntregaEpi>('entrega')
   const [obs, setObs] = useState('')
@@ -652,7 +654,7 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
       const payload = {
         colaborador_id: colabId,
         colaborador_nome: colabNome,
-        obra_id: obraId || undefined,
+        base_id: baseId || undefined,
         data_entrega: dataEntrega,
         motivo,
         observacoes: obs || undefined,
@@ -695,6 +697,7 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
     <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — gere o PDF, colha a assinatura e arquive" onClose={onClose}>
       <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => {
         setColabId(id); setColabNome(c?.nome ?? ''); setCargoSel(c?.cargo ?? '')
+        if ((c as { base_id?: string })?.base_id) setBaseId((c as { base_id?: string }).base_id!)
         // Auto-carrega o kit do cargo pela matriz de EPI
         const kit = matriz
           .filter(m => m.exigencia === 'obrigatorio' && cargoBase(m.cargo) === cargoBase(c?.cargo))
@@ -708,7 +711,13 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
             : 'sem matriz de EPI para este cargo — adicione os itens manualmente'}
         </p>
       )}
-      <ObraPicker isDark={isDark} value={obraId} onChange={setObraId} />
+      <div>
+        <label className={pickerLabelCls(isDark)}>Base</label>
+        <select value={baseId} onChange={e => setBaseId(e.target.value)} className={pickerInputCls(isDark)}>
+          <option value="">Selecione a base…</option>
+          {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={pickerLabelCls(isDark)}>Data da entrega</label>
@@ -737,40 +746,35 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
             <Plus size={10} /> EPI
           </button>
         </div>
-        {itens.map((it, i) => {
-          const epi = epis.find(e => e.id === it.epi_id)
-          return (
-            <div key={i} className="flex items-center gap-1.5">
-              <select
-                value={it.epi_id}
-                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, epi_id: e.target.value } : x))}
-                className={`${pickerInputCls(isDark)} flex-1`}
-              >
-                <option value="">Selecione o EPI…</option>
-                {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
-              </select>
-              <input
-                type="number" min={1} value={it.quantidade} title="Quantidade"
-                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, quantidade: e.target.value } : x))}
-                className={`${pickerInputCls(isDark)} w-16 shrink-0`}
-              />
-              <input
-                value={it.tamanho} placeholder="Tam." title="Tamanho"
-                onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
-                className={`${pickerInputCls(isDark)} w-16 shrink-0`}
-              />
-              <span className={`text-[9px] w-20 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} title="Troca prevista (vida útil do EPI)">
-                {trocaPrevista(it.epi_id) ? `troca ${new Date(trocaPrevista(it.epi_id)! + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}` : ''}
-              </span>
-              <button
-                onClick={() => setItens(prev => prev.filter((_, j) => j !== i))}
-                className="text-slate-400 hover:text-red-500 p-1 shrink-0"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          )
-        })}
+        {itens.map((it, i) => (
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_56px_64px_auto] items-center gap-1.5">
+            <select
+              value={it.epi_id}
+              onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, epi_id: e.target.value } : x))}
+              className={pickerInputCls(isDark)}
+            >
+              <option value="">Selecione o EPI…</option>
+              {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
+            </select>
+            <input
+              type="number" min={1} value={it.quantidade} title="Quantidade"
+              onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, quantidade: e.target.value } : x))}
+              className={pickerInputCls(isDark)}
+            />
+            <input
+              value={it.tamanho} placeholder="Tam." title="Tamanho"
+              onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
+              className={pickerInputCls(isDark)}
+            />
+            <button
+              onClick={() => setItens(prev => prev.filter((_, j) => j !== i))}
+              className="text-slate-400 hover:text-red-500 p-1"
+              title="Remover EPI"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
       </div>
 
       <div>
