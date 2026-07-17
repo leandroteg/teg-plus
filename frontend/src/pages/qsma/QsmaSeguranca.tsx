@@ -1854,7 +1854,13 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, obraNome }: {
             />
           </label>
         )}
-        {f.arquivo_assinado_path && (
+        {f.onedrive_web_url ? (
+          <a href={f.onedrive_web_url} target="_blank" rel="noreferrer"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${isDark ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+            title="Abrir a ficha assinada no OneDrive">
+            <ShieldCheck size={12} /> Ficha assinada (OneDrive)
+          </a>
+        ) : f.arquivo_assinado_path && (
           <button
             onClick={async () => {
               const url = await evidenciaUrl(f.arquivo_assinado_path)

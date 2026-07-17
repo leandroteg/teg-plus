@@ -169,6 +169,8 @@ export interface QsmaEpiFicha {
   observacoes?: string
   status: StatusFichaEpi
   arquivo_assinado_path?: string
+  onedrive_item_id?: string
+  onedrive_web_url?: string
   missao_id?: string
   entregue_por_nome?: string
   itens?: QsmaEpiEntrega[]
