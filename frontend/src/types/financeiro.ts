@@ -44,6 +44,23 @@ export type TipoDocumento =
   | 'nota_fiscal' | 'recibo' | 'comprovante'
   | 'relatorio_pagamento' | 'extrato_bancario' | 'outro'
 
+// ── Anexos de fornecedor (documentos: Cartão CNPJ, certidões, contrato social) ──
+export type FornecedorDocTipo =
+  | 'cartao_cnpj' | 'cnd_federal' | 'fgts' | 'trabalhista' | 'contrato_social' | 'outro'
+
+export interface FornecedorAnexo {
+  id: string
+  fornecedor_id: string
+  tipo: FornecedorDocTipo
+  storage_path: string
+  nome: string
+  mime?: string | null
+  tamanho_bytes?: number | null
+  data_emissao?: string | null
+  criado_em: string
+  criado_por_nome?: string | null
+}
+
 export interface Fornecedor {
   id: string
   numero_cadastro?: string

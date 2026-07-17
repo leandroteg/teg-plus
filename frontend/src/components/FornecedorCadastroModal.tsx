@@ -9,6 +9,13 @@ import {
   hasFornecedorPaymentData,
   normalizeDigits,
 } from '../hooks/useFornecedorVinculo'
+import FornecedorDocsSection from './FornecedorDocsSection'
+import {
+  motivoBloqueioCartaoCnpj,
+  persistStagedDocs,
+  useFornecedorAnexos,
+  type StagedDoc,
+} from '../hooks/useFornecedorDocs'
 import type { Fornecedor } from '../types/financeiro'
 
 export type FornecedorFormData = Partial<Fornecedor> & {
@@ -59,11 +66,14 @@ export default function FornecedorCadastroModal({
   const salvarFornecedor = useSalvarFornecedor()
   const [form, setForm] = useState<FornecedorFormData>(EMPTY_FORM)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [staged, setStaged] = useState<StagedDoc[]>([])
+  const { data: anexosExistentes = [] } = useFornecedorAnexos(form.id)
 
   useEffect(() => {
     if (!open) return
     setForm({ ...EMPTY_FORM, ...initialData })
     setErrorMessage(null)
+    setStaged([])
   }, [open, initialData])
 
   const cnpjLookup = useConsultaCNPJ(useCallback((result) => {
@@ -122,6 +132,15 @@ export default function FornecedorCadastroModal({
       return
     }
 
+    // Regra Cartão CNPJ: só bloqueia o cadastro NOVO (edição de legado não trava).
+    if (!form.id) {
+      const bloqueio = motivoBloqueioCartaoCnpj(cnpjDigits, anexosExistentes, staged)
+      if (bloqueio) {
+        setErrorMessage(bloqueio)
+        return
+      }
+    }
+
     const payload = {
       ...form,
       cnpj: cnpjDigits,
@@ -130,6 +149,15 @@ export default function FornecedorCadastroModal({
 
     try {
       const saved = await salvarFornecedor.mutateAsync(payload)
+      if (staged.length > 0) {
+        try {
+          await persistStagedDocs(saved.id, staged)
+        } catch (docErr) {
+          const m = docErr instanceof Error ? docErr.message : 'erro desconhecido'
+          setErrorMessage(`Fornecedor salvo, mas falha ao enviar documentos: ${m}. Reabra o cadastro para anexar.`)
+          return
+        }
+      }
       onSaved(saved)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao salvar fornecedor.'
@@ -287,6 +315,14 @@ export default function FornecedorCadastroModal({
               </div>
             </div>
           </div>
+
+          <FornecedorDocsSection
+            dark={dark}
+            fornecedorId={form.id}
+            cnpj={form.cnpj}
+            staged={staged}
+            onStagedChange={setStaged}
+          />
 
           <div className={`rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
             <div>

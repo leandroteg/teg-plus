@@ -13,6 +13,14 @@ import type { AiCadastroResult } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
 import ConfidenceField from '../../components/ConfidenceField'
 import SmartTextField from '../../components/SmartTextField'
+import FornecedorDocsSection from '../../components/FornecedorDocsSection'
+import {
+  motivoBloqueioCartaoCnpj,
+  persistStagedDocs,
+  useFornecedoresCartaoCnpjStatus,
+  isCnpj as isCnpjDigits,
+  type StagedDoc,
+} from '../../hooks/useFornecedorDocs'
 
 const EMPTY: Partial<Fornecedor> = {
   razao_social: '', nome_fantasia: '', cnpj: '',
@@ -45,8 +53,10 @@ export default function FornecedoresCad() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [cnpjDirty, setCnpjDirty] = useState(false)
+  const [staged, setStaged] = useState<StagedDoc[]>([])
 
   const { data: fornecedores = [], isLoading } = useCadFornecedores()
+  const { data: cartaoCnpjStatus } = useFornecedoresCartaoCnpjStatus()
   const salvar = useSalvarFornecedor()
   const aiParse = useAiCadastroParse()
   const { isAdmin } = useAuth()
@@ -101,6 +111,10 @@ export default function FornecedoresCad() {
   const SortIcon = ({ col }: { col: string }) =>
     sortCol === col ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null
 
+  // Cartão CNPJ pendente: fornecedor com CNPJ (14 díg.) sem Cartão CNPJ válido.
+  const docPendente = (f: Fornecedor) =>
+    Boolean(cartaoCnpjStatus) && isCnpjDigits(f.cnpj) && !cartaoCnpjStatus!.get(f.id)
+
   const toggleSelect = (id: string) => setSelected(prev => {
     const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
   })
@@ -119,6 +133,7 @@ export default function FornecedoresCad() {
     setEditItem({ ...EMPTY })
     setConfidence({})
     setCnpjDirty(false)
+    setStaged([])
     cnpjLookup.limpar()
     setShowForm(true)
   }
@@ -126,10 +141,11 @@ export default function FornecedoresCad() {
     setEditItem({ ...f })
     setConfidence({})
     setCnpjDirty(false)
+    setStaged([])
     cnpjLookup.limpar()
     setShowForm(true)
   }
-  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}); setCnpjDirty(false); cnpjLookup.limpar() }
+  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}); setCnpjDirty(false); setStaged([]); cnpjLookup.limpar() }
 
   const currentCnpjDigits = onlyDigits(editItem?.cnpj)
   const lookupCnpjDigits = onlyDigits(cnpjLookup.dados?.cnpj)
@@ -214,8 +230,25 @@ export default function FornecedoresCad() {
       alert(cnpjMessage)
       return
     }
+    // Regra Cartão CNPJ: bloqueia só o cadastro NOVO (edição de legado não trava).
+    if (!editItem.id) {
+      const bloqueio = motivoBloqueioCartaoCnpj(editItem.cnpj, [], staged)
+      if (bloqueio) {
+        alert(bloqueio)
+        return
+      }
+    }
     try {
-      await salvar.mutateAsync(editItem)
+      const saved = await salvar.mutateAsync(editItem)
+      if (staged.length > 0 && saved?.id) {
+        try {
+          await persistStagedDocs(saved.id, staged)
+        } catch (docErr: any) {
+          alert(`Fornecedor salvo, mas falha ao enviar documentos: ${docErr?.message || 'erro'}. Reabra o cadastro para anexar.`)
+          closeForm()
+          return
+        }
+      }
       closeForm()
     } catch (err: any) {
       console.error('Erro ao salvar fornecedor:', err)
@@ -357,7 +390,16 @@ export default function FornecedoresCad() {
                       className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                   </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden sm:table-cell">{f.numero_cadastro || '---'}</td>
-                  <td className="px-4 py-2.5 font-semibold text-slate-800">{f.razao_social}</td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      {f.razao_social}
+                      {docPendente(f) && (
+                        <span title="Cartão CNPJ pendente" className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                          <AlertCircle size={9} /> DOC
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{f.nome_fantasia || '—'}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden lg:table-cell">
                     {f.cnpj ? f.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '—'}
@@ -390,6 +432,11 @@ export default function FornecedoresCad() {
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-sm font-bold text-slate-800 truncate">{f.razao_social}</p>
                     {f.ativo && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
+                    {docPendente(f) && (
+                      <span title="Cartão CNPJ pendente" className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                        <AlertCircle size={9} /> DOC
+                      </span>
+                    )}
                   </div>
                   {f.nome_fantasia && (
                     <p className="text-[10px] text-slate-400">{f.nome_fantasia}</p>
@@ -549,6 +596,15 @@ export default function FornecedoresCad() {
                   </select>
                 </div>
               </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100">
+              <FornecedorDocsSection
+                fornecedorId={editItem.id}
+                cnpj={editItem.cnpj}
+                staged={staged}
+                onStagedChange={setStaged}
+              />
             </div>
           </div>
         </MagicModal>
