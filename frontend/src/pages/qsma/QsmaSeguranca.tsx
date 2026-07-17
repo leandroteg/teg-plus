@@ -1917,13 +1917,16 @@ function ControleEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovaFicha }:
 
   const bases = [...new Set(colabs.map(c => c.base).filter(Boolean))].sort() as string[]
   const cargos = [...new Set(colabs.map(c => cargoBase(c.cargo)).filter(Boolean))].sort() as string[]
+  // cargos que têm matriz de EPI (pelo menos 1 EPI obrigatório)
+  const cargosComMatriz = new Set(matriz.filter(m => m.exigencia === 'obrigatorio').map(m => cargoBase(m.cargo)))
 
   useEffect(() => {
-    if (colabs.length && fBase === null) {
+    if (colabs.length && matriz.length && fBase === null) {
       setFBase(new Set(bases.filter(b => cargoBase(b) !== 'ESCRITORIO CENTRAL' && b !== 'Escritório Central')))
-      setFCargo(new Set(cargos))
+      // pré-filtra só cargos COM matriz — esconde as posições "sem matriz p/ o cargo"
+      setFCargo(new Set(cargos.filter(c => cargosComMatriz.has(c))))
     }
-  }, [colabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [colabs.length, matriz.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const epiById = new Map(epis.map(e => [e.id, e]))
   // exigido por cargo-base: epi_id → quantidade
