@@ -110,6 +110,21 @@ export default function QsmaSeguranca() {
     ? new Date(d.includes('T') ? d : d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')
     : '—'
 
+  // Deep-link vindo do Painel: abre a ocorrência / treinamento pelo id
+  const ocoParam = params.get('ocorrencia')
+  useEffect(() => {
+    if (!ocoParam || !ocorrencias.length) return
+    const o = ocorrencias.find(x => x.id === ocoParam)
+    if (o) { setAba('ocorrencias'); setModalOcorrencia(o); setParams({}, { replace: true }) }
+  }, [ocoParam, ocorrencias]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const treParam = params.get('treinamento')
+  useEffect(() => {
+    if (!treParam || !treinamentos.length) return
+    const t = treinamentos.find(x => x.id === treParam)
+    if (t) { setAba('treinamentos'); setModalTreinamento(t); setParams({}, { replace: true }) }
+  }, [treParam, treinamentos]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
