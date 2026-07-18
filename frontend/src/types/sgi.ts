@@ -189,8 +189,8 @@ export interface SgiMeta {
   descricao?: string | null
   /** Prazo do KR (data-limite). */
   prazo?: string | null
-  /** Fonte automática do check-in (ex.: Produção mensal do EGP). Null/ausente = manual. */
-  fonte_auto?: { tipo: 'egp_producao' } | null
+  /** Fonte automática do check-in (Produção/Produtividade do EGP). Null/ausente = manual. */
+  fonte_auto?: { tipo: 'egp_producao' | 'egp_produtividade'; agregacao?: 'acumulado_ano' | 'mes'; escala?: 'mi' | 'reais'; headcount?: 'sem_pj' | 'total' } | null
   /** Acompanhamento (Check-in): aberto / encerrado / cancelado. */
   status_checkin?: StatusCheckinMeta
   /** Resultado (Revisão): atingida / parcial / não atingida / cancelada. */
