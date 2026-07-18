@@ -70,7 +70,7 @@ export interface QsmaInspecao {
 
 // ── SST ──────────────────────────────────────────────────────────────────────
 
-export type TipoOcorrencia = 'desvio' | 'quase_acidente' | 'acidente_spt' | 'acidente_cpt' | 'ambiental'
+export type TipoOcorrencia = 'desvio' | 'quase_acidente' | 'acidente_spt' | 'acidente_cpt' | 'acidente_fatal' | 'ambiental'
 export type Gravidade = 'baixa' | 'media' | 'alta' | 'critica'
 export type StatusOcorrencia = 'registro' | 'investigacao' | 'acao' | 'encerrada'
 
@@ -289,6 +289,7 @@ export const TIPO_OCORRENCIA_LABEL: Record<TipoOcorrencia, string> = {
   quase_acidente: 'Quase-acidente',
   acidente_spt: 'Acidente s/ afastamento',
   acidente_cpt: 'Acidente c/ afastamento',
+  acidente_fatal: 'Acidente fatal',
   ambiental: 'Ocorrência ambiental',
 }
 
