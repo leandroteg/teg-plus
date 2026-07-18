@@ -142,6 +142,45 @@ export function MultiCheck({
   )
 }
 
+// filtro de período (De/Até) no mesmo padrão visual do ToolbarSelect/MultiCheck
+export function ToolbarDateRange({
+  isDark, de, ate, onDe, onAte,
+}: {
+  isDark: boolean
+  de: string
+  ate: string
+  onDe: (v: string) => void
+  onAte: (v: string) => void
+}) {
+  const ativo = !!de || !!ate
+  return (
+    <div className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 shrink-0 ${
+      ativo
+        ? isDark ? 'border-red-500/40 bg-red-500/10' : 'border-red-300 bg-red-50'
+        : isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
+    }`}>
+      <input
+        type="date" value={de} onChange={e => onDe(e.target.value)}
+        className={`text-sm bg-transparent outline-none w-[118px] cursor-pointer ${
+          isDark ? 'text-slate-300 [color-scheme:dark]' : 'text-slate-600'
+        }`}
+      />
+      <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>–</span>
+      <input
+        type="date" value={ate} onChange={e => onAte(e.target.value)}
+        className={`text-sm bg-transparent outline-none w-[118px] cursor-pointer ${
+          isDark ? 'text-slate-300 [color-scheme:dark]' : 'text-slate-600'
+        }`}
+      />
+      {ativo && (
+        <button onClick={() => { onDe(''); onAte('') }} className="text-slate-400 hover:text-red-500 shrink-0">
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function ToolbarPills({
   isDark, value, onChange, options,
 }: {
