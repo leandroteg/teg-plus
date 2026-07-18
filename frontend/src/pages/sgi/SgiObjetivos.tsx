@@ -470,6 +470,27 @@ function MetasAgrupadas({ itens, isDark, txt, muted, card, accentText, renderMet
   )
 }
 
+// ── Linha do tempo de check-ins do card (todas as competências) ───────────────
+function CheckinsStrip({ meta, isDark }: { meta: MetaFull; isDark: boolean }) {
+  const hist = [...(meta.checkins || [])].sort((a, b) => (a.competencia || '').localeCompare(b.competencia || ''))
+  if (hist.length < 2) return null
+  return (
+    <div className={`flex flex-wrap gap-1.5 mt-2 pt-2 border-t ${isDark ? 'border-white/[0.05]' : 'border-slate-100'}`}>
+      {hist.map(c => {
+        const f = FAROL_CFG[(c.farol as Farol) || 'cinza']
+        const isAuto = !!c.observacao?.startsWith('auto')
+        return (
+          <span key={c.id} title={c.observacao ?? ''} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg ${f.bg} ${f.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
+            {c.competencia} · {c.realizado != null ? Number(c.realizado).toLocaleString('pt-BR') : '—'}
+            {isAuto && <Zap size={9} className="text-amber-500" />}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Campo destacado (label pequeno + valor em negrito) ────────────────────────
 function Campo({ label, value, tone, isDark }: { label: string; value: ReactNode; tone?: string; isDark: boolean }) {
   return (
@@ -711,6 +732,7 @@ export default function SgiObjetivos() {
                     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     <button onClick={() => setCheckin({ obj, meta: m })} className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
                   </div>
+                  <CheckinsStrip meta={m} isDark={isDark} />
                 </div>
               )
             }}
@@ -740,6 +762,7 @@ export default function SgiObjetivos() {
                       <button onClick={() => enviarMelhoria(obj, m)} disabled={criarRegistro.isPending} className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5"><Send size={13} /> Enviar</button>
                     )}
                   </div>
+                  <CheckinsStrip meta={m} isDark={isDark} />
                 </div>
               )
             }}
