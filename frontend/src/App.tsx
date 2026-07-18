@@ -236,6 +236,7 @@ const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
+const Logs = lazy(() => import('./pages/admin/Logs'))
 
 // TI / Help Desk
 const TIHome = lazy(() => import('./pages/ti/TIHome'))
@@ -617,6 +618,7 @@ export default function App() {
             <Route path="/admin/politicas-aprovacao" element={<Lazy><PoliticasAprovacao /></Lazy>} />
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
+            <Route path="/admin/logs" element={<Lazy><Logs /></Lazy>} />
           </Route>
         </Route>
       </Routes>
