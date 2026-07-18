@@ -220,6 +220,9 @@ export default function Logs() {
       ? 'bg-white border-slate-200 text-slate-700 focus:border-slate-400'
       : 'bg-white/[0.03] border-white/10 text-slate-200 focus:border-white/25'
   }`
+  // As <option> do dropdown nativo não herdam o tema do <select>: sem cor
+  // explícita, no dark ficam texto claro sobre fundo claro do SO (ilegível).
+  const optionCls = isLight ? 'text-slate-700 bg-white' : 'text-slate-100 bg-slate-800'
 
   return (
     <div className={`min-h-screen ${bg}`}>
@@ -257,9 +260,9 @@ export default function Logs() {
               value={filtro.modulo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, modulo: e.target.value || undefined }))}
             >
-              <option value="">Todos os módulos</option>
+              <option className={optionCls} value="">Todos os módulos</option>
               {modulos.map((m) => (
-                <option key={m} value={m}>{moduloLabel(m)}</option>
+                <option className={optionCls} key={m} value={m}>{moduloLabel(m)}</option>
               ))}
             </select>
             <select
@@ -267,19 +270,19 @@ export default function Logs() {
               value={filtro.tipo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, tipo: e.target.value || undefined }))}
             >
-              <option value="">Toda ação</option>
-              <option value="INSERT">Criação</option>
-              <option value="UPDATE">Alteração</option>
-              <option value="DELETE">Exclusão</option>
+              <option className={optionCls} value="">Toda ação</option>
+              <option className={optionCls} value="INSERT">Criação</option>
+              <option className={optionCls} value="UPDATE">Alteração</option>
+              <option className={optionCls} value="DELETE">Exclusão</option>
             </select>
             <select
               className={inputCls}
               value={filtro.usuarioId ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, usuarioId: e.target.value || undefined }))}
             >
-              <option value="">Todos os usuários</option>
+              <option className={optionCls} value="">Todos os usuários</option>
               {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>{u.nome}</option>
+                <option className={optionCls} key={u.id} value={u.id}>{u.nome}</option>
               ))}
             </select>
             <input
