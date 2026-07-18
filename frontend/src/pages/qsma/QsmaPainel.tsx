@@ -68,7 +68,8 @@ export default function QsmaPainel() {
     ocorrencias.forEach(o => {
       const gg = o.gravidade === 'alta' || o.gravidade === 'critica' // grave/gravíssimo
       let i = -1
-      if (o.tipo === 'acidente_cpt') i = gg ? 1 : 2       // com afastamento (0 = fatal, sem marcador ainda)
+      if (o.tipo === 'acidente_fatal') i = 0
+      else if (o.tipo === 'acidente_cpt') i = gg ? 1 : 2  // com afastamento
       else if (o.tipo === 'acidente_spt') i = gg ? 3 : 4  // sem afastamento
       else if (o.tipo === 'quase_acidente') i = gg ? 5 : 6
       else if (o.tipo === 'desvio') i = gg ? 7 : 8
