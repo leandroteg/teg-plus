@@ -408,7 +408,7 @@ export default function DashboardFinanceiro() {
                   {crPanel.ultimos.length === 0 ? (
                     <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum recebimento</p>
                   ) : crPanel.ultimos.map((c) => (
-                    <button key={c.id} onClick={() => nav('/financeiro/cr')} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                    <button key={c.id} onClick={() => nav(`/financeiro/cr${c.numero_nf ? `?nf=${c.numero_nf}` : ''}`)} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>{c.numero_nf ?? '—'}</div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{c.osc?.numero_os ?? c.descricao ?? 'Recebimento'}</p>
@@ -434,7 +434,7 @@ export default function DashboardFinanceiro() {
                     const bloq = !!c.bloqueio_tipo && c.bloqueio_tipo !== 'sem_bloqueio' && c.bloqueio_tipo !== 'resolvido'
                     const venc = new Date(c.data_vencimento + 'T00:00:00') < new Date(new Date().setHours(0, 0, 0, 0))
                     return (
-                      <button key={c.id} onClick={() => nav('/financeiro/cr')} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${bloq ? (isDark ? 'bg-red-500/[0.06]' : 'bg-red-50/60') : ''} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                      <button key={c.id} onClick={() => nav(`/financeiro/cr${c.numero_nf ? `?nf=${c.numero_nf}` : ''}`)} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${bloq ? (isDark ? 'bg-red-500/[0.06]' : 'bg-red-50/60') : ''} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold ${bloq ? 'bg-red-100 text-red-600' : venc ? 'bg-amber-50 text-amber-600' : isDark ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.numero_nf ?? '—'}</div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{c.osc?.numero_os ?? c.descricao ?? 'A receber'}</p>
