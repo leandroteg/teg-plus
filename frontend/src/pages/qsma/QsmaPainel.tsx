@@ -5,14 +5,21 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useOcorrencias, useTreinamentos } from '../../hooks/useQsma'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import { useIntegracaoTreinos } from '../../hooks/useRHAdmissaoFluxo'
-import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL, type Gravidade } from '../../types/qsma'
+import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL } from '../../types/qsma'
 
-// Potencial de gravidade → cor (para a pirâmide empilhada e legenda)
-const GRAV: { k: Gravidade; label: string; cor: string }[] = [
-  { k: 'baixa', label: 'Leve', cor: '#10b981' },
-  { k: 'media', label: 'Moderada', cor: '#f59e0b' },
-  { k: 'alta', label: 'Grave', cor: '#f97316' },
-  { k: 'critica', label: 'Gravíssima', cor: '#dc2626' },
+// Pirâmide de eventos — 9 andares (topo = mais severo → base = menos severo).
+// Cada andar combina tipo × faixa de potencial (leve/moderado vs grave/gravíssimo).
+// w = largura fixa do andar (afunila pro topo); cor num degradê vermelho→verde.
+const PIRAMIDE_NIVEIS = [
+  { label: 'Acidente fatal',                          cor: '#7f1d1d', w: 26 },
+  { label: 'Acidente c/ afastamento grave/gravíssimo', cor: '#b91c1c', w: 35 },
+  { label: 'Acidente c/ afastamento leve/moderado',    cor: '#ef4444', w: 44 },
+  { label: 'Acidente s/ afastamento grave/gravíssimo', cor: '#ea580c', w: 53 },
+  { label: 'Acidente s/ afastamento leve/moderado',    cor: '#f97316', w: 63 },
+  { label: 'Quase-acidente grave/gravíssimo',          cor: '#f59e0b', w: 72 },
+  { label: 'Quase-acidente leve/moderado',             cor: '#eab308', w: 81 },
+  { label: 'Desvio grave/gravíssimo',                  cor: '#84cc16', w: 91 },
+  { label: 'Desvio leve/moderado',                     cor: '#22c55e', w: 100 },
 ]
 
 // Painel do módulo QSMA — padrão dos demais painéis (título + hero de 2 cards:
@@ -56,22 +63,19 @@ export default function QsmaPainel() {
       .filter(t => t.vencimento && t.vencimento <= lim60)
       .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
 
-    // Pirâmide de eventos: tipo (faixas) × potencial de gravidade (segmentos)
-    const zero = () => ({ baixa: 0, media: 0, alta: 0, critica: 0 } as Record<Gravidade, number>)
-    const tiers = [
-      { label: 'Acidentes', w: 0.4, counts: zero(), total: 0 },
-      { label: 'Quase-acidentes', w: 0.7, counts: zero(), total: 0 },
-      { label: 'Desvios', w: 1, counts: zero(), total: 0 },
-    ]
-    const idxTipo = (t: string) => (t === 'acidente_spt' || t === 'acidente_cpt') ? 0 : t === 'quase_acidente' ? 1 : t === 'desvio' ? 2 : -1
+    // Pirâmide de eventos: 9 andares (índice = PIRAMIDE_NIVEIS)
+    const pir = new Array(PIRAMIDE_NIVEIS.length).fill(0)
     ocorrencias.forEach(o => {
-      const i = idxTipo(o.tipo)
-      if (i < 0) return
-      tiers[i].counts[o.gravidade] = (tiers[i].counts[o.gravidade] ?? 0) + 1
-      tiers[i].total += 1
+      const gg = o.gravidade === 'alta' || o.gravidade === 'critica' // grave/gravíssimo
+      let i = -1
+      if (o.tipo === 'acidente_cpt') i = gg ? 1 : 2       // com afastamento (0 = fatal, sem marcador ainda)
+      else if (o.tipo === 'acidente_spt') i = gg ? 3 : 4  // sem afastamento
+      else if (o.tipo === 'quase_acidente') i = gg ? 5 : 6
+      else if (o.tipo === 'desvio') i = gg ? 7 : 8
+      if (i >= 0) pir[i] += 1
     })
 
-    return { ocoPorObra: bars, abertas, treinsVencendo, tiers }
+    return { ocoPorObra: bars, abertas, treinsVencendo, pir }
   }, [ocorrencias, treinamentos, obras, lim60])
 
   // Indicadores chave
@@ -82,7 +86,7 @@ export default function QsmaPainel() {
   const treinVencendo = d.treinsVencendo.length
   const integracoesAbertas = integracao?.candidatos.length ?? 0
 
-  const pirTotal = d.tiers.reduce((s, t) => s + t.total, 0)
+  const pirTotal = d.pir.reduce((s: number, v: number) => s + v, 0)
 
   return (
     <div className="space-y-3">
@@ -148,40 +152,31 @@ export default function QsmaPainel() {
 
       {/* Grade 2×2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Pirâmide de Bird — tipo (faixas) × potencial de gravidade (segmentos) */}
+        {/* Pirâmide de eventos — 9 andares (tipo × potencial de gravidade) */}
         <Bloco isDark={isDark} className={card} titulo="Pirâmide de eventos" icon={AlertTriangle}>
-          <div className="space-y-1.5 py-1">
-            {d.tiers.map(n => (
-              <div key={n.label} className="flex items-center gap-2">
-                <span className={`text-[11px] w-28 shrink-0 ${isDark ? 'text-white' : 'text-slate-700'}`}>{n.label}</span>
-                {/* andar da pirâmide: largura fixa (afunila pro topo), segmentado por gravidade */}
-                <div className="flex-1 flex justify-center">
-                  <div
-                    className={`relative h-7 rounded overflow-hidden flex ${n.total === 0 ? (isDark ? 'bg-white/[0.05]' : 'bg-slate-100') : ''}`}
-                    style={{ width: `${n.w * 100}%` }}
-                  >
-                    {n.total > 0 && GRAV.map(g => n.counts[g.k] > 0 && (
-                      <div key={g.k} style={{ width: `${(n.counts[g.k] / n.total) * 100}%`, backgroundColor: g.cor }}
-                        title={`${g.label}: ${n.counts[g.k]}`} />
-                    ))}
-                    <span
-                      className={`absolute inset-0 flex items-center justify-center text-[11px] font-bold ${n.total > 0 ? 'text-white' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}
-                      style={n.total > 0 ? { textShadow: '0 1px 2px rgba(0,0,0,0.35)' } : undefined}
+          <div className="space-y-1 py-1">
+            {PIRAMIDE_NIVEIS.map((n, i) => {
+              const c = d.pir[i]
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <span className={`text-[9px] leading-tight text-right w-[46%] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{n.label}</span>
+                  <div className="flex-1 flex justify-center">
+                    <div
+                      className="relative h-6 rounded flex items-center justify-center transition-all"
+                      style={{ width: `${n.w}%`, backgroundColor: c > 0 ? n.cor : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9') }}
+                      title={`${n.label}: ${c}`}
                     >
-                      {n.total}
-                    </span>
+                      <span
+                        className={`text-[10px] font-bold ${c > 0 ? 'text-white' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}
+                        style={c > 0 ? { textShadow: '0 1px 2px rgba(0,0,0,0.35)' } : undefined}
+                      >
+                        {c}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {/* Legenda: potencial de gravidade */}
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1.5">
-              {GRAV.map(g => (
-                <span key={g.k} className={`flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: g.cor }} /> {g.label}
-                </span>
-              ))}
-            </div>
+              )
+            })}
             {pirTotal === 0 && (
               <p className={`text-[11px] italic text-center pt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum evento registrado</p>
             )}
