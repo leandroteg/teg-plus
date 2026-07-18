@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
@@ -971,6 +972,21 @@ export default function ContasReceber() {
 
   // Data
   const { data: contas = [], isLoading } = useContasReceber()
+
+  // Deep-link: ?nf=<numero_nf> (vindo do Painel) abre direto o modal de detalhe
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const nf = searchParams.get('nf')
+    if (!nf || contas.length === 0) return
+    const alvo = contas.find(c => c.numero_nf === nf)
+    if (alvo) {
+      setActiveTab(alvo.status as StatusCR)
+      setDetailCR(alvo)
+    }
+    searchParams.delete('nf')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, contas])
 
   // Mutations
   const autorizarMut = useAutorizarCR()
