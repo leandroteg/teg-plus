@@ -82,7 +82,6 @@ export default function QsmaPainel() {
   const treinVencendo = d.treinsVencendo.length
   const integracoesAbertas = integracao?.candidatos.length ?? 0
 
-  const pirMax = Math.max(1, ...d.tiers.map(t => t.total))
   const pirTotal = d.tiers.reduce((s, t) => s + t.total, 0)
 
   return (
@@ -151,21 +150,27 @@ export default function QsmaPainel() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Pirâmide de Bird — tipo (faixas) × potencial de gravidade (segmentos) */}
         <Bloco isDark={isDark} className={card} titulo="Pirâmide de eventos" icon={AlertTriangle}>
-          <div className="space-y-2 py-1">
+          <div className="space-y-1.5 py-1">
             {d.tiers.map(n => (
               <div key={n.label} className="flex items-center gap-2">
                 <span className={`text-[11px] w-28 shrink-0 ${isDark ? 'text-white' : 'text-slate-700'}`}>{n.label}</span>
-                <div className="flex-1 flex items-center justify-center gap-1.5">
+                {/* andar da pirâmide: largura fixa (afunila pro topo), segmentado por gravidade */}
+                <div className="flex-1 flex justify-center">
                   <div
-                    className={`h-6 rounded overflow-hidden flex transition-all ${n.total === 0 ? (isDark ? 'bg-white/[0.05]' : 'bg-slate-100') : ''}`}
-                    style={{ width: `${Math.max(n.w * (n.total / pirMax) * 100, 12)}%` }}
+                    className={`relative h-7 rounded overflow-hidden flex ${n.total === 0 ? (isDark ? 'bg-white/[0.05]' : 'bg-slate-100') : ''}`}
+                    style={{ width: `${n.w * 100}%` }}
                   >
-                    {GRAV.map(g => n.counts[g.k] > 0 && (
+                    {n.total > 0 && GRAV.map(g => n.counts[g.k] > 0 && (
                       <div key={g.k} style={{ width: `${(n.counts[g.k] / n.total) * 100}%`, backgroundColor: g.cor }}
                         title={`${g.label}: ${n.counts[g.k]}`} />
                     ))}
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center text-[11px] font-bold ${n.total > 0 ? 'text-white' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}
+                      style={n.total > 0 ? { textShadow: '0 1px 2px rgba(0,0,0,0.35)' } : undefined}
+                    >
+                      {n.total}
+                    </span>
                   </div>
-                  <span className={`text-[11px] font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-700'}`}>{n.total}</span>
                 </div>
               </div>
             ))}
