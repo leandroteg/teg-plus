@@ -2,10 +2,18 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Users2, HardHat, GraduationCap, ShieldAlert, UserPlus, Leaf, CalendarClock } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useQsmaKPIs, useOcorrencias, useTreinamentos } from '../../hooks/useQsma'
+import { useOcorrencias, useTreinamentos } from '../../hooks/useQsma'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import { useIntegracaoTreinos } from '../../hooks/useRHAdmissaoFluxo'
-import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL } from '../../types/qsma'
+import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL, type Gravidade } from '../../types/qsma'
+
+// Potencial de gravidade → cor (para a pirâmide empilhada e legenda)
+const GRAV: { k: Gravidade; label: string; cor: string }[] = [
+  { k: 'baixa', label: 'Leve', cor: '#10b981' },
+  { k: 'media', label: 'Moderada', cor: '#f59e0b' },
+  { k: 'alta', label: 'Grave', cor: '#f97316' },
+  { k: 'critica', label: 'Gravíssima', cor: '#dc2626' },
+]
 
 // Painel do módulo QSMA — padrão dos demais painéis (título + hero de 2 cards:
 // Indicadores Chave / Indicadores Críticos) + pirâmide de Bird e listas.
@@ -13,7 +21,6 @@ import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL } from '../../types/qsma'
 export default function QsmaPainel() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const { data: kpi } = useQsmaKPIs()
   const { data: ocorrencias = [] } = useOcorrencias()
   const { data: treinamentos = [] } = useTreinamentos()
   const { data: obras = [] } = useObrasComProjeto()
@@ -49,7 +56,22 @@ export default function QsmaPainel() {
       .filter(t => t.vencimento && t.vencimento <= lim60)
       .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
 
-    return { ocoPorObra: bars, abertas, treinsVencendo }
+    // Pirâmide de eventos: tipo (faixas) × potencial de gravidade (segmentos)
+    const zero = () => ({ baixa: 0, media: 0, alta: 0, critica: 0 } as Record<Gravidade, number>)
+    const tiers = [
+      { label: 'Acidentes', w: 0.4, counts: zero(), total: 0 },
+      { label: 'Quase-acidentes', w: 0.7, counts: zero(), total: 0 },
+      { label: 'Desvios', w: 1, counts: zero(), total: 0 },
+    ]
+    const idxTipo = (t: string) => (t === 'acidente_spt' || t === 'acidente_cpt') ? 0 : t === 'quase_acidente' ? 1 : t === 'desvio' ? 2 : -1
+    ocorrencias.forEach(o => {
+      const i = idxTipo(o.tipo)
+      if (i < 0) return
+      tiers[i].counts[o.gravidade] = (tiers[i].counts[o.gravidade] ?? 0) + 1
+      tiers[i].total += 1
+    })
+
+    return { ocoPorObra: bars, abertas, treinsVencendo, tiers }
   }, [ocorrencias, treinamentos, obras, lim60])
 
   // Indicadores chave
@@ -60,8 +82,8 @@ export default function QsmaPainel() {
   const treinVencendo = d.treinsVencendo.length
   const integracoesAbertas = integracao?.candidatos.length ?? 0
 
-  const pir = kpi?.piramide ?? { desvios: 0, quaseAcidentes: 0, acidentes: 0 }
-  const pirMax = Math.max(1, pir.desvios, pir.quaseAcidentes, pir.acidentes)
+  const pirMax = Math.max(1, ...d.tiers.map(t => t.total))
+  const pirTotal = d.tiers.reduce((s, t) => s + t.total, 0)
 
   return (
     <div className="space-y-3">
@@ -127,27 +149,35 @@ export default function QsmaPainel() {
 
       {/* Grade 2×2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Pirâmide de Bird */}
+        {/* Pirâmide de Bird — tipo (faixas) × potencial de gravidade (segmentos) */}
         <Bloco isDark={isDark} className={card} titulo="Pirâmide de eventos" icon={AlertTriangle}>
           <div className="space-y-2 py-1">
-            {[
-              { label: 'Acidentes', value: pir.acidentes, cor: '#dc2626', w: 0.4 },
-              { label: 'Quase-acidentes', value: pir.quaseAcidentes, cor: '#f97316', w: 0.7 },
-              { label: 'Desvios', value: pir.desvios, cor: '#f59e0b', w: 1 },
-            ].map(n => (
+            {d.tiers.map(n => (
               <div key={n.label} className="flex items-center gap-2">
                 <span className={`text-[11px] w-28 shrink-0 ${isDark ? 'text-white' : 'text-slate-700'}`}>{n.label}</span>
-                <div className="flex-1 flex justify-center">
+                <div className="flex-1 flex items-center justify-center gap-1.5">
                   <div
-                    className="h-6 rounded flex items-center justify-center text-[11px] font-bold text-white transition-all"
-                    style={{ width: `${Math.max(n.w * (n.value / pirMax) * 100, 12)}%`, backgroundColor: n.cor }}
+                    className={`h-6 rounded overflow-hidden flex transition-all ${n.total === 0 ? (isDark ? 'bg-white/[0.05]' : 'bg-slate-100') : ''}`}
+                    style={{ width: `${Math.max(n.w * (n.total / pirMax) * 100, 12)}%` }}
                   >
-                    {n.value}
+                    {GRAV.map(g => n.counts[g.k] > 0 && (
+                      <div key={g.k} style={{ width: `${(n.counts[g.k] / n.total) * 100}%`, backgroundColor: g.cor }}
+                        title={`${g.label}: ${n.counts[g.k]}`} />
+                    ))}
                   </div>
+                  <span className={`text-[11px] font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-700'}`}>{n.total}</span>
                 </div>
               </div>
             ))}
-            {pir.desvios + pir.quaseAcidentes + pir.acidentes === 0 && (
+            {/* Legenda: potencial de gravidade */}
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1.5">
+              {GRAV.map(g => (
+                <span key={g.k} className={`flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: g.cor }} /> {g.label}
+                </span>
+              ))}
+            </div>
+            {pirTotal === 0 && (
               <p className={`text-[11px] italic text-center pt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum evento registrado</p>
             )}
           </div>
