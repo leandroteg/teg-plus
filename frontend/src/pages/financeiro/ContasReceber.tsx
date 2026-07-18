@@ -53,10 +53,11 @@ const BLOQUEIOS: Record<BloqueioCR, { label: string; cls: string; Icon: typeof A
   rh:               { label: 'Bloqueio Recursos Humanos', cls: 'text-rose-500', Icon: Users },
   financeiro:       { label: 'Bloqueio Financeiro',   cls: 'text-rose-500',    Icon: Receipt },
   em_identificacao: { label: 'Em identificação',      cls: 'text-amber-500',   Icon: Search },
+  em_aprovacao:     { label: 'Em Aprovação',          cls: 'text-orange-500',  Icon: Clock },
   resolvido:        { label: 'Bloqueio resolvido',    cls: 'text-emerald-500', Icon: CheckCircle2 },
   sem_bloqueio:     { label: 'Sem bloqueio',          cls: 'text-slate-300',   Icon: null },
 }
-const BLOQUEIO_ORDER: BloqueioCR[] = ['sem_bloqueio', 'tecnico', 'contratual', 'rh', 'financeiro', 'em_identificacao', 'resolvido']
+const BLOQUEIO_ORDER: BloqueioCR[] = ['sem_bloqueio', 'tecnico', 'contratual', 'rh', 'financeiro', 'em_identificacao', 'em_aprovacao', 'resolvido']
 
 // cor do vencimento: vencido ou faltando ≤3 dias → vermelho (não conta se já recebido/conciliado)
 function vencInfo(cr: ContaReceber): { cls: string; bold: boolean } {
