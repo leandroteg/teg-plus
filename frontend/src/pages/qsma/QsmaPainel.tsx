@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Users2, HardHat, GraduationCap, ShieldAlert, UserPlus, Leaf, CalendarClock } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useQsmaKPIs, useOcorrencias, useTreinamentos } from '../../hooks/useQsma'
@@ -17,6 +18,7 @@ export default function QsmaPainel() {
   const { data: treinamentos = [] } = useTreinamentos()
   const { data: obras = [] } = useObrasComProjeto()
   const { data: integracao } = useIntegracaoTreinos()
+  const nav = useNavigate()
 
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
   const cardClass = isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-white border border-slate-200 shadow-sm'
@@ -165,7 +167,8 @@ export default function QsmaPainel() {
               {d.abertas.slice(0, 8).map(o => {
                 const g = GRAVIDADE_LABEL[o.gravidade]
                 return (
-                  <div key={o.id} className="flex items-center justify-between gap-2 py-1.5">
+                  <button key={o.id} onClick={() => nav(`/qsma/seguranca?aba=ocorrencias&ocorrencia=${o.id}`)}
+                    className={`w-full text-left flex items-center justify-between gap-2 py-1.5 -mx-1 px-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}>
                     <div className="min-w-0">
                       <p className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
                         {fmtData(o.data_ocorrencia)} · {obraNome(o.obra_id)}
@@ -175,7 +178,7 @@ export default function QsmaPainel() {
                       </p>
                     </div>
                     <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -191,7 +194,8 @@ export default function QsmaPainel() {
               {d.treinsVencendo.slice(0, 8).map(t => {
                 const vencido = !!t.vencimento && t.vencimento < hoje
                 return (
-                  <div key={t.id} className="flex items-center justify-between gap-2 py-1.5">
+                  <button key={t.id} onClick={() => nav(`/qsma/seguranca?aba=treinamentos&treinamento=${t.id}`)}
+                    className={`w-full text-left flex items-center justify-between gap-2 py-1.5 -mx-1 px-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}>
                     <div className="min-w-0">
                       <p className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{t.colaborador_nome ?? '—'}</p>
                       <p className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -201,7 +205,7 @@ export default function QsmaPainel() {
                     <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold ${vencido ? (isDark ? 'text-red-400' : 'text-red-600') : (isDark ? 'text-amber-400' : 'text-amber-600')}`}>
                       <CalendarClock size={11} /> {fmtData(t.vencimento)}
                     </span>
-                  </div>
+                  </button>
                 )
               })}
             </div>
