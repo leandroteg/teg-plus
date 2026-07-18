@@ -44,23 +44,6 @@ export type TipoDocumento =
   | 'nota_fiscal' | 'recibo' | 'comprovante'
   | 'relatorio_pagamento' | 'extrato_bancario' | 'outro'
 
-// ── Anexos de fornecedor (documentos: Cartão CNPJ, certidões, contrato social) ──
-export type FornecedorDocTipo =
-  | 'cartao_cnpj' | 'cnd_federal' | 'fgts' | 'trabalhista' | 'contrato_social' | 'outro'
-
-export interface FornecedorAnexo {
-  id: string
-  fornecedor_id: string
-  tipo: FornecedorDocTipo
-  storage_path: string
-  nome: string
-  mime?: string | null
-  tamanho_bytes?: number | null
-  data_emissao?: string | null
-  criado_em: string
-  criado_por_nome?: string | null
-}
-
 export interface Fornecedor {
   id: string
   numero_cadastro?: string
@@ -74,7 +57,6 @@ export interface Fornecedor {
   agencia?: string
   conta?: string
   boleto?: boolean
-  cartao?: boolean
   pix_chave?: string
   pix_tipo?: string
   omie_id?: number
@@ -199,7 +181,7 @@ export interface ContaReceber {
 
 export type BloqueioCR =
   | 'tecnico' | 'contratual' | 'rh' | 'financeiro'
-  | 'em_identificacao' | 'resolvido' | 'sem_bloqueio'
+  | 'em_identificacao' | 'em_aprovacao' | 'resolvido' | 'sem_bloqueio'
 
 export interface DocumentoFinanceiro {
   id: string
