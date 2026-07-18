@@ -378,6 +378,24 @@ export function useLancarCheckin() {
     },
   })
 }
+/** Check-in automático: puxa a Produção mensal do EGP (execução própria, medição deslocada -1 mês)
+ *  e lança em todas as metas com fonte_auto = {tipo:'egp_producao'}. Idempotente por competência. */
+export function useCheckinAutoEgp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (competencia?: string) => {
+      const { data, error } = await supabase.rpc('sgi_checkin_auto_egp', { p_competencia: competencia ?? null })
+      if (error) throw error
+      return data as { ok: boolean; competencia?: string; producao?: number; metas_atualizadas?: number; aviso?: string; erro?: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sgi_checkins'] })
+      qc.invalidateQueries({ queryKey: ['sgi_objetivos'] })
+      qc.invalidateQueries({ queryKey: ['sgi_registros'] })
+      qc.invalidateQueries({ queryKey: ['sgi_kpis'] })
+    },
+  })
+}
 
 // ── Ciência (Padronização → Missões do Portal) ────────────────────────────────
 export function usePublicarDocumento() {
