@@ -1,72 +1,129 @@
 import { useMemo } from 'react'
-import { ClipboardCheck, HardHat, Leaf, Ban, AlertTriangle, Users2 } from 'lucide-react'
+import { AlertTriangle, Users2, HardHat, GraduationCap, ShieldAlert, UserPlus, Leaf, CalendarClock } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useQsmaKPIs, useInspecoes, useOcorrencias } from '../../hooks/useQsma'
+import { useQsmaKPIs, useOcorrencias, useTreinamentos } from '../../hooks/useQsma'
 import { useObrasComProjeto } from '../../hooks/useObras'
-import { TIPO_OCORRENCIA_LABEL } from '../../types/qsma'
+import { useIntegracaoTreinos } from '../../hooks/useRHAdmissaoFluxo'
+import { GRAVIDADE_LABEL, TIPO_OCORRENCIA_LABEL } from '../../types/qsma'
 
-// Painel do módulo QSMA — padrão EGP: indicadores consolidados + pirâmide de
-// Bird + barras por obra. Dados 100% reais (nasce zerado até lançarem).
+// Painel do módulo QSMA — padrão dos demais painéis (título + hero de 2 cards:
+// Indicadores Chave / Indicadores Críticos) + pirâmide de Bird e listas.
+// Dados 100% reais (nasce zerado até lançarem).
 export default function QsmaPainel() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { data: kpi } = useQsmaKPIs()
-  const { data: inspecoes = [] } = useInspecoes()
   const { data: ocorrencias = [] } = useOcorrencias()
+  const { data: treinamentos = [] } = useTreinamentos()
   const { data: obras = [] } = useObrasComProjeto()
+  const { data: integracao } = useIntegracaoTreinos()
 
   const card = `rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`
   const cardClass = isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-white border border-slate-200 shadow-sm'
 
+  const obraNome = (id?: string | null) => obras.find(o => o.id === id)?.nome ?? '—'
+  const fmtData = (d?: string | null) => d
+    ? new Date(d.includes('T') ? d : d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')
+    : '—'
+
+  const hoje = new Date().toISOString().slice(0, 10)
+  const lim60 = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10)
+
   const d = useMemo(() => {
     const obraById = new Map(obras.map(o => [o.id, o]))
-    const inspPorObra = new Map<string, number>()
-    inspecoes.filter(i => i.status === 'executada').forEach(i => {
-      if (i.obra_id) inspPorObra.set(i.obra_id, (inspPorObra.get(i.obra_id) ?? 0) + 1)
-    })
     const ocoPorObra = new Map<string, number>()
     ocorrencias.forEach(o => {
       if (o.obra_id) ocoPorObra.set(o.obra_id, (ocoPorObra.get(o.obra_id) ?? 0) + 1)
     })
-    const ocoPorTipo = new Map<string, number>()
-    ocorrencias.forEach(o => {
-      const l = TIPO_OCORRENCIA_LABEL[o.tipo] ?? o.tipo
-      ocoPorTipo.set(l, (ocoPorTipo.get(l) ?? 0) + 1)
-    })
-    const toBar = (m: Map<string, number>, nomeFromObra = false) =>
-      [...m.entries()]
-        .map(([k, v]) => ({ label: nomeFromObra ? (obraById.get(k)?.nome ?? '—') : k, value: v }))
-        .sort((a, b) => b.value - a.value)
-    return {
-      inspPorObra: toBar(inspPorObra, true),
-      ocoPorObra: toBar(ocoPorObra, true),
-      ocoPorTipo: toBar(ocoPorTipo),
-    }
-  }, [inspecoes, ocorrencias, obras])
+    const bars = [...ocoPorObra.entries()]
+      .map(([k, v]) => ({ label: obraById.get(k)?.nome ?? '—', value: v }))
+      .sort((a, b) => b.value - a.value)
+
+    const abertas = ocorrencias
+      .filter(o => o.status !== 'encerrada')
+      .sort((a, b) => (b.data_ocorrencia ?? '').localeCompare(a.data_ocorrencia ?? ''))
+
+    const treinsVencendo = treinamentos
+      .filter(t => t.vencimento && t.vencimento <= lim60)
+      .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
+
+    return { ocoPorObra: bars, abertas, treinsVencendo }
+  }, [ocorrencias, treinamentos, obras, lim60])
+
+  // Indicadores chave
+  const totalOco = ocorrencias.length
+  const gravesGravissimas = ocorrencias.filter(o => o.gravidade === 'alta' || o.gravidade === 'critica').length
+  const naoTratadas = ocorrencias.filter(o => !o.sgi_registro_id && o.status !== 'encerrada').length
+  // Indicadores críticos
+  const treinVencendo = d.treinsVencendo.length
+  const integracoesAbertas = integracao?.candidatos.length ?? 0
 
   const pir = kpi?.piramide ?? { desvios: 0, quaseAcidentes: 0, acidentes: 0 }
   const pirMax = Math.max(1, pir.desvios, pir.quaseAcidentes, pir.acidentes)
 
   return (
     <div className="space-y-3">
-      {/* Indicadores consolidados — padrão EGP */}
-      <section className={`rounded-3xl p-4 md:p-5 ${cardClass}`}>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">QSMA · Indicadores consolidados</p>
-        <h2 className={`text-sm font-black mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-          Segurança e Meio Ambiente <span className="font-normal text-slate-400 text-[11px]">· campo, pessoas e conformidade</span>
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
-          <Kpi isDark={isDark} label="Inspeções 30d"    value={`${kpi?.inspecoes30 ?? 0}`}          note="executadas"        tone={isDark ? 'text-sky-400' : 'text-sky-600'} />
-          <Kpi isDark={isDark} label="Programadas"      value={`${kpi?.inspecoesProgramadas ?? 0}`} note="a executar"        tone={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
-          <Kpi isDark={isDark} label="Bloqueios"        value={`${kpi?.bloqueios ?? 0}`}            note="veredito bloqueado" tone={isDark ? 'text-red-400' : 'text-red-600'} />
-          <Kpi isDark={isDark} label="Ocorrências"      value={`${kpi?.ocorrenciasAbertas ?? 0}`}   note="abertas"           tone={isDark ? 'text-orange-400' : 'text-orange-600'} />
-          <Kpi isDark={isDark} label="Ações QSMA"       value={`${kpi?.acoesAbertas ?? 0}`}         note={`${kpi?.acoesAtrasadas ?? 0} atrasada(s)`} tone={isDark ? 'text-amber-400' : 'text-amber-600'} />
-          <Kpi isDark={isDark} label="EPIs a trocar"    value={`${kpi?.episVencendo ?? 0}`}         note="próximos 60 dias"  tone={isDark ? 'text-violet-400' : 'text-violet-600'} />
-          <Kpi isDark={isDark} label="Treinamentos"     value={`${kpi?.treinamentosVencendo ?? 0}`} note="vencendo em 60d"   tone={isDark ? 'text-fuchsia-400' : 'text-fuchsia-600'} />
-          <Kpi isDark={isDark} label="Licenças críticas" value={`${kpi?.licencasCriticas ?? 0}`}    note="vencidas/60d"      tone={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
-        </div>
-      </section>
+      {/* Header — padrão dos demais painéis */}
+      <div>
+        <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel - QSMA</h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Riscos, EPIs, treinamentos e ocorrências
+        </p>
+      </div>
 
+      {/* Hero 2 colunas — Indicadores Chave / Indicadores Críticos */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+        {/* Indicadores Chave */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Indicadores Chave
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Panorama de ocorrências
+                </h2>
+              </div>
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                <ShieldAlert size={18} className="text-red-500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric label="Ocorrências" value={totalOco} tone="slate" note="total registradas" isDark={isDark} />
+              <SpotlightMetric label="Graves / Gravíssimas" value={gravesGravissimas} tone="red" note="potencial alto" isDark={isDark} />
+              <SpotlightMetric label="Não tratadas" value={naoTratadas} tone={naoTratadas > 0 ? 'amber' : 'emerald'} note="sem tratativa no SGI" isDark={isDark} />
+            </div>
+          </div>
+        </section>
+
+        {/* Indicadores Críticos */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Indicadores Críticos
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  O que exige ação agora
+                </h2>
+              </div>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(treinVencendo + integracoesAbertas) > 0 ? 'bg-amber-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={(treinVencendo + integracoesAbertas) > 0 ? 'text-amber-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 flex-1">
+              <MiniInfoCard label="Treinamentos vencendo" value={treinVencendo} note="vencidos / próx. 60 dias"
+                icon={GraduationCap} iconTone={treinVencendo > 0 ? 'text-fuchsia-500' : 'text-slate-400'} isDark={isDark} />
+              <MiniInfoCard label="Integrações em aberto" value={integracoesAbertas} note="admissões na integração"
+                icon={UserPlus} iconTone={integracoesAbertas > 0 ? 'text-sky-500' : 'text-slate-400'} isDark={isDark} />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Grade 2×2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Pirâmide de Bird */}
         <Bloco isDark={isDark} className={card} titulo="Pirâmide de eventos" icon={AlertTriangle}>
@@ -94,14 +151,61 @@ export default function QsmaPainel() {
           </div>
         </Bloco>
 
-        <Bloco isDark={isDark} className={card} titulo="Ocorrências por tipo" icon={HardHat}>
-          <Barras isDark={isDark} dados={d.ocoPorTipo} cor="#f97316" vazio="Nenhuma ocorrência registrada" />
-        </Bloco>
-        <Bloco isDark={isDark} className={card} titulo="Inspeções executadas por obra" icon={ClipboardCheck}>
-          <Barras isDark={isDark} dados={d.inspPorObra} cor="#0ea5e9" vazio="Nenhuma inspeção executada" />
-        </Bloco>
+        {/* Ocorrências por obra (barras) */}
         <Bloco isDark={isDark} className={card} titulo="Ocorrências por obra" icon={Users2}>
           <Barras isDark={isDark} dados={d.ocoPorObra} cor="#ef4444" vazio="Nenhuma ocorrência registrada" />
+        </Bloco>
+
+        {/* Ocorrências em aberto (lista) */}
+        <Bloco isDark={isDark} className={card} titulo="Ocorrências em aberto" icon={HardHat}>
+          {d.abertas.length === 0 ? (
+            <p className={`text-[11px] italic py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma ocorrência em aberto</p>
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.06]' : 'divide-slate-100'}`}>
+              {d.abertas.slice(0, 8).map(o => {
+                const g = GRAVIDADE_LABEL[o.gravidade]
+                return (
+                  <div key={o.id} className="flex items-center justify-between gap-2 py-1.5">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                        {fmtData(o.data_ocorrencia)} · {obraNome(o.obra_id)}
+                      </p>
+                      <p className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className="font-mono">{o.codigo}</span> · {TIPO_OCORRENCIA_LABEL[o.tipo]}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Bloco>
+
+        {/* Treinamentos vencendo (lista) */}
+        <Bloco isDark={isDark} className={card} titulo="Treinamentos vencendo" icon={GraduationCap}>
+          {d.treinsVencendo.length === 0 ? (
+            <p className={`text-[11px] italic py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum treinamento vencendo</p>
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.06]' : 'divide-slate-100'}`}>
+              {d.treinsVencendo.slice(0, 8).map(t => {
+                const vencido = !!t.vencimento && t.vencimento < hoje
+                return (
+                  <div key={t.id} className="flex items-center justify-between gap-2 py-1.5">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{t.colaborador_nome ?? '—'}</p>
+                      <p className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {[t.norma, t.curso].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold ${vencido ? (isDark ? 'text-red-400' : 'text-red-600') : (isDark ? 'text-amber-400' : 'text-amber-600')}`}>
+                      <CalendarClock size={11} /> {fmtData(t.vencimento)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </Bloco>
       </div>
 
@@ -114,12 +218,38 @@ export default function QsmaPainel() {
   )
 }
 
-function Kpi({ isDark, label, value, note, tone }: { isDark: boolean; label: string; value: string; note: string; tone: string }) {
+// ── SpotlightMetric (número grande) ──────────────────────────────────────────
+function SpotlightMetric({ label, value, tone, note, isDark }: {
+  label: string; value: string | number; tone: string; note?: string; isDark: boolean
+}) {
+  const tones: Record<string, string> = {
+    teal: isDark ? 'text-teal-400' : 'text-teal-600',
+    emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    amber: isDark ? 'text-amber-400' : 'text-amber-600',
+    orange: isDark ? 'text-orange-400' : 'text-orange-600',
+    blue: isDark ? 'text-blue-400' : 'text-blue-600',
+    red: isDark ? 'text-red-400' : 'text-red-600',
+    slate: isDark ? 'text-slate-300' : 'text-slate-700',
+  }
   return (
-    <div className={`rounded-2xl border px-3.5 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/70'}`}>
-      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 truncate">{label}</p>
-      <p className={`mt-1.5 text-xl leading-none font-black ${tone}`}>{value}</p>
-      <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
+    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+    </div>
+  )
+}
+
+// ── MiniInfoCard ─────────────────────────────────────────────────────────────
+function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
+  label: string; value: string | number; note?: string; icon: typeof Users2; iconTone: string; isDark: boolean
+}) {
+  return (
+    <div className={`rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 flex-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <Icon size={16} className={iconTone} />
+      <p className={`text-2xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+      <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      {note && <p className={`text-[8px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
     </div>
   )
 }
