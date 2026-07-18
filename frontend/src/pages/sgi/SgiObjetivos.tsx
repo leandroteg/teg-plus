@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import {
   Target, Plus, X, Loader2, TrendingUp, TrendingDown, CheckCircle2, Circle, Send,
-  Pencil, Trash2, Search, ChevronRight, AlertTriangle,
+  Pencil, Trash2, Search, ChevronRight, AlertTriangle, Zap,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin,
   useAtualizarObjetivo, useAtualizarMeta, useRemoverObjetivo, useRemoverMeta,
-  useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro,
+  useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro, useCheckinAutoEgp,
 } from '../../hooks/useSgi'
 import { FAROL_CFG, STATUS_ACAO_LABEL, STATUS_CHECKIN_CFG, STATUS_REVISAO_CFG } from '../../types/sgi'
 import type { SgiObjetivo, SgiMeta, SgiCheckin, SgiAcao, DirecaoMeta, Farol, StatusCheckinMeta, StatusRevisaoMeta } from '../../types/sgi'
@@ -61,6 +61,7 @@ function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () 
   const [unidade, setUnidade] = useState(edit?.unidade ?? '')
   const [direcao, setDirecao] = useState<DirecaoMeta>(edit?.direcao ?? 'maior_melhor')
   const [alvo, setAlvo] = useState(metaAnual?.alvo != null ? String(metaAnual.alvo) : '')
+  const [autoEgp, setAutoEgp] = useState(metaAnual?.fonte_auto?.tipo === 'egp_producao')
   const [salvando, setSalvando] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -74,13 +75,14 @@ function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () 
     setSalvando(true)
     try {
       const fields = { titulo: titulo.trim(), area_processo: area || undefined, indicador: indicador || undefined, unidade: unidade || undefined, direcao }
+      const fonteAuto = autoEgp ? { tipo: 'egp_producao' as const } : null
       if (edit) {
         await atualizarObj.mutateAsync({ id: edit.id, ...fields })
-        if (metaAnual) await atualizarMeta.mutateAsync({ id: metaAnual.id, alvo: alvo ? Number(alvo) : null })
-        else await criarMeta.mutateAsync({ objetivo_id: edit.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined })
+        if (metaAnual) await atualizarMeta.mutateAsync({ id: metaAnual.id, alvo: alvo ? Number(alvo) : null, fonte_auto: fonteAuto })
+        else await criarMeta.mutateAsync({ objetivo_id: edit.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined, fonte_auto: fonteAuto })
       } else {
         const obj = await criarObj.mutateAsync({ ...fields, ano: anoAtual, status: 'ativo' })
-        await criarMeta.mutateAsync({ objetivo_id: obj.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined })
+        await criarMeta.mutateAsync({ objetivo_id: obj.id, periodo: 'anual', ano: anoAtual, alvo: alvo ? Number(alvo) : undefined, fonte_auto: fonteAuto })
       }
       onClose()
     } finally { setSalvando(false) }
@@ -123,6 +125,13 @@ function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () 
             <label className={`block text-xs font-semibold mb-1 ${muted}`}>Área / Processo</label>
             <input value={area} onChange={e => setArea(e.target.value)} placeholder="Ex.: QSMS" className={inputCls} />
           </div>
+          <label className={`flex items-start gap-2 rounded-xl border p-3 cursor-pointer ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+            <input type="checkbox" checked={autoEgp} onChange={e => setAutoEgp(e.target.checked)} className="accent-emerald-600 w-3.5 h-3.5 mt-0.5" />
+            <span>
+              <span className={`flex items-center gap-1 text-xs font-bold ${txt}`}><Zap size={12} className="text-amber-500" /> Check-in automático — Produção EGP</span>
+              <span className={`block text-[11px] mt-0.5 leading-snug ${muted}`}>O realizado do mês vem do Painel EGP (medições de execução própria TEG, em R$). Defina o alvo anual em R$.</span>
+            </span>
+          </label>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
             <button type="submit" disabled={salvando || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
@@ -210,10 +219,11 @@ function CheckinModal({ obj, meta, onClose, isDark }: { obj: ObjFull; meta: Meta
               <div className="space-y-1.5">
                 {historico.map(c => {
                   const f = FAROL_CFG[(c.farol as Farol) || 'cinza']
+                  const isAuto = !!c.observacao?.startsWith('auto')
                   return (
                     <div key={c.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className={muted}>{c.competencia}</span>
-                      <span className={txt}>{c.realizado ?? '—'}</span>
+                      <span className={`flex items-center gap-1 ${muted}`}>{c.competencia}{isAuto && <Zap size={10} className="text-amber-500" aria-label="Check-in automático (EGP)" />}</span>
+                      <span className={txt}>{c.realizado != null ? Number(c.realizado).toLocaleString('pt-BR') : '—'}</span>
                       <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     </div>
                   )
@@ -502,6 +512,8 @@ export default function SgiObjetivos() {
   const [delAlvo, setDelAlvo] = useState<{ tipo: 'objetivo' | 'meta'; id: string; label: string } | null>(null)
   const [checkin, setCheckin] = useState<{ obj: ObjFull; meta: MetaFull } | null>(null)
   const [enviados, setEnviados] = useState<Record<string, boolean>>({})
+  const autoEgp = useCheckinAutoEgp()
+  const [autoMsg, setAutoMsg] = useState<string | null>(null)
 
   // Filtros / visão (padrão Padronização) — aplicáveis a todas as abas
   const [busca, setBusca] = useState('')
@@ -512,6 +524,15 @@ export default function SgiObjetivos() {
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'
 
   const todasMetas = useMemo(() => objetivos.flatMap(o => o.metas.map(m => ({ obj: o, meta: m }))), [objetivos])
+  const temAutoEgp = useMemo(() => todasMetas.some(({ meta }) => meta.fonte_auto?.tipo === 'egp_producao'), [todasMetas])
+  const rodarAutoEgp = async () => {
+    setAutoMsg(null)
+    const r = await autoEgp.mutateAsync(undefined)
+    if (!r.ok) { setAutoMsg(r.erro || 'Falha ao atualizar.'); return }
+    setAutoMsg(r.aviso
+      ? r.aviso
+      : `Produção ${r.competencia}: R$ ${Number(r.producao ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} · ${r.metas_atualizadas} meta(s) atualizada(s).`)
+  }
   const metasTri = useMemo(() => objetivos.flatMap(o => o.metas.filter(m => m.periodo === 'trimestral').map(m => ({ obj: o, meta: m }))), [objetivos])
 
   const counts = useMemo(() => ({
@@ -609,7 +630,16 @@ export default function SgiObjetivos() {
                 {(Object.keys(FAROL_CFG) as Farol[]).map(k => <option key={k} value={k}>{FAROL_CFG[k].label}</option>)}
               </select>
             )}
+            {tab === 'checkin' && temAutoEgp && (
+              <button onClick={rodarAutoEgp} disabled={autoEgp.isPending}
+                className="ml-auto shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50">
+                {autoEgp.isPending ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Atualizar do EGP
+              </button>
+            )}
           </div>
+        )}
+        {tab === 'checkin' && autoMsg && (
+          <p className={`text-[11px] flex items-center gap-1.5 ${muted}`}><Zap size={11} className="text-amber-500" /> {autoMsg}</p>
         )}
 
         {objetivos.length === 0 ? (
@@ -664,14 +694,18 @@ export default function SgiObjetivos() {
                 <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className={`text-[8px] font-bold uppercase tracking-wider ${muted}`}>Meta</p>
+                      <p className={`flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-wider ${muted}`}>Meta
+                        {m.fonte_auto?.tipo === 'egp_producao' && (
+                          <span className="inline-flex items-center gap-0.5 normal-case tracking-normal text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500"><Zap size={9} /> Auto · EGP</span>
+                        )}
+                      </p>
                       <p className={`text-sm font-semibold leading-snug ${txt}`}>{m.descricao || alvoLabel(obj, m.alvo)}</p>
                     </div>
                     <StatusBadgeSelect value={(m.status_checkin ?? 'aberto') as StatusCheckinMeta} cfg={STATUS_CHECKIN_CFG} isDark={isDark}
                       onChange={s => atualizarMeta.mutate({ id: m.id, status_checkin: s })} />
                   </div>
                   <div className="flex items-center gap-4 mt-2.5">
-                    <Campo label="Realizado" value={u?.realizado != null ? `${u.realizado}%` : '—'} tone={u ? f.text : undefined} isDark={isDark} />
+                    <Campo label="Realizado" value={u?.realizado != null ? (obj.unidade ? `${Number(u.realizado).toLocaleString('pt-BR')} ${obj.unidade}` : `${u.realizado}%`) : '—'} tone={u ? f.text : undefined} isDark={isDark} />
                     <Campo label="Data" value={u?.competencia ?? '—'} isDark={isDark} />
                     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${f.bg} ${f.text}`}><span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />{f.label}</span>
                     <button onClick={() => setCheckin({ obj, meta: m })} className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Check-in</button>
@@ -697,7 +731,7 @@ export default function SgiObjetivos() {
                       onChange={(s: StatusRevisaoMeta) => atualizarMeta.mutate({ id: m.id, status_revisao: s })} />
                   </div>
                   <div className="flex items-center gap-4 mt-2.5">
-                    <Campo label="Realizado" value={u?.realizado != null ? `${u.realizado}%` : '—'} tone={u ? f.text : undefined} isDark={isDark} />
+                    <Campo label="Realizado" value={u?.realizado != null ? (obj.unidade ? `${Number(u.realizado).toLocaleString('pt-BR')} ${obj.unidade}` : `${u.realizado}%`) : '—'} tone={u ? f.text : undefined} isDark={isDark} />
                     <Campo label="Data" value={u?.competencia ?? '—'} isDark={isDark} />
                     {jaEnviado ? (
                       <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><CheckCircle2 size={13} /> Enviado</span>
