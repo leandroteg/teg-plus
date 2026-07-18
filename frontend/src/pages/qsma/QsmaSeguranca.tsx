@@ -28,7 +28,7 @@ import {
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
-import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips } from '../../components/qsma/Toolbar'
+import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
 import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
@@ -77,7 +77,7 @@ export default function QsmaSeguranca() {
   const { perfil } = useAuth()
   const isAdmin = perfil?.role === 'administrador'
   const [params, setParams] = useSearchParams()
-  const [aba, setAba] = useState<string>(params.get('aba') ?? 'treinamentos')
+  const [aba, setAba] = useState<string>(params.get('aba') ?? 'ocorrencias')
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
   const [modalEpi, setModalEpi] = useState<QsmaEpi | 'novo' | null>(null)
   const [modalFicha, setModalFicha] = useState(false)
@@ -134,7 +134,12 @@ export default function QsmaSeguranca() {
   const [busca, setBusca] = useState('')
   const [escopoF, setEscopoF] = useState('todos')
   const [normaF, setNormaF] = useState('')
-  const [tipoOcoF, setTipoOcoF] = useState('')
+  const [exTipoOco, setExTipoOco] = useState<Set<string>>(new Set())
+  const [exGravOco, setExGravOco] = useState<Set<string>>(new Set())
+  const [exObraOco, setExObraOco] = useState<Set<string>>(new Set())
+  const [exStatusOco, setExStatusOco] = useState<Set<string>>(new Set())
+  const [dataDeOco, setDataDeOco] = useState('')
+  const [dataAteOco, setDataAteOco] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
   const [subTreino, setSubTreino] = useState<'integracao' | 'controle' | 'matriz'>('controle')
   const [treinoColab, setTreinoColab] = useState<string | null>(null)
@@ -159,8 +164,18 @@ export default function QsmaSeguranca() {
       || (quickTre === 'vencendo' && !!t.vencimento && t.vencimento >= hoje && t.vencimento <= lim60))
     && (!q || (t.colaborador_nome ?? '').toLowerCase().includes(q) || (t.curso ?? '').toLowerCase().includes(q))
   )
+  const obrasComOcorrencia = [...new Map(
+    ocorrencias.filter(o => o.obra_id).map(o => [o.obra_id!, obraNome(o.obra_id)])
+  ).entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
   const ocorrenciasF = ocorrencias.filter(o =>
-    (!tipoOcoF || o.tipo === tipoOcoF)
+    !exTipoOco.has(o.tipo)
+    && !exGravOco.has(o.gravidade)
+    && !exObraOco.has(o.obra_id ?? '')
+    && !exStatusOco.has(o.status)
+    && (!dataDeOco || o.data_ocorrencia.slice(0, 10) >= dataDeOco)
+    && (!dataAteOco || o.data_ocorrencia.slice(0, 10) <= dataAteOco)
     && (!q || o.descricao.toLowerCase().includes(q) || (o.codigo ?? '').toLowerCase().includes(q) || obraNome(o.obra_id).toLowerCase().includes(q))
   )
 
@@ -278,12 +293,24 @@ export default function QsmaSeguranca() {
             isDark={isDark}
             contagem={`${ocorrenciasF.length} ocorrência${ocorrenciasF.length !== 1 ? 's' : ''}`}
             busca={busca} onBusca={setBusca} placeholder="Buscar ocorrência, código ou obra…"
-            acoes={<BotaoNovo label="Registrar Ocorrência" onClick={() => setModalOcorrencia('novo')} />}
           >
-            <ToolbarSelect
-              isDark={isDark} value={tipoOcoF} onChange={setTipoOcoF} allLabel="Todos os tipos"
+            <MultiCheck
+              isDark={isDark} label="Tipo" excluded={exTipoOco} setExcluded={setExTipoOco}
               options={(Object.keys(TIPO_OCORRENCIA_LABEL) as TipoOcorrencia[]).map(t => ({ value: t, label: TIPO_OCORRENCIA_LABEL[t] }))}
             />
+            <MultiCheck
+              isDark={isDark} label="Gravidade" excluded={exGravOco} setExcluded={setExGravOco}
+              options={(Object.keys(GRAVIDADE_LABEL) as Gravidade[]).map(g => ({ value: g, label: GRAVIDADE_LABEL[g].label }))}
+            />
+            <MultiCheck
+              isDark={isDark} label="Obra" excluded={exObraOco} setExcluded={setExObraOco}
+              options={obrasComOcorrencia}
+            />
+            <MultiCheck
+              isDark={isDark} label="Status" excluded={exStatusOco} setExcluded={setExStatusOco}
+              options={(Object.keys(STATUS_OCORRENCIA_LABEL) as StatusOcorrencia[]).map(s => ({ value: s, label: STATUS_OCORRENCIA_LABEL[s].label }))}
+            />
+            <ToolbarDateRange isDark={isDark} de={dataDeOco} ate={dataAteOco} onDe={setDataDeOco} onAte={setDataAteOco} />
             {/* toggle Lista/Kanban (só acompanhamento — o tratamento é no Gestão) */}
             <div className={`inline-flex rounded-xl border overflow-hidden shrink-0 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
               {([['lista', List], ['kanban', LayoutGrid]] as const).map(([v, Icon]) => (
