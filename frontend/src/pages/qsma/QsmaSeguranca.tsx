@@ -44,6 +44,12 @@ import {
 
 const STEPS: FlowStep[] = [
   {
+    key: 'ocorrencias', label: 'Ocorrências',
+    description: 'Registro → investigação (causa raiz) → ações corretivas no SGI.',
+    icon: Siren,
+    accent: { bg: 'hover:bg-red-50', bgActive: 'bg-red-50', text: 'text-red-600', textActive: 'text-red-800', border: 'border-red-500', badge: 'bg-red-100 text-red-700' },
+  },
+  {
     key: 'treinamentos', label: 'Treinamentos',
     description: 'Matriz de NRs por colaborador com vencimentos e reciclagens.',
     icon: GraduationCap,
@@ -60,12 +66,6 @@ const STEPS: FlowStep[] = [
     description: 'Inventário de riscos por GHE e análise preliminar por tarefa — matriz 5×5.',
     icon: AlertTriangle,
     accent: { bg: 'hover:bg-amber-50', bgActive: 'bg-amber-50', text: 'text-amber-600', textActive: 'text-amber-800', border: 'border-amber-500', badge: 'bg-amber-100 text-amber-700' },
-  },
-  {
-    key: 'ocorrencias', label: 'Ocorrências',
-    description: 'Registro → investigação (causa raiz) → ações corretivas no SGI.',
-    icon: Siren,
-    accent: { bg: 'hover:bg-red-50', bgActive: 'bg-red-50', text: 'text-red-600', textActive: 'text-red-800', border: 'border-red-500', badge: 'bg-red-100 text-red-700' },
   },
 ]
 
