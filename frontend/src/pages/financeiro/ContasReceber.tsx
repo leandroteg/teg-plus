@@ -764,11 +764,21 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
                 <ArrowRight size={15} /> Aguardar Pgto
               </button>
             )}
-            {cr.status === 'aguardando' && (
-              <button onClick={() => onAction('receber', cr)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Reg. Recebimento
-              </button>
-            )}
+            {cr.status === 'aguardando' && (() => {
+              const bloqueado = isBloqueado(cr.bloqueio_tipo)
+              return (
+                // wrapper leva o title p/ o tooltip aparecer mesmo com o botao disabled
+                <div className="flex-1" title={bloqueado ? 'Retire o bloqueio antes de registrar o recebimento' : undefined}>
+                  <button onClick={() => onAction('receber', cr)} disabled={bloqueado}
+                    className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      bloqueado
+                        ? (isDark ? 'bg-white/[0.05] text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed')
+                        : 'bg-teal-600 text-white hover:bg-teal-700'}`}>
+                    {bloqueado ? <Lock size={15} /> : <CheckCircle2 size={15} />} Reg. Recebimento
+                  </button>
+                </div>
+              )
+            })()}
             {cr.status === 'recebido' && (
               <button
                 disabled={aplicarConcil.isPending}
