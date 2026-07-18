@@ -12,7 +12,7 @@ const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 import Relatorios, { RelatoriosToolbar, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
-type PainelKey = 'painel' | 'pgtos_previstos' | 'rel_fluxo' | 'rel_aging'
+type PainelKey = 'painel' | 'contas_receber' | 'pgtos_previstos' | 'rel_fluxo' | 'rel_aging'
 const REL_TIPO: Record<string, 'fluxo' | 'aging'> = {
   rel_fluxo: 'fluxo', rel_aging: 'aging',
 }
@@ -176,6 +176,28 @@ export default function DashboardFinanceiro() {
     return { ...a, ccReceita }
   }, [crList])
 
+  // Painel de Contas a Receber: prazo médio, contagens e listas (últimos recebimentos / a receber)
+  const crPanel = useMemo(() => {
+    const isBloq = (b?: string) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
+    let nRecebidos = 0, nBloqueios = 0, prazoSum = 0, prazoN = 0
+    const recebidos: ContaReceber[] = [], abertos: ContaReceber[] = []
+    for (const c of crList as ContaReceber[]) {
+      if (['recebido', 'conciliado'].includes(c.status)) {
+        nRecebidos++; recebidos.push(c)
+        if (c.data_recebimento && c.data_emissao) {
+          const d = (new Date(c.data_recebimento + 'T00:00:00').getTime() - new Date(c.data_emissao + 'T00:00:00').getTime()) / 86400000
+          if (d >= 0) { prazoSum += d; prazoN++ }
+        }
+      } else {
+        abertos.push(c)
+        if (isBloq(c.bloqueio_tipo)) nBloqueios++
+      }
+    }
+    recebidos.sort((x, y) => (y.data_recebimento || '').localeCompare(x.data_recebimento || ''))
+    abertos.sort((x, y) => (x.data_vencimento || '').localeCompare(y.data_vencimento || ''))
+    return { prazoMedio: prazoN ? Math.round(prazoSum / prazoN) : 0, nRecebidos, nBloqueios, ultimos: recebidos.slice(0, 6), abertos: abertos.slice(0, 6) }
+  }, [crList])
+
   // KPIs consolidados
   const cpPago = kpis.valor_pago_periodo
   const cpAPagar = kpis.valor_total_aberto
@@ -234,6 +256,7 @@ export default function DashboardFinanceiro() {
               }`}
             >
               <option value="painel">Painel</option>
+              <option value="contas_receber">Contas a Receber</option>
               <option value="pgtos_previstos">Pgtos Previstos</option>
               <option value="rel_fluxo">Fluxo de Caixa</option>
               <option value="rel_aging">Aging</option>
@@ -285,6 +308,148 @@ export default function DashboardFinanceiro() {
       {painelAtivo in REL_TIPO && (
         <Relatorios key={painelAtivo} initialTipo={REL_TIPO[painelAtivo]} de={relPeriodo.de} ate={relPeriodo.ate} />
       )}
+
+      {painelAtivo === 'contas_receber' && (() => {
+        const segs = [
+          { key: 'recebido', label: 'Recebido', val: cr.recebido, color: 'bg-teal-500' },
+          { key: 'noprazo', label: 'No prazo', val: cr.emAberto, color: 'bg-emerald-400' },
+          { key: 'bloqueado', label: 'Bloqueado', val: cr.bloqueado, color: 'bg-red-500' },
+          { key: 'atraso', label: 'Em atraso', val: cr.vencido, color: 'bg-amber-500' },
+        ]
+        const total = segs.reduce((s, x) => s + x.val, 0)
+        const active = segs.filter(s => s.val > 0)
+        return (
+          <>
+            {/* Hero: Indicadores + Janela Critica */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+              <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+                <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nucleo de Recebiveis</p>
+                      <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do periodo</h2>
+                    </div>
+                    <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                      <Receipt size={18} className="text-emerald-500" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5 flex-1">
+                    <SpotlightMetric label="Recebido" value={fmt(cr.recebido)} tone="emerald" isDark={isDark} note={`${crPanel.nRecebidos} titulos`} />
+                    <SpotlightMetric label="A Receber" value={fmt(cr.aReceber)} tone="amber" isDark={isDark} note={`${crPanel.abertos.length} em aberto`} />
+                    <SpotlightMetric label="Prazo Medio" value={`${crPanel.prazoMedio}d`} tone="teal" isDark={isDark} note="emissao -> receb." />
+                  </div>
+                </div>
+              </section>
+              <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+                <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Janela Critica</p>
+                      <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>O que exige acao</h2>
+                    </div>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${cr.vencido > 0 || crPanel.nBloqueios > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                      <Zap size={14} className={cr.vencido > 0 || crPanel.nBloqueios > 0 ? 'text-red-500' : 'text-slate-400'} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MiniInfoCard label="Recebimentos em Atraso" value={fmt(cr.vencido)} icon={AlertTriangle}
+                      iconTone={cr.vencido > 0 ? 'text-red-500' : 'text-slate-400'} note={cr.vencido > 0 ? 'vencidos' : 'nenhum'} isDark={isDark} />
+                    <MiniInfoCard label="Bloqueios Ativos" value={crPanel.nBloqueios} icon={Lock}
+                      iconTone={crPanel.nBloqueios > 0 ? 'text-rose-500' : 'text-slate-400'} note={crPanel.nBloqueios > 0 ? 'travados' : 'nenhum'} isDark={isDark} />
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Pulso por status */}
+            <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+              <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+                <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                  <TrendingUp size={14} className="text-emerald-500" /> Pulso por Status
+                </h2>
+                <div className="flex items-center gap-3">
+                  {segs.map(s => (
+                    <span key={s.key} className="flex items-center gap-1">
+                      <span className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
+                      <span className="text-[10px] text-slate-500">{s.label}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="px-4 py-3">
+                {total === 0 ? (
+                  <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>Nenhum titulo</div>
+                ) : (
+                  <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    {active.map(s => {
+                      const pct = (s.val / total) * 100
+                      return (
+                        <div key={s.key} className={`${s.color} relative flex items-center justify-center transition-all`}
+                          style={{ width: `${Math.max(pct, 4)}%` }} title={`${s.label}: ${fmt(s.val)}`}>
+                          {pct >= 14 && <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{s.label}{pct >= 22 ? ` · ${fmt(s.val)}` : ''}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Listas: Ultimos Recebimentos + A Receber */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+                <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+                  <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    <CheckCircle2 size={14} className="text-emerald-500" /> Ultimos Recebimentos
+                  </h2>
+                  <button onClick={() => nav('/financeiro/cr')} className="flex items-center gap-0.5 text-[10px] text-emerald-600 font-semibold">Ver todos <ChevronRight size={11} /></button>
+                </div>
+                <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+                  {crPanel.ultimos.length === 0 ? (
+                    <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum recebimento</p>
+                  ) : crPanel.ultimos.map((c) => (
+                    <button key={c.id} onClick={() => nav('/financeiro/cr')} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>{c.numero_nf ?? '—'}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{c.osc?.numero_os ?? c.descricao ?? 'Recebimento'}</p>
+                        <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{c.data_recebimento ? `recebido ${fmtData(c.data_recebimento)}` : ''}</p>
+                      </div>
+                      <p className={`text-sm font-extrabold shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{fmt(c.valor_recebido || c.valor_original)}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+                <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+                  <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    <Clock size={14} className="text-amber-500" /> A Receber
+                  </h2>
+                  <button onClick={() => nav('/financeiro/cr')} className="flex items-center gap-0.5 text-[10px] text-emerald-600 font-semibold">Ver todos <ChevronRight size={11} /></button>
+                </div>
+                <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+                  {crPanel.abertos.length === 0 ? (
+                    <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nada a receber</p>
+                  ) : crPanel.abertos.map((c) => {
+                    const bloq = !!c.bloqueio_tipo && c.bloqueio_tipo !== 'sem_bloqueio' && c.bloqueio_tipo !== 'resolvido'
+                    const venc = new Date(c.data_vencimento + 'T00:00:00') < new Date(new Date().setHours(0, 0, 0, 0))
+                    return (
+                      <button key={c.id} onClick={() => nav('/financeiro/cr')} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${bloq ? (isDark ? 'bg-red-500/[0.06]' : 'bg-red-50/60') : ''} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold ${bloq ? 'bg-red-100 text-red-600' : venc ? 'bg-amber-50 text-amber-600' : isDark ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{c.numero_nf ?? '—'}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{c.osc?.numero_os ?? c.descricao ?? 'A receber'}</p>
+                          <p className={`text-[10px] ${bloq ? 'text-red-500 font-semibold' : venc ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>{bloq ? 'bloqueado · ' : venc ? 'em atraso · ' : ''}venc {fmtData(c.data_vencimento)}</p>
+                        </div>
+                        <p className={`text-sm font-extrabold shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmt(c.valor_original)}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+          </>
+        )
+      })()}
 
       {painelAtivo === 'painel' && (<>
 
