@@ -61,7 +61,7 @@ function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () 
   const [unidade, setUnidade] = useState(edit?.unidade ?? '')
   const [direcao, setDirecao] = useState<DirecaoMeta>(edit?.direcao ?? 'maior_melhor')
   const [alvo, setAlvo] = useState(metaAnual?.alvo != null ? String(metaAnual.alvo) : '')
-  const [autoEgp, setAutoEgp] = useState(metaAnual?.fonte_auto?.tipo === 'egp_producao')
+  const [autoEgp, setAutoEgp] = useState(!!metaAnual?.fonte_auto?.tipo)
   const [salvando, setSalvando] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -75,7 +75,8 @@ function ObjetivoModal({ edit, onClose, isDark }: { edit?: ObjFull; onClose: () 
     setSalvando(true)
     try {
       const fields = { titulo: titulo.trim(), area_processo: area || undefined, indicador: indicador || undefined, unidade: unidade || undefined, direcao }
-      const fonteAuto = autoEgp ? { tipo: 'egp_producao' as const } : null
+      // preserva a config existente (ex.: egp_produtividade) ao editar; default = produção
+      const fonteAuto = autoEgp ? (metaAnual?.fonte_auto ?? { tipo: 'egp_producao' as const }) : null
       if (edit) {
         await atualizarObj.mutateAsync({ id: edit.id, ...fields })
         if (metaAnual) await atualizarMeta.mutateAsync({ id: metaAnual.id, alvo: alvo ? Number(alvo) : null, fonte_auto: fonteAuto })
@@ -524,7 +525,7 @@ export default function SgiObjetivos() {
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'
 
   const todasMetas = useMemo(() => objetivos.flatMap(o => o.metas.map(m => ({ obj: o, meta: m }))), [objetivos])
-  const temAutoEgp = useMemo(() => todasMetas.some(({ meta }) => meta.fonte_auto?.tipo === 'egp_producao'), [todasMetas])
+  const temAutoEgp = useMemo(() => todasMetas.some(({ meta }) => !!meta.fonte_auto?.tipo), [todasMetas])
   const rodarAutoEgp = async () => {
     setAutoMsg(null)
     const r = await autoEgp.mutateAsync(undefined)
@@ -695,7 +696,7 @@ export default function SgiObjetivos() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className={`flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-wider ${muted}`}>Meta
-                        {m.fonte_auto?.tipo === 'egp_producao' && (
+                        {!!m.fonte_auto?.tipo && (
                           <span className="inline-flex items-center gap-0.5 normal-case tracking-normal text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500"><Zap size={9} /> Auto · EGP</span>
                         )}
                       </p>
