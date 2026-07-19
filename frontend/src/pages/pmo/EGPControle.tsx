@@ -16,6 +16,7 @@ import {
   useMudancas, useMultas, useStatusReports, useIndicadores, useObraStatus,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
+import { gerarStatusReportObraPdf } from '../../utils/status-report-obra-pdf'
 import type {
   PMOMedicaoResumo, PMOMedicaoItem, PMOMudanca, PMOMulta,
   PMOStatusReport, PMOIndicadoresSnapshot,
@@ -875,6 +876,7 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
   const [projOpen, setProjOpen] = useState(false)
   const [excludedObras, setExcludedObras] = useState<Set<string>>(new Set())
   const [obraOpen, setObraOpen] = useState(false)
+  const [detObra, setDetObra] = useState<ObraAgg | null>(null)
 
   const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'}`
   const sel = (active: boolean) => 'text-sm rounded-xl border px-2.5 py-2 outline-none cursor-pointer shrink-0 ' + (active ? (isLight ? 'border-teal-300 text-teal-700 bg-teal-50 font-semibold' : 'border-teal-500/40 text-teal-300 bg-teal-500/10 font-semibold') : (isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-300'))
@@ -1033,7 +1035,7 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
                       {!isCol && arr.map(o => {
                         const pct = obraPct(o); const prz = obraPrazo(o)
                         return (
-                          <tr key={polo + '||' + o.obra} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.03]'}`}>
+                          <tr key={polo + '||' + o.obra} onClick={() => setDetObra(o)} className={`border-b cursor-pointer ${isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.03]'}`}>
                             <td className={`py-2 px-4 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{o.obra}</td>
                             {(() => { const st = o.obra_id ? statusMap.get(o.obra_id) : undefined; return (
                               <td className="py-2 px-4 text-xs max-w-[340px]" title={st?.status_texto ?? 'Status descritivo — a ser gerado pela IA'}>
@@ -1061,6 +1063,48 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
           </div>
         )}
       </div>
+
+      {detObra && (() => {
+        const o = detObra
+        const st = o.obra_id ? statusMap.get(o.obra_id) : undefined
+        const fat = obraPct(o); const prz = obraPrazo(o); const saldo = o.valor - o.medido
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setDetObra(null)}>
+            <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`} onClick={e => e.stopPropagation()}>
+              <div className={`px-5 py-4 border-b flex items-start justify-between gap-2 sticky top-0 ${isLight ? 'border-slate-100 bg-white' : 'border-white/[0.06] bg-[#1e293b]'}`}>
+                <div className="min-w-0">
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Status Report · Obra</p>
+                  <h3 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{o.obra}</h3>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo} · {o.nOsc} OSC{o.nOsc !== 1 ? 's' : ''}</p>
+                </div>
+                <button onClick={() => setDetObra(null)} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {([['Valor contratado', fmt(o.valor), ''], ['Faturado', `${fmt(o.medido)} · ${fat}%`, 'text-emerald-600'], ['Saldo a produzir', fmt(saldo), 'text-red-600'], ['% Prazo consumido', prz == null ? '—' : prz + '%', prz != null && prz >= 90 ? 'text-red-600' : '']] as const).map(([l, v, c], i) => (
+                    <div key={i} className={`rounded-xl p-3 ${isLight ? 'bg-slate-50' : 'bg-white/[0.04]'}`}>
+                      <p className={`text-[10px] font-semibold uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{l}</p>
+                      <p className={`text-lg font-bold ${c || (isLight ? 'text-slate-800' : 'text-white')}`}>{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className={`rounded-xl border p-4 ${isLight ? 'border-slate-200 bg-slate-50/60' : 'border-white/[0.08] bg-white/[0.03]'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`w-2 h-2 rounded-full ${farolDot(st?.farol)}`} />
+                    <p className={`text-[11px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Situação atual</p>
+                  </div>
+                  <p className={`text-sm leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{st?.status_texto ?? 'Status ainda não gerado por IA.'}</p>
+                  {st?.gerado_por && <p className={`text-[10px] mt-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Gerado por {st.gerado_por}</p>}
+                </div>
+                <button onClick={() => gerarStatusReportObraPdf({ obra: o.obra, frente: o.polo, valor: o.valor, faturado: o.medido, saldo, fatPct: fat, prazoPct: prz, nOsc: o.nOsc, statusTexto: st?.status_texto ?? null, farol: st?.farol ?? null, geradoPor: st?.gerado_por ?? null })}
+                  className="w-full py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 flex items-center justify-center gap-2">
+                  <Download size={15} /> Exportar PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
