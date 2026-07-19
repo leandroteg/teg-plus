@@ -205,6 +205,20 @@ export function useRemoverAcao() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
   })
 }
+// Adiciona um comentário (append-only) à ação — o dono comenta em Minhas Tarefas.
+export function useComentarAcao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, texto, autorId, autorNome }: { id: string; texto: string; autorId?: string | null; autorNome?: string | null }) => {
+      const { data: atual } = await supabase.from('sgi_acoes').select('comentarios').eq('id', id).single()
+      const lista = Array.isArray((atual as { comentarios?: unknown })?.comentarios) ? (atual as { comentarios: unknown[] }).comentarios : []
+      const novo = { texto: texto.trim(), autor_id: autorId ?? null, autor_nome: autorNome ?? null, data: new Date().toISOString() }
+      const { error } = await supabase.from('sgi_acoes').update({ comentarios: [...lista, novo], updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_obj_contexto'] }) },
+  })
+}
 
 // ── Análise / Identificação de Causa (Ishikawa + 5 Porquês) ───────────────────
 export function useAnaliseCausa(registroId?: string) {
