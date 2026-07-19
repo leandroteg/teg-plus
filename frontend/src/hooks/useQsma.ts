@@ -315,6 +315,12 @@ export function useEnviarOcorrenciaSgi() {
       const o = p.ocorrencia
       const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_registro')
       const tipoSgi = o.tipo === 'quase_acidente' ? 'quase_acidente' : 'desvio'
+      const riia = o.riia as {
+        cinco_porques?: { p1?: string; p2?: string; p3?: string; p4?: string; p5?: string; causa_raiz?: string }
+        ishikawa?: Record<string, string[]>
+        acoes?: Array<{ causa_raiz?: string; acao?: string; responsavel?: string; prazo?: string }>
+      } | null | undefined
+      const temAnalise = !!(riia?.cinco_porques || riia?.ishikawa || riia?.acoes?.length)
       const { data, error } = await supabase.from('sgi_registros').insert({
         codigo: codigo ?? null,
         tipo: tipoSgi,
@@ -324,8 +330,8 @@ export function useEnviarOcorrenciaSgi() {
         area_processo: 'QSMA',
         titulo: `[${o.codigo ?? 'OCO'}] ${o.descricao.slice(0, 120)}`,
         descricao: `Ocorrência QSMA ${o.codigo ?? ''} — ${o.descricao}${o.local_descricao ? `\nLocal: ${o.local_descricao}` : ''}${p.obraNome ? `\nObra: ${p.obraNome}` : ''}`,
-        status_pdca: 'pendente',
-        classificacao: 'pendente',
+        status_pdca: temAnalise ? 'analise_causa' : 'pendente',
+        classificacao: temAnalise ? 'nc' : 'pendente',
         criado_por_nome: p.criado_por_nome ?? null,
       }).select('id, codigo').single()
       if (error) throw error
@@ -334,8 +340,23 @@ export function useEnviarOcorrenciaSgi() {
         .update({ sgi_registro_id: reg.id, status: 'investigacao', updated_at: new Date().toISOString() })
         .eq('id', o.id)
       if (e2) throw e2
-      // pré-preenche a Melhoria Contínua com o plano de ação gerado pelo SuperTEG (se houver)
-      const acoes = (o.riia as { acoes?: Array<{ causa_raiz?: string; acao?: string; responsavel?: string; prazo?: string }> } | null | undefined)?.acoes
+      // pré-preenche a Análise de Causa (5 Porquês + Ishikawa 6M) a partir do SuperTEG
+      if (riia?.cinco_porques || riia?.ishikawa) {
+        const cp = riia.cinco_porques ?? {}
+        const ish = riia.ishikawa ?? {}
+        const arr = (k: string) => (Array.isArray(ish[k]) ? ish[k] : [])
+        await supabase.from('sgi_analise_causa').insert({
+          registro_id: reg.id,
+          metodo: '5porques',
+          conteudo: {
+            porques: [cp.p1, cp.p2, cp.p3, cp.p4, cp.p5].map(x => (x ?? '').trim()),
+            ishikawa: { metodo: arr('metodo'), maquina: arr('maquina'), mao_obra: arr('mao_de_obra'), material: arr('material'), medicao: arr('medicao'), meio_ambiente: arr('meio_ambiente') },
+          },
+          causa_raiz: cp.causa_raiz?.trim() || null,
+        })
+      }
+      // pré-preenche o Plano de Ação (por REGISTRO — origem_tipo:'registro', origem_id:reg.id)
+      const acoes = riia?.acoes
       if (Array.isArray(acoes) && acoes.length) {
         const hoje = Date.now()
         const rows = acoes.filter(a => a?.acao).map(a => {
@@ -343,7 +364,7 @@ export function useEnviarOcorrenciaSgi() {
           const prazo = m ? new Date(hoje + Number(m[1]) * 864e5).toISOString().slice(0, 10) : null
           const desc = [a.causa_raiz ? `Causa raiz: ${a.causa_raiz}` : '', a.responsavel ? `Responsável sugerido: ${a.responsavel}` : ''].filter(Boolean).join('\n')
           return {
-            origem_tipo: 'qsma_ocorrencia', origem_id: o.id,
+            origem_tipo: 'registro', origem_id: reg.id,
             titulo: String(a.acao).slice(0, 200), descricao: desc || null,
             prazo, status: 'aberta', criado_por_nome: p.criado_por_nome ?? null,
           }
@@ -356,6 +377,7 @@ export function useEnviarOcorrenciaSgi() {
       qc.invalidateQueries({ queryKey: ['qsma_ocorrencias'] })
       qc.invalidateQueries({ queryKey: ['sgi_registros'] })
       qc.invalidateQueries({ queryKey: ['sgi_acoes'] })
+      qc.invalidateQueries({ queryKey: ['sgi_analise_causa'] })
       qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
     },
   })
