@@ -1,8 +1,17 @@
-import { useState, useMemo } from 'react'
-import { X, Download, ChevronRight, FolderKanban, FileText } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { X, Download, ChevronRight, FolderKanban, FileText, Save } from 'lucide-react'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, type EAPPolo, type EAPPacote } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
 import { gerarStatusReportProjetoPdf } from '../../utils/status-report-projeto-pdf'
+
+// Conteúdo serializável do relatório (live ou snapshot)
+interface ReportData {
+  projeto: string; nObras: number; nOscs: number
+  pctFis: number; pctFin: number; contratado: number; faturado: number; saldo: number
+  pacotes: EAPPacote[]
+  medicao: { pac: string; meses: number[]; total: number }[]
+  obras: { nome: string; status: string | null; diagnostico: string | null; farol: string | null; acoes: ObraStatusAcao[] | null }[]
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmtM = (v: number) => v >= 1e6 ? `R$ ${(v / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M` : `R$ ${Math.round(v / 1e3)}k`
@@ -56,6 +65,10 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
   const { data: secao = [] } = useMedicaoSecao()
   const { data: obraStatus = [] } = useObraStatus()
   const [det, setDet] = useState<EAPPolo | null>(null)
+  const [snapId, setSnapId] = useState<string>('live')
+  const { data: snaps = [] } = useProjetoSnapshots(det?.id)
+  const salvar = useSalvarProjetoSnapshot()
+  useEffect(() => { setSnapId('live') }, [det])
 
   // Só OSC de CONSTRUÇÃO NÃO CONCLUÍDA (tipo=construção e saldo>0)
   const excludedOscs = useMemo(() => {
@@ -134,6 +147,16 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
         const p = det
         const med = medicaoTabela(p)
         const obras = obrasDoProjeto(p)
+        const live: ReportData = {
+          projeto: p.label, nObras: p.obras.length, nOscs: p.nOscs,
+          pctFis: p.pctFis, pctFin: p.pctFin, contratado: p.contr, faturado: p.fat, saldo: p.saldo,
+          pacotes: p.pacotes,
+          medicao: med.map(m => ({ pac: m.pac, meses: MESES.map(mm => m.row[mm] ?? 0), total: m.total })),
+          obras: obras.map(o => ({ nome: o.nome, status: o.st?.status_texto ?? null, diagnostico: o.st?.diagnostico ?? null, farol: o.st?.farol ?? null, acoes: o.st?.acoes ?? null })),
+        }
+        const data: ReportData = snapId === 'live' ? live : ((snaps.find(s => s.id === snapId)?.payload as ReportData) ?? live)
+        const colTot = (i: number) => data.medicao.reduce((s, m) => s + (m.meses[i] ?? 0), 0)
+        const isLive = snapId === 'live'
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setDet(null)}>
             <div className={`rounded-2xl shadow-2xl w-full max-w-3xl my-6 ${isLight ? 'bg-white' : 'bg-[#0f172a]'}`} onClick={e => e.stopPropagation()}>
@@ -141,33 +164,42 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
               <div className={`px-5 py-4 border-b flex items-start justify-between gap-2 sticky top-0 z-10 rounded-t-2xl ${isLight ? 'border-slate-100 bg-white' : 'border-white/[0.06] bg-[#0f172a]'}`}>
                 <div>
                   <p className={`text-[10px] font-bold uppercase tracking-wider ${muted}`}>Status Report · Projeto</p>
-                  <h3 className={`text-lg font-extrabold ${txt}`}>{p.label}</h3>
-                  <p className={`text-xs ${muted}`}>{p.obras.length} obras · {p.nOscs} OSCs · Físico {p.pctFis}% · Financeiro {p.pctFin}%</p>
+                  <h3 className={`text-lg font-extrabold ${txt}`}>{data.projeto}</h3>
+                  <p className={`text-xs ${muted}`}>{data.nObras} obras · {data.nOscs} OSCs · Físico {data.pctFis}% · Financeiro {data.pctFin}%</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <select value={snapId} onChange={e => setSnapId(e.target.value)}
+                    className={`text-xs rounded-lg border px-2 py-1.5 outline-none ${isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.05] border-white/10 text-slate-300'}`}>
+                    <option value="live">Ao vivo</option>
+                    {snaps.map(s => <option key={s.id} value={s.id}>{new Date(s.data_report + 'T00:00:00').toLocaleDateString('pt-BR')}</option>)}
+                  </select>
+                  {isLive && (
+                    <button onClick={() => salvar.mutate({ projetoId: p.id, portfolioId: portfolioId ?? undefined, dataReport: new Date().toISOString().slice(0, 10), payload: live, geradoPor: 'SuperTEG' })}
+                      disabled={salvar.isPending} title="Salvar snapshot deste relatório"
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${isLight ? 'border border-slate-200 text-slate-600 hover:bg-slate-50' : 'border border-white/10 text-slate-300 hover:bg-white/[0.06]'}`}><Save size={13} /> {salvar.isPending ? 'Salvando…' : 'Salvar'}</button>
+                  )}
                   <button onClick={() => gerarStatusReportProjetoPdf({
-                    projeto: p.label, nObras: p.obras.length, nOscs: p.nOscs, pctFis: p.pctFis, pctFin: p.pctFin,
-                    contratado: p.contr, faturado: p.fat, saldo: p.saldo,
-                    pacotes: p.pacotes.map(pc => ({ n: pc.n, pctFis: pc.pctFis, pctFin: pc.pctFin, qtdContr: pc.qtdContr, qtdReal: pc.qtdReal, unidade: pc.unidade, valor: pc.valor })),
-                    medicao: med.map(m => ({ pac: m.pac, meses: MESES.map(mm => m.row[mm] ?? 0), total: m.total })),
-                    meses: MESES.map(m => MES_LBL[m]),
-                    obras: obras.map(o => ({ nome: o.nome, status: o.st?.status_texto ?? null, diagnostico: o.st?.diagnostico ?? null, farol: o.st?.farol ?? null, acoes: o.st?.acoes ?? null })),
+                    projeto: data.projeto, nObras: data.nObras, nOscs: data.nOscs, pctFis: data.pctFis, pctFin: data.pctFin,
+                    contratado: data.contratado, faturado: data.faturado, saldo: data.saldo,
+                    pacotes: data.pacotes.map(pc => ({ n: pc.n, pctFis: pc.pctFis, pctFin: pc.pctFin, qtdContr: pc.qtdContr, qtdReal: pc.qtdReal, unidade: pc.unidade, valor: pc.valor })),
+                    medicao: data.medicao, meses: MESES.map(m => MES_LBL[m]), obras: data.obras,
                   })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> PDF</button>
                   <button onClick={() => setDet(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
                 </div>
               </div>
 
               <div className="p-5 space-y-5">
+                {!isLive && <p className={`text-[11px] italic ${muted}`}>Visualizando snapshot de {new Date((snaps.find(s => s.id === snapId)?.data_report ?? '') + 'T00:00:00').toLocaleDateString('pt-BR')} (congelado). Selecione "Ao vivo" para os dados atuais.</p>}
                 {/* EAP por pacote */}
                 <div>
                   <h4 className={`text-sm font-bold mb-2 flex items-center gap-1.5 ${txt}`}><FileText size={14} className="text-teal-500" /> EAP do projeto (por pacote)</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {p.pacotes.map(pc => <PacoteBar key={pc.n} pac={pc} isLight={isLight} />)}
+                    {data.pacotes.map(pc => <PacoteBar key={pc.n} pac={pc} isLight={isLight} />)}
                   </div>
                 </div>
 
                 {/* Medição mês a mês */}
-                {med.length > 0 && (
+                {data.medicao.length > 0 && (
                   <div>
                     <h4 className={`text-sm font-bold mb-2 ${txt}`}>Medição mês a mês (por pacote)</h4>
                     <div className="overflow-x-auto">
@@ -180,17 +212,17 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {med.map(m => (
+                          {data.medicao.map(m => (
                             <tr key={m.pac} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
                               <td className={`py-1.5 pr-2 font-medium ${txt}`}>{m.pac}</td>
-                              {MESES.map(mm => <td key={mm} className={`text-right py-1.5 px-1.5 tabular-nums ${(m.row[mm] ?? 0) > 0 ? txt : muted}`}>{(m.row[mm] ?? 0) > 0 ? fmtM(m.row[mm]) : '·'}</td>)}
+                              {MESES.map((mm, i) => <td key={mm} className={`text-right py-1.5 px-1.5 tabular-nums ${(m.meses[i] ?? 0) > 0 ? txt : muted}`}>{(m.meses[i] ?? 0) > 0 ? fmtM(m.meses[i]) : '·'}</td>)}
                               <td className={`text-right py-1.5 pl-2 font-bold tabular-nums ${txt}`}>{fmtM(m.total)}</td>
                             </tr>
                           ))}
                           <tr className={`border-t-2 ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
                             <td className={`py-1.5 pr-2 font-bold ${txt}`}>Total</td>
-                            {MESES.map(mm => <td key={mm} className={`text-right py-1.5 px-1.5 font-bold tabular-nums ${txt}`}>{fmtM(med.reduce((s, m) => s + (m.row[mm] ?? 0), 0))}</td>)}
-                            <td className={`text-right py-1.5 pl-2 font-bold tabular-nums ${txt}`}>{fmtM(med.reduce((s, m) => s + m.total, 0))}</td>
+                            {MESES.map((mm, i) => <td key={mm} className={`text-right py-1.5 px-1.5 font-bold tabular-nums ${txt}`}>{fmtM(colTot(i))}</td>)}
+                            <td className={`text-right py-1.5 pl-2 font-bold tabular-nums ${txt}`}>{fmtM(data.medicao.reduce((s, m) => s + m.total, 0))}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -199,20 +231,20 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                 )}
 
                 {/* Detalhe por obra */}
-                {obras.length > 0 && (
+                {data.obras.length > 0 && (
                   <div>
-                    <h4 className={`text-sm font-bold mb-2 ${txt}`}>Obras críticas ({obras.length})</h4>
+                    <h4 className={`text-sm font-bold mb-2 ${txt}`}>Obras críticas ({data.obras.length})</h4>
                     <div className="space-y-2.5">
-                      {obras.map(o => (
+                      {data.obras.map(o => (
                         <div key={o.nome} className={`rounded-xl border p-3 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`w-2 h-2 rounded-full ${farolDot(o.st?.farol)}`} />
+                            <span className={`w-2 h-2 rounded-full ${farolDot(o.farol)}`} />
                             <p className={`text-xs font-bold ${txt}`}>{o.nome}</p>
                           </div>
-                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{o.st?.diagnostico ?? o.st?.status_texto}</p>
-                          {o.st?.acoes && o.st.acoes.length > 0 && (
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{o.diagnostico ?? o.status}</p>
+                          {o.acoes && o.acoes.length > 0 && (
                             <div className="mt-2 space-y-1">
-                              {o.st.acoes.map((a, i) => (
+                              {o.acoes.map((a, i) => (
                                 <p key={i} className={`text-[11px] ${muted}`}>• {a.acao} <span className="opacity-70">— {a.dono ?? '—'}{a.prazo ? ` · ${a.prazo}` : ''}</span></p>
                               ))}
                             </div>
