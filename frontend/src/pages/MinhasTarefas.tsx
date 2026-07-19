@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, CheckSquare, Zap, ChevronRight, ShoppingCart, Wallet, Building2,
   Package, FileText, Receipt, Truck, Clock, AlertCircle, Filter, Target, X, CheckCircle2, Circle, Loader2,
+  MessageSquare, Send,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { useMinhasTarefas, type Tarefa, type ModuloTarefa } from '../hooks/useMinhasTarefas'
-import { useSgiObjetivoContexto, useAtualizarAcao } from '../hooks/useSgi'
-import { FAROL_CFG, STATUS_ACAO_LABEL } from '../types/sgi'
+import { useSgiObjetivoContexto, useAtualizarAcao, useComentarAcao } from '../hooks/useSgi'
+import { FAROL_CFG, STATUS_ACAO_LABEL, type SgiAcao } from '../types/sgi'
 
 // ── Config ──────────────────────────────────────────────────────────────────────
 
@@ -253,7 +255,7 @@ function TarefaSgiModal({ metaId, focoAcaoId, isDark, onClose }: {
   metaId: string; focoAcaoId: string; isDark: boolean; onClose: () => void
 }) {
   const { data, isLoading } = useSgiObjetivoContexto(metaId)
-  const atualizar = useAtualizarAcao()
+  const { perfil } = useAuth()
   const panel = isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-800'
   const muted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -292,29 +294,77 @@ function TarefaSgiModal({ metaId, focoAcaoId, isDark, onClose }: {
                 </div>
                 <div className="space-y-1.5 pl-4">
                   {acoesKr.length === 0 && <p className={`text-[11px] ${muted}`}>Nenhuma ação planejada.</p>}
-                  {acoesKr.map(a => {
-                    const sa = STATUS_ACAO_LABEL[a.status]
-                    const done = a.status === 'concluida'
-                    const isClicked = a.id === focoAcaoId
-                    return (
-                      <div key={a.id} className={`flex items-center gap-2 rounded-lg p-2 ${isClicked ? (isDark ? 'bg-violet-500/10' : 'bg-violet-50') : (isDark ? 'bg-white/[0.03]' : 'bg-white')}`}>
-                        <button onClick={() => atualizar.mutate({ id: a.id, status: done ? 'aberta' : 'concluida', concluida_em: done ? null : new Date().toISOString() })} className="shrink-0">
-                          {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} className="text-slate-400" />}
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-xs font-medium ${done ? 'line-through ' + muted : txt}`}>{a.titulo}</p>
-                          {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmt(a.prazo)}</p>}
-                        </div>
-                        <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
-                      </div>
-                    )
-                  })}
+                  {acoesKr.map(a => (
+                    <AcaoRow key={a.id} acao={a} isMine={a.responsavel_id === perfil?.id} isClicked={a.id === focoAcaoId}
+                      isDark={isDark} meuNome={perfil?.nome ?? null} meuId={perfil?.id ?? null} />
+                  ))}
                 </div>
               </div>
             )
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Linha de ação no modal: concluir (só o dono) + comentários ────────────────────
+function AcaoRow({ acao: a, isMine, isClicked, isDark, meuNome, meuId }: {
+  acao: SgiAcao; isMine: boolean; isClicked: boolean; isDark: boolean; meuNome: string | null; meuId: string | null
+}) {
+  const atualizar = useAtualizarAcao()
+  const comentar = useComentarAcao()
+  const [aberto, setAberto] = useState(false)
+  const [texto, setTexto] = useState('')
+  const sa = STATUS_ACAO_LABEL[a.status]
+  const done = a.status === 'concluida'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const muted = isDark ? 'text-slate-500' : 'text-slate-400'
+  const coms = (a.comentarios ?? [])
+  const fmt = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
+  const fmtDT = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const enviar = async () => {
+    if (!texto.trim()) return
+    await comentar.mutateAsync({ id: a.id, texto, autorId: meuId, autorNome: meuNome })
+    setTexto('')
+  }
+  return (
+    <div className={`rounded-lg p-2 ${isClicked ? (isDark ? 'bg-violet-500/10' : 'bg-violet-50') : (isDark ? 'bg-white/[0.03]' : 'bg-white')}`}>
+      <div className="flex items-center gap-2">
+        <button onClick={() => isMine && atualizar.mutate({ id: a.id, status: done ? 'aberta' : 'concluida', concluida_em: done ? null : new Date().toISOString() })}
+          disabled={!isMine} title={isMine ? (done ? 'Reabrir' : 'Concluir') : 'Só o responsável conclui'} className={`shrink-0 ${isMine ? '' : 'cursor-default opacity-70'}`}>
+          {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} className={isMine ? 'text-slate-400' : 'text-slate-300'} />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className={`text-xs font-medium ${done ? 'line-through ' + muted : txt}`}>{a.titulo}</p>
+          {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmt(a.prazo)}</p>}
+        </div>
+        <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
+        <button onClick={() => setAberto(v => !v)} title="Comentários" className={`shrink-0 inline-flex items-center gap-0.5 p-1 rounded-md ${muted} hover:text-violet-500 hover:bg-violet-500/10`}>
+          <MessageSquare size={13} />{coms.length > 0 && <span className="text-[9px] font-bold">{coms.length}</span>}
+        </button>
+      </div>
+      {aberto && (
+        <div className={`mt-2 ml-6 pl-2 border-l ${isDark ? 'border-white/10' : 'border-slate-200'} space-y-1.5`}>
+          {coms.length === 0 && <p className={`text-[10px] italic ${muted}`}>Sem comentários.</p>}
+          {coms.map((c, i) => (
+            <div key={i} className="text-[11px]">
+              <span className={`font-semibold ${txt}`}>{c.autor_nome || 'Alguém'}</span>
+              <span className={`ml-1 text-[9px] ${muted}`}>{fmtDT(c.data)}</span>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>{c.texto}</p>
+            </div>
+          ))}
+          {isMine && (
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <input value={texto} onChange={e => setTexto(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') enviar() }} placeholder="Adicionar comentário…"
+                className={`flex-1 text-[11px] rounded-md px-2 py-1 border outline-none ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`} />
+              <button onClick={enviar} disabled={comentar.isPending || !texto.trim()} className="shrink-0 p-1 rounded-md bg-violet-600 text-white disabled:opacity-40">
+                {comentar.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
