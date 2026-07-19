@@ -17,7 +17,7 @@ import ControladoriaFlow, { type FlowStep } from '../../components/Controladoria
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
-  uploadEvidencia, evidenciaUrl, relatorioLinkPublico, type ItemFichaEpi,
+  uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
@@ -71,13 +71,25 @@ const STEPS: FlowStep[] = [
 
 const KANBAN: StatusOcorrencia[] = ['registro', 'investigacao', 'acao', 'encerrada']
 
-// abre o relatório RIIA no link público (renderiza como página, compartilhável)
-function abrirRelatorio(relUrl?: string | null) {
-  const link = relatorioLinkPublico(relUrl)
-  if (link) window.open(link, '_blank')
+// abre o relatório RIIA renderizado (storage/edge servem text/plain → blob text/html)
+async function abrirRelatorio(relUrl?: string | null) {
+  const url = await evidenciaUrl(relUrl)
+  if (!url) return
+  try {
+    const html = await (await fetch(url)).text()
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    window.open(URL.createObjectURL(blob), '_blank')
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+// link compartilhável: rota pública do ERP que renderiza o relatório (iframe srcdoc)
+function linkCompartilhavel(relUrl?: string | null): string | null {
+  if (!relUrl) return null
+  return `${window.location.origin}/relatorio?p=${encodeURIComponent(relUrl)}`
 }
 async function copiarLinkRelatorio(relUrl?: string | null): Promise<boolean> {
-  const link = relatorioLinkPublico(relUrl)
+  const link = linkCompartilhavel(relUrl)
   if (!link) return false
   try { await navigator.clipboard.writeText(link); return true }
   catch { window.prompt('Copie o link do relatório:', link); return true }
@@ -1738,13 +1750,20 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
     catch (e: any) { setRelIniciado(false); alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
   }
   const [linkCopiado, setLinkCopiado] = useState(false)
-  function abrirRelatorio() {
-    const link = relatorioLinkPublico(relUrl)
-    if (link) window.open(link, '_blank')
+  async function abrirRelatorio() {
+    const url = await evidenciaUrl(relUrl)
+    if (!url) return
+    try {
+      const html = await (await fetch(url)).text()
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch {
+      window.open(url, '_blank')
+    }
   }
   async function copiarLink() {
-    const link = relatorioLinkPublico(relUrl)
-    if (!link) return
+    if (!relUrl) return
+    const link = `${window.location.origin}/relatorio?p=${encodeURIComponent(relUrl)}`
     try { await navigator.clipboard.writeText(link) } catch { window.prompt('Copie o link do relatório:', link) }
     setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 1800)
   }
