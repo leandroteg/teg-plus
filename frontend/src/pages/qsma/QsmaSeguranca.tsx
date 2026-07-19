@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, Fragment, type ReactNode } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
@@ -19,7 +19,7 @@ import {
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
-  useAcoesQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
+  useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
@@ -31,7 +31,7 @@ import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/q
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
 import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
-import { useObrasComProjeto } from '../../hooks/useObras'
+import { useObrasComProjeto, useColaboradoresAtivos } from '../../hooks/useObras'
 import { useBases } from '../../hooks/useEstoque'
 import type {
   QsmaRisco, QsmaEpi, QsmaEpiFicha, QsmaTreinamento, QsmaOcorrencia,
@@ -103,6 +103,23 @@ export default function QsmaSeguranca() {
   const { data: treinamentos = [] } = useTreinamentos()
   const { data: ocorrencias = [] } = useOcorrencias()
   const { data: acoes = [] } = useAcoesQsma()
+  const registroIds = useMemo(() => Array.from(new Set(ocorrencias.map(o => o.sgi_registro_id).filter(Boolean) as string[])), [ocorrencias])
+  const { data: acoesReg = [] } = useAcoesDosRegistros(registroIds)
+  const { data: colaboradores = [] } = useColaboradoresAtivos()
+  const toggleAcao = useToggleAcaoQsma()
+  const colabMap = useMemo(() => new Map(colaboradores.map(c => [c.id, c.nome])), [colaboradores])
+  const [ocoExpandida, setOcoExpandida] = useState<Set<string>>(new Set())
+  const toggleExpandir = (id: string) => setOcoExpandida(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // ações do plano de uma ocorrência: diretas (qsma) + do registro em tratamento (sgi)
+  const acoesDaOco = (o: { id: string; sgi_registro_id?: string | null }) => [
+    ...acoes.filter(a => a.origem_id === o.id),
+    ...(o.sgi_registro_id ? acoesReg.filter(a => a.origem_id === o.sgi_registro_id) : []),
+  ]
+  const respAcao = (a: { responsavel_id?: string; descricao?: string }) => {
+    if (a.responsavel_id && colabMap.get(a.responsavel_id)) return colabMap.get(a.responsavel_id)!
+    const m = String(a.descricao ?? '').match(/respons[aá]vel(?:\s+sugerido)?:\s*([^\n]+)/i)
+    return m ? m[1].trim() : null
+  }
   const { data: obras = [] } = useObrasComProjeto()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
   // data no formato da planilha/pastas do OneDrive: DD.MM.AAAA
@@ -406,22 +423,56 @@ export default function QsmaSeguranca() {
                     <div className="space-y-2">
                       {itens.map(o => {
                         const g = GRAVIDADE_LABEL[o.gravidade]
-                        const nAcoes = acoes.filter(a => a.origem_id === o.id).length
+                        const acs = acoesDaOco(o)
+                        const exp = ocoExpandida.has(o.id)
                         return (
-                          <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left rounded-xl border p-2.5 transition-all ${
-                            isDark ? 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.07]' : 'bg-white border-slate-200 hover:shadow-md'
+                          <div key={o.id} className={`rounded-xl border transition-all ${
+                            isDark ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-white border-slate-200'
                           }`}>
-                            <div className="flex items-center justify-between gap-1 mb-1">
-                              <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                            <div onClick={() => toggleExpandir(o.id)} className={`p-2.5 cursor-pointer rounded-xl transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className="flex items-center gap-1 min-w-0">
+                                  {exp ? <ChevronDown size={13} className={txtMuted} /> : <ChevronRight size={13} className={txtMuted} />}
+                                  <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
+                                </span>
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                                  <button onClick={e => { e.stopPropagation(); setModalOcorrencia(o) }} title="Abrir ocorrência"
+                                    className={`p-1 rounded-md ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}><ExternalLink size={12} /></button>
+                                </span>
+                              </div>
+                              <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
+                              <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
+                              <p className={`text-[9px] mt-1 ${txtMuted}`}>
+                                {TIPO_OCORRENCIA_LABEL[o.tipo]}
+                                {acs.length > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{acs.length} ação(ões)</span>}
+                              </p>
                             </div>
-                            <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
-                            <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
-                            <p className={`text-[9px] mt-1 ${txtMuted}`}>
-                              {TIPO_OCORRENCIA_LABEL[o.tipo]}
-                              {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{nAcoes} ação(ões)</span>}
-                            </p>
-                          </button>
+                            {exp && (
+                              <div className={`px-2.5 pb-2.5 pt-1 space-y-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                                {acs.length === 0 ? (
+                                  <p className={`text-[10px] italic pt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma ação no plano ainda.</p>
+                                ) : acs.map(a => {
+                                  const done = a.status === 'concluida'
+                                  const resp = respAcao(a)
+                                  return (
+                                    <div key={a.id} className="flex items-start gap-2">
+                                      <button onClick={() => toggleAcao.mutate({ id: a.id, concluida: !done })} title={done ? 'Marcar como pendente' : 'Marcar como concluída'} className="shrink-0 mt-0.5">
+                                        {done ? <CheckCircle2 size={15} className="text-emerald-500" /> : <Circle size={15} className={isDark ? 'text-slate-500' : 'text-slate-300'} />}
+                                      </button>
+                                      <div className="min-w-0 flex-1">
+                                        <p className={`text-[10px] leading-snug ${done ? 'line-through ' + (isDark ? 'text-slate-500' : 'text-slate-400') : txtMain}`}>{a.titulo}</p>
+                                        <p className={`text-[9px] mt-0.5 flex items-center gap-2 flex-wrap ${txtMuted}`}>
+                                          {resp && <span className="inline-flex items-center gap-0.5"><User size={8} />{resp}</span>}
+                                          {a.prazo && <span className="inline-flex items-center gap-0.5"><Timer size={8} />{fmtDataPlanilha(a.prazo)}</span>}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
                         )
                       })}
                       {itens.length === 0 && <p className={`text-[10px] italic ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>—</p>}
