@@ -64,12 +64,15 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   const DARK = [30, 41, 59] as const, MID = [100, 116, 139] as const, RED = [220, 38, 38] as const
   const GREEN = [5, 150, 105] as const, AMBER = [217, 119, 6] as const
   const check = (n = 10) => { if (y + n > 282) { doc.addPage(); y = M } }
+  // mantém um item inteiro junto: se não couber na página e couber em UMA página, joga p/ a próxima
+  const PAGE_USABLE = 282 - M
+  const keepTogether = (h: number) => { if (h <= PAGE_USABLE && y + h > 282) { doc.addPage(); y = M } }
 
   // Cabeçalho de capítulo numerado (faixa escura)
   let chap = 0
   const chapter = (t: string) => {
     chap++
-    check(14)
+    check(20) // evita cabeçalho de capítulo órfão no rodapé
     doc.setFillColor(...DARK); doc.roundedRect(M, y - 4.5, CW, 8, 1.6, 1.6, 'F')
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255, 255, 255)
     doc.text(`${chap}.  ${t}`, M + 3.5, y + 0.8)
@@ -128,13 +131,14 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   chapter('OBRAS E OSCs DO PROJETO')
   if (d.obrasLista.length) {
     d.obrasLista.forEach(ob => {
-      check(8)
+      doc.setFontSize(7.5)
+      const ot = doc.splitTextToSize(ob.oscs.length ? `OSCs: ${ob.oscs.join('  ·  ')}` : 'sem OSC vinculada', CW - 8)
+      keepTogether(4 + ot.length * 3.8 + 3)
       doc.setFillColor(...DARK); doc.circle(M + 1.6, y - 1, 1.1, 'F')
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK); doc.text(ob.nome, M + 5, y)
       y += 4
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MID)
-      const ot = doc.splitTextToSize(ob.oscs.length ? `OSCs: ${ob.oscs.join('  ·  ')}` : 'sem OSC vinculada', CW - 8)
-      check(ot.length * 3.8 + 2); doc.text(ot, M + 5, y); y += ot.length * 3.8 + 3
+      doc.text(ot, M + 5, y); y += ot.length * 3.8 + 3
     })
   } else para('Sem obras de construção em aberto neste projeto.')
   y += 2
@@ -168,31 +172,37 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
 
   // ── 3. Prazo ──────────────────────────────────────────────────────────────
   chapter('PRAZO — CRONOGRAMA E PROJEÇÃO DE TÉRMINO')
-  const pp = d.prazo?.pctPrazoProj ?? null
-  if (pp != null) {
-    const delta = d.pctFis - pp
-    para(`Prazo consumido ${pp}% × físico ${d.pctFis}% → ${delta >= 0 ? `${delta} p.p. adiantado` : `${Math.abs(delta)} p.p. atrasado`}. Término previsto: ${fmtD(d.prazo.terminoPrev)}.`, 8.5, DARK)
-  } else para(`Físico ${d.pctFis}% × financeiro ${d.pctFin}%.`)
-  if (d.prazo?.obras?.length) {
-    check(8)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MID)
-    doc.text('Obra', M, y); doc.text('Vencimento', W - M - 40, y, { align: 'right' }); doc.text('Prazo consumido', W - M, y, { align: 'right' }); y += 4
-    d.prazo.obras.forEach(o => {
-      check(5.5)
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK)
-      doc.text(o.nome.slice(0, 46), M, y)
-      doc.text(fmtD(o.venc), W - M - 40, y, { align: 'right' })
-      const pc = o.pctPrazo
-      const pcCol: readonly [number, number, number] = pc == null ? MID : pc >= 90 ? RED : pc >= 70 ? AMBER : DARK
-      doc.setTextColor(...pcCol)
-      doc.text(pc == null ? '—' : `${pc}%`, W - M, y, { align: 'right' }); y += 4.5
-    })
-    y += 2
+  const diasLbl = (venc: string | null): { txt: string; n: number | null } => {
+    if (!venc) return { txt: '-', n: null }
+    const n = Math.round((Date.now() - new Date(venc + 'T00:00:00').getTime()) / 86400000)
+    if (n > 0) return { txt: `${n} dias de atraso`, n }
+    if (n < 0) return { txt: `faltam ${-n} dias`, n }
+    return { txt: 'vence hoje', n: 0 }
+  }
+  if (d.prazo?.terminoPrev || d.prazo?.obras?.length) {
+    const pj = diasLbl(d.prazo?.terminoPrev ?? null)
+    para(`Término previsto (vencimento da última OSC de construção): ${fmtD(d.prazo?.terminoPrev ?? null)}${pj.n != null ? ` — ${pj.txt}` : ''}. Físico atual ${d.pctFis}%.`, 8.5, DARK)
+    if (d.prazo?.obras?.length) {
+      const cVenc = W - M - 52
+      check(6)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MID)
+      doc.text('Obra', M, y); doc.text('Vencimento', cVenc, y, { align: 'right' }); doc.text('Desvio de prazo', W - M, y, { align: 'right' }); y += 4
+      d.prazo.obras.forEach(o => {
+        check(5.5)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK)
+        doc.text(o.nome.slice(0, 42), M, y)
+        doc.text(fmtD(o.venc), cVenc, y, { align: 'right' })
+        const dl = diasLbl(o.venc)
+        const dlCol: readonly [number, number, number] = dl.n == null ? MID : dl.n > 0 ? RED : GREEN
+        doc.setTextColor(...dlCol)
+        doc.text(dl.txt, W - M, y, { align: 'right' }); y += 4.5
+      })
+      y += 2
+    }
   } else naDisp('datas de OSC/vencimento não lançadas para as obras do projeto.')
 
   // ── 4. Produção e ritmo ───────────────────────────────────────────────────
   chapter('PRODUÇÃO E RITMO — MEDIÇÃO MÊS A MÊS')
-  para('Atenção ao lag de medição: a produção de campo do mês N só é MEDIDA e faturada em N+1. R$ 0 no mês corrente não significa obra parada — pode ser trabalho ainda não lançado.', 8, MID)
   if (d.medicao.length) {
     const nCol = d.meses.length
     const cLbl = 46, cTot = 20, cMes = (CW - cLbl - cTot) / nCol
@@ -222,7 +232,7 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   if (d.custos) {
     const pctC = d.custos.orcado > 0 ? Math.round(d.custos.realizado / d.custos.orcado * 100) : 0
     const margem = d.faturado - d.custos.realizado
-    para(`Custo realizado R$ ${fmtM(d.custos.realizado)} de R$ ${fmtM(d.custos.orcado)} orçado (${pctC}% do orçado) · margem parcial (faturado − custo) R$ ${fmtM(margem)}. Custo consolidado por frente; margem por obra não disponível no período.`, 8, MID)
+    para(`Custo realizado R$ ${fmtM(d.custos.realizado)} de R$ ${fmtM(d.custos.orcado)} orçado (${pctC}% do orçado) · margem parcial (faturado - custo) R$ ${fmtM(margem)}. Custo consolidado por frente; margem por obra não disponível no período.`, 8, MID)
   } else naDisp('custo realizado do projeto não consolidado no período (margem por obra indisponível).')
 
   // ── 6. Recursos e equipe ──────────────────────────────────────────────────
@@ -239,8 +249,9 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   if (d.riscos.length) {
     para(`${d.riscos.length} risco(s) ativo(s) — mais severos primeiro:`, 8.5, DARK)
     d.riscos.forEach(r => {
+      doc.setFontSize(8)
       const t = doc.splitTextToSize(r.descricao, CW - 30)
-      check(t.length * 4 + 3)
+      keepTogether(t.length * 4 + 3)
       const sc = sevRGB(r.sev)
       doc.setFillColor(...sc); doc.circle(M + 1.6, y - 1, 1.2, 'F')
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK); doc.text(t, M + 5, y)
@@ -264,16 +275,21 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   if (d.obras.length) {
     const farolRGB: Record<string, readonly [number, number, number]> = { vermelho: RED, amarelo: AMBER, verde: GREEN, cinza: MID }
     d.obras.forEach(o => {
-      check(20)
+      // pré-mede o item inteiro (título + diagnóstico + ações) p/ não quebrar no meio
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5)
+      const diag = doc.splitTextToSize(o.diagnostico ?? o.status ?? '', CW - 2)
+      doc.setFontSize(8)
+      const acoesLines = (o.acoes ?? []).map(a => doc.splitTextToSize(`- ${a.acao}  (${a.dono ?? '-'}${a.prazo ? ` · ${a.prazo}` : ''})`, CW - 4))
+      const itemH = 4.5 + diag.length * 4.5 + 1 + acoesLines.reduce((s, t) => s + t.length * 4, 0) + 4
+      keepTogether(itemH)
       const fc = farolRGB[o.farol ?? 'cinza'] ?? MID
       doc.setFillColor(...fc); doc.circle(M + 1.4, y - 1, 1.3, 'F')
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...DARK); doc.text(o.nome, M + 5, y); y += 4.5
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...MID)
-      const diag = doc.splitTextToSize(o.diagnostico ?? o.status ?? '', CW - 2)
-      check(diag.length * 4.5 + 6); doc.text(diag, M + 2, y); y += diag.length * 4.5 + 1
-      ;(o.acoes ?? []).forEach(a => {
-        const t = doc.splitTextToSize(`• ${a.acao}  — ${a.dono ?? '—'}${a.prazo ? ` · ${a.prazo}` : ''}`, CW - 4)
-        check(t.length * 4 + 2); doc.setFontSize(8); doc.setTextColor(...DARK); doc.text(t, M + 3, y); y += t.length * 4
+      check(diag.length * 4.5 + 2); doc.text(diag, M + 2, y); y += diag.length * 4.5 + 1
+      acoesLines.forEach(t => {
+        check(t.length * 4 + 2); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK)
+        doc.text(t, M + 3, y); y += t.length * 4
       })
       y += 4
     })
