@@ -394,12 +394,13 @@ export function useMedicaoPorOSC(portfolioId?: string) {
 }
 
 // ── Status descritivo por Obra (gerado pela IA) ───────────────────────────────
-export interface ObraStatusRow { obra_id: string; status_texto: string | null; farol: string | null; gerado_por: string | null; updated_at: string | null }
+export interface ObraStatusAcao { acao: string; dono?: string; prazo?: string }
+export interface ObraStatusRow { obra_id: string; status_texto: string | null; diagnostico: string | null; acoes: ObraStatusAcao[] | null; farol: string | null; gerado_por: string | null; updated_at: string | null }
 export function useObraStatus() {
   return useQuery<ObraStatusRow[]>({
     queryKey: ['pmo-obra-status'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('pmo_obra_status').select('obra_id, status_texto, farol, gerado_por, updated_at')
+      const { data, error } = await supabase.from('pmo_obra_status').select('obra_id, status_texto, diagnostico, acoes, farol, gerado_por, updated_at')
       if (error) return []
       return (data ?? []) as ObraStatusRow[]
     },
