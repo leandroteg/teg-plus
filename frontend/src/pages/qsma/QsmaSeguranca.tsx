@@ -19,7 +19,7 @@ import {
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
-  useAcoesQsma, useEnviarOcorrenciaSgi,
+  useAcoesQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
@@ -29,7 +29,7 @@ import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
-import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send } from 'lucide-react'
+import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send, Sparkles, FileText } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import { useBases } from '../../hooks/useEstoque'
@@ -1574,6 +1574,34 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
   const emTratamento = !!ocorrencia?.sgi_registro_id
   const stAtual = ocorrencia ? STATUS_OCORRENCIA_LABEL[ocorrencia.status] : null
 
+  // Relatório de investigação (SuperTEG)
+  const gerarRel = useGerarRelatorio()
+  const [relIniciado, setRelIniciado] = useState(false)
+  const statusInicial = ocorrencia?.relatorio_status ?? null
+  const pollAtivo = (statusInicial === 'processando') || relIniciado
+  const { data: relLive } = useRelatorioStatus(ocorrencia?.id, pollAtivo)
+  const relStatus = relLive?.relatorio_status ?? statusInicial
+  const relUrl = relLive?.relatorio_url ?? ocorrencia?.relatorio_url ?? null
+  const relProcessando = relStatus === 'processando'
+  async function handleGerarRelatorio() {
+    if (!ocorrencia?.id) return
+    try { setRelIniciado(true); await gerarRel.mutateAsync(ocorrencia.id) }
+    catch (e: any) { setRelIniciado(false); alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
+  }
+  async function abrirRelatorio() {
+    if (!relUrl) return
+    const url = await evidenciaUrl(relUrl)
+    if (!url) return
+    // o storage serve HTML como text/plain (segurança); reabre como blob text/html p/ renderizar
+    try {
+      const html = await (await fetch(url)).text()
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
   const erros: string[] = []
   if (!descricao.trim()) erros.push('descreva a ocorrência')
   if (!obraId) erros.push('selecione a obra')
@@ -1688,6 +1716,38 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
       </div>
 
       <FotosUpload isDark={isDark} pasta={`ocorrencias/${ocorrencia?.id ?? 'nova'}`} paths={fotos} onChange={setFotos} />
+
+      {/* Tratar com o SuperTEG — gera o relatório de investigação ilustrado */}
+      {isEdit && (
+        <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-teal-500/20 bg-teal-500/[0.04]' : 'border-teal-200 bg-teal-50/40'}`}>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
+            <Sparkles size={10} /> Relatório de Investigação — SuperTEG
+          </span>
+          {relProcessando ? (
+            <div className="flex items-center gap-2 text-[11px]">
+              <Loader2 size={14} className="animate-spin text-teal-500 shrink-0" />
+              <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>SuperTEG analisando a ocorrência e montando o relatório… pode levar alguns minutos (pode fechar — ele continua).</span>
+            </div>
+          ) : relStatus === 'pronto' && relUrl ? (
+            <>
+              <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Relatório gerado — revise, ajuste os campos e imprima/salve em PDF.</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={abrirRelatorio} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700"><FileText size={12} /> Ver relatório</button>
+                <button onClick={handleGerarRelatorio} disabled={gerarRel.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Sparkles size={11} /> Refazer</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {relStatus === 'erro' ? 'A geração anterior falhou — tente novamente. ' : ''}O SuperTEG lê os anexos, analisa a causa raiz e monta o relatório de investigação (RIIA ilustrado) no padrão da TEG.
+              </p>
+              <button onClick={handleGerarRelatorio} disabled={gerarRel.isPending} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+                <Sparkles size={11} /> {gerarRel.isPending ? 'Acionando…' : 'Tratar com o SuperTEG'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Tratamento — a execução acontece no módulo Gestão (SGI); aqui só acompanha */}
       {isEdit && (
