@@ -8,7 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import {
   useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin,
   useAtualizarObjetivo, useAtualizarMeta, useRemoverObjetivo, useRemoverMeta,
-  useAcoes, useCriarAcao, useAtualizarAcao, useCriarRegistro,
+  useAcoes, useCriarAcao, useAtualizarAcao, useRemoverAcao, useCriarRegistro,
 } from '../../hooks/useSgi'
 import { FAROL_CFG, STATUS_ACAO_LABEL, STATUS_CHECKIN_CFG, STATUS_REVISAO_CFG } from '../../types/sgi'
 import type { SgiObjetivo, SgiMeta, SgiCheckin, SgiAcao, DirecaoMeta, Farol, StatusCheckinMeta, StatusRevisaoMeta } from '../../types/sgi'
@@ -303,14 +303,26 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
 }) {
   const criarAcao = useCriarAcao()
   const atualizarAcao = useAtualizarAcao()
+  const removerAcao = useRemoverAcao()
   const [nova, setNova] = useState('')
   const [prazo, setPrazo] = useState('')
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editTitulo, setEditTitulo] = useState('')
+  const [editPrazo, setEditPrazo] = useState('')
   const mine = acoes.filter(a => a.origem_tipo === 'meta' && a.origem_id === meta.id)
   const add = async () => {
     if (!nova.trim()) return
     await criarAcao.mutateAsync({ origem_tipo: 'meta', origem_id: meta.id, titulo: nova.trim(), prazo: prazo || undefined, status: 'aberta' })
     setNova(''); setPrazo('')
   }
+  const startEdit = (a: SgiAcao) => { setEditId(a.id); setEditTitulo(a.titulo); setEditPrazo(a.prazo ?? '') }
+  const cancelEdit = () => { setEditId(null); setEditTitulo(''); setEditPrazo('') }
+  const saveEdit = async () => {
+    if (!editId || !editTitulo.trim()) return
+    await atualizarAcao.mutateAsync({ id: editId, titulo: editTitulo.trim(), prazo: editPrazo || null })
+    cancelEdit()
+  }
+  const inputCls = `text-xs rounded-lg px-2 py-1 border outline-none ${isDark ? 'bg-white/[0.06] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`
   return (
     <div className={`rounded-2xl border shadow-sm p-4 ${card}`}>
       <p className={`text-sm font-bold ${txt}`}>{meta.descricao || obj.titulo}</p>
@@ -320,8 +332,18 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
         {mine.map(a => {
           const sa = STATUS_ACAO_LABEL[a.status]
           const done = a.status === 'concluida'
+          if (editId === a.id) {
+            return (
+              <div key={a.id} className={`flex items-center gap-1.5 rounded-lg p-2 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
+                <input autoFocus value={editTitulo} onChange={e => setEditTitulo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }} className={`flex-1 min-w-0 ${inputCls}`} />
+                <input type="date" value={editPrazo ? editPrazo.slice(0, 10) : ''} onChange={e => setEditPrazo(e.target.value)} className={`w-28 ${inputCls}`} />
+                <button onClick={saveEdit} disabled={atualizarAcao.isPending || !editTitulo.trim()} title="Salvar" className="shrink-0 p-1 rounded-md text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-40">{atualizarAcao.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}</button>
+                <button onClick={cancelEdit} title="Cancelar" className="shrink-0 p-1 rounded-md text-slate-400 hover:bg-slate-500/10"><X size={14} /></button>
+              </div>
+            )
+          }
           return (
-            <div key={a.id} className={`flex items-center gap-2 rounded-lg p-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+            <div key={a.id} className={`group flex items-center gap-2 rounded-lg p-2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
               <button onClick={() => atualizarAcao.mutate({ id: a.id, status: done ? 'aberta' : 'concluida', concluida_em: done ? null : new Date().toISOString() })} className="shrink-0">
                 {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} className="text-slate-400" />}
               </button>
@@ -330,6 +352,8 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
                 {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmtDate(a.prazo)}</p>}
               </div>
               <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
+              <button onClick={() => startEdit(a)} title="Editar ação" className={`shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition ${muted} hover:text-violet-500 hover:bg-violet-500/10`}><Pencil size={13} /></button>
+              <button onClick={() => { if (confirm(`Excluir a ação "${a.titulo}"?`)) removerAcao.mutate(a.id) }} title="Excluir ação" className="shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 hover:bg-red-500/10"><Trash2 size={13} /></button>
             </div>
           )
         })}
