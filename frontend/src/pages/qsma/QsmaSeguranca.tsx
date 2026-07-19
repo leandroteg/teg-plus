@@ -17,7 +17,7 @@ import ControladoriaFlow, { type FlowStep } from '../../components/Controladoria
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
-  uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
+  uploadEvidencia, evidenciaUrl, relatorioLinkPublico, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
@@ -29,7 +29,7 @@ import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
-import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText } from 'lucide-react'
+import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText, Link as LinkIcon, Check } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto, useColaboradoresAtivos } from '../../hooks/useObras'
 import { useBases } from '../../hooks/useEstoque'
@@ -71,31 +71,37 @@ const STEPS: FlowStep[] = [
 
 const KANBAN: StatusOcorrencia[] = ['registro', 'investigacao', 'acao', 'encerrada']
 
-// abre o relatório RIIA (storage serve HTML como text/plain → reabre como blob text/html)
-async function abrirRelatorioBlob(relUrl?: string | null) {
-  if (!relUrl) return
-  const url = await evidenciaUrl(relUrl)
-  if (!url) return
-  try {
-    const html = await (await fetch(url)).text()
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-    window.open(URL.createObjectURL(blob), '_blank')
-  } catch {
-    window.open(url, '_blank')
-  }
+// abre o relatório RIIA no link público (renderiza como página, compartilhável)
+function abrirRelatorio(relUrl?: string | null) {
+  const link = relatorioLinkPublico(relUrl)
+  if (link) window.open(link, '_blank')
+}
+async function copiarLinkRelatorio(relUrl?: string | null): Promise<boolean> {
+  const link = relatorioLinkPublico(relUrl)
+  if (!link) return false
+  try { await navigator.clipboard.writeText(link); return true }
+  catch { window.prompt('Copie o link do relatório:', link); return true }
 }
 
-// indicador do relatório de investigação (SuperTEG): —/⏳ Gerando/📄 Ver
+// indicador do relatório de investigação (SuperTEG): —/⏳ Gerando/📄 Ver + copiar link
 function RelatorioTag({ o, isDark, muted }: { o: QsmaOcorrencia; isDark: boolean; muted: string }) {
+  const [copiado, setCopiado] = useState(false)
   if (o.relatorio_status === 'processando') {
     return <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-500"><Loader2 size={11} className="animate-spin" /> Gerando…</span>
   }
   if (o.relatorio_status === 'pronto' && o.relatorio_url) {
     return (
-      <button onClick={e => { e.stopPropagation(); abrirRelatorioBlob(o.relatorio_url) }} title="Ver relatório de investigação (RIIA)"
-        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}>
-        <FileText size={11} /> Ver
-      </button>
+      <span className="inline-flex items-center gap-1">
+        <button onClick={e => { e.stopPropagation(); abrirRelatorio(o.relatorio_url) }} title="Ver relatório de investigação (RIIA)"
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}>
+          <FileText size={11} /> Ver
+        </button>
+        <button onClick={async e => { e.stopPropagation(); if (await copiarLinkRelatorio(o.relatorio_url)) { setCopiado(true); setTimeout(() => setCopiado(false), 1500) } }}
+          title="Copiar link compartilhável"
+          className={`p-1 rounded-md transition-colors ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}>
+          {copiado ? <Check size={11} className="text-emerald-500" /> : <LinkIcon size={11} />}
+        </button>
+      </span>
     )
   }
   return <span className={muted}>—</span>
@@ -1731,18 +1737,16 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
     try { setRelIniciado(true); await gerarRel.mutateAsync(ocorrencia.id) }
     catch (e: any) { setRelIniciado(false); alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
   }
-  async function abrirRelatorio() {
-    if (!relUrl) return
-    const url = await evidenciaUrl(relUrl)
-    if (!url) return
-    // o storage serve HTML como text/plain (segurança); reabre como blob text/html p/ renderizar
-    try {
-      const html = await (await fetch(url)).text()
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-      window.open(URL.createObjectURL(blob), '_blank')
-    } catch {
-      window.open(url, '_blank')
-    }
+  const [linkCopiado, setLinkCopiado] = useState(false)
+  function abrirRelatorio() {
+    const link = relatorioLinkPublico(relUrl)
+    if (link) window.open(link, '_blank')
+  }
+  async function copiarLink() {
+    const link = relatorioLinkPublico(relUrl)
+    if (!link) return
+    try { await navigator.clipboard.writeText(link) } catch { window.prompt('Copie o link do relatório:', link) }
+    setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 1800)
   }
 
   const erros: string[] = []
@@ -1876,6 +1880,9 @@ function OcorrenciaModal({ isDark, ocorrencia, onClose }: { isDark: boolean; oco
               <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Relatório gerado — revise, ajuste os campos e imprima/salve em PDF.</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={abrirRelatorio} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700"><FileText size={12} /> Ver relatório</button>
+                <button onClick={copiarLink} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border ${isDark ? 'border-sky-500/30 text-sky-300 hover:bg-sky-500/10' : 'border-sky-200 text-sky-700 hover:bg-sky-50'}`}>
+                  {linkCopiado ? <><Check size={12} className="text-emerald-500" /> Link copiado</> : <><LinkIcon size={12} /> Copiar link</>}
+                </button>
                 <button onClick={handleGerarRelatorio} disabled={gerarRel.isPending} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Sparkles size={11} /> Refazer</button>
               </div>
             </>
