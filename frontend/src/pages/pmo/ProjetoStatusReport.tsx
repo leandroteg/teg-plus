@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { X, Download, ChevronRight, FolderKanban, FileText, Save, Sparkles } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, useStatusReportRun, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
 import { gerarStatusReportProjetoPdf } from '../../utils/status-report-projeto-pdf'
 
 // Conteúdo serializável do relatório (live ou snapshot)
@@ -68,11 +68,15 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
   const { data: obraStatus = [], refetch: refetchStatus } = useObraStatus()
   const [det, setDet] = useState<EAPPolo | null>(null)
   const [snapId, setSnapId] = useState<string>('live')
-  const [gerando, setGerando] = useState(false)
-  const [genMsg, setGenMsg] = useState<string | null>(null)
+  const [disparando, setDisparando] = useState(false)
+  const [dispErro, setDispErro] = useState<string | null>(null)
   const { data: snaps = [] } = useProjetoSnapshots(det?.id)
+  const { data: run, refetch: refetchRun } = useStatusReportRun(det?.id)
   const salvar = useSalvarProjetoSnapshot()
-  useEffect(() => { setSnapId('live'); setGenMsg(null) }, [det])
+  useEffect(() => { setSnapId('live'); setDispErro(null) }, [det])
+  // quando a geração conclui (run -> done), recarrega os status das obras p/ atualizar os cards
+  const runDone = run?.status === 'done' ? run.updated_at : null
+  useEffect(() => { if (runDone) refetchStatus() }, [runDone, refetchStatus])
 
   // Só OSC de CONSTRUÇÃO NÃO CONCLUÍDA (tipo=construção e saldo>0)
   const excludedOscs = useMemo(() => {
@@ -162,10 +166,9 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
         const data: ReportData = snapId === 'live' ? live : ((snaps.find(s => s.id === snapId)?.payload as ReportData) ?? live)
         const colTot = (i: number) => data.medicao.reduce((s, m) => s + (m.meses[i] ?? 0), 0)
         const isLive = snapId === 'live'
-        const projObraIds = new Set(p.obras.map(ob => obraIdByNome.get(ob.nome)).filter(Boolean) as string[])
-        const sig = (lst: typeof obraStatus) => JSON.stringify(lst.filter(s => projObraIds.has(s.obra_id)).map(s => [s.obra_id, s.updated_at]).sort())
+        const gerando = disparando || run?.status === 'running'
         const gerarComSuperTEG = async () => {
-          setGerando(true); setGenMsg('Enviando contexto ao SuperTEG…')
+          setDisparando(true); setDispErro(null)
           try {
             const contexto = {
               projeto: p.label, mes_corrente: new Date().toISOString().slice(0, 7),
@@ -174,18 +177,17 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
               obras: p.obras.map(ob => ({ obra_id: obraIdByNome.get(ob.nome) ?? null, nome: ob.nome, oscs: ob.oscs.map(o => o.numero_os) })).filter(o => o.obra_id),
               medicao_mes_a_mes: med.map(m => ({ pacote: m.pac, meses: MESES.map(mm => m.row[mm] ?? 0), total: m.total })),
             }
-            const before = sig(obraStatus)
             const { data: res, error } = await supabase.functions.invoke('egp-status-projeto-analisar', { body: { projeto_id: p.id, portfolio_id: portfolioId ?? undefined, contexto } })
             if (error) throw error
             if (res?.ok === false) throw new Error(res.motivo || 'Falha na análise')
-            if (res?.sincrono) { setGenMsg(`Status gerado pelo SuperTEG: ${res.gravados ?? 0} obra(s).`); await refetchStatus() }
-            else {
-              setGenMsg('Análise solicitada ao SuperTEG (Claude na VPS) — leva ~2 min. Os status aparecem aqui automaticamente.')
-              for (let i = 0; i < 48; i++) { await new Promise(r => setTimeout(r, 5000)); const { data: ns } = await refetchStatus(); if (ns && sig(ns) !== before) { setGenMsg(`Status atualizado pelo SuperTEG para ${p.label}.`); break } }
-            }
-          } catch (e: any) { setGenMsg('Erro: ' + (e?.message || String(e))) }
-          finally { setGerando(false) }
+            // o estado (running/done/error) passa a vir da run durável no banco
+            await refetchRun()
+            if (res?.sincrono) await refetchStatus()
+          } catch (e: any) { setDispErro('Erro ao acionar: ' + (e?.message || String(e))) }
+          finally { setDisparando(false) }
         }
+        // idade da run em andamento (p/ alertar se travar)
+        const runAgeMin = run?.status === 'running' ? (Date.now() - new Date(run.started_at).getTime()) / 60000 : 0
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setDet(null)}>
             <div className={`rounded-2xl shadow-2xl w-full max-w-3xl my-6 ${isLight ? 'bg-white' : 'bg-[#0f172a]'}`} onClick={e => e.stopPropagation()}>
@@ -224,7 +226,16 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
               </div>
 
               <div className="p-5 space-y-5">
-                {genMsg && <div className={`text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 ${genMsg.startsWith('Erro') ? 'bg-red-500/10 text-red-500' : 'bg-violet-500/10 text-violet-500'}`}><Sparkles size={13} className={gerando ? 'animate-pulse' : ''} /> {genMsg}</div>}
+                {dispErro && <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-red-500/10 text-red-500"><X size={13} /> {dispErro}</div>}
+                {run?.status === 'running' && (
+                  <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-violet-500/10 text-violet-500">
+                    <Sparkles size={13} className="animate-pulse" />
+                    <span>Gerando status com o SuperTEG… iniciado há {Math.max(0, Math.round(runAgeMin))} min · {run.n_obras ?? '—'} obra(s). Pode fechar o modal — continua rodando.
+                      {runAgeMin > 6 && <b className="text-amber-500"> Está demorando mais que o normal — pode ter falhado; tente novamente.</b>}</span>
+                  </div>
+                )}
+                {run?.status === 'error' && <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-red-500/10 text-red-500"><X size={13} /> Falha na geração: {run.mensagem ?? 'erro desconhecido'}</div>}
+                {run?.status === 'done' && !dispErro && <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-emerald-500/10 text-emerald-600"><Sparkles size={13} /> {run.mensagem ?? `Status gerado (${run.gravados ?? 0} obras)`} · {new Date(run.updated_at).toLocaleString('pt-BR')}</div>}
                 {!isLive && <p className={`text-[11px] italic ${muted}`}>Visualizando snapshot de {new Date((snaps.find(s => s.id === snapId)?.data_report ?? '') + 'T00:00:00').toLocaleDateString('pt-BR')} (congelado). Selecione "Ao vivo" para os dados atuais.</p>}
                 {/* EAP por pacote */}
                 <div>
