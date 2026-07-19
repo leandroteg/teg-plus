@@ -26,7 +26,7 @@ export async function uploadEvidencia(pasta: string, file: File): Promise<string
   return path
 }
 
-export async function evidenciaUrl(path?: string): Promise<string | null> {
+export async function evidenciaUrl(path?: string | null): Promise<string | null> {
   if (!path) return null
   if (/^https?:\/\//.test(path)) return path
   const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
