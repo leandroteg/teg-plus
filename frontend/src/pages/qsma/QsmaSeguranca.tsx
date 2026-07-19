@@ -71,6 +71,36 @@ const STEPS: FlowStep[] = [
 
 const KANBAN: StatusOcorrencia[] = ['registro', 'investigacao', 'acao', 'encerrada']
 
+// abre o relatório RIIA (storage serve HTML como text/plain → reabre como blob text/html)
+async function abrirRelatorioBlob(relUrl?: string | null) {
+  if (!relUrl) return
+  const url = await evidenciaUrl(relUrl)
+  if (!url) return
+  try {
+    const html = await (await fetch(url)).text()
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    window.open(URL.createObjectURL(blob), '_blank')
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
+// indicador do relatório de investigação (SuperTEG): —/⏳ Gerando/📄 Ver
+function RelatorioTag({ o, isDark, muted }: { o: QsmaOcorrencia; isDark: boolean; muted: string }) {
+  if (o.relatorio_status === 'processando') {
+    return <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-500"><Loader2 size={11} className="animate-spin" /> Gerando…</span>
+  }
+  if (o.relatorio_status === 'pronto' && o.relatorio_url) {
+    return (
+      <button onClick={e => { e.stopPropagation(); abrirRelatorioBlob(o.relatorio_url) }} title="Ver relatório de investigação (RIIA)"
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}>
+        <FileText size={11} /> Ver
+      </button>
+    )
+  }
+  return <span className={muted}>—</span>
+}
+
 export default function QsmaSeguranca() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
@@ -360,6 +390,7 @@ export default function QsmaSeguranca() {
                         { label: 'AÇÕES', align: 'text-center' },
                         { label: 'GRAVIDADE', align: 'text-center' },
                         { label: 'STATUS', align: 'text-center' },
+                        { label: 'RELATÓRIO', align: 'text-center' },
                         { label: 'GESTÃO', align: 'text-center' },
                       ].map(col => (
                         <th key={col.label} className={`${col.align} px-3 py-2 font-semibold whitespace-nowrap`}>{col.label}</th>
@@ -386,6 +417,7 @@ export default function QsmaSeguranca() {
                           </td>
                           <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span></td>
                           <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span></td>
+                          <td className="px-3 py-2.5 text-center"><RelatorioTag o={o} isDark={isDark} muted={txtMuted} /></td>
                           <td className="px-3 py-2.5 text-center">
                             {o.sgi_registro_id
                               ? <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)"><ExternalLink size={11} /> Gestão</span>
@@ -424,6 +456,7 @@ export default function QsmaSeguranca() {
                         </p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                      <RelatorioTag o={o} isDark={isDark} muted="hidden" />
                       {o.sgi_registro_id && (
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
                           <ExternalLink size={11} /> Gestão
@@ -474,6 +507,9 @@ export default function QsmaSeguranca() {
                                 {TIPO_OCORRENCIA_LABEL[o.tipo]}
                                 {acs.length > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{acs.length} ação(ões)</span>}
                               </p>
+                              {(o.relatorio_status === 'pronto' || o.relatorio_status === 'processando') && (
+                                <div className="mt-1.5"><RelatorioTag o={o} isDark={isDark} muted="hidden" /></div>
+                              )}
                             </div>
                             {exp && (
                               <div className={`px-2.5 pb-2.5 pt-1 space-y-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
