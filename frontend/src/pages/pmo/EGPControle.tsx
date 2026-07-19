@@ -854,6 +854,205 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
   )
 }
 
+// ── Status por Obra (agrupado por Projeto) — mesmos filtros do Controle ───────
+type ObraAgg = { obra: string; polo: string; nOsc: number; valor: number; medido: number; prazoNum: number; prazoDen: number }
+
+export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: rows, isLoading } = useMedicaoPorOSC(portfolioId)
+  const [q, setQ] = useState('')
+  const [fTipo, setFTipo] = useState('')
+  const [fValor, setFValor] = useState('')
+  const [fData, setFData] = useState('')
+  const [fPct, setFPct] = useState<Set<string>>(new Set())
+  const [fPrazo, setFPrazo] = useState<Set<string>>(new Set())
+  const [pctOpen, setPctOpen] = useState(false)
+  const [prazoOpen, setPrazoOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [projOpen, setProjOpen] = useState(false)
+  const [excludedObras, setExcludedObras] = useState<Set<string>>(new Set())
+  const [obraOpen, setObraOpen] = useState(false)
+
+  const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'}`
+  const sel = (active: boolean) => 'text-sm rounded-xl border px-2.5 py-2 outline-none cursor-pointer shrink-0 ' + (active ? (isLight ? 'border-teal-300 text-teal-700 bg-teal-50 font-semibold' : 'border-teal-500/40 text-teal-300 bg-teal-500/10 font-semibold') : (isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-300'))
+  const fmt = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR')
+
+  if (isLoading) return <Spinner />
+
+  const fAtivo = !!(q.trim() || fTipo || fValor || fData || fPct.size || fPrazo.size || excludedObras.size)
+  const match = (r: MedicaoOSCRow) => {
+    const s = q.trim().toLowerCase()
+    if (s && !(r.numero_os.toLowerCase().includes(s) || r.obra_nome.toLowerCase().includes(s) || r.polo_nome.toLowerCase().includes(s))) return false
+    if (fTipo && r.tipo !== fTipo) return false
+    if (fValor) { const v = r.valor; if (fValor === 'gt1m' && v <= 1e6) return false; if (fValor === 'mid' && !(v >= 1e5 && v <= 1e6)) return false; if (fValor === 'lt100k' && v >= 1e5) return false }
+    if (fData && (r.data_osc ?? '').slice(0, 4) !== fData) return false
+    if (fPct.size) { const p = r.valor ? Math.round(r.medido / r.valor * 100) : 0; if (!inBands(p, fPct)) return false }
+    if (fPrazo.size) { const pp = pctPrazo(r.data_osc, r.vencimento); if (pp == null || !inBands(pp, fPrazo)) return false }
+    return true
+  }
+  const baseList = (rows ?? []).filter(match)
+  const allPolos = [...new Set(baseList.map(r => r.polo_nome))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const afterPolo = baseList.filter(r => !excluded.has(r.polo_nome))
+  const allObras = [...new Set(afterPolo.map(r => r.obra_nome))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const list = afterPolo.filter(r => !excludedObras.has(r.obra_nome))
+
+  // Agrega OSC -> Obra
+  const obrasMap = new Map<string, ObraAgg>()
+  for (const r of list) {
+    const key = r.polo_nome + '||' + r.obra_nome
+    const a = obrasMap.get(key) ?? { obra: r.obra_nome, polo: r.polo_nome, nOsc: 0, valor: 0, medido: 0, prazoNum: 0, prazoDen: 0 }
+    a.nOsc++; a.valor += r.valor; a.medido += r.medido
+    const pp = pctPrazo(r.data_osc, r.vencimento)
+    if (pp != null && r.valor > 0) { a.prazoNum += pp * r.valor; a.prazoDen += r.valor }
+    obrasMap.set(key, a)
+  }
+  const obras = [...obrasMap.values()]
+  const porPolo = new Map<string, ObraAgg[]>()
+  for (const o of obras) { const arr = porPolo.get(o.polo) ?? []; arr.push(o); porPolo.set(o.polo, arr) }
+  const polos = [...porPolo.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+  for (const [, arr] of polos) arr.sort((a, b) => b.valor - a.valor)
+
+  const totValor = obras.reduce((s, o) => s + o.valor, 0)
+  const totMedido = obras.reduce((s, o) => s + o.medido, 0)
+  const obraPct = (o: ObraAgg) => o.valor ? Math.round(o.medido / o.valor * 100) : 0
+  const obraPrazo = (o: ObraAgg) => o.prazoDen ? Math.round(o.prazoNum / o.prazoDen) : null
+  const pctColor = (p: number) => p >= 80 ? 'text-emerald-500' : p >= 40 ? 'text-amber-500' : 'text-red-500'
+  const toggle = (p: string) => setCollapsed(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+  const toggleAll = () => setExcluded(excluded.size === 0 ? new Set(allPolos) : new Set())
+  const togglePolo = (p: string) => setExcluded(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
+  const obrasOcultas = allObras.filter(o => excludedObras.has(o)).length
+  const toggleAllObra = () => setExcludedObras(obrasOcultas === 0 ? new Set(allObras) : new Set())
+  const toggleObra = (o: string) => setExcludedObras(s => { const n = new Set(s); n.has(o) ? n.delete(o) : n.add(o); return n })
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros (mesmos do Controle) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <p className={`text-sm font-semibold shrink-0 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{obras.length} obra{obras.length !== 1 ? 's' : ''}</p>
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shrink-0 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+          <Search size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar…" className={`w-28 text-sm outline-none bg-transparent ${isLight ? 'text-slate-700 placeholder:text-slate-400' : 'text-white placeholder:text-slate-500'}`} />
+        </div>
+        <div className="relative shrink-0">
+          <button onClick={() => setProjOpen(o => !o)} className={`inline-flex items-center gap-1.5 ${sel(excluded.size > 0)}`}>
+            Projetos: {allPolos.length - excluded.size}/{allPolos.length}
+            <ChevronDown size={13} className={`transition-transform ${projOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {projOpen && (<>
+            <div className="fixed inset-0 z-10" onClick={() => setProjOpen(false)} />
+            <div className={`absolute z-20 mt-1 left-0 w-60 rounded-xl border shadow-lg p-1.5 max-h-72 overflow-y-auto ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+              <button onClick={toggleAll} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${excluded.size === 0 ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{excluded.size === 0 && <Check size={11} />}</span>
+                Selecionar todos
+              </button>
+              <div className={`my-1 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+              {allPolos.map(p => { const on = !excluded.has(p); return (
+                <button key={p} onClick={() => togglePolo(p)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{on && <Check size={11} />}</span>
+                  <span className="truncate text-left">{p}</span>
+                </button>) })}
+            </div>
+          </>)}
+        </div>
+        <div className="relative shrink-0">
+          <button onClick={() => setObraOpen(o => !o)} className={`inline-flex items-center gap-1.5 ${sel(excludedObras.size > 0)}`} disabled={!allObras.length}>
+            Obras: {allObras.length - obrasOcultas}/{allObras.length}
+            <ChevronDown size={13} className={`transition-transform ${obraOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {obraOpen && (<>
+            <div className="fixed inset-0 z-10" onClick={() => setObraOpen(false)} />
+            <div className={`absolute z-20 mt-1 left-0 w-72 rounded-xl border shadow-lg p-1.5 max-h-72 overflow-y-auto ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`}>
+              <button onClick={toggleAllObra} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${obrasOcultas === 0 ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{obrasOcultas === 0 && <Check size={11} />}</span>
+                Selecionar todas
+              </button>
+              <div className={`my-1 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+              {allObras.map(o => { const on = !excludedObras.has(o); return (
+                <button key={o} onClick={() => toggleObra(o)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm ${isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-200 hover:bg-white/[0.06]'}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : (isLight ? 'border-slate-300' : 'border-white/20')}`}>{on && <Check size={11} />}</span>
+                  <span className="truncate text-left">{o}</span>
+                </button>) })}
+            </div>
+          </>)}
+        </div>
+        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel(!!fTipo)}>
+          <option value="">Tipo: todos</option><option value="construcao">Construção</option><option value="manutencao">O&amp;M</option><option value="deposito">Depósito</option>
+        </select>
+        <select value={fValor} onChange={e => setFValor(e.target.value)} className={sel(!!fValor)}>
+          <option value="">Valor: todos</option><option value="gt1m">&gt; R$ 1 mi</option><option value="mid">R$ 100 mil – 1 mi</option><option value="lt100k">&lt; R$ 100 mil</option>
+        </select>
+        <select value={fData} onChange={e => setFData(e.target.value)} className={sel(!!fData)}>
+          <option value="">Ano: todos</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+        </select>
+        <BandFilter label="% Faturado" selected={fPct} setSelected={setFPct} open={pctOpen} setOpen={setPctOpen} selBtn={sel} isLight={isLight} />
+        <BandFilter label="% Prazo" selected={fPrazo} setSelected={setFPrazo} open={prazoOpen} setOpen={setPrazoOpen} selBtn={sel} isLight={isLight} />
+        {fAtivo && <button onClick={() => { setQ(''); setFTipo(''); setFValor(''); setFData(''); setFPct(new Set()); setFPrazo(new Set()); setExcludedObras(new Set()) }} title="Limpar" className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><Plus size={15} className="rotate-45" /></button>}
+        <div className={`ml-auto text-xs font-semibold shrink-0 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          {fmt(totMedido)} / {fmt(totValor)} · {totValor ? Math.round(totMedido / totValor * 100) : 0}% faturado
+        </div>
+      </div>
+
+      {/* Tabela por PROJETO > obras */}
+      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+        {obras.length === 0 ? (
+          <EmptyState isLight={isLight} message="Nenhuma obra encontrada" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                  <th className={thCls}>Obra</th>
+                  <th className={`${thCls} text-center`}>OSCs</th>
+                  <th className={`${thCls} text-right`}>Valor</th>
+                  <th className={`${thCls} text-right`}>% Prazo</th>
+                  <th className={`${thCls} text-right`}>% Faturado</th>
+                  <th className={`${thCls} text-right`}>Faturado</th>
+                  <th className={`${thCls} text-right`}>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {polos.map(([polo, arr]) => {
+                  const pValor = arr.reduce((s, o) => s + o.valor, 0)
+                  const pMed = arr.reduce((s, o) => s + o.medido, 0)
+                  const isCol = collapsed.has(polo)
+                  return (
+                    <Fragment key={polo}>
+                      <tr onClick={() => toggle(polo)} className={`cursor-pointer border-b ${isLight ? 'bg-slate-50 border-slate-100 hover:bg-slate-100' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.06]'}`}>
+                        <td colSpan={2} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>
+                          <span className="inline-flex items-center gap-1.5">{isCol ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{polo} · {arr.length} obra{arr.length !== 1 ? 's' : ''}</span>
+                        </td>
+                        <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pValor)}</td>
+                        <td className="py-2.5 px-4" />
+                        <td className={`py-2.5 px-4 text-right text-xs font-bold ${pctColor(pValor ? Math.round(pMed / pValor * 100) : 0)}`}>{pValor ? Math.round(pMed / pValor * 100) : 0}%</td>
+                        <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pMed)}</td>
+                        <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pValor - pMed)}</td>
+                      </tr>
+                      {!isCol && arr.map(o => {
+                        const pct = obraPct(o); const prz = obraPrazo(o)
+                        return (
+                          <tr key={polo + '||' + o.obra} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.03]'}`}>
+                            <td className={`py-2 px-4 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{o.obra}</td>
+                            <td className={`py-2 px-4 text-xs text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{o.nOsc}</td>
+                            <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{fmt(o.valor)}</td>
+                            <td className={`py-2 px-4 text-xs text-right font-semibold ${prz == null ? (isLight ? 'text-slate-300' : 'text-slate-600') : pctColor(prz)}`}>{prz == null ? '—' : prz + '%'}</td>
+                            <td className={`py-2 px-4 text-xs text-right font-semibold ${pctColor(pct)}`}>{pct}%</td>
+                            <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{fmt(o.medido)}</td>
+                            <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(o.valor - o.medido)}</td>
+                          </tr>
+                        )
+                      })}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Status Report Panel ─────────────────────────────────────────────────────
 
 export function StatusReportPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
