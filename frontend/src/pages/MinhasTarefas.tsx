@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, CheckSquare, Zap, ChevronRight, ShoppingCart, Wallet, Building2,
-  Package, FileText, Receipt, Truck, Clock, AlertCircle, Filter,
+  Package, FileText, Receipt, Truck, Clock, AlertCircle, Filter, Target,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useMinhasTarefas, type Tarefa, type ModuloTarefa } from '../hooks/useMinhasTarefas'
@@ -17,6 +17,7 @@ const MODULO_ICON: Record<ModuloTarefa, typeof ShoppingCart> = {
   contratos:  FileText,
   despesas:   Receipt,
   transporte: Truck,
+  gestao:     Target,
 }
 
 const MODULO_COLOR: Record<ModuloTarefa, { dot: string; text: string; bg: string; bgDark: string; textDark: string }> = {
@@ -27,6 +28,7 @@ const MODULO_COLOR: Record<ModuloTarefa, { dot: string; text: string; bg: string
   contratos:  { dot: 'bg-violet-500',  text: 'text-violet-600',  bg: 'bg-violet-50',  textDark: 'text-violet-300',  bgDark: 'bg-violet-500/10' },
   despesas:   { dot: 'bg-rose-500',    text: 'text-rose-600',    bg: 'bg-rose-50',    textDark: 'text-rose-300',    bgDark: 'bg-rose-500/10' },
   transporte: { dot: 'bg-cyan-500',    text: 'text-cyan-600',    bg: 'bg-cyan-50',    textDark: 'text-cyan-300',    bgDark: 'bg-cyan-500/10' },
+  gestao:     { dot: 'bg-violet-500',  text: 'text-violet-600',  bg: 'bg-violet-50',  textDark: 'text-violet-300',  bgDark: 'bg-violet-500/10' },
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
