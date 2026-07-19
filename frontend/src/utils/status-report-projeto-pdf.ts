@@ -32,6 +32,15 @@ async function loadLogoBase64(url: string): Promise<string | null> {
 
 const fmtM = (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}k`
 const fmtQ = (q: number, u: string | null) => u ? `${Number(q).toLocaleString('pt-BR', { maximumFractionDigits: q < 10 ? 1 : 0 })} ${u}` : ''
+const PAC_RGB = (n: string): [number, number, number] => {
+  const s = n.toLowerCase()
+  if (s.includes('cabo')) return [79, 70, 229]
+  if (s.includes('torre') || s.includes('montag')) return [30, 41, 59]
+  if (s.includes('funda')) return [180, 83, 9]
+  if (s.includes('adm')) return [124, 58, 237]
+  if (s.includes('prelim') || s.includes('canteir')) return [37, 99, 235]
+  return [100, 116, 139]
+}
 
 function buildDoc(d: StatusReportProjetoPdfData, empresa: EmpresaData, logo: string | null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -73,24 +82,34 @@ function buildDoc(d: StatusReportProjetoPdfData, empresa: EmpresaData, logo: str
   })
   y += 24
 
-  // EAP por pacote
+  // EAP por pacote (cards com barra, 2 por linha)
   title('EAP DO PROJETO (POR PACOTE)')
-  doc.setFontSize(8.5)
-  d.pacotes.forEach(pc => {
-    check(9)
-    const fis = pc.pctFis != null ? `Físico ${pc.pctFis}%` : `Faturado ${pc.pctFin}%`
-    const qtd = fmtQ(pc.qtdReal, pc.unidade) && `${fmtQ(pc.qtdReal, pc.unidade)} / ${fmtQ(pc.qtdContr, pc.unidade)}`
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK); doc.text(pc.n, M, y)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(...MID)
-    doc.text(`${fis}${qtd ? `  ·  ${qtd}` : ''}`, M + 55, y)
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK); doc.text(`R$ ${fmtM(pc.valor)}`, W - M, y, { align: 'right' })
-    y += 4
+  const gcw = (CW - 4) / 2, gch = 18
+  d.pacotes.forEach((pc, i) => {
+    const col = i % 2
+    if (col === 0) check(gch + 3)
+    const cx = M + col * (gcw + 4), cy = y
+    const color = PAC_RGB(pc.n)
+    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3); doc.roundedRect(cx, cy, gcw, gch, 2, 2)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(30, 42, 74); doc.text(pc.n.slice(0, 24), cx + 3, cy + 5.5)
+    // badge de quantidade
+    const qb = fmtQ(pc.qtdContr, pc.unidade)
+    if (qb) {
+      doc.setFontSize(6.5); const bw = doc.getTextWidth(qb) + 4
+      doc.setFillColor(...color); doc.roundedRect(cx + gcw - bw - 3, cy + 2, bw, 4.5, 2.2, 2.2, 'F')
+      doc.setTextColor(255, 255, 255); doc.text(qb, cx + gcw - bw - 1, cy + 5.2)
+    }
+    // barra
     const bar = pc.pctFis ?? pc.pctFin
-    doc.setFillColor(226, 232, 240); doc.roundedRect(M, y, CW, 1.8, 0.9, 0.9, 'F')
-    doc.setFillColor(...DARK); doc.roundedRect(M, y, Math.max(2, CW * Math.min(bar, 100) / 100), 1.8, 0.9, 0.9, 'F')
-    y += 5
+    doc.setFillColor(226, 232, 240); doc.roundedRect(cx + 3, cy + 8, gcw - 6, 3.4, 1.7, 1.7, 'F')
+    doc.setFillColor(...color); doc.roundedRect(cx + 3, cy + 8, Math.max(2, (gcw - 6) * Math.min(bar, 100) / 100), 3.4, 1.7, 1.7, 'F')
+    // rodapé do card
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID)
+    doc.text(pc.pctFis != null ? `Físico ${pc.pctFis}% · falta ${fmtQ(pc.qtdContr - (pc.qtdReal ?? 0), pc.unidade) || '0'}` : `Faturado ${pc.pctFin}%`, cx + 3, cy + 15.5)
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 42, 74); doc.text(`R$ ${fmtM(pc.valor)}`, cx + gcw - 3, cy + 15.5, { align: 'right' })
+    if (col === 1 || i === d.pacotes.length - 1) y += gch + 3
   })
-  y += 3
+  y += 2
 
   // Medição mês a mês
   if (d.medicao.length) {
