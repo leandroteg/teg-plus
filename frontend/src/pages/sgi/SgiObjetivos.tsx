@@ -5,6 +5,7 @@ import {
   Pencil, Trash2, Search, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   useObjetivos, useCriarObjetivo, useCriarMeta, useLancarCheckin,
   useAtualizarObjetivo, useAtualizarMeta, useRemoverObjetivo, useRemoverMeta,
@@ -301,6 +302,9 @@ function ObjetivoCard({ obj, periodo, isDark, txt, muted, card, onEdit, onDelete
 function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
   obj: ObjFull; meta: MetaFull; acoes: SgiAcao[]; isDark: boolean; txt: string; muted: string; card: string
 }) {
+  const { isAdmin, getPapelForModule } = useAuth()
+  // só admin ou supervisor (e acima) do módulo Gestão (SGI) editam/excluem ações
+  const podeEditar = isAdmin || ['supervisor', 'gerente', 'gestor', 'ceo'].includes(getPapelForModule('sgi'))
   const criarAcao = useCriarAcao()
   const atualizarAcao = useAtualizarAcao()
   const removerAcao = useRemoverAcao()
@@ -309,7 +313,9 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
   const [editId, setEditId] = useState<string | null>(null)
   const [editTitulo, setEditTitulo] = useState('')
   const [editPrazo, setEditPrazo] = useState('')
+  // ordena por prazo (mais próximo primeiro; sem prazo por último)
   const mine = acoes.filter(a => a.origem_tipo === 'meta' && a.origem_id === meta.id)
+    .sort((a, b) => (a.prazo ?? '9999').localeCompare(b.prazo ?? '9999') || a.titulo.localeCompare(b.titulo))
   const add = async () => {
     if (!nova.trim()) return
     await criarAcao.mutateAsync({ origem_tipo: 'meta', origem_id: meta.id, titulo: nova.trim(), prazo: prazo || undefined, status: 'aberta' })
@@ -332,7 +338,7 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
         {mine.map(a => {
           const sa = STATUS_ACAO_LABEL[a.status]
           const done = a.status === 'concluida'
-          if (editId === a.id) {
+          if (editId === a.id && podeEditar) {
             return (
               <div key={a.id} className={`flex items-center gap-1.5 rounded-lg p-2 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
                 <input autoFocus value={editTitulo} onChange={e => setEditTitulo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }} className={`flex-1 min-w-0 ${inputCls}`} />
@@ -352,8 +358,10 @@ function PlanoAcaoMeta({ obj, meta, acoes, isDark, txt, muted, card }: {
                 {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmtDate(a.prazo)}</p>}
               </div>
               <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
-              <button onClick={() => startEdit(a)} title="Editar ação" className={`shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition ${muted} hover:text-violet-500 hover:bg-violet-500/10`}><Pencil size={13} /></button>
-              <button onClick={() => { if (confirm(`Excluir a ação "${a.titulo}"?`)) removerAcao.mutate(a.id) }} title="Excluir ação" className="shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 hover:bg-red-500/10"><Trash2 size={13} /></button>
+              {podeEditar && <>
+                <button onClick={() => startEdit(a)} title="Editar ação" className={`shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition ${muted} hover:text-violet-500 hover:bg-violet-500/10`}><Pencil size={13} /></button>
+                <button onClick={() => { if (confirm(`Excluir a ação "${a.titulo}"?`)) removerAcao.mutate(a.id) }} title="Excluir ação" className="shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500 hover:bg-red-500/10"><Trash2 size={13} /></button>
+              </>}
             </div>
           )
         })}
