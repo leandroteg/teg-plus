@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, CheckSquare, Zap, ChevronRight, ShoppingCart, Wallet, Building2,
-  Package, FileText, Receipt, Truck, Clock, AlertCircle, Filter, Target,
+  Package, FileText, Receipt, Truck, Clock, AlertCircle, Filter, Target, X, CheckCircle2, Circle, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useMinhasTarefas, type Tarefa, type ModuloTarefa } from '../hooks/useMinhasTarefas'
+import { useSgiObjetivoContexto, useAtualizarAcao } from '../hooks/useSgi'
+import { FAROL_CFG, STATUS_ACAO_LABEL } from '../types/sgi'
 
 // ── Config ──────────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,11 @@ export default function MinhasTarefas() {
   const { data: tarefas = [], isLoading } = useMinhasTarefas()
 
   const [filtroModulo, setFiltroModulo] = useState<ModuloTarefa | 'todos'>('todos')
+  const [sgiModal, setSgiModal] = useState<{ metaId: string; acaoId: string } | null>(null)
+  const abrir = (t: Tarefa) => {
+    if (t.sgiMetaId) setSgiModal({ metaId: t.sgiMetaId, acaoId: t.id.replace('sgiacao-', '') })
+    else navigate(t.link)
+  }
 
   const bg      = isDark ? 'bg-[#0f172a]' : 'bg-slate-50'
   const cardBg  = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
@@ -164,12 +171,16 @@ export default function MinhasTarefas() {
         ) : (
           <div className="space-y-2">
             {filtered.map(t => (
-              <TarefaCard key={t.id} tarefa={t} isDark={isDark} onClick={() => navigate(t.link)} />
+              <TarefaCard key={t.id} tarefa={t} isDark={isDark} onClick={() => abrir(t)} />
             ))}
           </div>
         )}
 
       </div>
+
+      {sgiModal && (
+        <TarefaSgiModal metaId={sgiModal.metaId} focoAcaoId={sgiModal.acaoId} isDark={isDark} onClose={() => setSgiModal(null)} />
+      )}
     </div>
   )
 }
@@ -234,6 +245,77 @@ function TarefaCard({ tarefa: t, isDark, onClick }: { tarefa: Tarefa; isDark: bo
       {/* Chevron */}
       <ChevronRight size={16} className={`shrink-0 mt-1 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
     </button>
+  )
+}
+
+// ── Modal SGI: objetivo da área + KRs do período + ações (aberto in-place) ────────
+function TarefaSgiModal({ metaId, focoAcaoId, isDark, onClose }: {
+  metaId: string; focoAcaoId: string; isDark: boolean; onClose: () => void
+}) {
+  const { data, isLoading } = useSgiObjetivoContexto(metaId)
+  const atualizar = useAtualizarAcao()
+  const panel = isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const sub = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
+  const fmt = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto" onClick={onClose}>
+      <div className={`w-full max-w-2xl my-6 rounded-2xl border shadow-2xl ${panel}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`flex items-start justify-between gap-2 px-5 py-4 border-b sticky top-0 rounded-t-2xl ${panel} ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 flex items-center gap-1"><Target size={12} /> {data?.objetivo?.area_processo || 'Gestão'} · {data?.trimestre ? `T${data.trimestre}/${data.ano}` : `${data?.ano ?? ''}`}</p>
+            <h3 className={`text-base font-extrabold leading-tight ${txt}`}>{data?.objetivo?.titulo || 'Objetivo'}</h3>
+            {data?.objetivo?.descricao && <p className={`text-xs mt-0.5 ${muted}`}>{data.objetivo.descricao}</p>}
+          </div>
+          <button onClick={onClose} className={`shrink-0 p-1 rounded-lg ${muted} hover:bg-slate-500/10`}><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {isLoading && <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-violet-500" /></div>}
+          {!isLoading && (data?.metas ?? []).length === 0 && <p className={`text-sm ${muted}`}>Sem KRs no período.</p>}
+          {(data?.metas ?? []).map(m => {
+            const ck = [...(m.checkins ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+            const farol = FAROL_CFG[(ck?.farol ?? 'cinza') as keyof typeof FAROL_CFG]
+            const acoesKr = (data?.acoes ?? []).filter(a => a.origem_id === m.id)
+            const isFoco = m.id === metaId
+            return (
+              <div key={m.id} className={`rounded-xl border p-3 ${sub} ${isFoco ? 'ring-1 ring-violet-400/50' : ''}`}>
+                <div className="flex items-start gap-2 mb-2">
+                  <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${farol.dot}`} title={farol.label} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold leading-snug ${txt}`}>{m.descricao || (m.alvo != null ? `Alvo ${m.alvo}` : 'KR')}</p>
+                    <p className={`text-[11px] ${muted}`}>{m.prazo ? `Prazo ${fmt(m.prazo)}` : 'sem prazo'} · {farol.label}{ck?.realizado != null ? ` · realizado ${ck.realizado}` : ''}</p>
+                  </div>
+                </div>
+                <div className="space-y-1.5 pl-4">
+                  {acoesKr.length === 0 && <p className={`text-[11px] ${muted}`}>Nenhuma ação planejada.</p>}
+                  {acoesKr.map(a => {
+                    const sa = STATUS_ACAO_LABEL[a.status]
+                    const done = a.status === 'concluida'
+                    const isClicked = a.id === focoAcaoId
+                    return (
+                      <div key={a.id} className={`flex items-center gap-2 rounded-lg p-2 ${isClicked ? (isDark ? 'bg-violet-500/10' : 'bg-violet-50') : (isDark ? 'bg-white/[0.03]' : 'bg-white')}`}>
+                        <button onClick={() => atualizar.mutate({ id: a.id, status: done ? 'aberta' : 'concluida', concluida_em: done ? null : new Date().toISOString() })} className="shrink-0">
+                          {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} className="text-slate-400" />}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-medium ${done ? 'line-through ' + muted : txt}`}>{a.titulo}</p>
+                          {a.prazo && <p className={`text-[10px] ${muted}`}>Prazo {fmt(a.prazo)}</p>}
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${sa.bg} ${sa.text}`}>{sa.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 
