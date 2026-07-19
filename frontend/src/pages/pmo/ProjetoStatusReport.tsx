@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { X, Download, ChevronRight, FolderKanban, FileText, Save, Sparkles } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, useStatusReportRun, useRiscosEGP, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, useStatusReportRun, useProjetoStatus, useRiscosEGP, type EAPPolo, type EAPPacote, type ObraStatusAcao, type ProjetoStatusCap } from '../../hooks/usePMO'
 import { useEfetivoReal } from '../../hooks/useEfetivoReal'
 import { useCustosReal, MARGEM_LUCRO } from '../../hooks/useCustos'
 import type { PMORisco } from '../../types/pmo'
@@ -20,6 +20,8 @@ interface ReportData {
   riscos: { descricao: string; categoria: string | null; sev: number; prob: number; imp: number }[]
   custos: { realizado: number; orcado: number } | null
   obras: { nome: string; status: string | null; diagnostico: string | null; farol: string | null; acoes: ObraStatusAcao[] | null }[]
+  // análise do SuperTEG (respostas às 10 perguntas do padrão)
+  stReport: { farol: string | null; sintese: string | null; decisoes: string[] | null; capitulos: ProjetoStatusCap[] | null; gerado_em: string | null } | null
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -82,11 +84,12 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
   const [dispErro, setDispErro] = useState<string | null>(null)
   const { data: snaps = [] } = useProjetoSnapshots(det?.id)
   const { data: run, refetch: refetchRun } = useStatusReportRun(det?.id)
+  const { data: pjStatus, refetch: refetchPjStatus } = useProjetoStatus(det?.id)
   const salvar = useSalvarProjetoSnapshot()
   useEffect(() => { setSnapId('live'); setDispErro(null) }, [det])
-  // quando a geração conclui (run -> done), recarrega os status das obras p/ atualizar os cards
+  // quando a geração conclui (run -> done), recarrega status das obras + relatório do projeto
   const runDone = run?.status === 'done' ? run.updated_at : null
-  useEffect(() => { if (runDone) refetchStatus() }, [runDone, refetchStatus])
+  useEffect(() => { if (runDone) { refetchStatus(); refetchPjStatus() } }, [runDone, refetchStatus, refetchPjStatus])
 
   // Só OSC de CONSTRUÇÃO NÃO CONCLUÍDA (tipo=construção e saldo>0)
   const excludedOscs = useMemo(() => {
@@ -214,6 +217,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
             ? { realizado: Math.round(Object.values(custos.porFrente[p.label]).reduce((s, v) => s + (v || 0), 0)), orcado: Math.round((1 - MARGEM_LUCRO) * p.contr) }
             : null,
           obras: obras.map(o => ({ nome: o.nome, status: o.st?.status_texto ?? null, diagnostico: o.st?.diagnostico ?? null, farol: o.st?.farol ?? null, acoes: o.st?.acoes ?? null })),
+          stReport: pjStatus ? { farol: pjStatus.farol, sintese: pjStatus.sintese, decisoes: pjStatus.decisoes, capitulos: pjStatus.capitulos, gerado_em: pjStatus.gerado_em } : null,
         }
         const data: ReportData = snapId === 'live' ? live : ((snaps.find(s => s.id === snapId)?.payload as ReportData) ?? live)
         const colTot = (i: number) => data.medicao.reduce((s, m) => s + (m.meses[i] ?? 0), 0)
@@ -274,7 +278,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                     medicao: data.medicao, meses: MESES.map(m => MES_LBL[m]),
                     prazo: data.prazo ?? { pctPrazoProj: null, terminoPrev: null, obras: [] },
                     recursos: data.recursos ?? null, riscos: data.riscos ?? [], custos: data.custos ?? null,
-                    obras: data.obras,
+                    obras: data.obras, stReport: data.stReport ?? null,
                   })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> PDF</button>
                   <button onClick={() => setDet(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
                 </div>
@@ -292,6 +296,22 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                 {run?.status === 'error' && <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-red-500/10 text-red-500"><X size={13} /> Falha na geração: {run.mensagem ?? 'erro desconhecido'}</div>}
                 {run?.status === 'done' && !dispErro && <div className="text-[11px] rounded-lg px-3 py-2 flex items-center gap-2 bg-emerald-500/10 text-emerald-600"><Sparkles size={13} /> {run.mensagem ?? `Status gerado (${run.gravados ?? 0} obras)`} · {new Date(run.updated_at).toLocaleString('pt-BR')}</div>}
                 {!isLive && <p className={`text-[11px] italic ${muted}`}>Visualizando snapshot de {new Date((snaps.find(s => s.id === snapId)?.data_report ?? '') + 'T00:00:00').toLocaleDateString('pt-BR')} (congelado). Selecione "Ao vivo" para os dados atuais.</p>}
+                {/* Síntese do SuperTEG */}
+                {data.stReport?.sintese && (
+                  <div className={`rounded-xl border p-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.08] bg-white/[0.03]'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-2.5 h-2.5 rounded-full ${farolDot(data.stReport.farol)}`} />
+                      <p className={`text-xs font-bold ${txt}`}>Síntese do SuperTEG</p>
+                      {data.stReport.gerado_em && <span className={`text-[10px] ${muted}`}>· {new Date(data.stReport.gerado_em).toLocaleString('pt-BR')}</span>}
+                    </div>
+                    <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{data.stReport.sintese}</p>
+                    {(data.stReport.decisoes ?? []).length > 0 && (
+                      <div className="mt-1.5 space-y-0.5">
+                        {(data.stReport.decisoes ?? []).map((dec, i) => <p key={i} className={`text-[11px] font-medium ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>▸ Decisão: {dec}</p>)}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* EAP por pacote */}
                 <div>
                   <h4 className={`text-sm font-bold mb-2 flex items-center gap-1.5 ${txt}`}><FileText size={14} className="text-teal-500" /> EAP do projeto (por pacote)</h4>
@@ -351,6 +371,28 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                               ))}
                             </div>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Análise SuperTEG — respostas às perguntas do padrão de status report */}
+                {(data.stReport?.capitulos ?? []).length > 0 && (
+                  <div>
+                    <h4 className={`text-sm font-bold mb-2 flex items-center gap-1.5 ${txt}`}><Sparkles size={14} className="text-violet-500" /> Análise SuperTEG</h4>
+                    <div className="space-y-2">
+                      {(data.stReport?.capitulos ?? []).map((cap, ci) => (
+                        <div key={cap.key ?? ci} className={`rounded-xl border p-3 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
+                          <p className={`text-xs font-bold mb-1.5 ${txt}`}>{cap.titulo}</p>
+                          <div className="space-y-1.5">
+                            {(cap.itens ?? []).map((it, ii) => (
+                              <div key={ii}>
+                                <p className={`text-[11px] font-semibold ${muted}`}>{it.q}</p>
+                                <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{it.a}</p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
