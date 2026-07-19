@@ -100,6 +100,10 @@ export interface QsmaOcorrencia {
   riia?: unknown
   /** Registro vinculado no SGI (Melhoria Contínua) — o tratamento acontece lá */
   sgi_registro_id?: string
+  /** Relatório de investigação gerado pelo SuperTEG (path no bucket qsma-evidencias) */
+  relatorio_url?: string | null
+  relatorio_status?: 'processando' | 'pronto' | 'erro' | null
+  relatorio_gerado_em?: string | null
   registrado_por_id?: string
   registrado_por_nome?: string
   created_at: string
