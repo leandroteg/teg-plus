@@ -25,6 +25,7 @@ export interface Tarefa {
   prioridade: 'alta' | 'normal' | 'baixa'
   criadoEm: string
   link: string // rota para onde navegar ao clicar
+  sgiMetaId?: string // KR (sgi_metas.id) quando a tarefa é uma ação do SGI → abre modal in-place
 }
 
 const MODULO_LABEL: Record<ModuloTarefa, string> = {
@@ -270,7 +271,7 @@ export function useMinhasTarefas() {
       if (perfilId) {
         const { data: acoes } = await supabase
           .from('sgi_acoes')
-          .select('id, origem_tipo, titulo, descricao, prazo, status, created_at')
+          .select('id, origem_tipo, origem_id, titulo, descricao, prazo, status, created_at')
           .eq('responsavel_id', perfilId)
           .not('status', 'in', '(concluida,cancelada)')
           .order('prazo', { ascending: true, nullsFirst: false })
@@ -293,6 +294,7 @@ export function useMinhasTarefas() {
             prioridade: venceEm != null && venceEm <= 2 ? 'alta' : 'normal',
             criadoEm: a.created_at as string,
             link,
+            sgiMetaId: ot === 'meta' ? (a.origem_id as string) : undefined,
           })
         }
       }
