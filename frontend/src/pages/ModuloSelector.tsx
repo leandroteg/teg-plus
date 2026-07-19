@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, Megaphone, User, Link2, Code2, ScrollText, ClipboardList, HandHelping, CheckSquare,
+  LogOut, X, Lock, Megaphone, User, Link2, Code2, ClipboardList, HandHelping, CheckSquare,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useMinhasTarefas } from '../hooks/useMinhasTarefas'
 import LogoTeg from '../components/LogoTeg'
 import MuralPopup from '../components/MuralPopup'
 import ApprovalBadge from '../components/ApprovalBadge'
@@ -203,6 +204,8 @@ export default function ModuloSelector() {
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   const avatarMenuRef = useRef<HTMLDivElement>(null)
+  const { data: minhasTarefas = [] } = useMinhasTarefas()
+  const nTarefas = minhasTarefas.length
 
   const nome = perfil?.nome ?? 'Usu\u00e1rio'
   const role = (perfil?.role ?? 'visitante') as Role
@@ -392,15 +395,6 @@ export default function ModuloSelector() {
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/logs') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <ScrollText size={15} className="shrink-0 opacity-50" />
-                Logs de Auditoria
               </button>
             </>
           )}
@@ -677,6 +671,19 @@ export default function ModuloSelector() {
             >
               <LogoTeg size={80} animated={false} glowing={false} />
             </div>
+            {nTarefas > 0 && (
+              <span
+                className="absolute z-20 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-lg ring-2 ring-white"
+                style={{
+                  top: 4, right: 2, minWidth: 24, height: 24, padding: '0 6px', fontSize: 12,
+                  animation: entered ? 'qaBadgePop 0.4s cubic-bezier(0.175,0.885,0.32,1.275) 0.9s both' : 'none',
+                }}
+                title={`${nTarefas} tarefa${nTarefas !== 1 ? 's' : ''} pendente${nTarefas !== 1 ? 's' : ''}`}
+              >
+                {nTarefas > 99 ? '99+' : nTarefas}
+              </span>
+            )}
+            <style>{`@keyframes qaBadgePop { from { opacity:0; transform: scale(0) } 60% { transform: scale(1.25) } to { opacity:1; transform: scale(1) } }`}</style>
           </button>
 
           {/* ── Orbital pillar nodes ────────────────────────────── */}
@@ -848,6 +855,8 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
   isLight: boolean
   onNavigate: (path: string) => void
 }) {
+  const { data: minhasTarefas = [] } = useMinhasTarefas()
+  const nTarefas = minhasTarefas.length
   if (!open) return null
 
   const tiles = [
@@ -906,12 +915,19 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
               <button
                 key={t.path}
                 onClick={() => onNavigate(t.path)}
-                className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
+                className={`group relative rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
                   isLight
                     ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
                     : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
                 }`}
               >
+                {t.path === '/minhas-tarefas' && nTarefas > 0 && (
+                  <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
+                    style={{ minWidth: 22, height: 22, padding: '0 6px', fontSize: 11 }}
+                    title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                    {nTarefas > 99 ? '99+' : nTarefas}
+                  </span>
+                )}
                 <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${isLight ? clr.bg : clr.bgDark}`}>
                   <Icon size={20} strokeWidth={2.2} className={isLight ? clr.text : clr.textDark} />
                 </div>
