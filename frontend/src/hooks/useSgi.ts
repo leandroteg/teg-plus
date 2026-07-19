@@ -195,6 +195,16 @@ export function useAtualizarAcao() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
   })
 }
+export function useRemoverAcao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('sgi_acoes').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
+  })
+}
 
 // ── Análise / Identificação de Causa (Ishikawa + 5 Porquês) ───────────────────
 export function useAnaliseCausa(registroId?: string) {
@@ -369,24 +379,6 @@ export function useLancarCheckin() {
       const { data, error } = await supabase.rpc('sgi_meta_checkin_lancar', { p_meta_id: metaId, p_competencia: competencia, p_realizado: realizado, p_observacao: observacao ?? null })
       if (error) throw error
       return data as { ok: boolean; farol?: string; registro_criado?: string | null }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sgi_checkins'] })
-      qc.invalidateQueries({ queryKey: ['sgi_objetivos'] })
-      qc.invalidateQueries({ queryKey: ['sgi_registros'] })
-      qc.invalidateQueries({ queryKey: ['sgi_kpis'] })
-    },
-  })
-}
-/** Check-in automático: puxa a Produção mensal do EGP (execução própria, medição deslocada -1 mês)
- *  e lança em todas as metas com fonte_auto = {tipo:'egp_producao'}. Idempotente por competência. */
-export function useCheckinAutoEgp() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (competencia?: string) => {
-      const { data, error } = await supabase.rpc('sgi_checkin_auto_egp', { p_competencia: competencia ?? null })
-      if (error) throw error
-      return data as { ok: boolean; competencia?: string; producao?: number; metas_atualizadas?: number; aviso?: string; erro?: string }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sgi_checkins'] })
