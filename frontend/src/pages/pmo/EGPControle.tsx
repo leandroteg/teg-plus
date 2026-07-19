@@ -1002,11 +1002,11 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
                   <th className={thCls}>Obra</th>
+                  <th className={thCls}>Status</th>
                   <th className={`${thCls} text-center`}>OSCs</th>
                   <th className={`${thCls} text-right`}>Valor</th>
                   <th className={`${thCls} text-right`}>% Prazo</th>
                   <th className={`${thCls} text-right`}>% Faturado</th>
-                  <th className={`${thCls} text-right`}>Faturado</th>
                   <th className={`${thCls} text-right`}>Saldo</th>
                 </tr>
               </thead>
@@ -1018,13 +1018,12 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
                   return (
                     <Fragment key={polo}>
                       <tr onClick={() => toggle(polo)} className={`cursor-pointer border-b ${isLight ? 'bg-slate-50 border-slate-100 hover:bg-slate-100' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.06]'}`}>
-                        <td colSpan={2} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>
+                        <td colSpan={3} className={`py-2.5 px-4 text-xs font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-200'}`}>
                           <span className="inline-flex items-center gap-1.5">{isCol ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{polo} · {arr.length} obra{arr.length !== 1 ? 's' : ''}</span>
                         </td>
                         <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pValor)}</td>
                         <td className="py-2.5 px-4" />
                         <td className={`py-2.5 px-4 text-right text-xs font-bold ${pctColor(pValor ? Math.round(pMed / pValor * 100) : 0)}`}>{pValor ? Math.round(pMed / pValor * 100) : 0}%</td>
-                        <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pMed)}</td>
                         <td className={`py-2.5 px-4 text-right text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(pValor - pMed)}</td>
                       </tr>
                       {!isCol && arr.map(o => {
@@ -1032,11 +1031,11 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
                         return (
                           <tr key={polo + '||' + o.obra} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.03]'}`}>
                             <td className={`py-2 px-4 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{o.obra}</td>
+                            <td className={`py-2 px-4 text-xs max-w-[280px] italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`} title="Status descritivo — a ser gerado pela IA">—</td>
                             <td className={`py-2 px-4 text-xs text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{o.nOsc}</td>
                             <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{fmt(o.valor)}</td>
                             <td className={`py-2 px-4 text-xs text-right font-semibold ${prz == null ? (isLight ? 'text-slate-300' : 'text-slate-600') : pctColor(prz)}`}>{prz == null ? '—' : prz + '%'}</td>
                             <td className={`py-2 px-4 text-xs text-right font-semibold ${pctColor(pct)}`}>{pct}%</td>
-                            <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{fmt(o.medido)}</td>
                             <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(o.valor - o.medido)}</td>
                           </tr>
                         )
