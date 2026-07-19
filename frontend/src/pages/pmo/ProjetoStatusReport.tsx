@@ -8,6 +8,7 @@ import { gerarStatusReportProjetoPdf } from '../../utils/status-report-projeto-p
 interface ReportData {
   projeto: string; nObras: number; nOscs: number
   pctFis: number; pctFin: number; contratado: number; faturado: number; saldo: number
+  obrasLista: { nome: string; oscs: string[] }[]
   pacotes: EAPPacote[]
   medicao: { pac: string; meses: number[]; total: number }[]
   obras: { nome: string; status: string | null; diagnostico: string | null; farol: string | null; acoes: ObraStatusAcao[] | null }[]
@@ -150,6 +151,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
         const live: ReportData = {
           projeto: p.label, nObras: p.obras.length, nOscs: p.nOscs,
           pctFis: p.pctFis, pctFin: p.pctFin, contratado: p.contr, faturado: p.fat, saldo: p.saldo,
+          obrasLista: p.obras.map(ob => ({ nome: ob.nome, oscs: (ob.oscs ?? []).map(o => o.numero_os) })),
           pacotes: p.pacotes,
           medicao: med.map(m => ({ pac: m.pac, meses: MESES.map(mm => m.row[mm] ?? 0), total: m.total })),
           obras: obras.map(o => ({ nome: o.nome, status: o.st?.status_texto ?? null, diagnostico: o.st?.diagnostico ?? null, farol: o.st?.farol ?? null, acoes: o.st?.acoes ?? null })),
@@ -181,6 +183,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                   <button onClick={() => gerarStatusReportProjetoPdf({
                     projeto: data.projeto, nObras: data.nObras, nOscs: data.nOscs, pctFis: data.pctFis, pctFin: data.pctFin,
                     contratado: data.contratado, faturado: data.faturado, saldo: data.saldo,
+                    obrasLista: data.obrasLista ?? [],
                     pacotes: data.pacotes.map(pc => ({ n: pc.n, pctFis: pc.pctFis, pctFin: pc.pctFin, qtdContr: pc.qtdContr, qtdReal: pc.qtdReal, unidade: pc.unidade, valor: pc.valor })),
                     medicao: data.medicao, meses: MESES.map(m => MES_LBL[m]), obras: data.obras,
                   })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> PDF</button>
