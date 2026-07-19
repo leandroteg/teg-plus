@@ -17,6 +17,11 @@ export interface ProjPdfMedRow { pac: string; meses: number[]; total: number }
 export interface ProjPdfAcao { acao: string; dono?: string; prazo?: string }
 export interface ProjPdfObra { nome: string; status: string | null; diagnostico: string | null; farol: string | null; acoes: ProjPdfAcao[] | null }
 export interface ProjPdfObraLista { nome: string; oscs: string[] }
+export interface ProjPdfPrazoObra { nome: string; venc: string | null; pctPrazo: number | null }
+export interface ProjPdfPrazo { pctPrazoProj: number | null; terminoPrev: string | null; obras: ProjPdfPrazoObra[] }
+export interface ProjPdfRecursos { fundacao: number; montlanc: number; maqFund: number; maqML: number }
+export interface ProjPdfRisco { descricao: string; categoria: string | null; sev: number; prob: number; imp: number }
+export interface ProjPdfCustos { realizado: number; orcado: number }
 export interface StatusReportProjetoPdfData {
   projeto: string; nObras: number; nOscs: number
   pctFis: number; pctFin: number
@@ -25,6 +30,10 @@ export interface StatusReportProjetoPdfData {
   pacotes: ProjPdfPacote[]
   medicao: ProjPdfMedRow[]
   meses: string[]
+  prazo: ProjPdfPrazo
+  recursos: ProjPdfRecursos | null
+  riscos: ProjPdfRisco[]
+  custos: ProjPdfCustos | null
   obras: ProjPdfObra[]
 }
 
@@ -72,16 +81,16 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
     const t = doc.splitTextToSize(txt, CW - 4)
     check(t.length * (size * 0.5) + 3); doc.text(t, M + 2, y); y += t.length * (size * 0.5) + 3
   }
-  // Marca de dimensão ainda não instrumentada (honesto)
-  const gap = (txt: string) => {
-    check(9)
-    doc.setDrawColor(...AMBER); doc.setLineWidth(0.5); doc.line(M + 2, y - 3, M + 2, y + 2)
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...AMBER)
-    doc.text('A instrumentar', M + 5, y)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(...MID)
-    const t = doc.splitTextToSize(txt, CW - 30)
-    doc.text(t, M + 30, y); y += Math.max(t.length * 4, 4) + 4
+  // Dado inexistente no período (honesto, discreto — sem alarde)
+  const naDisp = (txt: string) => {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...MID)
+    const t = doc.splitTextToSize(`Não disponível no período — ${txt}`, CW - 4)
+    check(t.length * 4 + 3); doc.text(t, M + 2, y); y += t.length * 4 + 3
   }
+  const fmtD = (s: string | null) => s ? (() => { const d2 = new Date(s + 'T00:00:00'); return `${String(d2.getDate()).padStart(2, '0')}/${String(d2.getMonth() + 1).padStart(2, '0')}/${d2.getFullYear()}` })() : '—'
+  const CAT_LBL: Record<string, string> = { prazo: 'Prazo', custo: 'Custo', recurso: 'Recurso', seguranca: 'Segurança', qualidade: 'Qualidade', ambiental: 'Ambiental', externo: 'Externo', contratual: 'Contratual' }
+  const sevRGB = (s: number): readonly [number, number, number] => s >= 16 ? RED : s >= 11 ? [234, 88, 12] : s >= 6 ? AMBER : GREEN
+  const sevLbl = (s: number) => s >= 16 ? 'Crítico' : s >= 11 ? 'Alto' : s >= 6 ? 'Médio' : 'Baixo'
 
   // ── Cabeçalho enxuto (sem CNPJ/endereço) ──────────────────────────────────
   const HH = 26
@@ -159,11 +168,27 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
 
   // ── 3. Prazo ──────────────────────────────────────────────────────────────
   chapter('PRAZO — CRONOGRAMA E PROJEÇÃO DE TÉRMINO')
-  const gapFisFin = d.pctFis - d.pctFin
-  para(gapFisFin >= 3
-    ? `Físico (${d.pctFis}%) à frente do financeiro (${d.pctFin}%) em ${gapFisFin.toFixed(0)} p.p. — há produção executada ainda não medida/faturada (ver lag no cap. Produção).`
-    : `Físico ${d.pctFis}% × financeiro ${d.pctFin}%.`)
-  gap('% de prazo consumido e projeção de término por obra (data OSC × vencimento) ainda não consolidados neste relatório automático.')
+  const pp = d.prazo?.pctPrazoProj ?? null
+  if (pp != null) {
+    const delta = d.pctFis - pp
+    para(`Prazo consumido ${pp}% × físico ${d.pctFis}% → ${delta >= 0 ? `${delta} p.p. adiantado` : `${Math.abs(delta)} p.p. atrasado`}. Término previsto: ${fmtD(d.prazo.terminoPrev)}.`, 8.5, DARK)
+  } else para(`Físico ${d.pctFis}% × financeiro ${d.pctFin}%.`)
+  if (d.prazo?.obras?.length) {
+    check(8)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MID)
+    doc.text('Obra', M, y); doc.text('Vencimento', W - M - 40, y, { align: 'right' }); doc.text('Prazo consumido', W - M, y, { align: 'right' }); y += 4
+    d.prazo.obras.forEach(o => {
+      check(5.5)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK)
+      doc.text(o.nome.slice(0, 46), M, y)
+      doc.text(fmtD(o.venc), W - M - 40, y, { align: 'right' })
+      const pc = o.pctPrazo
+      const pcCol: readonly [number, number, number] = pc == null ? MID : pc >= 90 ? RED : pc >= 70 ? AMBER : DARK
+      doc.setTextColor(...pcCol)
+      doc.text(pc == null ? '—' : `${pc}%`, W - M, y, { align: 'right' }); y += 4.5
+    })
+    y += 2
+  } else naDisp('datas de OSC/vencimento não lançadas para as obras do projeto.')
 
   // ── 4. Produção e ritmo ───────────────────────────────────────────────────
   chapter('PRODUÇÃO E RITMO — MEDIÇÃO MÊS A MÊS')
@@ -194,23 +219,45 @@ function buildDoc(d: StatusReportProjetoPdfData, _empresa: EmpresaData, logo: st
   // ── 5. Financeiro ─────────────────────────────────────────────────────────
   chapter('FINANCEIRO — FATURADO × CONTRATADO')
   para(`Contratado R$ ${fmtM(d.contratado)} · Faturado R$ ${fmtM(d.faturado)} (${d.pctFin}%) · Saldo a produzir R$ ${fmtM(d.saldo)}.`, 8.5, DARK)
-  gap('Margem por obra (receita × custo realizado) não é fechada aqui — o custo está consolidado por polo/frente, não por obra.')
+  if (d.custos) {
+    const pctC = d.custos.orcado > 0 ? Math.round(d.custos.realizado / d.custos.orcado * 100) : 0
+    const margem = d.faturado - d.custos.realizado
+    para(`Custo realizado R$ ${fmtM(d.custos.realizado)} de R$ ${fmtM(d.custos.orcado)} orçado (${pctC}% do orçado) · margem parcial (faturado − custo) R$ ${fmtM(margem)}. Custo consolidado por frente; margem por obra não disponível no período.`, 8, MID)
+  } else naDisp('custo realizado do projeto não consolidado no período (margem por obra indisponível).')
 
   // ── 6. Recursos e equipe ──────────────────────────────────────────────────
-  chapter('RECURSOS E EQUIPE — EFETIVO E LIDERANÇA DA FRENTE')
-  gap('Efetivo real no ponto (view de presença por frente), horas, liderança nominal (eng./supervisor/encarregado) e veículos alocados — a preencher pela análise do SuperTEG. Lembrar: liderança é PJ e nem sempre bate ponto.')
+  chapter('RECURSOS E EQUIPE — EFETIVO E MÁQUINAS DA FRENTE')
+  if (d.recursos) {
+    const r = d.recursos
+    const pes = r.fundacao + r.montlanc, maq = r.maqFund + r.maqML
+    para(`Efetivo de produção: ${pes} pessoa(s) — ${r.fundacao} em Fundação, ${r.montlanc} em Montagem/Lançamento. Máquinas: ${maq} — ${r.maqFund} de fundação, ${r.maqML} guindauto/lançamento.`, 8.5, DARK)
+    para('Liderança nominal (eng./supervisor/encarregado), presença real por dispositivo e horas: ver diagnóstico das obras críticas. Lembrar: liderança é PJ e nem sempre bate ponto na frente.', 8, MID)
+  } else naDisp('efetivo da frente não casado com a base do projeto no período.')
 
   // ── 7. Riscos e bloqueios ─────────────────────────────────────────────────
-  chapter('RISCOS E BLOQUEIOS')
-  gap('Riscos priorizados (matriz prob.×impacto do módulo EGP-Riscos) e bloqueios de campo (acesso/fundiário/projeto/suprimentos) ainda não vinculados ao relatório por projeto.')
+  chapter(`RISCOS E BLOQUEIOS${d.riscos.length ? ` (${d.riscos.length})` : ''}`)
+  if (d.riscos.length) {
+    para(`${d.riscos.length} risco(s) ativo(s) — mais severos primeiro:`, 8.5, DARK)
+    d.riscos.forEach(r => {
+      const t = doc.splitTextToSize(r.descricao, CW - 30)
+      check(t.length * 4 + 3)
+      const sc = sevRGB(r.sev)
+      doc.setFillColor(...sc); doc.circle(M + 1.6, y - 1, 1.2, 'F')
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK); doc.text(t, M + 5, y)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(...sc)
+      doc.text(`${sevLbl(r.sev)} ${r.prob}×${r.imp}${r.categoria ? ` · ${CAT_LBL[r.categoria] ?? r.categoria}` : ''}`, W - M, y, { align: 'right' })
+      y += t.length * 4 + 2
+    })
+    y += 1
+  } else naDisp('nenhum risco cadastrado para o projeto no módulo EGP-Riscos.')
 
   // ── 8. Qualidade e segurança ──────────────────────────────────────────────
   chapter('QUALIDADE E SEGURANÇA')
-  gap('Retrabalho, não-conformidades e ocorrências de segurança (módulo QSMA) a integrar por frente/obra.')
+  naDisp('ocorrências/não-conformidades do QSMA ainda não vinculadas por obra ao relatório.')
 
   // ── 9. Contrato e cliente ─────────────────────────────────────────────────
   chapter('CONTRATO E CLIENTE (CEMIG)')
-  gap('Pendências contratuais, aditivos e status de relacionamento com o cliente a consolidar.')
+  naDisp('pendências contratuais e aditivos não estruturados para consolidação automática.')
 
   // ── 10. Ações e obras críticas (PDCA) ─────────────────────────────────────
   chapter(`AÇÕES E OBRAS CRÍTICAS${d.obras.length ? ` (${d.obras.length})` : ''}`)
