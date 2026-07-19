@@ -33,6 +33,15 @@ export async function evidenciaUrl(path?: string): Promise<string | null> {
   return data?.signedUrl ?? null
 }
 
+// Link PÚBLICO e compartilhável do relatório (edge qsma-relatorio-view serve
+// o HTML como text/html; o storage devolve text/plain, que não renderiza).
+export function relatorioLinkPublico(path?: string | null): string | null {
+  if (!path) return null
+  if (/^https?:\/\//.test(path)) return path
+  const base = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://uzfjfucrinokeuwpbeie.supabase.co'
+  return `${base}/functions/v1/qsma-relatorio-view?p=${encodeURIComponent(path)}`
+}
+
 async function proximoCodigo(tipo: string): Promise<string | null> {
   const { data } = await supabase.rpc('qsma_proximo_codigo', { p_tipo: tipo })
   return (data as string) ?? null
