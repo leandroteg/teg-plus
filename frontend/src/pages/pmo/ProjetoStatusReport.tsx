@@ -2,7 +2,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { X, Download, ChevronRight, FolderKanban, FileText, Save, Sparkles } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
-import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, useStatusReportRun, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
+import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjetoSnapshots, useSalvarProjetoSnapshot, useStatusReportRun, useRiscosEGP, type EAPPolo, type EAPPacote, type ObraStatusAcao } from '../../hooks/usePMO'
+import { useEfetivoReal } from '../../hooks/useEfetivoReal'
+import { useCustosReal, MARGEM_LUCRO } from '../../hooks/useCustos'
+import type { PMORisco } from '../../types/pmo'
 import { gerarStatusReportProjetoPdf } from '../../utils/status-report-projeto-pdf'
 
 // Conteúdo serializável do relatório (live ou snapshot)
@@ -12,6 +15,10 @@ interface ReportData {
   obrasLista: { nome: string; oscs: string[] }[]
   pacotes: EAPPacote[]
   medicao: { pac: string; meses: number[]; total: number }[]
+  prazo: { pctPrazoProj: number | null; terminoPrev: string | null; obras: { nome: string; venc: string | null; pctPrazo: number | null }[] }
+  recursos: { fundacao: number; montlanc: number; maqFund: number; maqML: number } | null
+  riscos: { descricao: string; categoria: string | null; sev: number; prob: number; imp: number }[]
+  custos: { realizado: number; orcado: number } | null
   obras: { nome: string; status: string | null; diagnostico: string | null; farol: string | null; acoes: ObraStatusAcao[] | null }[]
 }
 
@@ -66,6 +73,9 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
   const { data: raws = [], isLoading } = useEAPFinal(portfolioId)
   const { data: secao = [] } = useMedicaoSecao()
   const { data: obraStatus = [], refetch: refetchStatus } = useObraStatus()
+  const { data: efetivo } = useEfetivoReal(portfolioId)
+  const { data: riscos = [] } = useRiscosEGP(portfolioId)
+  const { data: custos } = useCustosReal(portfolioId)
   const [det, setDet] = useState<EAPPolo | null>(null)
   const [snapId, setSnapId] = useState<string>('live')
   const [disparando, setDisparando] = useState(false)
@@ -120,6 +130,40 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
     .filter(o => o.st?.status_texto)
     .sort((a, b) => (a.st?.farol === 'vermelho' ? 0 : 1) - (b.st?.farol === 'vermelho' ? 0 : 1))
 
+  // prazo consumido por obra/projeto (data OSC × vencimento das OSCs de construção)
+  const prazoDoProjeto = (polo: EAPPolo) => {
+    const rawPolo = raws.find(r => r.id === polo.id)
+    const today = Date.now()
+    const pct = (di: string | null, vf: string | null) => {
+      if (!di || !vf) return null
+      const a = new Date(di + 'T00:00:00').getTime(), b = new Date(vf + 'T00:00:00').getTime()
+      if (!(b > a)) return null
+      return Math.round(Math.max(0, (today - a) / (b - a)) * 100)
+    }
+    const byObra = new Map<string, { di: string | null; vf: string | null }>()
+    let pDi: string | null = null, pVf: string | null = null
+    for (const o of rawPolo?.oscs ?? []) {
+      if (!((o.tipo ?? '').toLowerCase().includes('constru') && (o.saldo_reais ?? 0) > 0)) continue
+      const nome = o.obra_nome || '— Sem obra'
+      const cur = byObra.get(nome) ?? { di: null, vf: null }
+      if (o.data_osc && (!cur.di || o.data_osc < cur.di)) cur.di = o.data_osc
+      if (o.vencimento && (!cur.vf || o.vencimento > cur.vf)) cur.vf = o.vencimento
+      byObra.set(nome, cur)
+      if (o.data_osc && (!pDi || o.data_osc < pDi)) pDi = o.data_osc
+      if (o.vencimento && (!pVf || o.vencimento > pVf)) pVf = o.vencimento
+    }
+    return {
+      pctPrazoProj: pct(pDi, pVf), terminoPrev: pVf,
+      obras: [...byObra.entries()].map(([nome, v]) => ({ nome, venc: v.vf, pctPrazo: pct(v.di, v.vf) })).sort((a, b) => (b.pctPrazo ?? -1) - (a.pctPrazo ?? -1)),
+    }
+  }
+  const scoreR = (r: PMORisco, k: 'p' | 'i') => {
+    const s = k === 'p' ? r.prob_score : r.impacto_score
+    if (s) return Math.max(1, Math.min(5, s))
+    const t = k === 'p' ? r.probabilidade : r.impacto
+    return t === 'alta' || t === 'alto' ? 4 : t === 'baixa' || t === 'baixo' ? 2 : 3
+  }
+
   const card = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
   const txt = isLight ? 'text-slate-800' : 'text-white'
   const muted = isLight ? 'text-slate-500' : 'text-slate-400'
@@ -161,6 +205,14 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
           obrasLista: p.obras.map(ob => ({ nome: ob.nome, oscs: (ob.oscs ?? []).map(o => o.numero_os) })),
           pacotes: p.pacotes,
           medicao: med.map(m => ({ pac: m.pac, meses: MESES.map(mm => m.row[mm] ?? 0), total: m.total })),
+          prazo: prazoDoProjeto(p),
+          recursos: efetivo?.porFrente?.[p.label] ?? null,
+          riscos: riscos.filter(r => r.frente === p.label && r.status !== 'fechado')
+            .map(r => { const pr = scoreR(r, 'p'), im = scoreR(r, 'i'); return { descricao: r.descricao, categoria: r.categoria ?? null, prob: pr, imp: im, sev: pr * im } })
+            .sort((a, b) => b.sev - a.sev).slice(0, 8),
+          custos: custos?.porFrente?.[p.label]
+            ? { realizado: Math.round(Object.values(custos.porFrente[p.label]).reduce((s, v) => s + (v || 0), 0)), orcado: Math.round((1 - MARGEM_LUCRO) * p.contr) }
+            : null,
           obras: obras.map(o => ({ nome: o.nome, status: o.st?.status_texto ?? null, diagnostico: o.st?.diagnostico ?? null, farol: o.st?.farol ?? null, acoes: o.st?.acoes ?? null })),
         }
         const data: ReportData = snapId === 'live' ? live : ((snaps.find(s => s.id === snapId)?.payload as ReportData) ?? live)
@@ -219,7 +271,10 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                     contratado: data.contratado, faturado: data.faturado, saldo: data.saldo,
                     obrasLista: data.obrasLista ?? [],
                     pacotes: data.pacotes.map(pc => ({ n: pc.n, pctFis: pc.pctFis, pctFin: pc.pctFin, qtdContr: pc.qtdContr, qtdReal: pc.qtdReal, unidade: pc.unidade, valor: pc.valor })),
-                    medicao: data.medicao, meses: MESES.map(m => MES_LBL[m]), obras: data.obras,
+                    medicao: data.medicao, meses: MESES.map(m => MES_LBL[m]),
+                    prazo: data.prazo ?? { pctPrazoProj: null, terminoPrev: null, obras: [] },
+                    recursos: data.recursos ?? null, riscos: data.riscos ?? [], custos: data.custos ?? null,
+                    obras: data.obras,
                   })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> PDF</button>
                   <button onClick={() => setDet(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
                 </div>
