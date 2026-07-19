@@ -856,7 +856,7 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
 
 // ── Status Report Panel ─────────────────────────────────────────────────────
 
-function StatusReportPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+export function StatusReportPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: reports, isLoading } = useStatusReports(portfolioId)
 
   if (isLoading) return <Spinner />
