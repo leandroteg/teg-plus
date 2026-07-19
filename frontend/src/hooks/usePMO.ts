@@ -407,6 +407,36 @@ export function useObraStatus() {
   })
 }
 
+// ── Snapshots de Status Report por projeto (versionado por data) ──────────────
+export interface ProjetoSnapshot { id: string; data_report: string; gerado_por: string | null; payload: unknown }
+export function useProjetoSnapshots(projetoId?: string | null) {
+  return useQuery<ProjetoSnapshot[]>({
+    queryKey: ['pmo-projeto-snapshots', projetoId],
+    enabled: !!projetoId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_status_report')
+        .select('id, data_report, gerado_por, payload')
+        .eq('projeto_id', projetoId!).not('payload', 'is', null)
+        .order('data_report', { ascending: false })
+      if (error) return []
+      return (data ?? []) as ProjetoSnapshot[]
+    },
+  })
+}
+export function useSalvarProjetoSnapshot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { projetoId: string; portfolioId?: string; dataReport: string; payload: unknown; geradoPor?: string | null }) => {
+      const { data, error } = await supabase.from('pmo_status_report')
+        .insert({ projeto_id: p.projetoId, portfolio_id: p.portfolioId ?? null, data_report: p.dataReport, periodo: p.dataReport.slice(0, 7), payload: p.payload, gerado_por: p.geradoPor ?? 'SuperTEG', status: 'publicado' })
+        .select('id').single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['pmo-projeto-snapshots', v.projetoId] }),
+  })
+}
+
 // ── EAP Final (visão por polo, financeiro + físico ao vivo) ───────────────────
 export interface EAPPacote {
   n: string
