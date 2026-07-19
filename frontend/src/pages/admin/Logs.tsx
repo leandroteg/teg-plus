@@ -189,7 +189,8 @@ const TONE_AVATAR: Record<string, { light: string; dark: string }> = {
 
 function LogRow({ log, isLight, agora }: { log: LogAtividade; isLight: boolean; agora: number }) {
   const [aberto, setAberto] = useState(false)
-  const meta = TIPO_META[log.tipo] ?? { label: log.tipo, verbo: log.tipo.toLowerCase(), icon: PencilLine, tone: 'slate' }
+  const tipoStr = String(log.tipo ?? '')
+  const meta = TIPO_META[tipoStr] ?? { label: tipoStr || '—', verbo: tipoStr.toLowerCase() || 'alterou', icon: PencilLine, tone: 'slate' }
   const Icon = meta.icon
   const isSistema = log.dados?.origem === 'sistema'
   const nQtd = log.tipo === 'UPDATE' ? log.dados?.campos_alterados?.length ?? 0 : 0
