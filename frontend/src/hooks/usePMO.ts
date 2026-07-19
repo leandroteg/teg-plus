@@ -437,6 +437,24 @@ export function useSalvarProjetoSnapshot() {
   })
 }
 
+// ── Estado DURÁVEL da geração de Status Report pelo SuperTEG (running/done/error) ─
+export interface StatusReportRun { projeto_id: string; run_id: string | null; status: 'running' | 'done' | 'error'; mensagem: string | null; n_obras: number | null; gravados: number | null; started_at: string; updated_at: string }
+export function useStatusReportRun(projetoId?: string | null) {
+  return useQuery<StatusReportRun | null>({
+    queryKey: ['pmo-status-run', projetoId],
+    enabled: !!projetoId,
+    // enquanto estiver gerando, recarrega a cada 4s p/ refletir a conclusão/erro
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? 4000 : false),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_status_report_run')
+        .select('projeto_id, run_id, status, mensagem, n_obras, gravados, started_at, updated_at')
+        .eq('projeto_id', projetoId!).maybeSingle()
+      if (error) return null
+      return (data ?? null) as StatusReportRun | null
+    },
+  })
+}
+
 // ── EAP Final (visão por polo, financeiro + físico ao vivo) ───────────────────
 export interface EAPPacote {
   n: string
