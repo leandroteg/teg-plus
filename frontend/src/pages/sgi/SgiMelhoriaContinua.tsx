@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   RefreshCcw, Plus, X, Search, LayoutList, LayoutGrid, Loader2, Calendar, CheckCircle2, Circle,
-  Check, Target, FlaskConical, ListChecks, ClipboardCheck, Lock,
+  Check, Target, FlaskConical, ListChecks, ClipboardCheck, Lock, ChevronDown, Building2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -273,7 +273,7 @@ function RegistroModal({ registro, onClose, isDark }: { registro: SgiRegistro; o
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2.5 text-xs mb-3">
               <div><p className={muted}>Tipo</p><p className={`font-semibold ${txt}`}>{TIPO_REGISTRO_LABEL[registro.tipo]}</p></div>
               <div><p className={muted}>Origem</p><p className={`font-semibold ${txt}`}>{ORIGEM_REGISTRO_LABEL[registro.origem]}</p></div>
-              <div><p className={muted}>Departamento</p><p className={`font-semibold ${txt}`}>{registro.area_processo || '—'}</p></div>
+              <div><p className={muted}>Área (tema)</p><p className={`font-semibold ${txt}`}>{registro.area_processo || '—'}</p></div>
               <div><p className={muted}>Projeto</p><p className={`font-semibold ${txt}`}>{obraNome ?? '—'}</p></div>
             </div>
             {registro.descricao && (
@@ -490,7 +490,10 @@ function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: b
   const criar = useCriarRegistro()
   const obras = useLookupObras()
   const { data: objetivos = [] } = useObjetivos()
-  const departamentos = useMemo(() => objetivos.filter(o => o.indicador === 'OKR').map(o => o.titulo), [objetivos])
+  const departamentos = useMemo(() => {
+    const areas = objetivos.filter(o => o.indicador === 'OKR').map(o => o.titulo)
+    return [...new Set(['Estratégia', ...areas])]
+  }, [objetivos])
   const [titulo, setTitulo] = useState('')
   const [tipo, setTipo] = useState<TipoRegistro>('anomalia')
   const [origem, setOrigem] = useState<OrigemRegistro>('campo')
@@ -543,7 +546,7 @@ function NovaAnomaliaModal({ onClose, isDark }: { onClose: () => void; isDark: b
               </select>
             </div>
             <div>
-              <label className={`block text-xs font-semibold mb-1 ${muted}`}>Departamento</label>
+              <label className={`block text-xs font-semibold mb-1 ${muted}`}>Área (tema)</label>
               <select value={area} onChange={e => setArea(e.target.value)} className={inputCls}>
                 <option value="">Selecione…</option>
                 {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
@@ -607,6 +610,53 @@ function RegistroRow({ r, isDark, onClick }: { r: SgiRegistro; isDark: boolean; 
   )
 }
 
+// ── Filtro Área (multi-select + Selecionar todos) ─────────────────────────────
+const SEM_AREA = '(sem área)'
+function AreaFilter({ options, selected, onChange, isDark }: {
+  options: string[]; selected: string[]; onChange: (v: string[]) => void; isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const allChecked = selected.length === options.length
+  const label = allChecked ? 'Área: todas' : selected.length === 0 ? 'Área: nenhuma' : `Área: ${selected.length}`
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const box = (on: boolean) => `shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-amber-600 border-amber-600 text-white' : isDark ? 'border-white/20' : 'border-slate-300'}`
+  return (
+    <div className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+          allChecked
+            ? isDark ? 'border-white/[0.08] bg-white/[0.04] text-slate-300' : 'border-slate-200 bg-white text-slate-600'
+            : isDark ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 font-semibold' : 'border-amber-300 bg-amber-50 text-amber-700 font-semibold'
+        }`}>
+        <Building2 size={13} /> {label}
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div className={`absolute z-30 mt-1 left-0 w-56 max-h-72 overflow-y-auto rounded-xl border shadow-lg p-1.5 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+            <button type="button" onClick={() => onChange(allChecked ? [] : options)}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-100'}`}>
+              <span className={box(allChecked)}>{allChecked && <Check size={11} />}</span> Selecionar todos
+            </button>
+            <div className={`my-1 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
+            {options.map(o => {
+              const on = selected.includes(o)
+              return (
+                <button key={o} type="button" onClick={() => toggle(o)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-100'}`}>
+                  <span className={box(on)}>{on && <Check size={11} />}</span>
+                  <span className="truncate text-left">{o}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Main (card + abas por etapa + toolbar, padrão da casa) ────────────────────
 export default function SgiMelhoriaContinua() {
   const { isDark } = useTheme()
@@ -617,17 +667,35 @@ export default function SgiMelhoriaContinua() {
   const [detail, setDetail] = useState<SgiRegistro | null>(null)
   const [showNovo, setShowNovo] = useState(false)
 
+  // Filtro Área (tema): opções = áreas distintas dos registros (inclui "Estratégia" das metas)
+  const areaKey = (r: SgiRegistro) => r.area_processo || SEM_AREA
+  const areaOptions = useMemo(() => [...new Set(registros.map(areaKey))].sort(), [registros])
+  const [areaSel, setAreaSel] = useState<string[]>([])
+  const areaInit = useRef(false)
+  useEffect(() => {
+    if (!areaInit.current) { if (areaOptions.length) { setAreaSel(areaOptions); areaInit.current = true } return }
+    // mantém a seleção; áreas novas entram marcadas p/ não sumirem
+    setAreaSel(prev => { const novas = areaOptions.filter(o => !prev.includes(o)); return novas.length ? [...prev, ...novas] : prev })
+  }, [areaOptions])
+
+  // aplica o filtro de área em TODAS as abas (afeta contagens + lista)
+  const areaAll = areaSel.length === areaOptions.length
+  const areaFiltered = useMemo(
+    () => areaAll ? registros : registros.filter(r => areaSel.includes(areaKey(r))),
+    [registros, areaSel, areaAll],
+  )
+
   const counts = useMemo(() => {
     const m: Record<string, number> = {}
-    registros.forEach(r => { m[r.status_pdca] = (m[r.status_pdca] || 0) + 1 })
+    areaFiltered.forEach(r => { m[r.status_pdca] = (m[r.status_pdca] || 0) + 1 })
     return m
-  }, [registros])
+  }, [areaFiltered])
 
   const filtrados = useMemo(() => {
-    let items = registros.filter(r => r.status_pdca === tab)
+    let items = areaFiltered.filter(r => r.status_pdca === tab)
     if (busca) { const q = busca.toLowerCase(); items = items.filter(r => [r.codigo, r.titulo, r.area_processo].some(v => v?.toLowerCase().includes(q))) }
     return items
-  }, [registros, tab, busca])
+  }, [areaFiltered, tab, busca])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -672,6 +740,7 @@ export default function SgiMelhoriaContinua() {
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>
+        <AreaFilter options={areaOptions} selected={areaSel} onChange={setAreaSel} isDark={isDark} />
         <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setView('list')} className={`p-1.5 ${view === 'list' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
           <button onClick={() => setView('cards')} className={`p-1.5 ${view === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
