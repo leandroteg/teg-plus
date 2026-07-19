@@ -29,7 +29,7 @@ import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
-import { Timer, FileSignature, List, LayoutGrid, ExternalLink, Send, Sparkles, FileText } from 'lucide-react'
+import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto } from '../../hooks/useObras'
 import { useBases } from '../../hooks/useEstoque'
@@ -144,7 +144,7 @@ export default function QsmaSeguranca() {
   const [subTreino, setSubTreino] = useState<'integracao' | 'controle' | 'matriz'>('controle')
   const [treinoColab, setTreinoColab] = useState<string | null>(null)
   const [quickFicha, setQuickFicha] = useState('todos')
-  const [vistaOco, setVistaOco] = useState<'lista' | 'kanban'>('lista')
+  const [vistaOco, setVistaOco] = useState<'lista' | 'cards' | 'kanban'>('cards')
   const q = busca.trim().toLowerCase()
   const lim60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
 
@@ -311,10 +311,10 @@ export default function QsmaSeguranca() {
               options={(Object.keys(STATUS_OCORRENCIA_LABEL) as StatusOcorrencia[]).map(s => ({ value: s, label: STATUS_OCORRENCIA_LABEL[s].label }))}
             />
             <ToolbarDateRange isDark={isDark} de={dataDeOco} ate={dataAteOco} onDe={setDataDeOco} onAte={setDataAteOco} />
-            {/* toggle Lista/Kanban (só acompanhamento — o tratamento é no Gestão) */}
+            {/* toggle Lista/Cards/Quadro (só acompanhamento — o tratamento é no Gestão) */}
             <div className={`inline-flex rounded-xl border overflow-hidden shrink-0 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
-              {([['lista', List], ['kanban', LayoutGrid]] as const).map(([v, Icon]) => (
-                <button key={v} onClick={() => setVistaOco(v)} title={v === 'lista' ? 'Lista' : 'Quadro por etapa'}
+              {([['lista', LayoutList, 'Lista'], ['cards', LayoutGrid, 'Cards'], ['kanban', Columns3, 'Quadro por etapa']] as const).map(([v, Icon, tt]) => (
+                <button key={v} onClick={() => setVistaOco(v)} title={tt}
                   className={`px-2.5 py-2 transition-all ${vistaOco === v
                     ? isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-50 text-red-700'
                     : isDark ? 'bg-transparent text-slate-400 hover:bg-white/[0.05]' : 'bg-white text-slate-500 hover:bg-slate-50'
@@ -325,8 +325,39 @@ export default function QsmaSeguranca() {
             </div>
           </QsmaToolbar>
 
-          {/* Vista Lista (padrão) */}
+          {/* Vista Lista (compacta — linhas) */}
           {vistaOco === 'lista' && (
+            ocorrenciasF.length === 0 ? (
+              <Vazio isDark={isDark} texto="Nenhuma ocorrência registrada" />
+            ) : (
+              <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+                {ocorrenciasF.map((o, i) => {
+                  const g = GRAVIDADE_LABEL[o.gravidade]
+                  const st = STATUS_OCORRENCIA_LABEL[o.status]
+                  const nAcoes = acoes.filter(a => a.origem_id === o.id).length
+                  return (
+                    <button key={o.id} onClick={() => setModalOcorrencia(o)}
+                      className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition-colors ${i > 0 ? (isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100') : ''} ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                      <span className={`font-mono text-[10px] shrink-0 w-16 ${txtMuted}`}>{o.codigo}</span>
+                      <span className={`text-[11px] shrink-0 w-20 tabular-nums ${txtMuted}`}>{fmtDataPlanilha(o.data_ocorrencia)}</span>
+                      <span className={`text-[12px] font-semibold truncate flex-1 min-w-0 ${txtMain}`}>{obraNome(o.obra_id)} · <span className="font-normal">{o.descricao}</span></span>
+                      {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] text-violet-400"><Link2 size={11} />{nAcoes}</span>}
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                      {o.sgi_registro_id && (
+                        <span className={`inline-flex items-center gap-1 shrink-0 px-2 py-1 rounded-full text-[10px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
+                          <ExternalLink size={11} /> Gestão
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          )}
+
+          {/* Vista Cards */}
+          {vistaOco === 'cards' && (
             ocorrenciasF.length === 0 ? (
               <Vazio isDark={isDark} texto="Nenhuma ocorrência registrada" />
             ) : (
@@ -338,20 +369,20 @@ export default function QsmaSeguranca() {
                   return (
                     <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left ${card} p-3.5 flex items-center gap-3 flex-wrap hover:shadow-md transition-all`}>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-bold ${txtMain} flex items-center gap-1.5 flex-wrap`}>
+                        <p className={`text-sm font-bold ${txtMain} flex items-center gap-2 flex-wrap`}>
                           <span className={`font-mono text-[10px] ${txtMuted}`}>{o.codigo}</span>
                           <span>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                         </p>
                         <p className={`text-[11px] truncate ${txtMuted}`}>
                           {TIPO_OCORRENCIA_LABEL[o.tipo]} · {o.descricao}
                           {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={9} />{nAcoes} ação(ões)</span>}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
                       {o.sgi_registro_id && (
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold ${isDark ? 'text-violet-400' : 'text-violet-600'}`} title="Em tratamento no módulo Gestão (SGI)">
-                          <ExternalLink size={9} /> Gestão
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
+                          <ExternalLink size={11} /> Gestão
                         </span>
                       )}
                     </button>
@@ -382,7 +413,7 @@ export default function QsmaSeguranca() {
                           }`}>
                             <div className="flex items-center justify-between gap-1 mb-1">
                               <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                             </div>
                             <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
                             <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
