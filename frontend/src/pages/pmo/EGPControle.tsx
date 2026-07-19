@@ -13,7 +13,7 @@ import {
   usePortfolio, useProjetos, useCriarProjeto,
   useMedicaoPorOSC, type MedicaoOSCRow, useAplicarMedicao, parseOSCPdf,
   useOSCItens, type EGPOscItem, useEspelhosDaOSC, getEspelhoUrl,
-  useMudancas, useMultas, useStatusReports, useIndicadores,
+  useMudancas, useMultas, useStatusReports, useIndicadores, useObraStatus,
 } from '../../hooks/usePMO'
 import { useLookups } from '../../hooks/useLookups'
 import type {
@@ -855,10 +855,13 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
 }
 
 // ── Status por Obra (agrupado por Projeto) — mesmos filtros do Controle ───────
-type ObraAgg = { obra: string; polo: string; nOsc: number; valor: number; medido: number; prazoNum: number; prazoDen: number }
+type ObraAgg = { obra: string; polo: string; obra_id: string | null; nOsc: number; valor: number; medido: number; prazoNum: number; prazoDen: number }
 
 export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
   const { data: rows, isLoading } = useMedicaoPorOSC(portfolioId)
+  const { data: statusRows = [] } = useObraStatus()
+  const statusMap = new Map(statusRows.map(s => [s.obra_id, s]))
+  const farolDot = (f?: string | null) => f === 'vermelho' ? 'bg-red-500' : f === 'amarelo' ? 'bg-amber-500' : f === 'verde' ? 'bg-emerald-500' : 'bg-slate-400'
   const [q, setQ] = useState('')
   const [fTipo, setFTipo] = useState('')
   const [fValor, setFValor] = useState('')
@@ -900,7 +903,8 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
   const obrasMap = new Map<string, ObraAgg>()
   for (const r of list) {
     const key = r.polo_nome + '||' + r.obra_nome
-    const a = obrasMap.get(key) ?? { obra: r.obra_nome, polo: r.polo_nome, nOsc: 0, valor: 0, medido: 0, prazoNum: 0, prazoDen: 0 }
+    const a = obrasMap.get(key) ?? { obra: r.obra_nome, polo: r.polo_nome, obra_id: r.obra_id, nOsc: 0, valor: 0, medido: 0, prazoNum: 0, prazoDen: 0 }
+    if (!a.obra_id && r.obra_id) a.obra_id = r.obra_id
     a.nOsc++; a.valor += r.valor; a.medido += r.medido
     const pp = pctPrazo(r.data_osc, r.vencimento)
     if (pp != null && r.valor > 0) { a.prazoNum += pp * r.valor; a.prazoDen += r.valor }
@@ -1031,7 +1035,16 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
                         return (
                           <tr key={polo + '||' + o.obra} className={`border-b ${isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.03]'}`}>
                             <td className={`py-2 px-4 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{o.obra}</td>
-                            <td className={`py-2 px-4 text-xs max-w-[280px] italic ${isLight ? 'text-slate-400' : 'text-slate-500'}`} title="Status descritivo — a ser gerado pela IA">—</td>
+                            {(() => { const st = o.obra_id ? statusMap.get(o.obra_id) : undefined; return (
+                              <td className="py-2 px-4 text-xs max-w-[340px]" title={st?.status_texto ?? 'Status descritivo — a ser gerado pela IA'}>
+                                {st?.status_texto ? (
+                                  <span className="flex items-start gap-1.5">
+                                    <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${farolDot(st.farol)}`} />
+                                    <span className={`line-clamp-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{st.status_texto}</span>
+                                  </span>
+                                ) : <span className={`italic ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>}
+                              </td>
+                            ) })()}
                             <td className={`py-2 px-4 text-xs text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{o.nOsc}</td>
                             <td className={`py-2 px-4 text-xs text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{fmt(o.valor)}</td>
                             <td className={`py-2 px-4 text-xs text-right font-semibold ${prz == null ? (isLight ? 'text-slate-300' : 'text-slate-600') : pctColor(prz)}`}>{prz == null ? '—' : prz + '%'}</td>
