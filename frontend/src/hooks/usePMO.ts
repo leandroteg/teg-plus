@@ -438,7 +438,7 @@ export function useSalvarProjetoSnapshot() {
 }
 
 // ── Relatório consolidado do PROJETO gerado pelo SuperTEG (respostas às 10 perguntas) ─
-export interface ProjetoStatusCapItem { q: string; a: string }
+export interface ProjetoStatusCapItem { q: string; a: string; tabela?: { colunas: string[]; linhas: string[][] } | null; bullets?: string[] | null }
 export interface ProjetoStatusCap { key: string; titulo: string; itens: ProjetoStatusCapItem[] }
 export interface ProjetoStatusRow { projeto_id: string; farol: string | null; sintese: string | null; decisoes: string[] | null; capitulos: ProjetoStatusCap[] | null; gerado_por: string | null; gerado_em: string | null; updated_at: string | null }
 export function useProjetoStatus(projetoId?: string | null) {
