@@ -334,11 +334,28 @@ export function useEnviarOcorrenciaSgi() {
         .update({ sgi_registro_id: reg.id, status: 'investigacao', updated_at: new Date().toISOString() })
         .eq('id', o.id)
       if (e2) throw e2
+      // pré-preenche a Melhoria Contínua com o plano de ação gerado pelo SuperTEG (se houver)
+      const acoes = (o.riia as { acoes?: Array<{ causa_raiz?: string; acao?: string; responsavel?: string; prazo?: string }> } | null | undefined)?.acoes
+      if (Array.isArray(acoes) && acoes.length) {
+        const hoje = Date.now()
+        const rows = acoes.filter(a => a?.acao).map(a => {
+          const m = String(a.prazo ?? '').match(/(\d+)\s*dia/i)
+          const prazo = m ? new Date(hoje + Number(m[1]) * 864e5).toISOString().slice(0, 10) : null
+          const desc = [a.causa_raiz ? `Causa raiz: ${a.causa_raiz}` : '', a.responsavel ? `Responsável sugerido: ${a.responsavel}` : ''].filter(Boolean).join('\n')
+          return {
+            origem_tipo: 'qsma_ocorrencia', origem_id: o.id,
+            titulo: String(a.acao).slice(0, 200), descricao: desc || null,
+            prazo, status: 'aberta', criado_por_nome: p.criado_por_nome ?? null,
+          }
+        })
+        if (rows.length) await supabase.from('sgi_acoes').insert(rows)
+      }
       return reg
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['qsma_ocorrencias'] })
       qc.invalidateQueries({ queryKey: ['sgi_registros'] })
+      qc.invalidateQueries({ queryKey: ['sgi_acoes'] })
       qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
     },
   })
