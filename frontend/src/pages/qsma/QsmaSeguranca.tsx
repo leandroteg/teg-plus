@@ -342,33 +342,60 @@ export default function QsmaSeguranca() {
             </div>
           </QsmaToolbar>
 
-          {/* Vista Lista (compacta — linhas) */}
+          {/* Vista Lista (tabela com colunas) */}
           {vistaOco === 'lista' && (
             ocorrenciasF.length === 0 ? (
               <Vazio isDark={isDark} texto="Nenhuma ocorrência registrada" />
             ) : (
-              <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
-                {ocorrenciasF.map((o, i) => {
-                  const g = GRAVIDADE_LABEL[o.gravidade]
-                  const st = STATUS_OCORRENCIA_LABEL[o.status]
-                  const nAcoes = acoes.filter(a => a.origem_id === o.id).length
-                  return (
-                    <button key={o.id} onClick={() => setModalOcorrencia(o)}
-                      className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition-colors ${i > 0 ? (isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100') : ''} ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
-                      <span className={`font-mono text-[10px] shrink-0 w-16 ${txtMuted}`}>{o.codigo}</span>
-                      <span className={`text-[11px] shrink-0 w-20 tabular-nums ${txtMuted}`}>{fmtDataPlanilha(o.data_ocorrencia)}</span>
-                      <span className={`text-[12px] font-semibold truncate flex-1 min-w-0 ${txtMain}`}>{obraNome(o.obra_id)} · <span className="font-normal">{o.descricao}</span></span>
-                      {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] text-violet-400"><Link2 size={11} />{nAcoes}</span>}
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${isDark ? g.dark : g.light}`}>{g.label}</span>
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${isDark ? st.dark : st.light}`}>{st.label}</span>
-                      {o.sgi_registro_id && (
-                        <span className={`inline-flex items-center gap-1 shrink-0 px-2 py-1 rounded-full text-[10px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
-                          <ExternalLink size={11} /> Gestão
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
+              <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <table className="w-full min-w-[900px] text-xs">
+                  <thead>
+                    <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                      {[
+                        { label: 'CÓDIGO', align: 'text-left' },
+                        { label: 'DATA', align: 'text-left' },
+                        { label: 'OBRA', align: 'text-left' },
+                        { label: 'TIPO', align: 'text-left' },
+                        { label: 'DESCRIÇÃO', align: 'text-left' },
+                        { label: 'AÇÕES', align: 'text-center' },
+                        { label: 'GRAVIDADE', align: 'text-center' },
+                        { label: 'STATUS', align: 'text-center' },
+                        { label: 'GESTÃO', align: 'text-center' },
+                      ].map(col => (
+                        <th key={col.label} className={`${col.align} px-3 py-2 font-semibold whitespace-nowrap`}>{col.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ocorrenciasF.map(o => {
+                      const g = GRAVIDADE_LABEL[o.gravidade]
+                      const st = STATUS_OCORRENCIA_LABEL[o.status]
+                      const nAcoes = acoesDaOco(o).length
+                      return (
+                        <tr key={o.id} onClick={() => setModalOcorrencia(o)}
+                          className={`cursor-pointer transition-colors ${isDark ? 'border-t border-white/[0.04] hover:bg-white/[0.04]' : 'border-t border-slate-100 hover:bg-slate-50'}`}>
+                          <td className={`px-3 py-2.5 font-mono font-bold whitespace-nowrap ${isDark ? 'text-red-300' : 'text-red-700'}`}>{o.codigo}</td>
+                          <td className={`px-3 py-2.5 tabular-nums whitespace-nowrap ${txtMuted}`}>{fmtDataPlanilha(o.data_ocorrencia)}</td>
+                          <td className={`px-3 py-2.5 font-semibold whitespace-nowrap ${txtMain}`}>{obraNome(o.obra_id)}</td>
+                          <td className={`px-3 py-2.5 whitespace-nowrap ${txtMuted}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</td>
+                          <td className={`px-3 py-2.5 ${txtMuted}`}><span className="block truncate max-w-[360px]">{o.descricao}</span></td>
+                          <td className="px-3 py-2.5 text-center">
+                            {nAcoes > 0
+                              ? <span className="inline-flex items-center gap-0.5 text-violet-400 font-semibold"><Link2 size={11} />{nAcoes}</span>
+                              : <span className={txtMuted}>—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span></td>
+                          <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span></td>
+                          <td className="px-3 py-2.5 text-center">
+                            {o.sgi_registro_id
+                              ? <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)"><ExternalLink size={11} /> Gestão</span>
+                              : <span className={txtMuted}>—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )
           )}
