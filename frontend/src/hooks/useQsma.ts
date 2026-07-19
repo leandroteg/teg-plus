@@ -243,6 +243,34 @@ export function useSalvarOcorrencia() {
   })
 }
 
+// ── Relatório de investigação gerado pelo SuperTEG (edge → n8n → worker) ──────
+export function useGerarRelatorio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (ocorrenciaId: string) => {
+      const { data, error } = await supabase.functions.invoke('qsma-ocorrencia-relatorio', { body: { ocorrencia_id: ocorrenciaId } })
+      if (error) throw error
+      if (data && data.ok === false) throw new Error(data.motivo || 'falha ao acionar o SuperTEG')
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_ocorrencias'] }),
+  })
+}
+
+// Poll do status do relatório enquanto está "processando"
+export function useRelatorioStatus(ocorrenciaId: string | undefined, ativo: boolean) {
+  return useQuery({
+    queryKey: ['qsma_relatorio_status', ocorrenciaId],
+    enabled: !!ocorrenciaId && ativo,
+    refetchInterval: ativo ? 6000 : false,
+    queryFn: async () => {
+      const { data } = await supabase.from('qsma_ocorrencias')
+        .select('relatorio_status, relatorio_url, relatorio_gerado_em').eq('id', ocorrenciaId!).single()
+      return data as { relatorio_status: string | null; relatorio_url: string | null; relatorio_gerado_em: string | null } | null
+    },
+  })
+}
+
 // Ação corretiva da ocorrência → sgi_acoes (plano de ação único da empresa)
 export function useCriarAcaoOcorrencia() {
   const qc = useQueryClient()
