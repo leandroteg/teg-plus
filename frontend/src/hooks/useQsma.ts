@@ -402,6 +402,50 @@ export function useAcoesQsma() {
   })
 }
 
+// Ações do PLANO (geradas no SGI sob o registro) das ocorrências em tratamento
+export function useAcoesDosRegistros(registroIds: string[]) {
+  const key = [...registroIds].sort().join(',')
+  return useQuery({
+    queryKey: ['qsma_acoes_registros', key],
+    enabled: registroIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sgi_acoes')
+        .select('id, origem_id, titulo, descricao, responsavel_id, prazo, status, created_at')
+        .eq('origem_tipo', 'registro')
+        .in('origem_id', registroIds)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as {
+        id: string; origem_id: string; titulo: string; descricao?: string
+        responsavel_id?: string; prazo?: string; status: string; created_at: string
+      }[]
+    },
+  })
+}
+
+// Marca/desmarca uma ação como concluída (checkbox no card do Quadro)
+export function useToggleAcaoQsma() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, concluida }: { id: string; concluida: boolean }) => {
+      const { error } = await supabase.from('sgi_acoes')
+        .update({
+          status: concluida ? 'concluida' : 'aberta',
+          concluida_em: concluida ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_acoes'] })
+      qc.invalidateQueries({ queryKey: ['sgi_acoes'] })
+      qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+    },
+  })
+}
+
 // ── Riscos (PGR / APR) ───────────────────────────────────────────────────────
 
 export function useRiscos() {
