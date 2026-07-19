@@ -4,7 +4,7 @@ import { ContractSelector } from '../../components/EGPLayout'
 import {
   ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign, Ruler,
   AlertTriangle, Plus, Trash2, Save, Edit3, X, Check, Sparkles, FolderKanban, ChevronRight,
-  Table2, GitBranch,
+  Table2, GitBranch, FileText,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -23,11 +23,11 @@ import CronogramaPainel from './paineis/CronogramaPainel'
 import HistogramaRecursos from './paineis/HistogramaPainel'
 import CustosPainel from './paineis/CustosPainel'
 import RiscosPainel from './paineis/RiscosPainel'
-import { MedicoesPanel } from './EGPControle'
+import { MedicoesPanel, StatusReportPanel } from './EGPControle'
 import { Wallet } from 'lucide-react'
 import type { PMOEAP, PMOTarefa, PMOHistograma, PMOOrcamento, PMORisco } from '../../types/pmo'
 
-type Tab = 'eap' | 'cronograma' | 'histograma' | 'custos' | 'medicao' | 'riscos'
+type Tab = 'eap' | 'cronograma' | 'histograma' | 'custos' | 'medicao' | 'riscos' | 'status_report'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'eap', label: 'EAP', icon: Network },
@@ -36,6 +36,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'custos', label: 'Custos', icon: Wallet },
   { key: 'medicao', label: 'Medição', icon: Ruler },
   { key: 'riscos', label: 'Riscos', icon: AlertTriangle },
+  { key: 'status_report', label: 'Status Report', icon: FileText },
 ]
 
 const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; textActive: string; border: string; bgDark: string; bgActiveDark: string; textDark: string; textActiveDark: string; borderDark: string }> = {
@@ -45,6 +46,7 @@ const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; text
   custos:      { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-emerald-500/10', textDark: 'text-emerald-400', textActiveDark: 'text-emerald-300', borderDark: 'border-emerald-500/40' },
   medicao:     { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',     text: 'text-sky-600',     textActive: 'text-sky-800',     border: 'border-sky-500',     bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-sky-500/10',     textDark: 'text-sky-400',     textActiveDark: 'text-sky-300',     borderDark: 'border-sky-500/40' },
   riscos:      { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',   text: 'text-amber-600',   textActive: 'text-amber-800',   border: 'border-amber-500',   bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-amber-500/10',   textDark: 'text-amber-400',   textActiveDark: 'text-amber-300',   borderDark: 'border-amber-500/40' },
+  status_report: { bg: 'hover:bg-indigo-50', bgActive: 'bg-indigo-50', text: 'text-indigo-600', textActive: 'text-indigo-800', border: 'border-indigo-500', bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-indigo-500/10', textDark: 'text-indigo-400', textActiveDark: 'text-indigo-300', borderDark: 'border-indigo-500/40' },
 }
 
 const fmtBRL = (v: number) =>
@@ -140,7 +142,7 @@ export default function EGPPlanejamento() {
 
       {/* Barra de filtro: Cronograma/Histograma não usam o seletor de Projetos (contrato inteiro).
           Medição tem a própria linha de filtros (MedicoesPanel), então dispensa a barra de cima. */}
-      {tab === 'histograma' || tab === 'custos' || tab === 'riscos' || tab === 'medicao' ? null : tab === 'cronograma' ? (
+      {tab === 'histograma' || tab === 'custos' || tab === 'riscos' || tab === 'medicao' || tab === 'status_report' ? null : tab === 'cronograma' ? (
         <div id="crono-filters-slot" className="flex items-center gap-2 flex-wrap justify-start" />
       ) : (
         <ProjetosFilterBar
@@ -178,6 +180,7 @@ export default function EGPPlanejamento() {
       {tab === 'custos' && <CustosPainel portfolioId={portfolioId} />}
       {tab === 'medicao' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPainel portfolioId={portfolioId} />}
+      {tab === 'status_report' && <StatusReportPanel portfolioId={portfolioId} isLight={isLight} />}
     </div>
   )
 }
