@@ -108,8 +108,15 @@ export interface SgiAcao {
   escalonado: boolean
   evidencia_url?: string | null
   concluida_em?: string | null
+  comentarios?: SgiAcaoComentario[] | null
   created_at: string
   updated_at: string
+}
+export interface SgiAcaoComentario {
+  texto: string
+  autor_id?: string | null
+  autor_nome?: string | null
+  data: string
 }
 
 // Identificação de causa (Ishikawa 6M + 5 Porquês) — guardado em sgi_analise_causa.conteudo (jsonb)
@@ -189,8 +196,6 @@ export interface SgiMeta {
   descricao?: string | null
   /** Prazo do KR (data-limite). */
   prazo?: string | null
-  /** Fonte automática do check-in (Produção/Produtividade do EGP). Null/ausente = manual. */
-  fonte_auto?: { tipo: 'egp_producao' | 'egp_produtividade'; agregacao?: 'acumulado_ano' | 'mes'; escala?: 'mi' | 'reais'; headcount?: 'sem_pj' | 'total' } | null
   /** Acompanhamento (Check-in): aberto / encerrado / cancelado. */
   status_checkin?: StatusCheckinMeta
   /** Resultado (Revisão): atingida / parcial / não atingida / cancelada. */
