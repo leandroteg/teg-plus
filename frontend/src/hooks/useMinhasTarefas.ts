@@ -12,6 +12,7 @@ export type ModuloTarefa =
   | 'contratos'
   | 'despesas'
   | 'transporte'
+  | 'gestao'
 
 export interface Tarefa {
   id: string
@@ -34,6 +35,7 @@ const MODULO_LABEL: Record<ModuloTarefa, string> = {
   contratos: 'Contratos',
   despesas: 'Despesas',
   transporte: 'Transporte',
+  gestao: 'Gestao',
 }
 
 // ── Hook principal ──────────────────────────────────────────────────────────────
@@ -41,11 +43,12 @@ const MODULO_LABEL: Record<ModuloTarefa, string> = {
 export function useMinhasTarefas() {
   const { perfil } = useAuth()
   const authId = perfil?.auth_id
+  const perfilId = perfil?.id
   const email = perfil?.email?.toLowerCase()
   const enabled = !!authId
 
   return useQuery<Tarefa[]>({
-    queryKey: ['minhas-tarefas', authId],
+    queryKey: ['minhas-tarefas', authId, perfilId],
     enabled,
     refetchInterval: 60_000,
     staleTime: 30_000,
@@ -261,6 +264,37 @@ export function useMinhasTarefas() {
           criadoEm: a.created_at as string,
           link: `/despesas/adiantamentos`,
         })
+      }
+
+      // 10. Ações do SGI (metas/OKR, melhoria contínua, ocorrências) onde EU sou o responsável
+      if (perfilId) {
+        const { data: acoes } = await supabase
+          .from('sgi_acoes')
+          .select('id, origem_tipo, titulo, descricao, prazo, status, created_at')
+          .eq('responsavel_id', perfilId)
+          .not('status', 'in', '(concluida,cancelada)')
+          .order('prazo', { ascending: true, nullsFirst: false })
+
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+        for (const a of acoes ?? []) {
+          const ot = a.origem_tipo as string
+          const tipo = ot === 'meta' ? 'Ação de meta (OKR)' : ot === 'registro' ? 'Ação de melhoria/ocorrência' : 'Ação'
+          const link = ot === 'meta' ? '/sgi/objetivos' : ot === 'registro' ? '/sgi/melhoria' : '/sgi'
+          const prazo = a.prazo ? new Date(String(a.prazo) + 'T00:00:00') : null
+          const venceEm = prazo ? Math.round((prazo.getTime() - hoje.getTime()) / 86400000) : null
+          tarefas.push({
+            id: `sgiacao-${a.id}`,
+            modulo: 'gestao',
+            moduloLabel: MODULO_LABEL.gestao,
+            tipo,
+            numero: prazo ? (venceEm! < 0 ? `venceu há ${-venceEm!}d` : venceEm === 0 ? 'vence hoje' : `faltam ${venceEm}d`) : 'sem prazo',
+            titulo: a.titulo as string,
+            descricao: (a.descricao as string | null)?.replace(/\s*\[.*?\]\s*$/, '') || undefined,
+            prioridade: venceEm != null && venceEm <= 2 ? 'alta' : 'normal',
+            criadoEm: a.created_at as string,
+            link,
+          })
+        }
       }
 
       // Sort: high priority first, then by date desc
