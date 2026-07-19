@@ -134,6 +134,7 @@ const DPBeneficios = lazy(() => import('./pages/rh/DPBeneficios'))
 const DPPonto = lazy(() => import('./pages/rh/DPPonto'))
 const AssinarDocumento = lazy(() => import('./pages/publico/AssinarDocumento'))
 const VerificarAssinatura = lazy(() => import('./pages/publico/VerificarAssinatura'))
+const RelatorioPublico = lazy(() => import('./pages/publico/RelatorioPublico'))
 const DPFolha = lazy(() => import('./pages/rh/DPFolha'))
 const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
 const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
@@ -236,7 +237,6 @@ const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
-const Logs = lazy(() => import('./pages/admin/Logs'))
 
 // TI / Help Desk
 const TIHome = lazy(() => import('./pages/ti/TIHome'))
@@ -289,6 +289,9 @@ export default function App() {
         <Route path="/aprovacao/:token" element={<Lazy><Aprovacao /></Lazy>} />
         <Route path="/aprovaai"         element={<Lazy><AprovAi /></Lazy>} />
         <Route path="/portal-teg"       element={<Lazy><PortalTEG /></Lazy>} />
+
+        {/* Relatório de investigação QSMA: link público compartilhável */}
+        <Route path="/relatorio" element={<Lazy><RelatorioPublico /></Lazy>} />
 
         {/* Assinatura eletrônica: públicas (colaborador via missão do Portal) */}
         <Route path="/assinar/:id"   element={<Lazy><AssinarDocumento /></Lazy>} />
@@ -618,7 +621,6 @@ export default function App() {
             <Route path="/admin/politicas-aprovacao" element={<Lazy><PoliticasAprovacao /></Lazy>} />
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
-            <Route path="/admin/logs" element={<Lazy><Logs /></Lazy>} />
           </Route>
         </Route>
       </Routes>
