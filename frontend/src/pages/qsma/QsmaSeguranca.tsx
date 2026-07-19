@@ -93,13 +93,13 @@ function RelatorioTag({ o, isDark, muted }: { o: QsmaOcorrencia; isDark: boolean
     return (
       <span className="inline-flex items-center gap-1">
         <button onClick={e => { e.stopPropagation(); abrirRelatorio(o.relatorio_url) }} title="Ver relatório de investigação (RIIA)"
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}>
-          <FileText size={11} /> Ver
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${isDark ? 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}>
+          <FileText size={13} /> Ver
         </button>
         <button onClick={async e => { e.stopPropagation(); if (await copiarLinkRelatorio(o.relatorio_url)) { setCopiado(true); setTimeout(() => setCopiado(false), 1500) } }}
           title="Copiar link compartilhável"
           className={`p-1 rounded-md transition-colors ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}>
-          {copiado ? <Check size={11} className="text-emerald-500" /> : <LinkIcon size={11} />}
+          {copiado ? <Check size={13} className="text-emerald-500" /> : <LinkIcon size={13} />}
         </button>
       </span>
     )
