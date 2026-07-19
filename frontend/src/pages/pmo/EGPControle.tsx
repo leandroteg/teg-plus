@@ -1094,9 +1094,26 @@ export function StatusObrasPanel({ portfolioId, isLight }: { portfolioId?: strin
                     <p className={`text-[11px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Situação atual</p>
                   </div>
                   <p className={`text-sm leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{st?.status_texto ?? 'Status ainda não gerado por IA.'}</p>
+                  {st?.diagnostico && <p className={`text-xs leading-relaxed mt-3 pt-3 border-t ${isLight ? 'text-slate-600 border-slate-200' : 'text-slate-300 border-white/[0.06]'}`}>{st.diagnostico}</p>}
                   {st?.gerado_por && <p className={`text-[10px] mt-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Gerado por {st.gerado_por}</p>}
                 </div>
-                <button onClick={() => gerarStatusReportObraPdf({ obra: o.obra, frente: o.polo, valor: o.valor, faturado: o.medido, saldo, fatPct: fat, prazoPct: prz, nOsc: o.nOsc, statusTexto: st?.status_texto ?? null, farol: st?.farol ?? null, geradoPor: st?.gerado_por ?? null })}
+                {st?.acoes && st.acoes.length > 0 && (
+                  <div className={`rounded-xl border p-4 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
+                    <p className={`text-[11px] font-bold uppercase tracking-wide mb-2.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Ações sugeridas</p>
+                    <div className="space-y-2.5">
+                      {st.acoes.map((a, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 text-[9px] font-bold flex items-center justify-center">{i + 1}</span>
+                          <div className="min-w-0">
+                            <p className={`text-xs font-medium leading-snug ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{a.acao}</p>
+                            <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{a.dono ?? '—'}{a.prazo ? ` · até ${a.prazo}` : ''}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <button onClick={() => gerarStatusReportObraPdf({ obra: o.obra, frente: o.polo, valor: o.valor, faturado: o.medido, saldo, fatPct: fat, prazoPct: prz, nOsc: o.nOsc, statusTexto: st?.status_texto ?? null, diagnostico: st?.diagnostico ?? null, acoes: st?.acoes ?? null, farol: st?.farol ?? null, geradoPor: st?.gerado_por ?? null })}
                   className="w-full py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 flex items-center justify-center gap-2">
                   <Download size={15} /> Exportar PDF
                 </button>
