@@ -6,7 +6,7 @@ import { useEAPFinal, aggregatePolos, useMedicaoSecao, useObraStatus, useProjeto
 import { useEfetivoReal } from '../../hooks/useEfetivoReal'
 import { useCustosReal, MARGEM_LUCRO } from '../../hooks/useCustos'
 import type { PMORisco } from '../../types/pmo'
-import { gerarStatusReportProjetoPdf } from '../../utils/status-report-projeto-pdf'
+import { gerarStatusReportProjetoHtml } from '../../utils/status-report-projeto-html'
 
 // Conteúdo serializável do relatório (live ou snapshot)
 interface ReportData {
@@ -270,7 +270,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                       disabled={salvar.isPending} title="Salvar snapshot deste relatório"
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${isLight ? 'border border-slate-200 text-slate-600 hover:bg-slate-50' : 'border border-white/10 text-slate-300 hover:bg-white/[0.06]'}`}><Save size={13} /> {salvar.isPending ? 'Salvando…' : 'Salvar'}</button>
                   )}
-                  <button onClick={() => gerarStatusReportProjetoPdf({
+                  <button onClick={() => gerarStatusReportProjetoHtml({
                     projeto: data.projeto, nObras: data.nObras, nOscs: data.nOscs, pctFis: data.pctFis, pctFin: data.pctFin,
                     contratado: data.contratado, faturado: data.faturado, saldo: data.saldo,
                     obrasLista: data.obrasLista ?? [],
@@ -279,7 +279,7 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                     prazo: data.prazo ?? { pctPrazoProj: null, terminoPrev: null, obras: [] },
                     recursos: data.recursos ?? null, riscos: data.riscos ?? [], custos: data.custos ?? null,
                     obras: data.obras, stReport: data.stReport ?? null,
-                  })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> PDF</button>
+                  })} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5"><Download size={13} /> Relatório</button>
                   <button onClick={() => setDet(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
                 </div>
               </div>
@@ -385,11 +385,32 @@ export default function ProjetoStatusReport({ isLight }: { isLight: boolean }) {
                       {(data.stReport?.capitulos ?? []).map((cap, ci) => (
                         <div key={cap.key ?? ci} className={`rounded-xl border p-3 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
                           <p className={`text-xs font-bold mb-1.5 ${txt}`}>{cap.titulo}</p>
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             {(cap.itens ?? []).map((it, ii) => (
                               <div key={ii}>
                                 <p className={`text-[11px] font-semibold ${muted}`}>{it.q}</p>
-                                <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{it.a}</p>
+                                {it.a && <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{it.a}</p>}
+                                {it.tabela && (it.tabela.colunas?.length ?? 0) >= 2 && (it.tabela.linhas?.length ?? 0) > 0 && (
+                                  <div className="overflow-x-auto mt-1">
+                                    <table className="w-full text-[11px]">
+                                      <thead><tr className={muted}>
+                                        {it.tabela.colunas.map((c, i) => <th key={i} className={`font-semibold py-1 ${i === 0 ? 'text-left pr-2' : 'text-right px-1.5'}`}>{c}</th>)}
+                                      </tr></thead>
+                                      <tbody>
+                                        {it.tabela.linhas.map((l, li) => (
+                                          <tr key={li} className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                                            {it.tabela!.colunas.map((_c, i) => <td key={i} className={`py-1 tabular-nums ${i === 0 ? `text-left pr-2 font-medium ${txt}` : `text-right px-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}`}>{String(l[i] ?? '')}</td>)}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                {(it.bullets ?? []).length > 0 && (
+                                  <ul className="mt-1 space-y-0.5">
+                                    {(it.bullets ?? []).map((b, bi) => <li key={bi} className={`text-[11px] pl-3 relative ${isLight ? 'text-slate-600' : 'text-slate-300'}`}><span className="absolute left-0">•</span>{b}</li>)}
+                                  </ul>
+                                )}
                               </div>
                             ))}
                           </div>
