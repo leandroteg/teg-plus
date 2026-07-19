@@ -291,6 +291,33 @@ export function useObjetivos(filtros?: { ano?: number }) {
     },
   })
 }
+// Contexto de um KR (a partir da meta clicada em Minhas Tarefas): objetivo da área +
+// todos os KRs do MESMO período + as ações de cada KR. Usado no modal de tarefa do SGI.
+export function useSgiObjetivoContexto(metaId?: string | null) {
+  return useQuery({
+    queryKey: ['sgi_obj_contexto', metaId],
+    enabled: !!metaId,
+    queryFn: async () => {
+      const { data: foco } = await supabase.from('sgi_metas').select('objetivo_id, trimestre, ano').eq('id', metaId!).maybeSingle()
+      if (!foco) return null
+      const { data: obj } = await supabase.from('sgi_objetivos')
+        .select('*, metas:sgi_metas(*, checkins:sgi_metas_checkin(*))')
+        .eq('id', foco.objetivo_id).maybeSingle()
+      if (!obj) return null
+      const metas = ((obj.metas ?? []) as (SgiMeta & { checkins: SgiCheckin[] })[])
+        .filter(m => m.ano === foco.ano && (foco.trimestre == null || m.trimestre === foco.trimestre))
+        .sort((a, b) => (a.prazo ?? '9999').localeCompare(b.prazo ?? '9999'))
+      const ids = metas.map(m => m.id)
+      let acoes: SgiAcao[] = []
+      if (ids.length) {
+        const { data } = await supabase.from('sgi_acoes').select('*').in('origem_id', ids)
+          .order('prazo', { ascending: true, nullsFirst: false })
+        acoes = (data ?? []) as SgiAcao[]
+      }
+      return { objetivo: obj as SgiObjetivo, metas, acoes, focoMetaId: metaId, trimestre: foco.trimestre, ano: foco.ano }
+    },
+  })
+}
 export function useCriarObjetivo() {
   const qc = useQueryClient()
   return useMutation({
