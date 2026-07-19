@@ -8,6 +8,7 @@ import jsPDF from 'jspdf'
 import type { EmpresaData } from '../services/empresa'
 import { EMPRESA_FALLBACK, getEmpresa } from '../services/empresa'
 
+export interface StatusReportObraPdfAcao { acao: string; dono?: string; prazo?: string }
 export interface StatusReportObraPdfData {
   obra: string
   frente: string
@@ -18,6 +19,8 @@ export interface StatusReportObraPdfData {
   prazoPct: number | null
   nOsc: number
   statusTexto: string | null
+  diagnostico?: string | null
+  acoes?: StatusReportObraPdfAcao[] | null
   farol: string | null
   geradoPor?: string | null
 }
@@ -95,9 +98,31 @@ function buildDoc(d: StatusReportObraPdfData, empresa: EmpresaData, logo: string
   doc.setFillColor(...fRGB); doc.circle(M + 2, y - 1.2, 1.6, 'F')
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...fRGB)
   doc.text((d.farol ?? '—').toUpperCase(), M + 6, y); y += 6
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...DARK)
-  const linhas = doc.splitTextToSize(d.statusTexto ?? 'Status ainda não gerado.', CW)
-  doc.text(linhas, M, y); y += linhas.length * 5.5 + 8
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...DARK)
+  const resumo = doc.splitTextToSize(d.statusTexto ?? 'Status ainda não gerado.', CW)
+  doc.text(resumo, M, y); y += resumo.length * 5.5 + 4
+
+  if (d.diagnostico) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...MID)
+    const diag = doc.splitTextToSize(d.diagnostico, CW)
+    if (y + diag.length * 5 > 272) { doc.addPage(); y = M }
+    doc.text(diag, M, y); y += diag.length * 5 + 8
+  }
+
+  if (d.acoes && d.acoes.length) {
+    if (y + 22 > 272) { doc.addPage(); y = M }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...RED)
+    doc.text('AÇÕES SUGERIDAS', M, y); y += 1
+    doc.setDrawColor(...RED); doc.setLineWidth(0.5); doc.line(M, y, W - M, y); y += 6
+    d.acoes.forEach((a, i) => {
+      const txt = doc.splitTextToSize(`${i + 1}. ${a.acao}`, CW - 4)
+      if (y + txt.length * 5 + 5 > 278) { doc.addPage(); y = M }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...DARK)
+      doc.text(txt, M, y); y += txt.length * 5
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...MID)
+      doc.text(`${a.dono ?? '—'}${a.prazo ? ` · até ${a.prazo}` : ''}`, M + 4, y); y += 6
+    })
+  }
 
   // ── Rodapé ──
   doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(...MID)
