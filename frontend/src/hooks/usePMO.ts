@@ -437,6 +437,24 @@ export function useSalvarProjetoSnapshot() {
   })
 }
 
+// ── Relatório consolidado do PROJETO gerado pelo SuperTEG (respostas às 10 perguntas) ─
+export interface ProjetoStatusCapItem { q: string; a: string }
+export interface ProjetoStatusCap { key: string; titulo: string; itens: ProjetoStatusCapItem[] }
+export interface ProjetoStatusRow { projeto_id: string; farol: string | null; sintese: string | null; decisoes: string[] | null; capitulos: ProjetoStatusCap[] | null; gerado_por: string | null; gerado_em: string | null; updated_at: string | null }
+export function useProjetoStatus(projetoId?: string | null) {
+  return useQuery<ProjetoStatusRow | null>({
+    queryKey: ['pmo-projeto-status', projetoId],
+    enabled: !!projetoId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_projeto_status')
+        .select('projeto_id, farol, sintese, decisoes, capitulos, gerado_por, gerado_em, updated_at')
+        .eq('projeto_id', projetoId!).maybeSingle()
+      if (error) return null
+      return (data ?? null) as ProjetoStatusRow | null
+    },
+  })
+}
+
 // ── Estado DURÁVEL da geração de Status Report pelo SuperTEG (running/done/error) ─
 export interface StatusReportRun { projeto_id: string; run_id: string | null; status: 'running' | 'done' | 'error'; mensagem: string | null; n_obras: number | null; gravados: number | null; started_at: string; updated_at: string }
 export function useStatusReportRun(projetoId?: string | null) {
