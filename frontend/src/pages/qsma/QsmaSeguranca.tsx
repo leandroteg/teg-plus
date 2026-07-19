@@ -378,7 +378,7 @@ export default function QsmaSeguranca() {
               <Vazio isDark={isDark} texto="Nenhuma ocorrência registrada" />
             ) : (
               <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-                <table className="w-full min-w-[900px] text-xs">
+                <table className="w-full min-w-[780px] text-sm">
                   <thead>
                     <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                       {[
@@ -386,14 +386,13 @@ export default function QsmaSeguranca() {
                         { label: 'DATA', align: 'text-left' },
                         { label: 'OBRA', align: 'text-left' },
                         { label: 'TIPO', align: 'text-left' },
-                        { label: 'DESCRIÇÃO', align: 'text-left' },
                         { label: 'AÇÕES', align: 'text-center' },
                         { label: 'GRAVIDADE', align: 'text-center' },
                         { label: 'STATUS', align: 'text-center' },
                         { label: 'RELATÓRIO', align: 'text-center' },
                         { label: 'GESTÃO', align: 'text-center' },
                       ].map(col => (
-                        <th key={col.label} className={`${col.align} px-3 py-2 font-semibold whitespace-nowrap`}>{col.label}</th>
+                        <th key={col.label} className={`${col.align} px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap`}>{col.label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -405,22 +404,21 @@ export default function QsmaSeguranca() {
                       return (
                         <tr key={o.id} onClick={() => setModalOcorrencia(o)}
                           className={`cursor-pointer transition-colors ${isDark ? 'border-t border-white/[0.04] hover:bg-white/[0.04]' : 'border-t border-slate-100 hover:bg-slate-50'}`}>
-                          <td className={`px-3 py-2.5 font-mono font-bold whitespace-nowrap ${isDark ? 'text-red-300' : 'text-red-700'}`}>{o.codigo}</td>
-                          <td className={`px-3 py-2.5 tabular-nums whitespace-nowrap ${txtMuted}`}>{fmtDataPlanilha(o.data_ocorrencia)}</td>
-                          <td className={`px-3 py-2.5 font-semibold whitespace-nowrap ${txtMain}`}>{obraNome(o.obra_id)}</td>
-                          <td className={`px-3 py-2.5 whitespace-nowrap ${txtMuted}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</td>
-                          <td className={`px-3 py-2.5 ${txtMuted}`}><span className="block truncate max-w-[360px]">{o.descricao}</span></td>
-                          <td className="px-3 py-2.5 text-center">
+                          <td className={`px-3 py-3 font-mono font-bold text-[13px] whitespace-nowrap ${isDark ? 'text-red-300' : 'text-red-700'}`}>{o.codigo}</td>
+                          <td className={`px-3 py-3 tabular-nums whitespace-nowrap ${txtMuted}`}>{fmtDataPlanilha(o.data_ocorrencia)}</td>
+                          <td className={`px-3 py-3 font-semibold whitespace-nowrap ${txtMain}`}>{obraNome(o.obra_id)}</td>
+                          <td className={`px-3 py-3 whitespace-nowrap ${txtMuted}`}>{TIPO_OCORRENCIA_LABEL[o.tipo]}</td>
+                          <td className="px-3 py-3 text-center">
                             {nAcoes > 0
-                              ? <span className="inline-flex items-center gap-0.5 text-violet-400 font-semibold"><Link2 size={11} />{nAcoes}</span>
+                              ? <span className="inline-flex items-center gap-0.5 text-violet-400 font-semibold"><Link2 size={13} />{nAcoes}</span>
                               : <span className={txtMuted}>—</span>}
                           </td>
-                          <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span></td>
-                          <td className="px-3 py-2.5 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span></td>
-                          <td className="px-3 py-2.5 text-center"><RelatorioTag o={o} isDark={isDark} muted={txtMuted} /></td>
-                          <td className="px-3 py-2.5 text-center">
+                          <td className="px-3 py-3 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span></td>
+                          <td className="px-3 py-3 text-center"><span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span></td>
+                          <td className="px-3 py-3 text-center"><RelatorioTag o={o} isDark={isDark} muted={txtMuted} /></td>
+                          <td className="px-3 py-3 text-center">
                             {o.sgi_registro_id
-                              ? <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)"><ExternalLink size={11} /> Gestão</span>
+                              ? <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)"><ExternalLink size={12} /> Gestão</span>
                               : <span className={txtMuted}>—</span>}
                           </td>
                         </tr>
@@ -445,21 +443,21 @@ export default function QsmaSeguranca() {
                   return (
                     <button key={o.id} onClick={() => setModalOcorrencia(o)} className={`w-full text-left ${card} p-3.5 flex items-center gap-3 flex-wrap hover:shadow-md transition-all`}>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-bold ${txtMain} flex items-center gap-2 flex-wrap`}>
-                          <span className={`font-mono text-[10px] ${txtMuted}`}>{o.codigo}</span>
+                        <p className={`text-[15px] font-bold ${txtMain} flex items-center gap-2 flex-wrap`}>
+                          <span className={`font-mono text-[13px] font-bold ${isDark ? 'text-red-300' : 'text-red-700'}`}>{o.codigo}</span>
                           <span>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</span>
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                         </p>
-                        <p className={`text-[11px] truncate ${txtMuted}`}>
+                        <p className={`text-[12px] truncate mt-0.5 ${txtMuted}`}>
                           {TIPO_OCORRENCIA_LABEL[o.tipo]} · {o.descricao}
-                          {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={9} />{nAcoes} ação(ões)</span>}
+                          {nAcoes > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={10} />{nAcoes} ação(ões)</span>}
                         </p>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
                       <RelatorioTag o={o} isDark={isDark} muted="hidden" />
                       {o.sgi_registro_id && (
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
-                          <ExternalLink size={11} /> Gestão
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-50 text-violet-700'}`} title="Em tratamento no módulo Gestão (SGI)">
+                          <ExternalLink size={12} /> Gestão
                         </span>
                       )}
                     </button>
@@ -492,20 +490,20 @@ export default function QsmaSeguranca() {
                             <div onClick={() => toggleExpandir(o.id)} className={`p-2.5 cursor-pointer rounded-xl transition-colors ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
                               <div className="flex items-center justify-between gap-1 mb-1">
                                 <span className="flex items-center gap-1 min-w-0">
-                                  {exp ? <ChevronDown size={13} className={txtMuted} /> : <ChevronRight size={13} className={txtMuted} />}
-                                  <span className={`text-[9px] font-mono font-bold ${txtMuted}`}>{o.codigo}</span>
+                                  {exp ? <ChevronDown size={14} className={txtMuted} /> : <ChevronRight size={14} className={txtMuted} />}
+                                  <span className={`text-[12px] font-mono font-bold ${isDark ? 'text-red-300' : 'text-red-700'}`}>{o.codigo}</span>
                                 </span>
                                 <span className="flex items-center gap-1 shrink-0">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${isDark ? g.dark : g.light}`}>{g.label}</span>
                                   <button onClick={e => { e.stopPropagation(); setModalOcorrencia(o) }} title="Abrir ocorrência"
-                                    className={`p-1 rounded-md ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}><ExternalLink size={12} /></button>
+                                    className={`p-1 rounded-md ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}><ExternalLink size={13} /></button>
                                 </span>
                               </div>
-                              <p className={`text-[11px] font-semibold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
-                              <p className={`text-[10px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
-                              <p className={`text-[9px] mt-1 ${txtMuted}`}>
+                              <p className={`text-[13px] font-bold leading-tight ${txtMain}`}>{fmtDataPlanilha(o.data_ocorrencia)} · {obraNome(o.obra_id)}</p>
+                              <p className={`text-[11px] mt-0.5 line-clamp-2 ${txtMuted}`}>{o.descricao}</p>
+                              <p className={`text-[10px] mt-1 ${txtMuted}`}>
                                 {TIPO_OCORRENCIA_LABEL[o.tipo]}
-                                {acs.length > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={8} />{acs.length} ação(ões)</span>}
+                                {acs.length > 0 && <span className="inline-flex items-center gap-0.5 ml-1 text-violet-400"><Link2 size={9} />{acs.length} ação(ões)</span>}
                               </p>
                               {(o.relatorio_status === 'pronto' || o.relatorio_status === 'processando') && (
                                 <div className="mt-1.5"><RelatorioTag o={o} isDark={isDark} muted="hidden" /></div>
