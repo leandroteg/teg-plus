@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
-  usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras,
+  usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras, useColabAtivosIds,
   usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia, usePontoDispositivos,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
@@ -117,14 +117,23 @@ export function RegistrosPontoTab(props: PontoTabProps) {
   return props.vista === 'dia' ? <RegistrosDia {...props} /> : <RegistrosMes {...props} />
 }
 
-function RegistrosMes({ anoMes, baseId, pessoa, quickReg, dispositivo }: PontoTabProps) {
+// Situação = Ativos / Inativos / Todos. Enquanto o set não carregou, não filtra (mostra tudo).
+function matchSituacao(colaboradorId: string | null | undefined, situacao: PontoTabProps['situacao'], ativos?: Set<string>): boolean {
+  if (situacao === 'todos' || !ativos) return true
+  const ativo = !!colaboradorId && ativos.has(colaboradorId)
+  return situacao === 'ativos' ? ativo : !ativo
+}
+
+function RegistrosMes({ anoMes, baseId, pessoa, quickReg, dispositivo, situacao }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const { data: atestados = [] } = usePontoAtestados(anoMes)
+  const { data: ativosSet } = useColabAtivosIds()
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
   const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
   const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa)
     && (!dispositivo || r.dispositivo === dispositivo)
+    && matchSituacao(r.colaborador_id, situacao, ativosSet)
     && (
     quickReg === 'aberto' ? r.dias_em_aberto > 0
       : quickReg === 'fora_horario' ? r.dias_fora_horario > 0
@@ -229,9 +238,10 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 }
 
 // visão diária — registros de UM dia (todos os colaboradores)
-function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo }: PontoTabProps) {
+function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo, situacao }: PontoTabProps) {
   const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
   const { data: dispositivos = [] } = usePontoDispositivos()
+  const { data: ativosSet } = useColabAtivosIds()
   const c = useThemeCls()
   const horaCls = (fora: boolean) => fora ? 'text-rose-500 font-bold' : c.txt
   // resolve o Ponto Virtual do dia: primeiro equip id não-vazio das batidas → cadastro linkdisp
@@ -241,7 +251,7 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo }: PontoT
     return eq ? dispById.get(Number(eq)) ?? null : null
   }
   const rows = data
-    .filter(r => matchPessoa(r.colaborador?.nome, pessoa))
+    .filter(r => matchPessoa(r.colaborador?.nome, pessoa) && matchSituacao(r.colaborador_id, situacao, ativosSet))
     .map(r => {
       const disp = dispDoDia(r)
       // compara com a base de CADASTRO do colaborador (a base do dia é derivada do próprio dispositivo)
