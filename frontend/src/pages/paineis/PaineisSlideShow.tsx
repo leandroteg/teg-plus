@@ -6,7 +6,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { PAINEIS, type PainelDef } from './registry'
-import { useSlideShows, useCriarSlideShow, useAtualizarSlideShow, useRemoverSlideShow, type SlideShow, type SlideItem } from '../../hooks/usePaineisSlideshows'
+import { useSlideShows, useCriarSlideShow, useAtualizarSlideShow, useRemoverSlideShow, useDefinirEmailDiretoria, type SlideShow, type SlideItem } from '../../hooks/usePaineisSlideshows'
 // (useAtualizarSlideShow é usado no editor)
 
 const DEFAULT_INTERVAL = 20
@@ -236,6 +236,7 @@ export default function PaineisSlideShow() {
   const { data: shows = [], isLoading } = useSlideShows()
   const criar = useCriarSlideShow()
   const remover = useRemoverSlideShow()
+  const definirEmail = useDefinirEmailDiretoria()
 
   const [playing, setPlaying] = useState<SlideShow | null>(null)
   const [editing, setEditing] = useState<SlideShow | null>(null)
@@ -337,6 +338,18 @@ export default function PaineisSlideShow() {
                   className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
                   <Play size={16} /> Iniciar apresentação
                 </button>
+
+                {/* Qual slide show é enviado à diretoria (dia 20) — exclusivo */}
+                {s.enviar_diretoria ? (
+                  <div className={`mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+                    <Mail size={14} /> Este é o enviado à diretoria (dia 20)
+                  </div>
+                ) : (
+                  <button onClick={() => definirEmail.mutate(s.id)} disabled={definirEmail.isPending}
+                    className={`mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-50`}>
+                    <Mail size={13} /> Usar este no e-mail da diretoria
+                  </button>
+                )}
               </div>
             )
           })}
@@ -351,7 +364,7 @@ export default function PaineisSlideShow() {
           </div>
           <div className="min-w-0 flex-1">
             <p className={`text-sm font-bold ${txt}`}>Envio automático à diretoria</p>
-            <p className={`text-xs mt-0.5 ${muted}`}>Todo <b className={txt}>dia 20, às 08h (Brasília)</b>, os painéis são exportados num PDF único e enviados para <b className={txt}>diretoria@teguniao.com.br</b>.</p>
+            <p className={`text-xs mt-0.5 ${muted}`}>Todo <b className={txt}>dia 20, às 08h (Brasília)</b>, o slide show <b className={txt}>{shows.find(s => s.enviar_diretoria)?.nome ?? '— (nenhum marcado)'}</b> é exportado num PDF único (screenshot real de cada painel) e enviado para <b className={txt}>diretoria@teguniao.com.br</b>. Marque qual slide show enviar no botão de cada card acima.</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <input type="email" value={enviarPara} onChange={e => setEnviarPara(e.target.value)} placeholder="destinatario@teguniao.com.br"
                 className={`text-xs rounded-lg px-2.5 py-1.5 border outline-none w-full sm:w-72 ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} />
