@@ -33,6 +33,7 @@ export default function DPPonto() {
   const [vista, setVista] = useState('mes')
   const [diaData, setDiaData] = useState(hojeISO())
   const [dispositivo, setDispositivo] = useState('')
+  const [situacao, setSituacao] = useState<'ativos' | 'inativos' | 'todos'>('ativos')
   const { data: basesRaw = [] } = useBases()
   const { data: dispositivos = [] } = usePontoDispositivos()
   const bases = basesRaw.map(b => ({ id: b.id, nome: b.nome, codigo: b.codigo }))
@@ -48,7 +49,7 @@ export default function DPPonto() {
   const selCls = `px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
 
   function renderPanel(key: string) {
-    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, dispositivo, bases }
+    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, dispositivo, situacao, bases }
     const temStatus = key === 'retificacoes' || key === 'horas_extras' || key === 'atestados'
     const chipCls = (on: boolean) => `inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${on ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30') : (isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`
     const segCls = (on: boolean) => `px-2.5 py-2 text-xs font-semibold inline-flex items-center gap-1 ${on ? (isLight ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-300') : (isLight ? 'bg-white text-slate-500 hover:bg-slate-50' : 'bg-transparent text-slate-400 hover:bg-white/[0.05]')}`
@@ -85,6 +86,13 @@ export default function DPPonto() {
               <option value="">Todos os dispositivos</option>
               {dispositivos.map(d => <option key={d.descricao} value={d.descricao}>{d.descricao}</option>)}
             </select>
+          )}
+          {key === 'registros' && (
+            <div className={`inline-flex rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-slate-700'}`}>
+              <button onClick={() => setSituacao('ativos')} className={segCls(situacao === 'ativos')}>Ativos</button>
+              <button onClick={() => setSituacao('inativos')} className={segCls(situacao === 'inativos')}>Inativos</button>
+              <button onClick={() => setSituacao('todos')} className={segCls(situacao === 'todos')}>Todos</button>
+            </div>
           )}
           {!semFiltroBase(key) && (
             <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
