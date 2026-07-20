@@ -101,10 +101,10 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-export default function FrotasHome() {
+export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel' | 'disponibilidade' | 'indicadores' | 'motoristas' } = {}) {
   const nav = useNavigate()
   const { isDark } = useTheme()
-  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'disponibilidade' | 'indicadores' | 'motoristas'>('painel')
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'disponibilidade' | 'indicadores' | 'motoristas'>(initialPainel ?? 'painel')
   const { data: kpis, isLoading, refetch } = useFrotasKPIs()
   const { data: osAbertas = [] } = useOrdensServico({
     status: ['aberta', 'em_cotacao', 'aguardando_aprovacao', 'aprovada', 'em_execucao'],
