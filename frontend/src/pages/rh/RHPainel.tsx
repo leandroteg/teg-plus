@@ -144,9 +144,9 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
-export default function RHPainel() {
+export default function RHPainel({ initialPainel }: { initialPainel?: PainelKey } = {}) {
   const { isDark } = useTheme()
-  const [painel, setPainel] = useState<PainelKey>('geral')
+  const [painel, setPainel] = useState<PainelKey>(initialPainel ?? 'geral')
   const [de, setDe] = useState('2026-01')
   const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
