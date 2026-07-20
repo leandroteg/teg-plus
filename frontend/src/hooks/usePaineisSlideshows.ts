@@ -9,6 +9,7 @@ export interface SlideShow {
   intervalo_sec: number
   slides: SlideItem[]
   ordem: number
+  enviar_diretoria: boolean
   criado_por_nome: string | null
   created_at: string
   updated_at: string
@@ -59,6 +60,19 @@ export function useRemoverSlideShow() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('paineis_slideshows').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+
+// Define QUAL slide show é o enviado à diretoria (exclusivo: liga um, desliga os outros).
+export function useDefinirEmailDiretoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from('paineis_slideshows').update({ enviar_diretoria: false }).neq('id', id)
+      const { error } = await supabase.from('paineis_slideshows').update({ enviar_diretoria: true, updated_at: new Date().toISOString() }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
