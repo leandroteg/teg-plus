@@ -6,6 +6,19 @@ import type {
   PontoResumoMes, PontoDia, PontoAfastamento, PontoRetificacao, HoraExtraItem, AprovKey, AprovStatus, PontoDiaLista,
 } from '../types/ponto'
 
+// Conjunto de ids de colaboradores ATIVOS (para filtrar a lista de ponto por situação)
+export function useColabAtivosIds() {
+  return useQuery<Set<string>>({
+    queryKey: ['ponto-colab-ativos-ids'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_colaboradores').select('id').eq('ativo', true)
+      if (error) { console.error('useColabAtivosIds:', error); return new Set<string>() }
+      return new Set((data ?? []).map(r => (r as { id: string }).id))
+    },
+  })
+}
+
 // Visão diária: todas as marcações/apuração de UM dia
 export function usePontoDia(dataISO: string, baseId?: string) {
   return useQuery<PontoDiaLista[]>({
