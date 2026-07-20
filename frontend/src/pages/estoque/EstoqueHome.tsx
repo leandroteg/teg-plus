@@ -94,11 +94,11 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-export default function EstoqueHome() {
+export default function EstoqueHome({ initialPainel }: { initialPainel?: 'painel' | 'indicadores' } = {}) {
   const nav = useNavigate()
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'indicadores'>('painel')
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'indicadores'>(initialPainel ?? 'painel')
 
   const { data: kpis, isLoading, refetch } = useEstoqueKPIs()
   const { data: abaixoMinimo = [] } = useSaldosAbaixoMinimo()
