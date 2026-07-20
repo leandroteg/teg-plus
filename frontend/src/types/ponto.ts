@@ -112,6 +112,7 @@ export interface PontoTabProps {
   vista: string
   diaData: string
   dispositivo: string
+  situacao: 'ativos' | 'inativos' | 'todos'
   bases: { id: string; nome: string; codigo: string }[]
 }
 
