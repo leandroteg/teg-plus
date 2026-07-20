@@ -52,17 +52,15 @@ const leitoLbl = (codigo?: string | null) => {
   const c = (codigo ?? '').trim()
   return /^h/i.test(c) ? c.toUpperCase() : `#${c}`
 }
-// Faixa de leitos de um alojamento (para a folha do alojamento) — respeita o prefixo H
-function faixaLeitos(leitos: Leito[]): string {
-  const codes = leitos.map(l => (l.codigo_leito ?? '').trim()).filter(Boolean)
-  if (!codes.length) return ''
-  const isH = codes.some(c => /^h/i.test(c))
-  const pfx = isH ? 'H' : '#'
+// Faixa de leitos ATIVOS de um alojamento (para a folha do alojamento) — respeita o prefixo H.
+// Só leitos ativos entram: é a faixa de números que o colaborador pode informar no check-in.
+function faixaLeitosInfo(leitos: Leito[]): { total: number; ini: string; fim: string } | null {
+  const codes = leitos.filter(l => l.ativo !== false).map(l => (l.codigo_leito ?? '').trim()).filter(Boolean)
+  if (!codes.length) return null
+  const pfx = codes.some(c => /^h/i.test(c)) ? 'H' : '#'
   const nums = codes.map(c => parseInt(c.replace(/\D/g, ''), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
-  if (!nums.length) return ''
-  return nums.length === 1
-    ? `leito ${pfx}${nums[0]}`
-    : `${nums.length} leitos · ${pfx}${nums[0]} a ${pfx}${nums[nums.length - 1]}`
+  if (!nums.length) return null
+  return { total: nums.length, ini: `${pfx}${nums[0]}`, fim: `${pfx}${nums[nums.length - 1]}` }
 }
 
 // Imagem de QR gerada no cliente (lib qrcode, sem chamada externa)
@@ -127,7 +125,7 @@ async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
 async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
   const logo = LOGO()
   const codigo = alojamento.titulo || alojamento.nome || alojamento.descricao || 'Alojamento'
-  const faixa = faixaLeitos(leitos)
+  const faixa = faixaLeitosInfo(leitos)
   const dataUrl = await QRCode.toDataURL(alojamentoUrl(alojamento.id), { width: 720, margin: 1 })
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Alojamento — ${esc(codigo)}</title>
     <style>${PRINT_CSS}
@@ -139,8 +137,11 @@ async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
       .end{font-size:12pt;color:#475569;max-width:150mm}
       .qr{width:100mm;height:100mm;margin:8mm 0}
       .call{font-size:16pt;font-weight:800;color:#0891b2;max-width:150mm}
-      .stats{margin-top:6mm;font-size:12pt;color:#334155}
-      .stats b{color:#0f172a}
+      .faixa{margin-top:7mm;border:2px solid #0891b2;border-radius:12px;padding:5mm 10mm;background:#ecfeff}
+      .faixa .fx-lbl{font-size:11pt;letter-spacing:.22em;color:#0e7490;font-weight:700}
+      .faixa .fx-num{font-family:'Consolas',monospace;font-size:34pt;font-weight:900;color:#0f172a;line-height:1.1;margin-top:1mm}
+      .faixa .fx-num span{font-family:inherit;font-size:18pt;color:#64748b;font-weight:700;margin:0 3mm}
+      .faixa .fx-sub{font-size:11pt;color:#475569;margin-top:1mm}
       footer{margin-top:auto;font-size:10pt;color:#94a3b8}
     </style></head><body>
     <div class="bar"><button onclick="window.print()">🖨 Imprimir folha do alojamento</button></div>
@@ -151,7 +152,13 @@ async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
       <div class="end">${esc(fmtEndereco(alojamento))}${alojamento.cidade ? ' · ' + esc(alojamento.cidade) : ''}${alojamento.uf ? '/' + esc(alojamento.uf) : ''}</div>
       <img class="qr" src="${dataUrl}" alt="QR"/>
       <div class="call">Escaneie e informe o número do seu leito<br/>para fazer check-in / check-out no Portal TEG</div>
-      ${faixa ? `<div class="stats">${faixa}</div>` : ''}
+      ${faixa ? `<div class="faixa">
+        <div class="fx-lbl">LEITOS DESTE ALOJAMENTO</div>
+        <div class="fx-num">${faixa.total === 1
+          ? esc(faixa.ini)
+          : `${esc(faixa.ini)}<span>a</span>${esc(faixa.fim)}`}</div>
+        <div class="fx-sub">${faixa.total} leito${faixa.total > 1 ? 's' : ''} · informe um número desta faixa</div>
+      </div>` : ''}
       <footer>Cada leito também tem o seu próprio QR</footer>
     </section>
     </body></html>`
