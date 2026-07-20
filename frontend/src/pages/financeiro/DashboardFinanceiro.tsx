@@ -134,12 +134,12 @@ function SingleMetric({ label, value, tone, note, isDark }: {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
-export default function DashboardFinanceiro() {
+export default function DashboardFinanceiro({ initialPainel }: { initialPainel?: PainelKey } = {}) {
   const { isDark } = useTheme()
   const nav = useNavigate()
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
-  const [painelAtivo, setPainelAtivo] = useState<PainelKey>('painel')
+  const [painelAtivo, setPainelAtivo] = useState<PainelKey>(initialPainel ?? 'painel')
   const [relPeriodo, setRelPeriodo] = useState(relPeriodoDefault)  // De → Até dos relatórios (vive no header)
 
   // Fluxo de Caixa SEMPRE abre olhando pra frente: próximo mês → fim do ano
