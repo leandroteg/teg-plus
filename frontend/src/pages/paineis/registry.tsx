@@ -37,6 +37,9 @@ export interface PainelDef {
   pilar: Pilar
   Painel: LazyExoticComponent<ComponentType>
   Mobile: LazyExoticComponent<ComponentType>
+  /** Sub-painéis (abas internas) selecionáveis no slide show — só p/ módulos cujo
+   *  Painel aceita `initialPainel`. Vazio/ausente = o módulo entra como painel único. */
+  subPaineis?: { tab: string; label: string }[]
 }
 
 export const PAINEIS: PainelDef[] = [
@@ -46,7 +49,7 @@ export const PAINEIS: PainelDef[] = [
   { key: 'contratos',     label: 'Contratos',      desc: 'Gestão de contratos e SLAs',              emoji: '📋', Icon: FileText,       accent: '#34D399', route: '/contratos',     pilar: 'Backoffice',  Painel: lazy(() => import('../contratos/DashboardContratos')),    Mobile: lazy(() => import('../contratos/DashboardContratosMobile')) },
   { key: 'fiscal',        label: 'Fiscal',         desc: 'Notas fiscais e créditos',                emoji: '🧾', Icon: Receipt,        accent: '#34D399', route: '/fiscal',        pilar: 'Backoffice',  Painel: lazy(() => import('../fiscal/FiscalHome')),               Mobile: lazy(() => import('../fiscal/FiscalHomeMobile')) },
   // Projetos
-  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Operação',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')) },
+  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Operação',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')), subPaineis: [ { tab: 'geral', label: 'Visão Geral' }, { tab: 'producao', label: 'Produção' }, { tab: 'faturamento', label: 'Faturamento' }, { tab: 'medicao', label: 'Medição' }, { tab: 'cronograma', label: 'Cronograma' }, { tab: 'custos', label: 'Custos' } ] },
   { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Operação',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainelMobile')) },
   { key: 'qsma',          label: 'QSMA',           desc: 'Inspeções, ocorrências, EPIs e ambiental', emoji: '🦺', Icon: ShieldAlert,   accent: '#818CF8', route: '/qsma',          pilar: 'Operação',    Painel: lazy(() => import('../qsma/QsmaPainel')),                 Mobile: lazy(() => import('../qsma/QsmaPainel')) },
   // Suprimentos
