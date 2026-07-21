@@ -6,9 +6,10 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   Calculator, SearchCheck, FileEdit, Lock, Send, CheckCircle2, Receipt, Plus, X, Upload,
-  Loader2, AlertTriangle, FileText, Trash2, Download, ShieldCheck, Ban, Landmark, ClipboardCheck,
-  FileBarChart2,
+  Loader2, FileText, Trash2, Download, ShieldCheck, Ban, Landmark,
+  FileBarChart2, ChevronRight,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { gerarFolhaChecklistHtml } from '../../utils/folha-checklist-html'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -95,49 +96,79 @@ async function abrirArquivo(path: string) {
 }
 
 // ── card de folha ─────────────────────────────────────────────────────────
-function FolhaCard({ folha, onClick }: { folha: DPFolha; onClick: () => void }) {
-  const { isLightSidebar: isLight } = useTheme()
-  const proc = folha.status === 'verificando'
-  const err = folha.status === 'erro'
+const STATUS_META: Record<FolhaStatus, { label: string; cls: string; spin?: boolean }> = {
+  apuracao:    { label: 'Em apuração',       cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' },
+  verificando: { label: 'Processando',      cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', spin: true },
+  verificado:  { label: 'Verificado',       cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300' },
+  corrigindo:  { label: 'Em correção',      cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+  fechamento:  { label: 'Aguard. aprovação', cls: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' },
+  pagamento:   { label: 'Aprovada',         cls: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300' },
+  concluido:   { label: 'Concluída',        cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' },
+  erro:        { label: 'Erro',             cls: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' },
+}
+
+function folhaInfo(f: DPFolha): string {
+  switch (f.status) {
+    case 'verificando': return 'Processando no SuperTEG…'
+    case 'erro': return 'Erro — reabrir para reenviar'
+    case 'verificado': return `${f.qtd_desvios} desvio(s) encontrados`
+    case 'corrigindo':
+    case 'fechamento': return `${f.qtd_desvios_abertos} aberto(s) de ${f.qtd_desvios} desvio(s)`
+    case 'pagamento': return `Aprovada por ${f.aprovado_por_nome ?? '—'}`
+    case 'concluido': return `Pago em ${fmtDate(f.data_pagamento)}`
+    default: return 'Aguardando envio para verificação'
+  }
+}
+
+// ── linha de folha (padrão lista do Compras: linhas em divide-y) ─────────────
+function FolhaRow({ folha, onClick, isDark }: { folha: DPFolha; onClick: () => void; isDark: boolean }) {
+  const s = STATUS_META[folha.status]
   return (
-    <button onClick={onClick}
-      className={`text-left rounded-2xl border p-4 transition-all hover:shadow-md ${isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.16]'}`}>
-      <div className="flex items-center justify-between">
-        <span className={`font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Folha {compLabel(folha.competencia)}</span>
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/[0.06] text-slate-300'}`}>{TIPO_LABEL[folha.tipo] ?? folha.tipo}</span>
-      </div>
-      <div className={`mt-2 text-xs flex items-center gap-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-        {proc && <><Loader2 size={13} className="animate-spin text-sky-500" /> Processando no SuperTEG…</>}
-        {err && <><AlertTriangle size={13} className="text-rose-500" /> Erro — reabrir para reenviar</>}
-        {!proc && !err && folha.status === 'verificado' && <><ClipboardCheck size={13} className="text-sky-500" /> {folha.qtd_desvios} desvio(s) encontrados</>}
-        {!proc && !err && ['corrigindo', 'fechamento'].includes(folha.status) && <>{folha.qtd_desvios_abertos} aberto(s) de {folha.qtd_desvios}</>}
-        {folha.status === 'pagamento' && <><ShieldCheck size={13} className="text-teal-500" /> Aprovada por {folha.aprovado_por_nome ?? '—'}</>}
-        {folha.status === 'concluido' && <><CheckCircle2 size={13} className="text-emerald-500" /> Pago {fmtDate(folha.data_pagamento)}</>}
-        {folha.status === 'apuracao' && <>Aguardando envio para verificação</>}
+    <button type="button" onClick={onClick}
+      className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Folha {compLabel(folha.competencia)}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{TIPO_LABEL[folha.tipo] ?? folha.tipo}</span>
+          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${s.cls}`}>
+            {s.spin && <Loader2 size={10} className="animate-spin" />}{s.label}
+          </span>
+        </div>
+        <p className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{folhaInfo(folha)}</p>
       </div>
       {folha.resumo?.total_liquido != null && (
-        <div className={`mt-2 text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Líquido total: <span className="font-semibold">{fmtBRL(folha.resumo.total_liquido)}</span></div>
+        <div className="text-right shrink-0">
+          <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(folha.resumo.total_liquido)}</p>
+          <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>líquido</p>
+        </div>
       )}
+      <ChevronRight size={16} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
     </button>
   )
 }
 
-// ── grid de estágio ────────────────────────────────────────────────────────
-function StageGrid({ folhas, onOpen, empty, header }: { folhas: DPFolha[]; onOpen: (f: DPFolha) => void; empty: string; header?: ReactNode }) {
-  const { isLightSidebar: isLight } = useTheme()
+// ── lista de estágio (section-card padrão Compras) ──────────────────────────
+function StageList({ titulo, icon: Icon, folhas, onOpen, empty }: {
+  titulo: string; icon: LucideIcon; folhas: DPFolha[]; onOpen: (f: DPFolha) => void; empty: string
+}) {
+  const { isLightSidebar: isLight } = useTheme(); const isDark = !isLight
+  const cardCls = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-100'
   return (
-    <div className={`rounded-2xl border p-4 sm:p-5 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`}>
-      {header}
+    <section className={`rounded-2xl shadow-sm overflow-hidden ${cardCls}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          <Icon size={14} className="text-blue-500" /> {titulo}
+        </h2>
+        <span className={`text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{folhas.length}</span>
+      </div>
       {folhas.length === 0 ? (
-        <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-12 px-6 ${isLight ? 'border-slate-300 bg-slate-50/60 text-slate-500' : 'border-white/[0.1] bg-white/[0.02] text-slate-400'}`}>
-          <p className="text-sm">{empty}</p>
-        </div>
+        <div className={`text-center text-sm py-12 px-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{empty}</div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {folhas.map(f => <FolhaCard key={f.id} folha={f} onClick={() => onOpen(f)} />)}
+        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+          {folhas.map(f => <FolhaRow key={f.id} folha={f} onClick={() => onOpen(f)} isDark={isDark} />)}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -176,12 +207,12 @@ export default function DPFolha() {
 
       <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} />
 
-      {active === 'apuracao' && <StageGrid folhas={grupos.apuracao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em apuração. Clique em “Nova Folha” para lançar." />}
-      {active === 'verificacao' && <StageGrid folhas={grupos.verificacao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em verificação." />}
-      {active === 'correcoes' && <StageGrid folhas={grupos.correcoes} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em correção." />}
-      {active === 'fechamento' && <StageGrid folhas={grupos.fechamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aguardando fechamento." />}
-      {active === 'envio_pagamento' && <StageGrid folhas={grupos.envio_pagamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aprovada aguardando pagamento." />}
-      {active === 'concluido' && <StageGrid folhas={grupos.concluido} onOpen={f => setSelId(f.id)} empty="Nenhuma folha concluída ainda." />}
+      {active === 'apuracao' && <StageList titulo="Folhas em apuração" icon={Calculator} folhas={grupos.apuracao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em apuração. Clique em “Nova Folha” para lançar." />}
+      {active === 'verificacao' && <StageList titulo="Folhas em verificação" icon={SearchCheck} folhas={grupos.verificacao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em verificação." />}
+      {active === 'correcoes' && <StageList titulo="Folhas em correção" icon={FileEdit} folhas={grupos.correcoes} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em correção." />}
+      {active === 'fechamento' && <StageList titulo="Folhas aguardando fechamento" icon={Lock} folhas={grupos.fechamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aguardando fechamento." />}
+      {active === 'envio_pagamento' && <StageList titulo="Folhas aprovadas — envio de pagamento" icon={Send} folhas={grupos.envio_pagamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aprovada aguardando pagamento." />}
+      {active === 'concluido' && <StageList titulo="Folhas concluídas" icon={CheckCircle2} folhas={grupos.concluido} onOpen={f => setSelId(f.id)} empty="Nenhuma folha concluída ainda." />}
 
       {novaOpen && <NovaFolhaModal onClose={() => setNovaOpen(false)} onCreated={id => { setNovaOpen(false); setActive('apuracao'); setSelId(id) }} />}
 
