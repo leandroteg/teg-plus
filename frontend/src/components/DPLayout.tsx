@@ -1,4 +1,4 @@
-import { LayoutDashboard, Gift, Fingerprint, Receipt, FileText, Plus } from 'lucide-react'
+import { LayoutDashboard, Gift, Fingerprint, Receipt, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 
@@ -29,7 +29,6 @@ export default function DPLayout() {
     { to: '/rh/dp/beneficios', icon: Gift,            label: 'Benefícios' },
     { to: '/rh/dp/ponto',      icon: Fingerprint,     label: 'Ponto' },
     { to: '/rh/dp/folha',      icon: Receipt,         label: 'Folha' },
-    { to: '/rh/dp/holerites',  icon: FileText,        label: 'Holerites' },
   ]
 
   return (
