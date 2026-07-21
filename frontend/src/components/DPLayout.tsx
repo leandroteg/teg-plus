@@ -18,7 +18,7 @@ export default function DPLayout() {
         items: [
           {
             icon: Receipt,
-            label: 'Lançar folha de pagamento',
+            label: 'Lançar Folha de Pagamento',
             description: 'Criar a apuração de uma nova competência de folha.',
             tone: 'blue' as const,
             action: () => navigate('/rh/dp/folha?nova=1'),
