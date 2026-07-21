@@ -64,9 +64,10 @@ export function gerarFolhaChecklistHtml(folha: DPFolha, itens: DPFolhaItem[], de
   }).join('')
 
   const totalDesvios = folha.qtd_desvios ?? desvios.length
+  // Assertividade = conformes (OK + Atenção — atenção não é erro) ÷ verificáveis (só desvios confirmados descontam)
   const verificaveis = itens.filter(it => ['ok', 'desvio', 'atencao'].includes(it.resultado)).length
-  const okCount = itens.filter(it => it.resultado === 'ok').length
-  const assert = verificaveis ? Math.round((okCount / verificaveis) * 100) : null
+  const conformes = itens.filter(it => it.resultado === 'ok' || it.resultado === 'atencao').length
+  const assert = verificaveis ? Math.round((conformes / verificaveis) * 100) : null
   const dataGer = new Date(Date.now() - 3 * 3600_000).toLocaleString('pt-BR')
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
