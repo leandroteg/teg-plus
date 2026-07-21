@@ -408,9 +408,10 @@ function ChecklistReport({ folha, itens, desvios }: { folha: DPFolha; itens: DPF
       {(folha.resumo || itens.length > 0) && (() => {
         const r = folha.resumo || {}
         const nDesvios = folha.qtd_desvios ?? desvios.length
+        // Assertividade = itens conformes (OK + Atenção — atenção não é erro) ÷ itens verificáveis (exclui só desvios confirmados)
         const verificaveis = itens.filter(it => ['ok', 'desvio', 'atencao'].includes(it.resultado)).length
-        const okCount = itens.filter(it => it.resultado === 'ok').length
-        const assert = verificaveis ? Math.round((okCount / verificaveis) * 100) : null
+        const conformes = itens.filter(it => it.resultado === 'ok' || it.resultado === 'atencao').length
+        const assert = verificaveis ? Math.round((conformes / verificaveis) * 100) : null
         const assertCor = assert == null ? '' : assert >= 90 ? 'text-emerald-600 dark:text-emerald-400' : assert >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
         const cards: [string, any, string?][] = [
           // linha 1: colaboradores + os 2 pedidos
