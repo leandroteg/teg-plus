@@ -477,6 +477,7 @@ function PagamentoModal({ folha, onClose, onPago }: { folha: DPFolha; onClose: (
   const [dataPg, setDataPg] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const semConta = desvios.filter(d => d.tipo === 'sem_conta' && d.status === 'aberto')
+  const naoPagar = desvios.filter(d => d.tipo === 'nao_pagar')
   return (
     <Modal open onClose={onClose} wide title={`Envio Pagamento — Folha ${compLabel(folha.competencia)}`}
       subtitle={`Aprovada por ${folha.aprovado_por_nome ?? '—'} em ${fmtDate(folha.aprovado_em)}`}
@@ -487,6 +488,21 @@ function PagamentoModal({ folha, onClose, onPago }: { folha: DPFolha; onClose: (
           {enviar.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar para pagamento
         </button>
       </>}>
+      {naoPagar.length > 0 && (
+        <div className="mb-4 rounded-xl border border-rose-300 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/[0.08] p-3">
+          <div className="flex items-center gap-1.5 text-sm font-bold text-rose-700 dark:text-rose-300"><Ban size={15} /> NÃO PAGAR — {naoPagar.length} colaborador(es)</div>
+          <ul className="mt-1.5 space-y-1">
+            {naoPagar.map(d => (
+              <li key={d.id} className="text-xs text-rose-700 dark:text-rose-300 flex items-start gap-1.5">
+                <span className={`shrink-0 ${d.status !== 'aberto' ? 'line-through opacity-60' : ''}`}>•</span>
+                <span className={d.status !== 'aberto' ? 'line-through opacity-60' : ''}>{d.colaborador_nome && <b>{d.colaborador_nome}: </b>}{d.descricao}</span>
+                {d.status !== 'aberto' && <span className="text-emerald-600 dark:text-emerald-400 not-italic">(tratado)</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-rose-600/80 dark:text-rose-300/70 mt-1.5">Inativos, demitidos e colaboradores com processo trabalhista não devem entrar no pagamento. Confirme a exclusão antes de enviar.</p>
+        </div>
+      )}
       <label className="block text-sm mb-4">
         <span className="text-slate-500 dark:text-slate-400">Data de pagamento</span>
         <input type="date" value={dataPg} onChange={e => setDataPg(e.target.value)}
