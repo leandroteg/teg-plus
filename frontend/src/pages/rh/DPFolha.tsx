@@ -561,6 +561,9 @@ function FechamentoModal({ folha, podeAprovar, onClose, onAprovado }: { folha: D
   const { data: desvios = [] } = useFolhaDesvios(folha.id)
   const { data: arquivos = [] } = useFolhaArquivos(folha.id)
   const aprovar = useAprovarFolha()
+  // Por segurança, no fechamento só o RESUMO fica disponível (Extrato/Líquidos/Lançamentos têm detalhe sensível por pessoa)
+  const anexosResumo = arquivos.filter(a => a.tipo === 'resumo')
+  const corrigidos = desvios.filter(d => d.status !== 'aberto')
   return (
     <Modal open onClose={onClose} wide title={`Fechamento — Folha ${compLabel(folha.competencia)}`}
       subtitle="Revisão final: anexos, relatório de verificação e correções aplicadas"
@@ -576,16 +579,38 @@ function FechamentoModal({ folha, podeAprovar, onClose, onAprovado }: { folha: D
         </div>
       )}
       <div className="mb-4">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Anexos da folha</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Anexo da folha</h4>
         <div className="flex flex-wrap gap-2">
-          {arquivos.map(a => (
+          {anexosResumo.map(a => (
             <button key={a.id} onClick={() => abrirArquivo(a.arquivo_url)} className="inline-flex items-center gap-1.5 text-xs rounded-lg border px-2.5 py-1.5 border-slate-200 dark:border-white/[0.08] hover:bg-slate-50 dark:hover:bg-white/[0.04]">
               <Download size={13} className="text-slate-400" /> {a.nome}
             </button>
           ))}
-          {arquivos.length === 0 && <span className="text-xs text-slate-400">Nenhum anexo</span>}
+          {anexosResumo.length === 0 && <span className="text-xs text-slate-400">Resumo não anexado</span>}
         </div>
+        <p className="text-[10px] text-slate-400 mt-1">Por segurança, no fechamento só o Resumo fica disponível (Extrato, Líquidos e Lançamentos ficam restritos às etapas anteriores).</p>
       </div>
+
+      {corrigidos.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Correções aplicadas ({corrigidos.length})</h4>
+          <div className="space-y-1.5">
+            {corrigidos.map(d => (
+              <div key={d.id} className="rounded-lg border p-2.5 border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/20 dark:bg-emerald-500/[0.06]">
+                <div className="flex items-start gap-1.5">
+                  <CheckCircle2 size={14} className="mt-0.5 text-emerald-500 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm text-slate-700 dark:text-slate-200">{d.colaborador_nome && <b>{d.colaborador_nome}: </b>}{d.descricao}</div>
+                    {d.correcao_obs && <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5"><b>Comentário:</b> {d.correcao_obs}</div>}
+                    <div className="text-[10px] text-slate-400 mt-0.5">{d.corrigido_por_nome ? `por ${d.corrigido_por_nome}` : 'corrigido'}{d.corrigido_em ? ` · ${fmtDate(d.corrigido_em)}` : ''}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <ChecklistReport folha={folha} itens={itens} desvios={desvios} />
     </Modal>
   )
