@@ -7,7 +7,9 @@ import type { ReactNode } from 'react'
 import {
   Calculator, SearchCheck, FileEdit, Lock, Send, CheckCircle2, Receipt, Plus, X, Upload,
   Loader2, AlertTriangle, FileText, Trash2, Download, ShieldCheck, Ban, Landmark, ClipboardCheck,
+  FileBarChart2,
 } from 'lucide-react'
+import { gerarFolhaChecklistHtml } from '../../utils/folha-checklist-html'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import RHTabRail, { type RHTab } from '../../components/rh/RHTabRail'
@@ -296,16 +298,31 @@ function ApuracaoModal({ folha, onClose, onEnviado }: { folha: DPFolha; onClose:
   )
 }
 
-// ── Relatório do checklist (reusado em Verificação/Fechamento) ────────────────
+// ── Relatório do checklist (reusado em Verificação/Fechamento/Concluído) ──────
+// Padrão card/lista: cada seção é um card; cada item é uma linha com o resultado
+// em pílula à esquerda, título + observação e o Nº de desvios à direita.
 function ChecklistReport({ folha, itens, desvios }: { folha: DPFolha; itens: DPFolhaItem[]; desvios: DPFolhaDesvio[] }) {
+  const { isLightSidebar: isLight } = useTheme()
   const porSecao = useMemo(() => {
     const m = new Map<string, DPFolhaItem[]>()
     for (const it of itens) { const k = it.secao ?? '—'; (m.get(k) ?? m.set(k, []).get(k)!).push(it) }
-    return [...m.entries()]
+    return [...m.entries()].sort((a, b) => (a[1][0]?.secao_ordem ?? 9) - (b[1][0]?.secao_ordem ?? 9))
   }, [itens])
   const desviosDe = (codigo?: string | null) => desvios.filter(d => d.item_codigo === codigo)
+  const cardCls = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'
+  const rowCls = isLight ? 'border-slate-100 bg-slate-50/60' : 'border-white/[0.06] bg-white/[0.02]'
+
   return (
     <div className="space-y-4">
+      {/* barra: título + gerar relatório HTML */}
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Relatório do checklist</p>
+        <button onClick={() => gerarFolhaChecklistHtml(folha, itens, desvios)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white hover:bg-slate-900 dark:bg-white/[0.08] dark:hover:bg-white/[0.14]">
+          <FileBarChart2 size={14} /> Abrir relatório (HTML)
+        </button>
+      </div>
+
       {folha.resumo && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
@@ -314,42 +331,51 @@ function ChecklistReport({ folha, itens, desvios }: { folha: DPFolha; itens: DPF
             ['Bruto total', fmtBRL(folha.resumo.total_bruto)],
             ['Var. vs mês ant.', folha.resumo.variacao_mes_anterior_pct != null ? `${folha.resumo.variacao_mes_anterior_pct}%` : '—'],
           ].map(([k, v]) => (
-            <div key={k as string} className="rounded-xl border p-2.5 border-slate-200 dark:border-white/[0.08]">
+            <div key={k as string} className={`rounded-xl border p-2.5 ${cardCls}`}>
               <div className="text-[10px] uppercase tracking-wide text-slate-400">{k}</div>
-              <div className="text-sm font-bold text-slate-700 dark:text-slate-100">{v as any}</div>
+              <div className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{v as any}</div>
             </div>
           ))}
         </div>
       )}
-      {folha.resumo?.sintese && <p className="text-sm text-slate-600 dark:text-slate-300">{folha.resumo.sintese}</p>}
+      {folha.resumo?.sintese && (
+        <div className={`rounded-xl border p-3 text-sm ${cardCls} ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <span className="font-semibold">Síntese: </span>{folha.resumo.sintese}
+        </div>
+      )}
+
       {porSecao.map(([secao, its]) => (
-        <div key={secao}>
-          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">{secao}</h4>
-          <div className="space-y-1.5">
+        <div key={secao} className={`rounded-2xl border p-4 ${cardCls}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-900 text-xs font-extrabold flex items-center justify-center shrink-0">{its[0]?.secao_ordem ?? '•'}</span>
+            <h4 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{secao.replace(/^\d+\.\s*/, '')}</h4>
+          </div>
+          <div className="space-y-2">
             {its.map(it => {
               const b = RESULT_BADGE[it.resultado] ?? RESULT_BADGE.na
               const ds = desviosDe(it.item_codigo)
               return (
-                <div key={it.id} className="rounded-lg border p-2.5 border-slate-200 dark:border-white/[0.08]">
-                  <div className="flex items-start gap-2">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${b.cls}`}>{b.label}</span>
-                    <div className="min-w-0">
-                      <div className="text-sm text-slate-700 dark:text-slate-200"><span className="text-slate-400">{it.item_codigo}</span> {it.item_titulo}</div>
-                      {it.observacao && <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{it.observacao}</div>}
-                    </div>
+                <div key={it.id} className={`flex items-start gap-3 p-3 rounded-xl border ${rowCls}`}>
+                  <span className={`mt-0.5 shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold ${b.cls}`}>{b.label}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`}><span className="text-slate-400">{it.item_codigo}</span> {it.item_titulo}</div>
+                    {it.observacao && <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{it.observacao}</div>}
+                    {ds.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {ds.map(d => (
+                          <li key={d.id} className="text-xs flex items-start gap-1.5">
+                            <span className={`text-[9px] px-1 py-0.5 rounded font-semibold shrink-0 ${SEV_CLS[d.severidade]}`}>{d.severidade}</span>
+                            <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
+                              {d.colaborador_nome && <b>{d.colaborador_nome}: </b>}{d.descricao}
+                              {(d.valor_esperado || d.valor_encontrado) && <span className="text-slate-400"> (esperado {d.valor_esperado ?? '—'} · encontrado {d.valor_encontrado ?? '—'})</span>}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {ds.length > 0 && (
-                    <ul className="mt-1.5 ml-1 space-y-1">
-                      {ds.map(d => (
-                        <li key={d.id} className="text-xs flex items-start gap-1.5">
-                          <span className={`text-[9px] px-1 py-0.5 rounded font-semibold shrink-0 ${SEV_CLS[d.severidade]}`}>{d.severidade}</span>
-                          <span className="text-slate-600 dark:text-slate-300">
-                            {d.colaborador_nome && <b>{d.colaborador_nome}: </b>}{d.descricao}
-                            {(d.valor_esperado || d.valor_encontrado) && <span className="text-slate-400"> (esperado {d.valor_esperado ?? '—'} · encontrado {d.valor_encontrado ?? '—'})</span>}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                  {(it.qtd_desvios ?? 0) > 0 && (
+                    <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{it.qtd_desvios}</span>
                   )}
                 </div>
               )
