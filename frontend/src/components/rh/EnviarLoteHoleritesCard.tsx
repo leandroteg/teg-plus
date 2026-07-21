@@ -3,7 +3,7 @@
 // Upload de 1 PDF consolidado de holerites → SuperTEG splita por colaborador.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef } from 'react'
-import { FileUp, Upload, X, Send, Loader2, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react'
+import { FileUp, Upload, X, Send, Loader2, CheckCircle2, AlertTriangle, Sparkles, FileArchive } from 'lucide-react'
 import { useEnviarLoteHolerites, type TipoLoteHolerite, type LoteResultado } from '../../hooks/useHolerites'
 
 const TIPOS: { value: TipoLoteHolerite; label: string }[] = [
@@ -12,7 +12,7 @@ const TIPOS: { value: TipoLoteHolerite; label: string }[] = [
   { value: 'ferias', label: 'Férias' },
 ]
 
-export default function EnviarLoteHoleritesCard({ isDark }: { isDark: boolean }) {
+export default function EnviarLoteHoleritesCard({ isDark, onImportarZip }: { isDark: boolean; onImportarZip?: () => void }) {
   const enviar = useEnviarLoteHolerites()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -106,7 +106,13 @@ export default function EnviarLoteHoleritesCard({ isDark }: { isDark: boolean })
       </div>
 
       {/* Ação */}
-      <div className="mt-4 flex items-center justify-end gap-2">
+      <div className="mt-4 flex items-center justify-between gap-2">
+        {onImportarZip ? (
+          <button onClick={onImportarZip} title="Importar vários holerites de uma vez via ZIP"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <FileArchive size={15} /> Importar ZIP
+          </button>
+        ) : <span />}
         <button onClick={handleEnviar} disabled={enviar.isPending || !file}
           className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-60 shadow-sm">
           {enviar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
