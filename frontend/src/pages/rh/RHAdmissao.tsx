@@ -204,7 +204,11 @@ export default function RHAdmissao() {
   const admissoes = useMemo(() => admissoesRaw.filter(a => !a.arquivada), [admissoesRaw])
 
   // Status é específico da etapa. Liberação já entra pré-filtrada em "Aguardando liberação".
-  useEffect(() => { setFStatus(etapa === 'liberado' ? 'aguardando' : '') }, [etapa])
+  // Integração e Liberação abrem em visão Lista por padrão; demais etapas em Cards.
+  useEffect(() => {
+    setFStatus(etapa === 'liberado' ? 'aguardando' : '')
+    setViewMode(etapa === 'integracao' || etapa === 'liberado' ? 'list' : 'cards')
+  }, [etapa])
 
   const temFiltroStatus = etapa === 'integracao' || etapa === 'liberado'
 
