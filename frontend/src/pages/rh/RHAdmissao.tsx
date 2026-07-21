@@ -610,9 +610,15 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
             const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
             const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
             const status = admStatus(a)
+            const admDatas = cands.map(c => c.colaborador?.data_admissao).filter((d): d is string => !!d).sort()
+            const dtAdm = admDatas[0] ?? null
+            const diasReg = dtAdm ? Math.floor((Date.now() - new Date(dtAdm + 'T00:00:00').getTime()) / 86400000) : null
+            const atrasado = diasReg != null && diasReg > 13
             return (
               <tr key={a.id} onClick={() => onSelect(a)}
-                className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
+                className={`cursor-pointer transition-all ${atrasado
+                  ? (isDark ? 'bg-red-500/10 hover:bg-red-500/[0.15] border-t border-red-500/20' : 'bg-red-50 hover:bg-red-100 border-t border-red-100')
+                  : (isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100')}`}>
                 <td className={`px-3 py-2 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   {nome}{a.urgente && <span className="ml-1.5 text-[9px] font-bold text-orange-600">URGENTE</span>}
                 </td>
@@ -620,7 +626,16 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
                 <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
                 <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span></td>
-                <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(a.created_at).toLocaleDateString('pt-BR')}</td>
+                <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {dtAdm ? (
+                    <div className="leading-tight">
+                      <div className={atrasado ? 'font-semibold text-red-600' : (isDark ? 'text-slate-300' : 'text-slate-600')}>
+                        adm {dtAdm.slice(0, 10).split('-').reverse().join('/')}{atrasado && <span className="ml-1 text-[9px] font-bold">· {diasReg}d</span>}
+                      </div>
+                      <div className="text-[10px] opacity-70">req {new Date(a.created_at).toLocaleDateString('pt-BR')}</div>
+                    </div>
+                  ) : new Date(a.created_at).toLocaleDateString('pt-BR')}
+                </td>
                 <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
               </tr>
             )
