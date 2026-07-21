@@ -223,6 +223,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
     label: 'TI',
     modulos: [
       { key: 'ti', label: 'TI (Helpdesk)', icon: '🖥️' },
+      { key: 'monitoramento', label: 'Monitoramento (CFTV)', icon: '🎥' },
     ],
   },
 ]

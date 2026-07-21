@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, ChevronRight, ChevronLeft,
+  UserCog, UserSearch, Server, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, ChevronRight, ChevronLeft, Video,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -145,7 +145,7 @@ const PILLARS: Pillar[] = [
     accent: '#38BDF8',
     subs: [
       { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti' },
-      { key: 'ai', label: 'AI Agents', desc: 'Agentes inteligentes TEG+', Icon: Bot, active: false, route: '' },
+      { key: 'monitoramento', label: 'Monitoramento', desc: 'Câmeras (CFTV) e eventos', Icon: Video, active: true, route: '/monitoramento' },
     ],
   },
   {
