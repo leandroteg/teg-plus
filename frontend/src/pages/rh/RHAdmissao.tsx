@@ -593,57 +593,79 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
 
 // ── Visão lista (tabela) ──────────────────────────────────────────────────────
 function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDark: boolean; onSelect: (a: RHAdmissao) => void }) {
-  const th = 'text-left px-3 py-2 font-semibold'
+  const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: '', dir: 'asc' })
+  const toggleSort = (field: string) => setSort(s => s.field === field ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { field, dir: 'asc' })
+  const fmt = (d: string | null | undefined) => d ? d.slice(0, 10).split('-').reverse().join('/') : '—'
+
+  const rows = itens.map(a => {
+    const cands = a.candidatos ?? []
+    const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
+    const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
+    const status = admStatus(a)
+    const admDatas = cands.map(c => c.colaborador?.data_admissao).filter((d): d is string => !!d).sort()
+    const dtAdm = admDatas[0] ?? null
+    const diasReg = dtAdm ? Math.floor((Date.now() - new Date(dtAdm + 'T00:00:00').getTime()) / 86400000) : null
+    const atrasado = diasReg != null && diasReg > 13
+    return { a, nome, nDocs, status, dtAdm, diasReg, atrasado, prev: a.data_prevista_inicio ?? null }
+  })
+
+  if (sort.field) {
+    const val = (r: typeof rows[number]): string | number => {
+      switch (sort.field) {
+        case 'candidato': return r.nome.toLowerCase()
+        case 'base': return (r.a.base || '').toLowerCase()
+        case 'cc': return (r.a.centro_custo?.codigo || '').toLowerCase()
+        case 'docs': return r.nDocs
+        case 'status': return r.status.label.toLowerCase()
+        case 'admissao': return r.dtAdm || ''
+        case 'previsao': return r.prev || ''
+        default: return ''
+      }
+    }
+    rows.sort((x, y) => {
+      const a = val(x), b = val(y)
+      const c = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))
+      return sort.dir === 'asc' ? c : -c
+    })
+  }
+
+  const th = 'text-left px-3 py-2 font-semibold cursor-pointer select-none whitespace-nowrap'
+  const arrow = (f: string) => sort.field === f ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''
   return (
     <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
       <table className="w-full text-xs">
         <thead>
           <tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
-            <th className={th}>Candidato(s)</th>
-            <th className={th}>Base</th>
-            <th className={th}>CC</th>
-            <th className="text-center px-3 py-2 font-semibold">Docs</th>
-            <th className={th}>Status</th>
-            <th className={th}>Data</th>
+            <th className={th} onClick={() => toggleSort('candidato')}>Candidato(s){arrow('candidato')}</th>
+            <th className={th} onClick={() => toggleSort('base')}>Base{arrow('base')}</th>
+            <th className={th} onClick={() => toggleSort('cc')}>CC{arrow('cc')}</th>
+            <th className="text-center px-3 py-2 font-semibold cursor-pointer select-none" onClick={() => toggleSort('docs')}>Docs{arrow('docs')}</th>
+            <th className={th} onClick={() => toggleSort('status')}>Status{arrow('status')}</th>
+            <th className={th} onClick={() => toggleSort('admissao')}>Admissão{arrow('admissao')}</th>
+            <th className={th} onClick={() => toggleSort('previsao')}>Previsão{arrow('previsao')}</th>
             <th className="px-2 py-2" />
           </tr>
         </thead>
         <tbody>
-          {itens.map(a => {
-            const cands = a.candidatos ?? []
-            const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
-            const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
-            const status = admStatus(a)
-            const admDatas = cands.map(c => c.colaborador?.data_admissao).filter((d): d is string => !!d).sort()
-            const dtAdm = admDatas[0] ?? null
-            const diasReg = dtAdm ? Math.floor((Date.now() - new Date(dtAdm + 'T00:00:00').getTime()) / 86400000) : null
-            const atrasado = diasReg != null && diasReg > 13
-            return (
-              <tr key={a.id} onClick={() => onSelect(a)}
-                className={`cursor-pointer transition-all ${atrasado
-                  ? (isDark ? 'bg-red-500/10 hover:bg-red-500/[0.15] border-t border-red-500/20' : 'bg-red-50 hover:bg-red-100 border-t border-red-100')
-                  : (isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100')}`}>
-                <td className={`px-3 py-2 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                  {nome}{a.urgente && <span className="ml-1.5 text-[9px] font-bold text-orange-600">URGENTE</span>}
-                </td>
-                <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.base || '—'}</td>
-                <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
-                <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
-                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span></td>
-                <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {dtAdm ? (
-                    <div className="leading-tight">
-                      <div className={atrasado ? 'font-semibold text-red-600' : (isDark ? 'text-slate-300' : 'text-slate-600')}>
-                        adm {dtAdm.slice(0, 10).split('-').reverse().join('/')}{atrasado && <span className="ml-1 text-[9px] font-bold">· {diasReg}d</span>}
-                      </div>
-                      <div className="text-[10px] opacity-70">req {new Date(a.created_at).toLocaleDateString('pt-BR')}</div>
-                    </div>
-                  ) : new Date(a.created_at).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
-              </tr>
-            )
-          })}
+          {rows.map(({ a, nome, nDocs, status, dtAdm, diasReg, atrasado, prev }) => (
+            <tr key={a.id} onClick={() => onSelect(a)}
+              className={`cursor-pointer transition-all ${atrasado
+                ? (isDark ? 'bg-red-500/10 hover:bg-red-500/[0.15] border-t border-red-500/20' : 'bg-red-50 hover:bg-red-100 border-t border-red-100')
+                : (isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100')}`}>
+              <td className={`px-3 py-2 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                {nome}{a.urgente && <span className="ml-1.5 text-[9px] font-bold text-orange-600">URGENTE</span>}
+              </td>
+              <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.base || '—'}</td>
+              <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
+              <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
+              <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span></td>
+              <td className={`px-3 py-2 whitespace-nowrap ${atrasado ? 'font-semibold text-red-600' : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>
+                {fmt(dtAdm)}{atrasado && <span className="ml-1 text-[9px] font-bold">· {diasReg}d</span>}
+              </td>
+              <td className={`px-3 py-2 whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(prev)}</td>
+              <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
