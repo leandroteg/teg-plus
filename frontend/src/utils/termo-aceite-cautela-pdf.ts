@@ -17,8 +17,17 @@ export interface TermoAceiteData {
   cautela: Cautela
   /** Nome da base/almoxarifado (não persistido no registro da cautela) */
   baseNome?: string
-  /** Assinatura do colaborador capturada no tablet (data URL PNG) */
+  /** Assinatura do colaborador na RETIRADA (data URL PNG) */
   assinaturaDataUrl?: string
+  /** Histórico de devoluções (cada etapa, total ou parcial, com suas assinaturas). */
+  devolucoes?: Array<{
+    data?: string
+    devolvido_por_nome?: string
+    recebedor_nome?: string
+    itens?: Array<{ descricao?: string; quantidade: number; condicao?: string }>
+    assinaturaDevolucaoDataUrl?: string
+    assinaturaRecebedorDataUrl?: string
+  }>
 }
 
 // ── Logo Loader ─────────────────────────────────────────────────────────────
@@ -326,6 +335,58 @@ function buildTermoDoc(
     `${empresa.cidade || ''}${empresa.cidade ? ', ' : ''}${fmtDateFull(cautela.data_retirada || cautela.criado_em)}`,
     M, y,
   )
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION: DEVOLUÇÕES (histórico — cada etapa, total ou parcial)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const devolucoes = data.devolucoes ?? []
+  if (devolucoes.length > 0) {
+    checkPage(18)
+    y += 6
+    sectionTitle('DEVOLUÇÕES')
+
+    devolucoes.forEach((ev, idx) => {
+      checkPage(44)
+      // Cabeçalho da etapa
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8.5)
+      doc.setTextColor(...DARK)
+      doc.text(`${idx + 1}. Devolução em ${fmtDate(ev.data)}`, M, y)
+      y += 5
+
+      // Itens devolvidos nesta etapa
+      const itensTxt = (ev.itens ?? [])
+        .map(it => `${it.quantidade}× ${it.descricao || 'item'}${it.condicao ? ` (${it.condicao})` : ''}`)
+        .join('  ·  ')
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...MID)
+      const itensLines = doc.splitTextToSize(itensTxt || '—', CW)
+      doc.text(itensLines.slice(0, 3), M, y)
+      y += Math.min(itensLines.length, 3) * 4 + 12
+
+      // Assinaturas da etapa (esquerda: quem devolveu / direita: quem recebeu)
+      if (ev.assinaturaDevolucaoDataUrl) {
+        try { doc.addImage(ev.assinaturaDevolucaoDataUrl, 'PNG', M, y - 16, 65, 16) } catch { /* ignore */ }
+      }
+      if (ev.assinaturaRecebedorDataUrl) {
+        try { doc.addImage(ev.assinaturaRecebedorDataUrl, 'PNG', W - M - 70, y - 16, 65, 16) } catch { /* ignore */ }
+      }
+      doc.setDrawColor(...LIGHT)
+      doc.setLineWidth(0.3)
+      doc.line(M, y, M + 70, y)
+      doc.line(W - M - 70, y, W - M, y)
+      doc.setFontSize(7)
+      doc.setTextColor(...MID)
+      doc.text('Devolvido por', M + 35, y + 4, { align: 'center' })
+      doc.text('Recebido por', W - M - 35, y + 4, { align: 'center' })
+      doc.setFontSize(6)
+      if (ev.devolvido_por_nome) doc.text(ev.devolvido_por_nome, M + 35, y + 7.5, { align: 'center' })
+      if (ev.recebedor_nome) doc.text(ev.recebedor_nome, W - M - 35, y + 7.5, { align: 'center' })
+      y += 13
+    })
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // FOOTER

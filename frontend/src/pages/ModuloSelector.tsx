@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useMinhasTarefas } from '../hooks/useMinhasTarefas'
 import LogoTeg from '../components/LogoTeg'
 import MuralPopup from '../components/MuralPopup'
 import ApprovalBadge from '../components/ApprovalBadge'
@@ -52,7 +53,7 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     key: 'projetos',
-    label: 'Projetos',
+    label: 'Operação',
     tagline: 'Gestão de obras e segurança',
     Icon: FolderKanban,
     grad: 'from-blue-500/20 to-indigo-600/20',
@@ -62,7 +63,7 @@ const PILLARS: Pillar[] = [
     subs: [
       { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: true, route: '/egp' },
       { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: true, route: '/obras' },
-      { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
+      { key: 'qsma', label: 'QSMA', desc: 'Qualidade, segurança e meio ambiente', Icon: ShieldCheck, active: true, route: '/qsma' },
     ],
   },
   {
@@ -80,7 +81,7 @@ const PILLARS: Pillar[] = [
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
       { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
       { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
-      { key: 'locacoes', label: 'Locação Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
+      { key: 'locacoes', label: 'Gestão de Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
     ],
   },
   {
@@ -129,7 +130,7 @@ const PILLARS: Pillar[] = [
       { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount', moduleKey: 'rh' },
       { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
       { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
-      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura', moduleKey: 'rh' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e Mural TEG', Icon: Heart, active: true, route: '/rh/cultura', moduleKey: 'rh' },
       { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: true, route: '/rh/dp', moduleKey: 'rh' },
     ],
   },
@@ -203,6 +204,8 @@ export default function ModuloSelector() {
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   const avatarMenuRef = useRef<HTMLDivElement>(null)
+  const { data: minhasTarefas = [] } = useMinhasTarefas()
+  const nTarefas = minhasTarefas.length
 
   const nome = perfil?.nome ?? 'Usu\u00e1rio'
   const role = (perfil?.role ?? 'visitante') as Role
@@ -668,6 +671,19 @@ export default function ModuloSelector() {
             >
               <LogoTeg size={80} animated={false} glowing={false} />
             </div>
+            {nTarefas > 0 && (
+              <span
+                className="absolute z-20 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-lg ring-2 ring-white"
+                style={{
+                  top: 4, right: 2, minWidth: 24, height: 24, padding: '0 6px', fontSize: 12,
+                  animation: entered ? 'qaBadgePop 0.4s cubic-bezier(0.175,0.885,0.32,1.275) 0.9s both' : 'none',
+                }}
+                title={`${nTarefas} tarefa${nTarefas !== 1 ? 's' : ''} pendente${nTarefas !== 1 ? 's' : ''}`}
+              >
+                {nTarefas > 99 ? '99+' : nTarefas}
+              </span>
+            )}
+            <style>{`@keyframes qaBadgePop { from { opacity:0; transform: scale(0) } 60% { transform: scale(1.25) } to { opacity:1; transform: scale(1) } }`}</style>
           </button>
 
           {/* ── Orbital pillar nodes ────────────────────────────── */}
@@ -839,6 +855,8 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
   isLight: boolean
   onNavigate: (path: string) => void
 }) {
+  const { data: minhasTarefas = [] } = useMinhasTarefas()
+  const nTarefas = minhasTarefas.length
   const { isAdmin, hasModule } = useAuth()
   // Um ÚNICO botão ("Minha Área Pessoal") que expande a lista com todas as
   // funções pessoais — padrão do flyout "Novo Registro" do EGP.
@@ -911,8 +929,15 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
                   : 'bg-white/[0.03] hover:bg-white/[0.06] hover:ring-teal-400/40 active:scale-[0.98]'
               }`}
             >
-              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-110 ${isLight ? 'bg-teal-50' : 'bg-teal-500/10'}`}>
+              <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-110 ${isLight ? 'bg-teal-50' : 'bg-teal-500/10'}`}>
                 <User size={20} strokeWidth={2.2} className={isLight ? 'text-teal-600' : 'text-teal-300'} />
+                {nTarefas > 0 && (
+                  <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
+                    style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
+                    title={`${nTarefas} tarefa${nTarefas !== 1 ? 's' : ''} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                    {nTarefas > 99 ? '99+' : nTarefas}
+                  </span>
+                )}
               </div>
               <div className="flex-1">
                 <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>Minha Área Pessoal</p>
@@ -942,8 +967,15 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
                   onClick={() => onNavigate(f.path)}
                   className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
                 >
-                  <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
+                  <span className={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
                     <Icon size={16} />
+                    {f.path === '/minhas-tarefas' && nTarefas > 0 && (
+                      <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
+                        style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
+                        title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                        {nTarefas > 99 ? '99+' : nTarefas}
+                      </span>
+                    )}
                   </span>
                   <span>
                     <span className={`block text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{f.label}</span>

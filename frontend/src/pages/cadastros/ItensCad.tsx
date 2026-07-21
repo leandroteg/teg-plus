@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, RefreshCw } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
@@ -33,6 +34,7 @@ const EMPTY: Partial<EstItem> = {
 }
 
 export default function ItensCad() {
+  const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -43,12 +45,25 @@ export default function ItensCad() {
   const [sortCol, setSortCol] = useState<string>('descricao')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Linha de RC (cmp_requisicao_itens.id) que abriu este cadastro — ao salvar um
+  // item NOVO, vinculamos essa linha ao item recém-criado (fluxo aguardando_catalogo).
+  const [vinculoRi, setVinculoRi] = useState<string | null>(null)
+  const [vinculoMsg, setVinculoMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  // Rota da RC que abriu este cadastro — ao vincular com sucesso, volta pra la
+  // automaticamente (pode ter outros itens orfaos esperando cadastro).
+  const [voltarPara, setVoltarPara] = useState<string | null>(null)
 
   // Prefill via query param ?descricao=X — usado pelo fluxo "aguardando_catalogo"
   // do RequisicaoDetalhe: abre o modal com a descricao livre da RC ja preenchida.
+  // ?ri=<id> (opcional): vincula a linha da RC ao item ao salvar.
+  // ?voltar=<path> (opcional): rota da RC pra onde voltar apos o vinculo.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const desc = params.get('descricao')
+    const ri = params.get('ri')
+    const voltar = params.get('voltar')
+    if (ri && ri.trim()) setVinculoRi(ri.trim())
+    if (voltar && voltar.trim()) setVoltarPara(voltar.trim())
     if (desc && desc.trim()) {
       setEditItem({ ...EMPTY, descricao: desc.trim() })
       setClasseBusca('')
@@ -130,13 +145,13 @@ export default function ItensCad() {
     window.location.reload()
   }
 
+  // Sem corte: com a busca vazia lista TODAS as classes (o dropdown rola).
   const classesFiltradas = classes
     .filter((classe) => {
       const termo = classeBusca.trim().toLowerCase()
       if (!termo) return true
       return `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(termo)
     })
-    .slice(0, 12)
 
   function formatClasseLabel(classe?: typeof classes[number]) {
     if (!classe) return ''
@@ -200,12 +215,48 @@ export default function ItensCad() {
         ? (editItem.ponto_reposicao ?? editItem.estoque_minimo ?? 0)
         : 0,
     }
-    await salvar.mutateAsync(payload)
+    const isNovo = !editItem.id
+    const novoId = await salvar.mutateAsync(payload)
+
+    // Fluxo aguardando_catalogo: item criado a partir de uma linha de RC — vincula
+    // a linha ao item recém-criado (por id, sem depender de match de descrição).
+    if (isNovo && vinculoRi && novoId) {
+      try {
+        const { error } = await supabase.rpc('fn_vincular_item_rc_manual', {
+          p_ri_id: vinculoRi,
+          p_item_id: novoId,
+        })
+        if (error) throw error
+        setVinculoRi(null)
+        closeForm()
+        // Chegou aqui pelo botao "Cadastrar" da RC (aguardando_catalogo) — volta
+        // direto pra la, assim da pra cadastrar o proximo item orfao sem precisar
+        // achar a RC de novo na lista.
+        if (voltarPara) {
+          navigate(voltarPara)
+          return
+        }
+        setVinculoMsg({ type: 'success', msg: 'Item cadastrado e vinculado à requisição.' })
+        return
+      } catch (e) {
+        setVinculoMsg({ type: 'error', msg: `Item cadastrado, mas o vínculo falhou: ${(e as Error).message}` })
+        closeForm()
+        return
+      }
+    }
     closeForm()
   }
 
   return (
     <div className="space-y-4">
+      {vinculoMsg && (
+        <div className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm ${vinculoMsg.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          <span>{vinculoMsg.msg}</span>
+          <button onClick={() => setVinculoMsg(null)} className="shrink-0 opacity-60 hover:opacity-100">
+            <X size={15} />
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">Catalogo de Itens</h1>

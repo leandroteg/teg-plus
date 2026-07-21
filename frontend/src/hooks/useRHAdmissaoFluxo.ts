@@ -6,14 +6,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import type { RHAdmissao } from '../types/rh'
+import type { RHAdmissao, RHAdmissaoCandidato } from '../types/rh'
 
 const BUCKET = 'rh-admissao-docs'
+
+// URL assinada (1h) de um anexo no bucket privado — p/ baixar/abrir na tela
+export async function anexoSignedUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
+}
 const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
 const SELECT =
   '*, centro_custo:sys_centros_custo!centro_custo_id(id,codigo,descricao), ' +
-  'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*)), ' +
+  'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*), colaborador:rh_colaboradores!colaborador_id(id,departamento)), ' +
   'anexos:rh_admissao_anexos!admissao_id(*)'
 
 // Bases operacionais (cadastro est_bases) — leitura para o select da requisição
@@ -83,6 +89,67 @@ export async function parseDocumentoAdmissao(file: File, tipo?: string): Promise
     return (await resp.json()) as CandidatoExtraido
   } catch (e) {
     console.warn('parseDocumentoAdmissao:', e)
+    return null
+  }
+}
+
+// ── IA: preenche a Ficha de Registro inteira lendo os anexos do candidato ──────
+// Baixa cada anexo do bucket, converte p/ base64 e manda ao n8n (Gemini), que lê
+// tudo e devolve os campos da ficha consolidados. Síncrono do ponto de vista da UI.
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      resolve(res.includes(',') ? res.split(',')[1] : res)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+const MAX_DOC_BYTES = 10 * 1024 * 1024   // pula anexo individual > 10MB
+const MAX_TOTAL_B64 = 14 * 1024 * 1024   // limite do payload n8n (~16MB)
+
+export async function preencherFichaRegistroAuto(
+  cand: RHAdmissaoCandidato,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const anexos = cand.anexos ?? []
+    const documentos: { tipo: string; nome: string; mime_type: string; base64: string }[] = []
+    let totalB64 = 0
+    for (const a of anexos) {
+      if (a.tamanho_bytes && a.tamanho_bytes > MAX_DOC_BYTES) { console.warn('anexo grande pulado:', a.arquivo_nome); continue }
+      const { data, error } = await supabase.storage.from(BUCKET).download(a.arquivo_path)
+      if (error || !data) { console.warn('falha ao baixar anexo:', a.arquivo_nome, error); continue }
+      const base64 = await blobToBase64(data)
+      if (!base64) continue
+      if (totalB64 + base64.length > MAX_TOTAL_B64) { console.warn('payload cheio, anexo ignorado:', a.arquivo_nome); continue }
+      totalB64 += base64.length
+      documentos.push({ tipo: a.tipo, nome: a.arquivo_nome, mime_type: a.mime_type || data.type || 'application/pdf', base64 })
+    }
+    if (!documentos.length) return null
+    const resp = await fetch(`${N8N_URL}/rh/admissao/preencher-ficha-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'analise os documentos anexos desse colaborador e preencha automaticamente a ficha de registro',
+        candidato: {
+          id: cand.id,
+          nome: cand.nome,
+          cpf: cand.cpf,
+          data_nascimento: cand.data_nascimento,
+          cargo: cand.cargo,
+          salario: cand.salario,
+        },
+        documentos,
+      }),
+    })
+    if (!resp.ok) return null
+    const json = (await resp.json()) as Record<string, unknown>
+    return (json?.dados ?? json) as Record<string, unknown>
+  } catch (e) {
+    console.warn('preencherFichaRegistroAuto:', e)
     return null
   }
 }
@@ -422,6 +489,21 @@ export function useMissoesDocsStatus(candidatoId?: string) {
   })
 }
 
+// true quando todos os candidatos têm os documentos recebidos (trava avanço p/ Exames)
+export function useDocsRecebidos(admissaoId?: string) {
+  return useQuery<boolean>({
+    queryKey: ['rh-admissao-docs-recebidos', admissaoId],
+    enabled: !!admissaoId,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rh_admissao_docs_recebidos', { p_admissao_id: admissaoId })
+      if (error) { console.error('useDocsRecebidos:', error); return false }
+      return !!data
+    },
+  })
+}
+
 // ── Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP ───────
 export interface ParecerQualificacao {
   candidato_id: string
@@ -478,6 +560,12 @@ export interface RHMobilizacao {
   alojamento_endereco: string | null
   alojamento_detalhes: string | null
   alojamento_ok: boolean
+  hora_apresentacao: string | null
+  tem_deslocamento: boolean | null
+  tem_alojamento: boolean | null
+  alojamento_imovel_id: string | null
+  apresentacao_base_id: string | null
+  recebido_por_id: string | null
   kit_epi_ok: boolean
   acessos_ok: boolean
   dados_confirmados: boolean
@@ -509,6 +597,19 @@ export interface RHRegistro {
   ficha_dados: Record<string, unknown> | null
 }
 
+export interface AssinaturaMissaoDoc {
+  id: string
+  titulo: string
+  status: string
+  concluida_em: string | null
+  metadata: { anexo_id?: string; documento_id?: string } | null
+  arquivo_assinado_path?: string | null
+  // contra-assinatura da empresa (supervisão RH assina no TEG+)
+  empresa_status?: string
+  empresa_assinado_em?: string | null
+  empresa_nome?: string | null
+}
+
 export interface RHProposta {
   candidato_id: string
   proposta_enviada: boolean
@@ -518,6 +619,8 @@ export interface RHProposta {
   deslocamento_detalhes: string | null
   responsavel_recebimento: string | null
   observacoes: string | null
+  // Recursos/necessidades definidos pelo RH (Alinhamento; editável tb em Mob/Integração)
+  recursos: Record<string, string> | null
 }
 
 // Dados de etapa por candidato (1 fetch por card)
@@ -528,7 +631,7 @@ export function useEtapaCandidato(candidatoId?: string) {
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,   // não recarregar enquanto o RH preenche
     queryFn: async () => {
-      const [prop, ex, tr, mob, integ, ace, reg, ass] = await Promise.all([
+      const [prop, ex, tr, mob, integ, ace, reg, ass, assDocs] = await Promise.all([
         supabase.from('rh_admissao_proposta').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_exame').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.from('rh_admissao_treinamentos').select('*').eq('candidato_id', candidatoId).order('created_at'),
@@ -537,8 +640,12 @@ export function useEtapaCandidato(candidatoId?: string) {
         supabase.rpc('rh_admissao_aceites_status', { p_candidato_id: candidatoId }),
         supabase.from('rh_admissao_registro').select('*').eq('candidato_id', candidatoId).maybeSingle(),
         supabase.rpc('rh_admissao_assinatura_status', { p_candidato_id: candidatoId }),
+        // status de assinatura por anexo — via RPC (sig_documento/sig_assinatura),
+        // porque portalteg_missoes tem RLS só de service_role (o RH não enxerga direto).
+        supabase.rpc('rh_admissao_assinatura_docs', { p_candidato_id: candidatoId }),
       ])
       const assRow = (Array.isArray(ass.data) ? ass.data[0] : ass.data) as { status?: string; concluida_em?: string } | undefined
+      const assinaturasDocs = (assDocs.data ?? []) as AssinaturaMissaoDoc[]
       return {
         proposta: (prop.data ?? null) as RHProposta | null,
         exame: (ex.data ?? null) as RHExame | null,
@@ -548,6 +655,7 @@ export function useEtapaCandidato(candidatoId?: string) {
         aceites: (ace.data ?? []) as AceiteStatus[],
         registro: (reg.data ?? null) as RHRegistro | null,
         assinatura: assRow ? { status: assRow.status ?? 'pendente', concluida_em: assRow.concluida_em ?? null } : null,
+        assinaturasDocs,
       }
     },
   })
@@ -592,6 +700,61 @@ export function useUploadAnexoCandidato() {
   })
 }
 
+// Exclui um anexo da admissão (ex.: documento duplicado): limpa missão de
+// assinatura + registros sig no banco (RPC) e apaga os arquivos do storage.
+export function useExcluirAnexoAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { anexoId: string; candidatoId: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_anexo_excluir', { p_anexo_id: i.anexoId })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; paths?: string[] }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao excluir o documento')
+      const paths = (r.paths ?? []).filter(Boolean)
+      if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
+      return r
+    },
+    onSuccess: (_r, i) => {
+      qc.invalidateQueries({ queryKey: ['rh-admissao-etapa-cand', i.candidatoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
+// RH anexa um documento pelo TEG+ no lugar do colaborador: sobe o arquivo e
+// conclui a missão correspondente do Portal (o pedido some do celular dele).
+export function useAnexarDocMissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: {
+      missaoId: string; admissaoId: string; candidatoId: string
+      docTipo: string; file: File; autorId?: string
+    }) => {
+      const safeName = i.file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `${i.admissaoId}/${i.candidatoId}/rh_${i.docTipo}_${Date.now()}_${safeName}`
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, i.file, { upsert: false })
+      if (upErr) throw upErr
+      const { data, error } = await supabase.rpc('rh_admissao_doc_anexar', {
+        p_missao_id: i.missaoId,
+        p_arquivo_path: path,
+        p_arquivo_nome: i.file.name,
+        p_mime: i.file.type || null,
+        p_tamanho: i.file.size,
+        p_autor_id: i.autorId ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao anexar o documento')
+      return r
+    },
+    onSuccess: (_r, i) => {
+      qc.invalidateQueries({ queryKey: ['rh-admissao-missoes-docs', i.candidatoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissao-docs-recebidos', i.admissaoId] })
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+    },
+  })
+}
+
 function invalidateEtapa(qc: ReturnType<typeof useQueryClient>, candidatoId: string) {
   qc.invalidateQueries({ queryKey: ['rh-admissao-etapa-cand', candidatoId] })
 }
@@ -628,9 +791,13 @@ export function useAsoSetStatus() {
 export function useTreinamentos() {
   const qc = useQueryClient()
   const add = useMutation({
-    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string }) => {
+    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; concluido?: boolean }) => {
       const { error } = await supabase.from('rh_admissao_treinamentos')
-        .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null })
+        .insert({
+          candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+          status: i.concluido ? 'concluido' : 'pendente',
+          concluido_em: i.concluido ? new Date().toISOString() : null,
+        })
       if (error) throw error
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
@@ -651,7 +818,70 @@ export function useTreinamentos() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
-  return { add, toggle, remover }
+  // anexa o certificado (bucket rh-admissao-docs) e conclui aquele treinamento
+  const anexarCert = useMutation({
+    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; file: File }) => {
+      const safe = i.file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `treinamentos/${i.candidatoId}/${Date.now()}_${safe}`
+      const { error: upErr } = await supabase.storage.from('rh-admissao-docs').upload(path, i.file, { upsert: true })
+      if (upErr) throw upErr
+      const patch = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      if (i.recId) {
+        const { error } = await supabase.from('rh_admissao_treinamentos').update(patch).eq('id', i.recId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('rh_admissao_treinamentos')
+          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null, ...patch })
+        if (error) throw error
+      }
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { add, toggle, remover, anexarCert }
+}
+
+export async function certTreinamentoUrl(path?: string | null): Promise<string | null> {
+  if (!path) return null
+  const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
+}
+
+// ── Integração: candidatos na etapa 'integracao' + seus treinamentos ─────────
+// Alimenta a sub-aba "Integração" do QSMA (Gestão SST › Treinamentos). O upload
+// de certificado reusa useTreinamentos().anexarCert (grava em rh_admissao_treinamentos),
+// então aparece automaticamente na Admissão › Integração.
+export interface IntegracaoCand { id: string; nome: string; cargo: string | null; base: string | null; admissao_id: string; colaborador_id: string | null }
+export interface IntegracaoTreino {
+  id: string; candidato_id: string; nome: string; norma: string | null
+  status: string; certificado_path: string | null; certificado_nome: string | null
+}
+
+export function useIntegracaoTreinos() {
+  return useQuery<{ candidatos: IntegracaoCand[]; treinos: IntegracaoTreino[] }>({
+    queryKey: ['integracao-treinos'],
+    queryFn: async () => {
+      const { data: adms, error } = await supabase
+        .from('rh_admissoes')
+        .select('id, base, cargo_previsto, candidatos:rh_admissao_candidatos(id, nome, cargo, colaborador_id)')
+        .eq('etapa', 'integracao')
+      if (error) { console.error('useIntegracaoTreinos:', error); return { candidatos: [], treinos: [] } }
+      const candidatos: IntegracaoCand[] = (adms ?? []).flatMap((a: any) =>
+        (a.candidatos ?? []).map((c: any) => ({
+          id: c.id, nome: c.nome, cargo: c.cargo || a.cargo_previsto || null, base: a.base ?? null,
+          admissao_id: a.id, colaborador_id: c.colaborador_id ?? null,
+        })))
+      const ids = candidatos.map(c => c.id)
+      let treinos: IntegracaoTreino[] = []
+      if (ids.length) {
+        const { data: tr } = await supabase
+          .from('rh_admissao_treinamentos')
+          .select('id, candidato_id, nome, norma, status, certificado_path, certificado_nome')
+          .in('candidato_id', ids)
+        treinos = (tr ?? []) as IntegracaoTreino[]
+      }
+      return { candidatos, treinos }
+    },
+  })
 }
 
 export function useMobilizacao() {
@@ -678,6 +908,31 @@ export function useMobilizacao() {
   return { enviarMissao, atualizar }
 }
 
+// Apoio da Mobilização: alojamentos (Locação), bases e possíveis receptores
+export function useMobApoio() {
+  return useQuery({
+    queryKey: ['rh-mob-apoio'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const [aloj, bases, rec, todos] = await Promise.all([
+        supabase.from('loc_imoveis').select('id, titulo, nome, cidade').eq('tipo', 'ALOJ').eq('status', 'ativo').order('cidade'),
+        supabase.from('est_bases').select('id, nome, cidade, endereco').eq('ativa', true).order('nome'),
+        supabase.from('rh_colaboradores').select('id, nome, cargo, base_id').eq('ativo', true)
+          .or('cargo.ilike.%engenheir%,cargo.ilike.%supervisor%,cargo.ilike.%administrat%,cargo.ilike.%gerente%,departamento.ilike.rh,departamento.ilike.adm%,departamento.ilike.dp')
+          .order('nome'),
+        // headcount completo (ativos) — para busca livre de "quem vai receber"
+        supabase.from('rh_colaboradores').select('id, nome, cargo, base_id').eq('ativo', true).order('nome'),
+      ])
+      return {
+        alojamentos: (aloj.data ?? []) as { id: string; titulo: string | null; nome: string | null; cidade: string | null }[],
+        bases: (bases.data ?? []) as { id: string; nome: string; cidade: string | null; endereco: string | null }[],
+        receptores: (rec.data ?? []) as { id: string; nome: string; cargo: string | null; base_id: string | null }[],
+        todos: (todos.data ?? []) as { id: string; nome: string; cargo: string | null; base_id: string | null }[],
+      }
+    },
+  })
+}
+
 export function useIntegracao() {
   const qc = useQueryClient()
   const enviarAceites = useMutation({
@@ -691,6 +946,18 @@ export function useIntegracao() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
+  // Envia as 2 missões de integração ao Portal: Declarações de Ciência + Treinamentos
+  const enviarMissoes = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_int_enviar_missoes', {
+        p_candidato_id: i.candidatoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar missões')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
   const atualizar = useMutation({
     mutationFn: async (i: { candidatoId: string; patch: Partial<RHIntegracao> }) => {
       const { error } = await supabase.from('rh_admissao_integracao')
@@ -699,7 +966,7 @@ export function useIntegracao() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
-  return { enviarAceites, atualizar }
+  return { enviarAceites, enviarMissoes, atualizar }
 }
 
 // Etapa Registro: ficha p/ contabilidade, contrato p/ assinatura, matrícula
@@ -735,6 +1002,22 @@ export function useRegistro() {
     },
     onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
   })
+  // Envia UM documento específico para assinatura (1 missão por documento)
+  const enviarAssinaturaAnexo = useMutation({
+    mutationFn: async (i: { candidatoId: string; anexoId: string; anexoPath: string; titulo: string; autorNome?: string }) => {
+      const { data: signed, error: sErr } = await supabase.storage
+        .from(BUCKET).createSignedUrl(i.anexoPath, 7 * 24 * 3600)
+      if (sErr || !signed?.signedUrl) throw new Error('Falha ao gerar o link do documento')
+      const { data, error } = await supabase.rpc('rh_admissao_reg_enviar_assinatura_anexo', {
+        p_candidato_id: i.candidatoId, p_anexo_id: i.anexoId, p_acao_url: signed.signedUrl,
+        p_titulo: i.titulo, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar para assinatura')
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
   const setMatricula = useMutation({
     mutationFn: async (i: { colaboradorId: string; candidatoId: string; matricula: string }) => {
       const { error } = await supabase.from('rh_colaboradores')
@@ -745,27 +1028,76 @@ export function useRegistro() {
   })
   // Envia a ficha + documentos do candidato por e-mail (caixa do RH via n8n)
   const enviarEmail = useMutation({
-    mutationFn: async (i: { candidatoId: string; destinatario: string }) => {
+    mutationFn: async (i: { candidatoId: string; destinatario: string; cc?: string }) => {
       const resp = await fetch(`${N8N_URL}/rh/ficha/enviar-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidato_id: i.candidatoId, destinatario: i.destinatario }),
+        body: JSON.stringify({ candidato_id: i.candidatoId, destinatario: i.destinatario, cc: i.cc || null }),
       })
       const r = (await resp.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!resp.ok || !r.ok) throw new Error(r.message || 'Falha ao enviar o e-mail')
     },
   })
-  return { gerarFicha, enviarAssinatura, setMatricula, enviarEmail }
+  const setLotacao = useMutation({
+    mutationFn: async (i: { colaboradorId: string; candidatoId: string; lotacao: string }) => {
+      const { error } = await supabase.from('rh_colaboradores')
+        .update({ secullum_lotacao: i.lotacao || null }).eq('id', i.colaboradorId)
+      if (error) throw error
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  // Finaliza o registro: efetiva o colaborador (RPC passos 1-2: ativo/headcount) e
+  // dispara OneDrive (pasta + anexos) + Secullum (cadastro) via SuperTEG (n8n, passos 3-4, assíncrono).
+  const finalizarRegistro = useMutation({
+    mutationFn: async (i: { candidatoId: string; autorId?: string; autorNome?: string }) => {
+      // Edge orquestra: efetiva o colaborador (RPC 1-2) + dispara OneDrive/Secullum no SuperTEG (3-4).
+      const { data, error } = await supabase.functions.invoke('rh-admissao-finalizar', {
+        body: { candidato_id: i.candidatoId, autor_id: i.autorId ?? null, autor_nome: i.autorNome ?? null },
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string; colaborador_id?: string; job_id?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao finalizar o registro')
+      return r
+    },
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
+  })
+  // Contra-assinatura da EMPRESA (supervisão RH logada no TEG+) em todos os docs do candidato.
+  // A edge valida a sessão (JWT) e o papel (rh: supervisor/diretor/ceo ou administrador).
+  const assinarPelaEmpresa = useMutation({
+    mutationFn: async (i: { candidatoId: string }) => {
+      const { data, error } = await supabase.functions.invoke('sig-assinatura', {
+        body: { action: 'assinar-empresa', candidato_id: i.candidatoId },
+      })
+      if (error) {
+        // 403 = usuário sem papel de assinatura pela empresa
+        const status = (error as { context?: { status?: number } })?.context?.status
+        if (status === 403) throw new Error('Sem permissões para assinatura')
+        throw error
+      }
+      const r = data as { ok: boolean; erro?: string; assinados?: number; aguardando_colaborador?: number; falhas?: string[] }
+      if (!r.ok) {
+        if (/permiss/i.test(r.erro ?? '')) throw new Error('Sem permissões para assinatura')
+        throw new Error(r.erro || 'Falha ao assinar pela empresa')
+      }
+      return r
+    },
+    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+  })
+  return { gerarFicha, enviarAssinatura, enviarAssinaturaAnexo, setMatricula, setLotacao, enviarEmail, finalizarRegistro, assinarPelaEmpresa }
 }
 
-// Matrícula atual do colaborador vinculado (etapa Registro)
+// Matrícula + lotação Secullum do colaborador vinculado (etapa Registro)
 export function useMatriculaColaborador(colaboradorId?: string) {
-  return useQuery<string | null>({
+  return useQuery<{ matricula: string | null; lotacao: string | null }>({
     queryKey: ['rh-colab-matricula', colaboradorId],
     enabled: !!colaboradorId,
     queryFn: async () => {
-      const { data } = await supabase.from('rh_colaboradores').select('matricula').eq('id', colaboradorId).maybeSingle()
-      return (data?.matricula ?? null) as string | null
+      const { data } = await supabase.from('rh_colaboradores').select('matricula, secullum_lotacao').eq('id', colaboradorId).maybeSingle()
+      return { matricula: (data?.matricula ?? null) as string | null, lotacao: (data?.secullum_lotacao ?? null) as string | null }
     },
   })
 }
@@ -786,6 +1118,41 @@ export function useLiberarAdmissao() {
       qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
       qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
     },
+  })
+}
+
+// Encerrar (arquivar) uma admissão já liberada — sai do board.
+export function useEncerrarAdmissao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { admissaoId: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_encerrar', {
+        p_admissao_id: i.admissaoId, p_autor_nome: i.autorNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao encerrar')
+      return r
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
+  })
+}
+
+// Sub-status GESET na etapa Liberação (aguardando liberação de campo × liberado).
+// Fica na MESMA aba; só troca o selo por candidato. p_status vazio/'liberado' volta ao padrão.
+export function useGesetLiberacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (i: { candidatoId: string; status: 'aguardando_liberacao' | 'liberado' }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_geset_status', {
+        p_cand_id: i.candidatoId, p_status: i.status,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao alterar status')
+      return r
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
   })
 }
 

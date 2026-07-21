@@ -2,26 +2,36 @@
 // pages/rh/RHColaboradorDetalhe.tsx — Ficha completa do colaborador
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Save, User, Briefcase, MapPin, Building2, CreditCard,
   FileText, Users2, Phone, Mail, Calendar, Hash, Edit3, Plus, Trash2,
   ChevronDown, ChevronUp, Clock, TrendingUp,
   Cloud, FolderOpen, Download, ExternalLink, Copy, Check, Loader2,
   Sparkles, FileBarChart, X, Paperclip, AlertCircle,
+  PenLine, Send, CheckCircle2, ShieldCheck, RotateCcw, GraduationCap,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes } from '../../hooks/useRH'
+import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes, useDepartamentos } from '../../hooks/useRH'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus,
+  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi, evidenciaUrl } from '../../hooks/useQsma'
+import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
+import { HardHat, Ruler } from 'lucide-react'
 import { useCadObras } from '../../hooks/useCadastros'
+import { useBases } from '../../hooks/useEstoque'
+import { Lock } from 'lucide-react'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
 
-export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
+export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostrarEpi }: { id: string; onBack: () => void; soTreinamentos?: boolean; mostrarEpi?: boolean }) {
   const { isLightSidebar: isLight } = useTheme()
   const { data: colab, isLoading } = useRHColaborador(id)
   const { data: dependentes = [] } = useRHDependentes(id)
   const { data: movimentacoes = [] } = useRHMovimentacoes({ colaborador_id: id })
   const { data: obras = [] } = useCadObras()
+  const { data: bases = [] } = useBases()
+  const { data: departamentos = [] } = useDepartamentos()
   const salvar = useSalvarRHColaborador()
   const salvarDep = useSalvarRHDependente()
   const removerDep = useRemoverRHDependente()
@@ -81,7 +91,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         <button onClick={onBack} className={`flex items-center gap-1.5 text-sm font-semibold ${isLight ? 'text-violet-600' : 'text-violet-400'}`}>
           <ArrowLeft size={16} /> Voltar
         </button>
-        {editMode ? (
+        {!soTreinamentos && (editMode ? (
           <div className="flex gap-2">
             <button onClick={() => setEditMode(false)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/10'}`}>
@@ -99,7 +109,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
             }`}>
             <Edit3 size={12} /> Editar
           </button>
-        )}
+        ))}
       </div>
 
       {/* Header card */}
@@ -139,6 +149,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      {!soTreinamentos && (<>
       {/* Dados Pessoais */}
       <div className={sectionCls}>
         <div className={headerCls} onClick={() => toggleSection('pessoal')}>
@@ -179,7 +190,29 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
               <Field label="CNPJ (PJ)" value={data?.cnpj_pj} onChange={v => set('cnpj_pj', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             )}
             <Field label="Cargo" value={data?.cargo} onChange={v => set('cargo', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Departamento" value={data?.departamento} onChange={v => set('departamento', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</label>
+              {editMode ? (
+                <select value={(data as any)?.base_id || ''} onChange={e => set('base_id', e.target.value || undefined)} className={inputCls}>
+                  <option value="">—</option>
+                  {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+                </select>
+              ) : (
+                <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.base?.nome || '—'}</p>
+              )}
+            </div>
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Departamento</label>
+              {editMode ? (
+                <select value={data?.departamento || ''} onChange={e => set('departamento', e.target.value || undefined)} className={inputCls}>
+                  <option value="">—</option>
+                  {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
+                  {data?.departamento && !departamentos.includes(data.departamento) && <option value={data.departamento}>{data.departamento}</option>}
+                </select>
+              ) : (
+                <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.departamento || '—'}</p>
+              )}
+            </div>
             <Field label="Setor" value={data?.setor} onChange={v => set('setor', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Obra</label>
@@ -193,8 +226,13 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
               )}
             </div>
             <FieldSelect label="Local de trabalho (UF)" value={data?.local_trabalho_uf} onChange={v => set('local_trabalho_uf', v || undefined)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Salário" value={data?.salario != null ? String(data.salario) : ''} onChange={v => set('salario', Number(v) || undefined)}
-              editable={editMode} type="number" cls={inputCls} isLight={isLight} />
+            <div>
+              <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Salário</label>
+              <div className={`w-full px-3 py-2 rounded-xl border border-transparent text-sm flex items-center gap-1.5 ${isLight ? 'bg-slate-50 text-slate-400' : 'bg-white/[0.04] text-slate-500'}`}
+                title="Dado restrito — visível apenas em totalizações/painéis, não na ficha individual">
+                <Lock size={13} /> Restrito
+              </div>
+            </div>
             <Field label="Data Admissão" value={data?.data_admissao} onChange={v => set('data_admissao', v)} editable={editMode} type="date" cls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Status</label>
@@ -398,6 +436,30 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
         </div>
       </div>
 
+      </>)}
+
+      {/* Treinamentos & Saúde (matriz QSMA + ASO) */}
+      <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />
+
+      {/* EPIs — ficha do colaborador + tamanhos (aberto pela tela QSMA › EPIs › Controle) */}
+      {mostrarEpi && (
+        <EpisColaborador colaborador={colab} sectionCls={sectionCls} isLight={isLight} />
+      )}
+
+      {!soTreinamentos && (<>
+      {/* Missões & Assinaturas (Portal TEG) */}
+      <MissoesColaborador
+        colaboradorId={id}
+        nome={colab.nome}
+        ativo={!!colab.ativo}
+        podeAssinar={!!(colab.ativo && colab.cpf && colab.data_nascimento)}
+        sectionCls={sectionCls}
+        isLight={isLight}
+      />
+
+      {/* Acesso ao Portal (PIN) */}
+      <AcessoPortalPin colaboradorId={id} ativo={!!colab.ativo} sectionCls={sectionCls} isLight={isLight} />
+
       {/* Documentos (OneDrive) */}
       <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
 
@@ -418,6 +480,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
           )}
         </div>
       </div>
+      </>)}
     </div>
   )
 }
@@ -438,6 +501,280 @@ function fmtTam(bytes: number | null) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ── Bloco EPIs do colaborador: tamanhos editáveis + kit da matriz + fichas ─────
+function EpisColaborador({ colaborador, sectionCls, isLight }: {
+  colaborador: RHColaborador; sectionCls: string; isLight: boolean
+}) {
+  const qc = useQueryClient()
+  const [aberto, setAberto] = useState(true)
+  const { data: epis = [] } = useEpis()
+  const { data: matriz = [] } = useMatrizEpi()
+  const { data: entregas = [] } = useEpiEntregas()
+  const { data: fichas = [] } = useFichasEpi()
+  const { data: bases = [] } = useBases()
+  const salvar = useSalvarRHColaborador()
+
+  const [editSz, setEditSz] = useState(false)
+  const [salvandoSz, setSalvandoSz] = useState(false)
+  const [sz, setSz] = useState({
+    camisa: colaborador.tamanho_camisa ?? '',
+    calca: colaborador.tamanho_calca ?? '',
+    calcado: colaborador.tamanho_calcado ?? '',
+  })
+
+  const epiById = new Map(epis.map(e => [e.id, e]))
+  const cargoNorm = cargoBase(colaborador.cargo)
+  const req = matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio')
+  const entregueIds = new Set(entregas.filter(e => e.colaborador_id === colaborador.id).map(e => e.epi_id))
+  const kit = req.map(m => ({ epi: epiById.get(m.epi_id), entregue: entregueIds.has(m.epi_id) }))
+  const ok = kit.filter(k => k.entregue).length
+  const total = kit.length
+  const minhasFichas = fichas
+    .filter(f => f.colaborador_id === colaborador.id)
+    .sort((a, b) => (b.data_entrega ?? '').localeCompare(a.data_entrega ?? ''))
+  const baseNome = (bid?: string) => bases.find(b => b.id === bid)?.nome ?? '—'
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+
+  async function salvarTamanhos() {
+    setSalvandoSz(true)
+    try {
+      await salvar.mutateAsync({
+        id: colaborador.id,
+        tamanho_camisa: sz.camisa || undefined,
+        tamanho_calca: sz.calca || undefined,
+        tamanho_calcado: sz.calcado || undefined,
+      })
+      qc.invalidateQueries({ queryKey: ['rh-colaborador', colaborador.id] })
+      setEditSz(false)
+    } catch (e) {
+      alert('Erro ao salvar tamanhos: ' + (e instanceof Error ? e.message : 'desconhecido'))
+    } finally { setSalvandoSz(false) }
+  }
+
+  const inCls = `w-full px-2.5 py-1.5 rounded-lg border text-sm ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
+  const szBox = (label: string, val: string) => (
+    <div className={`px-3 py-2 rounded-xl ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+      <p className={`text-[10px] font-semibold uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</p>
+      <p className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{val || '—'}</p>
+    </div>
+  )
+
+  return (
+    <div className={sectionCls}>
+      <button onClick={() => setAberto(a => !a)} className="w-full px-5 py-3 flex items-center justify-between">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <HardHat size={16} className="text-amber-500" /> EPIs
+          {total > 0 && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ok === total ? 'bg-emerald-100 text-emerald-700' : ok === 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+              Kit {ok}/{total}
+            </span>
+          )}
+        </h3>
+        {aberto ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {aberto && (
+        <div className="px-5 pb-4 space-y-4">
+          {/* Tamanhos (uniforme / EPI) — editáveis */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className={`text-xs font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                <Ruler size={13} className="text-slate-400" /> Tamanhos (uniforme / EPI)
+              </p>
+              {editSz ? (
+                <div className="flex gap-1.5">
+                  <button onClick={() => { setEditSz(false); setSz({ camisa: colaborador.tamanho_camisa ?? '', calca: colaborador.tamanho_calca ?? '', calcado: colaborador.tamanho_calcado ?? '' }) }}
+                    className={`text-[11px] px-2 py-1 rounded-lg border ${isLight ? 'border-slate-200 text-slate-500' : 'border-slate-700 text-slate-400'}`}>Cancelar</button>
+                  <button onClick={salvarTamanhos} disabled={salvandoSz}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-violet-600 text-white font-semibold disabled:opacity-50 inline-flex items-center gap-1">
+                    <Save size={12} /> {salvandoSz ? 'Salvando…' : 'Salvar'}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => setEditSz(true)} className={`text-[11px] px-2 py-1 rounded-lg inline-flex items-center gap-1 ${isLight ? 'text-violet-600 hover:bg-violet-50' : 'text-violet-400 hover:bg-white/[0.04]'}`}>
+                  <Edit3 size={12} /> Editar
+                </button>
+              )}
+            </div>
+            {editSz ? (
+              <div className="grid grid-cols-3 gap-2">
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Camisa</label>
+                  <input value={sz.camisa} onChange={e => setSz(s => ({ ...s, camisa: e.target.value }))} placeholder="P/M/G/GG" className={inCls} /></div>
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Calça</label>
+                  <input value={sz.calca} onChange={e => setSz(s => ({ ...s, calca: e.target.value }))} placeholder="38/40…" className={inCls} /></div>
+                <div><label className={`text-[10px] font-semibold uppercase block mb-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Calçado</label>
+                  <input value={sz.calcado} onChange={e => setSz(s => ({ ...s, calcado: e.target.value }))} placeholder="42" className={inCls} /></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {szBox('Camisa', sz.camisa)}
+                {szBox('Calça', sz.calca)}
+                {szBox('Calçado', sz.calcado)}
+              </div>
+            )}
+          </div>
+
+          {/* Kit da matriz do cargo */}
+          <div>
+            <p className={`text-xs font-bold mb-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Kit do cargo{total > 0 ? ` · ${ok}/${total} entregues` : ''}</p>
+            {total === 0 ? (
+              <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem matriz de EPI para o cargo "{colaborador.cargo || '—'}". Configure em QSMA › Segurança › EPIs › Matriz.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {kit.map((k, idx) => (
+                  <span key={idx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${k.entregue ? (isLight ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-500/15 text-emerald-300') : (isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/15 text-red-300')}`}>
+                    {k.entregue ? <Check size={10} /> : <AlertCircle size={10} />}
+                    {k.epi?.nome ?? 'EPI'}{k.epi?.ca ? ` · CA ${k.epi.ca}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fichas de entrega */}
+          <div>
+            <p className={`text-xs font-bold mb-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Fichas de entrega</p>
+            {minhasFichas.length === 0 ? (
+              <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma ficha registrada. Registre em QSMA › <b>+ Novo Registro</b>.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {minhasFichas.map(f => (
+                  <div key={f.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                        <span className={`font-mono text-[10px] mr-1.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{f.codigo}</span>
+                        {(f.itens?.length ?? 0)} item(ns)
+                      </p>
+                      <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(f.data_entrega)} · {baseNome(f.base_id)}</p>
+                    </div>
+                    {/* Ficha assinada arquivada: prioriza o documento real no OneDrive */}
+                    {f.onedrive_web_url ? (
+                      <a href={f.onedrive_web_url} target="_blank" rel="noreferrer"
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'}`}
+                        title="Abrir a ficha assinada no OneDrive">
+                        <ShieldCheck size={11} /> OneDrive
+                      </a>
+                    ) : f.arquivo_assinado_path ? (
+                      <button onClick={async () => { const url = await evidenciaUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank') }}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'}`}
+                        title="Abrir ficha assinada arquivada">
+                        <ShieldCheck size={11} /> Assinada
+                      </button>
+                    ) : null}
+                    <button onClick={() => gerarFichaEpiPdf({
+                      codigo: f.codigo,
+                      colaboradorNome: f.colaborador_nome ?? colaborador.nome,
+                      baseNome: baseNome(f.base_id),
+                      dataEntrega: f.data_entrega,
+                      motivo: f.motivo,
+                      observacoes: f.observacoes,
+                      entreguePorNome: f.entregue_por_nome,
+                      itens: (f.itens ?? []).map(it => ({ nome: it.epi?.nome ?? 'EPI', ca: it.epi?.ca, quantidade: it.quantidade, tamanho: it.tamanho, trocaPrevista: it.data_troca_prevista })),
+                    })}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border ${isLight ? 'border-slate-200 text-slate-600 hover:bg-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.05]'}`}
+                      title="Gerar o PDF em branco da ficha">
+                      <Download size={11} /> PDF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Bloco Treinamentos & ASO (matriz QSMA do cargo × registros do colaborador) ──
+function TreinamentosSaude({ colaboradorId, cargo, sectionCls, isLight }: {
+  colaboradorId: string; cargo?: string | null; sectionCls: string; isLight: boolean
+}) {
+  const [aberto, setAberto] = useState(true)
+  const { data: catalogo = [] } = useCatalogoTreinamentos()
+  const { data: matriz = [] } = useMatrizTreinamentos()
+  const { data: treinos = [] } = useTreinamentos()
+
+  const cargoNorm = cargoBase(cargo)
+  const requeridos = new Set(
+    matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id)
+  )
+  const meus = treinos.filter(t => t.colaborador_id === colaboradorId)
+  // último registro por treinamento (por treinamento_id; fallback norma)
+  const regDe = (cat: { id: string; norma: string | null }) => {
+    const cands = meus.filter(t => (t as any).treinamento_id === cat.id || (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()))
+    return cands.sort((a, b) => (b.data_realizacao ?? '').localeCompare(a.data_realizacao ?? ''))[0] ?? null
+  }
+
+  const linhas = catalogo
+    .filter(c => requeridos.has(c.id))
+    .map(c => {
+      const r = regDe(c)
+      return { cat: c, reg: r, status: treinoStatus(!!r, r?.vencimento) }
+    })
+    .sort((a, b) => (a.status === 'faltando' ? -1 : 0) - (b.status === 'faltando' ? -1 : 0) || a.cat.ordem - b.cat.ordem)
+
+  const cont = {
+    ok: linhas.filter(l => l.status === 'ok').length,
+    vencendo: linhas.filter(l => l.status === 'vencendo').length,
+    vencido: linhas.filter(l => l.status === 'vencido').length,
+    faltando: linhas.filter(l => l.status === 'faltando').length,
+  }
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+  const chip = (s: TreinoStatus) => s === 'ok' ? 'bg-emerald-100 text-emerald-700'
+    : s === 'vencendo' ? 'bg-amber-100 text-amber-700'
+    : s === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'
+  const chipTxt = (l: typeof linhas[number]) => l.status === 'faltando' ? 'Faltando'
+    : l.status === 'vencido' ? `Vencido ${fmt(l.reg?.vencimento)}`
+    : l.status === 'vencendo' ? `Vence ${fmt(l.reg?.vencimento)}`
+    : l.reg?.vencimento ? `Válido até ${fmt(l.reg?.vencimento)}` : 'Válido'
+
+  return (
+    <div className={sectionCls}>
+      <button onClick={() => setAberto(a => !a)} className="w-full px-5 py-3 flex items-center justify-between">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <GraduationCap size={16} className="text-sky-500" /> Treinamentos & Saúde (ASO)
+          <span className="flex items-center gap-1.5 ml-2">
+            {cont.faltando > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{cont.faltando} faltando</span>}
+            {cont.vencido > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{cont.vencido} vencido</span>}
+            {cont.vencendo > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{cont.vencendo} vencendo</span>}
+            {cont.ok > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{cont.ok} ok</span>}
+          </span>
+        </h3>
+        {aberto ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {aberto && (
+        <div className="px-5 pb-4">
+          {linhas.length === 0 ? (
+            <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum treinamento obrigatório mapeado para o cargo "{cargo || '—'}". Verifique a Matriz de Treinamentos (QSMA › Segurança).</p>
+          ) : (
+            <div className="space-y-1.5">
+              {linhas.map(l => (
+                <div key={l.cat.id} className={`flex items-center gap-3 py-1.5 px-3 rounded-lg ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                      {l.cat.nome} {l.cat.norma && <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>· {l.cat.norma}</span>}
+                    </p>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {l.reg?.data_realizacao ? `Realizado ${fmt(l.reg.data_realizacao)}` : 'Sem registro'}
+                    </p>
+                  </div>
+                  {(l.reg as any)?.certificado_url && (
+                    <a href={(l.reg as any).certificado_url} target="_blank" rel="noopener noreferrer" title="Abrir certificado"
+                      onClick={e => e.stopPropagation()} className="shrink-0 text-slate-400 hover:text-sky-500">
+                      <ExternalLink size={13} />
+                    </a>
+                  )}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${chip(l.status)}`}>{chipTxt(l)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function OneDriveDocs({ colaboradorId, sectionCls, isLight }: { colaboradorId: string; sectionCls: string; isLight: boolean }) {
@@ -773,6 +1110,280 @@ function RelatorioHistorico({ colaboradorId, sectionCls, isLight }: { colaborado
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Missões & Assinaturas do colaborador (Portal TEG) ────────────────────────
+interface MissaoRow {
+  id: string; categoria: string; titulo: string; descricao: string | null
+  status: string; prazo: string | null; acao_url: string | null; acao_label: string | null
+  created_at: string; concluida_em: string | null
+  documento_id: string | null; assinado_em: string | null; arquivo_assinado_path: string | null
+  origem: string | null
+}
+
+function MissoesColaborador({ colaboradorId, nome, ativo, podeAssinar, sectionCls, isLight }: {
+  colaboradorId: string; nome: string; ativo: boolean; podeAssinar: boolean; sectionCls: string; isLight: boolean
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [lista, setLista] = useState<MissaoRow[]>([])
+  const [carregado, setCarregado] = useState(false)
+  const [carregando, setCarregando] = useState(false)
+  const [modal, setModal] = useState(false)
+  const [titulo, setTitulo] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [prazo, setPrazo] = useState('')
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState<string | null>(null)
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+
+  async function carregar() {
+    setCarregando(true)
+    const { data } = await supabase.rpc('rh_colaborador_missoes', { p_colaborador_id: colaboradorId })
+    setLista((data ?? []) as MissaoRow[])
+    setCarregado(true); setCarregando(false)
+  }
+  function abrir() { setAberto(true); if (!carregado) carregar() }
+
+  // Poll enquanto houver missão pendente (colaborador pode assinar a qualquer momento)
+  const temPendente = lista.some(m => m.status === 'pendente')
+  useEffect(() => {
+    if (!aberto || !temPendente) return
+    const t = setInterval(() => { carregar() }, 10000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, temPendente])
+
+  async function enviar() {
+    if (!titulo.trim() || !arquivo) { setErro('Informe o título e selecione o PDF.'); return }
+    setEnviando(true); setErro(null)
+    try {
+      const safe = arquivo.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\- ]/g, '').replace(/\s+/g, '_')
+      const path = `rh-doc/${colaboradorId}/${Date.now()}-${safe}`
+      const up = await supabase.storage.from('rh-admissao-docs').upload(path, arquivo, {
+        contentType: arquivo.type || 'application/pdf', upsert: false,
+      })
+      if (up.error) throw up.error
+      const { data, error } = await supabase.rpc('rh_missao_enviar', {
+        p_colaborador_id: colaboradorId,
+        p_titulo: titulo.trim(),
+        p_arquivo_path: path,
+        p_tipo: 'assinatura',
+        p_descricao: descricao.trim() || null,
+        p_prazo: prazo || null,
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao enviar')
+      setModal(false); setTitulo(''); setDescricao(''); setPrazo(''); setArquivo(null)
+      await carregar()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao enviar documento')
+    } finally { setEnviando(false) }
+  }
+
+  async function verAssinado(m: MissaoRow) {
+    if (!m.arquivo_assinado_path) return
+    const win = window.open('', '_blank')
+    try {
+      const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(m.arquivo_assinado_path, 3600)
+      const url = data?.signedUrl
+      if (url && win) win.location.href = url
+      else if (url) window.location.href = url
+      else win?.close()
+    } catch { win?.close() }
+  }
+
+  async function copiar(m: MissaoRow) {
+    if (!m.acao_url) return
+    try { await navigator.clipboard.writeText(m.acao_url); setCopiado(m.id); setTimeout(() => setCopiado(null), 2000) } catch { /* */ }
+  }
+
+  const pendentes = lista.filter(m => m.status === 'pendente').length
+
+  return (
+    <div className={sectionCls}>
+      <div className={`flex items-center justify-between px-5 py-3 cursor-pointer ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => (aberto ? setAberto(false) : abrir())}>
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <PenLine size={14} className="text-teal-500" /> Missões & Assinaturas
+          {pendentes > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-300'}`}>{pendentes} pendente{pendentes > 1 ? 's' : ''}</span>
+          )}
+        </h3>
+        {aberto ? <ChevronUp size={16} className={muted} /> : <ChevronDown size={16} className={muted} />}
+      </div>
+
+      {aberto && (
+        <div className="px-5 pb-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className={`text-[11px] ${muted}`}>Envie um documento para o colaborador assinar no Portal TEG. Ao assinar, ele volta aqui como “Assinado”.</p>
+            <button onClick={() => { setModal(true); setErro(null) }} disabled={!podeAssinar}
+              title={!podeAssinar ? 'Colaborador precisa estar ativo e ter CPF + data de nascimento para assinar no Portal.' : ''}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Send size={13} /> Enviar p/ assinatura
+            </button>
+          </div>
+
+          {!podeAssinar && (
+            <p className="text-[11px] text-amber-600 flex items-center gap-1.5">
+              <AlertCircle size={12} />
+              {ativo ? 'Sem CPF ou data de nascimento — necessário para acessar/assinar no Portal.' : 'Colaborador inativo não acessa o Portal.'}
+            </p>
+          )}
+
+          {carregando && lista.length === 0 ? (
+            <div className="flex items-center justify-center py-8"><Loader2 size={22} className="animate-spin text-teal-500" /></div>
+          ) : lista.length === 0 ? (
+            <p className={`text-xs ${muted} py-2 text-center`}>Nenhuma missão enviada ainda.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {lista.map(m => {
+                const assinado = !!m.assinado_em
+                const concluida = m.status === 'concluida' || assinado
+                return (
+                  <div key={m.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border ${isLight ? 'border-slate-100 bg-slate-50/60' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                    {concluida
+                      ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                      : <PenLine size={15} className="text-amber-500 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${txt}`}>{m.titulo}</p>
+                      <p className={`text-[10px] ${muted}`}>
+                        {m.categoria === 'assinaturas' ? 'Assinatura' : m.categoria}
+                        {' · '}{new Date(m.created_at).toLocaleDateString('pt-BR')}
+                        {assinado && ` · assinado ${new Date(m.assinado_em!).toLocaleDateString('pt-BR')}`}
+                        {!concluida && m.prazo && ` · prazo ${new Date(m.prazo).toLocaleDateString('pt-BR')}`}
+                      </p>
+                    </div>
+                    {concluida ? (
+                      m.arquivo_assinado_path ? (
+                        <button onClick={() => verAssinado(m)} title="Baixar assinado"
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isLight ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25'}`}>
+                          <Download size={12} /> Assinado
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-emerald-500">Concluída</span>
+                      )
+                    ) : (
+                      <button onClick={() => copiar(m)} title="Copiar link para enviar ao colaborador"
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${copiado === m.id ? 'text-emerald-600' : isLight ? 'text-teal-700 bg-teal-50 hover:bg-teal-100' : 'text-teal-300 bg-teal-500/15 hover:bg-teal-500/25'}`}>
+                        {copiado === m.id ? <Check size={12} /> : <Copy size={12} />} {copiado === m.id ? 'Copiado' : 'Link'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal enviar */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setModal(false)}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><PenLine size={18} className="text-teal-600" /> Enviar para assinatura</h2>
+              <button onClick={() => setModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-[11px] text-slate-500">Para <span className="font-semibold text-slate-700">{nome}</span> assinar no Portal TEG.</p>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Título do documento</label>
+                <input value={titulo} onChange={e => setTitulo(e.target.value)}
+                  placeholder="Ex.: Contrato de trabalho, Advertência, Termo…"
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Instrução (opcional)</label>
+                <textarea rows={2} value={descricao} onChange={e => setDescricao(e.target.value)}
+                  placeholder="Mensagem que o colaborador verá antes de assinar."
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Prazo (opcional)</label>
+                <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)}
+                  className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase text-slate-500">Documento (PDF)</label>
+                <label className="mt-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 cursor-pointer hover:border-teal-300">
+                  <Paperclip size={14} /> {arquivo ? arquivo.name : 'Selecionar PDF'}
+                  <input type="file" className="hidden" accept="application/pdf,.pdf"
+                    onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+                </label>
+                <p className="text-[10px] text-slate-400 mt-1">Dica: onde houver o campo de assinatura (linha com o nome do colaborador), o carimbo digital cai exatamente ali; o resto das páginas recebe rubrica.</p>
+              </div>
+              {erro && <p className="text-xs text-red-600 font-semibold flex items-center gap-1.5"><AlertCircle size={13} /> {erro}</p>}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancelar</button>
+              <button onClick={enviar} disabled={enviando || !titulo.trim() || !arquivo}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-60">
+                {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                {enviando ? 'Enviando…' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Acesso ao Portal: status do PIN + reset (RH) ─────────────────────────────
+function AcessoPortalPin({ colaboradorId, ativo, sectionCls, isLight }: {
+  colaboradorId: string; ativo: boolean; sectionCls: string; isLight: boolean
+}) {
+  const [temPin, setTemPin] = useState<boolean | null>(null)
+  const [resetando, setResetando] = useState(false)
+
+  async function carregar() {
+    const { data } = await supabase.rpc('portalteg_pin_status', { p_colaborador_id: colaboradorId })
+    setTemPin(((data as { tem_pin?: boolean } | null)?.tem_pin) ?? false)
+  }
+  useEffect(() => { carregar() // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colaboradorId])
+
+  async function resetar() {
+    if (!window.confirm('Resetar o PIN deste colaborador? No próximo acesso ele entra só com CPF + data de nascimento e poderá criar um novo PIN.')) return
+    setResetando(true)
+    try {
+      await supabase.rpc('rh_portalteg_pin_resetar', { p_colaborador_id: colaboradorId, p_autor_nome: null })
+      await carregar()
+    } finally { setResetando(false) }
+  }
+
+  const txt = isLight ? 'text-slate-700' : 'text-slate-300'
+  const muted = isLight ? 'text-slate-400' : 'text-slate-500'
+
+  return (
+    <div className={sectionCls}>
+      <div className="px-5 py-3 flex items-center justify-between gap-3">
+        <h3 className={`text-sm font-bold flex items-center gap-2 ${txt}`}>
+          <ShieldCheck size={14} className={temPin ? 'text-emerald-500' : 'text-slate-400'} /> Acesso ao Portal
+        </h3>
+        <div className="flex items-center gap-2">
+          {temPin === null ? (
+            <Loader2 size={14} className="animate-spin text-slate-400" />
+          ) : temPin ? (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-400'}`}>PIN ativo</span>
+          ) : (
+            <span className={`text-[10px] ${muted}`}>Sem PIN{ativo ? '' : ' · inativo'}</span>
+          )}
+          {temPin && (
+            <button onClick={resetar} disabled={resetando}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold disabled:opacity-50 ${isLight ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-amber-300 bg-amber-500/15 hover:bg-amber-500/25'}`}>
+              {resetando ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Resetar PIN
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

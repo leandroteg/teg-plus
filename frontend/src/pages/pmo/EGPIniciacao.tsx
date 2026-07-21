@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   Rocket, ClipboardCheck, Users, MessageSquare,
   Plus, Trash2, Save, Edit3, X, Check, Building2, Search, ChevronRight, Upload, Loader2, Ban, RotateCcw, FileText, Eye, Download,
+  ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
@@ -897,6 +898,17 @@ function ObrasIniciadasPanel({ portfolioId, isLight }: { portfolioId?: string; i
             className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}><X size={15} /></button>
         )}
         <div className="ml-auto flex items-center gap-2 shrink-0 pl-2">
+          {list.length > 0 && (
+            <button
+              onClick={() => {
+                if (open.size > 0) setOpen(new Set())
+                else { setCollapsedPolos(new Set()); setOpen(new Set(list.map(o => o.id))) }
+              }}
+              title={open.size > 0 ? 'Recolher todas as obras' : 'Expandir todas as obras'}
+              className={`shrink-0 p-2 rounded-xl ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}>
+              {open.size > 0 ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+            </button>
+          )}
           <button onClick={() => { setPForm({ nome: '', codigo: '' }); setModal('projeto') }}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100' : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'}`}>
             <Plus size={14} /> Projeto

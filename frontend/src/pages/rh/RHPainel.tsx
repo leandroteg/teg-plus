@@ -3,9 +3,11 @@
 // Seletor de painel (Visão Geral · Evolução · Composição · Turnover), igual ao Frotas.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, lazy, Suspense } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  Users, UserPlus, UserMinus, TrendingUp, RefreshCw, ChevronRight,
+  Users, UserPlus, TrendingUp, RefreshCw, ChevronRight,
   Zap, AlertTriangle, Activity, Building2, ChevronDown,
+  ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -17,19 +19,17 @@ import type { RHAdmissao } from '../../types/rh'
 const EvolucaoHeadcount = lazy(() => import('./paineis/EvolucaoHeadcount'))
 const ComposicaoHeadcount = lazy(() => import('./paineis/ComposicaoHeadcount'))
 const TurnoverHeadcount = lazy(() => import('./paineis/TurnoverHeadcount'))
+const LiberacaoHeadcount = lazy(() => import('./paineis/LiberacaoHeadcount'))
 
-type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover'
+type PainelKey = 'geral' | 'evolucao' | 'composicao' | 'turnover' | 'liberacao'
 const PAINEIS: Array<{ key: PainelKey; label: string }> = [
-  { key: 'composicao', label: 'Composição' },
   { key: 'geral', label: 'Visão Geral' },
+  { key: 'liberacao', label: 'Liberação' },
+  { key: 'composicao', label: 'Composição' },
   { key: 'evolucao', label: 'Evolução' },
   { key: 'turnover', label: 'Turnover' },
 ]
 
-const ETAPA_LABEL: Record<string, string> = {
-  requisicao: 'Pendente', aprovacao: 'Aprovação', documentacao: 'Documentação',
-  exames_treinamentos: 'Exames/Trein.', mobilizacao: 'Mobilização', integracao: 'Integração', liberado: 'Liberado',
-}
 const EM_ANDAMENTO = ['requisicao', 'aprovacao', 'documentacao', 'exames_treinamentos', 'mobilizacao', 'integracao']
 
 function SpotlightMetric({ label, value, tone, note, isDark }: {
@@ -43,10 +43,13 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
     slate: isDark ? 'text-slate-400' : 'text-slate-500',
   }
   return (
-    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+    <div className={`rounded-2xl p-3 flex flex-col ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
-      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+      {/* valor centralizado no espaço restante → alinha com os números do Movimento */}
+      <div className="flex-1 flex flex-col justify-center">
+        <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+        {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+      </div>
     </div>
   )
 }
@@ -78,6 +81,49 @@ const MESES_OPT: Array<[string, string]> = [
   ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
 ]
 
+// R$ compacto p/ caber no card estreito: 967757 → "R$ 968 mil"; 1.2mi → "R$ 1,2 mi"
+function formatBRLcompacto(v: number): string {
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
+  if (v >= 1_000) return `R$ ${(v / 1_000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} mil`
+  return `R$ ${v.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+}
+
+// 'YYYY-MM' → 'mmm/aa' (ex.: '2026-06' → 'jun/26')
+function fmtComp(ym: string): string {
+  const [y, m] = ym.split('-')
+  const lbl = MESES_OPT.find(([v]) => v === m)?.[1] ?? m
+  return `${lbl.toLowerCase()}/${y.slice(2)}`
+}
+
+// Card de Movimento do mês: entradas (↑ verde, esquerda) e saídas (↓ vermelho, direita)
+function MovimentoCard({ entradas, saidas, isDark }: { entradas: number; saidas: number; isDark: boolean }) {
+  const emerald = isDark ? 'text-emerald-400' : 'text-emerald-600'
+  const red = saidas > 0 ? (isDark ? 'text-red-400' : 'text-red-600') : 'text-slate-400'
+  const labelCls = `text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+  return (
+    <div className={`rounded-2xl p-3 flex flex-col gap-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Movimento</p>
+      <div className="flex items-stretch flex-1">
+        <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <ArrowUp size={18} className={emerald} strokeWidth={2.8} />
+            <span className={`text-[1.85rem] font-extrabold leading-none ${emerald}`}>{entradas}</span>
+          </div>
+          <span className={labelCls}>entradas</span>
+        </div>
+        <div className={`w-px self-stretch ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <ArrowDown size={18} className={red} strokeWidth={2.8} />
+            <span className={`text-[1.85rem] font-extrabold leading-none ${red}`}>{saidas}</span>
+          </div>
+          <span className={labelCls}>saídas</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
   const [y, m] = value.split('-')
   const anoAtual = new Date().getFullYear()
@@ -98,13 +144,18 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
-export default function RHPainel() {
+export default function RHPainel({ initialPainel }: { initialPainel?: PainelKey } = {}) {
   const { isDark } = useTheme()
-  const [painel, setPainel] = useState<PainelKey>('composicao')
+  const [painel, setPainel] = useState<PainelKey>(initialPainel ?? 'geral')
   const [de, setDe] = useState('2026-01')
   const [ate, setAte] = useState(ymHoje())
   const { data: stats, isLoading, refetch } = useRHStats()
   const { data: admissoes = [] } = useAdmissoesFluxo()
+  const qc = useQueryClient()
+  const atualizar = () => {
+    if (painel === 'liberacao') qc.invalidateQueries({ queryKey: ['rh-liberacao-painel'] })
+    else refetch()
+  }
 
   return (
     <div className="space-y-3">
@@ -126,7 +177,7 @@ export default function RHPainel() {
           </div>
         </div>
         {painel === 'geral' ? (
-          <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+          <button onClick={atualizar} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
             <RefreshCw size={16} />
           </button>
         ) : (
@@ -141,6 +192,7 @@ export default function RHPainel() {
       {painel === 'evolucao' && <Suspense fallback={<PainelSpinner />}><EvolucaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'composicao' && <Suspense fallback={<PainelSpinner />}><ComposicaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'turnover' && <Suspense fallback={<PainelSpinner />}><TurnoverHeadcount de={de} ate={ate} /></Suspense>}
+      {painel === 'liberacao' && <Suspense fallback={<PainelSpinner />}><LiberacaoHeadcount de={de} ate={ate} /></Suspense>}
       {painel === 'geral' && (
         (isLoading || !stats) ? <PainelSpinner /> : <VisaoGeral stats={stats} admissoes={admissoes} isDark={isDark} />
       )}
@@ -153,13 +205,38 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
   // ── Métricas ───────────────────────────────────────────────────────────────
-  const admMes = stats.admissoesMes
-  const saiMes = stats.desligamentosMes
+  // Entradas/saídas do mês = movimento REAL (data_admissao/data_demissao), não requisições.
+  const entradas = stats.admitidosMes
+  const saidas = stats.desligadosMes
   const ativos = stats.totalAtivos || 1
-  const turnover = (((admMes + saiMes) / 2) / ativos) * 100
+  // Turnover = desligamentos acumulados do ano ÷ efetivo ativo (definição TEG: só saídas)
+  const turnover = (stats.desligadosAno / ativos) * 100
+  const folha = stats.folhaTotal
 
   const emAndamento = admissoes.filter(a => EM_ANDAMENTO.includes(a.etapa ?? 'requisicao'))
-  const urgentes = emAndamento.filter(a => a.urgente).length
+  // Liberações atrasadas: pessoas cujo início previsto já venceu e ainda não foram liberadas.
+  // (created_at não serve — as requisições foram recriadas em massa; data_prevista_inicio é o sinal real.)
+  const hojeStr = new Date().toISOString().slice(0, 10)
+  const liberacoesAtrasadas = emAndamento
+    .filter(a => a.data_prevista_inicio && a.data_prevista_inicio.slice(0, 10) < hojeStr)
+    .reduce((soma, a) => soma + Math.max(a.candidatos?.length ?? 0, 1), 0)
+
+  // Admissões em andamento totalizadas por Centro de Custo (base), com contagem por cargo
+  const gruposCC = (() => {
+    const map = new Map<string, { cc: string; total: number; cargos: Map<string, number> }>()
+    emAndamento.forEach(a => {
+      const cc = a.base || a.centro_custo?.codigo || 'Sem centro de custo'
+      const g = map.get(cc) ?? { cc, total: 0, cargos: new Map<string, number>() }
+      const cands: Array<{ cargo?: string }> = a.candidatos?.length ? a.candidatos : [{ cargo: a.cargo_previsto }]
+      cands.forEach(c => {
+        g.total += 1
+        const cargo = (c.cargo || a.cargo_previsto || 'Sem cargo').trim()
+        g.cargos.set(cargo, (g.cargos.get(cargo) ?? 0) + 1)
+      })
+      map.set(cc, g)
+    })
+    return Array.from(map.values()).sort((a, b) => b.total - a.total)
+  })()
 
   const clt = stats.totalCLT
   const pj = stats.totalPJ
@@ -183,16 +260,17 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Núcleo de Pessoas</p>
-                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores do mês</h2>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Indicadores-chave</h2>
               </div>
               <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
                 <Users size={18} className="text-violet-500" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 flex-1">
-              <SpotlightMetric label="Admissões" value={admMes} tone="violet" isDark={isDark} note={`${ativos} ativos`} />
-              <SpotlightMetric label="Saídas" value={saiMes} tone={saiMes > 0 ? 'amber' : 'slate'} isDark={isDark} note="no mês" />
-              <SpotlightMetric label="Turnover" value={`${turnover.toFixed(1)}%`} tone={turnover >= 5 ? 'red' : 'emerald'} isDark={isDark} note="mensal" />
+              <SpotlightMetric label="Folha" value={folha != null ? formatBRLcompacto(folha) : '—'} tone="violet" isDark={isDark}
+                note={stats.folhaComp ? `CLT líq + PJ · ${fmtComp(stats.folhaComp)}` : 'CLT + PJ'} />
+              <MovimentoCard entradas={entradas} saidas={saidas} isDark={isDark} />
+              <SpotlightMetric label="Turnover" value={`${turnover.toFixed(1)}%`} tone={turnover >= 5 ? 'red' : 'emerald'} isDark={isDark} note={`acum. ${new Date().getFullYear()}`} />
             </div>
           </div>
         </section>
@@ -204,13 +282,13 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Janela Crítica</p>
                 <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>O que exige ação agora</h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <Zap size={14} className={urgentes > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${liberacoesAtrasadas > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <Zap size={14} className={liberacoesAtrasadas > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard label="Adm. Urgentes" value={urgentes} icon={AlertTriangle}
-                iconTone={urgentes > 0 ? 'text-orange-500' : 'text-slate-400'} note={urgentes > 0 ? 'priorizar!' : 'nenhuma'} isDark={isDark} />
+              <MiniInfoCard label="Liberações atrasadas" value={liberacoesAtrasadas} icon={AlertTriangle}
+                iconTone={liberacoesAtrasadas > 0 ? 'text-red-500' : 'text-slate-400'} note={liberacoesAtrasadas > 0 ? 'início já vencido' : 'em dia'} isDark={isDark} />
               <MiniInfoCard label="Em Andamento" value={emAndamento.length} icon={Activity}
                 iconTone={emAndamento.length > 0 ? 'text-violet-500' : 'text-slate-400'} note="no fluxo" isDark={isDark} />
             </div>
@@ -228,7 +306,7 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
             {comp.map(c => (
               <span key={c.key} className="flex items-center gap-1">
                 <span className={`w-2.5 h-2.5 rounded-full ${c.color}`} />
-                <span className="text-[10px] text-slate-500">{c.label}</span>
+                <span className="text-[10px] text-slate-500">{c.label} <span className="font-bold text-slate-600">{c.total}</span></span>
               </span>
             ))}
           </div>
@@ -241,8 +319,8 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
               {comp.map(c => {
                 const pct = (c.total / compTotal) * 100
                 return (
-                  <div key={c.key} className={`${c.color} flex items-center justify-center transition-all`} style={{ width: `${Math.max(pct, 4)}%` }} title={`${c.label}: ${c.total}`}>
-                    {pct >= 12 && <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{c.label} {c.total}</span>}
+                  <div key={c.key} className={`${c.color} flex items-center justify-center transition-all`} style={{ width: `${Math.max(pct, 5)}%` }} title={`${c.label}: ${c.total}`}>
+                    <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">{pct >= 12 ? `${c.label} ${c.total}` : c.total}</span>
                   </div>
                 )
               })}
@@ -261,24 +339,23 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
             <button onClick={() => nav('/rh/headcount/admissao')} className="flex items-center gap-0.5 text-[10px] text-violet-600 font-semibold">Ver todas <ChevronRight size={11} /></button>
           </div>
           <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-            {emAndamento.length === 0 ? (
+            {gruposCC.length === 0 ? (
               <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma admissão em andamento</p>
-            ) : emAndamento.slice(0, 6).map(a => {
-              const cand = a.candidatos?.[0]?.nome || a.nome_candidato || 'Candidato'
-              const n = a.candidatos?.length ?? 0
+            ) : gruposCC.slice(0, 6).map(g => {
+              const cargosStr = Array.from(g.cargos.entries())
+                .sort((a, b) => b[1] - a[1])
+                .map(([cargo, n]) => `${n} ${cargo}`)
+                .join(' · ')
               return (
-                <div key={a.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                <div key={g.cc} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
-                    <UserPlus size={14} className="text-violet-500" />
+                    <Building2 size={14} className="text-violet-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                      {cand}{n > 1 && <span className="text-violet-500 font-bold"> +{n - 1}</span>}
-                    </p>
-                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{a.base || a.centro_custo?.codigo || '—'}</p>
+                    <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{g.cc}</p>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cargosStr}</p>
                   </div>
-                  {a.urgente && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 shrink-0">URGENTE</span>}
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{ETAPA_LABEL[a.etapa ?? 'requisicao']}</span>
+                  <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full shrink-0 ${isDark ? 'bg-violet-500/10 text-violet-300' : 'bg-violet-50 text-violet-700'}`}>{g.total}</span>
                 </div>
               )
             })}
@@ -296,7 +373,7 @@ function VisaoGeral({ stats, admissoes, isDark }: { stats: RHStats; admissoes: R
               <p className={`text-center text-sm py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados por departamento</p>
             ) : porDept.slice(0, 8).map(d => (
               <div key={d.departamento} className="flex items-center gap-3">
-                <p className={`text-[11px] font-semibold text-right shrink-0 w-[90px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d.departamento}</p>
+                <p className={`text-[11px] font-semibold text-right shrink-0 w-[132px] leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d.departamento}</p>
                 <div className="flex-1 relative">
                   <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                     <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-600 transition-all duration-500" style={{ width: `${Math.max((d.total / maxDept) * 100, 4)}%` }} />

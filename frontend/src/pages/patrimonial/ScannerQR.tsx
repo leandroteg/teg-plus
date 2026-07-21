@@ -66,7 +66,13 @@ export default function ScannerQR() {
 
   const handleQRResult = (raw: string) => {
     stopScanner()
-    // Extract numero from URL: .../p/PAT-0001 or just PAT-0001
+    // Item de estoque: .../e/CODIGO
+    const estoque = raw.match(/\/e\/([^/?#]+)/)
+    if (estoque) {
+      nav(`/e/${estoque[1]}`)
+      return
+    }
+    // Patrimônio: .../p/PAT-0001 ou só PAT-0001
     const match = raw.match(/\/p\/([A-Za-z0-9\-]+)/) || raw.match(/(PAT-\d+)/)
     if (match) {
       nav(`/p/${match[1]}`)

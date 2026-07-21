@@ -1,25 +1,28 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, X, ShieldCheck,
   Building2, Tag, Briefcase, Hash, Layers,
   ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, ArrowDown, ArrowUp, Receipt, Mail,
-  ArrowRight, Upload, RefreshCw, XCircle, Zap,
+  ArrowRight, Upload, RefreshCw, XCircle, Zap, Users, Lock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useContasReceber, useAutorizarCR, useFaturarCR,
   useAvancarStatusCR, useRegistrarRecebimentoCR,
   useCompartilharNFEmail, useConciliarCRBatch,
-  useExtratoCandidatos, useAplicarConciliacaoAuto,
+  useExtratoCandidatos, useAplicarConciliacaoAuto, useAtualizarBloqueioCR, useBloqueioHist,
 } from '../../hooks/useFinanceiro'
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
+import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
-import type { ContaReceber, StatusCR } from '../../types/financeiro'
+import type { ContaReceber, StatusCR, BloqueioCR } from '../../types/financeiro'
 import { CR_PIPELINE_STAGES } from '../../types/financeiro'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -41,7 +44,35 @@ const fmtDataFull = (d: string) =>
 type SortField = 'vencimento' | 'valor' | 'cliente' | 'emissao'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
-const CR_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_90px_72px_minmax(0,1fr)_72px_96px] items-center gap-x-3'
+// colunas da lista: checkbox · NF · Emissão · OSC+obra+CC · Cliente · Vencimento · Bloqueio · Valor
+const CR_COLS = '18px 62px 74px minmax(0,2fr) minmax(0,1.2fr) 86px 44px 104px'
+
+// tipos de bloqueio (preenchido manual no modal)
+const BLOQUEIOS: Record<BloqueioCR, { label: string; cls: string; Icon: typeof AlertTriangle | null }> = {
+  tecnico:          { label: 'Bloqueio Técnico',      cls: 'text-rose-500',    Icon: AlertTriangle },
+  contratual:       { label: 'Bloqueio Contratual',   cls: 'text-rose-500',    Icon: FileText },
+  rh:               { label: 'Bloqueio Recursos Humanos', cls: 'text-rose-500', Icon: Users },
+  financeiro:       { label: 'Bloqueio Financeiro',   cls: 'text-rose-500',    Icon: Receipt },
+  em_identificacao: { label: 'Em identificação',      cls: 'text-amber-500',   Icon: Search },
+  em_aprovacao:     { label: 'Em Aprovação',          cls: 'text-orange-500',  Icon: Clock },
+  resolvido:        { label: 'Bloqueio resolvido',    cls: 'text-emerald-500', Icon: CheckCircle2 },
+  sem_bloqueio:     { label: 'Sem bloqueio',          cls: 'text-slate-300',   Icon: null },
+}
+const BLOQUEIO_ORDER: BloqueioCR[] = ['sem_bloqueio', 'tecnico', 'contratual', 'rh', 'financeiro', 'em_identificacao', 'em_aprovacao', 'resolvido']
+
+// cor do vencimento: vencido ou faltando ≤3 dias → vermelho (não conta se já recebido/conciliado)
+function vencInfo(cr: ContaReceber): { cls: string; bold: boolean } {
+  if (['recebido', 'conciliado', 'cancelado'].includes(cr.status)) return { cls: '', bold: false }
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = Math.floor((new Date(cr.data_vencimento + 'T00:00:00').getTime() - today.getTime()) / 86_400_000)
+  if (d < 0) return { cls: 'text-red-600', bold: true }
+  if (d <= 3) return { cls: 'text-red-500', bold: true }
+  return { cls: '', bold: false }
+}
+// bloqueio ATIVO (não conta sem_bloqueio nem resolvido)
+const isBloqueado = (b?: BloqueioCR) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
+const diasEntre = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000))
+const fmtDur = (dias: number) => dias === 0 ? 'hoje' : dias === 1 ? '1 dia' : `${dias} dias`
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -349,17 +380,132 @@ function RegistrarRecebimentoModal({ cr, onClose, isDark }: { cr: ContaReceber; 
   )
 }
 
+// ── MedicaoDetailModal (medição do EGP a partir da CR) ───────────────────────
+
+function MedicaoDetailModal({ numeroOs, medicaoId, isDark, onClose }: {
+  numeroOs: string; medicaoId?: string | null; isDark: boolean; onClose: () => void
+}) {
+  const { data: espelhos = [], isLoading: loadEsp } = useEspelhosDaOSC(numeroOs)
+  const { data: osc } = useQuery({
+    queryKey: ['osc-info-cr', numeroOs],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_fluxo_os')
+        .select('numero_os, valor, saldo_reais, vencimento, tipo, data_osc').eq('numero_os', numeroOs).maybeSingle()
+      return data
+    },
+  })
+  const { data: mensal = [] } = useQuery({
+    queryKey: ['medicao-mensal-cr', numeroOs],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_medicao_mensal')
+        .select('competencia, realizado, acumulado, n_medicoes, subcontratada')
+        .eq('numero_os', numeroOs).order('competencia', { ascending: false })
+      return data ?? []
+    },
+  })
+  const [abrindo, setAbrindo] = useState<string | null>(null)
+  const abrirPdf = async (path: string) => {
+    setAbrindo(path)
+    try { const url = await getEspelhoUrl(path); if (url) window.open(url, '_blank') } finally { setAbrindo(null) }
+  }
+  const compLabel = (c: string | null) => { if (!c) return '—'; const [y, m] = c.slice(0, 7).split('-'); return `${m}/${y}` }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Layers size={18} className="text-indigo-500 shrink-0" />
+            <div className="min-w-0">
+              <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>Medição · {numeroOs}</h3>
+              <p className="text-[11px] text-slate-400">Origem no EGP (Gestão de Projetos)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Resumo da OSC */}
+          <div className={`rounded-xl p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <div><span className="text-slate-400">OSC:</span> <span className="font-mono font-semibold">{numeroOs}</span></div>
+            <div><span className="text-slate-400">Tipo:</span> <span className="font-semibold capitalize">{osc?.tipo ?? '—'}</span></div>
+            <div><span className="text-slate-400">Valor contratado:</span> <span className="font-semibold">{osc?.valor != null ? fmtFull(osc.valor) : '—'}</span></div>
+            <div><span className="text-slate-400">Saldo:</span> <span className="font-semibold">{osc?.saldo_reais != null ? fmtFull(osc.saldo_reais) : '—'}</span></div>
+            {osc?.vencimento && <div><span className="text-slate-400">Vencimento OSC:</span> <span>{fmtData(osc.vencimento)}</span></div>}
+          </div>
+
+          {/* Medição mensal (realizado/acumulado) */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Medições por competência</p>
+            {mensal.length === 0 ? (
+              <p className="text-xs text-slate-400">Sem medição mensal registrada no EGP.</p>
+            ) : (
+              <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <div className={`grid grid-cols-[1fr_1fr_1fr] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+                  <span>Competência</span><span className="text-right">Realizado</span><span className="text-right">Acumulado</span>
+                </div>
+                {mensal.slice(0, 12).map((m, i) => (
+                  <div key={i} className={`grid grid-cols-[1fr_1fr_1fr] px-3 py-1.5 text-[11px] border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+                    <span className="font-semibold">{compLabel(m.competencia)}{m.subcontratada ? ' · sub' : ''}</span>
+                    <span className="text-right tabular-nums text-emerald-600">{m.realizado != null ? fmt(m.realizado) : '—'}</span>
+                    <span className="text-right tabular-nums text-slate-500">{m.acumulado != null ? fmt(m.acumulado) : '—'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Espelhos PDF */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><FileText size={9} /> Espelhos de medição (PDF)</p>
+            {loadEsp ? (
+              <div className="flex items-center justify-center py-4"><div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+            ) : espelhos.length === 0 ? (
+              <p className="text-xs text-slate-400">Nenhum PDF de medição anexado no EGP para esta OSC.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {espelhos.map(e => {
+                  const destaque = e.id === medicaoId
+                  return (
+                    <button key={e.id} onClick={() => abrirPdf(e.storage_path)}
+                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
+                        destaque ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-400/30'
+                        : isDark ? 'border-white/[0.06] bg-white/[0.02] hover:border-indigo-400/40' : 'border-slate-200 bg-white hover:border-indigo-300'
+                      }`}>
+                      <FileText size={14} className="text-indigo-500 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{e.arquivo_nome ?? 'Medição.pdf'}</p>
+                        <p className="text-[10px] text-slate-500">{compLabel(e.competencia)}{destaque ? ' · faturada nesta NF' : ''}</p>
+                      </div>
+                      {abrindo === e.storage_path
+                        ? <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                        : <ExternalLink size={12} className="text-slate-400 shrink-0" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CRDetailModal ──────────────────────────────────────────────────────────
 
-function CRDetailModal({ cr, onClose, onAction, isDark }: {
+function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
   cr: ContaReceber
   onClose: () => void
   onAction: (action: string, cr: ContaReceber) => void
+  onOpenMedicao: (numeroOs: string, medicaoId?: string | null) => void
   isDark: boolean
 }) {
   const urgency = getUrgency(cr)
   const stage = CR_PIPELINE_STAGES.find(s => s.status === cr.status)
   const [selExtratoMovId, setSelExtratoMovId] = useState<string | null>(null)
+  const atualizarBloqueio = useAtualizarBloqueioCR()
+  const { data: bloqHist = [] } = useBloqueioHist(cr.id)
   const aplicarConcil = useAplicarConciliacaoAuto()
   const { data: extratoCandidatos = [], isLoading: loadingExtrato } = useExtratoCandidatos({
     tipo: 'cr',
@@ -415,6 +561,72 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
             </div>
             {cr.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cr.descricao}</p>}
           </div>
+
+          {/* Vínculo com a medição do EGP (clicável) */}
+          {cr.osc?.numero_os && (
+            <button onClick={() => onOpenMedicao(cr.osc!.numero_os, cr.pmo_medicao_id)}
+              className={`w-full flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                isDark ? 'border-indigo-500/30 bg-indigo-500/[0.06] hover:bg-indigo-500/[0.12]' : 'border-indigo-200 bg-indigo-50/60 hover:bg-indigo-50'}`}>
+              <Layers size={16} className="text-indigo-500 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Medição / OSC (EGP)</p>
+                <p className={`text-sm font-bold font-mono ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{cr.osc.numero_os}</p>
+              </div>
+              <span className="text-[10px] font-semibold text-indigo-500 flex items-center gap-1 shrink-0">ver detalhes <ArrowRight size={11} /></span>
+            </button>
+          )}
+
+          {/* Bloqueio do recebimento (preenchido manual) + linha do tempo */}
+          {(() => {
+            const atual = cr.bloqueio_tipo ?? 'sem_bloqueio'
+            const b = BLOQUEIOS[atual]
+            const bloqueado = isBloqueado(atual)
+            // tempo de solução: do 1º bloqueio até resolvido (ou até agora, se ainda bloqueado)
+            const primeiroBloqueio = bloqHist.find(h => isBloqueado(h.bloqueio_tipo as BloqueioCR))
+            const resolvidoEm = [...bloqHist].reverse().find(h => h.bloqueio_tipo === 'resolvido')
+            const agora = new Date().toISOString()
+            let metrica: { txt: string; cls: string } | null = null
+            if (primeiroBloqueio) {
+              if (bloqueado) metrica = { txt: `Bloqueado há ${fmtDur(diasEntre(primeiroBloqueio.created_at, agora))}`, cls: 'text-rose-600' }
+              else if (atual === 'resolvido' && resolvidoEm) metrica = { txt: `Resolvido em ${fmtDur(diasEntre(primeiroBloqueio.created_at, resolvidoEm.created_at))}`, cls: 'text-emerald-600' }
+            }
+            return (
+              <div className={`rounded-xl border p-3 ${bloqueado ? (isDark ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-rose-300 bg-rose-50/60') : (isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-200 bg-slate-50')}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${bloqueado ? 'text-rose-500' : 'text-slate-400'}`}>
+                    {b.Icon ? <b.Icon size={9} /> : <Lock size={9} />} Bloqueio do recebimento
+                  </p>
+                  {metrica && <span className={`text-[10px] font-bold ${metrica.cls}`}>{metrica.txt}</span>}
+                </div>
+                <select
+                  value={atual}
+                  onChange={e => atualizarBloqueio.mutate({ crId: cr.id, bloqueio: e.target.value })}
+                  className={`w-full text-sm rounded-lg border px-3 py-2 outline-none ${isDark ? 'bg-[#0f172a] border-white/10 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                >
+                  {BLOQUEIO_ORDER.map(k => <option key={k} value={k}>{BLOQUEIOS[k].label}</option>)}
+                </select>
+
+                {/* Linha do tempo das alterações */}
+                {bloqHist.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><Clock size={9} /> Linha do tempo</p>
+                    {[...bloqHist].reverse().map((h, i) => {
+                      const bh = BLOQUEIOS[h.bloqueio_tipo as BloqueioCR] ?? BLOQUEIOS.sem_bloqueio
+                      return (
+                        <div key={h.id} className="flex items-center gap-2 text-[11px]">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? (bloqueado ? 'bg-rose-500' : 'bg-emerald-500') : 'bg-slate-300'}`} />
+                          {bh.Icon && <bh.Icon size={11} className={`${bh.cls} shrink-0`} />}
+                          <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{bh.label}</span>
+                          <span className="text-slate-400 flex-1 truncate">· {h.alterado_por_nome ?? '—'}</span>
+                          <span className="text-slate-400 shrink-0">{new Date(h.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {cr.chave_nfe && (
             <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
@@ -553,11 +765,21 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
                 <ArrowRight size={15} /> Aguardar Pgto
               </button>
             )}
-            {cr.status === 'aguardando' && (
-              <button onClick={() => onAction('receber', cr)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Reg. Recebimento
-              </button>
-            )}
+            {cr.status === 'aguardando' && (() => {
+              const bloqueado = isBloqueado(cr.bloqueio_tipo)
+              return (
+                // wrapper leva o title p/ o tooltip aparecer mesmo com o botao disabled
+                <div className="flex-1" title={bloqueado ? 'Retire o bloqueio antes de registrar o recebimento' : undefined}>
+                  <button onClick={() => onAction('receber', cr)} disabled={bloqueado}
+                    className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      bloqueado
+                        ? (isDark ? 'bg-white/[0.05] text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed')
+                        : 'bg-teal-600 text-white hover:bg-teal-700'}`}>
+                    {bloqueado ? <Lock size={15} /> : <CheckCircle2 size={15} />} Reg. Recebimento
+                  </button>
+                </div>
+              )
+            })()}
             {cr.status === 'recebido' && (
               <button
                 disabled={aplicarConcil.isPending}
@@ -590,22 +812,6 @@ function CRDetailModal({ cr, onClose, onAction, isDark }: {
   )
 }
 
-// ── CrColResizeHandle ────────────────────────────────────────────────────────
-
-function CrColResizeHandle({ colIndex, onStart }: {
-  colIndex: number
-  onStart: (colIndex: number, startX: number) => void
-}) {
-  return (
-    <div
-      className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center group/rh z-10"
-      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onStart(colIndex, e.clientX) }}
-    >
-      <div className="w-0.5 h-5 rounded-full bg-slate-400 opacity-20 group-hover/rh:opacity-100 group-hover/rh:bg-indigo-500 transition-all" />
-    </div>
-  )
-}
-
 // ── CRRow (compact table row) ────────────────────────────────────────────────
 
 function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
@@ -615,17 +821,23 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
   isSelected: boolean
   onSelect: (id: string) => void
 }) {
-  const urgency = getUrgency(cr)
+  const overdue = getUrgency(cr) === 'overdue'
+  const v = vencInfo(cr)
+  const bloq = BLOQUEIOS[cr.bloqueio_tipo ?? 'sem_bloqueio']
+  const blocked = isBloqueado(cr.bloqueio_tipo)
 
   return (
     <div
       onClick={onClick}
       className={`grid items-center gap-x-3 px-3 py-2 border-b cursor-pointer transition-all ${
-        isDark
-          ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
-          : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
+        blocked
+          ? (isDark ? `bg-rose-500/[0.08] border-rose-500/20 hover:bg-rose-500/[0.14] ${isSelected ? 'bg-rose-500/20' : ''}`
+                    : `bg-rose-50 border-rose-100 hover:bg-rose-100/70 ${isSelected ? 'bg-rose-100' : ''}`)
+          : (isDark
+              ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
+              : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`)
       }`}
-      style={{ gridTemplateColumns: 'var(--cr-cols)' }}
+      style={{ gridTemplateColumns: CR_COLS }}
     >
       <input
         type="checkbox"
@@ -635,39 +847,41 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
         className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
       />
 
-      <div className={`w-0.5 h-4 rounded-full shrink-0 ${
-        urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
-      }`} />
-
-      <span className={`text-xs font-semibold truncate min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-        {cr.cliente_nome}
-      </span>
-
-      <span className={`text-[11px] truncate min-w-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cr.descricao || '—'}
-      </span>
-
-      <span className={`text-[11px] truncate font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      {/* Número NF */}
+      <span className={`text-[11px] font-mono font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
         {cr.numero_nf ? `NF ${cr.numero_nf}` : '—'}
       </span>
 
+      {/* Data de emissão */}
       <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cr.centro_custo || '—'}
+        {cr.data_emissao ? fmtData(cr.data_emissao) : '—'}
       </span>
 
-      <span className={`text-[11px] truncate min-w-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cr.classe_financeira || '—'}
+      {/* OSC (destaque) · obra · centro de custo */}
+      <div className="min-w-0">
+        <p className="text-xs font-bold font-mono text-indigo-600 truncate">{cr.osc?.numero_os ?? '—'}</p>
+        <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {[cr.obra?.nome, cr.centro_custo].filter(Boolean).join(' · ') || '—'}
+        </p>
+      </div>
+
+      {/* Cliente (sem destaque) */}
+      <span className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+        {cr.cliente_nome}
       </span>
 
-      <span className={`text-[11px] text-right ${
-        urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
-      }`}>
+      {/* Vencimento (destaque, vermelho se ≤3 dias) */}
+      <span className={`text-[11px] text-right whitespace-nowrap ${v.cls || (isDark ? 'text-slate-300' : 'text-slate-600')} ${v.bold ? 'font-bold' : 'font-semibold'}`}>
         {fmtData(cr.data_vencimento)}
       </span>
 
-      <span className={`text-xs font-bold text-right ${
-        urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
-      }`}>
+      {/* Alerta de bloqueio */}
+      <span className="flex items-center justify-center" title={bloq.label}>
+        {bloq.Icon ? <bloq.Icon size={14} className={bloq.cls} /> : <span className="text-slate-300 text-xs">·</span>}
+      </span>
+
+      {/* Valor */}
+      <span className={`text-xs font-bold text-right ${overdue ? 'text-red-600' : 'text-emerald-600'}`}>
         {fmt(cr.valor_original)}
       </span>
     </div>
@@ -683,19 +897,25 @@ function CRCard({ cr, onClick, isDark, isSelected, onSelect }: {
   isSelected: boolean
   onSelect: (id: string) => void
 }) {
-  const urgency = getUrgency(cr)
+  const overdue = getUrgency(cr) === 'overdue'
+  const v = vencInfo(cr)
+  const bloq = BLOQUEIOS[cr.bloqueio_tipo ?? 'sem_bloqueio']
+  const blocked = isBloqueado(cr.bloqueio_tipo)
 
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
-        isDark
-          ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
-          : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
+      className={`rounded-2xl border p-4 cursor-pointer transition-all ${
+        blocked
+          ? (isDark ? `bg-rose-500/[0.08] border-rose-500/30 hover:border-rose-500/50 ${isSelected ? 'ring-2 ring-rose-500/30' : ''}`
+                    : `bg-rose-50 border-rose-200 hover:border-rose-300 ${isSelected ? 'ring-2 ring-rose-300' : ''}`)
+          : (isDark
+              ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
+              : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`)
       }`}
     >
-      {/* Linha 1: checkbox + cliente + urgency + valor */}
-      <div className="flex items-center gap-3">
+      {/* Linha 1: checkbox + NF + emissão + bloqueio + valor */}
+      <div className="flex items-center gap-2.5">
         <input
           type="checkbox"
           checked={isSelected}
@@ -703,52 +923,29 @@ function CRCard({ cr, onClick, isDark, isSelected, onSelect }: {
           onClick={e => e.stopPropagation()}
           className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
         />
-        <div className={`w-1 h-6 rounded-full shrink-0 ${
-          urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
-        }`} />
-        <p className={`text-sm font-bold truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          {cr.cliente_nome}
-        </p>
-        {urgency === 'overdue' && (
-          <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
+        <span className={`text-xs font-mono font-bold shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{cr.numero_nf ? `NF ${cr.numero_nf}` : '—'}</span>
+        <span className={`text-[10px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cr.data_emissao ? fmtData(cr.data_emissao) : ''}</span>
+        <span className="flex-1" />
+        {bloq.Icon && (
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${blocked ? 'bg-rose-100 text-rose-700' : cr.bloqueio_tipo === 'resolvido' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`} title={bloq.label}>
+            <bloq.Icon size={10} /> {bloq.label.replace('Bloqueio ', '')}
+          </span>
         )}
-        <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
-          {fmt(cr.valor_original)}
-        </p>
+        <p className={`text-sm font-extrabold shrink-0 ${overdue ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(cr.valor_original)}</p>
       </div>
 
-      {/* Linha 2: descricao */}
-      {cr.descricao && (
-        <p className={`text-xs truncate mt-1.5 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cr.descricao}</p>
-      )}
-
-      {/* Linha 3: tags + data */}
-      <div className="flex items-center justify-between mt-2 ml-10">
-        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-          {cr.numero_nf && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-semibold shrink-0 ${isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-700'}`}>
-              <FileText size={9} /> NF {cr.numero_nf}
-            </span>
-          )}
-          {cr.centro_custo && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-              <Briefcase size={9} /> {cr.centro_custo}
-            </span>
-          )}
-          {cr.classe_financeira && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-              <Tag size={9} /> {cr.classe_financeira}
-            </span>
-          )}
-          {cr.natureza && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-              {cr.natureza}
-            </span>
-          )}
+      {/* Linha 2: OSC (destaque) · obra · CC */}
+      <div className="mt-2 ml-6">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-bold font-mono text-indigo-600 shrink-0">{cr.osc?.numero_os ?? '—'}</span>
+          <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{[cr.obra?.nome, cr.centro_custo].filter(Boolean).join(' · ')}</span>
         </div>
-        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
-          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
-        }`}>
+      </div>
+
+      {/* Linha 3: cliente + vencimento */}
+      <div className="flex items-center justify-between mt-1.5 ml-6">
+        <span className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cr.cliente_nome}</span>
+        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 whitespace-nowrap ${v.cls || (isDark ? 'text-slate-400' : 'text-slate-500')} ${v.bold ? 'font-bold' : 'font-semibold'}`}>
           <Calendar size={10} /> {fmtData(cr.data_vencimento)}
         </span>
       </div>
@@ -763,6 +960,7 @@ export default function ContasReceber() {
   const [activeTab, setActiveTab] = useState<StatusCR>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCR, setDetailCR] = useState<ContaReceber | null>(null)
+  const [medicaoView, setMedicaoView] = useState<{ numeroOs: string; medicaoId?: string | null } | null>(null)
   const [faturarModal, setFaturarModal] = useState<ContaReceber | null>(null)
   const [recebimentoModal, setRecebimentoModal] = useState<ContaReceber | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -772,39 +970,23 @@ export default function ContasReceber() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
-  // Resizable columns
-  const crTableRef = useRef<HTMLDivElement>(null)
-  const crColWidthsRef = useRef<number[]>([])
-  const CR_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) 90px 72px minmax(0,1fr) 72px 96px'
-  const startCrColResize = useCallback((colIndex: number, startX: number) => {
-    const container = crTableRef.current
-    if (!container) return
-    const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-crh]'))
-    const startWidths = cells.length > 0
-      ? cells.map(el => el.getBoundingClientRect().width)
-      : crColWidthsRef.current.length > 0
-        ? [...crColWidthsRef.current]
-        : [220, 180, 90, 72, 120, 72, 96]
-    crColWidthsRef.current = startWidths
-    const onMove = (e: MouseEvent) => {
-      const next = startWidths.map((w, i) => i === colIndex ? Math.max(40, w + (e.clientX - startX)) : w)
-      crColWidthsRef.current = next
-      container.style.setProperty('--cr-cols', `20px 2px ${next.map(w => `${w}px`).join(' ')}`)
-    }
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      document.body.style.removeProperty('cursor')
-      document.body.style.removeProperty('user-select')
-    }
-    document.body.style.setProperty('cursor', 'col-resize')
-    document.body.style.setProperty('user-select', 'none')
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [])
-
   // Data
   const { data: contas = [], isLoading } = useContasReceber()
+
+  // Deep-link: ?nf=<numero_nf> (vindo do Painel) abre direto o modal de detalhe
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const nf = searchParams.get('nf')
+    if (!nf || contas.length === 0) return
+    const alvo = contas.find(c => c.numero_nf === nf)
+    if (alvo) {
+      setActiveTab(alvo.status as StatusCR)
+      setDetailCR(alvo)
+    }
+    searchParams.delete('nf')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, contas])
 
   // Mutations
   const autorizarMut = useAutorizarCR()
@@ -1223,27 +1405,22 @@ export default function ContasReceber() {
               </p>
             </div>
           ) : viewMode === 'list' ? (
-            <div
-              ref={crTableRef}
-              style={{ '--cr-cols': crColWidthsRef.current.length ? `20px 2px ${crColWidthsRef.current.map(w => `${w}px`).join(' ')}` : CR_COLS_DEFAULT } as Record<string, string>}
-              className="overflow-x-auto"
-            >
+            <div className="overflow-x-auto">
               {/* Table header */}
               <div
                 className={`grid items-center gap-x-3 px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
                   isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
                 }`}
-                style={{ gridTemplateColumns: 'var(--cr-cols)' }}
+                style={{ gridTemplateColumns: CR_COLS }}
               >
                 <span />
-                <span />
-                <span className="relative" data-crh>Cliente<CrColResizeHandle colIndex={0} onStart={startCrColResize} /></span>
-                <span className="relative" data-crh>Descrição<CrColResizeHandle colIndex={1} onStart={startCrColResize} /></span>
-                <span className="relative" data-crh>NF<CrColResizeHandle colIndex={2} onStart={startCrColResize} /></span>
-                <span className="relative" data-crh>CC<CrColResizeHandle colIndex={3} onStart={startCrColResize} /></span>
-                <span className="relative" data-crh>Classe<CrColResizeHandle colIndex={4} onStart={startCrColResize} /></span>
-                <span className="relative text-right" data-crh>Venc.<CrColResizeHandle colIndex={5} onStart={startCrColResize} /></span>
-                <span className="text-right" data-crh>Valor</span>
+                <span>NF</span>
+                <span>Emissão</span>
+                <span>OSC · Obra · CC</span>
+                <span>Cliente</span>
+                <span className="text-right">Venc.</span>
+                <span className="text-center">Bloq.</span>
+                <span className="text-right">Valor</span>
               </div>
               {activeCRs.map(cr => (
                 <CRRow
@@ -1279,7 +1456,18 @@ export default function ContasReceber() {
           cr={detailCR}
           onClose={() => setDetailCR(null)}
           onAction={handleDetailAction}
+          onOpenMedicao={(numeroOs, medicaoId) => setMedicaoView({ numeroOs, medicaoId })}
           isDark={isDark}
+        />
+      )}
+
+      {/* Detalhe da medição (EGP) */}
+      {medicaoView && (
+        <MedicaoDetailModal
+          numeroOs={medicaoView.numeroOs}
+          medicaoId={medicaoView.medicaoId}
+          isDark={isDark}
+          onClose={() => setMedicaoView(null)}
         />
       )}
 

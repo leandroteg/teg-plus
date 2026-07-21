@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronLeft, ChevronDown, FileText, Clock, DollarSign, BarChart3,
   FileSignature, RefreshCw, Download, ExternalLink, Calendar,
   Building2, MapPin, Loader2, AlertTriangle, CheckCircle2,
   CircleDot, ArrowUpRight, ArrowDownRight, Hash, Briefcase,
-  Pencil, X, Check, Upload, Folder, File as FileIcon,
+  Pencil, X, Check, Upload, Folder, File as FileIcon, Plus,
 } from 'lucide-react'
+import { NovaMedicaoModal } from './GestaoContratos'
 import { supabase } from '../../services/supabase'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
@@ -203,6 +204,9 @@ export default function ContratoDetalhe() {
   const atualizarContrato = useAtualizarContrato()
   const uploadArquivo = useUploadContratoArquivo()
   const [uploadErro, setUploadErro] = useState<string | null>(null)
+  const qc = useQueryClient()
+  const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
+  const [medToast, setMedToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const { data: contrato, isLoading: loadingContrato } = useQuery({
@@ -298,6 +302,30 @@ export default function ContratoDetalhe() {
     enabled: !!id,
   })
 
+  // Execução real no EGP (pmo_projetos.contrato_id -> OSCs -> medições mensais)
+  type EgpResumo = {
+    oscs: number; valor_oscs: number; saldo: number; faturado: number
+    primeira_osc: string | null; ultima_osc: string | null
+    mensal: { competencia: string; realizado: number }[]
+  }
+  const { data: egp } = useQuery<EgpResumo | null>({
+    queryKey: ['contrato-egp', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('con_contrato_egp_resumo', { p_contrato_id: id! })
+      if (error) return null
+      return data as EgpResumo
+    },
+    enabled: !!id,
+  })
+  const egpAtivo = (egp?.oscs ?? 0) > 0
+  // Valor mensal previsto = média móvel das últimas 6 competências faturadas no EGP
+  const egpMedia6m = (() => {
+    const serie = egp?.mensal ?? []
+    if (serie.length === 0) return null
+    const ult = serie.slice(-6)
+    return ult.reduce((s, m) => s + m.realizado, 0) / ult.length
+  })()
+
   const { data: reajustes = [] } = useQuery({
     queryKey: ['contrato-reajustes', id],
     queryFn: async () => {
@@ -356,8 +384,33 @@ export default function ContratoDetalhe() {
   const parcelasPagas = parcelas.filter(p => p.status === 'pago')
   const totalPago = parcelasPagas.reduce((s, p) => s + p.valor, 0)
   const totalMedido = medicoes.reduce((s, m) => s + m.valor_medido, 0)
-  const execPct = valorTotal > 0 ? Math.round((totalMedido / valorTotal) * 100) : (totalPago > 0 && valorTotal > 0 ? Math.round((totalPago / valorTotal) * 100) : 0)
+  // Com EGP vinculado, a execução vem do faturado real das OSCs (fonte da verdade)
+  const execPct = egpAtivo && egp!.valor_oscs > 0
+    ? Math.round((egp!.faturado / egp!.valor_oscs) * 100)
+    : valorTotal > 0 ? Math.round((totalMedido / valorTotal) * 100) : (totalPago > 0 && valorTotal > 0 ? Math.round((totalPago / valorTotal) * 100) : 0)
   const grupoLabel = contrato.grupo_contrato ? (GRUPO_CONTRATO_LABEL[contrato.grupo_contrato as GrupoContrato] ?? contrato.grupo_contrato) : '—'
+  const porMedicao = contrato.forma_faturamento === 'medicao'
+
+  const switchForma = async (forma: 'parcela' | 'medicao') => {
+    if (forma === 'medicao' && !confirm('Mudar para faturamento por medição?\n\nAs parcelas previstas (ainda não pagas) deste contrato serão removidas — o pagamento passa a ser por medição (BM).')) return
+    const { data, error } = await supabase.rpc('con_definir_forma_faturamento', { p_contrato_id: contrato.id, p_forma: forma })
+    if (error || !(data as any)?.ok) {
+      setMedToast({ type: 'error', msg: 'Erro ao mudar a forma de faturamento' })
+      setTimeout(() => setMedToast(null), 4000)
+      return
+    }
+    qc.invalidateQueries({ queryKey: ['contrato-detalhe', id] })
+    qc.invalidateQueries({ queryKey: ['contrato-parcelas', id] })
+    qc.invalidateQueries({ queryKey: ['contrato-medicoes', id] })
+    const removidas = (data as any).parcelas_previstas_removidas ?? 0
+    setMedToast({
+      type: 'success',
+      msg: forma === 'medicao'
+        ? `Faturamento por medição${removidas ? ` · ${removidas} parcela(s) prevista(s) removida(s)` : ''}`
+        : 'Faturamento por parcelas',
+    })
+    setTimeout(() => setMedToast(null), 4000)
+  }
 
   // ── Timeline dot color ────────────────────────────────────────────────────
   const timelineDot = (h: SolicitacaoHistorico) => {
@@ -405,10 +458,15 @@ export default function ContratoDetalhe() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-          <SummaryCard icon={DollarSign} label="Valor Total" value={fmtCompact(valorTotal)} sub={valorMensal ? `${fmt(valorMensal)}/mes` : undefined} color="indigo" />
+          <SummaryCard icon={DollarSign} label="Valor Total" value={fmtCompact(valorTotal)}
+            sub={egpAtivo && egpMedia6m ? `${fmt(egpMedia6m)}/mês (média 6m)` : valorMensal ? `${fmt(valorMensal)}/mes` : undefined} color="indigo" />
           <SummaryCard icon={Calendar} label="Vigencia" value={meses ? `${meses} meses` : '—'} sub={contrato.data_fim_previsto ? `ate ${fmtDate(contrato.data_fim_previsto)}` : undefined} color="violet" />
-          <SummaryCard icon={Hash} label="Parcelas" value={parcelas.length > 0 ? `${parcelasPagas.length}/${parcelas.length}` : '—'} sub={parcelasPagas.length > 0 ? 'pagas' : 'nenhuma parcela'} color="emerald" />
-          <SummaryCard icon={BarChart3} label="Execucao" value={`${execPct}%`} sub="realizado" color="amber" />
+          {egpAtivo ? (
+            <SummaryCard icon={Hash} label="OSCs (EGP)" value={String(egp!.oscs)} sub={`${fmtCompact(egp!.valor_oscs)} emitidos`} color="emerald" />
+          ) : (
+            <SummaryCard icon={Hash} label="Parcelas" value={parcelas.length > 0 ? `${parcelasPagas.length}/${parcelas.length}` : '—'} sub={parcelasPagas.length > 0 ? 'pagas' : 'nenhuma parcela'} color="emerald" />
+          )}
+          <SummaryCard icon={BarChart3} label="Execucao" value={`${execPct}%`} sub={egpAtivo ? `${fmtCompact(egp!.faturado)} faturado` : 'realizado'} color="amber" />
         </div>
       </div>
 
@@ -437,6 +495,70 @@ export default function ContratoDetalhe() {
           />
         </div>
       </Section>
+
+      {/* ── Execução no EGP (contratos vinculados a projetos do EGP) ───────── */}
+      {egpAtivo && (
+        <Section icon={BarChart3} title="Execução no EGP" count={egp!.oscs} defaultOpen={true}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-indigo-500 uppercase">OSCs emitidas</p>
+              <p className="text-lg font-extrabold text-indigo-700 mt-1">{fmtCompact(egp!.valor_oscs)}</p>
+              <p className="text-[10px] text-indigo-400">{egp!.oscs} ordens de serviço</p>
+            </div>
+            <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase">Faturado</p>
+              <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmtCompact(egp!.faturado)}</p>
+              <p className="text-[10px] text-emerald-500">{egp!.valor_oscs > 0 ? Math.round(egp!.faturado / egp!.valor_oscs * 100) : 0}% das OSCs</p>
+            </div>
+            <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3 text-center">
+              <p className="text-[10px] font-bold text-amber-600 uppercase">Saldo a faturar</p>
+              <p className="text-lg font-extrabold text-amber-700 mt-1">{fmtCompact(egp!.saldo)}</p>
+              <p className="text-[10px] text-amber-500">nas OSCs abertas</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
+              <p className="text-[10px] font-bold text-slate-500 uppercase">Período das OSCs</p>
+              <p className="text-sm font-extrabold text-slate-700 mt-1.5">{fmtDate(egp!.primeira_osc)}</p>
+              <p className="text-[10px] text-slate-400">até {fmtDate(egp!.ultima_osc)}</p>
+            </div>
+          </div>
+
+          {egp!.mensal.length > 0 && (() => {
+            const serie = egp!.mensal.slice(-12)
+            const max = Math.max(...serie.map(m => m.realizado), 1)
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Faturamento por competência (últimos {serie.length} meses)
+                  </p>
+                  {egpMedia6m && (
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 rounded-full px-2.5 py-1">
+                      média móvel 6m: {fmt(egpMedia6m)}/mês
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {serie.map(m => (
+                    <div key={m.competencia} className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-semibold text-slate-500 w-14 shrink-0">
+                        {m.competencia.slice(5, 7)}/{m.competencia.slice(2, 4)}
+                      </span>
+                      <div className="flex-1 h-4 bg-slate-100 rounded-md overflow-hidden">
+                        <div className="h-full bg-emerald-400/80 rounded-md" style={{ width: `${Math.max(2, (m.realizado / max) * 100)}%` }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 w-16 text-right shrink-0">{fmtCompact(m.realizado)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          <p className="text-[10px] text-slate-400 mt-4">
+            Fonte: módulo EGP (Projeto › Obra › OSC) — medições e saldos das OSCs vinculadas a este contrato.
+          </p>
+        </Section>
+      )}
 
       {/* ── Section 2: Linha do Tempo ─────────────────────────────────────── */}
       <Section icon={Clock} title="Linha do Tempo" count={historico.length} defaultOpen={true}>
@@ -665,6 +787,36 @@ export default function ContratoDetalhe() {
 
       {/* ── Section 5: Medicoes ───────────────────────────────────────────── */}
       <Section icon={BarChart3} title="Medicoes" count={medicoes.length} defaultOpen={true}>
+        {porMedicao ? (
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => switchForma('parcela')}
+              className="text-[11px] text-slate-400 hover:text-slate-600 underline decoration-dotted"
+            >
+              Faturamento por medição · mudar para parcelas
+            </button>
+            <button
+              onClick={() => setNovaMedicaoOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all"
+            >
+              <Plus size={13} /> Nova Medição
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+              Faturamento por <b>parcelas</b> — este contrato não usa medição.
+            </span>
+            {!contrato.recorrente && (
+              <button
+                onClick={() => switchForma('medicao')}
+                className="shrink-0 text-[11px] font-semibold text-fuchsia-600 hover:text-fuchsia-700 underline decoration-dotted"
+              >
+                Mudar para medição
+              </button>
+            )}
+          </div>
+        )}
         {medicoes.length === 0 ? (
           <Empty text="Nenhuma medicao registrada" />
         ) : (
@@ -791,6 +943,30 @@ export default function ContratoDetalhe() {
         criadoPor={contrato?.criado_por_nome}
         atualizadoPor={contrato?.atualizado_por_nome}
       />
+
+      {novaMedicaoOpen && (
+        <NovaMedicaoModal
+          open
+          onClose={() => setNovaMedicaoOpen(false)}
+          contratos={[contrato]}
+          medicoes={medicoes}
+          contratoInicial={contrato.id}
+          onToast={(type, msg) => {
+            if (type === 'success') {
+              qc.invalidateQueries({ queryKey: ['contrato-medicoes', id] })
+              qc.invalidateQueries({ queryKey: ['contrato-parcelas', id] })
+            }
+            setMedToast({ type, msg })
+            setTimeout(() => setMedToast(null), 4000)
+          }}
+        />
+      )}
+
+      {medToast && (
+        <div className={`fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-xl shadow-lg text-xs font-bold ${medToast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+          {medToast.msg}
+        </div>
+      )}
 
     </div>
   )

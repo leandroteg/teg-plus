@@ -13,7 +13,7 @@ export default function CulturaHome() {
 
   const features = [
     {
-      label: 'Mural de Recados',
+      label: 'Mural TEG',
       desc: 'Banners e campanhas na tela inicial',
       icon: ImagePlay,
       route: '/rh/cultura/mural',

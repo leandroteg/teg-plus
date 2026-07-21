@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   LocImovel, LocEntrada, LocSaida, LocVistoria, LocVistoriaFoto,
-  LocFatura, LocSolicitacao, LocAcordo, LocAditivo,
+  LocFatura, LocFaturaDesconto, LocSolicitacao, LocAcordo, LocAditivo,
   StatusEntrada, StatusSaida, StatusFatura, StatusVistoria, TipoVistoria,
   CriarEntradaPayload, CriarSolicitacaoPayload,
 } from '../types/locacao'
@@ -418,6 +418,67 @@ export function useAtualizarFatura() {
   })
 }
 
+// ── Descontos da fatura (ex.: desconto no aluguel) ──────────────────────────
+// Cada desconto tem descrição + valor + anexo OBRIGATÓRIO. O valor líquido
+// (fatura − descontos) é o que a RPC de envio manda pro Financeiro.
+export function useDescontosFatura(faturaId?: string) {
+  return useQuery({
+    queryKey: ['loc_fatura_descontos', faturaId],
+    enabled: !!faturaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loc_fatura_descontos')
+        .select('*')
+        .eq('fatura_id', faturaId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as LocFaturaDesconto[]
+    },
+  })
+}
+
+// upload do anexo do desconto (bucket privado locacao-faturas, pasta descontos/)
+export async function uploadDescontoAnexo(faturaId: string, file: File): Promise<string> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `descontos/${faturaId}/${Date.now()}_${safe}`
+  const { error } = await supabase.storage.from(FATURAS_BUCKET).upload(path, file, {
+    upsert: true, contentType: file.type || undefined,
+  })
+  if (error) throw error
+  return path
+}
+
+export function useCriarDescontoFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { fatura_id: string; descricao: string; valor: number; anexo_url: string; criado_por_nome?: string }) => {
+      const { error } = await supabase.from('loc_fatura_descontos').insert(p)
+      if (error) throw error
+    },
+    onSuccess: (_d, { fatura_id }) => {
+      qc.invalidateQueries({ queryKey: ['loc_fatura_descontos', fatura_id] })
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+    },
+  })
+}
+
+export function useRemoverDescontoFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, fatura_id, anexo_url }: { id: string; fatura_id: string; anexo_url?: string }) => {
+      if (anexo_url && !/^https?:\/\//.test(anexo_url)) {
+        await supabase.storage.from(FATURAS_BUCKET).remove([anexo_url])
+      }
+      const { error } = await supabase.from('loc_fatura_descontos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: (_d, { fatura_id }) => {
+      qc.invalidateQueries({ queryKey: ['loc_fatura_descontos', fatura_id] })
+      qc.invalidateQueries({ queryKey: ['loc_faturas'] })
+    },
+  })
+}
+
 // Envia faturas selecionadas pro financeiro (RPC migrations 124 + 147).
 // Cria 1 fin_contas_pagar por fatura elegivel (status previsto/lancado) com
 // loc_fatura_id vinculado, e muda status da fatura pra enviado_pagamento.
@@ -653,6 +714,107 @@ export function useAtualizarStatusAditivo() {
       qc.invalidateQueries({ queryKey: ['loc_imoveis'] })
       qc.invalidateQueries({ queryKey: ['contratos'] })
     },
+  })
+}
+
+// ── Lançamento de faturas por anexo (IA via n8n) ──────────────────────────────
+// Envia os arquivos (base64) ao webhook n8n "Locacao - Parse Faturas AI" (Gemini),
+// que identifica tipo (energia/água/...), valor, vencimento e competência de cada
+// documento — 1 arquivo = 1 fatura. O arquivo fica no bucket privado
+// locacao-faturas e o path é gravado em loc_faturas.boleto_url.
+
+const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+const FATURAS_BUCKET = 'locacao-faturas'
+
+export interface FaturaParseada {
+  doc: number
+  tipo: string
+  valor: number | null
+  vencimento: string
+  competencia: string
+  fornecedor: string
+  confianca: number
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      resolve(res.includes(',') ? res.split(',')[1] : res)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+const MAX_DOC_BYTES = 10 * 1024 * 1024   // anexo individual > 10MB não passa
+const MAX_TOTAL_B64 = 14 * 1024 * 1024   // limite do payload do n8n (~16MB)
+
+export async function parseFaturasAnexos(
+  files: File[],
+  contexto: { competencia?: string; imovel?: string },
+): Promise<FaturaParseada[]> {
+  let totalB64 = 0
+  const documentos: { nome: string; mime_type: string; base64: string }[] = []
+  for (const f of files) {
+    if (f.size > MAX_DOC_BYTES) {
+      throw new Error(`"${f.name}" tem mais de 10MB — reduza o arquivo (foto menor ou PDF compactado)`)
+    }
+    const base64 = await fileToBase64(f)
+    totalB64 += base64.length
+    if (totalB64 > MAX_TOTAL_B64) {
+      throw new Error('Os anexos juntos passam de ~14MB — envie em lotes menores')
+    }
+    documentos.push({ nome: f.name, mime_type: f.type || 'application/pdf', base64 })
+  }
+  const resp = await fetch(`${N8N_URL}/locacao/faturas/parse-ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentos, contexto }),
+  })
+  if (!resp.ok) throw new Error('IA indisponível no momento — tente novamente')
+  const json = await resp.json() as { success?: boolean; error?: string; faturas?: FaturaParseada[] }
+  if (!json?.success) throw new Error(json?.error || 'Falha ao analisar os anexos')
+  return json.faturas ?? []
+}
+
+export async function uploadFaturaAnexo(imovelId: string, competencia: string, file: File): Promise<string> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${imovelId}/${competencia}/${Date.now()}_${safe}`
+  const { error } = await supabase.storage.from(FATURAS_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: file.type || undefined,
+  })
+  if (error) throw error
+  return path
+}
+
+// URL p/ abrir o anexo: path do bucket privado (signed 1h) ou URL http legada
+export async function faturaAnexoUrl(pathOrUrl?: string): Promise<string | null> {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl
+  const { data } = await supabase.storage.from(FATURAS_BUCKET).createSignedUrl(pathOrUrl, 3600)
+  return data?.signedUrl ?? null
+}
+
+// Apaga o arquivo do bucket (ignora URLs http legadas de fora do bucket)
+export async function removerFaturaAnexoStorage(path?: string) {
+  if (path && !/^https?:\/\//.test(path)) {
+    await supabase.storage.from(FATURAS_BUCKET).remove([path])
+  }
+}
+
+// Exclui a fatura (e o anexo dela no bucket, se houver)
+export function useExcluirFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, boleto_url }: { id: string; boleto_url?: string }) => {
+      await removerFaturaAnexoStorage(boleto_url)
+      const { error } = await supabase.from('loc_faturas').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_faturas'] }),
   })
 }
 

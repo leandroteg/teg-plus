@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { hardRecoverFromStaleChunk } from '../utils/chunkRecovery'
 
 interface Props {
   children: ReactNode
@@ -41,20 +42,22 @@ export default class ErrorBoundary extends Component<Props, State> {
       componentStack: info.componentStack,
     })
 
-    // Auto-reload uma vez quando for erro de chunk (deploy novo)
+    // Auto-recupera uma vez quando for erro de chunk (deploy novo). Reload
+    // simples não basta quando o SW do PWA está defasado — limpa SW+caches.
     if (isChunkLoadError(error)) {
       const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? 0)
       const now = Date.now()
-      if (now - lastReload > 10_000) {           // evita loop: máx 1 reload a cada 10s
+      if (now - lastReload > 10_000) {           // evita loop: máx 1 recuperação a cada 10s
         sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now))
-        window.location.reload()
+        void hardRecoverFromStaleChunk()
       }
     }
   }
 
   handleRetry = () => {
     if (this.state.error && isChunkLoadError(this.state.error)) {
-      window.location.reload()
+      // Retry manual ignora a trava: usuário pediu — limpa SW+caches e recarrega
+      void hardRecoverFromStaleChunk()
     } else {
       this.setState({ hasError: false, error: null })
     }

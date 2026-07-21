@@ -43,6 +43,10 @@ const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '�
 function CautelaCardItem({ cautela, onClick, isDark }: { cautela: Cautela; onClick: () => void; isDark: boolean }) {
   const accent = isDark ? STATUS_ACCENT_DARK[cautela.status] : STATUS_ACCENT[cautela.status]
   const stage = CAUTELA_PIPELINE_STAGES.find(s => s.status === cautela.status)
+  const itensC = cautela.itens ?? []
+  const totalQtd = itensC.reduce((s, it) => s + (it.quantidade ?? 0), 0)
+  const totalDev = itensC.reduce((s, it) => s + (it.quantidade_devolvida ?? 0), 0)
+  const parcial = totalDev > 0 && totalDev < totalQtd
   return (
     <button type="button" onClick={onClick} className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md hover:border-slate-300'}`}>
       <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -55,6 +59,11 @@ function CautelaCardItem({ cautela, onClick, isDark }: { cautela: Cautela; onCli
         </span>
       </div>
       {cautela.obra_nome && <p className={`text-xs flex items-center gap-1 mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Building2 size={11} /> {cautela.obra_nome}</p>}
+      {parcial && (
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold mb-0.5 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+          Parcial · {totalDev}/{totalQtd} devolvido
+        </span>
+      )}
       <div className="flex items-center justify-between mt-1">
         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Calendar size={10} className="inline mr-1" />{fmtDate(cautela.criado_em)}</span>
         {cautela.data_devolucao_prevista && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Devolução: {fmtDate(cautela.data_devolucao_prevista)}</span>}
@@ -66,11 +75,22 @@ function CautelaCardItem({ cautela, onClick, isDark }: { cautela: Cautela; onCli
 // ── Row ──────────────────────────────────────────────────────────────────────
 function CautelaRow({ cautela, onClick, isDark }: { cautela: Cautela; onClick: () => void; isDark: boolean }) {
   const accent = isDark ? STATUS_ACCENT_DARK[cautela.status] : STATUS_ACCENT[cautela.status]
+  const itensR = cautela.itens ?? []
+  const totalQtdR = itensR.reduce((s, it) => s + (it.quantidade ?? 0), 0)
+  const totalDevR = itensR.reduce((s, it) => s + (it.quantidade_devolvida ?? 0), 0)
+  const parcialR = totalDevR > 0 && totalDevR < totalQtdR
   return (
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2 text-left border-b transition-all ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
       <span className={`w-2 h-2 rounded-full shrink-0 ${accent.dot}`} />
       <span className={`w-[90px] text-xs font-mono shrink-0 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cautela.numero || '—'}</span>
-      <span className={`flex-1 text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cautela.solicitante_nome || '—'}</span>
+      <span className={`flex-1 text-xs font-semibold truncate flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+        {cautela.solicitante_nome || '—'}
+        {parcialR && (
+          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+            {totalDevR}/{totalQtdR}
+          </span>
+        )}
+      </span>
       <span className={`w-[120px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cautela.obra_nome || '—'}</span>
       <span className={`w-[70px] text-xs text-right shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDate(cautela.criado_em)}</span>
     </button>
@@ -86,7 +106,7 @@ export default function CautelaHome() {
 
   const { data: cautelas = [], isLoading } = useCautelas()
 
-  const [activeTab, setActiveTab] = useState<StatusCautela>(() => (searchParams.get('tab') as StatusCautela) || 'pendente')
+  const [activeTab, setActiveTab] = useState<StatusCautela>(() => (searchParams.get('tab') as StatusCautela) || 'em_aberto')
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')

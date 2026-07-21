@@ -1,11 +1,23 @@
 import { useState } from 'react'
-import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart } from 'lucide-react'
+import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2 } from 'lucide-react'
 import { useEmitirPedidoDireto } from '../hooks/usePedidos'
-import { useCadFornecedores, useCadClasses } from '../hooks/useCadastros'
+import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
 import NumericInput from './NumericInput'
 import { toUpperNorm } from './UpperInput'
+
+const soDigitos = (s: string) => s.replace(/\D/g, '')
+
+// 12345678000199 -> 12.345.678/0001-99 (parcial conforme digita)
+function fmtCnpj(s: string) {
+  const d = soDigitos(s).slice(0, 14)
+  return d
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+}
 
 interface ItemDireto {
   descricao: string
@@ -32,8 +44,14 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const obras = useLookupObras()
 
+  const salvarFornecedor = useSalvarFornecedor()
+
   const [fornecedorNome, setFornecedorNome] = useState('')
   const [fornecedorId, setFornecedorId] = useState('')
+  const [fornecedorBusca, setFornecedorBusca] = useState('')
+  const [fornecedorDropdown, setFornecedorDropdown] = useState(false)
+  const [showNovoFornecedor, setShowNovoFornecedor] = useState(false)
+  const [novoForn, setNovoForn] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', telefone: '', email: '' })
   const [obraId, setObraId] = useState('')
   const [classeId, setClasseId] = useState('')
   const [classeBusca, setClasseBusca] = useState('')
@@ -65,10 +83,75 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
     setItens(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
   }
 
-  function handleFornecedorSelect(id: string) {
-    const f = fornecedores.find(f => f.id === id)
+  // Busca por nome (fantasia/razão) ou CNPJ (compara só dígitos)
+  const buscaDigitos = soDigitos(fornecedorBusca)
+  const fornecedoresFiltrados = fornecedores
+    .filter(f => {
+      const t = fornecedorBusca.trim().toLowerCase()
+      if (!t) return false
+      const porNome = `${f.nome_fantasia ?? ''} ${f.razao_social ?? ''}`.toLowerCase().includes(t)
+      const porCnpj = buscaDigitos.length >= 3 && soDigitos(f.cnpj ?? '').includes(buscaDigitos)
+      return porNome || porCnpj
+    })
+    .slice(0, 10)
+
+  const fornecedorSel = fornecedores.find(f => f.id === fornecedorId)
+
+  function selecionarFornecedor(id: string) {
+    const f = fornecedores.find(x => x.id === id)
     setFornecedorId(id)
-    if (f) setFornecedorNome(f.nome_fantasia || f.razao_social || '')
+    setFornecedorNome(f ? (f.nome_fantasia || f.razao_social || '') : '')
+    setFornecedorBusca('')
+    setFornecedorDropdown(false)
+    setShowNovoFornecedor(false)
+  }
+
+  function limparFornecedor() {
+    setFornecedorId('')
+    setFornecedorNome('')
+    setFornecedorBusca('')
+  }
+
+  function abrirNovoFornecedor() {
+    setShowNovoFornecedor(true)
+    setFornecedorDropdown(false)
+    setNovoForn({
+      razao_social: fornecedorBusca && !buscaDigitos.match(/^\d+$/) ? fornecedorBusca.toUpperCase() : '',
+      nome_fantasia: '',
+      cnpj: buscaDigitos.length >= 11 ? fmtCnpj(fornecedorBusca) : '',
+      telefone: '', email: '',
+    })
+  }
+
+  async function handleCadastrarFornecedor() {
+    setErro(null)
+    if (!novoForn.razao_social.trim()) return setErro('Informe a razão social do novo fornecedor.')
+    const cnpjDig = soDigitos(novoForn.cnpj)
+    if (cnpjDig) {
+      const existente = fornecedores.find(f => soDigitos(f.cnpj ?? '') === cnpjDig)
+      if (existente) {
+        // CNPJ já cadastrado — seleciona o existente em vez de duplicar
+        selecionarFornecedor(existente.id)
+        setErro(`CNPJ já cadastrado para "${existente.nome_fantasia || existente.razao_social}" — fornecedor selecionado.`)
+        return
+      }
+    }
+    try {
+      const criado = await salvarFornecedor.mutateAsync({
+        razao_social: toUpperNorm(novoForn.razao_social),
+        nome_fantasia: novoForn.nome_fantasia ? toUpperNorm(novoForn.nome_fantasia) : undefined,
+        cnpj: novoForn.cnpj || undefined,
+        telefone: novoForn.telefone || undefined,
+        email: novoForn.email ? novoForn.email.toLowerCase() : undefined,
+        ativo: true,
+      })
+      setFornecedorId(criado.id)
+      setFornecedorNome(criado.nome_fantasia || criado.razao_social || '')
+      setShowNovoFornecedor(false)
+      setFornecedorBusca('')
+    } catch (e) {
+      setErro(`Erro ao cadastrar fornecedor: ${(e as Error).message}`)
+    }
   }
 
   async function handleSubmit() {
@@ -135,26 +218,130 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
             </p>
           </div>
 
-          {/* Fornecedor */}
+          {/* Fornecedor: busca por nome/CNPJ + cadastro rápido */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-600">Fornecedor *</label>
-            <select
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
-              value={fornecedorId}
-              onChange={e => handleFornecedorSelect(e.target.value)}
-            >
-              <option value="">Selecionar do cadastro...</option>
-              {fornecedores.map(f => (
-                <option key={f.id} value={f.id}>{f.nome_fantasia || f.razao_social}</option>
-              ))}
-            </select>
-            {!fornecedorId && (
-              <input
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none"
-                placeholder="Ou digite o nome do fornecedor..."
-                value={fornecedorNome}
-                onChange={e => setFornecedorNome(e.target.value.toUpperCase())}
-              />
+
+            {fornecedorId && fornecedorSel ? (
+              <div className="flex items-center justify-between gap-2 border border-emerald-200 bg-emerald-50 rounded-xl px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-emerald-800 truncate flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="shrink-0" />
+                    {fornecedorSel.nome_fantasia || fornecedorSel.razao_social}
+                  </p>
+                  {fornecedorSel.cnpj && (
+                    <p className="text-[11px] text-emerald-600 ml-5">CNPJ {fmtCnpj(fornecedorSel.cnpj)}</p>
+                  )}
+                </div>
+                <button type="button" onClick={limparFornecedor} className="text-slate-400 hover:text-slate-600 shrink-0" title="Trocar fornecedor">
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none"
+                  placeholder="Buscar por nome ou CNPJ..."
+                  value={fornecedorBusca}
+                  onChange={e => { setFornecedorBusca(e.target.value.toUpperCase()); setFornecedorDropdown(true); setFornecedorNome(e.target.value.toUpperCase()) }}
+                  onFocus={() => setFornecedorDropdown(true)}
+                  onBlur={() => setTimeout(() => setFornecedorDropdown(false), 150)}
+                />
+                {fornecedorDropdown && fornecedorBusca.trim() && (
+                  <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {fornecedoresFiltrados.map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onMouseDown={() => selecionarFornecedor(f.id)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <span className="font-medium text-slate-700 truncate">{f.nome_fantasia || f.razao_social}</span>
+                        {f.cnpj && <span className="text-[11px] text-slate-400 shrink-0 font-mono">{fmtCnpj(f.cnpj)}</span>}
+                      </button>
+                    ))}
+                    {fornecedoresFiltrados.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-slate-400">Nenhum fornecedor encontrado.</p>
+                    )}
+                    <button
+                      type="button"
+                      onMouseDown={abrirNovoFornecedor}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50 border-t border-slate-100"
+                    >
+                      <UserPlus size={14} /> Cadastrar novo fornecedor
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showNovoFornecedor && !fornecedorId && (
+              <div className="border border-orange-200 bg-orange-50/50 rounded-xl p-3 space-y-2">
+                <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <UserPlus size={12} /> Novo Fornecedor
+                </p>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                  placeholder="Razão social *"
+                  value={novoForn.razao_social}
+                  onChange={e => setNovoForn(p => ({ ...p, razao_social: e.target.value.toUpperCase() }))}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                    placeholder="Nome fantasia"
+                    value={novoForn.nome_fantasia}
+                    onChange={e => setNovoForn(p => ({ ...p, nome_fantasia: e.target.value.toUpperCase() }))}
+                  />
+                  <input
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none font-mono"
+                    placeholder="CNPJ"
+                    inputMode="numeric"
+                    value={novoForn.cnpj}
+                    onChange={e => setNovoForn(p => ({ ...p, cnpj: fmtCnpj(e.target.value) }))}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                    placeholder="Telefone"
+                    value={novoForn.telefone}
+                    onChange={e => setNovoForn(p => ({ ...p, telefone: e.target.value }))}
+                  />
+                  <input
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                    placeholder="E-mail"
+                    type="email"
+                    value={novoForn.email}
+                    onChange={e => setNovoForn(p => ({ ...p, email: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowNovoFornecedor(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:bg-white"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCadastrarFornecedor}
+                    disabled={salvarFornecedor.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-60"
+                  >
+                    {salvarFornecedor.isPending ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+                    Cadastrar e usar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!fornecedorId && !showNovoFornecedor && fornecedorNome.trim() && (
+              <p className="text-[11px] text-slate-400">
+                Sem cadastro selecionado — o pedido sairá com o nome digitado: <strong>{fornecedorNome}</strong>
+              </p>
             )}
           </div>
 

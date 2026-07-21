@@ -11,7 +11,7 @@ import { useEfetivoReal } from '../../../hooks/useEfetivoReal'
 import { supabase } from '../../../services/supabase'
 import { Kpi, PanelCard } from '../../rh/paineis/_ui'
 import {
-  ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra, equipeFromEfetivo,
+  ymLabel, shiftYM, startYM, buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo,
   type Obra, type Config, type Versao,
 } from './cronogramaEngine'
 import { useFiltrosTree, FiltrosFrenteObra, filtrarTree } from './egpFiltros'
@@ -44,11 +44,14 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     queryKey: ['crono-versoes', portfolioId],
     queryFn: async () => { const { data } = await supabase.from('pmo_cronograma_versao').select('id, nome, config, updated_at').eq('portfolio_id', portfolioId).order('updated_at', { ascending: false }); return (data ?? []) as Versao[] },
   })
+  // verId null = versão MAIS RECENTE (cronograma publicado replica aqui automaticamente); '__padrao__' = plano teórico
+  const verSel = verId === '__padrao__' ? undefined : (versoes.find(x => x.id === verId) ?? versoes[0])
   const planoCfg = useMemo<Config>(() => {
-    const v = versoes.find(x => x.id === verId); if (!v) return defaultConfig
+    const v = verSel; if (!v) return defaultConfig
     const c = v.config as Partial<Config>
-    return { prodPP: c.prodPP ?? defaultConfig.prodPP, equipe: c.equipe ?? defaultConfig.equipe, horizonte: c.horizonte ?? 12, precedencia: c.precedencia, lag: c.lag }
-  }, [versoes, verId, defaultConfig])
+    // preserva TUDO da versão (datas por serviço, predecessão, realocação) — replica o cronograma 1:1
+    return { prodPP: c.prodPP ?? defaultConfig.prodPP, prodPPTorre: c.prodPPTorre ?? defaultConfig.prodPPTorre, equipe: c.equipe ?? defaultConfig.equipe, horizonte: c.horizonte ?? 12, precedencia: c.precedencia, lag: c.lag, realoc: c.realoc, fila: c.fila, pred: c.pred, inicio: c.inicio, fim: c.fim, inicioS: c.inicioS, fimS: c.fimS }
+  }, [verSel, defaultConfig])
   const realCfg = useMemo<Config>(() => ({
     prodPP: defaultConfig.prodPP, horizonte: 12, precedencia: true, lag: 0,
     equipe: equipeFromEfetivo(tree, efetivo?.porFrente ?? {}, false),
@@ -58,9 +61,11 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   const hist = useMemo(() => {
     const cfg = fonte === 'real' ? realCfg : planoCfg
     const frentesSel = filtrarTree(tree, flt)
+    // projeção CONJUNTA (mesma engine do Cronograma): respeita datas por serviço, predecessão e realocação da versão
+    const projAll = projTodas(allObras, cfg, start)
     const pjMap = new Map<Obra, ReturnType<typeof projObra>>()
     let H = 0
-    for (const fr of frentesSel) for (const o of fr.obras) { const pj = projObra(o, cfg, start); pjMap.set(o, pj); H = Math.max(H, pj.maxMeses) }
+    for (const fr of frentesSel) for (const o of fr.obras) { const pj = projAll.get(o.nome) ?? projObra(o, cfg, start); pjMap.set(o, pj); H = Math.max(H, pj.maxMeses) }
     const zero = () => ({ fundP: new Array(H).fill(0), mlP: new Array(H).fill(0), maqF: new Array(H).fill(0), maqM: new Array(H).fill(0) } as Record<ResKey, number[]>)
     const perFrente = frentesSel.map(fr => {
       const ef = efetivo?.porFrente[fr.label]
@@ -93,7 +98,7 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
     const totMaq = meses.map((_, m) => totals.maqF[m] + totals.maqM[m])
     const picoPpl = Math.max(0, ...totPpl), picoMaq = Math.max(0, ...totMaq)
     return { meses, frentes: frentesF, totals, picoPpl, picoMaq, picoPplMes: totPpl.indexOf(picoPpl), picoMaqMes: totMaq.indexOf(picoMaq) }
-  }, [tree, flt.fFrente, flt.fObra, flt.fPct, fonte, realCfg, planoCfg, efetivo, start])
+  }, [tree, allObras, flt.fFrente, flt.fObra, flt.fPct, fonte, realCfg, planoCfg, efetivo, start])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
@@ -131,9 +136,9 @@ export default function HistogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
         </div>
         <FiltrosFrenteObra tree={tree} f={flt} isDark={isDark} />
         {fonte === 'plano' && versoes.length > 0 && (
-          <select value={verId ?? ''} onChange={e => setVerId(e.target.value || null)} className={`text-[12px] font-semibold rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
-            <option value="">Plano padrão</option>
+          <select value={verId ?? versoes[0]?.id ?? '__padrao__'} onChange={e => setVerId(e.target.value)} title="Versão do cronograma — a mais recente (publicada) entra por padrão" className={`text-[12px] font-semibold rounded-xl border px-2.5 py-1.5 outline-none ${isDark ? 'bg-slate-800 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
             {versoes.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+            <option value="__padrao__">Plano padrão (teórico)</option>
           </select>
         )}
         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fonte === 'real' ? 'pessoas: RH · máquinas: frota' : 'equipe do plano · máquinas: frota'}</span>

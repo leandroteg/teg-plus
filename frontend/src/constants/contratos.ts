@@ -23,6 +23,7 @@ export const GRUPO_CONTRATO_OPTIONS: { value: GrupoContrato; label: string; subt
     { value: 'telefonia', label: 'Internet e Telefonia' },
     { value: 'medicos', label: 'Serviços Médicos' },
   ]},
+  { value: 'telefonia_internet', label: 'Internet e Telefonia' },
   { value: 'aquisicao', label: 'Aquisição', subtipos: [
     { value: 'equipamentos', label: 'Equipamentos' },
     { value: 'veiculos', label: 'Veículos' },
@@ -43,6 +44,7 @@ export const GRUPO_CONTRATO_OPTIONS: { value: GrupoContrato; label: string; subt
     { value: 'frete', label: 'Frete / Transportes' },
   ]},
   { value: 'seguros', label: 'Seguros' },
+  { value: 'fornecimento', label: 'Fornecimento' },
   { value: 'outro', label: 'Outro' },
 ]
 

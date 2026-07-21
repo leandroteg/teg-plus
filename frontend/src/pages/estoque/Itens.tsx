@@ -2,15 +2,20 @@ import { useState, useMemo, lazy, Suspense } from 'react'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
-  CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
+  CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight, QrCode,
+  GitMerge, ShoppingCart,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { gerarEtiquetasItensLotePDF } from '../../utils/etiqueta-item-pdf'
 
 const Movimentacoes = lazy(() => import('./Movimentacoes'))
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
   useConfirmarEntrada, useCancelarEntrada, useContaCorrenteItem,
+  useGerarOcMinimo,
 } from '../../hooks/useEstoque'
+import { MesclarItensModal } from '../../components/MesclarItensModal'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import type {
@@ -63,6 +68,13 @@ const EMPTY_FORM: Partial<EstItem> = {
 
 type ViewMode = 'list' | 'cards'
 
+// Limite que dispara "abaixo do mínimo": ponto de reposição, caindo pro estoque
+// mínimo quando não configurado. Usa || de propósito — 0 no cadastro significa
+// "não configurado" e deve cair pro mínimo (?? só cobre null).
+function limiteReposicao(item?: { ponto_reposicao?: number | null; estoque_minimo?: number | null } | null) {
+  return item?.ponto_reposicao || item?.estoque_minimo || 0
+}
+
 function fmtDate(iso?: string) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -77,11 +89,15 @@ function fmtCurrency(v: number) {
 
 export default function Itens() {
   const { isDark } = useTheme()
-  const { isAdmin } = useAuth()
+  const { isAdmin, perfil } = useAuth()
+  const navigate = useNavigate()
+  const [gerandoEtiquetas, setGerandoEtiquetas] = useState(false)
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
+  const [soAbaixoMinimo, setSoAbaixoMinimo] = useState(false)
+  const [showMesclar, setShowMesclar] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
   const [baseFilter, setBaseFilter] = useState('')
@@ -90,23 +106,97 @@ export default function Itens() {
   // Data
   const { data: bases = [] } = useBases()
   const { data: saldos = [], isLoading: loadingSaldos } = useSaldos(baseFilter || undefined)
+  // Catálogo completo: usado pelo filtro "abaixo do mínimo" pra incluir itens
+  // com mínimo configurado que nunca movimentaram (sem linha em est_saldos).
+  const { data: itensCatalogo = [] } = useEstoqueItens()
   const { data: entradas = [], isLoading: loadingEntradas } = useAguardandoEntrada()
   const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
   const confirmarEntrada = useConfirmarEntrada()
   const cancelarEntrada = useCancelarEntrada()
+  const gerarRc = useGerarOcMinimo()
+
+  const podeMesclar = isAdmin || !!perfil?.comprador
+
+  // Botão "Enviar RC" por item abaixo do mínimo: cria RC de reposição em
+  // rascunho via est_gerar_oc_minimo (mig 183). Idempotente — se o item já
+  // está coberto por RC em aberto, avisa em vez de duplicar.
+  const handleEnviarRc = async (s: EstSaldo) => {
+    const desc = s.item?.descricao ?? 'este item'
+    if (!confirm(`Gerar RC de reposição para "${desc}"?`)) return
+    try {
+      // Linha sintética (item sem movimentação) não tem base — a RPC escolhe e a
+      // idempotência garante uma RC só.
+      const res = await gerarRc.mutateAsync({ baseId: s.base_id || undefined, itemId: s.item_id })
+      if (res.rcs_criadas > 0) {
+        alert(`RC ${res.resumo[0]?.rc_numero ?? ''} criada em rascunho. Revise em Compras antes de enviar para aprovação.`)
+      } else if (res.itens_ja_pendentes > 0) {
+        alert('Este item já está coberto por uma RC em aberto — nenhuma RC nova foi criada.')
+      } else {
+        alert('Nenhuma RC gerada: o item não tem estoque mínimo configurado ou o saldo calculado não está abaixo do mínimo.')
+      }
+    } catch (e: any) {
+      alert(e?.message ?? 'Falha ao gerar RC.')
+    }
+  }
 
   const handleCancelar = (ids: string[]) => {
     if (!confirm(`Cancelar ${ids.length} entrada(s)? Esta ação não pode ser desfeita.`)) return
     cancelarEntrada.mutate(ids)
   }
 
+  // Etiquetas QR em lote dos itens atualmente filtrados (deduplicados por código).
+  const handleEtiquetasLote = async () => {
+    const seen = new Set<string>()
+    const itens = saldosFiltrados
+      .map(s => s.item)
+      .filter((it): it is NonNullable<typeof it> => !!it?.codigo)
+      .filter(it => { const k = it.codigo.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true })
+      .map(it => ({ codigo: it.codigo, descricao: it.descricao, unidade: it.unidade }))
+    if (itens.length === 0) return
+    if (itens.length > 60 && !confirm(`Gerar PDF com ${itens.length} etiquetas QR?`)) return
+    setGerandoEtiquetas(true)
+    try {
+      const blob = await gerarEtiquetasItensLotePDF(itens)
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch {
+      alert('Falha ao gerar as etiquetas.')
+    } finally {
+      setGerandoEtiquetas(false)
+    }
+  }
+  const abrirFichaItem = (codigo: string) => navigate(`/e/${encodeURIComponent(codigo)}`)
+
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
-    let list = saldos.filter(s => s.saldo > 0)
+    // Com o filtro "abaixo do mínimo" ativo, inclui saldo zerado e também itens
+    // com mínimo configurado que nunca movimentaram (sem linha em est_saldos) —
+    // esses entram como linha sintética de saldo 0, senão ficariam invisíveis.
+    let list = soAbaixoMinimo
+      ? saldos.filter(s => {
+          const lim = limiteReposicao(s.item)
+          return s.item && lim > 0 && s.saldo <= lim
+        })
+      : saldos.filter(s => s.saldo > 0)
+    if (soAbaixoMinimo) {
+      const comSaldo = new Set(saldos.map(s => s.item_id))
+      const sinteticos = itensCatalogo
+        .filter(it => limiteReposicao(it) > 0 && !comSaldo.has(it.id))
+        .map(it => ({
+          id: `sem-saldo-${it.id}`,
+          item_id: it.id,
+          base_id: '',
+          saldo: 0,
+          saldo_reservado: 0,
+          atualizado_em: '',
+          item: it,
+          base: { codigo: '', nome: 'Sem movimentação' },
+        } as unknown as EstSaldo))
+      list = [...list, ...sinteticos]
+    }
     if (curvaFiltro) list = list.filter(s => s.item?.curva_abc === curvaFiltro)
     if (busca.trim()) {
       const t = busca.toLowerCase()
@@ -116,7 +206,7 @@ export default function Itens() {
       )
     }
     return list
-  }, [saldos, curvaFiltro, busca])
+  }, [saldos, itensCatalogo, curvaFiltro, busca, soAbaixoMinimo])
 
   const baseFilterNome = useMemo(
     () => baseFilter ? bases.find(b => b.id === baseFilter)?.nome ?? '' : '',
@@ -325,6 +415,32 @@ export default function Itens() {
             </div>
           )}
 
+          {activeTab === 'em_estoque' && (
+            <button
+              onClick={() => setSoAbaixoMinimo(v => !v)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all border ${
+                soAbaixoMinimo
+                  ? 'bg-amber-500 text-white border-amber-500'
+                  : isDark
+                    ? 'bg-white/[0.03] text-amber-400 border-white/[0.08] hover:bg-white/[0.06]'
+                    : 'bg-white text-amber-600 border-slate-200 hover:bg-amber-50'
+              }`}
+              title="Mostrar somente itens abaixo do mínimo / ponto de reposição"
+            >
+              <AlertTriangle size={11} /> Abaixo do mínimo
+            </button>
+          )}
+
+          {activeTab === 'em_estoque' && podeMesclar && (
+            <button
+              onClick={() => setShowMesclar(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${isDark ? 'border-white/[0.06] text-fuchsia-300 hover:bg-white/[0.04]' : 'border-slate-200 text-fuchsia-700 hover:bg-fuchsia-50'}`}
+              title="Mesclar itens duplicados do catálogo (De/Para)"
+            >
+              <GitMerge size={14} /> De/Para
+            </button>
+          )}
+
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <button onClick={() => setViewMode('list')}
               className={`p-1.5 transition-all ${viewMode === 'list'
@@ -348,12 +464,25 @@ export default function Itens() {
             <Download size={14} />
           </button>
 
+          {activeTab === 'em_estoque' && (
+            <button onClick={handleEtiquetasLote} disabled={gerandoEtiquetas || saldosFiltrados.length === 0}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-40`}
+              title="Gerar etiquetas QR (PDF) dos itens filtrados">
+              {gerandoEtiquetas ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+              Etiquetas QR
+            </button>
+          )}
+
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             <span>{counts[activeTab]} item(ns)</span>
-            {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length > 0 && (
-              <span className="flex items-center gap-1 text-amber-500 font-bold">
-                <AlertTriangle size={11} /> {saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length} abaixo do mínimo
-              </span>
+            {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)).length > 0 && (
+              <button
+                onClick={() => setSoAbaixoMinimo(v => !v)}
+                className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
+                title="Filtrar somente itens abaixo do mínimo"
+              >
+                <AlertTriangle size={11} /> {saldosFiltrados.filter(s => s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)).length} abaixo do mínimo
+              </button>
             )}
           </div>
         </div>
@@ -367,8 +496,8 @@ export default function Itens() {
           <>
             {activeTab === 'em_estoque' && (
               viewMode === 'list'
-                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} />
-                : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} />
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} onQR={abrirFichaItem} onEnviarRc={handleEnviarRc} enviandoRc={gerarRc.isPending} />
+                : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} onQR={abrirFichaItem} onEnviarRc={handleEnviarRc} enviandoRc={gerarRc.isPending} />
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
@@ -409,6 +538,10 @@ export default function Itens() {
           isDark={isDark}
         />
       )}
+
+      {showMesclar && (
+        <MesclarItensModal onClose={() => setShowMesclar(false)} isDark={isDark} />
+      )}
     </div>
   )
 }
@@ -417,7 +550,7 @@ export default function Itens() {
 // Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void }) {
+function SaldosList({ data, isDark, onEdit, onClickItem, onQR, onEnviarRc, enviandoRc }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void; onQR: (codigo: string) => void; onEnviarRc: (s: EstSaldo) => void; enviandoRc: boolean }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <>
@@ -430,11 +563,11 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
         <span className="w-[80px] shrink-0 text-right">Saldo</span>
         <span className="w-[60px] shrink-0 text-right">Reserv.</span>
         <span className="w-[80px] shrink-0 text-right">Disp.</span>
-        <span className="w-[40px] shrink-0" />
+        <span className="w-[96px] shrink-0" />
       </div>
       {/* Rows */}
       {data.map(s => {
-        const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
+        const abaixo = s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
@@ -470,7 +603,26 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
             }`}>
               {disponivel} {s.item?.unidade}
             </span>
-            <span className="w-[40px] shrink-0 text-right">
+            <span className="w-[96px] shrink-0 flex items-center justify-end gap-2">
+              {abaixo && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEnviarRc(s) }}
+                  disabled={enviandoRc}
+                  className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-all disabled:opacity-40 ${isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+                  title="Gerar RC de reposição para este item"
+                >
+                  <ShoppingCart size={10} /> RC
+                </button>
+              )}
+              {s.item?.codigo && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onQR(s.item!.codigo) }}
+                  className={`${isDark ? 'text-slate-400 hover:text-indigo-300' : 'text-slate-400 hover:text-indigo-600'}`}
+                  title="Ver ficha / etiqueta QR"
+                >
+                  <QrCode size={13} />
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
                 className="text-[10px] text-blue-600 font-semibold hover:underline"
@@ -485,12 +637,12 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
   )
 }
 
-function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: boolean; onClickItem: (itemId: string) => void }) {
+function SaldosCards({ data, isDark, onClickItem, onQR, onEnviarRc, enviandoRc }: { data: EstSaldo[]; isDark: boolean; onClickItem: (itemId: string) => void; onQR: (codigo: string) => void; onEnviarRc: (s: EstSaldo) => void; enviandoRc: boolean }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
       {data.map(s => {
-        const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
+        const abaixo = s.item && limiteReposicao(s.item) > 0 && s.saldo <= limiteReposicao(s.item)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
@@ -506,12 +658,23 @@ function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: 
                   {s.item?.descricao}
                 </p>
               </div>
-              {s.item?.curva_abc && (
-                <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-                  ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
-                  Curva {s.item.curva_abc}
-                </span>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {s.item?.codigo && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onQR(s.item!.codigo) }}
+                    className={`${isDark ? 'text-slate-500 hover:text-indigo-300' : 'text-slate-400 hover:text-indigo-600'}`}
+                    title="Ver ficha / etiqueta QR"
+                  >
+                    <QrCode size={14} />
+                  </button>
+                )}
+                {s.item?.curva_abc && (
+                  <span className={`rounded-full text-[10px] font-bold px-2 py-0.5
+                    ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
+                    Curva {s.item.curva_abc}
+                  </span>
+                )}
+              </div>
             </div>
             <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
             <div className="flex items-center justify-between text-xs">
@@ -529,8 +692,18 @@ function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: 
               </span>
             </div>
             {abaixo && (
-              <div className="flex items-center gap-1 mt-2 text-[10px] text-amber-500 font-semibold">
-                <AlertTriangle size={10} /> Abaixo do mínimo
+              <div className="flex items-center justify-between mt-2">
+                <span className="flex items-center gap-1 text-[10px] text-amber-500 font-semibold">
+                  <AlertTriangle size={10} /> Abaixo do mínimo
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEnviarRc(s) }}
+                  disabled={enviandoRc}
+                  className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-all disabled:opacity-40 ${isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+                  title="Gerar RC de reposição para este item"
+                >
+                  <ShoppingCart size={10} /> Enviar RC
+                </button>
               </div>
             )}
           </div>

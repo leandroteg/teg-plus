@@ -3,6 +3,7 @@ import type { LazyExoticComponent, ComponentType } from 'react'
 import {
   Banknote, BarChart3, FileText, Receipt, HardHat, FolderKanban, Truck, Car,
   KeySquare, Building2, Package, Calculator, ShoppingCart, ClipboardCheck, Users,
+  ShieldAlert,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -23,7 +24,7 @@ import {
 //  `Painel` = desktop (lg+) · `Mobile` = versão mobile-native (<lg).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type Pilar = 'Projetos' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão' | 'RH'
+export type Pilar = 'Operação' | 'Suprimentos' | 'Backoffice' | 'Governança' | 'Expansão' | 'RH'
 
 export interface PainelDef {
   key: string
@@ -36,28 +37,32 @@ export interface PainelDef {
   pilar: Pilar
   Painel: LazyExoticComponent<ComponentType>
   Mobile: LazyExoticComponent<ComponentType>
+  /** Sub-painéis (abas internas) selecionáveis no slide show — só p/ módulos cujo
+   *  Painel aceita `initialPainel`. Vazio/ausente = o módulo entra como painel único. */
+  subPaineis?: { tab: string; label: string }[]
 }
 
 export const PAINEIS: PainelDef[] = [
   // Backoffice
-  { key: 'financeiro',    label: 'Financeiro',     desc: 'Contas, fluxo de caixa e conciliação',   emoji: '💰', Icon: Banknote,       accent: '#34D399', route: '/financeiro',    pilar: 'Backoffice',  Painel: lazy(() => import('../financeiro/DashboardFinanceiro')),  Mobile: lazy(() => import('../financeiro/DashboardFinanceiroMobile')) },
+  { key: 'financeiro',    label: 'Financeiro',     desc: 'Contas, fluxo de caixa e conciliação',   emoji: '💰', Icon: Banknote,       accent: '#34D399', route: '/financeiro',    pilar: 'Backoffice',  Painel: lazy(() => import('../financeiro/DashboardFinanceiro')),  Mobile: lazy(() => import('../financeiro/DashboardFinanceiroMobile')), subPaineis: [ { tab: 'painel', label: 'Painel' }, { tab: 'contas_receber', label: 'Contas a Receber' }, { tab: 'pgtos_previstos', label: 'Pgtos Previstos' }, { tab: 'rel_fluxo', label: 'Fluxo de Caixa' }, { tab: 'rel_aging', label: 'Aging' } ] },
   { key: 'controladoria', label: 'Controladoria',  desc: 'Indicadores e relatórios gerenciais',     emoji: '📈', Icon: BarChart3,      accent: '#34D399', route: '/controladoria', pilar: 'Backoffice',  Painel: lazy(() => import('../controladoria/ControladoriaHome')),  Mobile: lazy(() => import('../controladoria/ControladoriaHomeMobile')) },
   { key: 'contratos',     label: 'Contratos',      desc: 'Gestão de contratos e SLAs',              emoji: '📋', Icon: FileText,       accent: '#34D399', route: '/contratos',     pilar: 'Backoffice',  Painel: lazy(() => import('../contratos/DashboardContratos')),    Mobile: lazy(() => import('../contratos/DashboardContratosMobile')) },
   { key: 'fiscal',        label: 'Fiscal',         desc: 'Notas fiscais e créditos',                emoji: '🧾', Icon: Receipt,        accent: '#34D399', route: '/fiscal',        pilar: 'Backoffice',  Painel: lazy(() => import('../fiscal/FiscalHome')),               Mobile: lazy(() => import('../fiscal/FiscalHomeMobile')) },
   // Projetos
-  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Projetos',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')) },
-  { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Projetos',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainel')) },
+  { key: 'egp',           label: 'EGP · Projetos', desc: 'Portfólio e gestão de projetos',          emoji: '📊', Icon: FolderKanban,   accent: '#818CF8', route: '/egp',           pilar: 'Operação',    Painel: lazy(() => import('../pmo/EGPPainel')),                   Mobile: lazy(() => import('../pmo/EGPPainelMobile')), subPaineis: [ { tab: 'geral', label: 'Visão Geral' }, { tab: 'producao', label: 'Produção' }, { tab: 'faturamento', label: 'Faturamento' }, { tab: 'medicao', label: 'Medição' }, { tab: 'cronograma', label: 'Cronograma' }, { tab: 'custos', label: 'Custos' } ] },
+  { key: 'obras',         label: 'Obras',          desc: 'Mobilização: equipes e frota por obra',   emoji: '🏗️', Icon: HardHat,        accent: '#818CF8', route: '/obras',         pilar: 'Operação',    Painel: lazy(() => import('../obras/ObrasPainel')),               Mobile: lazy(() => import('../obras/ObrasPainelMobile')) },
+  { key: 'qsma',          label: 'QSMA',           desc: 'Inspeções, ocorrências, EPIs e ambiental', emoji: '🦺', Icon: ShieldAlert,   accent: '#818CF8', route: '/qsma',          pilar: 'Operação',    Painel: lazy(() => import('../qsma/QsmaPainel')),                 Mobile: lazy(() => import('../qsma/QsmaPainel')) },
   // Suprimentos
   { key: 'compras',       label: 'Compras',        desc: 'Requisições, cotações e pedidos',         emoji: '🛒', Icon: ShoppingCart,   accent: '#2DD4BF', route: '/compras',       pilar: 'Suprimentos', Painel: lazy(() => import('../Dashboard')),                       Mobile: lazy(() => import('../DashboardMobile')) },
   { key: 'logistica',     label: 'Logística',      desc: 'Transportes e expedição',                 emoji: '🚚', Icon: Truck,          accent: '#2DD4BF', route: '/logistica',     pilar: 'Suprimentos', Painel: lazy(() => import('../logistica/LogisticaHome')),         Mobile: lazy(() => import('../logistica/LogisticaHomeMobile')) },
-  { key: 'estoque',       label: 'Estoque',        desc: 'Almoxarifado e inventário',               emoji: '📦', Icon: Package,        accent: '#2DD4BF', route: '/estoque',       pilar: 'Suprimentos', Painel: lazy(() => import('../estoque/EstoqueHome')),             Mobile: lazy(() => import('../estoque/EstoqueHomeMobile')) },
+  { key: 'estoque',       label: 'Estoque',        desc: 'Almoxarifado e inventário',               emoji: '📦', Icon: Package,        accent: '#2DD4BF', route: '/estoque',       pilar: 'Suprimentos', Painel: lazy(() => import('../estoque/EstoqueHome')),             Mobile: lazy(() => import('../estoque/EstoqueHomeMobile')), subPaineis: [ { tab: 'painel', label: 'Painel' }, { tab: 'indicadores', label: 'Indicadores' } ] },
   { key: 'patrimonial',   label: 'Patrimonial',    desc: 'Ativos e depreciação',                    emoji: '🏛️', Icon: Building2,      accent: '#2DD4BF', route: '/patrimonial',   pilar: 'Suprimentos', Painel: lazy(() => import('../patrimonial/PatrimonialHome')),     Mobile: lazy(() => import('../patrimonial/PatrimonialHomeMobile')) },
-  { key: 'frotas',        label: 'Frotas',         desc: 'Veículos, OS e telemetria',               emoji: '🚛', Icon: Car,            accent: '#2DD4BF', route: '/frotas',        pilar: 'Suprimentos', Painel: lazy(() => import('../frotas/FrotasHome')),               Mobile: lazy(() => import('../frotas/FrotasHomeMobile')) },
-  { key: 'locacoes',      label: 'Locação Imóveis',desc: 'Imóveis, aditivos e faturas',             emoji: '🏘️', Icon: KeySquare,     accent: '#2DD4BF', route: '/locacoes',      pilar: 'Suprimentos', Painel: lazy(() => import('../locacao/LocacaoHome')),             Mobile: lazy(() => import('../locacao/LocacaoHomeMobile')) },
+  { key: 'frotas',        label: 'Frotas',         desc: 'Veículos, OS e telemetria',               emoji: '🚛', Icon: Car,            accent: '#2DD4BF', route: '/frotas',        pilar: 'Suprimentos', Painel: lazy(() => import('../frotas/FrotasHome')),               Mobile: lazy(() => import('../frotas/FrotasHomeMobile')), subPaineis: [ { tab: 'painel', label: 'Painel' }, { tab: 'disponibilidade', label: 'Disponibilidade' }, { tab: 'indicadores', label: 'Indicadores' }, { tab: 'motoristas', label: 'Motoristas' } ] },
+  { key: 'locacoes',      label: 'Gestão de Imóveis',desc: 'Imóveis, aditivos e faturas',             emoji: '🏘️', Icon: KeySquare,     accent: '#2DD4BF', route: '/locacoes',      pilar: 'Suprimentos', Painel: lazy(() => import('../locacao/LocacaoHome')),             Mobile: lazy(() => import('../locacao/LocacaoHomeMobile')) },
   // Expansão
   { key: 'orcamentacao',  label: 'Orçamentação',   desc: 'Estimativa de LT por KMZ',                emoji: '📐', Icon: Calculator,     accent: '#FBBF24', route: '/orcamentacao',  pilar: 'Expansão',    Painel: lazy(() => import('../orcamentacao/OrcamentacaoHome')),   Mobile: lazy(() => import('../orcamentacao/OrcamentacaoHomeMobile')) },
   // Governança
   { key: 'sgi',           label: 'Gestão · SGI',   desc: 'Documentos, NC/melhoria e objetivos',     emoji: '⚖️', Icon: ClipboardCheck, accent: '#C4B5FD', route: '/sgi',           pilar: 'Governança',  Painel: lazy(() => import('../sgi/SgiPainel')),                   Mobile: lazy(() => import('../sgi/SgiPainelMobile')) },
   // RH
-  { key: 'rh',            label: 'RH',             desc: 'Headcount, admissões e movimentações',    emoji: '👥', Icon: Users,          accent: '#A78BFA', route: '/rh/headcount',  pilar: 'RH',          Painel: lazy(() => import('../rh/RHPainel')),                     Mobile: lazy(() => import('../rh/RHPainel')) },
+  { key: 'rh',            label: 'RH',             desc: 'Headcount, admissões e movimentações',    emoji: '👥', Icon: Users,          accent: '#A78BFA', route: '/rh/headcount',  pilar: 'RH',          Painel: lazy(() => import('../rh/RHPainel')),                     Mobile: lazy(() => import('../rh/RHPainel')), subPaineis: [ { tab: 'geral', label: 'Visão Geral' }, { tab: 'liberacao', label: 'Liberação' }, { tab: 'composicao', label: 'Composição' }, { tab: 'evolucao', label: 'Evolução' }, { tab: 'turnover', label: 'Turnover' } ] },
 ]

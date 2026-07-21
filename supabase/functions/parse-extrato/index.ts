@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +102,14 @@ function parseCSV(text: string): Mov[] {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  // Rate limiting: 10 req/min por usuario (fallback IP).
+  const rlClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+  const rl = await enforceRateLimit(req, rlClient, { key: "parse-extrato", limit: 10, windowSec: 60 });
+  if (!rl.allowed) return rl.response!;
 
   let importId = "";
   try {

@@ -9,6 +9,13 @@ import {
   hasFornecedorPaymentData,
   normalizeDigits,
 } from '../hooks/useFornecedorVinculo'
+import FornecedorDocsSection from './FornecedorDocsSection'
+import {
+  motivoBloqueioCartaoCnpj,
+  persistStagedDocs,
+  useFornecedorAnexos,
+  type StagedDoc,
+} from '../hooks/useFornecedorDocs'
 import type { Fornecedor } from '../types/financeiro'
 
 export type FornecedorFormData = Partial<Fornecedor> & {
@@ -40,6 +47,7 @@ const EMPTY_FORM: FornecedorFormData = {
   agencia: '',
   conta: '',
   boleto: false,
+  cartao: false,
   pix_chave: '',
   pix_tipo: '',
   ativo: true,
@@ -58,11 +66,14 @@ export default function FornecedorCadastroModal({
   const salvarFornecedor = useSalvarFornecedor()
   const [form, setForm] = useState<FornecedorFormData>(EMPTY_FORM)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [staged, setStaged] = useState<StagedDoc[]>([])
+  const { data: anexosExistentes = [] } = useFornecedorAnexos(form.id)
 
   useEffect(() => {
     if (!open) return
     setForm({ ...EMPTY_FORM, ...initialData })
     setErrorMessage(null)
+    setStaged([])
   }, [open, initialData])
 
   const cnpjLookup = useConsultaCNPJ(useCallback((result) => {
@@ -121,6 +132,15 @@ export default function FornecedorCadastroModal({
       return
     }
 
+    // Regra Cartão CNPJ: só bloqueia o cadastro NOVO (edição de legado não trava).
+    if (!form.id) {
+      const bloqueio = motivoBloqueioCartaoCnpj(cnpjDigits, anexosExistentes, staged)
+      if (bloqueio) {
+        setErrorMessage(bloqueio)
+        return
+      }
+    }
+
     const payload = {
       ...form,
       cnpj: cnpjDigits,
@@ -129,6 +149,15 @@ export default function FornecedorCadastroModal({
 
     try {
       const saved = await salvarFornecedor.mutateAsync(payload)
+      if (staged.length > 0) {
+        try {
+          await persistStagedDocs(saved.id, staged)
+        } catch (docErr) {
+          const m = docErr instanceof Error ? docErr.message : 'erro desconhecido'
+          setErrorMessage(`Fornecedor salvo, mas falha ao enviar documentos: ${m}. Reabra o cadastro para anexar.`)
+          return
+        }
+      }
       onSaved(saved)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao salvar fornecedor.'
@@ -228,39 +257,50 @@ export default function FornecedorCadastroModal({
               </span>
             </div>
 
-            <label className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold ${text}`}>
-              <input
-                type="checkbox"
-                checked={Boolean(form.boleto)}
-                onChange={(event) => setField('boleto', event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-              />
-              Recebe por boleto
-            </label>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4">
+              <label className={`inline-flex items-center gap-2 text-sm font-semibold ${text}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.boleto)}
+                  onChange={(event) => setForm(prev => ({ ...prev, boleto: event.target.checked, cartao: event.target.checked ? false : prev.cartao }))}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                />
+                Recebe por boleto
+              </label>
+              <label className={`inline-flex items-center gap-2 text-sm font-semibold ${text}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.cartao)}
+                  onChange={(event) => setForm(prev => ({ ...prev, cartao: event.target.checked, boleto: event.target.checked ? false : prev.boleto }))}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                />
+                Recebe por cartão
+              </label>
+            </div>
             <p className={`text-[11px] mt-1 ${subtext}`}>
-              Ao marcar boleto, Banco, Agência, Conta e PIX deixam de ser obrigatórios.
+              Ao marcar boleto ou cartão, Banco, Agência, Conta e PIX deixam de ser obrigatórios.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Banco</label>
-                <UpperInput value={form.banco_nome ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.banco_nome ?? ''} disabled={Boolean(form.boleto || form.cartao)} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input} ${form.boleto || form.cartao ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Agência</label>
-                <UpperInput value={form.agencia ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.agencia ?? ''} disabled={Boolean(form.boleto || form.cartao)} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input} ${form.boleto || form.cartao ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Conta</label>
-                <UpperInput value={form.conta ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.conta ?? ''} disabled={Boolean(form.boleto || form.cartao)} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input} ${form.boleto || form.cartao ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Chave PIX</label>
-                <input value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <input value={form.pix_chave ?? ''} disabled={Boolean(form.boleto || form.cartao)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto || form.cartao ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Tipo PIX</label>
-                <select value={form.pix_tipo ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_tipo', event.target.value)} className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                <select value={form.pix_tipo ?? ''} disabled={Boolean(form.boleto || form.cartao)} onChange={(event) => setField('pix_tipo', event.target.value)} className={`input-base ${input} ${form.boleto || form.cartao ? 'opacity-60 cursor-not-allowed' : ''}`}>
                   <option value="">Selecione</option>
                   <option value="cpf">CPF</option>
                   <option value="cnpj">CNPJ</option>
@@ -275,6 +315,14 @@ export default function FornecedorCadastroModal({
               </div>
             </div>
           </div>
+
+          <FornecedorDocsSection
+            dark={dark}
+            fornecedorId={form.id}
+            cnpj={form.cnpj}
+            staged={staged}
+            onStagedChange={setStaged}
+          />
 
           <div className={`rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
             <div>

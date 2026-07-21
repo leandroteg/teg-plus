@@ -49,7 +49,9 @@ export function useAnexosPedido(pedidoId: string | undefined) {
       if (error) throw error
       return (data ?? []) as PedidoAnexo[]
     },
-    refetchInterval: 60_000,
+    // Uploads do próprio usuário invalidam a query; o poll cobre apenas anexos
+    // gravados por integrações externas (n8n) — 120s basta.
+    refetchInterval: 120_000,
     refetchOnWindowFocus: false,
   })
 }

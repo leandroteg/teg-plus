@@ -1,16 +1,32 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
+  Sparkles, Paperclip, AlertTriangle, Percent, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useFaturas, useCriarFatura, useAtualizarFatura, useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura } from '../../hooks/useLocacao'
+import { useAuth } from '../../contexts/AuthContext'
+import {
+  useImoveis, useFaturas, useCriarFatura, useAtualizarFatura,
+  useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura,
+  parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
+  removerFaturaAnexoStorage, useExcluirFatura,
+  useDescontosFatura, useCriarDescontoFatura, useRemoverDescontoFatura, uploadDescontoAnexo,
+} from '../../hooks/useLocacao'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TIPOS: TipoFatura[] = ['energia', 'agua', 'internet', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao']
+const TIPOS: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
+
+// Vencimento padrão do aluguel = mês seguinte à competência, no dia de vencimento do contrato
+function aluguelVencDefault(competenciaYYYYMM: string, diaVenc?: number) {
+  const [y, m] = competenciaYYYYMM.split('-').map(Number)
+  const dia = Math.min(Math.max(diaVenc || 5, 1), 28)
+  const d = new Date(y, m, dia) // m (0-based+1) = mês seguinte
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const STATUS_FILTERS = [
   { value: 'todos',     label: 'Todos' },
@@ -82,25 +98,32 @@ function isOverdue(f: LocFatura) {
 function InlineEditForm({
   tipo,
   fatura,
-  imovelId,
+  imovel,
   competencia,
   isDark,
   onClose,
 }: {
   tipo: TipoFatura
   fatura: LocFatura | null
-  imovelId: string
+  imovel: LocImovel
   competencia: string
   isDark: boolean
   onClose: () => void
 }) {
   const criarFatura = useCriarFatura()
   const atualizarFatura = useAtualizarFatura()
+  const excluirFatura = useExcluirFatura()
   const isEdit = !!fatura?.id
+  const podeExcluir = isEdit && ['previsto', 'lancado'].includes(fatura!.status)
+  // Aluguel novo: pré-preenche valor + vencimento a partir do contrato/imóvel
+  const isAluguelNovo = tipo === 'aluguel' && !fatura
 
-  const [vencimento, setVencimento] = useState(fatura?.vencimento ?? '')
+  const [vencimento, setVencimento] = useState(
+    fatura?.vencimento ?? (isAluguelNovo ? aluguelVencDefault(competencia, imovel.dia_vencimento) : '')
+  )
   const [valor, setValor] = useState<string>(
-    (fatura?.valor_confirmado ?? fatura?.valor_previsto)?.toString() ?? ''
+    (fatura?.valor_confirmado ?? fatura?.valor_previsto)?.toString()
+    ?? (isAluguelNovo && imovel.valor_aluguel_mensal ? String(imovel.valor_aluguel_mensal) : '')
   )
   const [status, setStatus] = useState<StatusFatura>(fatura?.status ?? 'previsto')
 
@@ -122,7 +145,7 @@ function InlineEditForm({
     } else {
       criarFatura.mutate(
         {
-          imovel_id: imovelId,
+          imovel_id: imovel.id,
           tipo,
           competencia: competencia + '-01',
           vencimento: vencimento || undefined,
@@ -181,8 +204,134 @@ function InlineEditForm({
             >
               Cancelar
             </button>
+            {podeExcluir && (
+              <button
+                onClick={() => {
+                  if (!confirm('Excluir esta fatura? O anexo (se houver) também será apagado.')) return
+                  excluirFatura.mutate(
+                    { id: fatura!.id, boleto_url: fatura!.boleto_url },
+                    { onSuccess: onClose },
+                  )
+                }}
+                disabled={excluirFatura.isPending}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${
+                  isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                {excluirFatura.isPending ? 'Excluindo…' : 'Excluir'}
+              </button>
+            )}
           </div>
         </div>
+      </td>
+    </tr>
+  )
+}
+
+// ── Descontos do Aluguel (sub-linha) ─────────────────────────────────────────
+// Cada desconto: Descrição + Valor + Anexo OBRIGATÓRIO. Líquido = aluguel − descontos.
+function DescontosAluguel({ fatura, isDark }: { fatura: LocFatura; isDark: boolean }) {
+  const { perfil } = useAuth()
+  const { data: descontos = [] } = useDescontosFatura(fatura.id)
+  const criar = useCriarDescontoFatura()
+  const remover = useRemoverDescontoFatura()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [desc, setDesc] = useState('')
+  const [valor, setValor] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const editavel = ['previsto', 'lancado'].includes(fatura.status)
+  const bruto = fatura.valor_confirmado ?? fatura.valor_previsto ?? 0
+  const totalDesc = descontos.reduce((s, d) => s + d.valor, 0)
+  const liquido = bruto - totalDesc
+
+  const inputCls = `rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
+    isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+  }`
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  async function abrir(path: string) { const url = await faturaAnexoUrl(path); if (url) window.open(url, '_blank') }
+
+  async function salvar() {
+    const v = parseFloat(valor)
+    if (!desc.trim()) { alert('Informe a descrição do desconto.'); return }
+    if (!v || v <= 0) { alert('Informe um valor de desconto válido.'); return }
+    if (!file) { alert('O anexo do desconto é obrigatório.'); return }
+    setSaving(true)
+    try {
+      const path = await uploadDescontoAnexo(fatura.id, file)
+      await criar.mutateAsync({ fatura_id: fatura.id, descricao: desc.trim(), valor: v, anexo_url: path, criado_por_nome: perfil?.nome })
+      setDesc(''); setValor(''); setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    } catch (e: any) { alert('Erro ao salvar desconto: ' + (e?.message ?? 'desconhecido')) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <tr className={isDark ? 'bg-amber-500/[0.05]' : 'bg-amber-50/50'}>
+      <td colSpan={4} className="px-4 py-3">
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+          Descontos no aluguel
+        </p>
+
+        {descontos.length === 0 ? (
+          <p className={`text-[11px] italic mb-2 ${txtMuted}`}>Nenhum desconto lançado.</p>
+        ) : (
+          <div className="space-y-1 mb-2">
+            {descontos.map(d => (
+              <div key={d.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-white border border-slate-100'}`}>
+                <span className={`flex-1 truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{d.descricao}</span>
+                <span className="font-semibold text-red-500">− {fmtCurrency(d.valor)}</span>
+                <button onClick={() => abrir(d.anexo_url)} title="Abrir anexo do desconto"
+                  className={`p-1 rounded ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}>
+                  <Paperclip size={12} />
+                </button>
+                {editavel && (
+                  <button onClick={() => { if (confirm('Remover este desconto? O anexo será apagado.')) remover.mutate({ id: d.id, fatura_id: fatura.id, anexo_url: d.anexo_url }) }}
+                    title="Remover desconto"
+                    className={`p-1 rounded ${isDark ? 'hover:bg-red-500/10 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}>
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Líquido */}
+        <div className={`flex items-center justify-end gap-3 text-xs mb-2 ${txtMuted}`}>
+          <span>Bruto {fmtCurrency(bruto)}</span>
+          <span className="text-red-500">Descontos − {fmtCurrency(totalDesc)}</span>
+          <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Líquido {fmtCurrency(liquido)}</span>
+        </div>
+
+        {/* Novo desconto */}
+        {editavel && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[140px]">
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Descrição</label>
+              <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex.: reparo custeado pelo locatário" className={`${inputCls} w-full`} />
+            </div>
+            <div className="w-24">
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Valor (R$)</label>
+              <input type="number" step="0.01" value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" className={`${inputCls} w-full`} />
+            </div>
+            <div>
+              <label className={`text-[10px] font-semibold block mb-1 ${txtMuted}`}>Anexo <span className="text-red-500">*</span></label>
+              <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp"
+                onChange={e => setFile(e.target.files?.[0] ?? null)}
+                className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`} />
+            </div>
+            <button onClick={salvar} disabled={saving}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Salvando…' : '+ Desconto'}
+            </button>
+          </div>
+        )}
+        {!editavel && (
+          <p className={`text-[10px] ${txtMuted}`}>Fatura já enviada/paga — descontos bloqueados.</p>
+        )}
       </td>
     </tr>
   )
@@ -205,6 +354,143 @@ function ImovelFaturasModal({
   const [editingRow, setEditingRow] = useState<{ tipo: TipoFatura; fatura: LocFatura | null } | null>(null)
   const enviarFinanceiro = useEnviarFaturasFinanceiro()
   const cancelarEnvio = useCancelarEnvioFatura()
+  const criarFatura = useCriarFatura()
+  const atualizarFatura = useAtualizarFatura()
+
+  // ── Lançar contas por anexo (IA) — salva AUTOMATICAMENTE ao anexar ──────────
+  // Fluxo em 2 etapas do processo: a lançadora só anexa (grava na hora, mesmo
+  // incompleto) e fecha; a validadora depois revisa/edita (lápis ou vencimento
+  // em lote) e envia ao Financeiro (faturamento).
+  type ResultadoItem = {
+    nome: string
+    tipo: TipoFatura
+    valor: number | null
+    vencimento: string | null
+    acao: 'criada' | 'atualizada' | 'pulada'
+    obs: string[]
+  }
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [parsing, setParsing] = useState(false)
+  const [resultado, setResultado] = useState<ResultadoItem[] | null>(null)
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return
+    const arr = Array.from(files)
+    setParsing(true)
+    setResultado(null)
+    try {
+      const parsed = await parseFaturasAnexos(arr, {
+        competencia: modalCompetencia,
+        imovel: endereco || imovel.descricao,
+      })
+      // snapshot local (tipo|competência → fatura) p/ decidir criar/atualizar dentro do lote
+      const locais = new Map<string, { id: string; status: StatusFatura; temAnexo: boolean }>()
+      allFaturas.filter(f => f.imovel_id === imovel.id).forEach(f => {
+        locais.set(`${f.tipo}|${(f.competencia ?? '').slice(0, 7)}`, {
+          id: f.id, status: f.status, temAnexo: !!f.boleto_url,
+        })
+      })
+      const out: ResultadoItem[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const file = arr[i]
+        const p = parsed.find(x => x.doc === i) ?? parsed[i]
+        const tipoRaw = p?.tipo === 'aluguel' ? 'outro' : (p?.tipo ?? 'outro')
+        const tipo = (TIPOS as string[]).includes(tipoRaw) ? (tipoRaw as TipoFatura) : 'outro'
+        const comp = /^\d{4}-\d{2}$/.test(p?.competencia ?? '') ? p!.competencia : modalCompetencia
+        const valor = p?.valor != null && p.valor > 0 ? p.valor : null
+        const venc = p?.vencimento && !isNaN(new Date(p.vencimento + 'T00:00:00').getTime())
+          ? p.vencimento : null
+        const obs: string[] = []
+        if (!valor) obs.push('sem valor — complete no lápis')
+        if (!venc) obs.push('sem vencimento — complete no lápis')
+        if ((p?.confianca ?? 0) < 0.6) obs.push('confiança baixa da IA — confira')
+
+        const key = `${tipo}|${comp}`
+        const exist = locais.get(key)
+        // já existe fatura do mesmo tipo+mês COM anexo → não sobrescreve (pode ser 2ª via)
+        if (exist?.temAnexo) {
+          out.push({
+            nome: file.name, tipo, valor, vencimento: venc, acao: 'pulada',
+            obs: [`já existe ${TIPO_FATURA_LABEL[tipo]} de ${comp} com anexo — edite manualmente se for o caso`],
+          })
+          continue
+        }
+        const path = await uploadFaturaAnexo(imovel.id, comp, file)
+        if (exist) {
+          await atualizarFatura.mutateAsync({
+            id: exist.id,
+            vencimento: venc ?? undefined,
+            valor_previsto: valor ?? undefined,
+            boleto_url: path,
+            descricao: p?.fornecedor || undefined,
+            status: exist.status === 'previsto' ? 'lancado' : exist.status,
+          })
+          locais.set(key, { ...exist, temAnexo: true })
+          out.push({ nome: file.name, tipo, valor, vencimento: venc, acao: 'atualizada', obs })
+        } else {
+          await criarFatura.mutateAsync({
+            imovel_id: imovel.id,
+            tipo,
+            competencia: comp + '-01',
+            vencimento: venc ?? undefined,
+            valor_previsto: valor ?? undefined,
+            boleto_url: path,
+            descricao: p?.fornecedor || undefined,
+            status: 'lancado',
+          })
+          locais.set(key, { id: 'nova', status: 'lancado', temAnexo: true })
+          out.push({ nome: file.name, tipo, valor, vencimento: venc, acao: 'criada', obs })
+        }
+      }
+      setResultado(out)
+    } catch (err: any) {
+      alert(`Erro ao processar anexos: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setParsing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // ── Vencimento em lote (etapa de validação/faturamento) ─────────────────────
+  const [bulkVenc, setBulkVenc] = useState('')
+  const [aplicandoVenc, setAplicandoVenc] = useState(false)
+
+  async function aplicarVencLote() {
+    const alvo = mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status))
+    if (!alvo.length) {
+      alert('Nenhuma fatura editável neste mês (só "previsto" ou "lançado" podem ser alteradas).')
+      return
+    }
+    const label = new Date(bulkVenc + 'T12:00:00').toLocaleDateString('pt-BR')
+    if (!confirm(`Alterar o vencimento de ${alvo.length} fatura(s) de ${competenciaLabel(modalCompetencia)} para ${label}?`)) return
+    setAplicandoVenc(true)
+    try {
+      for (const f of alvo) {
+        await atualizarFatura.mutateAsync({ id: f.id, vencimento: bulkVenc })
+      }
+      alert(`✓ Vencimento de ${alvo.length} fatura(s) alterado para ${label}.`)
+      setBulkVenc('')
+    } catch (err: any) {
+      alert(`Erro: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setAplicandoVenc(false)
+    }
+  }
+
+  async function abrirAnexo(pathOrUrl?: string) {
+    const url = await faturaAnexoUrl(pathOrUrl)
+    if (url) window.open(url, '_blank')
+  }
+
+  async function removerAnexo(fat: LocFatura) {
+    if (!confirm('Remover o anexo desta fatura? O arquivo será apagado do sistema (os valores lançados permanecem).')) return
+    try {
+      await removerFaturaAnexoStorage(fat.boleto_url)
+      await atualizarFatura.mutateAsync({ id: fat.id, boleto_url: null } as never)
+    } catch (err: any) {
+      alert(`Erro ao remover anexo: ${err?.message ?? 'desconhecido'}`)
+    }
+  }
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -230,7 +516,13 @@ function ImovelFaturasModal({
     return map
   }, [mesFaturas])
 
-  const totalMes = mesFaturas.reduce((s, f) => s + getFaturaValor(f), 0)
+  // Descontos do aluguel do mês (afetam o líquido enviado ao Financeiro)
+  const aluguelFat = faturaByTipo['aluguel']
+  const { data: descAluguel = [] } = useDescontosFatura(aluguelFat?.id)
+  const totalDescAluguel = descAluguel.reduce((s, d) => s + d.valor, 0)
+  const [showDescAluguel, setShowDescAluguel] = useState(false)
+
+  const totalMes = mesFaturas.reduce((s, f) => s + getFaturaValor(f), 0) - totalDescAluguel
 
   // Historico: last 10 faturas for this imovel (excluding current month)
   const historico = useMemo(
@@ -247,7 +539,7 @@ function ImovelFaturasModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${border} ${bg} rounded-t-2xl`}>
           <div className="min-w-0">
@@ -282,6 +574,76 @@ function ImovelFaturasModal({
             </button>
           </div>
 
+          {/* Lançar contas por anexo (IA) — salva automaticamente */}
+          <div className={`rounded-xl border p-3 ${isDark ? 'border-indigo-500/20 bg-indigo-500/[0.04]' : 'border-indigo-200 bg-indigo-50/40'}`}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="application/pdf,image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={e => handleFiles(e.target.files)}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                <Sparkles size={13} /> Lançar contas por anexo
+              </span>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={parsing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {parsing ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                {parsing ? 'Lendo e salvando…' : 'Enviar anexos'}
+              </button>
+            </div>
+            <p className={`text-[10px] mt-1 ${txtMuted}`}>
+              Envie 1 ou mais contas (PDF/foto) — a IA identifica tipo, valor e vencimento e <b>salva na hora</b> como "Lançado". O que faltar, complete depois pelo lápis ✏️.
+            </p>
+
+            {resultado && resultado.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {resultado.map((r, i) => {
+                  const pulada = r.acao === 'pulada'
+                  return (
+                    <div key={i} className={`rounded-lg border px-2.5 py-2 ${
+                      pulada
+                        ? isDark ? 'border-red-500/30 bg-red-500/[0.04]' : 'border-red-200 bg-red-50/40'
+                        : isDark ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-emerald-200 bg-emerald-50/40'
+                    }`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[11px] font-semibold truncate ${txtMain}`}>
+                          {pulada ? '✗' : '✓'} {TIPO_FATURA_LABEL[r.tipo]} — {r.valor != null ? fmtCurrency(r.valor) : 'sem valor'} · venc. {r.vencimento ? fmtDate(r.vencimento) : '—'}
+                        </span>
+                        <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider ${
+                          pulada ? 'text-red-500' : isDark ? 'text-emerald-400' : 'text-emerald-600'
+                        }`}>
+                          {r.acao}
+                        </span>
+                      </div>
+                      <p className={`text-[10px] truncate ${txtMuted}`} title={r.nome}>📄 {r.nome}</p>
+                      {r.obs.length > 0 && (
+                        <p className={`mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium ${pulada ? 'text-red-500' : 'text-amber-500'}`}>
+                          <AlertTriangle size={10} /> {r.obs.join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setResultado(null)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                      isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    Ocultar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Faturas Table */}
           <div className={`rounded-xl border overflow-hidden ${border}`}>
             <table className="w-full text-xs">
@@ -304,9 +666,49 @@ function ImovelFaturasModal({
                       {fat ? (
                         <>
                           <td className={`text-center px-2 py-2.5 ${txtMuted}`}>{fmtDate(fat.vencimento)}</td>
-                          <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>{fmtCurrency(getFaturaValor(fat))}</td>
+                          <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>
+                            {tipo === 'aluguel' && totalDescAluguel > 0 ? (
+                              <span className="inline-flex flex-col items-end leading-tight">
+                                <span className={`text-[10px] line-through ${txtMuted}`}>{fmtCurrency(getFaturaValor(fat))}</span>
+                                <span>{fmtCurrency(getFaturaValor(fat) - totalDescAluguel)}</span>
+                              </span>
+                            ) : fmtCurrency(getFaturaValor(fat))}
+                          </td>
                           <td className="text-right px-4 py-2.5">
                             <div className="flex items-center justify-end gap-2">
+                              {tipo === 'aluguel' && (
+                                <button
+                                  onClick={() => setShowDescAluguel(v => !v)}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold transition-colors ${
+                                    descAluguel.length
+                                      ? (isDark ? 'text-amber-300 bg-amber-500/10' : 'text-amber-700 bg-amber-50')
+                                      : (isDark ? 'text-slate-500 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100')
+                                  }`}
+                                  title="Descontos do aluguel"
+                                >
+                                  <Percent size={11} /> {descAluguel.length ? `${descAluguel.length}` : 'desc.'}
+                                </button>
+                              )}
+                              {fat.boleto_url && (
+                                <span className="inline-flex items-center">
+                                  <button
+                                    onClick={() => abrirAnexo(fat.boleto_url)}
+                                    className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}
+                                    title="Abrir anexo da fatura"
+                                  >
+                                    <Paperclip size={12} />
+                                  </button>
+                                  {['previsto', 'lancado'].includes(fat.status) && (
+                                    <button
+                                      onClick={() => removerAnexo(fat)}
+                                      className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-red-500/10 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-slate-400 hover:text-red-500'}`}
+                                      title="Remover anexo (arquivo errado)"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  )}
+                                </span>
+                              )}
                               <span className="inline-flex items-center gap-1">
                                 <span className={`w-1.5 h-1.5 rounded-full ${isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'}`} />
                                 <span className={`text-[10px] font-semibold ${isOverdue(fat) ? 'text-red-500' : STATUS_FATURA_LABEL[fat.status]?.text || txtMuted}`}>
@@ -345,6 +747,27 @@ function ImovelFaturasModal({
                             </div>
                           </td>
                         </>
+                      ) : tipo === 'aluguel' && imovel.valor_aluguel_mensal ? (
+                        /* Aluguel ainda não lançado: prévia com valor + vencimento do contrato */
+                        <>
+                          <td className="text-center px-2 py-2.5">
+                            <span className="text-amber-500" title="Vencimento do contrato">{fmtDate(aluguelVencDefault(modalCompetencia, imovel.dia_vencimento))}</span>
+                          </td>
+                          <td className="text-right px-2 py-2.5">
+                            <span className="text-amber-500 font-semibold" title="Valor do contrato">{fmtCurrency(imovel.valor_aluguel_mensal)}</span>
+                          </td>
+                          <td className="text-right px-4 py-2.5">
+                            <button
+                              onClick={() => setEditingRow(isEditing ? null : { tipo, fatura: null })}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                                isDark ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20' : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
+                              }`}
+                              title="Lançar o aluguel (valor e vencimento já vêm do contrato)"
+                            >
+                              <Plus size={10} /> Lancar
+                            </button>
+                          </td>
+                        </>
                       ) : (
                         <>
                           <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
@@ -368,11 +791,14 @@ function ImovelFaturasModal({
                       <InlineEditForm
                         tipo={tipo}
                         fatura={fat}
-                        imovelId={imovel.id}
+                        imovel={imovel}
                         competencia={modalCompetencia}
                         isDark={isDark}
                         onClose={closeEditing}
                       />
+                    )}
+                    {tipo === 'aluguel' && fat && showDescAluguel && (
+                      <DescontosAluguel fatura={fat} isDark={isDark} />
                     )}
                   </tbody>
                 )
@@ -384,6 +810,30 @@ function ImovelFaturasModal({
           <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${cardBg}`}>
             <span className={`text-xs font-bold uppercase tracking-wider ${txtMuted}`}>Total</span>
             <span className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtCurrency(totalMes)}</span>
+          </div>
+
+          {/* Vencimento em lote (validação/faturamento) */}
+          <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 ${cardBg}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Vencimento em lote</span>
+            <div className="ml-auto flex items-center gap-2">
+              <input
+                type="date"
+                value={bulkVenc}
+                onChange={e => setBulkVenc(e.target.value)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs outline-none ${
+                  isDark ? 'bg-white/[0.04] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              />
+              <button
+                onClick={aplicarVencLote}
+                disabled={!bulkVenc || aplicandoVenc}
+                title={'Altera o vencimento de todas as faturas "previsto"/"lançado" deste mês'}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {aplicandoVenc ? <Loader2 size={11} className="animate-spin" /> : <Pencil size={11} />}
+                Aplicar ao mês
+              </button>
+            </div>
           </div>
 
           {/* Historico */}
@@ -414,10 +864,10 @@ function ImovelFaturasModal({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
             <button
               onClick={() => alert('Exportar PDF — em breve!')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
                 isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
@@ -449,7 +899,7 @@ function ImovelFaturasModal({
                 }
               }}
               disabled={enviarFinanceiro.isPending}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send size={13} /> {enviarFinanceiro.isPending ? 'Enviando...' : 'Enviar p/ Financeiro'}
             </button>

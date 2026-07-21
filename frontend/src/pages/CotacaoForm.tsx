@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
-  ScrollText, Undo2, Printer,
+  ScrollText, Undo2, Printer, RotateCcw,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao, useDevolverRequisicaoCotacao } from '../hooks/useCotacoes'
 import { condicaoPagamentoInterpretavel } from '../utils/pagamentos'
@@ -34,6 +35,7 @@ const FILE_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
 const FILE_MAX_SIZE = 50 * 1024 * 1024
 
 interface FornecedorForm {
+  id?:                string   // presente quando já existe em cmp_cotacao_fornecedores (cotação reaberta)
   fornecedor_nome:    string
   fornecedor_contato: string
   fornecedor_telefone: string
@@ -44,14 +46,14 @@ interface FornecedorForm {
   prazo_entrega_dias: number
   condicao_pagamento: string
   observacao:         string
-  arquivo_url:        string
+  arquivo_urls:       string[]
   itens_precos:       ItemPreco[]
 }
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_telefone: '', fornecedor_email: '', fornecedor_cnpj: '',
   valor_total: 0, valor_frete: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
-  arquivo_url: '', itens_precos: [],
+  arquivo_urls: [], itens_precos: [],
 })
 
 const calcTotalItems = (itens: ItemPreco[]) =>
@@ -73,16 +75,65 @@ function ItemPricingTable({
   onChange: (items: ItemPreco[]) => void
   reqItens?: ReqItem[]
 }) {
+  // Itens trancados ao escopo da RC por padrao (alterar exige devolver ao
+  // solicitante). Excecao temporaria (1a fase): comprador (flag
+  // sys_perfis.comprador) ou admin podem inserir itens novos e editar a
+  // descricao/quantidade direto na cotacao, ate organizarmos o fluxo formal.
+  const { isAdmin, perfil } = useAuth()
+  const podeEditarItens = isAdmin || !!perfil?.comprador
+  const podeEditarQtd = podeEditarItens
   const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
   const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
   const [itemQuery, setItemQuery] = useState<Record<number, string>>({})
   const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+  // Dropdown de sugestao renderizado via portal (position:fixed) pra fugir do
+  // overflow-hidden da tabela — senao fica cortado atras do banner de total.
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const [ddPos, setDdPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const openIdx = useMemo(() => {
+    const k = Object.keys(itemOpen).find(key => itemOpen[Number(key)])
+    return k !== undefined ? Number(k) : null
+  }, [itemOpen])
+  useLayoutEffect(() => {
+    if (openIdx === null) { setDdPos(null); return }
+    const el = inputRefs.current[openIdx]
+    if (!el) { setDdPos(null); return }
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      setDdPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 288) })
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [openIdx])
+
+  // Itens que vieram do parse de PDF sem bater automaticamente com a RC (descricao
+  // vazia + sugestao com o texto original) chegam aqui pra o comprador escolher o
+  // item certo — pre-preenche a busca com a sugestao pra já mostrar candidatos.
+  useEffect(() => {
+    setItemQuery(prev => {
+      let changed = false
+      const next = { ...prev }
+      items.forEach((it, idx) => {
+        if (!it.descricao && it.sugestao && next[idx] === undefined) {
+          next[idx] = toUpperNorm(it.sugestao)
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [items])
 
   // Itens da requisição que ainda não foram adicionados
   const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()).filter(Boolean))
   const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
 
-  const canAddItem = availableReqItens.length > 0
+  // Comprador/admin pode adicionar item mesmo sem sobra da RC (item novo, fora do escopo).
+  const canAddItem = availableReqItens.length > 0 || podeEditarItens
 
   const addItem = () => {
     if (!canAddItem) return
@@ -126,8 +177,45 @@ function ItemPricingTable({
 
     const reqMatches = filterReqItens(normalizedQuery)
     setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
+    // Um dropdown aberto por vez: abrir substitui o mapa (fecha os demais).
+    setItemOpen(prev => reqMatches.length > 0 ? { [i]: true } : { ...prev, [i]: false })
   }, [availableReqItens])
+
+  // Descrição livre (comprador/admin): escreve direto no item e sugere itens da
+  // RC (sincrono) + do catálogo est_itens (async, debounced) pra facilitar o
+  // pareamento e evitar recadastro. Pegar do catálogo preenche unidade/valor médio.
+  const handleDescChange = (i: number, text: string) => {
+    if (!podeEditarItens) { searchItem(i, text); return }
+    const normalized = toUpperNorm(text)
+    onChange(items.map((item, idx) => idx === i ? { ...item, descricao: normalized } : item))
+    setItemQuery(prev => ({ ...prev, [i]: normalized }))
+
+    const rcMatches = filterReqItens(normalized).map(ri => ({ ...ri, _fromReq: true }))
+    setItemResults(prev => ({ ...prev, [i]: rcMatches }))
+    // Abre o dropdown se ha sugestao OU se ja da pra oferecer "Cadastrar" (>=2 chars),
+    // senao o rodape de cadastro nunca aparece quando o item nao existe.
+    // Substitui o mapa (um aberto por vez).
+    setItemOpen((rcMatches.length > 0 || normalized.trim().length >= 2) ? { [i]: true } : {})
+
+    if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
+    if (normalized.trim().length < 2) return
+    itemTimerRef.current[i] = setTimeout(async () => {
+      const term = `%${normalized.trim()}%`
+      const { data } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, valor_medio')
+        .eq('ativo', true)
+        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
+        .order('descricao')
+        .limit(20)
+      const rcDescs = new Set(rcMatches.map(r => r.descricao.toLowerCase().trim()))
+      const catalogo = (data ?? [])
+        .filter((c: any) => !rcDescs.has(String(c.descricao ?? '').toLowerCase().trim()))
+        .map((c: any) => ({ ...c, _fromReq: false }))
+      setItemResults(prev => ({ ...prev, [i]: [...rcMatches, ...catalogo] }))
+      setItemOpen({ [i]: true })
+    }, 300)
+  }
 
   const clearItemDescricao = (i: number) => {
     onChange(items.map((item, idx) => idx === i ? { ...item, descricao: '' } : item))
@@ -199,23 +287,27 @@ function ItemPricingTable({
             >
               <div className="relative flex items-center gap-1">
                 <input
+                  ref={el => { inputRefs.current[i] = el }}
                   className={`text-[11px] border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full ${
-                    item.descricao ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default' : 'bg-white border-slate-200'
+                    item.descricao && !podeEditarItens
+                      ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default'
+                      : item.sugestao && !item.descricao
+                        ? 'bg-amber-50 border-amber-300'
+                        : 'bg-white border-slate-200'
                   }`}
-                  placeholder="Selecione um item da RC..."
+                  placeholder={podeEditarItens ? 'Descreva o item ou escolha da RC...' : 'Selecione um item da RC...'}
+                  title={!item.descricao && item.sugestao ? `Não bateu automaticamente com a RC — texto original: "${item.sugestao}". Escolha o item correto abaixo.` : undefined}
                   autoComplete="off"
-                  readOnly={!!item.descricao}
+                  readOnly={!!item.descricao && !podeEditarItens}
                   value={item.descricao || (itemQuery[i] ?? '')}
-                  onChange={e => searchItem(i, e.target.value)}
+                  onChange={e => handleDescChange(i, e.target.value)}
                   onFocus={() => {
-                    if (item.descricao) return
-                    const reqMatches = filterReqItens(itemQuery[i] ?? '')
-                    setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-                    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
+                    if (item.descricao && !podeEditarItens) return
+                    handleDescChange(i, item.descricao || (itemQuery[i] ?? ''))
                   }}
                   onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
                 />
-                {item.descricao && (
+                {item.descricao && !podeEditarItens && (
                   <button
                     type="button"
                     onClick={() => clearItemDescricao(i)}
@@ -225,9 +317,17 @@ function ItemPricingTable({
                     <X size={11} />
                   </button>
                 )}
-                {itemOpen[i] && !item.descricao && (itemResults[i]?.length ?? 0) > 0 && (
-                  <div className="absolute z-50 left-0 w-72 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-                    {itemResults[i].map((est: any, ri: number) => (
+                {itemOpen[i] && ddPos && (!item.descricao || podeEditarItens) && (() => {
+                  const text = (item.descricao || itemQuery[i] || '').trim()
+                  const results = itemResults[i] ?? []
+                  const showCadastrar = podeEditarItens && text.length >= 2
+                  if (results.length === 0 && !showCadastrar) return null
+                  return createPortal(
+                  <div
+                    className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto"
+                    style={{ top: ddPos.top, left: ddPos.left, width: ddPos.width }}
+                  >
+                    {results.map((est: any, ri: number) => (
                       <button
                         key={est.id || `req-${ri}`}
                         type="button"
@@ -237,7 +337,9 @@ function ItemPricingTable({
                         onMouseDown={() => selectItem(i, est)}
                       >
                         <p className="text-[11px] font-semibold text-slate-800 truncate">
-                          {est._fromReq && <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>}
+                          {est._fromReq
+                            ? <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>
+                            : <span className="text-[9px] font-bold text-teal-600 mr-1">CATÁLOGO</span>}
                           {est.descricao}
                         </p>
                         <p className="text-[10px] text-slate-400">
@@ -248,15 +350,32 @@ function ItemPricingTable({
                         </p>
                       </button>
                     ))}
-                  </div>
-                )}
+                    {showCadastrar && (
+                      <button
+                        type="button"
+                        onMouseDown={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(text)}`, '_blank')}
+                        className="w-full text-left px-2.5 py-2 hover:bg-violet-50 border-t border-slate-100 flex items-center gap-1.5 text-violet-600"
+                      >
+                        <PlusCircle size={12} className="shrink-0" />
+                        <span className="text-[11px] font-semibold truncate">Cadastrar “{text}” no catálogo</span>
+                      </button>
+                    )}
+                  </div>,
+                  document.body
+                  )
+                })()}
               </div>
               <input
-                type="number"
-                readOnly
-                className="text-[11px] bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center outline-none text-slate-600 cursor-not-allowed w-full"
+                type="number" min="0" step="0.01"
+                readOnly={!podeEditarQtd}
+                className={`text-[11px] rounded px-1 py-1 text-center outline-none w-full ${
+                  podeEditarQtd
+                    ? 'bg-white border border-slate-200 focus:ring-1 focus:ring-teal-300'
+                    : 'bg-slate-50 border border-slate-200 text-slate-600 cursor-not-allowed'
+                }`}
                 value={item.qtd || ''}
-                title="Quantidade definida pela RC. Para alterar, devolva a requisição ao solicitante."
+                onChange={podeEditarQtd ? e => updateItem(i, 'qtd', e.target.value) : undefined}
+                title={podeEditarQtd ? 'Quantidade da cotação (comprador pode ajustar)' : 'Quantidade definida pela RC. Para alterar, devolva a requisição ao solicitante.'}
               />
               <input
                 type="number" min="0" step="0.01"
@@ -309,7 +428,9 @@ function ItemPricingTable({
       )}
       {items.some(it => !it.descricao.trim()) && (
         <p className="text-[10px] text-rose-500 text-center mt-1 font-semibold">
-          Existe item sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha.
+          {podeEditarItens
+            ? 'Existe item sem descrição. Preencha a descrição ou remova a linha.'
+            : 'Existe item sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha.'}
         </p>
       )}
     </div>
@@ -854,7 +975,7 @@ export default function CotacaoForm() {
   // Modal devolver ao solicitante
   const [showDevolverModal, setShowDevolverModal] = useState(false)
   const [motivoDevolucao, setMotivoDevolucao] = useState('')
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: cotacao?.requisicao_id ?? id,
     enabled: Boolean(cotacao?.requisicao_id ?? id),
@@ -863,6 +984,98 @@ export default function CotacaoForm() {
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(),
   ])
+  // IDs de fornecedores já salvos (cmp_cotacao_fornecedores) removidos da tela nesta
+  // sessão — precisam ser deletados no banco no submit, senão ficam órfãos.
+  const [fornecedoresRemovidosIds, setFornecedoresRemovidosIds] = useState<string[]>([])
+  const removeFornecedor = useCallback((idx: number) => {
+    setFornecedores(prev => {
+      const alvo = prev[idx]
+      if (alvo?.id) setFornecedoresRemovidosIds(ids => [...ids, alvo.id as string])
+      return prev.filter((_, i) => i !== idx)
+    })
+  }, [])
+  // Itens da RC ainda pendentes (não atendidos por pedido anterior), prontos pra
+  // virar linhas de um card de fornecedor — qtd da RC, preço zerado. Usado sempre
+  // que um card "em branco" é criado (1º acesso, Adicionar Fornecedor, Recomeçar),
+  // pra o comprador só descer preenchendo preço em vez de buscar item por item.
+  const itensPendentesDaRC = useCallback((): ItemPreco[] => {
+    const rcItens = (cotacao?.requisicao?.itens ?? []) as any[]
+    return rcItens
+      .filter(item => !item.atendido_em_pedido_id)
+      .map(item => ({
+        descricao: toUpperNorm(item.descricao),
+        qtd: item.quantidade,
+        valor_unitario: 0,
+        valor_total: 0,
+      }))
+  }, [cotacao?.requisicao])
+  // REGRA: todo fornecedor sempre exibe a lista COMPLETA dos itens em escopo da
+  // RC, mesmo que ele cote só uma parte (itens não cotados ficam em branco,
+  // preço 0). Parte da lista completa e sobrepõe os preços/qtd já salvos daquele
+  // fornecedor, casando por descrição normalizada. Usado ao reabrir uma cotação
+  // salva — sem isso, cada fornecedor voltaria só com o subconjunto que foi salvo
+  // e a lista divergiria entre fornecedores.
+  const comEscopoCompletoDaRC = useCallback((salvos: ItemPreco[] = []): ItemPreco[] => {
+    const base = itensPendentesDaRC()
+    if (base.length === 0) return salvos ?? []
+    const porDescricao = new Map(
+      (salvos ?? [])
+        .filter(it => it.descricao?.trim())
+        .map(it => [toUpperNorm(it.descricao).trim(), it]),
+    )
+    return base.map(item => {
+      const salvo = porDescricao.get(toUpperNorm(item.descricao).trim())
+      return salvo
+        ? {
+            descricao: item.descricao,
+            qtd: salvo.qtd ?? item.qtd,
+            valor_unitario: salvo.valor_unitario ?? 0,
+            valor_total: salvo.valor_total ?? 0,
+          }
+        : item
+    })
+  }, [itensPendentesDaRC])
+  // Recomeça a cotação do zero: remove TODOS os fornecedores já salvos (marcados
+  // pra deletar no submit) e volta pra 1 card em branco com os itens da RC
+  // pré-listados. Só o que já foi digitado/lido de cotação anterior some.
+  const resetFornecedores = useCallback(() => {
+    setFornecedores(prev => {
+      const idsExistentes = prev.filter(f => f.id).map(f => f.id as string)
+      if (idsExistentes.length > 0) setFornecedoresRemovidosIds(ids => [...ids, ...idsExistentes])
+      return [{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }]
+    })
+    setSelecaoPorItem(new Map())
+    setSelecaoTocada(false)
+  }, [itensPendentesDaRC])
+  // Hidrata o formulário quando a cotação carrega: reaproveita fornecedores já
+  // salvos (cotação em andamento reaberta) ou, se ainda não há nenhum, pré-lista
+  // os itens da RC no card 1 — em vez de começar totalmente em branco. Só roda 1x
+  // — não pode sobrescrever edições em curso em refetches seguintes.
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (hydratedRef.current) return
+    if (!cotacao) return
+    hydratedRef.current = true
+    if (cotacao.fornecedores && cotacao.fornecedores.length > 0) {
+      setFornecedores(cotacao.fornecedores.map(f => ({
+        id:                 f.id,
+        fornecedor_nome:    f.fornecedor_nome ?? '',
+        fornecedor_contato: f.fornecedor_contato ?? '',
+        fornecedor_telefone: f.fornecedor_telefone ?? '',
+        fornecedor_email:   f.fornecedor_email ?? '',
+        fornecedor_cnpj:    f.fornecedor_cnpj ?? '',
+        valor_total:        f.valor_total ?? 0,
+        valor_frete:        (f as any).valor_frete ?? 0,
+        prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
+        condicao_pagamento: f.condicao_pagamento ?? '',
+        observacao:         f.observacao ?? '',
+        arquivo_urls:       f.arquivo_urls ?? [],
+        itens_precos:       comEscopoCompletoDaRC(f.itens_precos),
+      })))
+    } else {
+      setFornecedores([{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])
+    }
+  }, [cotacao, itensPendentesDaRC, comEscopoCompletoDaRC])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -945,7 +1158,7 @@ export default function CotacaoForm() {
     }
   }, [handleCnpjLookup])
 
-  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) => {
+  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number | string[]) => {
     const normalized = typeof value === 'string'
       && field !== 'fornecedor_cnpj'
       && field !== 'fornecedor_contato'
@@ -1120,32 +1333,38 @@ export default function CotacaoForm() {
 
     let itensForaEscopo = 0
     let fornecedoresDescartados = 0
+    let rcNaoCotados: string[] = []
 
     setFornecedores(prev => {
       const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
       const novos: FornecedorForm[] = parsed.map(p => {
-        // Só inclui itens que têm preço E batem com algum item da RC.
-        // Itens fora do escopo são descartados (contagem vai para toast de aviso).
+        // rcUsed evita que UM fornecedor mapeie o mesmo item da RC 2x. O escopo é
+        // por fornecedor: quando o documento traz vários fornecedores cotando os
+        // MESMOS itens, cada um precisa poder mapear a RC do zero. Sem este reset,
+        // o 1º fornecedor "consome" todos os itens e os demais ficam sem match →
+        // descartados (apareciam zerados, sem nem carregar nome/CNPJ).
+        rcUsed.clear()
+        // Inclui todo item com preço. Quando não bate com nenhum item da RC
+        // (sigla/tamanho abreviado, marca no meio da descrição, etc.), mantém a
+        // linha com descrição vazia + sugestão do texto original — o comprador
+        // resolve na hora escolhendo o item certo no dropdown (mesma UI de
+        // "Adicionar item"), sem precisar devolver a requisição ao solicitante.
         const itensComValor: ItemPreco[] = (p.itens ?? [])
           .filter(it => it.valor_unitario > 0)
           .map(it => {
             const rcMatch = matchesRcItem(it.descricao)
-            if (!rcMatch) {
-              itensForaEscopo++
-              return null
-            }
+            if (!rcMatch) itensForaEscopo++
             return {
-              descricao:      rcMatch, // usa a descrição canônica da RC
+              descricao:      rcMatch ?? '', // vazio = comprador escolhe manualmente
               qtd:            it.qtd,
               valor_unitario: it.valor_unitario,
               valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+              sugestao:       rcMatch ? undefined : (it.descricao || undefined),
             }
           })
-          .filter((x): x is ItemPreco => x !== null)
-        // Se nenhum item bateu com a RC, descarta o fornecedor inteiro
-        // (não preenche nome, CNPJ, contato nem valor do documento).
+        // Fornecedor sem nenhum item com preço (documento vazio/ilegível) é descartado.
         if (itensComValor.length === 0) {
           fornecedoresDescartados++
           return null
@@ -1165,7 +1384,7 @@ export default function CotacaoForm() {
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
           observacao:         toUpperNorm(p.observacao || ''),
-          arquivo_url:        uploadedPath,
+          arquivo_urls:       uploadedPath ? [uploadedPath] : [],
           itens_precos:       itensComValor,
         }
       }).filter((f): f is FornecedorForm => f !== null)
@@ -1183,6 +1402,17 @@ export default function CotacaoForm() {
         result.push(novo)
       }
       result.push(...restantes)
+
+      // Itens da RC que nenhum fornecedor (incluindo os já cadastrados antes
+      // deste upload) cotou ainda — fica visível pro comprador decidir, em vez
+      // de sumir silenciosamente da tela (ex.: kit lido como itens avulsos).
+      const descricoesCotadas = new Set(
+        result.flatMap(f => f.itens_precos.map(it => toUpperNorm(it.descricao).trim()).filter(Boolean))
+      )
+      rcNaoCotados = rcTokensList
+        .map(rc => rc.descricao)
+        .filter(desc => !descricoesCotadas.has(desc))
+
       return result
     })
 
@@ -1210,18 +1440,120 @@ export default function CotacaoForm() {
       } catch { /* silencioso: chip deixa de aparecer, mas o form segue */ }
     }
 
+    const msgs: string[] = []
     if (fornecedoresDescartados > 0) {
-      setToast({
-        type: 'error',
-        msg: `${fornecedoresDescartados} fornecedor(es) do PDF foram ignorados porque nenhum item bateu com a RC. Para incluí-los, devolva a requisição ao solicitante.`,
-      })
-    } else if (itensForaEscopo > 0) {
-      setToast({
-        type: 'error',
-        msg: `${itensForaEscopo} item(ns) do PDF foram ignorados por não pertencerem à RC. Para incluí-los, devolva a requisição ao solicitante.`,
-      })
+      msgs.push(`${fornecedoresDescartados} fornecedor(es) do PDF ficaram sem nenhum item com preço legível.`)
+    }
+    if (itensForaEscopo > 0) {
+      msgs.push(`${itensForaEscopo} item(ns) do PDF não bateram automaticamente com a RC — ficaram na lista sem descrição. Escolha o item correto no dropdown de cada linha (não precisa devolver ao solicitante).`)
+    }
+    if (rcNaoCotados.length > 0) {
+      msgs.push(`${rcNaoCotados.length} item(ns) da RC ainda sem cotação de nenhum fornecedor: ${rcNaoCotados.join(', ')}.`)
+    }
+    if (msgs.length > 0) {
+      setToast({ type: 'error', msg: msgs.join(' ') })
     }
   }, [id, cotacao?.requisicao])
+
+  // Leitura de IA escopada a UM card de fornecedor já existente (em vez de criar
+  // fornecedor novo, como o upload global no topo faz). Usa só o 1º fornecedor
+  // detectado no documento. Preenche campo em branco; nunca sobrescreve o que o
+  // comprador já digitou manualmente — nem nome/CNPJ/condição, nem preço de item.
+  const handleFornecedorParsed = useCallback(async (idx: number, parsed: {
+    fornecedor_nome: string
+    fornecedor_cnpj?: string
+    fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
+    prazo_entrega_dias?: number
+    condicao_pagamento?: string
+    observacao?: string
+    itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+  }[], file: File) => {
+    const p = parsed[0]
+    if (!p) return
+
+    let uploadedPath = ''
+    if (id && file) {
+      try {
+        const safeName = 'cotacao_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${id}/${Date.now()}_${safeName}`
+        const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
+        if (!error) uploadedPath = path
+      } catch { /* upload falhou, segue sem anexo */ }
+    }
+
+    const tokenize = (s: string) =>
+      toUpperNorm(String(s ?? ''))
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length >= 3)
+
+    setFornecedores(prev => prev.map((f, i) => {
+      if (i !== idx) return f
+
+      // Fuzzy match (mesma regra do upload global) contra as linhas JÁ LISTADAS
+      // neste card — pré-carregadas com os itens da RC.
+      const rowTokens = f.itens_precos.map(row => ({
+        descricao: toUpperNorm(row.descricao).trim(),
+        tokens: new Set(tokenize(row.descricao)),
+      }))
+      const rowUsed = new Set<string>()
+      const matchRow = (desc: string): string | null => {
+        const norm = toUpperNorm(desc).trim()
+        if (!norm) return null
+        for (const r of rowTokens) {
+          if (!rowUsed.has(r.descricao) && r.descricao === norm) { rowUsed.add(r.descricao); return r.descricao }
+        }
+        const pdfTokens = new Set(tokenize(norm))
+        if (pdfTokens.size === 0) return null
+        let best: { desc: string; score: number } | null = null
+        for (const r of rowTokens) {
+          if (rowUsed.has(r.descricao) || r.tokens.size === 0) continue
+          let overlap = 0
+          for (const t of pdfTokens) if (r.tokens.has(t)) overlap++
+          const score = overlap / Math.min(pdfTokens.size, r.tokens.size)
+          if (overlap >= 2 && score >= 0.4 && (!best || score > best.score)) best = { desc: r.descricao, score }
+        }
+        if (best) { rowUsed.add(best.desc); return best.desc }
+        return null
+      }
+
+      const itensAtualizados = f.itens_precos.map(item => ({ ...item }))
+      for (const it of (p.itens ?? [])) {
+        if (!(it.valor_unitario > 0)) continue
+        const matched = matchRow(it.descricao)
+        if (!matched) continue
+        const rowIdx = itensAtualizados.findIndex(row => toUpperNorm(row.descricao).trim() === matched)
+        if (rowIdx === -1 || itensAtualizados[rowIdx].valor_unitario > 0) continue // preço já preenchido — preserva
+        const qtd = itensAtualizados[rowIdx].qtd || it.qtd
+        itensAtualizados[rowIdx] = {
+          ...itensAtualizados[rowIdx],
+          valor_unitario: it.valor_unitario,
+          valor_total: Math.round(qtd * it.valor_unitario * 100) / 100,
+        }
+      }
+
+      const contatoSeparado = splitFornecedorContato(p.fornecedor_contato)
+      const telefone = p.fornecedor_telefone || contatoSeparado.telefone
+      const email = p.fornecedor_email || contatoSeparado.email
+
+      return {
+        ...f,
+        fornecedor_nome:     f.fornecedor_nome.trim() || toUpperNorm(p.fornecedor_nome || ''),
+        fornecedor_cnpj:     f.fornecedor_cnpj.trim() || (p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : ''),
+        fornecedor_telefone: f.fornecedor_telefone.trim() || telefone,
+        fornecedor_email:    f.fornecedor_email.trim() || email,
+        fornecedor_contato:  f.fornecedor_contato.trim() || joinFornecedorContato(telefone, email, p.fornecedor_contato),
+        prazo_entrega_dias:  f.prazo_entrega_dias || (p.prazo_entrega_dias || 0),
+        condicao_pagamento:  f.condicao_pagamento.trim() || toUpperNorm(p.condicao_pagamento || ''),
+        observacao:          f.observacao.trim() || toUpperNorm(p.observacao || ''),
+        arquivo_urls:        f.arquivo_urls.length > 0 ? f.arquivo_urls : (uploadedPath ? [uploadedPath] : []),
+        itens_precos:        itensAtualizados,
+        valor_total:         calcTotalItems(itensAtualizados),
+      }
+    }))
+  }, [id])
 
   // ── Upload de arquivo por fornecedor ──────────────────────────────────────
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
@@ -1247,20 +1579,20 @@ export default function CotacaoForm() {
       const path = `${id}/${Date.now()}_${safeName}`
       const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
       if (error) throw error
-      updateFornecedor(idx, 'arquivo_url', path)
+      updateFornecedor(idx, 'arquivo_urls', [...(fornecedores[idx]?.arquivo_urls ?? []), path])
     } catch (err) {
       setUploadError(prev => ({ ...prev, [idx]: err instanceof Error ? err.message : 'Erro no upload' }))
     } finally {
       setUploading(prev => ({ ...prev, [idx]: false }))
     }
-  }, [id, updateFornecedor])
+  }, [id, fornecedores, updateFornecedor])
 
-  const removeFile = useCallback(async (idx: number) => {
-    const path = fornecedores[idx]?.arquivo_url
+  const removeFile = useCallback(async (idx: number, fileIdx: number) => {
+    const path = fornecedores[idx]?.arquivo_urls?.[fileIdx]
     if (path) {
       await supabase.storage.from('cotacoes-docs').remove([path]).catch(() => {})
     }
-    updateFornecedor(idx, 'arquivo_url', '')
+    updateFornecedor(idx, 'arquivo_urls', (fornecedores[idx]?.arquivo_urls ?? []).filter((_, i) => i !== fileIdx))
   }, [fornecedores, updateFornecedor])
 
   const viewFile = useCallback(async (path: string) => {
@@ -1296,6 +1628,14 @@ export default function CotacaoForm() {
   const itensEscolhidos = Array.from(itensParaEscolher).filter(k => selecaoPorItem.has(k)).length
   const itensPendentes = itensParaEscolher.size - itensEscolhidos
   const precisaEscolherFornecedores = validos.length >= 2 && itensParaEscolher.size > 0 && itensPendentes > 0
+
+  // Itens da RC (ainda não atendidos por um pedido anterior) que nenhum fornecedor
+  // válido cotou — aviso não bloqueante: o comprador pode enviar assim mesmo, mas
+  // fica ciente de que vai precisar reabrir cotação pra esses itens depois.
+  const rcItensNaoCotados = (((cotacao?.requisicao as any)?.itens ?? []) as any[])
+    .filter(it => !it.atendido_em_pedido_id)
+    .map(it => String(it.descricao ?? '').trim())
+    .filter(desc => desc && !itensParaEscolher.has(desc.toLowerCase()))
 
   const fornecedoresComCondicaoInvalida = validos
     .map((f, i) => ({ idx: i + 1, nome: f.fornecedor_nome, cond: f.condicao_pagamento }))
@@ -1386,13 +1726,15 @@ export default function CotacaoForm() {
             const fornIdxOriginal = selecaoPorItem.get(key)
             const fornIdxEmValidos = fornIdxOriginal !== undefined ? validosIdxMap.get(fornIdxOriginal) : undefined
             const selecionado = fornIdxEmValidos === validosIdx
+            const { sugestao: _sugestao, ...itemSemSugestao } = item
             return {
-              ...item,
+              ...itemSemSugestao,
               descricao: toUpperNorm(item.descricao),
               selecionado,
             }
           })
           return {
+            id:                 f.id,
             fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
             fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
             fornecedor_telefone: f.fornecedor_telefone || undefined,
@@ -1403,12 +1745,13 @@ export default function CotacaoForm() {
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
             observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
-            arquivo_url:        f.arquivo_url || undefined,
+            arquivo_urls:       f.arquivo_urls,
             itens_precos:       itensComSelecao.length > 0 ? itensComSelecao : undefined,
           }
         }),
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
+        fornecedores_removidos_ids: fornecedoresRemovidosIds,
       })
       setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
       setTimeout(() => nav('/cotacoes'), 800)
@@ -1447,6 +1790,14 @@ export default function CotacaoForm() {
             <p className="text-xs text-amber-600 mt-1">
               Esta cotação está bloqueada temporariamente para evitar conflito de alterações.
             </p>
+            {canOverride && (
+              <button
+                type="button"
+                onClick={assumeControl}
+                className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                Assumir edição (Admin)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1457,16 +1808,32 @@ export default function CotacaoForm() {
           </button>
           <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
         </div>
-        {cotacao && (
-          <button
-            type="button"
-            onClick={() => gerarSolicitacaoCotacao(cotacao)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
-          >
-            <Printer size={13} />
-            Solicitar Cotação
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {fornecedores.some(f => f.id) && (
+            <button
+              type="button"
+              title="Remove os fornecedores já salvos nesta cotação e volta pra 1 card em branco. Os itens da RC continuam disponíveis normalmente."
+              onClick={() => {
+                if (!confirm('Recomeçar a cotação? Os fornecedores já salvos nesta cotação serão removidos ao enviar. Os itens da RC continuam disponíveis pra escolher de novo.')) return
+                resetFornecedores()
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors"
+            >
+              <RotateCcw size={13} />
+              Recomeçar
+            </button>
+          )}
+          {cotacao && (
+            <button
+              type="button"
+              onClick={() => gerarSolicitacaoCotacao(cotacao)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
+            >
+              <Printer size={13} />
+              Solicitar Cotação
+            </button>
+          )}
+        </div>
       </div>
 
       <fieldset disabled={isLocked} className={isLocked ? 'space-y-4 opacity-60' : 'space-y-4'}>
@@ -1511,13 +1878,16 @@ export default function CotacaoForm() {
         </div>
       )}
 
-      {/* Upload inteligente com IA */}
+      {/* Upload inteligente com IA — OCULTADO 2026-07-03: gerava muita divergência
+          na cotação (IA lê PDF/imagem e preenche preços errados). Reativar: trocar false por true. */}
+      {false && (
       <UploadCotacao
         onParsed={handleAiParsed}
         disabled={cotacao?.status === 'concluida' || isLocked}
         cotacaoId={id}
         requisicaoId={cotacao?.requisicao_id}
       />
+      )}
 
       {/* Progresso de fornecedores */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
@@ -1557,7 +1927,7 @@ export default function CotacaoForm() {
               )}
             </div>
             {fornecedores.length > 1 && (
-              <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}
+              <button type="button" onClick={() => removeFornecedor(idx)}
                 className="p-1 rounded-lg hover:bg-red-50 transition">
                 <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
               </button>
@@ -1624,6 +1994,18 @@ export default function CotacaoForm() {
               )}
             </div>
 
+            {/* Atalho: cadastrar fornecedor que não está na base (fluxo manual).
+                Abre o mesmo modal pré-preenchido com o que já foi digitado. */}
+            {!precisaCadastrar && (
+              <button
+                type="button"
+                onClick={() => setCadastroModalIdx(idx)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition"
+              >
+                <PlusCircle size={12} /> Não encontrou? Cadastrar novo fornecedor
+              </button>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="relative">
                 <input
@@ -1664,6 +2046,20 @@ export default function CotacaoForm() {
                 onChange={e => updateFornecedor(idx, 'fornecedor_email', e.target.value)}
               />
             </div>
+
+            {/* ── Leitura de IA escopada a este fornecedor ──────────────────────
+                Preenche só o que estiver em branco (nome/CNPJ/condição) e o preço
+                dos itens ainda zerados — não mexe no que já foi digitado à mão.
+                OCULTADO 2026-07-03: mesma decisão do upload global (muita divergência).
+                Reativar: trocar false por true. */}
+            {false && (
+            <UploadCotacao
+              onParsed={(parsed, file) => handleFornecedorParsed(idx, parsed, file)}
+              disabled={cotacao?.status === 'concluida' || isLocked}
+              cotacaoId={id}
+              requisicaoId={cotacao?.requisicao_id}
+            />
+            )}
 
             {/* ── Itens e Preços ─────────────────────────────────────────────── */}
             <ItemPricingTable
@@ -1762,60 +2158,63 @@ export default function CotacaoForm() {
               </div>
             </div>
 
-            {/* ── Anexo da Cotação ─────────────────────────────────────────── */}
-            <div className="pt-1">
+            {/* ── Anexos da Cotação ────────────────────────────────────────── */}
+            <div className="pt-1 space-y-1.5">
               <input
                 ref={el => { fileInputRefs.current[idx] = el }}
                 type="file"
                 accept={FILE_ACCEPTED.join(',')}
+                multiple
                 className="hidden"
                 onChange={e => {
-                  const file = e.target.files?.[0]
-                  if (file) handleFileUpload(idx, file)
+                  const files = Array.from(e.target.files ?? [])
+                  files.forEach(file => handleFileUpload(idx, file))
                   if (fileInputRefs.current[idx]) fileInputRefs.current[idx]!.value = ''
                 }}
               />
 
-              {forn.arquivo_url ? (
+              {forn.arquivo_urls.map((url, fileIdx) => (
                 /* Arquivo anexado */
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                <div key={url} className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                   <FileText size={16} className="text-emerald-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-emerald-700 truncate">
                       Cotação anexada
                     </p>
                     <p className="text-[10px] text-emerald-500 truncate">
-                      {forn.arquivo_url.split('/').pop()?.replace(/^\d+_/, '') ?? 'arquivo'}
+                      {url.split('/').pop()?.replace(/^\d+_/, '') ?? 'arquivo'}
                     </p>
                   </div>
-                  <button type="button" onClick={() => viewFile(forn.arquivo_url)}
+                  <button type="button" onClick={() => viewFile(url)}
                     className="p-1.5 rounded-lg hover:bg-emerald-100 transition" title="Visualizar">
                     <Eye size={14} className="text-emerald-600" />
                   </button>
-                  <button type="button" onClick={() => removeFile(idx)}
+                  <button type="button" onClick={() => removeFile(idx, fileIdx)}
                     className="p-1.5 rounded-lg hover:bg-red-50 transition" title="Remover">
                     <X size={14} className="text-red-400 hover:text-red-600" />
                   </button>
                 </div>
-              ) : uploading[idx] ? (
+              ))}
+
+              {uploading[idx] && (
                 /* Fazendo upload */
                 <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                   <Loader2 size={16} className="text-amber-600 animate-spin flex-shrink-0" />
                   <p className="text-xs font-semibold text-amber-700">Enviando arquivo...</p>
                 </div>
-              ) : (
-                /* Botão de upload */
-                <button
-                  type="button"
-                  onClick={() => fileInputRefs.current[idx]?.click()}
-                  className="w-full flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-3 py-2.5 hover:border-violet-400 hover:bg-violet-50/30 transition-all group"
-                >
-                  <Paperclip size={14} className="text-slate-400 group-hover:text-violet-500 transition" />
-                  <span className="text-xs text-slate-400 group-hover:text-violet-600 font-semibold transition">
-                    Anexar cotação (PDF, foto)
-                  </span>
-                </button>
               )}
+
+              {/* Botão de upload — sempre visível, permite anexar mais de um arquivo */}
+              <button
+                type="button"
+                onClick={() => fileInputRefs.current[idx]?.click()}
+                className="w-full flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-3 py-2.5 hover:border-violet-400 hover:bg-violet-50/30 transition-all group"
+              >
+                <Paperclip size={14} className="text-slate-400 group-hover:text-violet-500 transition" />
+                <span className="text-xs text-slate-400 group-hover:text-violet-600 font-semibold transition">
+                  {forn.arquivo_urls.length > 0 ? 'Anexar mais um arquivo' : 'Anexar cotação (PDF, foto)'}
+                </span>
+              </button>
 
               {uploadError[idx] && (
                 <p className="text-[11px] text-red-500 mt-1 pl-1">{uploadError[idx]}</p>
@@ -1828,18 +2227,7 @@ export default function CotacaoForm() {
       {/* Adicionar fornecedor */}
       <button
         type="button"
-        onClick={() => {
-          const rcItens = cotacao?.requisicao?.itens ?? []
-          // Filtra itens já atendidos por pedido anterior — não devem entrar em nova cotação.
-          const itensPendentes = rcItens.filter((item: any) => !item.atendido_em_pedido_id)
-          const itensPrecos: ItemPreco[] = itensPendentes.map(item => ({
-            descricao: toUpperNorm(item.descricao),
-            qtd: item.quantidade,
-            valor_unitario: 0,
-            valor_total: 0,
-          }))
-          setFornecedores(p => [...p, { ...emptyFornecedor(), itens_precos: itensPrecos }])
-        }}
+        onClick={() => setFornecedores(p => [...p, { ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])}
         className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-teal-600 border-2 border-dashed border-teal-300 rounded-2xl hover:bg-teal-50 transition"
       >
         <PlusCircle size={14} /> Adicionar Fornecedor
@@ -1904,7 +2292,7 @@ export default function CotacaoForm() {
               prazo_entrega_dias: f.prazo_entrega_dias || undefined,
               condicao_pagamento: f.condicao_pagamento || undefined,
               itens_precos: f.itens_precos,
-              arquivo_url: f.arquivo_url || undefined,
+              arquivo_urls: f.arquivo_urls,
               selecionado: calcTotalEntregue(f) === Math.min(...validos.map(x => calcTotalEntregue(x))),
             }))}
             selecaoPorItem={selecaoPorItemParaComparativo}
@@ -1981,6 +2369,16 @@ export default function CotacaoForm() {
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-2 text-sm font-semibold text-rose-700">
           <CheckCircle size={16} className="text-rose-500" />
           Requisição devolvida ao solicitante. As aprovações anteriores foram invalidadas.
+        </div>
+      )}
+
+      {rcItensNaoCotados.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2 text-xs text-amber-700">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span>
+            <strong>{rcItensNaoCotados.length} item{rcItensNaoCotados.length > 1 ? 's' : ''} da RC sem cotação de nenhum fornecedor:</strong>{' '}
+            {rcItensNaoCotados.join(', ')}. Pode enviar assim mesmo — depois será preciso reabrir uma cotação pra esses itens.
+          </span>
         </div>
       )}
 
@@ -2116,12 +2514,12 @@ export default function CotacaoForm() {
         </div>
       )}
 
-      {/* Modal: cadastrar novo fornecedor identificado pelo upload */}
+      {/* Modal: cadastrar novo fornecedor direto da cotação (fluxo manual ou banner) */}
       {cadastroModalIdx !== null && fornecedores[cadastroModalIdx] && (
         <FornecedorCadastroModal
           open
           title="Cadastrar fornecedor"
-          description="Fornecedor identificado no upload ainda não está cadastrado."
+          description="Cadastre o fornecedor para usá-lo nesta cotação e no Financeiro."
           initialData={{
             razao_social: fornecedores[cadastroModalIdx].fornecedor_nome,
             nome_fantasia: fornecedores[cadastroModalIdx].fornecedor_nome,

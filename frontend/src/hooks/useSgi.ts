@@ -10,6 +10,40 @@ const QK = {
   documento:  (id: string)  => ['sgi_documento', id],
 }
 
+// ── Anexo (bucket privado sgi-documentos): guarda o PATH, abre via URL assinada ──
+export async function uploadSgiArquivo(file: File, docId?: string): Promise<{ path: string; nome: string }> {
+  const safe = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${docId ?? 'novo'}/${Date.now()}-${safe}`
+  const { error } = await supabase.storage.from('sgi-documentos').upload(path, file, { upsert: true, contentType: file.type || undefined })
+  if (error) throw error
+  return { path, nome: file.name }
+}
+
+export async function abrirSgiArquivo(pathOrUrl: string, nome?: string | null): Promise<void> {
+  const ehHtml = /\.html?(\?|$)/i.test(nome || pathOrUrl)
+  // Abre a aba já no clique (evita bloqueio de pop-up) e navega depois do assinar/fetch.
+  const win = window.open('about:blank', '_blank')
+  try {
+    // Docs importados guardam URL pública completa; uploads novos guardam o path no bucket privado.
+    let url = pathOrUrl
+    if (!/^https?:\/\//i.test(pathOrUrl)) {
+      const { data, error } = await supabase.storage.from('sgi-documentos').createSignedUrl(pathOrUrl, 3600)
+      if (error) throw error
+      url = data.signedUrl
+    }
+    if (ehHtml) {
+      // Supabase serve HTML como text/plain (anti-XSS); busca e abre como blob text/html pra renderizar.
+      const resp = await fetch(url)
+      url = URL.createObjectURL(new Blob([await resp.text()], { type: 'text/html' }))
+    }
+    if (win) win.location.href = url
+    else window.open(url, '_blank', 'noopener,noreferrer')
+  } catch (e) {
+    win?.close()
+    throw e
+  }
+}
+
 // ── Documentos (Padronização) ─────────────────────────────────────────────────
 export function useDocumentos(filtros?: { status?: StatusDocumento; tipo?: TipoDocumento }) {
   return useQuery({
@@ -29,7 +63,7 @@ export function useCriarDocumento() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: CriarDocumentoPayload) => {
-      const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_documento', { p_tipo: payload.tipo })
+      const { data: codigo } = await supabase.rpc('sgi_proximo_codigo_documento', { p_tipo: payload.tipo, p_setor: payload.area_processo ?? null })
       const { data, error } = await supabase
         .from('sgi_documentos')
         .insert({ ...payload, codigo: codigo ?? null })
@@ -161,6 +195,30 @@ export function useAtualizarAcao() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
   })
 }
+export function useRemoverAcao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('sgi_acoes').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_kpis'] }) },
+  })
+}
+// Adiciona um comentário (append-only) à ação — o dono comenta em Minhas Tarefas.
+export function useComentarAcao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, texto, autorId, autorNome }: { id: string; texto: string; autorId?: string | null; autorNome?: string | null }) => {
+      const { data: atual } = await supabase.from('sgi_acoes').select('comentarios').eq('id', id).single()
+      const lista = Array.isArray((atual as { comentarios?: unknown })?.comentarios) ? (atual as { comentarios: unknown[] }).comentarios : []
+      const novo = { texto: texto.trim(), autor_id: autorId ?? null, autor_nome: autorNome ?? null, data: new Date().toISOString() }
+      const { error } = await supabase.from('sgi_acoes').update({ comentarios: [...lista, novo], updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sgi_acoes'] }); qc.invalidateQueries({ queryKey: ['sgi_obj_contexto'] }) },
+  })
+}
 
 // ── Análise / Identificação de Causa (Ishikawa + 5 Porquês) ───────────────────
 export function useAnaliseCausa(registroId?: string) {
@@ -192,6 +250,48 @@ export function useSalvarAnaliseCausa() {
   })
 }
 
+// ── Verificação de eficácia (ISO 9001 §10.2.1.d) ──────────────────────────────
+export interface SgiVerificacao {
+  id: string
+  registro_id: string
+  eficaz: boolean | null
+  evidencia?: string | null
+  observacao?: string | null
+  verificado_por_id?: string | null
+  criado_por_nome?: string | null
+  created_at: string
+}
+
+export function useVerificacao(registroId?: string) {
+  return useQuery({
+    queryKey: ['sgi_verificacao', registroId],
+    enabled: !!registroId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('sgi_verificacao').select('*').eq('registro_id', registroId!).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return (data ?? null) as SgiVerificacao | null
+    },
+  })
+}
+
+export function useSalvarVerificacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, registro_id, eficaz, evidencia, observacao, criado_por_nome }: Partial<SgiVerificacao> & { registro_id: string }) => {
+      const payload = { eficaz: eficaz ?? null, evidencia: evidencia ?? null, observacao: observacao ?? null, criado_por_nome: criado_por_nome ?? null }
+      if (id) {
+        const { data, error } = await supabase.from('sgi_verificacao').update(payload).eq('id', id).select().single()
+        if (error) throw error
+        return data as SgiVerificacao
+      }
+      const { data, error } = await supabase.from('sgi_verificacao').insert({ registro_id, ...payload }).select().single()
+      if (error) throw error
+      return data as SgiVerificacao
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['sgi_verificacao', v.registro_id] }),
+  })
+}
+
 // ── Objetivos e Metas ─────────────────────────────────────────────────────────
 export function useObjetivos(filtros?: { ano?: number }) {
   return useQuery({
@@ -202,6 +302,33 @@ export function useObjetivos(filtros?: { ano?: number }) {
       const { data, error } = await q
       if (error) throw error
       return (data ?? []) as (SgiObjetivo & { metas: (SgiMeta & { checkins: SgiCheckin[] })[] })[]
+    },
+  })
+}
+// Contexto de um KR (a partir da meta clicada em Minhas Tarefas): objetivo da área +
+// todos os KRs do MESMO período + as ações de cada KR. Usado no modal de tarefa do SGI.
+export function useSgiObjetivoContexto(metaId?: string | null) {
+  return useQuery({
+    queryKey: ['sgi_obj_contexto', metaId],
+    enabled: !!metaId,
+    queryFn: async () => {
+      const { data: foco } = await supabase.from('sgi_metas').select('objetivo_id, trimestre, ano').eq('id', metaId!).maybeSingle()
+      if (!foco) return null
+      const { data: obj } = await supabase.from('sgi_objetivos')
+        .select('*, metas:sgi_metas(*, checkins:sgi_metas_checkin(*))')
+        .eq('id', foco.objetivo_id).maybeSingle()
+      if (!obj) return null
+      const metas = ((obj.metas ?? []) as (SgiMeta & { checkins: SgiCheckin[] })[])
+        .filter(m => m.ano === foco.ano && (foco.trimestre == null || m.trimestre === foco.trimestre))
+        .sort((a, b) => (a.prazo ?? '9999').localeCompare(b.prazo ?? '9999'))
+      const ids = metas.map(m => m.id)
+      let acoes: SgiAcao[] = []
+      if (ids.length) {
+        const { data } = await supabase.from('sgi_acoes').select('*').in('origem_id', ids)
+          .order('prazo', { ascending: true, nullsFirst: false })
+        acoes = (data ?? []) as SgiAcao[]
+      }
+      return { objetivo: obj as SgiObjetivo, metas, acoes, focoMetaId: metaId, trimestre: foco.trimestre, ano: foco.ano }
     },
   })
 }

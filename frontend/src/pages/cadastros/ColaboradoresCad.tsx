@@ -250,12 +250,20 @@ export default function ColaboradoresCad() {
               <ConfidenceField label="Telefone" value={editItem.telefone ?? ''} onChange={v => set('telefone', v)}
                 confidence={confidence.telefone} type="tel" placeholder="(00) 00000-0000" />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={editItem.ativo ?? true}
-                onChange={e => set('ativo', e.target.checked)}
-                className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
-              <span className="text-xs font-semibold text-slate-600">Ativo</span>
-            </label>
+            <div className="flex items-center gap-6 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editItem.ativo ?? true}
+                  onChange={e => set('ativo', e.target.checked)}
+                  className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-xs font-semibold text-slate-600">Ativo</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer" title="Não bate ponto e não é cadastrado no Secullum">
+                <input type="checkbox" checked={editItem.cargo_confianca ?? false}
+                  onChange={e => set('cargo_confianca', e.target.checked)}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                <span className="text-xs font-semibold text-slate-600">Cargo de confiança <span className="text-[10px] text-slate-400">(sem ponto/Secullum)</span></span>
+              </label>
+            </div>
           </div>
         </MagicModal>
       )}

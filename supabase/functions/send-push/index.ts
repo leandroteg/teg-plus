@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 const VAPID_PUBLIC_KEY = "BBxTOl-a41Qz4pjvF078WsTWxNmJKKTyLeKB9YWEjmWmDpaEjrpWKUMmn3ZuakkFjjYiZ47wGT0b221GQOrP8Ks";
 
@@ -199,17 +200,22 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type" } });
   }
 
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // Rate limiting: 60 req/min por usuario (fallback IP).
+  const rl = await enforceRateLimit(req, supabase, { key: "send-push", limit: 60, windowSec: 60 });
+  if (!rl.allowed) return rl.response!;
+
   try {
     const { user_ids, title, body, url, icon } = await req.json();
     if (!user_ids?.length || !title) {
-      return new Response(JSON.stringify({ error: "user_ids and title required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "user_ids and title required" }), { status: 400, headers: { "Content-Type": "application/json", ...rl.headers } });
     }
 
     // Get VAPID private key from vault
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     const { data: secrets } = await supabase.rpc("get_secret", { secret_name: "VAPID_PRIVATE_KEY" });
     const vapidPrivateKey = secrets?.[0]?.secret;
@@ -227,7 +233,7 @@ Deno.serve(async (req: Request) => {
 
     if (subErr) throw subErr;
     if (!subs?.length) {
-      return new Response(JSON.stringify({ sent: 0, message: "No subscriptions found" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sent: 0, message: "No subscriptions found" }), { headers: { "Content-Type": "application/json", ...rl.headers } });
     }
 
     const payload = JSON.stringify({
@@ -256,7 +262,7 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ sent, failed, total: results.length }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json", ...rl.headers } }
     );
   } catch (err) {
     console.error("[send-push]", err);

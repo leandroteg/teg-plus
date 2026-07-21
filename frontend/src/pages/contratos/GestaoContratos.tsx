@@ -1,14 +1,17 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
-  Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
+  Briefcase, Search, FileText, FileSignature, TrendingUp, Check,
   TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Clock, Banknote, CreditCard,
-  Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
+  Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play, Users,
   LayoutList, LayoutGrid, Eye, Receipt, Send, Plus, X,
+  Paperclip, ExternalLink, Upload, FileStack,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas, useMedicoes, useFaturarMedicao, useCriarMedicao, useAtualizarMedicao, useUploadMedicaoArquivo, useModelosContrato } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { Contrato, ContratoMedicao } from '../../types/contratos'
@@ -16,6 +19,7 @@ import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
+import ModelosContrato from './ModelosContrato'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -34,6 +38,10 @@ const fmtPct = (v: number) =>
 function ymHoje() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function ymMais(meses: number) { const d = new Date(); d.setMonth(d.getMonth() + meses); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 function diffMeses(a: string, b: string) { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by - ay) * 12 + (bm - am) }
+
+// Contrato agregado "Equipe PJ": os valores individuais são SIGILOSOS.
+// O bloco aparece na lista (total), mas o detalhe só abre para admin/supervisão de Contratos.
+const isEquipePJ = (c: { grupo_contrato?: string | null }) => (c?.grupo_contrato ?? '') === 'equipe_pj'
 const MESES_OPT: Array<[string, string]> = [
   ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
   ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
@@ -51,17 +59,126 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
+// ── MultiSelect (checkboxes + Selecionar Todos) ──────────────────────────────
+// selected[] = valores marcados. "Todos marcados" (length === options) equivale a
+// SEM filtro (mostra tudo, inclusive status fora da lista). Nada marcado = mostra nada.
+function MultiSelect({ label, options, selected, onChange, minW = 150 }: {
+  label: string
+  options: { value: string; label: string }[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  minW?: number
+}) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  // Padrão EGP (ProjetosFilterBar): fecha por backdrop (fixed inset-0), SEM listener de scroll
+  // — assim rolar dentro do painel não fecha. Painel em position:fixed p/ escapar do overflow-x da barra.
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 224) })
+    setOpen(true)
+  }
+  const allValues = options.map(o => o.value)
+  const total = allValues.length
+  const sel = selected.length
+  const allChecked = sel === total
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const box = (on: boolean) => `shrink-0 inline-flex items-center justify-center w-4 h-4 rounded border ${on ? 'bg-teal-600 border-teal-600 text-white' : 'border-slate-300'}`
+  const btnCls = 'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ' +
+    (allChecked ? 'border-slate-200 bg-white text-slate-600' : 'border-teal-300 bg-teal-50 text-teal-700 font-semibold')
+  return (
+    <div className="relative shrink-0" style={{ minWidth: minW }}>
+      <button ref={btnRef} type="button" onClick={() => (open ? setOpen(false) : openMenu())} className={btnCls}>
+        <span className="truncate">{label}: {sel}/{total}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && pos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 50 }}
+            className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5">
+            <button type="button" onClick={() => onChange(allChecked ? [] : allValues)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-100">
+              <span className={box(allChecked)}>{allChecked && <Check size={11} />}</span>
+              Selecionar todos
+            </button>
+            <div className="my-1 border-t border-slate-100" />
+            {options.map(o => {
+              const on = selected.includes(o.value)
+              return (
+                <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100">
+                  <span className={box(on)}>{on && <Check size={11} />}</span>
+                  <span className="truncate text-left">{o.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Opções de status do Provisionado (parcelas) — usadas no MultiSelect
+const STATUS_PROV_OPTIONS: { value: string; label: string }[] = [
+  { value: 'previsto', label: 'Previsto' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'liberado', label: 'Liberado' },
+  { value: 'pago',     label: 'Pago' },
+]
+// Status/tipo de contrato (aba Contratos)
+const STATUS_CONTRATO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'em_negociacao', label: 'Em Negociação' },
+  { value: 'assinado',      label: 'Assinado' },
+  { value: 'vigente',       label: 'Vigente' },
+  { value: 'suspenso',      label: 'Suspenso' },
+  { value: 'encerrado',     label: 'Encerrado' },
+  { value: 'rescindido',    label: 'Rescindido' },
+]
+const TIPO_CONTRATO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'receita', label: 'Receita' },
+  { value: 'despesa', label: 'Despesa' },
+]
+// Status das parcelas a receber (aba Recebíveis)
+const STATUS_RECEB_OPTIONS: { value: string; label: string }[] = [
+  { value: 'previsto', label: 'Previsto' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'liberado', label: 'Liberado' },
+  { value: 'pago',     label: 'Recebido' },
+]
+// Status das medições (aba Medições)
+const STATUS_MEDICAO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'em_aprovacao', label: 'Em Aprovação' },
+  { value: 'aprovado',     label: 'Aprovadas' },
+  { value: 'faturado',     label: 'No Financeiro' },
+  { value: 'rejeitado',    label: 'Rejeitadas' },
+  { value: 'rascunho',     label: 'Rascunho' },
+]
+// Tipo/status (aba Aditivos e Reajustes)
+const TIPO_ADITIVO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'aditivo',  label: 'Aditivos' },
+  { value: 'reajuste', label: 'Reajustes' },
+]
+const STATUS_ADITIVO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'rascunho',     label: 'Rascunho' },
+  { value: 'em_aprovacao', label: 'Em Aprovação' },
+  { value: 'aprovado',     label: 'Aprovado' },
+  { value: 'rejeitado',    label: 'Rejeitado' },
+]
+
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
+type Tab = 'contratos' | 'medicoes' | 'aditivos' | 'recebiveis' | 'provisionado' | 'modelos'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'contratos',    label: 'Contratos',    icon: FileText },
+  { key: 'aditivos',     label: 'Aditivos e Reajustes', icon: FileSignature },
   { key: 'medicoes',     label: 'Medições',     icon: Receipt },
   { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote },
   { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
-  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature },
-  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp },
-  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
+  { key: 'modelos',      label: 'Modelos',      icon: FileStack },
 ]
 
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -72,8 +189,7 @@ const TAB_ACCENT: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
   provisionado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
   aditivos:     { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
-  reajustes:    { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',    border:'border-cyan-200' },
-  vencimentos:  { bg:'bg-red-50',     bgActive:'bg-red-100',     text:'text-red-500',     textActive:'text-red-800',     dot:'bg-red-500',     badge:'bg-red-200/80 text-red-700',     border:'border-red-200' },
+  modelos:      { bg:'bg-cyan-50',    bgActive:'bg-cyan-100',    text:'text-cyan-500',    textActive:'text-cyan-800',    dot:'bg-cyan-500',    badge:'bg-cyan-200/80 text-cyan-700',    border:'border-cyan-200' },
 }
 
 const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
@@ -82,8 +198,7 @@ const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
   recebiveis:   { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   provisionado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
   aditivos:     { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
-  reajustes:    { bg:'bg-cyan-500/5',    bgActive:'bg-cyan-500/15',    text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
-  vencimentos:  { bg:'bg-red-500/5',     bgActive:'bg-red-500/15',     text:'text-red-400',     textActive:'text-red-200',     dot:'bg-red-400',     badge:'bg-red-500/15 text-red-300',     border:'border-red-500/20' },
+  modelos:      { bg:'bg-cyan-500/5',    bgActive:'bg-cyan-500/15',    text:'text-cyan-400',    textActive:'text-cyan-200',    dot:'bg-cyan-400',    badge:'bg-cyan-500/15 text-cyan-300',    border:'border-cyan-500/20' },
 }
 
 // ── Status configs ──────────────────────────────────────────────────────────
@@ -149,7 +264,8 @@ const ACTIONS: Record<string, ContratoAction[]> = {
 // ── Contrato Card ───────────────────────────────────────────────────────────
 function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (type: 'success' | 'error', msg: string) => void }) {
   const nav = useNavigate()
-  const { atLeast, hasSetorPapel } = useAuth()
+  const { atLeast, hasSetorPapel, perfil } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const atualizarContrato = useAtualizarContrato()
   const [expanded, setExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ContratoAction | null>(null)
@@ -271,15 +387,21 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-3">
-          <button
-            onClick={() => nav(`/contratos/detalhe/${contrato.id}`)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-              bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
-              hover:bg-indigo-100 transition-all"
-          >
-            <CalendarDays size={11} />
-            Ver detalhes
-          </button>
+          {isEquipePJ(contrato) && !canPJ ? (
+            <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-400">
+              <Lock size={11} /> Sigiloso
+            </span>
+          ) : (
+            <button
+              onClick={() => nav(isEquipePJ(contrato) ? '/contratos/equipe-pj' : `/contratos/detalhe/${contrato.id}`)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
+                hover:bg-indigo-100 transition-all"
+            >
+              <CalendarDays size={11} />
+              Ver detalhes
+            </button>
+          )}
           {actions.map(action => {
             const Icon = action.icon
             return (
@@ -377,10 +499,13 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
 // ── Tab: Contratos ──────────────────────────────────────────────────────────
 function TabContratos() {
   const nav = useNavigate()
+  const { hasSetorPapel, perfil } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [tipoFilter, setTipoFilter] = useState('')
-  const [filtroGrupo, setFiltroGrupo] = useState<string>('')
+  const [statusSel, setStatusSel] = useState<string[]>(['vigente'])   // pré-filtrado: só vigentes
+  const [tipoSel, setTipoSel] = useState<string[]>(TIPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [vencFilter, setVencFilter] = useState('')   // absorve a antiga aba Vencimentos
   const [busca, setBusca] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -389,12 +514,12 @@ function TabContratos() {
     setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const { data: contratos = [], isLoading } = useContratos(
-    (statusFilter || tipoFilter) ? {
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(tipoFilter ? { tipo_contrato: tipoFilter } : {}),
-    } : undefined
-  )
+  // Busca tudo e filtra no cliente (multi-select). Status/tipo/grupo com semântica "tudo marcado = sem filtro".
+  const { data: contratos = [], isLoading } = useContratos(undefined)
+
+  const statusAll = statusSel.length === STATUS_CONTRATO_OPTIONS.length
+  const tipoAll = tipoSel.length === TIPO_CONTRATO_OPTIONS.length
+  const grupoAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
 
   let filtered = contratos.filter(c =>
     !busca
@@ -403,8 +528,16 @@ function TabContratos() {
     || c.cliente?.nome.toLowerCase().includes(busca.toLowerCase())
     || c.fornecedor?.razao_social?.toLowerCase().includes(busca.toLowerCase())
   )
-  if (filtroGrupo) {
-    filtered = filtered.filter(c => c.grupo_contrato === filtroGrupo)
+  if (!statusAll) filtered = filtered.filter(c => statusSel.includes(c.status))
+  if (!tipoAll) filtered = filtered.filter(c => tipoSel.includes((c as any).tipo_contrato))
+  if (!grupoAll) filtered = filtered.filter(c => grupoSel.includes(c.grupo_contrato ?? ''))
+  if (vencFilter) {
+    const hoje = Date.now()
+    const dias = (c: Contrato) => Math.ceil((new Date(c.data_fim_previsto).getTime() - hoje) / 86400000)
+    filtered = filtered
+      .filter(c => c.status === 'vigente')
+      .filter(c => vencFilter === 'vencido' ? dias(c) < 0 : dias(c) >= 0 && dias(c) <= Number(vencFilter))
+      .sort((a, b) => dias(a) - dias(b))
   }
 
   return (
@@ -429,39 +562,24 @@ function TabContratos() {
               focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-        >
-          <option value="">Todos os Status</option>
-          <option value="em_negociacao">Em Negociacao</option>
-          <option value="assinado">Assinado</option>
-          <option value="vigente">Vigente</option>
-          <option value="suspenso">Suspenso</option>
-          <option value="encerrado">Encerrado</option>
-          <option value="rescindido">Rescindido</option>
-        </select>
+        <MultiSelect label="Status" options={STATUS_CONTRATO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        <MultiSelect label="Tipo" options={TIPO_CONTRATO_OPTIONS}
+          selected={tipoSel} onChange={setTipoSel} minW={110} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
 
         <select
-          value={tipoFilter}
-          onChange={e => setTipoFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+          value={vencFilter}
+          onChange={e => setVencFilter(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${
+            vencFilter ? 'border-red-200 bg-red-50 text-red-700 font-semibold' : 'border-slate-200 bg-white text-slate-600'}`}
         >
-          <option value="">Todos os Tipos</option>
-          <option value="receita">Receita</option>
-          <option value="despesa">Despesa</option>
-        </select>
-
-        <select
-          value={filtroGrupo}
-          onChange={e => setFiltroGrupo(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 min-w-[180px]"
-        >
-          <option value="">Todos os Grupos</option>
-          {GRUPO_CONTRATO_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          <option value="">Vencimento</option>
+          <option value="vencido">Vencidos</option>
+          <option value="30">Vence em até 30d</option>
+          <option value="60">Vence em até 60d</option>
+          <option value="90">Vence em até 90d</option>
         </select>
 
         <div className="flex border rounded-lg border-slate-200">
@@ -519,7 +637,9 @@ function TabContratos() {
                   const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
                   const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || (c as any).solicitacao?.contraparte_nome || (c as any).contraparte_nome || '—'
                   return (
-                    <tr key={c.id} onClick={() => nav(`/contratos/detalhe/${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
+                    <tr key={c.id}
+                      onClick={() => { if (isEquipePJ(c) && !canPJ) return; nav(isEquipePJ(c) ? '/contratos/equipe-pj' : `/contratos/detalhe/${c.id}`) }}
+                      className={`hover:bg-slate-50/80 transition-colors ${isEquipePJ(c) && !canPJ ? 'cursor-default' : 'cursor-pointer'}`}>
                       <td className="px-3 py-2.5">
                         <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
@@ -551,10 +671,17 @@ function TabContratos() {
                         <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center">
-                        <button onClick={e => { e.stopPropagation(); nav(`/contratos/detalhe/${c.id}`) }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
-                          <Eye size={11} /> Detalhes
-                        </button>
+                        {isEquipePJ(c) && !canPJ ? (
+                          <span title="Valores individuais sob sigilo — acesso restrito à supervisão de Contratos"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-400 bg-slate-50 border border-slate-100">
+                            <Lock size={11} /> Sigiloso
+                          </span>
+                        ) : (
+                          <button onClick={e => { e.stopPropagation(); nav(isEquipePJ(c) ? '/contratos/equipe-pj' : `/contratos/detalhe/${c.id}`) }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
+                            <Eye size={11} /> Detalhes
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -572,28 +699,55 @@ function TabContratos() {
 }
 
 // ── Tab: Aditivos ───────────────────────────────────────────────────────────
-function TabAditivos() {
+function TabAditivosReajustes() {
   const { perfil } = useAuth()
-  const [statusFilter, setStatusFilter] = useState('')
+  const [tipoSel, setTipoSel] = useState<string[]>(TIPO_ADITIVO_OPTIONS.map(o => o.value))
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_ADITIVO_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
+  const [view, setView] = useState<'table' | 'card'>('table')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const { data: aditivos = [], isLoading } = useAditivos()
+  const { data: aditivos = [], isLoading: l1 } = useAditivos()
+  const { data: reajustes = [], isLoading: l2 } = useReajustes()
+  const isLoading = l1 || l2
   const atualizarAditivo = useAtualizarAditivo()
 
-  const filtered = aditivos.filter(a => {
-    if (statusFilter && a.status !== statusFilter) return false
+  // Linha unificada (mesmo padrão da tela Aditivos & Renovações de Locações):
+  // aditivos e reajustes continuam em tabelas separadas; o merge é só visual.
+  const linhas = [
+    ...aditivos.map(a => ({ kind: 'aditivo' as const, key: `a-${a.id}`, data: ((a as any).created_at ?? '').slice(0, 10), a, r: undefined })),
+    ...reajustes.map(r => ({ kind: 'reajuste' as const, key: `r-${r.id}`, data: r.data_base ?? '', a: undefined, r })),
+  ]
+
+  const tipoAll = tipoSel.length === TIPO_ADITIVO_OPTIONS.length
+  const statusAll = statusSel.length === STATUS_ADITIVO_OPTIONS.length
+  const filtered = linhas.filter(l => {
+    if (!tipoAll && !tipoSel.includes(l.kind)) return false
+    // status só existe em aditivos; filtrar por status oculta reajustes (que não têm status)
+    if (!statusAll) {
+      if (l.kind !== 'aditivo' || !statusSel.includes(l.a!.status)) return false
+    }
     if (busca) {
       const q = busca.toLowerCase()
+      if (l.kind === 'aditivo') {
+        const a = l.a!
+        return (
+          a.numero_aditivo.toLowerCase().includes(q) ||
+          a.descricao.toLowerCase().includes(q) ||
+          a.contrato?.numero?.toLowerCase().includes(q) ||
+          a.contrato?.objeto?.toLowerCase().includes(q)
+        )
+      }
+      const r = l.r!
       return (
-        a.numero_aditivo.toLowerCase().includes(q) ||
-        a.descricao.toLowerCase().includes(q) ||
-        a.contrato?.numero?.toLowerCase().includes(q) ||
-        a.contrato?.objeto?.toLowerCase().includes(q)
+        r.indice_nome.toLowerCase().includes(q) ||
+        r.observacoes?.toLowerCase().includes(q) ||
+        r.contrato?.numero?.toLowerCase().includes(q) ||
+        r.contrato?.objeto?.toLowerCase().includes(q)
       )
     }
     return true
-  })
+  }).sort((x, y) => (y.data || '').localeCompare(x.data || ''))
 
   const handleStatusChange = (id: string, status: StatusAditivo) => {
     const label = status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : status
@@ -610,12 +764,6 @@ function TabAditivos() {
     )
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' }, { label: 'Rascunho', value: 'rascunho' },
-    { label: 'Em Aprovação', value: 'em_aprovacao' }, { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Rejeitados', value: 'rejeitado' },
-  ]
-
   return (
     <div className="space-y-4">
       {toast && (
@@ -627,24 +775,29 @@ function TabAditivos() {
         </div>
       )}
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar aditivo, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
+      {/* Toolbar: busca + filtros + toggle (1 linha, padrão Locações) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar aditivo, reajuste, contrato..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
+              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+        </div>
+        <MultiSelect label="Tipo" options={TIPO_ADITIVO_OPTIONS}
+          selected={tipoSel} onChange={setTipoSel} minW={110} />
+        <MultiSelect label="Status" options={STATUS_ADITIVO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        <div className="flex items-center gap-1">
+          <button onClick={() => setView('table')} title="Tabela"
+            className={`p-1.5 rounded-lg transition-colors ${view === 'table' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}>
+            <LayoutList size={16} />
           </button>
-        ))}
+          <button onClick={() => setView('card')} title="Cards"
+            className={`p-1.5 rounded-lg transition-colors ${view === 'card' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}>
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -656,72 +809,109 @@ function TabAditivos() {
           <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
             <FileSignature size={24} className="text-indigo-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum aditivo encontrado</p>
+          <p className="text-sm font-semibold text-slate-500">Nenhum aditivo ou reajuste encontrado</p>
         </div>
-      ) : (
+      ) : view === 'table' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Aditivo</th>
                   <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Descricao</th>
+                  <th className="px-4 py-3">Detalhe</th>
+                  <th className="px-4 py-3">Data</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Acoes</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(a => {
-                  const sc = STATUS_ADITIVO[a.status]
-                  const tc = TIPO_ADITIVO[a.tipo]
+                {filtered.map(l => {
+                  const contrato = l.kind === 'aditivo' ? l.a!.contrato : l.r!.contrato
                   return (
-                    <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={l.key} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <p className="text-xs font-bold text-slate-800">{a.contrato?.numero ?? '-'}</p>
-                        <p className="text-[10px] truncate max-w-[160px] text-slate-400">{a.contrato?.objeto}</p>
+                        <p className="text-xs font-bold text-slate-800">{contrato?.numero ?? '-'}</p>
+                        <p className="text-[10px] truncate max-w-[160px] text-slate-400">{contrato?.objeto}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs font-mono font-semibold text-slate-700">{a.numero_aditivo}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 ${tc.bg} ${tc.text}`}>
-                          {tc.label}
-                        </span>
+                        {l.kind === 'aditivo' ? (
+                          <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 ${TIPO_ADITIVO[l.a!.tipo].bg} ${TIPO_ADITIVO[l.a!.tipo].text}`}>
+                            Aditivo · {TIPO_ADITIVO[l.a!.tipo].label}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-cyan-50 text-cyan-700">
+                            Reajuste
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-xs max-w-[220px] truncate text-slate-600">{a.descricao}</td>
-                      <td className={`px-4 py-3 text-xs font-bold text-right ${a.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {fmtFull(a.valor_acrescimo)}
+                      <td className="px-4 py-3 text-xs max-w-[220px] text-slate-600">
+                        {l.kind === 'aditivo' ? (
+                          <>
+                            <span className="font-mono font-semibold text-slate-700">{l.a!.numero_aditivo}</span>
+                            <span className="block truncate text-[11px] text-slate-400">{l.a!.descricao}</span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-700">{l.r!.indice_nome}</span>
+                            <span className={`inline-flex items-center gap-0.5 font-bold ${l.r!.percentual_aplicado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {l.r!.percentual_aplicado >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                              {fmtPct(l.r!.percentual_aplicado)}
+                            </span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{l.data ? fmtData(l.data) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-right whitespace-nowrap">
+                        {l.kind === 'aditivo' ? (
+                          <span className={`font-bold ${l.a!.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(l.a!.valor_acrescimo)}</span>
+                        ) : (
+                          <span className="text-slate-500">
+                            {fmtFull(l.r!.valor_antes)}
+                            <span className={`ml-1 font-bold ${l.r!.valor_depois - l.r!.valor_antes >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>→ {fmtFull(l.r!.valor_depois)}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
-                        </span>
+                        {l.kind === 'aditivo' ? (
+                          <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${STATUS_ADITIVO[l.a!.status].bg} ${STATUS_ADITIVO[l.a!.status].text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_ADITIVO[l.a!.status].dot}`} />{STATUS_ADITIVO[l.a!.status].label}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Aplicado
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {a.status === 'em_aprovacao' && (
-                            <>
-                              <button onClick={() => handleStatusChange(a.id, 'aprovado')} disabled={atualizarAditivo.isPending}
-                                title="Aprovar" className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all disabled:opacity-50">
-                                <CheckCircle2 size={13} />
+                        {l.kind === 'aditivo' ? (
+                          <div className="flex items-center justify-center gap-1">
+                            {l.a!.status === 'em_aprovacao' && (
+                              <>
+                                <button onClick={() => handleStatusChange(l.a!.id, 'aprovado')} disabled={atualizarAditivo.isPending}
+                                  title="Aprovar" className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all disabled:opacity-50">
+                                  <CheckCircle2 size={13} />
+                                </button>
+                                <button onClick={() => handleStatusChange(l.a!.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
+                                  title="Rejeitar" className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-all disabled:opacity-50">
+                                  <XCircle size={13} />
+                                </button>
+                              </>
+                            )}
+                            {l.a!.status === 'rascunho' && (
+                              <button onClick={() => handleStatusChange(l.a!.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
+                                className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all disabled:opacity-50">
+                                Enviar
                               </button>
-                              <button onClick={() => handleStatusChange(a.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
-                                title="Rejeitar" className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-all disabled:opacity-50">
-                                <XCircle size={13} />
-                              </button>
-                            </>
-                          )}
-                          {a.status === 'rascunho' && (
-                            <button onClick={() => handleStatusChange(a.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
-                              className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all disabled:opacity-50">
-                              Enviar
-                            </button>
-                          )}
-                          {(a.status === 'aprovado' || a.status === 'rejeitado') && (
-                            <span className="text-[10px] text-slate-400">—</span>
-                          )}
-                        </div>
+                            )}
+                            {(l.a!.status === 'aprovado' || l.a!.status === 'rejeitado') && (
+                              <span className="text-[10px] text-slate-400">—</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
                       </td>
                     </tr>
                   )
@@ -729,226 +919,85 @@ function TabAditivos() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Tab: Reajustes ──────────────────────────────────────────────────────────
-function TabReajustes() {
-  const [busca, setBusca] = useState('')
-  const { data: reajustes = [], isLoading } = useReajustes()
-
-  const filtered = reajustes.filter(r => {
-    if (!busca) return true
-    const q = busca.toLowerCase()
-    return (
-      r.indice_nome.toLowerCase().includes(q) ||
-      r.observacoes?.toLowerCase().includes(q) ||
-      r.contrato?.numero?.toLowerCase().includes(q) ||
-      r.contrato?.objeto?.toLowerCase().includes(q)
-    )
-  })
-
-  const totalDelta = filtered.reduce((s, r) => s + (r.valor_depois - r.valor_antes), 0)
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{filtered.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest">Impacto</p>
-          <p className={`text-lg font-extrabold mt-1 ${totalDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {fmtFull(totalDelta)}
-          </p>
-        </div>
-      </div>
-
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar índice, contrato..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-            <TrendingUp size={24} className="text-indigo-300" />
-          </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum reajuste encontrado</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Data Base</th>
-                  <th className="px-4 py-3">Indice</th>
-                  <th className="px-4 py-3 text-right">Percentual</th>
-                  <th className="px-4 py-3 text-right">Antes</th>
-                  <th className="px-4 py-3 text-right">Depois</th>
-                  <th className="px-4 py-3 text-right">Diferenca</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => {
-                  const delta = r.valor_depois - r.valor_antes
-                  const isPositive = r.percentual_aplicado >= 0
-                  return (
-                    <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-bold text-slate-800">{r.contrato?.numero ?? '-'}</p>
-                        <p className="text-[10px] truncate max-w-[140px] text-slate-400">{r.contrato?.objeto}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-700">{fmtData(r.data_base)}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-700">
-                          {r.indice_nome}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`inline-flex items-center gap-1 text-xs font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                          {fmtPct(r.percentual_aplicado)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-right text-slate-500">{fmtFull(r.valor_antes)}</td>
-                      <td className="px-4 py-3 text-xs font-bold text-right text-slate-800">{fmtFull(r.valor_depois)}</td>
-                      <td className={`px-4 py-3 text-xs font-bold text-right ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {fmtFull(delta)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Tab: Vencimentos ────────────────────────────────────────────────────────
-function TabVencimentos() {
-  const [faixa, setFaixa] = useState<'' | '30' | '60' | '90' | 'vencido'>('')
-  const { data: contratos = [], isLoading } = useContratos({ status: 'vigente' })
-
-  const hoje = Date.now()
-
-  const items = contratos.map(c => {
-    const fim = new Date(c.data_fim_previsto).getTime()
-    const dias = Math.ceil((fim - hoje) / (1000 * 60 * 60 * 24))
-    const contraparte = c.tipo_contrato === 'despesa'
-      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
-      : c.cliente?.nome ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
-    return { ...c, dias, contraparte }
-  }).sort((a, b) => a.dias - b.dias)
-
-  const filtered = items.filter(i => {
-    if (faixa === 'vencido') return i.dias < 0
-    if (faixa === '30') return i.dias >= 0 && i.dias <= 30
-    if (faixa === '60') return i.dias >= 0 && i.dias <= 60
-    if (faixa === '90') return i.dias >= 0 && i.dias <= 90
-    return true
-  })
-
-  const vencidos = items.filter(i => i.dias < 0).length
-  const ate30 = items.filter(i => i.dias >= 0 && i.dias <= 30).length
-  const ate60 = items.filter(i => i.dias > 30 && i.dias <= 60).length
-  const ate90 = items.filter(i => i.dias > 60 && i.dias <= 90).length
-
-  const FAIXAS = [
-    { label: 'Todos', value: '' as const },
-    { label: `Vencidos (${vencidos})`, value: 'vencido' as const },
-    { label: `Ate 30d (${ate30})`, value: '30' as const },
-    { label: `Ate 60d (${ate60 + ate30})`, value: '60' as const },
-    { label: `Ate 90d (${ate90 + ate60 + ate30})`, value: '90' as const },
-  ]
-
-  const diasColor = (d: number) =>
-    d < 0 ? 'text-red-600 bg-red-50' : d <= 30 ? 'text-amber-700 bg-amber-50' : d <= 60 ? 'text-orange-600 bg-orange-50' : 'text-slate-600 bg-slate-100'
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Vencidos</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{vencidos}</p>
-        </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-500 uppercase">30 dias</p>
-          <p className="text-xl font-extrabold text-amber-700 mt-1">{ate30}</p>
-        </div>
-        <div className="bg-orange-50 rounded-2xl border border-orange-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-orange-500 uppercase">31-60 dias</p>
-          <p className="text-xl font-extrabold text-orange-600 mt-1">{ate60}</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">61-90 dias</p>
-          <p className="text-xl font-extrabold text-slate-700 mt-1">{ate90}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FAIXAS.map(f => (
-          <button key={f.value} onClick={() => setFaixa(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${faixa === f.value
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-            <CalendarClock size={24} className="text-indigo-300" />
-          </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum contrato nessa faixa</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${diasColor(c.dias)}`}>
-                  {c.dias < 0 ? <AlertTriangle size={16} /> : <Clock size={16} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-800 truncate">{c.contraparte}</p>
-                    <span className={`text-xs font-extrabold shrink-0 rounded-full px-2.5 py-0.5 ${diasColor(c.dias)}`}>
-                      {c.dias < 0 ? `${Math.abs(c.dias)}d vencido` : `${c.dias}d restantes`}
+          {filtered.map(l => {
+            const contrato = l.kind === 'aditivo' ? l.a!.contrato : l.r!.contrato
+            return (
+              <div key={l.key} className="bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-200 hover:shadow-sm transition-all">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {l.kind === 'aditivo' ? (
+                      <>
+                        <p className="text-sm font-bold text-slate-800 truncate">{l.a!.numero_aditivo}</p>
+                        <span className={`inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 ${TIPO_ADITIVO[l.a!.tipo].bg} ${TIPO_ADITIVO[l.a!.tipo].text}`}>
+                          Aditivo · {TIPO_ADITIVO[l.a!.tipo].label}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-slate-800 truncate">{l.r!.indice_nome}</p>
+                        <span className="inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 bg-cyan-50 text-cyan-700">Reajuste</span>
+                      </>
+                    )}
+                  </div>
+                  {l.kind === 'aditivo' ? (
+                    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 ${STATUS_ADITIVO[l.a!.status].bg} ${STATUS_ADITIVO[l.a!.status].text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_ADITIVO[l.a!.status].dot}`} />{STATUS_ADITIVO[l.a!.status].label}
                     </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
-                    <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">{c.numero}</span>
-                    <span className="text-slate-400">Vence: {fmtData(c.data_fim_previsto)}</span>
-                    {c.objeto && <span className="text-slate-400 truncate max-w-[200px]">{c.objeto}</span>}
-                  </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 shrink-0 bg-emerald-50 text-emerald-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Aplicado
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-slate-500 mb-2 truncate">{contrato?.numero ?? '-'}{contrato?.objeto ? ` · ${contrato.objeto}` : ''}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                  {l.data && <span>{fmtData(l.data)}</span>}
+                  {l.kind === 'aditivo' ? (
+                    <>
+                      <span className={`font-bold ${l.a!.valor_acrescimo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtFull(l.a!.valor_acrescimo)}</span>
+                      {l.a!.descricao && <span className="truncate max-w-[320px] text-slate-400">{l.a!.descricao}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className={`inline-flex items-center gap-0.5 font-bold ${l.r!.percentual_aplicado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {l.r!.percentual_aplicado >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                        {fmtPct(l.r!.percentual_aplicado)}
+                      </span>
+                      <span>
+                        {fmtFull(l.r!.valor_antes)}
+                        <span className={`ml-1 font-bold ${l.r!.valor_depois - l.r!.valor_antes >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>→ {fmtFull(l.r!.valor_depois)}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+                {l.kind === 'aditivo' && (l.a!.status === 'rascunho' || l.a!.status === 'em_aprovacao') && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                    {l.a!.status === 'em_aprovacao' && (
+                      <>
+                        <button onClick={() => handleStatusChange(l.a!.id, 'aprovado')} disabled={atualizarAditivo.isPending}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                          <CheckCircle2 size={12} /> Aprovar
+                        </button>
+                        <button onClick={() => handleStatusChange(l.a!.id, 'rejeitado')} disabled={atualizarAditivo.isPending}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 ml-3">
+                          <XCircle size={12} /> Rejeitar
+                        </button>
+                      </>
+                    )}
+                    {l.a!.status === 'rascunho' && (
+                      <button onClick={() => handleStatusChange(l.a!.id, 'em_aprovacao')} disabled={atualizarAditivo.isPending}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:text-amber-700 disabled:opacity-50">
+                        <Send size={12} /> Enviar p/ aprovação
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -957,28 +1006,122 @@ function TabVencimentos() {
 
 // ── Tab: Recebiveis (A Receber) ──────────────────────────────────────────────
 function TabRecebiveis() {
-  const [statusFilter, setStatusFilter] = useState('')
+  const nav = useNavigate()
+  const { isDark } = useTheme()
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_RECEB_OPTIONS.map(o => o.value))
+  const [busca, setBusca] = useState('')
+  const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses
+  const [ate, setAte] = useState(ymMais(36))
+  const [quick, setQuick] = useState<'7d' | null>(null)
   const { data: parcelas = [], isLoading } = useParcelas()
+  const bq = busca.trim().toLowerCase()
+  const matchBusca = (...vals: (string | null | undefined)[]) => !bq || vals.some(v => (v ?? '').toLowerCase().includes(bq))
 
-  // Only receita parcels
+  const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0)
+  const lim7d = new Date(hoje0); lim7d.setDate(lim7d.getDate() + 7)
+  const mesesJanela = diffMeses(de, ate) + 1
+
+  // Recebíveis além das parcelas: saldo EGP a faturar + medições (BM) por estágio
+  type RecEgp = { contrato_id: string; numero: string; objeto: string; valor_oscs: number; faturado: number; saldo: number; media_6m: number | null }
+  type RecMed = { id: string; numero_bm: string; valor: number; status: string; fin_status: string | null; contrato: string; objeto: string; periodo_fim: string | null; vencimento: string | null }
+  const { data: extra } = useQuery<{ egp: RecEgp[]; medicoes: RecMed[] } | null>({
+    queryKey: ['con-recebiveis-egp'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('con_recebiveis_egp')
+      if (error) return null
+      return data as { egp: RecEgp[]; medicoes: RecMed[] }
+    },
+  })
+  const meds = extra?.medicoes ?? []
+  const medEstagio = (m: RecMed) =>
+    m.status === 'aprovado' ? { label: 'A Faturar', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400' }
+    : m.fin_status === 'recebido' ? { label: 'Recebido', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' }
+    : { label: 'No Financeiro', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' }
+
+  // ── Janela de período (mesma mecânica do Provisionado) ─────────────────────
+  // EGP: projeção = média móvel 6m × meses da janela, limitada ao saldo (backlog sem data).
+  // No atalho 7 dias o backlog não entra (não tem vencimento).
+  const egpProjecao = (e: RecEgp): number => {
+    if (quick === '7d') return 0
+    if (!e.media_6m) return e.saldo
+    return Math.min(e.saldo, e.media_6m * mesesJanela)
+  }
+  const egpRows = (extra?.egp ?? [])
+    .map(e => ({ ...e, projecao: egpProjecao(e) }))
+    .filter(e => e.saldo > 0 && e.projecao > 0 && matchBusca(e.objeto, e.numero))
+
+  // Medições: entram pela data (vencimento no Financeiro; senão fim do período medido)
+  const medNaJanela = (m: RecMed): boolean => {
+    const ref = m.vencimento || m.periodo_fim
+    if (!ref) return quick !== '7d'
+    if (quick === '7d') {
+      const d = new Date(ref + 'T00:00:00')
+      return d >= hoje0 && d <= lim7d
+    }
+    const ym = ref.slice(0, 7)
+    return ym >= de && ym <= ate
+  }
+  const medsJanela = meds.filter(m => medNaJanela(m) && matchBusca(m.contrato, m.objeto, m.numero_bm))
+
+  // Parcelas de receita: recorrente = valor_mensal × meses ativos na janela
   const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
+  const aReceberDe = (p: typeof parcelas[number]): number => {
+    const c = p.contrato
+    if (quick === '7d') {
+      const fim = (c?.data_fim_previsto || '9999-12').slice(0, 7)
+      if (fim < ymHoje()) return 0
+      const dia = parseInt((p.data_vencimento || '').slice(8, 10)) || 1
+      let occ = new Date(hoje0.getFullYear(), hoje0.getMonth(), dia)
+      if (occ < hoje0) occ = new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, dia)
+      if (occ > lim7d) return 0
+      return c?.recorrente ? (c.valor_mensal || 0) : p.valor
+    }
+    if (c?.recorrente) {
+      const ini = (c.data_inicio || '').slice(0, 7) || '0000-00'
+      const fim = (c.data_fim_previsto || '9999-12').slice(0, 7)
+      const lo = ini > de ? ini : de
+      const hi = fim < ate ? fim : ate
+      if (lo > hi) return 0
+      return (c.valor_mensal || 0) * (diffMeses(lo, hi) + 1)
+    }
+    const ym = (p.data_vencimento || '').slice(0, 7)
+    return (ym >= de && ym <= ate) ? p.valor : 0
+  }
+  const parcelasJanela = recebiveis
+    .map(p => ({ ...p, aReceber: aReceberDe(p) }))
+    .filter(p => p.aReceber > 0)
 
-  const filtered = recebiveis.filter(p => {
-    if (statusFilter && p.status !== statusFilter) return false
+  const statusRecebAll = statusSel.length === STATUS_RECEB_OPTIONS.length
+  const filtered = parcelasJanela.filter(p => {
+    if (!statusRecebAll && !statusSel.includes(p.status)) return false
+    if (!matchBusca(p.contrato?.objeto, p.contrato?.numero, (p.contrato as any)?.contraparte_nome)) return false
     return true
   })
 
-  const totalEmAberto = recebiveis
+  // KPIs sobre a janela
+  const medsFaturadas = medsJanela.filter(m => m.status === 'faturado' && m.fin_status !== 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  const medsRecebidas = medsJanela.filter(m => m.fin_status === 'recebido').reduce((s, m) => s + (m.valor || 0), 0)
+  const totalFaturado = parcelasJanela
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
-    .reduce((s, p) => s + p.valor, 0)
-  const totalRecebido = recebiveis
+    .reduce((s, p) => s + p.aReceber, 0) + medsFaturadas
+  const totalRecebido = parcelasJanela
     .filter(p => p.status === 'pago')
-    .reduce((s, p) => s + p.valor, 0)
-  const pendentes = recebiveis.filter(p => p.status === 'pendente' || p.status === 'liberado').length
-  const atrasadas = recebiveis.filter(p =>
+    .reduce((s, p) => s + p.aReceber, 0) + medsRecebidas
+  const saldoEgp = egpRows.reduce((s, e) => s + e.projecao, 0)
+  const atrasadas = parcelasJanela.filter(p =>
     p.status !== 'pago' && p.status !== 'cancelado' &&
     new Date(p.data_vencimento).getTime() < Date.now()
   ).length
+
+  // atalhos de período (mesmos do Provisionado)
+  const mesAtual = ymHoje(), mesProx = ymMais(1)
+  const anoFim = `${new Date().getFullYear()}-12`
+  const ATALHOS: Array<[string, boolean, () => void]> = [
+    ['Próx. 7 dias', quick === '7d', () => setQuick('7d')],
+    ['Esse mês', quick === null && de === mesAtual && ate === mesAtual, () => { setQuick(null); setDe(mesAtual); setAte(mesAtual) }],
+    ['Próx. mês', quick === null && de === mesProx && ate === mesProx, () => { setQuick(null); setDe(mesProx); setAte(mesProx) }],
+    ['Esse ano', quick === null && de === mesAtual && ate === anoFim, () => { setQuick(null); setDe(mesAtual); setAte(anoFim) }],
+  ]
 
   const STATUS_PARCELA: Record<string, { label: string; dot: string; bg: string; text: string }> = {
     previsto:  { label: 'Previsto',  dot: 'bg-slate-400',   bg: 'bg-slate-100',   text: 'text-slate-600' },
@@ -988,52 +1131,47 @@ function TabRecebiveis() {
     cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' },
-    { label: 'Previsto', value: 'previsto' },
-    { label: 'Pendente', value: 'pendente' },
-    { label: 'Liberado', value: 'liberado' },
-    { label: 'Recebido', value: 'pago' },
-  ]
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Em Aberto</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalEmAberto)}</p>
+      {/* Filtros numa linha + resumo inline (parcelas + saldo EGP + medições) que atualiza c/ os filtros */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        {(() => {
+          const n = filtered.length + egpRows.length + medsJanela.length
+          const total = filtered.reduce((s, p) => s + p.aReceber, 0) + egpRows.reduce((s, e) => s + e.projecao, 0) + medsJanela.reduce((s, m) => s + (m.valor || 0), 0)
+          return (
+            <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+              <b className="text-slate-700">{n}</b> {n === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(total)}</b>
+            </span>
+          )
+        })()}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar numero, objeto, contraparte..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
         </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Recebido</p>
-          <p className="text-lg font-extrabold text-blue-700 mt-1">{fmt(totalRecebido)}</p>
-        </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-600 uppercase">Pendentes</p>
-          <p className="text-xl font-extrabold text-amber-700 mt-1">{pendentes}</p>
-        </div>
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasadas</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
+        <MultiSelect label="Status" options={STATUS_RECEB_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        {ATALHOS.map(([label, active, onClick]) => (
+          <button key={label} onClick={onClick}
+            className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {label}
           </button>
         ))}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className="text-xs text-slate-400">→</span>
+          <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && egpRows.length === 0 && medsJanela.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
             <Banknote size={24} className="text-emerald-300" />
@@ -1042,6 +1180,62 @@ function TabRecebiveis() {
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Saldo a faturar dos contratos vinculados ao EGP (backlog de OSCs) */}
+          {egpRows.map(e => (
+            <div key={e.contrato_id}
+              onClick={() => nav(`/contratos/detalhe/${e.contrato_id}`)}
+              className="bg-white rounded-2xl border border-indigo-200 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <TrendingUp size={16} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-800 truncate">{e.objeto}</p>
+                    <div className="text-right shrink-0 leading-tight">
+                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(e.projecao)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">{e.projecao < e.saldo ? 'projeção no período (EGP)' : 'saldo a faturar (EGP)'}</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {e.numero} · saldo total {fmt(e.saldo)} · {fmt(e.faturado)} faturado de {fmt(e.valor_oscs)} em OSCs
+                    {e.media_6m ? <> · <span className="font-bold text-indigo-500">{fmt(e.media_6m)}/mês</span> (média móvel 6m)</> : null}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Medições (BM) de contratos de receita, por estágio */}
+          {medsJanela.map(m => {
+            const st = medEstagio(m)
+            return (
+              <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-fuchsia-50 flex items-center justify-center shrink-0">
+                    <Receipt size={16} className="text-fuchsia-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{m.objeto ?? 'Medição'}</p>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(m.valor || 0)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                      <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${st.bg} ${st.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
+                        {m.contrato} — {m.numero_bm}
+                      </span>
+                      {m.vencimento && <span className="text-slate-400">Vence: {fmtData(m.vencimento)}</span>}
+                      {!m.vencimento && m.periodo_fim && <span className="text-slate-400">Período até: {fmtData(m.periodo_fim)}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
           {filtered.map(p => {
             const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
             const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
@@ -1054,7 +1248,7 @@ function TabRecebiveis() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
-                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.valor)}</p>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.aReceber)}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
                       <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
@@ -1080,9 +1274,14 @@ function TabRecebiveis() {
 // ── Tab: Provisionado (A Pagar) ──────────────────────────────────────────────
 function TabProvisionado() {
   const { isDark } = useTheme()
-  const [statusFilter, setStatusFilter] = useState('')
-  const [de, setDe] = useState(ymHoje())          // período: padrão mês atual → +36 meses (mostra tudo)
-  const [ate, setAte] = useState(ymMais(36))
+  const nav = useNavigate()
+  const { perfil, hasSetorPapel } = useAuth()
+  const canPJ = perfil?.role === 'administrador' || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_PROV_OPTIONS.map(o => o.value))
+  const [busca, setBusca] = useState('')
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [de, setDe] = useState(ymMais(1))          // inicia no PRÓXIMO mês (atalho "Próx. mês" ativo)
+  const [ate, setAte] = useState(ymMais(1))
   const [quick, setQuick] = useState<'7d' | null>(null)   // atalho "próximos 7 dias" (precisão de dia)
   const { data: parcelas = [], isLoading } = useParcelas()
 
@@ -1119,10 +1318,23 @@ function TabProvisionado() {
     .map(p => ({ ...p, aPagar: aPagarDe(p) }))
     .filter(p => p.aPagar > 0)
 
+  const statusAll = statusSel.length === STATUS_PROV_OPTIONS.length
+  const grupoAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
   const filtered = compromissos.filter(p => {
-    if (statusFilter && p.status !== statusFilter) return false
+    if (!statusAll && !statusSel.includes(p.status)) return false
+    if (!grupoAll && !grupoSel.includes((p.contrato as any)?.grupo_contrato ?? '')) return false
+    if (busca) {
+      const q = busca.toLowerCase()
+      const hay = `${p.contrato?.objeto ?? ''} ${p.contrato?.numero ?? ''} ${(p.contrato as any)?.contraparte_nome ?? ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
     return true
   })
+
+  // Bloco agregado Equipe PJ fixo no topo (saldo do período = mensal × meses na janela)
+  const pjRow = filtered.find(p => p.contrato?.numero === 'EQUIPE-PJ')
+  const demais = filtered.filter(p => p.contrato?.numero !== 'EQUIPE-PJ')
+  const pjMeses = pjRow?.contrato?.valor_mensal ? Math.round(pjRow.aPagar / pjRow.contrato.valor_mensal) : 0
 
   const totalEmAberto = compromissos
     .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
@@ -1144,14 +1356,6 @@ function TabProvisionado() {
     cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
   }
 
-  const FILTROS = [
-    { label: 'Todos', value: '' },
-    { label: 'Previsto', value: 'previsto' },
-    { label: 'Pendente', value: 'pendente' },
-    { label: 'Liberado', value: 'liberado' },
-    { label: 'Pago', value: 'pago' },
-  ]
-
   // atalhos de período
   const mesAtual = ymHoje(), mesProx = ymMais(1)
   const anoFim = `${new Date().getFullYear()}-12`
@@ -1164,46 +1368,30 @@ function TabProvisionado() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-amber-600 uppercase">Compromissado</p>
-          <p className="text-lg font-extrabold text-amber-700 mt-1">{fmt(totalEmAberto)}</p>
+      {/* Filtros numa linha (padrão Contratos) + resumo inline que atualiza conforme os filtros */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+          <b className="text-slate-700">{filtered.length}</b> {filtered.length === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(filtered.reduce((s, p) => s + p.aPagar, 0))}</b>
+        </span>
+        <div className="relative flex-1 min-w-[160px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar numero, objeto, contraparte..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
         </div>
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Pago</p>
-          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalPago)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Pendentes</p>
-          <p className="text-xl font-extrabold text-blue-700 mt-1">{pendentes}</p>
-        </div>
-        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasados</p>
-          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-          {FILTROS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
-          {ATALHOS.map(([label, active, onClick]) => (
-            <button key={label} onClick={onClick}
-              className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${active ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
-              {label}
-            </button>
-          ))}
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Período</span>
+        <MultiSelect label="Status" options={STATUS_PROV_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={120} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
+        {ATALHOS.map(([label, active, onClick]) => (
+          <button key={label} onClick={onClick}
+            className={`shrink-0 px-2.5 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${active ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {label}
+          </button>
+        ))}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
           <PeriodoSelect value={de} onChange={v => { setQuick(null); setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
           <span className="text-xs text-slate-400">→</span>
           <PeriodoSelect value={ate} onChange={v => { setQuick(null); setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
@@ -1223,7 +1411,35 @@ function TabProvisionado() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(p => {
+          {pjRow && (
+            <div
+              onClick={() => { if (canPJ) nav('/contratos/equipe-pj') }}
+              className={`bg-white rounded-2xl border border-indigo-200 shadow-sm p-4 transition-all ${canPJ ? 'cursor-pointer hover:shadow-md' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <Users size={16} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-800 truncate flex items-center gap-2">
+                      Equipe PJ
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase tracking-wide">
+                        <Lock size={9} /> sigiloso
+                      </span>
+                    </p>
+                    <div className="text-right shrink-0 leading-tight">
+                      <p className="text-sm font-extrabold text-indigo-600">{fmtFull(pjRow.aPagar)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">no período</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {fmt(pjRow.contrato?.valor_mensal || 0)}/mês × {pjMeses} {pjMeses === 1 ? 'mês' : 'meses'} no período selecionado
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {demais.map(p => {
             const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
             const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
             return (
@@ -1274,19 +1490,28 @@ const STATUS_MEDICAO: Record<string, { label: string; dot: string; bg: string; t
 }
 
 // ── Nova Medição modal ──────────────────────────────────────────────────────
-function NovaMedicaoModal({
-  open, onClose, contratos, medicoes, onToast,
+export function NovaMedicaoModal({
+  open, onClose, contratos, medicoes, onToast, contratoInicial,
 }: {
   open: boolean
   onClose: () => void
   contratos: Contrato[]
   medicoes: ContratoMedicao[]
   onToast: (type: 'success' | 'error', msg: string) => void
+  // Quando informado, o contrato vem pré-selecionado e travado (uso na tela de detalhe).
+  contratoInicial?: string
 }) {
   const criar = useCriarMedicao()
+  const upload = useUploadMedicaoArquivo()
   const today = new Date().toISOString().slice(0, 10)
-  const [contratoId, setContratoId] = useState('')
-  const [numeroBm, setNumeroBm] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [contratoId, setContratoId] = useState(contratoInicial ?? '')
+  const [numeroBm, setNumeroBm] = useState(() => {
+    const cid = contratoInicial ?? ''
+    if (!cid) return ''
+    const n = medicoes.filter(m => m.contrato_id === cid).length + 1
+    return `BM-${String(n).padStart(3, '0')}`
+  })
   const [bmTouched, setBmTouched] = useState(false)
   const [periodoInicio, setPeriodoInicio] = useState(today)
   const [periodoFim, setPeriodoFim] = useState(today)
@@ -1316,12 +1541,12 @@ function NovaMedicaoModal({
   const liquido = Math.max(medido - retencao, 0)
 
   const reset = () => {
-    setContratoId(''); setNumeroBm(''); setBmTouched(false)
+    setContratoId(contratoInicial ?? ''); setNumeroBm(''); setBmTouched(false)
     setPeriodoInicio(today); setPeriodoFim(today)
-    setValorMedido(''); setValorRetencao(''); setObservacoes('')
+    setValorMedido(''); setValorRetencao(''); setObservacoes(''); setFile(null)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!contratoId) { onToast('error', 'Selecione o contrato'); return }
     if (!numeroBm.trim()) { onToast('error', 'Informe o número do BM'); return }
     if (!periodoInicio || !periodoFim) { onToast('error', 'Informe o período (início e fim)'); return }
@@ -1329,8 +1554,8 @@ function NovaMedicaoModal({
     if (medido <= 0) { onToast('error', 'Valor medido deve ser maior que zero'); return }
     if (retencao > medido) { onToast('error', 'Retenção não pode ser maior que o valor medido'); return }
 
-    criar.mutate(
-      {
+    try {
+      const criada = await criar.mutateAsync({
         contrato_id: contratoId,
         numero_bm: numeroBm.trim().toUpperCase(),
         periodo_inicio: periodoInicio,
@@ -1340,15 +1565,22 @@ function NovaMedicaoModal({
         // valor_liquido é coluna gerada no banco (valor_medido - valor_retencao); não enviar
         status: 'em_aprovacao',
         observacoes: observacoes.trim() || undefined,
-      } as any,
-      {
-        onSuccess: () => {
-          onToast('success', 'Medição criada com sucesso')
-          reset(); onClose()
-        },
-        onError: (err: any) => onToast('error', `Erro ao criar medição: ${err?.message ?? 'desconhecido'}`),
+      } as any)
+      if (file) {
+        try {
+          await upload.mutateAsync({ medicaoId: criada.id, file })
+          onToast('success', 'Medição criada com documento anexado')
+        } catch (e: any) {
+          // Medição já existe — não bloqueia; dá pra anexar depois pela lista.
+          onToast('error', `Medição criada, mas o anexo falhou: ${e?.message ?? 'desconhecido'}. Anexe pela lista de medições.`)
+        }
+      } else {
+        onToast('success', 'Medição criada com sucesso')
       }
-    )
+      reset(); onClose()
+    } catch (err: any) {
+      onToast('error', `Erro ao criar medição: ${err?.message ?? 'desconhecido'}`)
+    }
   }
 
   if (!open) return null
@@ -1370,19 +1602,29 @@ function NovaMedicaoModal({
         <div className="p-5 space-y-3">
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contrato</label>
-            <select
-              value={contratoId}
-              onChange={e => handleContratoChange(e.target.value)}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
-            >
-              <option value="">Selecione um contrato vigente</option>
-              {contratosElegiveis.map(c => {
-                const cp = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
-                return (
-                  <option key={c.id} value={c.id}>{c.numero} — {cp}</option>
-                )
-              })}
-            </select>
+            {contratoInicial ? (
+              <div className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-600">
+                {(() => {
+                  const c = contratos.find(x => x.id === contratoInicial)
+                  const cp = c?.fornecedor?.razao_social || c?.fornecedor?.nome_fantasia || c?.cliente?.nome || ''
+                  return c ? `${c.numero}${cp ? ` — ${cp}` : ''}` : 'Contrato atual'
+                })()}
+              </div>
+            ) : (
+              <select
+                value={contratoId}
+                onChange={e => handleContratoChange(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30"
+              >
+                <option value="">Selecione um contrato vigente</option>
+                {contratosElegiveis.map(c => {
+                  const cp = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                  return (
+                    <option key={c.id} value={c.id}>{c.numero} — {cp}</option>
+                  )
+                })}
+              </select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1456,22 +1698,41 @@ function NovaMedicaoModal({
               className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30 resize-none"
             />
           </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Documento (opcional)</label>
+            <p className="text-[11px] text-slate-400 mb-1.5">Planilha de medição, boletim (BM) ou nota — acompanha a medição até o Financeiro.</p>
+            {file ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-fuchsia-700 truncate">
+                  <Paperclip size={12} /> {file.name}
+                </span>
+                <button onClick={() => setFile(null)} disabled={criar.isPending || upload.isPending} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer">
+                <Upload size={14} /> Selecionar arquivo
+                <input type="file" className="hidden" disabled={criar.isPending || upload.isPending}
+                  onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
           <button
             onClick={onClose}
-            disabled={criar.isPending}
+            disabled={criar.isPending || upload.isPending}
             className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-all disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
-            disabled={criar.isPending}
+            disabled={criar.isPending || upload.isPending}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all disabled:opacity-50"
           >
-            {criar.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            {(criar.isPending || upload.isPending) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
             Criar Medição
           </button>
         </div>
@@ -1480,13 +1741,164 @@ function NovaMedicaoModal({
   )
 }
 
+// ── Enviar Medição ao Financeiro (com opção de anexar documento) ─────────────
+function EnviarMedicaoModal({
+  medicao, contrato, onClose, onToast,
+}: {
+  medicao: ContratoMedicao
+  contrato?: Contrato
+  onClose: () => void
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const upload = useUploadMedicaoArquivo()
+  const faturar = useFaturarMedicao()
+  const [file, setFile] = useState<File | null>(null)
+  const busy = upload.isPending || faturar.isPending
+
+  const cp = contrato?.fornecedor?.razao_social || contrato?.fornecedor?.nome_fantasia || contrato?.cliente?.nome || ''
+  const destinoTipo = contrato?.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+
+  const submit = async () => {
+    try {
+      if (file) await upload.mutateAsync({ medicaoId: medicao.id, file })
+      const res = await faturar.mutateAsync(medicao.id)
+      if (res.ok) {
+        const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
+        onToast('success', `Enviada ao ${destino}${res.data_vencimento ? ` • Vence ${fmtData(res.data_vencimento)}` : ''}`)
+        onClose()
+      } else {
+        onToast('error', (res as any).mensagem ?? `Não enviada: ${res.motivo ?? 'desconhecido'}`)
+      }
+    } catch (e: any) {
+      onToast('error', `Erro ao enviar: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Send size={16} className="text-fuchsia-600" />
+            <h2 className="text-sm font-bold text-slate-800">Enviar Medição ao Financeiro</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
+            <div className="flex justify-between"><span className="text-slate-400">Contrato</span><span className="font-semibold text-slate-700">{contrato?.numero ?? '—'}{cp ? ` · ${cp}` : ''}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">BM</span><span className="font-mono font-semibold text-slate-700">{medicao.numero_bm}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Valor líquido</span><span className="font-bold text-fuchsia-700">{fmtFull(medicao.valor_liquido)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Destino</span><span className="font-semibold text-slate-700">{destinoTipo}</span></div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Documento (opcional)</label>
+            <p className="text-[11px] text-slate-400 mb-1.5">Planilha de medição, boletim (BM) ou nota — fica anexado e visível no Financeiro.</p>
+            {file ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-fuchsia-700 truncate">
+                  <Paperclip size={12} /> {file.name}
+                </span>
+                <button onClick={() => setFile(null)} disabled={busy} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={14} /></button>
+              </div>
+            ) : medicao.arquivo_url ? (
+              <div className="flex items-center justify-between gap-2">
+                <a href={medicao.arquivo_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-fuchsia-700 hover:underline truncate">
+                  <ExternalLink size={12} /> {medicao.arquivo_nome || 'Documento já anexado'}
+                </a>
+                <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer shrink-0">
+                  <Upload size={12} /> Trocar
+                  <input type="file" className="hidden" disabled={busy} onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+                </label>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer">
+                <Upload size={14} /> Selecionar arquivo
+                <input type="file" className="hidden" disabled={busy} onChange={e => { const f = e.currentTarget.files?.[0]; if (f) setFile(f) }} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-all disabled:opacity-50">Cancelar</button>
+          <button onClick={submit} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 shadow-sm transition-all disabled:opacity-50">
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            {file ? 'Anexar e Enviar' : 'Enviar ao Financeiro'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Anexar/trocar documento de uma medição já enviada (ex.: envio automático na aprovação).
+function MedicaoAnexoInline({ medicao, onToast }: {
+  medicao: ContratoMedicao
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const upload = useUploadMedicaoArquivo()
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      {medicao.arquivo_url && (
+        <a href={medicao.arquivo_url} target="_blank" rel="noopener noreferrer"
+          title={medicao.arquivo_nome || 'Abrir documento'}
+          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700 hover:bg-fuchsia-100 transition-all">
+          <ExternalLink size={11} /> Documento
+        </a>
+      )}
+      <label
+        title={medicao.arquivo_url ? 'Trocar documento' : 'Anexar documento'}
+        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
+        {upload.isPending ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />}
+        {medicao.arquivo_url ? 'Trocar' : 'Anexar'}
+        <input
+          type="file"
+          className="hidden"
+          disabled={upload.isPending}
+          onChange={async e => {
+            const f = e.currentTarget.files?.[0]
+            e.currentTarget.value = ''
+            if (!f) return
+            try {
+              await upload.mutateAsync({ medicaoId: medicao.id, file: f })
+              onToast('success', 'Documento anexado à medição')
+            } catch (err: any) {
+              onToast('error', `Falha ao anexar: ${err?.message ?? 'desconhecido'}`)
+            }
+          }}
+        />
+      </label>
+    </div>
+  )
+}
+
 function TabMedicoes() {
+  const { isDark } = useTheme()
   const { perfil, isAdmin, hasSetorPapel } = useAuth()
   const podeAprovar = isAdmin || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusSel, setStatusSel] = useState<string[]>(STATUS_MEDICAO_OPTIONS.map(o => o.value))
   const [busca, setBusca] = useState('')
+  const [grupoSel, setGrupoSel] = useState<string[]>(GRUPO_CONTRATO_OPTIONS.map(o => o.value))
+  const [de, setDe] = useState(ymMais(-36))   // default amplo: 3 anos atrás → +12m (mostra tudo)
+  const [ate, setAte] = useState(ymMais(12))
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [novaMedicaoOpen, setNovaMedicaoOpen] = useState(false)
+  const [enviarMedicao, setEnviarMedicao] = useState<ContratoMedicao | null>(null)
+
+  // Chegou pelo menu flutuante "Nova Solicitação > Nova Medição" do módulo
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.has('nova-medicao')) {
+      setNovaMedicaoOpen(true)
+      searchParams.delete('nova-medicao')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data: medicoes = [], isLoading } = useMedicoes()
   const { data: contratos = [] } = useContratos()
@@ -1495,8 +1907,13 @@ function TabMedicoes() {
 
   const contratoMap = new Map(contratos.map(c => [c.id, c]))
 
+  const statusMedAll = statusSel.length === STATUS_MEDICAO_OPTIONS.length
+  const grupoMedAll = grupoSel.length === GRUPO_CONTRATO_OPTIONS.length
   const filtered = medicoes.filter(m => {
-    if (statusFilter && m.status !== statusFilter) return false
+    if (!statusMedAll && !statusSel.includes(m.status)) return false
+    if (!grupoMedAll && !grupoSel.includes(contratoMap.get(m.contrato_id)?.grupo_contrato ?? '')) return false
+    const ym = (m.periodo_fim || m.created_at || '').slice(0, 7)
+    if (ym && (ym < de || ym > ate)) return false
     if (busca) {
       const q = busca.toLowerCase()
       return (
@@ -1518,20 +1935,8 @@ function TabMedicoes() {
     setTimeout(() => setToast(null), 4000)
   }
 
-  const handleEnviar = (medicaoId: string) => {
-    if (!confirm('Enviar esta medição ao Financeiro?\n\nIsso cria automaticamente uma conta a pagar/receber a partir do valor líquido e do prazo do contrato.')) return
-    faturar.mutate(medicaoId, {
-      onSuccess: (res) => {
-        if (res.ok) {
-          const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
-          showToast('success', `Enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
-        } else {
-          showToast('error', `Não enviada: ${res.motivo ?? 'desconhecido'}`)
-        }
-      },
-      onError: () => showToast('error', 'Erro ao enviar medição'),
-    })
-  }
+  // O envio ao Financeiro passa pelo EnviarMedicaoModal (permite anexar documento).
+  // O reenvio manual (status 'aprovado') abre o modal via setEnviarMedicao.
 
   const handleSubmeter = (medicaoId: string) => {
     atualizar.mutate({ id: medicaoId, status: 'em_aprovacao' }, {
@@ -1556,7 +1961,7 @@ function TabMedicoes() {
               const destino = res.tipo_contrato === 'receita' ? 'Contas a Receber' : 'Contas a Pagar'
               showToast('success', `Aprovada e enviada ao ${destino} • Vence ${fmtData(res.data_vencimento!)}`)
             } else {
-              showToast('error', `Aprovada, mas não enviada: ${res.motivo ?? 'desconhecido'}`)
+              showToast('error', (res as any).mensagem ?? `Aprovada, mas não enviada: ${res.motivo ?? 'desconhecido'}`)
             }
           },
           onError: () => showToast('error', 'Aprovada, mas falhou ao enviar ao Financeiro'),
@@ -1574,15 +1979,6 @@ function TabMedicoes() {
     })
   }
 
-  const FILTROS = [
-    { label: 'Todas',         value: '' },
-    { label: 'Em Aprovação',  value: 'em_aprovacao' },
-    { label: 'Aprovadas',     value: 'aprovado' },
-    { label: 'No Financeiro', value: 'faturado' },
-    { label: 'Rejeitadas',    value: 'rejeitado' },
-    { label: 'Rascunho',      value: 'rascunho' },
-  ]
-
   return (
     <div className="space-y-4">
       {toast && (
@@ -1594,53 +1990,27 @@ function TabMedicoes() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-emerald-600 uppercase">Aprovadas</p>
-          <p className="text-xl font-extrabold text-emerald-700 mt-1">{aprovadas}</p>
-        </div>
-        <div className="bg-fuchsia-50 rounded-2xl border border-fuchsia-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-fuchsia-600 uppercase">A Faturar</p>
-          <p className="text-lg font-extrabold text-fuchsia-700 mt-1">{fmt(totalAFaturar)}</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">No Financeiro</p>
-          <p className="text-xl font-extrabold text-blue-700 mt-1">{faturadas}</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 text-center">
-          <p className="text-[10px] font-bold text-slate-500 uppercase">Total Enviado</p>
-          <p className="text-lg font-extrabold text-slate-700 mt-1">{fmt(totalFaturado)}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      {/* Filtros numa linha + resumo inline que atualiza conforme os filtros */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto hide-scrollbar">
+        <span className="shrink-0 text-[11px] text-slate-500 whitespace-nowrap">
+          <b className="text-slate-700">{filtered.length}</b> {filtered.length === 1 ? 'item' : 'itens'} · totalizando <b className="text-slate-700">{fmt(filtered.reduce((s, m) => s + m.valor_liquido, 0))}</b>
+        </span>
+        <div className="relative flex-1 min-w-[160px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar BM, contrato..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/30" />
         </div>
-        <button
-          onClick={() => setNovaMedicaoOpen(true)}
-          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-fuchsia-600 text-white
-            text-xs font-bold hover:bg-fuchsia-700 transition-all shadow-sm whitespace-nowrap"
-        >
-          <Plus size={14} />
-          Nova Medição de Contrato
-        </button>
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-              ${statusFilter === f.value
-                ? 'bg-fuchsia-600 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'}`}>
-            {f.label}
-          </button>
-        ))}
+        <MultiSelect label="Status" options={STATUS_MEDICAO_OPTIONS}
+          selected={statusSel} onChange={setStatusSel} minW={130} />
+        <MultiSelect label="Grupos" options={GRUPO_CONTRATO_OPTIONS}
+          selected={grupoSel} onChange={setGrupoSel} minW={130} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Período</span>
+          <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+          <span className="text-xs text-slate-400">→</span>
+          <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        </div>
       </div>
 
       <NovaMedicaoModal
@@ -1650,6 +2020,16 @@ function TabMedicoes() {
         medicoes={medicoes}
         onToast={showToast}
       />
+
+      {enviarMedicao && (
+        <EnviarMedicaoModal
+          key={enviarMedicao.id}
+          medicao={enviarMedicao}
+          contrato={contratoMap.get(enviarMedicao.contrato_id)}
+          onClose={() => setEnviarMedicao(null)}
+          onToast={showToast}
+        />
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -1761,14 +2141,13 @@ function TabMedicoes() {
                           )}
                           {podeEnviar && (
                             <button
-                              onClick={() => handleEnviar(m.id)}
-                              disabled={faturar.isPending}
+                              onClick={() => setEnviarMedicao(m)}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl
                                 bg-fuchsia-50 border border-fuchsia-200 text-[10px] font-bold text-fuchsia-700
                                 hover:bg-fuchsia-100 transition-all disabled:opacity-50"
-                              title="Reenviar ao Financeiro"
+                              title="Enviar ao Financeiro (com opção de anexar documento)"
                             >
-                              {faturar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                              <Send size={11} />
                               Enviar ao Financeiro
                             </button>
                           )}
@@ -1782,6 +2161,8 @@ function TabMedicoes() {
                               <XCircle size={11} /> Rejeitada
                             </span>
                           )}
+                          {/* Anexo disponível em qualquer status — o doc acompanha a medição até o Financeiro */}
+                          <MedicaoAnexoInline medicao={m} onToast={showToast} />
                         </div>
                       </td>
                     </tr>
@@ -1799,22 +2180,23 @@ function TabMedicoes() {
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
   const { isDark } = useTheme()
-  const [tab, setTab] = useState<Tab>('contratos')
+  const [tab, setTab] = useState<Tab>(() =>
+    new URLSearchParams(window.location.search).has('nova-medicao') ? 'medicoes' : 'contratos')
   const { data: contratos = [] } = useContratos()
   const { data: aditivos = [] } = useAditivos()
   const { data: reajustes = [] } = useReajustes()
   const { data: medicoes = [] } = useMedicoes()
   const { data: parcelas = [] } = useParcelas()
+  const { data: modelos = [] } = useModelosContrato()
 
   const counts: Record<Tab, number> = useMemo(() => ({
     contratos: contratos.length,
     medicoes: medicoes.length,
     recebiveis: parcelas.filter(p => p.contrato?.tipo_contrato === 'receita').length,
     provisionado: parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa').length,
-    aditivos: aditivos.length,
-    reajustes: reajustes.length,
-    vencimentos: contratos.filter(c => c.status === 'vigente').length,
-  }), [contratos, medicoes, parcelas, aditivos, reajustes])
+    aditivos: aditivos.length + reajustes.length,
+    modelos: modelos.length,
+  }), [contratos, medicoes, parcelas, aditivos, reajustes, modelos])
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -1824,7 +2206,7 @@ export default function GestaoContratos() {
           <Briefcase size={18} className="text-indigo-500" /> Gestão de Contratos
         </h1>
         <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Contratos ativos, aditivos, reajustes e vencimentos
+          Contratos ativos, aditivos, reajustes e provisionamento
         </p>
       </div>
 
@@ -1861,9 +2243,8 @@ export default function GestaoContratos() {
         {tab === 'medicoes' && <TabMedicoes />}
         {tab === 'recebiveis' && <TabRecebiveis />}
         {tab === 'provisionado' && <TabProvisionado />}
-        {tab === 'aditivos' && <TabAditivos />}
-        {tab === 'reajustes' && <TabReajustes />}
-        {tab === 'vencimentos' && <TabVencimentos />}
+        {tab === 'modelos' && <ModelosContrato />}
+        {tab === 'aditivos' && <TabAditivosReajustes />}
       </div>
     </div>
   )

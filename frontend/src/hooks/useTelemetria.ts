@@ -21,7 +21,7 @@ export function useUltimasPosicoes() {
       if (error) throw error
       return data as TelUltimaPosicao[]
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
   })
 }
@@ -236,6 +236,6 @@ export function useTelemetriaKPIs() {
         km_hoje: Math.round(km_hoje),
       } as TelemetriaKPIs
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 }

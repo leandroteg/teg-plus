@@ -3,6 +3,13 @@ export type StatusDocumento = 'rascunho' | 'em_revisao' | 'em_aprovacao' | 'vige
 export type TipoDocumento = 'politica' | 'procedimento' | 'instrucao' | 'formulario' | 'manual' | 'outro'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
+export interface SgiComentario {
+  acao: 'rejeitar' | 'esclarecer' | 'comentario'
+  texto: string
+  autor?: string | null
+  data: string
+}
+
 export interface SgiDocumento {
   id: string
   codigo?: string | null
@@ -16,6 +23,7 @@ export interface SgiDocumento {
   publico_alvo?: Record<string, unknown>
   arquivo_url?: string | null
   arquivo_nome?: string | null
+  comentarios?: SgiComentario[]
   proxima_revisao?: string | null
   periodicidade_revisao_meses?: number | null
   responsavel_id?: string | null
@@ -36,6 +44,8 @@ export interface CriarDocumentoPayload {
   area_processo?: string
   requer_ciencia?: boolean
   periodicidade_revisao_meses?: number
+  arquivo_url?: string | null
+  arquivo_nome?: string | null
 }
 
 // ── Label maps (mesma forma dos demais módulos) ───────────────────────────────
@@ -98,8 +108,15 @@ export interface SgiAcao {
   escalonado: boolean
   evidencia_url?: string | null
   concluida_em?: string | null
+  comentarios?: SgiAcaoComentario[] | null
   created_at: string
   updated_at: string
+}
+export interface SgiAcaoComentario {
+  texto: string
+  autor_id?: string | null
+  autor_nome?: string | null
+  data: string
 }
 
 // Identificação de causa (Ishikawa 6M + 5 Porquês) — guardado em sgi_analise_causa.conteudo (jsonb)
@@ -151,7 +168,8 @@ export const STATUS_ACAO_LABEL: Record<StatusAcao, { label: string; bg: string; 
 
 // ════════════════ FASE 3 — Objetivos e Metas ════════════════
 export type DirecaoMeta = 'maior_melhor' | 'menor_melhor'
-export type Farol = 'verde' | 'amarelo' | 'vermelho' | 'cinza'
+// 'azul' = entregue, porém fora do prazo (nem tão bom quanto no prazo, nem tão ruim quanto não feito)
+export type Farol = 'verde' | 'azul' | 'amarelo' | 'vermelho' | 'cinza'
 
 export interface SgiObjetivo {
   id: string
@@ -186,7 +204,7 @@ export interface SgiMeta {
 }
 
 export type StatusCheckinMeta = 'aberto' | 'encerrado' | 'cancelado'
-export type StatusRevisaoMeta = 'atingida' | 'parcial' | 'nao_atingida' | 'cancelada'
+export type StatusRevisaoMeta = 'atingida' | 'atingida_atraso' | 'parcial' | 'nao_atingida' | 'cancelada'
 
 export const STATUS_CHECKIN_CFG: Record<StatusCheckinMeta, { label: string; badge: string }> = {
   aberto:    { label: 'Aberto',    badge: 'bg-sky-100 text-sky-700' },
@@ -194,10 +212,11 @@ export const STATUS_CHECKIN_CFG: Record<StatusCheckinMeta, { label: string; badg
   cancelado: { label: 'Cancelado', badge: 'bg-slate-200 text-slate-600' },
 }
 export const STATUS_REVISAO_CFG: Record<StatusRevisaoMeta, { label: string; badge: string }> = {
-  atingida:     { label: 'Atingida',       badge: 'bg-emerald-100 text-emerald-700' },
-  parcial:      { label: 'Atingida parcial',badge: 'bg-amber-100 text-amber-700' },
-  nao_atingida: { label: 'Não atingida',   badge: 'bg-red-100 text-red-700' },
-  cancelada:    { label: 'Cancelada',      badge: 'bg-slate-200 text-slate-600' },
+  atingida:        { label: 'Atingida',            badge: 'bg-emerald-100 text-emerald-700' },
+  atingida_atraso: { label: 'Atingida c/ atraso',  badge: 'bg-blue-100 text-blue-700' },
+  parcial:         { label: 'Atingida parcial',    badge: 'bg-amber-100 text-amber-700' },
+  nao_atingida:    { label: 'Não atingida',        badge: 'bg-red-100 text-red-700' },
+  cancelada:       { label: 'Cancelada',           badge: 'bg-slate-200 text-slate-600' },
 }
 export interface SgiCheckin {
   id: string
@@ -210,8 +229,9 @@ export interface SgiCheckin {
 }
 
 export const FAROL_CFG: Record<Farol, { label: string; dot: string; bg: string; text: string }> = {
-  verde:    { label: 'No alvo',  dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  amarelo:  { label: 'Atenção',  dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
-  vermelho: { label: 'Crítico',  dot: 'bg-red-500',     bg: 'bg-red-50',     text: 'text-red-700' },
-  cinza:    { label: 'Sem dado', dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-500' },
+  verde:    { label: 'No alvo',        dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  azul:     { label: 'Com atraso',     dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700' },
+  amarelo:  { label: 'Atenção',        dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
+  vermelho: { label: 'Crítico',        dot: 'bg-red-500',     bg: 'bg-red-50',     text: 'text-red-700' },
+  cinza:    { label: 'Sem dado',       dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-500' },
 }

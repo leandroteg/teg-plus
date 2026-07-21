@@ -48,10 +48,13 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
     return [...s].sort()
   }, [mensal, de, ateF])
 
-  // frente(EAP) × mês
+  // frente(EAP) × mês — desconta subcontratadas (execução própria)
   const frente = useMemo(() => {
+    const subKeys = new Set<string>()
+    for (const r of (mensal ?? [])) { if (r.subcontratada) subKeys.add(`${r.numero_os}|${r.competencia}`) }
     const mp = new Map<string, Map<string, number>>()
     for (const r of (secao ?? [])) { const c = r.competencia; const v = Number(r.realizado ?? 0); if (v <= 0 || c < de || c > ateF) continue
+      if (subKeys.has(`${r.numero_os}|${c}`)) continue
       let m = mp.get(r.pacote); if (!m) { m = new Map(); mp.set(r.pacote, m) }; m.set(c, (m.get(c) ?? 0) + v) }
     const rows = PAC_ORD.filter(p => mp.has(p)).map(p => {
       const mm = mp.get(p)!; const vals = meses.map(c => mm.get(c) ?? 0); const total = vals.reduce((s, x) => s + x, 0)
@@ -59,7 +62,7 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
     })
     const totMes = meses.map(c => rows.reduce((s, r) => s + (r.vals[meses.indexOf(c)] ?? 0), 0))
     return { rows, totMes, total: totMes.reduce((s, x) => s + x, 0) }
-  }, [secao, meses, de, ateF])
+  }, [secao, mensal, meses, de, ateF])
 
   // OSC × mês (+ acum, TEG/Sub)
   const oscTab = useMemo(() => {
@@ -75,13 +78,14 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
   // KPIs (último mês × penúltimo, TEG/Sub do período)
   const kpi = useMemo(() => {
     const ult = meses[meses.length - 1]; const pen = meses[meses.length - 2]
-    const somaMes = (c?: string) => c ? (mensal ?? []).filter(r => r.competencia === c).reduce((s, r) => s + Number(r.realizado ?? 0), 0) : 0
+    // KPIs de valor = execução própria (desconta subcontratadas)
+    const somaMes = (c?: string) => c ? (mensal ?? []).filter(r => r.competencia === c && !r.subcontratada).reduce((s, r) => s + Number(r.realizado ?? 0), 0) : 0
     const fUlt = somaMes(ult); const fPen = somaMes(pen)
-    const nOscUlt = ult ? new Set((mensal ?? []).filter(r => r.competencia === ult && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
+    const nOscUlt = ult ? new Set((mensal ?? []).filter(r => r.competencia === ult && !r.subcontratada && Number(r.realizado ?? 0) > 0).map(r => r.numero_os)).size : 0
     let teg = 0, sub = 0
     for (const r of (mensal ?? [])) { const c = r.competencia; const v = Number(r.realizado ?? 0); if (v <= 0 || c < de || c > ateF) continue; if (r.subcontratada) sub += v; else teg += v }
     const tot = teg + sub
-    return { ult, fUlt, nOscUlt, varPct: fPen > 0 ? (fUlt - fPen) / fPen * 100 : null, total: tot, pctTeg: tot ? Math.round(teg / tot * 100) : 0, pctSub: tot ? Math.round(sub / tot * 100) : 0 }
+    return { ult, fUlt, nOscUlt, varPct: fPen > 0 ? (fUlt - fPen) / fPen * 100 : null, total: teg, pctTeg: tot ? Math.round(teg / tot * 100) : 0, pctSub: tot ? Math.round(sub / tot * 100) : 0 }
   }, [mensal, meses, de, ateF])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -102,8 +106,8 @@ export default function MedicaoPainel({ de = '2024-01', ate }: { de?: string; at
       </div>
 
       {/* Comparativo por frente (EAP) mês a mês */}
-      <PanelCard title="Comparativo por frente (EAP) — mês a mês" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
-        right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Var = penúlt → último mês</span>} pad={false} bodyClassName="overflow-x-auto">
+      <PanelCard title="Comparativo por frente (EAP) — mês a mês (execução própria)" icon={<Grid3x3 size={14} className="text-teal-500" />} isDark={isDark}
+        right={<span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>exclui subcontratadas · Var = penúlt → último mês</span>} pad={false} bodyClassName="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>

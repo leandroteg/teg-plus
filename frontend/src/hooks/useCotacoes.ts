@@ -11,7 +11,7 @@ const TABLE_FORN = 'cmp_cotacao_fornecedores'
 const SELECT_COTACAO = `
   id, requisicao_id, comprador_id, status,
   fornecedor_selecionado_id, valor_selecionado, fornecedor_selecionado_nome,
-  observacao, data_limite, data_conclusao,
+  observacao, data_limite, data_conclusao, concluido_por_nome,
   created_at, updated_at, criado_por_nome, atualizado_por_nome,
   requisicao:cmp_requisicoes(
     id, numero, solicitante_nome, obra_nome, descricao, justificativa,
@@ -54,7 +54,7 @@ export function useCotacoes(compradorId?: string, status?: string) {
       return all.map((c: unknown) => {
         const cot = c as Record<string, unknown>
         const comprador = cot.comprador as Record<string, string> | null
-        return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+        return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
       })
     },
     refetchInterval: 60_000,
@@ -79,7 +79,7 @@ export function useCotacao(id?: string) {
 
       const cot = data as Record<string, unknown>
       const comprador = cot.comprador as Record<string, string> | null
-      return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+      return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
     },
     retry: false,
   })
@@ -134,7 +134,7 @@ export function useCotacaoByRequisicao(requisicaoId?: string) {
 
       const cot = data as Record<string, unknown>
       const comprador = cot.comprador as Record<string, string> | null
-      return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
+      return { ...cot, comprador_nome: (cot.concluido_por_nome as string) || comprador?.nome || '' } as Cotacao
     },
     staleTime: 15_000,
   })
@@ -146,6 +146,7 @@ export interface FinalizarCotacaoPayload {
   cotacao_id: string
   requisicao_id: string
   fornecedores: {
+    id?: string   // presente = atualiza a linha existente; ausente = insere nova
     fornecedor_nome: string
     fornecedor_contato?: string
     fornecedor_telefone?: string
@@ -156,11 +157,14 @@ export interface FinalizarCotacaoPayload {
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
-    arquivo_url?: string
+    arquivo_urls?: string[]
     itens_precos?: ItemPreco[]
   }[]
   sem_cotacoes_minimas?: boolean
   justificativa_sem_cotacoes?: string
+  // Fornecedores já salvos que o comprador removeu da tela nesta sessão —
+  // precisam ser deletados, senão ficam órfãos (nunca selecionados, some da UI).
+  fornecedores_removidos_ids?: string[]
 }
 
 export function useFinalizarCotacao() {
@@ -169,8 +173,18 @@ export function useFinalizarCotacao() {
     mutationFn: async (payload: FinalizarCotacaoPayload) => {
       const { cotacao_id, requisicao_id, fornecedores } = payload
 
-      // 1. Insere fornecedores no Supabase
-      const fornecedoresInsert = fornecedores.map(f => ({
+      // 1. Salva fornecedores no Supabase — upsert por id quando a cotação foi
+      //    reaberta (linha já existe), insert quando é fornecedor novo na tela.
+      //    Sem isso, reabrir uma cotação parcial duplicava o fornecedor já salvo.
+      if (payload.fornecedores_removidos_ids && payload.fornecedores_removidos_ids.length > 0) {
+        const { error: delError } = await supabase
+          .from(TABLE_FORN)
+          .delete()
+          .in('id', payload.fornecedores_removidos_ids)
+        if (delError) throw new Error(delError.message)
+      }
+
+      const rowShape = (f: FinalizarCotacaoPayload['fornecedores'][number]) => ({
         cotacao_id,
         fornecedor_nome: f.fornecedor_nome,
         fornecedor_contato: f.fornecedor_contato || null,
@@ -183,16 +197,33 @@ export function useFinalizarCotacao() {
         condicao_pagamento: f.condicao_pagamento || null,
         itens_precos: f.itens_precos ?? [],
         observacao: f.observacao || null,
-        arquivo_url: f.arquivo_url || null,
+        arquivo_urls: f.arquivo_urls ?? [],
         selecionado: false,
-      }))
+      })
 
-      const { data: fornInserted, error: fornError } = await supabase
-        .from(TABLE_FORN)
-        .insert(fornecedoresInsert)
-        .select('id, fornecedor_nome, valor_total, itens_precos')
+      const novos = fornecedores.filter(f => !f.id)
+      const existentes = fornecedores.filter(f => f.id)
+      const fornInserted: { id: string; fornecedor_nome: string; valor_total: number; itens_precos: ItemPreco[] }[] = []
 
-      if (fornError) throw new Error(fornError.message)
+      if (novos.length > 0) {
+        const { data, error } = await supabase
+          .from(TABLE_FORN)
+          .insert(novos.map(rowShape))
+          .select('id, fornecedor_nome, valor_total, itens_precos')
+        if (error) throw new Error(error.message)
+        fornInserted.push(...(data ?? []))
+      }
+
+      for (const f of existentes) {
+        const { data, error } = await supabase
+          .from(TABLE_FORN)
+          .update(rowShape(f))
+          .eq('id', f.id as string)
+          .select('id, fornecedor_nome, valor_total, itens_precos')
+          .single()
+        if (error) throw new Error(error.message)
+        if (data) fornInserted.push(data)
+      }
 
       // 2. Calcula total "escolhido" por fornecedor (soma dos itens com selecionado=true).
       //    Se o comprador selecionou manualmente itens (split), o vencedor primário é o
@@ -354,7 +385,7 @@ export function useFinalizarCotacao() {
       try {
         await api.submeterCotacao({
           cotacao_id,
-          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [], arquivo_url: f.arquivo_url ?? null })),
+          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [], arquivo_urls: f.arquivo_urls ?? [] })),
         })
       } catch {
         // n8n indisponível, tudo já está salvo no Supabase

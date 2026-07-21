@@ -8,14 +8,18 @@ import {
   UserPlus, ClipboardList, ShieldCheck, FileText, Stethoscope, Truck,
   HeartHandshake, CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
   ChevronRight as ChevR, Paperclip, AlertTriangle, XCircle, HelpCircle, Loader2,
-  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake,
+  Smartphone, Circle, MinusCircle, User, Building2, Calendar, Briefcase, Handshake, Upload,
+  ChevronDown, Check,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao } from '../../hooks/useRHAdmissaoFluxo'
+import {
+  useAdmissoesFluxo, useMissoesDocsStatus, useParecerQualificacao,
+  useAnexarDocMissao, useUploadAnexoCandidato,
+} from '../../hooks/useRHAdmissaoFluxo'
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
-import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard } from '../../components/rh/RHAdmissaoEtapas'
+import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard, ExcluirAdmissaoBtn } from '../../components/rh/RHAdmissaoEtapas'
 import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
@@ -24,13 +28,13 @@ type EtapaAdmissao = EtapaAdmissaoFluxo
 const ETAPAS: { key: EtapaAdmissao; num: number; label: string; descricao: string; icon: typeof Receipt }[] = [
   { key: 'requisicao',          num: 1, label: 'Pendente',                 descricao: 'Requisições aguardando envio para aprovação.',                   icon: ClipboardList },
   { key: 'aprovacao',           num: 2, label: 'Aprovação',               descricao: 'Diretoria autoriza a admissão solicitada.',                      icon: ShieldCheck },
-  { key: 'proposta_alinhamento', num: 3, label: 'Proposta e Alinhamento', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
+  { key: 'proposta_alinhamento', num: 3, label: 'Proposta', descricao: 'Proposta de contratação, aceite e alinhamento de chegada.',      icon: Handshake },
   { key: 'documentacao',        num: 4, label: 'Documentação',            descricao: 'Envio e conferência da documentação do colaborador.',            icon: FileText },
   { key: 'exames_treinamentos', num: 5, label: 'Exames',                  descricao: 'Exame admissional (ASO) — agendamento e resultado.',             icon: Stethoscope },
   { key: 'registro',            num: 6, label: 'Registro',                descricao: 'Ficha p/ contabilidade, contrato, assinatura e matrícula.',      icon: ClipboardList },
   { key: 'mobilizacao',         num: 7, label: 'Mobilização',             descricao: 'Logística de deslocamento e chegada à obra.',                    icon: Truck },
-  { key: 'integracao',          num: 8, label: 'Treinamentos e Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
-  { key: 'liberado',            num: 9, label: 'Liberado',                descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
+  { key: 'integracao',          num: 8, label: 'Integração', descricao: 'Treinamentos obrigatórios (NRs) + onboarding com RH e Gestor.', icon: HeartHandshake },
+  { key: 'liberado',            num: 9, label: 'Liberação',               descricao: 'Colaborador apto, ativo e liberado para iniciar as atividades.', icon: CheckCircle2 },
 ]
 
 const ETAPA_ICON: Record<Exclude<EtapaAdmissao, 'cancelada'>, typeof Receipt> = Object.fromEntries(
@@ -61,6 +65,112 @@ const ACCENT_DARK: Record<Exclude<EtapaAdmissao, 'cancelada'>, { bg: string; bgA
   liberado:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200', icon: 'text-emerald-400' },
 }
 
+// ── Status derivado por admissão (etapa-aware; reflete o sub-status GESET) ─────
+type StatusInfo = { key: string; label: string; cls: string }
+function admStatus(a: RHAdmissao): StatusInfo {
+  if (a.status_aprovacao === 'rejeitado') return { key: 'rejeitado', label: 'Rejeitado', cls: 'bg-red-100 text-red-700' }
+  if (a.status_aprovacao === 'esclarecimento') return { key: 'esclarecer', label: 'Esclarecer', cls: 'bg-amber-100 text-amber-700' }
+  const aguardandoGeset = (a.candidatos ?? []).some(
+    c => (c.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao',
+  )
+  if (a.etapa === 'liberado') {
+    return aguardandoGeset
+      ? { key: 'aguardando', label: 'Aguardando liberação', cls: 'bg-amber-100 text-amber-700' }
+      : { key: 'liberado', label: 'Liberado', cls: 'bg-emerald-100 text-emerald-700' }
+  }
+  if (a.etapa === 'integracao') {
+    return aguardandoGeset
+      ? { key: 'aguardando', label: 'Aguardando liberação', cls: 'bg-amber-100 text-amber-700' }
+      : { key: 'em_integracao', label: 'Em integração', cls: 'bg-teal-100 text-teal-700' }
+  }
+  if (a.etapa === 'aprovacao') return { key: 'aprovacao', label: 'Aguardando aprovação', cls: 'bg-amber-100 text-amber-700' }
+  return { key: 'pendente', label: 'Pendente', cls: 'bg-amber-100 text-amber-700' }
+}
+
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const mesLabel = (ym: string) => {
+  const [y, m] = ym.split('-')
+  return `${MESES_ABREV[Number(m) - 1] ?? m}/${y}`
+}
+
+// ── Dropdown de filtro compacto (padrão da linha de filtros) ───────────────────
+function FiltroSelect({ value, onChange, options, placeholder, isDark }: {
+  value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder: string; isDark: boolean
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border outline-none transition-all cursor-pointer ${
+        value
+          ? isDark ? 'bg-white/10 text-white border-white/10' : 'bg-slate-100 text-slate-800 border-slate-200'
+          : isDark ? 'bg-transparent text-slate-400 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+      }`}>
+      <option value="">{placeholder}</option>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  )
+}
+
+// ── Filtro multi-seleção (caixas selecionáveis num popover) ────────────────────
+function MultiFiltro({ label, selected, onChange, options, isDark }: {
+  label: string; selected: string[]; onChange: (v: string[]) => void
+  options: { value: string; label: string }[]; isDark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const active = selected.length > 0
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+          active
+            ? isDark ? 'bg-white/10 text-white border-white/10' : 'bg-slate-100 text-slate-800 border-slate-200'
+            : isDark ? 'bg-transparent text-slate-400 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+        }`}>
+        {label}{active && ` (${selected.length})`}
+        <ChevronDown size={11} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+      </button>
+      {open && (
+        <div className={`absolute z-30 mt-1 min-w-[190px] max-h-64 overflow-y-auto rounded-lg border shadow-lg p-1 ${
+          isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
+        }`}>
+          {options.length === 0 && <p className="px-2 py-1.5 text-[11px] text-slate-400">Sem opções</p>}
+          {options.map(o => {
+            const on = selected.includes(o.value)
+            return (
+              <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-left transition-colors ${
+                  isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                }`}>
+                <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                  on ? 'bg-teal-500 border-teal-500' : isDark ? 'border-white/20' : 'border-slate-300'
+                }`}>
+                  {on && <Check size={10} className="text-white" />}
+                </span>
+                <span className="truncate">{o.label}</span>
+              </button>
+            )
+          })}
+          {active && (
+            <button type="button" onClick={() => onChange([])}
+              className={`w-full text-left px-2 py-1.5 mt-0.5 rounded text-[11px] font-medium border-t ${
+                isDark ? 'text-slate-400 hover:bg-white/5 border-white/10' : 'text-slate-500 hover:bg-slate-50 border-slate-100'
+              }`}>
+              Limpar seleção
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tela principal ────────────────────────────────────────────────────────────
 export default function RHAdmissao() {
   const { isLightSidebar: isLight } = useTheme()
@@ -83,8 +193,20 @@ export default function RHAdmissao() {
   const [sortField, setSortField] = useState('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [fBase, setFBase] = useState<string[]>([])
+  const [fDepto, setFDepto] = useState<string[]>([])
+  const [fMes, setFMes] = useState('')
+  const [fUrg, setFUrg] = useState('')
+  const [fStatus, setFStatus] = useState('')
 
-  const { data: admissoes = [], isLoading } = useAdmissoesFluxo()
+  const { data: admissoesRaw = [], isLoading } = useAdmissoesFluxo()
+  // Encerradas (arquivadas) saem do board por completo
+  const admissoes = useMemo(() => admissoesRaw.filter(a => !a.arquivada), [admissoesRaw])
+
+  // Status é específico da etapa. Liberação já entra pré-filtrada em "Aguardando liberação".
+  useEffect(() => { setFStatus(etapa === 'liberado' ? 'aguardando' : '') }, [etapa])
+
+  const temFiltroStatus = etapa === 'integracao' || etapa === 'liberado'
 
   // Abertura via ?nova=1 (menu Nova Solicitação → Admissão)
   useEffect(() => {
@@ -97,10 +219,40 @@ export default function RHAdmissao() {
 
   const ativa = ETAPAS.find(e => e.key === etapa) ?? ETAPAS[0]
   const counts = ETAPAS.reduce((acc, e) => {
-    acc[e.key] = admissoes.filter(a => (a.etapa ?? 'requisicao') === e.key).length
+    const naEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === e.key)
+    // Liberação: o badge conta só quem ainda está "Aguardando liberação" no GESET
+    acc[e.key] = e.key === 'liberado'
+      ? naEtapa.filter(a => admStatus(a).key === 'aguardando').length
+      : naEtapa.length
     return acc
   }, {} as Record<EtapaAdmissao, number>)
   const itensEtapa = admissoes.filter(a => (a.etapa ?? 'requisicao') === etapa)
+
+  // Opções de filtro — base/mês são globais (consistentes entre abas); status é da etapa
+  const baseOptions = useMemo(
+    () => Array.from(new Set(admissoes.map(a => a.base).filter(Boolean) as string[])).sort()
+      .map(b => ({ value: b, label: b })),
+    [admissoes],
+  )
+  // Departamento vem do organograma (colaborador vinculado). Dedup case-insensitive.
+  const deptoOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    admissoes.forEach(a => (a.candidatos ?? []).forEach(c => {
+      const d = (c.colaborador?.departamento ?? '').trim()
+      if (d && !seen.has(d.toLowerCase())) seen.set(d.toLowerCase(), d)
+    }))
+    return Array.from(seen, ([value, label]) => ({ value, label })).sort((x, y) => x.label.localeCompare(y.label))
+  }, [admissoes])
+  const mesOptions = useMemo(
+    () => Array.from(new Set(admissoes.map(a => (a.created_at ?? '').slice(0, 7)).filter(Boolean)))
+      .sort().reverse().map(m => ({ value: m, label: mesLabel(m) })),
+    [admissoes],
+  )
+  const statusOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    itensEtapa.forEach(a => { const s = admStatus(a); if (!seen.has(s.key)) seen.set(s.key, s.label) })
+    return Array.from(seen, ([value, label]) => ({ value, label }))
+  }, [itensEtapa])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -114,6 +266,14 @@ export default function RHAdmissao() {
           || (a.motivo ?? '').toLowerCase().includes(q)
       })
     }
+    if (fBase.length) l = l.filter(a => fBase.includes(a.base ?? ''))
+    if (fDepto.length) l = l.filter(a => (a.candidatos ?? []).some(c => {
+      const d = (c.colaborador?.departamento ?? '').trim().toLowerCase()
+      return !!d && fDepto.includes(d)
+    }))
+    if (fMes) l = l.filter(a => (a.created_at ?? '').slice(0, 7) === fMes)
+    if (fUrg) l = l.filter(a => (fUrg === 'sim' ? !!a.urgente : !a.urgente))
+    if (fStatus && temFiltroStatus) l = l.filter(a => admStatus(a).key === fStatus)
     const dir = sortDir === 'asc' ? 1 : -1
     return [...l].sort((x, y) => {
       if (sortField === 'candidato') {
@@ -123,7 +283,7 @@ export default function RHAdmissao() {
       }
       return (new Date(x.created_at).getTime() - new Date(y.created_at).getTime()) * dir
     })
-  }, [itensEtapa, busca, sortField, sortDir])
+  }, [itensEtapa, busca, sortField, sortDir, fBase, fDepto, fMes, fUrg, fStatus, temFiltroStatus])
 
   if (view === 'nova') {
     return (
@@ -163,7 +323,17 @@ export default function RHAdmissao() {
               sortField={sortField} setSortField={setSortField} sortDir={sortDir} setSortDir={setSortDir}
               viewMode={viewMode} setViewMode={setViewMode}
               count={filtrados.length} total={itensEtapa.length}
-            />
+            >
+              <MultiFiltro label="Base" selected={fBase} onChange={setFBase} options={baseOptions} isDark={isDark} />
+              <MultiFiltro label="Departamento" selected={fDepto} onChange={setFDepto} options={deptoOptions} isDark={isDark} />
+              <FiltroSelect value={fMes} onChange={setFMes} options={mesOptions} placeholder="Mês da solicitação" isDark={isDark} />
+              <FiltroSelect value={fUrg} onChange={setFUrg}
+                options={[{ value: 'sim', label: 'Urgente' }, { value: 'nao', label: 'Não urgente' }]}
+                placeholder="Urgência" isDark={isDark} />
+              {temFiltroStatus && (
+                <FiltroSelect value={fStatus} onChange={setFStatus} options={statusOptions} placeholder="Status" isDark={isDark} />
+              )}
+            </RHFluxoToolbar>
             {filtrados.length === 0 ? (
               <PlaceholderVazio etapa={ativa} isDark={isDark} />
             ) : viewMode !== 'cards' ? (
@@ -198,8 +368,10 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
   const ccTxt = adm.centro_custo ? `${adm.centro_custo.codigo} - ${adm.centro_custo.descricao}` : null
   const criadoPorSuperTEG = (adm.observacoes ?? '').startsWith('[Criado por SuperTEG]')
   return (
-    <button onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all group ${
+    // <div>, e não <button>: os itens de documento carregam <input type="file"> dentro.
+    <div role="button" tabIndex={0} onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      className={`w-full text-left rounded-2xl border p-4 transition-all group cursor-pointer ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-violet-400/40 hover:bg-violet-500/5'
           : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-md'
@@ -208,14 +380,14 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
           <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            {candidatos[0]?.cargo || adm.cargo_previsto || 'Vaga'}
+            {candidatos[0]?.nome || adm.nome_candidato || 'Candidato'}
             {adm.urgente && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Urgente</span>}
             {criadoPorSuperTEG && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">🦸 SuperTEG</span>}
           </p>
           <div className={`flex items-center gap-3 flex-wrap mt-0.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {(candidatos[0]?.cargo || adm.cargo_previsto) && <span className="flex items-center gap-1 font-semibold"><Briefcase size={11} /> {candidatos[0]?.cargo || adm.cargo_previsto}</span>}
             {adm.base && <span className="flex items-center gap-1"><Building2 size={11} /> {adm.base}</span>}
-            {ccTxt && <span className="flex items-center gap-1"><Briefcase size={11} /> {ccTxt}</span>}
-            {adm.departamento_previsto && <span>{adm.departamento_previsto}</span>}
+            {ccTxt && <span>{ccTxt}</span>}
             {adm.data_prevista_inicio && (
               <span className="flex items-center gap-1"><Calendar size={11} /> início {new Date(adm.data_prevista_inicio).toLocaleDateString('pt-BR')}</span>
             )}
@@ -227,31 +399,34 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
       {/* Progresso de docs por candidato */}
       <div className="space-y-1.5">
         {candidatos.map(c => (
-          <DocCandidatoProgress key={c.id} candidatoId={c.id} nome={c.nome} isDark={isDark}
+          <DocCandidatoProgress key={c.id} candidatoId={c.id} admissaoId={adm.id} nome={c.nome} isDark={isDark}
             temPesquisaHistorico={(c.anexos ?? []).some(a => a.tipo === 'pesquisa_historico')} />
         ))}
         {candidatos.length === 0 && (
           <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum candidato.</p>
         )}
       </div>
-    </button>
+    </div>
   )
 }
 
-function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico }: {
-  candidatoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
+function DocCandidatoProgress({ candidatoId, admissaoId, nome, isDark, temPesquisaHistorico }: {
+  candidatoId: string; admissaoId: string; nome?: string; isDark: boolean; temPesquisaHistorico?: boolean
 }) {
+  const { perfil } = useAuth()
   const { data: docs = [], isLoading } = useMissoesDocsStatus(candidatoId)
   const { data: parecer } = useParecerQualificacao(candidatoId)
+  const anexar = useAnexarDocMissao()
+  const uploadAnexo = useUploadAnexoCandidato()
+  const [subindo, setSubindo] = useState<string | null>(null)
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null)
   const total = docs.length
   const ok = docs.filter(d => d.status === 'concluida' || d.status === 'dispensada').length
   const completo = total > 0 && ok === total && !!temPesquisaHistorico
 
   return (
     <div className={`rounded-xl border px-3 py-2 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/60'}`}>
-      <div className="flex items-center gap-2">
-        <User size={12} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
-        <span className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{nome || 'Candidato'}</span>
+      <div className="flex items-center gap-2 justify-end">
         {parecer && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
             parecer.aprovado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
@@ -275,37 +450,88 @@ function DocCandidatoProgress({ candidatoId, nome, isDark, temPesquisaHistorico 
       </div>
       {total > 0 && (
         <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap mt-1.5">
-          {docs.map(d => (
-            <span key={d.missao_id} className="flex items-center gap-1 min-w-0">
-              {d.status === 'concluida'
-                ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-                : d.status === 'dispensada'
-                  ? <MinusCircle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
-                  : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
-              <span className={`text-[10px] truncate ${
-                d.status === 'concluida'
-                  ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
+          {docs.map(d => {
+            const rotulo = d.titulo.replace(/^Enviar /, '').replace(/ \(se aplicável\)$/, '')
+            if (d.status === 'concluida') {
+              return (
+                <span key={d.missao_id} className="flex items-center gap-1 min-w-0">
+                  <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                  <span className={`text-[10px] truncate ${isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold'}`}>{rotulo}</span>
+                </span>
+              )
+            }
+            const enviando = anexar.isPending && subindo === d.missao_id
+            return (
+              <label key={d.missao_id}
+                title={`Anexar ${rotulo}`}
+                onClick={e => e.stopPropagation()}
+                className={`flex items-center gap-1 min-w-0 group/doc cursor-pointer rounded px-0.5 -mx-0.5 ${
+                  isDark ? 'hover:bg-teal-500/10' : 'hover:bg-teal-50'}`}>
+                {enviando
+                  ? <Loader2 size={11} className="animate-spin text-teal-500 shrink-0" />
                   : d.status === 'dispensada'
+                    ? <MinusCircle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'} group-hover/doc:text-teal-500`} />}
+                <span className={`text-[10px] truncate ${
+                  d.status === 'dispensada'
                     ? (isDark ? 'text-slate-600 line-through' : 'text-slate-400 line-through')
                     : (isDark ? 'text-slate-500' : 'text-slate-400')
-              }`}>
-                {d.titulo.replace(/^Enviar /, '').replace(/ \(se aplicável\)$/, '')}
+                } group-hover/doc:text-teal-600`}>
+                  {rotulo}
+                </span>
+                <Upload size={9} className="shrink-0 text-teal-500 opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                  disabled={anexar.isPending}
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    e.currentTarget.value = ''
+                    if (!file) return
+                    setErroAnexo(null); setSubindo(d.missao_id)
+                    anexar.mutate(
+                      { missaoId: d.missao_id, admissaoId, candidatoId, docTipo: d.doc_tipo, file, autorId: perfil?.id },
+                      { onError: err => setErroAnexo(err instanceof Error ? err.message : 'Falha ao anexar'), onSettled: () => setSubindo(null) },
+                    )
+                  }} />
+              </label>
+            )
+          })}
+          {/* Pesquisa Histórico — interno do RH (não vira missão do colaborador) */}
+          {temPesquisaHistorico ? (
+            <span className="flex items-center gap-1 min-w-0">
+              <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+              <span className={`text-[10px] truncate ${isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold'}`}>
+                Pesquisa Histórico 🔒
               </span>
             </span>
-          ))}
-          {/* Pesquisa Histórico — interno do RH */}
-          <span className="flex items-center gap-1 min-w-0">
-            {temPesquisaHistorico
-              ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-              : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />}
-            <span className={`text-[10px] truncate ${temPesquisaHistorico
-              ? (isDark ? 'text-slate-200 font-semibold' : 'text-slate-700 font-semibold')
-              : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
-              Pesquisa Histórico 🔒
-            </span>
-          </span>
+          ) : (
+            <label title="Anexar Pesquisa Histórico"
+              onClick={e => e.stopPropagation()}
+              className={`flex items-center gap-1 min-w-0 group/doc cursor-pointer rounded px-0.5 -mx-0.5 ${
+                isDark ? 'hover:bg-teal-500/10' : 'hover:bg-teal-50'}`}>
+              {uploadAnexo.isPending
+                ? <Loader2 size={11} className="animate-spin text-teal-500 shrink-0" />
+                : <Circle size={11} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'} group-hover/doc:text-teal-500`} />}
+              <span className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'} group-hover/doc:text-teal-600`}>
+                Pesquisa Histórico 🔒
+              </span>
+              <Upload size={9} className="shrink-0 text-teal-500 opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                disabled={uploadAnexo.isPending}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.currentTarget.value = ''
+                  if (!file) return
+                  setErroAnexo(null)
+                  uploadAnexo.mutate(
+                    { admissaoId, candidatoId, file, tipo: 'pesquisa_historico', autorId: perfil?.id },
+                    { onError: err => setErroAnexo(err instanceof Error ? err.message : 'Falha ao anexar') },
+                  )
+                }} />
+            </label>
+          )}
         </div>
       )}
+      {erroAnexo && <p className="text-[10px] text-red-500 font-semibold mt-1">{erroAnexo}</p>}
     </div>
   )
 }
@@ -321,8 +547,9 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       ? `${candidatos[0].nome || 'Candidato'} +${nCand - 1}`
       : (adm.nome_candidato || 'Solicitação de admissão')
   return (
+    <div className="relative">
     <button onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all group flex items-center gap-3 ${
+      className={`w-full text-left rounded-2xl border p-4 pr-16 transition-all group flex items-center gap-3 ${
         isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.05]' : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
       }`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-100'}`}>
@@ -355,6 +582,8 @@ function AdmissaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: boole
       </div>
       <ChevR size={14} className={`shrink-0 ${isDark ? 'text-slate-600 group-hover:text-violet-400' : 'text-slate-300 group-hover:text-violet-500'} transition-colors`} />
     </button>
+      <ExcluirAdmissaoBtn admId={adm.id} nome={titulo} className="absolute top-1/2 -translate-y-1/2 right-9 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" />
+    </div>
   )
 }
 
@@ -372,6 +601,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
             <th className="text-center px-3 py-2 font-semibold">Docs</th>
             <th className={th}>Status</th>
             <th className={th}>Data</th>
+            <th className="px-2 py-2" />
           </tr>
         </thead>
         <tbody>
@@ -379,12 +609,7 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
             const cands = a.candidatos ?? []
             const nDocs = cands.reduce((s, c) => s + (c.anexos?.length ?? 0), 0)
             const nome = cands.length === 1 ? (cands[0].nome || '—') : cands.length > 1 ? `${cands[0].nome || 'Candidato'} +${cands.length - 1}` : (a.nome_candidato || '—')
-            const statusTxt = a.status_aprovacao === 'rejeitado' ? 'Rejeitado'
-              : a.status_aprovacao === 'esclarecimento' ? 'Esclarecer'
-              : a.etapa === 'aprovacao' ? 'Aguardando aprovação' : 'Pendente'
-            const statusCls = a.status_aprovacao === 'rejeitado' ? 'bg-red-100 text-red-700'
-              : a.status_aprovacao === 'esclarecimento' ? 'bg-amber-100 text-amber-700'
-              : 'bg-amber-100 text-amber-700'
+            const status = admStatus(a)
             return (
               <tr key={a.id} onClick={() => onSelect(a)}
                 className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
@@ -394,8 +619,9 @@ function AdmissaoLista({ itens, isDark, onSelect }: { itens: RHAdmissao[]; isDar
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.base || '—'}</td>
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{a.centro_custo?.codigo || '—'}</td>
                 <td className={`px-3 py-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{nDocs}</td>
-                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusCls}`}>{statusTxt}</span></td>
+                <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span></td>
                 <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(a.created_at).toLocaleDateString('pt-BR')}</td>
+                <td className="px-2 py-2 text-right"><ExcluirAdmissaoBtn admId={a.id} nome={nome} /></td>
               </tr>
             )
           })}
@@ -560,7 +786,7 @@ function EtapaRail({
         onWheel={handleWheel}
         className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
       >
-        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:w-full">
+        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:min-w-0 md:w-full md:pr-0">
           {ETAPAS.map(e => {
             const count = counts[e.key] || 0
             const isActive = etapa === e.key
@@ -570,7 +796,7 @@ function EtapaRail({
               <button
                 key={e.key}
                 onClick={() => setEtapa(e.key)}
-                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
                   isActive
                     ? `${accent.bgActive} ${accent.textActive} border font-bold shadow-sm ${accent.border}`
                     : `${accent.bg} ${accent.text} font-medium`

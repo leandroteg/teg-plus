@@ -151,7 +151,7 @@ export function useParcelas(contratoId?: string, filters?: { status?: string }) 
         .from('con_parcelas')
         .select(`
           *,
-          contrato:con_contratos!contrato_id(numero, objeto, tipo_contrato, status, valor_mensal, recorrente, data_inicio, data_fim_previsto)
+          contrato:con_contratos!contrato_id(numero, objeto, tipo_contrato, status, grupo_contrato, contraparte_nome, valor_mensal, recorrente, data_inicio, data_fim_previsto)
         `)
         .order('data_vencimento', { ascending: true })
       if (contratoId) q = q.eq('contrato_id', contratoId)
@@ -397,6 +397,62 @@ export function useCriarMedicao() {
       qc.invalidateQueries({ queryKey: ['con-medicoes', vars.contrato_id] })
       qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
     },
+  })
+}
+
+// ── Anexo de documento da medição ──────────────────────────────────────────
+// Upload do documento (planilha/BM/NF) da medição. Reaproveita o bucket
+// contratos-anexos sob o prefixo medicoes/<id>/. Grava arquivo_url/nome na medição;
+// o Financeiro lê esse doc ao vivo pelo medicao_id da conta a pagar/receber.
+export function useUploadMedicaoArquivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ medicaoId, file }: { medicaoId: string; file: File }) => {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `medicoes/${medicaoId}/${Date.now()}_${safe}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('contratos-anexos')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('contratos-anexos')
+        .getPublicUrl(path)
+
+      const { data, error } = await supabase
+        .from('con_medicoes')
+        .update({ arquivo_url: urlData.publicUrl, arquivo_nome: file.name })
+        .eq('id', medicaoId)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoMedicao
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['con-medicoes'] })
+      qc.invalidateQueries({ queryKey: ['con-medicoes', data.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contrato-medicoes', data.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['medicao-doc', data.id] })
+    },
+  })
+}
+
+// Lê apenas o documento de uma medição (usado pelo Financeiro via medicao_id da conta).
+export function useMedicaoDoc(medicaoId?: string | null) {
+  return useQuery({
+    queryKey: ['medicao-doc', medicaoId],
+    enabled: !!medicaoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_medicoes')
+        .select('id, numero_bm, arquivo_url, arquivo_nome')
+        .eq('id', medicaoId!)
+        .maybeSingle()
+      if (error) throw error
+      return data as { id: string; numero_bm: string; arquivo_url: string | null; arquivo_nome: string | null } | null
+    },
+    staleTime: 60_000,
   })
 }
 

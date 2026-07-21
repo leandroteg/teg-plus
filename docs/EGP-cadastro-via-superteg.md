@@ -14,20 +14,30 @@ Projeto Supabase: `uzfjfucrinokeuwpbeie`. Contrato CEMIG `portfolio_id = 2cd4557
 
 ## 1. Nova Obra / OSC  (documento de abertura da OSC)
 
-Contexto recebido: `{ numero_os, projeto_id, portfolio_id, tipo, abertura_path, doc_url }`.
-A casca já existe em `pmo_fluxo_os` (criada pelo frontend) — **NÃO criar outra**; **atualizar** a existente.
+Contexto recebido: `{ casca_id, numero_os, projeto_id, projeto_nome, portfolio_id, tipo, arquivo_nome }` + `doc_url` (assinada pelo n8n).
+A casca já existe em `pmo_fluxo_os` (criada pelo frontend) — **NÃO criar outra**; **atualizar pela `casca_id`**.
 
-### 1.1 `pmo_fluxo_os` (a OSC) — ATUALIZAR a linha da casca
-Chave de busca: `numero_os` **+** `projeto_id` (pmo_fluxo_os **não tem unique** em numero_os → buscar antes).
-- `GET /rest/v1/pmo_fluxo_os?numero_os=eq.{n}&projeto_id=eq.{p}&select=id` → se achar, **PATCH** nessa `id`; se não, **POST** (com `portfolio_id`, `projeto_id`).
-- Campos a preencher do PDF: `valor` (valor total da OSC, numeric), `quantidade_us`, `saldo_us`, `saldo_reais`,
-  `data_osc` (date YYYY-MM-DD), `vencimento` (date), `qtd_torres` (int), `tipo` (`construcao|manutencao|deposito`),
-  `tipo_servico`, `tipo_obra`, `etapa_atual` (manter `aberta` se já recebida). **Não** sobrescrever `abertura_path`.
+Hierarquia: **Projeto/Frente (pmo_projetos) › Obra (sys_obras) › OSC (pmo_fluxo_os)**. A casca entra ligada à frente
+(`projeto_id`) mas **sem `obra_id`** — é o SuperTEG que identifica a obra pelo documento. Sem `obra_id` a OSC
+**não aparece** na árvore do EGP (filtra por obra).
+
+### 1.1 `pmo_fluxo_os` (a OSC) — ATUALIZAR a linha da casca (`PATCH ?id=eq.{casca_id}`)
+1. **Normalizar `numero_os`**: ler o número REAL da OSC no PDF (ex: `OSC-EA-885-031/2026`) e gravar limpo
+   (sem nome de arquivo, sem sufixos tipo `-Manifesto`). O valor que veio do front é provisório.
+2. **Identificar a OBRA** (`obra_id`): `GET /rest/v1/sys_obras?pmo_projeto_id=eq.{projeto_id}&select=id,nome,codigo`.
+   Normalizar os nomes dos dois lados (MAIÚSCULAS, sem acento, `/` e `-` → espaço, remover `, 138 KV`/`kV`/pontuação)
+   e fazer **match fuzzy por similaridade** entre o título da obra no documento (e em `arquivo_nome`) e os nomes das
+   obras. O match **nunca é perfeito** — escolher a mais parecida com boa confiança e gravar `obra_id`. Se **não** houver
+   candidata com confiança razoável, **deixar `obra_id` null** e incluir em `avisos`: `"obra nao identificada: <nome procurado>"`
+   (a tela pede confirmação manual). **Nunca** criar `sys_obras` novo nem chutar.
+3. Campos do PDF: `valor` (total da OSC, numeric), `quantidade_us`, `saldo_us`, `saldo_reais`,
+   `data_osc` (YYYY-MM-DD), `vencimento` (date), `qtd_torres` (int), `tipo` (`construcao|manutencao|deposito`),
+   `tipo_servico`, `tipo_obra`. Manter `etapa_atual='recebida'`. **Não** sobrescrever `abertura_path`.
 - Validar: `valor >= 0`; datas em ISO; se um campo não estiver no PDF, **deixar como está** (não zerar).
 
 ### 1.2 `pmo_osc_itens` (itens/EAP da OSC) — substituição atômica por OSC
-Cada item do PDF vira uma linha ligada por `fluxo_os_id` (= id da OSC acima). Para não duplicar ao reprocessar:
-1. `DELETE /rest/v1/pmo_osc_itens?fluxo_os_id=eq.{idDaOSC}` (apaga só os itens DESSA OSC).
+Cada item do PDF vira uma linha ligada por `fluxo_os_id` (= `casca_id`). Para não duplicar ao reprocessar:
+1. `DELETE /rest/v1/pmo_osc_itens?fluxo_os_id=eq.{casca_id}` (apaga só os itens DESSA OSC).
 2. `POST` os itens extraídos.
 
 Colunas: `fluxo_os_id`, `subsec_codigo` (ex. `4.2.1`), `subsec_nome`, `secao`, `unidade` (`m³|ton|km|un|vb...`),
@@ -73,9 +83,14 @@ A linha do documento já existe em `pmo_medicoes` (casca + anexo). A medição p
 
 ---
 
-## 4. Acionamento (n8n)
+## 4. Acionamento (n8n)  — workflow `HxbqC3F2zEAXniNd` "EGP - Parse e Cadastro (SuperTEG)"
 
-Frontend (EGP › Novo Registro) → sobe anexo no bucket (`egp-osc-abertura` / `egp-medicoes`) → cria a casca →
-gera **signed URL** → POST `webhook n8n egp-parse-cadastro` `{ tipo:'osc'|'medicao', doc_url, contexto }` →
-n8n chama o SuperTEG (`/chat` ou rota dedicada) com **este documento + o contexto** → SuperTEG lê o doc e cadastra
-seguindo as regras acima → responde resumo. (Mesmo padrão do `egp-riscos-analisar` e `egp/parse-osc`.)
+Frontend (EGP › Novo Registro) sobe o anexo no bucket (`egp-osc-abertura` / `egp-medicoes`), cria a casca e faz
+**POST** no webhook `egp-parse-cadastro` com um JSON pequeno: `{ tipo:'osc'|'medicao', bucket, path, contexto, run_id }`.
+O **n8n** então: (1) **responde rápido** (202 `{ok,aceito}`) pra não travar o navegador; (2) **assina a URL no servidor**
+(service role) — o front NÃO assina mais (era frágil/falhava em silêncio); (3) chama o SuperTEG `/chat` com
+`doc_url + contexto` → SuperTEG lê o doc e cadastra seguindo as regras acima → grava no banco e responde resumo
+`{ ok, tabela, id, numero_os, obra_id, inseridos, atualizados, avisos[] }`.
+
+> O disparo é assíncrono: o SuperTEG roda depois do 202. O resultado aparece na árvore do EGP quando ele grava
+> `obra_id` + `valor` + itens. Se `obra_id` voltar null (sem match), a OSC fica pendente de confirmação de obra.

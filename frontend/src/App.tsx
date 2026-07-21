@@ -39,6 +39,7 @@ import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
 import LocacaoLayout from './components/LocacaoLayout'
 import SgiLayout from './components/SgiLayout'
+import QsmaLayout from './components/QsmaLayout'
 import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 import PaineisLayout from './components/PaineisLayout'
 import ResponsivePainel from './components/paineis-mobile/ResponsivePainel'
@@ -133,6 +134,9 @@ const RHHolerites = lazy(() => import('./pages/rh/RHHolerites'))
 const DPPainel = lazy(() => import('./pages/rh/DPPainel'))
 const DPBeneficios = lazy(() => import('./pages/rh/DPBeneficios'))
 const DPPonto = lazy(() => import('./pages/rh/DPPonto'))
+const AssinarDocumento = lazy(() => import('./pages/publico/AssinarDocumento'))
+const VerificarAssinatura = lazy(() => import('./pages/publico/VerificarAssinatura'))
+const RelatorioPublico = lazy(() => import('./pages/publico/RelatorioPublico'))
 const DPFolha = lazy(() => import('./pages/rh/DPFolha'))
 const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
 const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
@@ -196,6 +200,13 @@ const SgiObjetivos = lazy(() => import('./pages/sgi/SgiObjetivos'))
 const SgiMelhoriaContinua = lazy(() => import('./pages/sgi/SgiMelhoriaContinua'))
 const SgiPadronizacao = lazy(() => import('./pages/sgi/SgiPadronizacao'))
 
+// QSMA (Projetos › Qualidade, Segurança e Meio Ambiente)
+const QsmaPainel = lazy(() => import('./pages/qsma/QsmaPainel'))
+const QsmaNovoRegistro = lazy(() => import('./pages/qsma/QsmaNovoRegistro'))
+const QsmaInspecoes = lazy(() => import('./pages/qsma/QsmaInspecoes'))
+const QsmaSeguranca = lazy(() => import('./pages/qsma/QsmaSeguranca'))
+const QsmaMeioAmbiente = lazy(() => import('./pages/qsma/QsmaMeioAmbiente'))
+
 // Painéis (hub que reúne os painéis de todos os módulos)
 const PaineisOverview = lazy(() => import('./pages/paineis/PaineisOverview'))
 const PaineisSlideShow = lazy(() => import('./pages/paineis/PaineisSlideShow'))
@@ -228,8 +239,9 @@ const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
+const AdminLogs = lazy(() => import('./pages/admin/Logs'))
 
-// TI — Help Desk (Supabase-nativo, admin-only). Telas legadas preservadas na branch backup/ti-chamados.
+// TI — Help Desk (Supabase-nativo). Telas legadas preservadas na branch backup/ti-chamados.
 const TiHome = lazy(() => import('./pages/ti/Home'))
 const TiChamados = lazy(() => import('./pages/ti/Chamados'))
 const TiNovoChamado = lazy(() => import('./pages/ti/NovoChamado'))
@@ -291,6 +303,13 @@ export default function App() {
         <Route path="/aprovaai"         element={<Lazy><AprovAi /></Lazy>} />
         <Route path="/portal-teg"       element={<Lazy><PortalTEG /></Lazy>} />
 
+        {/* Relatório de investigação QSMA: link público compartilhável */}
+        <Route path="/relatorio" element={<Lazy><RelatorioPublico /></Lazy>} />
+
+        {/* Assinatura eletrônica: públicas (colaborador via missão do Portal) */}
+        <Route path="/assinar/:id"   element={<Lazy><AssinarDocumento /></Lazy>} />
+        <Route path="/verificar/:id" element={<Lazy><VerificarAssinatura /></Lazy>} />
+
         {/* ── TI / Help Desk: exige o módulo 'ti' liberado ao usuário (admin sempre
              entra). Papéis internos: colaborador abre/acompanha chamados e lê a base;
              TiStaffRoute = equipe (atendentes/admin); TiAdminRoute = só admin. ── */}
@@ -335,7 +354,7 @@ export default function App() {
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 
-          {/* TI / Help Desk → bloco admin-only fora do PrivateRoute (acima) */}
+          {/* TI / Help Desk → bloco com ModuleRoute('ti') acima */}
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
@@ -432,6 +451,17 @@ export default function App() {
               <Route path="/sgi/objetivos"     element={<Lazy><SgiObjetivos /></Lazy>} />
               <Route path="/sgi/melhoria"      element={<Lazy><SgiMelhoriaContinua /></Lazy>} />
               <Route path="/sgi/padronizacao"  element={<Lazy><SgiPadronizacao /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo QSMA (Projetos › Qualidade, Segurança e Meio Ambiente) */}
+          <Route element={<ModuleRoute moduleKey="qsma" />}>
+            <Route element={<QsmaLayout />}>
+              <Route path="/qsma"               element={<LazyDash><QsmaPainel /></LazyDash>} />
+              <Route path="/qsma/novo"          element={<Lazy><QsmaNovoRegistro /></Lazy>} />
+              <Route path="/qsma/inspecoes"     element={<Lazy><QsmaInspecoes /></Lazy>} />
+              <Route path="/qsma/seguranca"     element={<Lazy><QsmaSeguranca /></Lazy>} />
+              <Route path="/qsma/meio-ambiente" element={<Lazy><QsmaMeioAmbiente /></Lazy>} />
             </Route>
           </Route>
 
@@ -629,6 +659,7 @@ export default function App() {
             <Route path="/admin/politicas-aprovacao" element={<Lazy><PoliticasAprovacao /></Lazy>} />
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
+            <Route path="/admin/logs" element={<Lazy><AdminLogs /></Lazy>} />
           </Route>
         </Route>
       </Routes>

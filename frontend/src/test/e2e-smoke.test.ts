@@ -481,9 +481,9 @@ describe('TC-AUTH-E2E-003: Module selector renders for admin', () => {
     expect(screen.getByText('Backoffice')).toBeTruthy()
   })
 
-  it('displays the Projetos pillar', () => {
+  it('displays the Operação pillar', () => {
     renderPage(React.createElement(ModuloSelector), ['/'])
-    expect(screen.getByText('Projetos')).toBeTruthy()
+    expect(screen.getByText('Operação')).toBeTruthy()
   })
 
   it('displays the RH pillar', () => {

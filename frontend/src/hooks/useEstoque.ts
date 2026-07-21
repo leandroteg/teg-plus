@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   EstBase, EstItem, EstSaldo, EstMovimentacao, EstSolicitacao,
@@ -65,6 +65,29 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
   })
 }
 
+// Busca ampla no catálogo (sem filtro de categoria) — usada no vínculo MANUAL
+// de item órfão de RC, onde o comprador já sabe qual item apontar e não pode
+// ser limitado pelo mapeamento categoria→estoque.
+export function useItemCatalogSearchAll(search: string) {
+  return useQuery<EstItem[]>({
+    queryKey: ['est-itens-catalog-all', search],
+    enabled: search.trim().length >= 2,
+    queryFn: async () => {
+      const term = `%${search.trim()}%`
+      const { data, error } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, categoria, categoria_financeira_descricao, valor_medio')
+        .eq('ativo', true)
+        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
+        .order('descricao')
+        .limit(30)
+      if (error) return []
+      return (data ?? []) as EstItem[]
+    },
+    staleTime: 15_000,
+  })
+}
+
 // ── Bases ─────────────────────────────────────────────────────────────────────
 export function useBases() {
   return useQuery<EstBase[]>({
@@ -78,6 +101,8 @@ export function useBases() {
       if (error) return []
       return (data ?? []) as EstBase[]
     },
+    // Bases raramente mudam e este hook monta em toda página (NotificationBell).
+    staleTime: 300_000,
   })
 }
 
@@ -129,10 +154,53 @@ export function useEstoqueItem(id: string | undefined) {
   })
 }
 
+// Ficha pública do item (QR /e/:codigo): item + saldo por base + últimas movimentações.
+export interface FichaItemEstoque {
+  item: EstItem
+  saldos: EstSaldo[]
+  movimentacoes: EstMovimentacao[]
+}
+export function useFichaItemEstoque(codigo: string | undefined) {
+  return useQuery<FichaItemEstoque | null>({
+    queryKey: ['est-ficha-item', codigo],
+    enabled: !!codigo,
+    queryFn: async () => {
+      const { data: itemData } = await supabase
+        .from('est_itens')
+        .select('*')
+        .ilike('codigo', codigo!)   // match exato case-insensitive (sem wildcards)
+        .limit(1)
+        .maybeSingle()
+      if (!itemData) return null
+      const item = itemData as EstItem
+
+      const [{ data: saldosData }, { data: movsData }] = await Promise.all([
+        supabase
+          .from('est_saldos')
+          .select('*, base:est_bases(codigo, nome)')
+          .eq('item_id', item.id)
+          .order('saldo', { ascending: false }),
+        supabase
+          .from('est_movimentacoes')
+          .select('*, base:est_bases!est_movimentacoes_base_id_fkey(codigo, nome)')
+          .eq('item_id', item.id)
+          .order('criado_em', { ascending: false })
+          .limit(15),
+      ])
+
+      return {
+        item,
+        saldos: (saldosData ?? []) as EstSaldo[],
+        movimentacoes: (movsData ?? []) as EstMovimentacao[],
+      }
+    },
+  })
+}
+
 export function useSalvarItem() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Partial<EstItem> & { id?: string }) => {
+    mutationFn: async (payload: Partial<EstItem> & { id?: string }): Promise<string> => {
       const { id, ...rest } = payload
       if (rest.descricao) rest.descricao = rest.descricao.replace(/^"+|"+$/g, '').trim()
       // Guarda final: força `unidade` para o enum est_unidade (UPPER + valid).
@@ -142,10 +210,13 @@ export function useSalvarItem() {
       if (id) {
         const { error } = await supabase.from('est_itens').update(rest).eq('id', id)
         if (error) throw error
-      } else {
-        const { error } = await supabase.from('est_itens').insert(rest)
-        if (error) throw error
+        return id
       }
+      // Retorna o id do novo item p/ quem precisa vincular na sequência
+      // (fluxo aguardando_catalogo: cadastro a partir da RC linka a linha órfã).
+      const { data, error } = await supabase.from('est_itens').insert(rest).select('id').single()
+      if (error) throw error
+      return (data as { id: string }).id
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['est-itens'] })
@@ -263,6 +334,8 @@ export function useMovimentacoes(filtros?: {
       if (error) return []
       return (data ?? []) as EstMovimentacao[]
     },
+    // Mantém a página anterior visível ao trocar page/filtros em vez de piscar loading.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -340,7 +413,7 @@ export function useRCsEmTriagemCD() {
       if (error) return []
       return data ?? []
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
   })
 }
@@ -481,7 +554,7 @@ export function useAcompanhamentoCD() {
         } as AcompCD
       }).sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? ''))
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 15_000,
   })
 }
@@ -735,9 +808,11 @@ export interface OcMinimoResult {
 export function useGerarOcMinimo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (baseId?: string): Promise<OcMinimoResult> => {
+    // itemId (mig 183) restringe a um item só — botão "Enviar RC" por item.
+    mutationFn: async ({ baseId, itemId }: { baseId?: string; itemId?: string } = {}): Promise<OcMinimoResult> => {
       const { data, error } = await supabase.rpc('est_gerar_oc_minimo', {
         p_base_id: baseId ?? null,
+        p_item_id: itemId ?? null,
       })
       if (error) throw error
       return data as OcMinimoResult
@@ -746,6 +821,47 @@ export function useGerarOcMinimo() {
       qc.invalidateQueries({ queryKey: ['est-saldos-alerta'] })
       qc.invalidateQueries({ queryKey: ['est-kpis'] })
       qc.invalidateQueries({ queryKey: ['cmp-requisicoes'] })
+    },
+  })
+}
+
+// ── De/Para de itens duplicados ───────────────────────────────────────────────
+// RPC est_mesclar_itens (mig 182): funde itens de origem num item canônico —
+// reaponta movimentações/solicitações/inventários/cautelas/RCs/recebimentos,
+// soma saldos por base no destino e desativa as origens. Admin ou comprador.
+export interface MesclarItensResult {
+  ok: boolean
+  mesclados: number
+  para_codigo: string
+  para_descricao: string
+  movimentacoes: number
+  solicitacao_itens: number
+  inventario_itens: number
+  cautela_itens: number
+  favoritos: number
+  requisicao_itens: number
+  recebimento_itens: number
+  saldos_transferidos: number
+}
+
+export function useMesclarItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ deIds, paraId }: { deIds: string[]; paraId: string }): Promise<MesclarItensResult> => {
+      const { data, error } = await supabase.rpc('est_mesclar_itens', {
+        p_de: deIds,
+        p_para: paraId,
+      })
+      if (error) throw error
+      return data as MesclarItensResult
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos-alerta'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-conta-corrente'] })
+      qc.invalidateQueries({ queryKey: ['est-kpis'] })
     },
   })
 }

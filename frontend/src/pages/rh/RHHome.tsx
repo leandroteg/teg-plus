@@ -57,7 +57,7 @@ const SUB_MODULES: SubModule[] = [
   {
     key: 'cultura',
     label: 'Cultura',
-    desc: 'Engajamento, clima organizacional, endomarketing e mural de recados',
+    desc: 'Engajamento, clima organizacional, endomarketing e Mural TEG',
     icon: Heart,
     route: '/rh/cultura',
     active: true,

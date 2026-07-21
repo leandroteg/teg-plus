@@ -5,17 +5,18 @@ import { useState } from 'react'
 import {
   X, Send, CheckCircle2, XCircle, HelpCircle, FileText, ExternalLink, Loader2,
   Building2, Calendar, Briefcase, AlertTriangle, User, Users, Smartphone, Circle, MinusCircle,
-  Pencil, ShieldCheck, ChevronDown, ChevronUp,
+  Pencil, ShieldCheck, ChevronDown, ChevronUp, Upload,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import {
   useTransicaoAdmissao, getAnexoSignedUrl, useEnviarMissaoDocs, useMissoesDocsStatus,
   useEditarAdmissao, useBasesAdmissao, useLiberarAdmissao, useUploadAnexoCandidato,
-  useParecerQualificacao,
+  useParecerQualificacao, useDocsRecebidos, useAnexarDocMissao,
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
+import { RegistroCard, IntegracaoCard, ExamesCard, LiberadoCard } from './RHAdmissaoEtapas'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const EDIT_INPUT = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -40,6 +41,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
   const editar = useEditarAdmissao()
   const centrosCusto = useLookupCentrosCusto()
   const { data: bases = [] } = useBasesAdmissao()
+  const { data: docsRecebidos = false } = useDocsRecebidos(adm.etapa === 'documentacao' ? adm.id : undefined)
   const [motivoAcao, setMotivoAcao] = useState('')
   const [pedindo, setPedindo] = useState<'rejeitar' | 'esclarecer' | null>(null)
   const [abrindo, setAbrindo] = useState<string | null>(null)
@@ -81,6 +83,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
         data_nascimento: cand.data_nascimento ? cand.data_nascimento.slice(0, 10) : '',
         cargo: cand.cargo ?? '',
         salario: cand.salario != null ? String(cand.salario) : '',
+        cargo_confianca: cand.cargo_confianca ? 'true' : 'false',
       }
     }
     setEdCands(c)
@@ -100,6 +103,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
           data_nascimento: edCands[c.id]?.data_nascimento ?? '',
           cargo: edCands[c.id]?.cargo ?? '',
           salario: edCands[c.id]?.salario ? Number(edCands[c.id].salario) : '',
+          cargo_confianca: edCands[c.id]?.cargo_confianca === 'true',
         },
       })),
       autorId: perfil?.id,
@@ -235,6 +239,12 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                     <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Salário</label>
                     <input type="number" step="0.01" value={edCands[c.id]?.salario ?? ''} onChange={e => setEdCands(p => ({ ...p, [c.id]: { ...p[c.id], salario: e.target.value } }))} className={EDIT_INPUT} />
                   </div>
+                  <label className="col-span-2 flex items-center gap-2 cursor-pointer mt-0.5" title="Não bate ponto e não é cadastrado no Secullum">
+                    <input type="checkbox" checked={edCands[c.id]?.cargo_confianca === 'true'}
+                      onChange={e => setEdCands(p => ({ ...p, [c.id]: { ...p[c.id], cargo_confianca: e.target.checked ? 'true' : 'false' } }))}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                    <span className="text-xs font-semibold text-slate-600">Cargo de confiança <span className="text-[10px] text-slate-400">(sem ponto/Secullum)</span></span>
+                  </label>
                 </div>
               ))}
             </div>
@@ -261,19 +271,29 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
             <p className="text-[11px] text-slate-400">Solicitado por <span className="font-semibold text-slate-600">{adm.solicitante_nome}</span></p>
           )}
 
-          {/* Candidatos */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1">
-              <Users size={11} /> Candidatos ({candidatos.length})
-            </p>
-            <div className="space-y-2">
-              {candidatos.map((c, i) => (
-                <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo}
-                  etapa={etapa} autorId={perfil?.id} autorNome={autorNome} editadoMap={editadoMap} />
-              ))}
-              {candidatos.length === 0 && <p className="text-xs text-slate-400">Nenhum candidato.</p>}
+          {/* Candidatos — nas etapas Exames/Registro/Integração usa o MESMO card rico da visão em cards */}
+          {etapa === 'exames_treinamentos' ? (
+            <ExamesCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'registro' ? (
+            <RegistroCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'integracao' ? (
+            <IntegracaoCard adm={adm} isDark={false} onClick={() => {}} autorNome={autorNome} />
+          ) : etapa === 'liberado' ? (
+            <LiberadoCard adm={adm} isDark={false} onClick={() => {}} />
+          ) : (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1">
+                <Users size={11} /> Candidatos ({candidatos.length})
+              </p>
+              <div className="space-y-2">
+                {candidatos.map((c, i) => (
+                  <CandidatoBloco key={c.id} cand={c} idx={i} abrindo={abrindo} onAbrir={abrirAnexo}
+                    etapa={etapa} autorId={perfil?.id} autorNome={autorNome} editadoMap={editadoMap} />
+                ))}
+                {candidatos.length === 0 && <p className="text-xs text-slate-400">Nenhum candidato.</p>}
+              </div>
             </div>
-          </div>
+          )}
           </>
           )}
 
@@ -339,26 +359,15 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
               </button>
             )}
             {etapa === 'documentacao' && (
-              <button onClick={() => executar('documentacao_recebida')} disabled={transicao.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
+              <button onClick={() => executar('documentacao_recebida')} disabled={transicao.isPending || !docsRecebidos}
+                title={docsRecebidos ? undefined : 'Só avança para Exames após todos os documentos obrigatórios recebidos (+ pesquisa histórico).'}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
                 {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                 Documentação Recebida
               </button>
             )}
-            {etapa === 'exames_treinamentos' && (
-              <button onClick={() => executar('apto_registro')} disabled={transicao.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
-                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                Apto — Enviar para Registro
-              </button>
-            )}
-            {etapa === 'registro' && (
-              <button onClick={() => executar('registro_concluido')} disabled={transicao.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
-                {transicao.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                Registro Concluído
-              </button>
-            )}
+            {/* Exames: concluído pelo botão "Concluir exames" dentro do card (libera após anexar o ASO), não aqui */}
+            {/* Registro: concluído pelo botão atualizado dentro da etapa (define matrícula), não aqui */}
             {etapa === 'mobilizacao' && (
               <button onClick={() => executar('mobilizacao_concluida')} disabled={transicao.isPending}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
@@ -366,15 +375,7 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
                 Mobilização Concluída
               </button>
             )}
-            {etapa === 'integracao' && (
-              <button
-                onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }); onClose() }}
-                disabled={liberar.isPending}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 shadow-sm">
-                {liberar.isPending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                Concluir Integração e Liberar
-              </button>
-            )}
+            {/* Integração: concluída pelo box "Finalizar Integração" dentro do card, não aqui */}
             {etapa === 'aprovacao' && (
               <>
                 <button onClick={() => { setPedindo('esclarecer'); setMotivoAcao('') }}
@@ -436,6 +437,8 @@ function CandidatoBloco({ cand, idx, abrindo, onAbrir, etapa, autorId, autorNome
           ))}
         </div>
       )}
+      {/* Parecer de Qualificação (SuperTEG × Matriz CEMIG) — em qualquer etapa, se já gerado (CTPS pode chegar na requisição ou na documentação) */}
+      <ParecerQualificacaoBloco candidatoId={cand.id} />
       {etapa === 'documentacao' && (
         <MissaoDocsSection cand={cand} autorId={autorId} autorNome={autorNome} />
       )}
@@ -451,8 +454,10 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
 }) {
   const enviar = useEnviarMissaoDocs()
   const uploadAnexo = useUploadAnexoCandidato()
+  const anexar = useAnexarDocMissao()
   const { data: docs = [], isLoading } = useMissoesDocsStatus(cand.id)
   const [erro, setErro] = useState<string | null>(null)
+  const [subindo, setSubindo] = useState<string | null>(null)
 
   const missaoEnviada = docs.length > 0
   // Pesquisa Histórico: documento interno do RH — não vira missão do colaborador
@@ -496,22 +501,50 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
         <span className="text-[10px] font-bold text-slate-500">{concluidos + dispensados}/{total}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        {docs.map(d => (
-          <div key={d.missao_id} className="flex items-center gap-1.5 min-w-0">
-            {d.status === 'concluida'
-              ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-              : d.status === 'dispensada'
-                ? <MinusCircle size={13} className="text-slate-300 shrink-0" />
-                : <Circle size={13} className="text-slate-300 shrink-0" />}
-            <span className={`text-[11px] truncate ${
-              d.status === 'concluida' ? 'text-slate-700 font-semibold'
-              : d.status === 'dispensada' ? 'text-slate-400 line-through'
-              : 'text-slate-500'}`}>
-              {d.titulo.replace(/^Enviar /, '')}
-            </span>
-          </div>
-        ))}
+        {docs.map(d => {
+          const nome = d.titulo.replace(/^Enviar /, '')
+          const enviando = anexar.isPending && subindo === d.missao_id
+          if (d.status === 'concluida') {
+            return (
+              <div key={d.missao_id} className="flex items-center gap-1.5 min-w-0">
+                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                <span className="text-[11px] truncate text-slate-700 font-semibold">{nome}</span>
+              </div>
+            )
+          }
+          return (
+            <label key={d.missao_id}
+              title={`Anexar ${nome}`}
+              className="flex items-center gap-1.5 min-w-0 group cursor-pointer rounded px-0.5 -mx-0.5 hover:bg-teal-50">
+              {enviando
+                ? <Loader2 size={13} className="animate-spin text-teal-600 shrink-0" />
+                : d.status === 'dispensada'
+                  ? <MinusCircle size={13} className="text-slate-300 shrink-0" />
+                  : <Circle size={13} className="text-slate-300 shrink-0 group-hover:text-teal-500" />}
+              <span className={`text-[11px] truncate ${
+                d.status === 'dispensada' ? 'text-slate-400 line-through' : 'text-slate-500'
+              } group-hover:text-teal-700`}>
+                {nome}
+              </span>
+              <Upload size={10} className="shrink-0 text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                disabled={anexar.isPending}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.currentTarget.value = ''
+                  if (!file) return
+                  setErro(null); setSubindo(d.missao_id)
+                  anexar.mutate(
+                    { missaoId: d.missao_id, admissaoId: cand.admissao_id, candidatoId: cand.id, docTipo: d.doc_tipo, file, autorId },
+                    { onError: err => setErro(err instanceof Error ? err.message : 'Falha ao anexar'), onSettled: () => setSubindo(null) },
+                  )
+                }} />
+            </label>
+          )
+        })}
       </div>
+      <p className="text-[9px] text-slate-400 mt-1">Clique em um documento pendente para anexá-lo pelo RH.</p>
+      {erro && <p className="text-[10px] text-red-600 font-semibold mt-1">{erro}</p>}
 
       {/* Pesquisa Histórico — interno do RH (o colaborador não vê) */}
       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
@@ -534,8 +567,6 @@ function MissaoDocsSection({ cand, autorId, autorNome }: {
         )}
       </div>
 
-      {/* Parecer de Qualificação (SuperTEG x Matriz CEMIG) — interno do ERP */}
-      <ParecerQualificacaoBloco candidatoId={cand.id} />
     </div>
   )
 }

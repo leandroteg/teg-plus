@@ -19,8 +19,8 @@ const fmtVal = (v: number | null | undefined, unidade?: string | null) => {
   return unidade === '%' ? `${n}%` : `${n} ${unidade}`
 }
 
-const FAROL_ORDER: Farol[] = ['verde', 'amarelo', 'vermelho', 'cinza']
-const FAROL_BAR: Record<Farol, string> = { verde: 'bg-emerald-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: 'bg-slate-300' }
+const FAROL_ORDER: Farol[] = ['verde', 'azul', 'amarelo', 'vermelho', 'cinza']
+const FAROL_BAR: Record<Farol, string> = { verde: 'bg-emerald-500', azul: 'bg-blue-500', amarelo: 'bg-amber-500', vermelho: 'bg-red-500', cinza: 'bg-slate-300' }
 
 // Card de uma meta anual (scorecard): Realizado em destaque (cor do farol) + Meta + farol
 function MetaScore({ entry, big, isDark }: { entry?: { o: ObjFull; m: MetaFull; u: SgiCheckin | null }; big?: boolean; isDark: boolean }) {
@@ -72,7 +72,7 @@ export default function SgiPainel() {
     .flatMap(o => o.metas.filter(m => m.periodo === 'anual').map(m => ({ o, m, u: ultimoCheckin(m) })))
     , [objetivos])
   const faroisAnuais = useMemo(() => {
-    const c: Record<Farol, number> = { verde: 0, amarelo: 0, vermelho: 0, cinza: 0 }
+    const c: Record<Farol, number> = { verde: 0, azul: 0, amarelo: 0, vermelho: 0, cinza: 0 }
     anuais.forEach(a => { c[(a.u?.farol as Farol) || 'cinza']++ })
     return c
   }, [anuais])
@@ -81,7 +81,7 @@ export default function SgiPainel() {
   // Saúde por trimestre (check-in dos KRs)
   const tris = useMemo(() => [1, 2, 3, 4].map(t => {
     const ms = objetivos.flatMap(o => o.metas.filter(m => m.periodo === 'trimestral' && m.trimestre === t).map(m => ultimoCheckin(m)))
-    const c: Record<Farol, number> = { verde: 0, amarelo: 0, vermelho: 0, cinza: 0 }
+    const c: Record<Farol, number> = { verde: 0, azul: 0, amarelo: 0, vermelho: 0, cinza: 0 }
     ms.forEach(u => { c[(u?.farol as Farol) || 'cinza']++ })
     return { t, total: ms.length, c }
   }).filter(x => x.total > 0), [objetivos])
@@ -161,7 +161,7 @@ export default function SgiPainel() {
                   {FAROL_ORDER.map(fk => c[fk] > 0 ? <div key={fk} className={FAROL_BAR[fk]} style={{ width: `${(c[fk] / total) * 100}%` }} title={`${FAROL_CFG[fk].label}: ${c[fk]}`} /> : null)}
                 </div>
                 <span className={`text-[10px] font-semibold w-28 text-right shrink-0 ${faint}`}>
-                  {c.verde}✓ · {c.amarelo}~ · {c.vermelho}✕ {c.cinza > 0 ? `· ${c.cinza}—` : ''}
+                  {c.verde}✓{c.azul > 0 ? ` · ${c.azul}⏱` : ''} · {c.amarelo}~ · {c.vermelho}✕ {c.cinza > 0 ? `· ${c.cinza}—` : ''}
                 </span>
               </div>
             ))}

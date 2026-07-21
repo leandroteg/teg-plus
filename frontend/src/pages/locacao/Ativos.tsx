@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
-  Pencil, Save, Loader2,
+  Pencil, Save, Loader2, Plus,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useVistorias, useAtualizarImovel } from '../../hooks/useLocacao'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import NovoImovelModal from '../../components/locacao/NovoImovelModal'
 import { UpperInput } from '../../components/UpperInput'
 import { fmtEndereco } from '../../types/locacao'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
@@ -349,14 +350,17 @@ export default function Ativos() {
   const { data: vistorias = [] } = useVistorias()
 
   const [busca, setBusca] = useState('')
-  const [statusFilter, setStatusFilter] = useState('todos')
+  // Abre já sem os inativos ("Em uso" = ativo + em entrada + em saída); "Todos" mostra tudo
+  const [statusFilter, setStatusFilter] = useState('em_uso')
   const [cidadeFilter, setCidadeFilter] = useState('')
   const [ccFilter, setCcFilter] = useState('')
   const [vencFilter, setVencFilter] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [detail, setDetail] = useState<LocImovel | null>(null)
-  const [sortCol, setSortCol] = useState<string>('')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [showNovo, setShowNovo] = useState(false)
+  // Padrão inicial: ordenado por NOME decrescente
+  const [sortCol, setSortCol] = useState<string>('nome')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const toggleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('asc') }
@@ -371,9 +375,11 @@ export default function Ativos() {
   }, [imoveis])
 
   const filtrados = useMemo(() => {
-    let items = [...imoveis]
+    // Hotéis (tipo HTL) são hospedagem temporária: aparecem no Controle de Leitos, não aqui
+    let items = imoveis.filter(i => (i as { tipo?: string }).tipo !== 'HTL')
     if (busca) { const q = busca.toLowerCase(); items = items.filter(i => [i.descricao, i.endereco, i.locador_nome, i.cidade].some(v => v?.toLowerCase().includes(q))) }
-    if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)
+    if (statusFilter === 'em_uso') items = items.filter(i => i.status !== 'inativo')
+    else if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)
     if (cidadeFilter) items = items.filter(i => i.cidade === cidadeFilter)
     if (ccFilter) items = items.filter(i => (i as any).centro_custo?.id === ccFilter)
     if (vencFilter) {
@@ -386,7 +392,7 @@ export default function Ativos() {
       items.sort((a, b) => {
         let va: any, vb: any
         switch (sortCol) {
-          case 'nome': va = a.descricao || ''; vb = b.descricao || ''; break
+          case 'nome': va = (a as any).nome || (a as any).titulo || ''; vb = (b as any).nome || (b as any).titulo || ''; break
           case 'imovel': va = a.endereco || a.descricao || ''; vb = b.endereco || b.descricao || ''; break
           case 'locador': va = a.locador_nome || ''; vb = b.locador_nome || ''; break
           case 'cc': va = (a as any).centro_custo?.descricao || ''; vb = (b as any).centro_custo?.descricao || ''; break
@@ -403,6 +409,7 @@ export default function Ativos() {
   }, [imoveis, busca, statusFilter, cidadeFilter, ccFilter, vencFilter, sortCol, sortDir])
 
   const statuses = [
+    { key: 'em_uso', label: 'Em uso' },
     { key: 'todos', label: 'Todos' },
     { key: 'ativo', label: 'Ativo' },
     { key: 'inativo', label: 'Inativo' },
@@ -457,8 +464,14 @@ export default function Ativos() {
           <option value="90d">Próximos 90 dias</option>
         </select>
 
+        {/* Novo Imóvel */}
+        <button onClick={() => setShowNovo(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+          <Plus size={14} /> Novo Imóvel
+        </button>
+
         {/* Toggle */}
-        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('table')} className={`p-1.5 ${viewMode === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
           <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
         </div>
@@ -508,7 +521,9 @@ export default function Ativos() {
                 return (
                   <tr key={imo.id} onClick={() => setDetail(imo)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
-                    <td className={`px-3 py-2.5 font-semibold whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.descricao || '—'}</td>
+                    <td className={`px-3 py-2.5 font-bold whitespace-nowrap ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                      {(imo as any).nome || (imo as any).titulo || '—'}
+                    </td>
                     <td className={`px-3 py-2.5 font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.cidade || '—'}</td>
                     <td className="px-3 py-2.5">
                       <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtEndereco(imo)}</p>
@@ -563,6 +578,7 @@ export default function Ativos() {
 
       {/* Modal */}
       {detail && <ImovelDetailModal key={detail.id} imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
+      {showNovo && <NovoImovelModal onClose={() => setShowNovo(false)} />}
     </div>
   )
 }

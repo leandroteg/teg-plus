@@ -1,19 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { Building2, Receipt, Wrench, FileSignature, Handshake } from 'lucide-react'
-import { useImoveis, useFaturas, useSolicitacoesLocacao, useAditivos, useAcordos } from '../../hooks/useLocacao'
+import { Building2, Receipt, Wrench, FileSignature, BedDouble, FileText } from 'lucide-react'
+import { gerarTabelaPdf } from '../../utils/tabela-pdf'
+import { useImoveis, useFaturas, useSolicitacoesLocacao, useAditivos } from '../../hooks/useLocacao'
+import { useLeitos } from '../../hooks/useLeitos'
 import Ativos from './Ativos'
 import Faturas from './Faturas'
 import ManutencoesServicos from './ManutencoesServicos'
 import AditivosRenovacoes from './AditivosRenovacoes'
-import Acordos from './Acordos'
+import ControleLeitos from './ControleLeitos'
 
 const TABS = [
   { key: 'ativos',   label: 'Ativos',                  icon: Building2 },
   { key: 'aditivos', label: 'Aditivos & Renovações',    icon: FileSignature },
   { key: 'faturas',  label: 'Faturas',                  icon: Receipt },
   { key: 'servicos', label: 'Manutenções e Serviços',   icon: Wrench },
-  { key: 'acordos',  label: 'Acordos',                  icon: Handshake },
+  { key: 'acordos',  label: 'Controle Leitos',          icon: BedDouble },
 ] as const
 
 type Tab = typeof TABS[number]['key']
@@ -38,28 +40,47 @@ const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
 export default function Gestao() {
   const { isDark } = useTheme()
   const [tab, setTab] = useState<Tab>('ativos')
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  function gerarRelatorio() {
+    const table = contentRef.current?.querySelector('table')
+    const label = TABS.find(t => t.key === tab)?.label ?? 'Gestão'
+    if (!table) {
+      alert('Nenhuma tabela visível nesta aba. Se estiver na visão de cards, alterne para a visão de lista/tabela e tente de novo.')
+      return
+    }
+    gerarTabelaPdf({ titulo: `Gestão de Locação — ${label}`, subtitulo: `Aba: ${label}`, table })
+  }
 
   // Contagens por aba
   const { data: imoveis = [] } = useImoveis()
   const { data: faturas = [] } = useFaturas()
   const { data: solicitacoes = [] } = useSolicitacoesLocacao()
   const { data: aditivos = [] } = useAditivos()
-  const { data: acordos = [] } = useAcordos()
+  const { data: leitos = [] } = useLeitos()
 
   const counts: Record<Tab, number> = useMemo(() => ({
-    ativos: imoveis.length,
+    ativos: imoveis.filter(i => (i as { tipo?: string }).tipo !== 'HTL').length,
     faturas: faturas.length,
     servicos: solicitacoes.length,
     aditivos: aditivos.length,
-    acordos: acordos.length,
-  }), [imoveis, faturas, solicitacoes, aditivos, acordos])
+    acordos: leitos.length,
+  }), [imoveis, faturas, solicitacoes, aditivos, leitos])
 
   return (
     <div className={`rounded-2xl border overflow-hidden flex flex-col h-full ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-2">
-        <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Gestão</h1>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ativos, faturas, manutenções, aditivos e acordos</p>
+      <div className="px-4 pt-4 pb-2 flex items-start justify-between gap-3">
+        <div>
+          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Gestão</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ativos, faturas, manutenções, aditivos e acordos</p>
+        </div>
+        <button onClick={gerarRelatorio} title="Gerar relatório em PDF da tabela visível"
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+            isDark ? 'border-white/10 text-slate-200 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}>
+          <FileText size={15} /> Relatório
+        </button>
       </div>
 
       {/* Tabs — mesmo layout de Entradas/Devoluções */}
@@ -89,12 +110,12 @@ export default function Gestao() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
+      <div ref={contentRef} className="flex-1 overflow-auto p-4">
         {tab === 'ativos'   && <Ativos />}
         {tab === 'faturas'  && <Faturas />}
         {tab === 'servicos' && <ManutencoesServicos />}
         {tab === 'aditivos' && <AditivosRenovacoes />}
-        {tab === 'acordos'  && <Acordos />}
+        {tab === 'acordos'  && <ControleLeitos />}
       </div>
     </div>
   )

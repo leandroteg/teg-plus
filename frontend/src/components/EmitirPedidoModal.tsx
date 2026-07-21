@@ -51,10 +51,12 @@ const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: strin
 
 function inferirFormaPagamentoInicial(fornecedor: {
   boleto?: boolean | null
+  cartao?: boolean | null
   pix_chave?: string | null
   banco_nome?: string | null
   conta?: string | null
 } | null | undefined): FormaPagamentoPedido | '' {
+  if (fornecedor?.cartao) return 'cartao'
   if (fornecedor?.boleto) return 'boleto'
   if (fornecedor?.pix_chave) return 'pix'
   if (fornecedor?.banco_nome && fornecedor?.conta) return 'transferencia'
@@ -107,7 +109,7 @@ export default function EmitirPedidoModal({
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
   const { data: cartoes = [] } = useCartoesCredito()
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: requisicaoId,
     enabled: open && Boolean(requisicaoId),
@@ -263,6 +265,7 @@ export default function EmitirPedidoModal({
   const [bancoAgencia, setBancoAgencia] = useState('')
   const [bancoConta, setBancoConta] = useState('')
   const [bancoBoleto, setBancoBoleto] = useState(false)
+  const [bancoCartao, setBancoCartao] = useState(false)
   const [bancoPix, setBancoPix] = useState('')
   const [bancoPixTipo, setBancoPixTipo] = useState('')
 
@@ -289,6 +292,7 @@ export default function EmitirPedidoModal({
     setBancoAgencia(fdb?.agencia ?? '')
     setBancoConta(fdb?.conta ?? '')
     setBancoBoleto(Boolean(fdb?.boleto))
+    setBancoCartao(Boolean(fdb?.cartao))
     setBancoPix(fdb?.pix_chave ?? '')
     setBancoPixTipo(fdb?.pix_tipo ?? '')
   }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, data?.fornecedorDB])
@@ -303,8 +307,8 @@ export default function EmitirPedidoModal({
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const fornecedorDB = data?.fornecedorDB ?? null
   const cartaoSelecionado = cartoes.find((cartao) => cartao.id === cartaoId)
-  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
-  const bankingProvided = bancoBoleto || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
+  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.cartao && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
+  const bankingProvided = bancoBoleto || bancoCartao || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
   // fluxo efetivo: contrato OU dispensado pelo comprador
   const fluxoContrato = !!compraRecorrente && !naoSolicitarContrato
@@ -417,6 +421,7 @@ export default function EmitirPedidoModal({
     if (fornecedorDB?.id && bankingProvided) {
       await supabase.from('cmp_fornecedores').update({
         boleto: bancoBoleto,
+        cartao: bancoCartao,
         ...(bancoPix.trim() ? { pix_chave: bancoPix.trim(), pix_tipo: bancoPixTipo || null } : {}),
         ...(bancoBancoNome.trim() ? { banco_nome: bancoBancoNome.trim() } : {}),
         ...(bancoAgencia.trim() ? { agencia: bancoAgencia.trim() } : {}),
@@ -476,6 +481,14 @@ export default function EmitirPedidoModal({
               <div>
                 <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
                 <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+                {canOverride && (
+                  <button
+                    type="button"
+                    onClick={assumeControl}
+                    className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                    Assumir edição (Admin)
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -609,32 +622,41 @@ export default function EmitirPedidoModal({
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className="md:col-span-2 inline-flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                    <label className="inline-flex items-center gap-2 text-[11px] font-bold text-slate-600">
                       <input
                         type="checkbox"
                         checked={bancoBoleto}
-                        onChange={e => setBancoBoleto(e.target.checked)}
+                        onChange={e => { setBancoBoleto(e.target.checked); if (e.target.checked) setBancoCartao(false) }}
                         className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                       />
                       Receber por boleto
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={bancoCartao}
+                        onChange={e => { setBancoCartao(e.target.checked); if (e.target.checked) setBancoBoleto(false) }}
+                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      />
+                      Receber por cartão
                     </label>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">PIX (chave)</label>
                       <UpperInput
                         value={bancoPix}
-                        disabled={bancoBoleto}
+                        disabled={bancoBoleto || bancoCartao}
                         onChange={e => setBancoPix(e.target.value)}
                         placeholder="CPF, CNPJ, e-mail ou chave aleatória"
-                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipo da chave PIX</label>
                       <select
                         value={bancoPixTipo}
-                        disabled={bancoBoleto}
+                        disabled={bancoBoleto || bancoCartao}
                         onChange={e => setBancoPixTipo(e.target.value)}
-                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       >
                         <option value="">Selecionar...</option>
                         <option value="cpf">CPF</option>
@@ -648,10 +670,10 @@ export default function EmitirPedidoModal({
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Banco</label>
                       <UpperInput
                         value={bancoBancoNome}
-                        disabled={bancoBoleto}
+                        disabled={bancoBoleto || bancoCartao}
                         onChange={e => setBancoBancoNome(e.target.value)}
                         placeholder="Ex.: Itaú, Bradesco, Sicredi..."
-                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -659,20 +681,20 @@ export default function EmitirPedidoModal({
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Agência</label>
                         <UpperInput
                           value={bancoAgencia}
-                          disabled={bancoBoleto}
+                          disabled={bancoBoleto || bancoCartao}
                           onChange={e => setBancoAgencia(e.target.value)}
                           placeholder="0000"
-                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Conta</label>
                         <UpperInput
                           value={bancoConta}
-                          disabled={bancoBoleto}
+                          disabled={bancoBoleto || bancoCartao}
                           onChange={e => setBancoConta(e.target.value)}
                           placeholder="00000-0"
-                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                         />
                       </div>
                     </div>

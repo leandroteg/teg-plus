@@ -1,11 +1,14 @@
 import {
   LayoutDashboard, Building2, FolderOpen, ArrowRightFromLine, Plus,
   Loader2, WifiOff, CloudUpload, CheckCircle2, AlertTriangle, X,
+  Home, Wrench, FileText, Handshake, RefreshCw,
 } from 'lucide-react'
 import { useState } from 'react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
 import NovaSolicitacaoModal from './locacao/NovaSolicitacaoModal'
+import NovoImovelModal from './locacao/NovoImovelModal'
+import type { TipoSolicitacao } from '../types/locacao'
 import { useVistoriaSync } from '../hooks/useVistoriaSync'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -113,7 +116,12 @@ function VistoriaSyncBanner() {
 // ── Layout ──────────────────────────────────────────────────────────────────
 
 export default function LocacaoLayout() {
-  const [showModal, setShowModal] = useState(false)
+  // solicTipo aberto = modal de solicitação já no tipo escolhido; showNovoImovel = cadastro de imóvel
+  const [solicTipo, setSolicTipo] = useState<TipoSolicitacao | null>(null)
+  const [showSolic, setShowSolic] = useState(false)
+  const [showNovoImovel, setShowNovoImovel] = useState(false)
+
+  const abrirSolic = (t: TipoSolicitacao) => { setSolicTipo(t); setShowSolic(true) }
 
   const NAV: NavItem[] = [
     { to: '/locacoes',              icon: LayoutDashboard,     label: 'Painel',           end: true },
@@ -122,8 +130,37 @@ export default function LocacaoLayout() {
       icon: Plus,
       label: 'Nova Solicitação',
       end: false,
-      action: () => setShowModal(true),
       accent: true,
+      actionMenu: {
+        title: 'Nova solicitação',
+        items: [
+          {
+            icon: Home, label: 'Novo Imóvel', tone: 'blue',
+            description: 'Cadastrar um novo imóvel (alojamento, canteiro, CD, escritório ou hotel).',
+            action: () => setShowNovoImovel(true),
+          },
+          {
+            icon: Wrench, label: 'Manutenção', tone: 'amber',
+            description: 'Reparos e manutenções no imóvel.',
+            action: () => abrirSolic('manutencao'),
+          },
+          {
+            icon: FileText, label: 'Contrato de Serviço', tone: 'sky',
+            description: 'Serviços terceirizados (limpeza, dedetização, etc).',
+            action: () => abrirSolic('servico'),
+          },
+          {
+            icon: Handshake, label: 'Acordo / Benfeitoria', tone: 'emerald',
+            description: 'Benfeitorias, abatimentos ou multas.',
+            action: () => abrirSolic('acordo'),
+          },
+          {
+            icon: RefreshCw, label: 'Aditivo / Renovação', tone: 'violet',
+            description: 'Renovar ou aditivar contrato de locação.',
+            action: () => abrirSolic('renovacao'),
+          },
+        ],
+      },
     },
     { to: '/locacoes/entradas',     icon: Building2,           label: 'Entradas'          },
     { to: '/locacoes/gestao',       icon: FolderOpen,          label: 'Gestão'            },
@@ -135,14 +172,15 @@ export default function LocacaoLayout() {
       <VistoriaSyncBanner />
       <ModuleLayout
         moduleKey="locacoes"
-        moduleName="Locação Imóveis"
+        moduleName="Gestão de Imóveis"
         moduleEmoji="🏘️"
         accent="indigo"
         nav={NAV}
         bottomNavMaxItems={5}
         truncateBottomLabels
       />
-      {showModal && <NovaSolicitacaoModal onClose={() => setShowModal(false)} />}
+      {showSolic && <NovaSolicitacaoModal tipoInicial={solicTipo ?? undefined} onClose={() => { setShowSolic(false); setSolicTipo(null) }} />}
+      {showNovoImovel && <NovoImovelModal onClose={() => setShowNovoImovel(false)} />}
     </>
   )
 }

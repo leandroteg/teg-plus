@@ -7,6 +7,21 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { toUpperNorm } from './components/UpperInput'
 import './index.css'
 
+// ── Auto-recuperação pós-deploy ───────────────────────────────────────────────
+// Após um deploy, abas abertas ficam com chunks defasados (e o SW do PWA pode
+// continuar servindo o index antigo — aí reload simples não basta). O Vite emite
+// 'vite:preloadError' nesse caso: desregistra SW + limpa caches + recarrega.
+// Trava de 30s evita loop se o erro persistir.
+import { hardRecoverFromStaleChunk } from './utils/chunkRecovery'
+window.addEventListener('vite:preloadError', (e) => {
+  const KEY = 'teg_chunk_reload_at'
+  const last = Number(sessionStorage.getItem(KEY) || 0)
+  if (Date.now() - last < 30_000) return // acabou de recarregar e falhou de novo — deixa o ErrorBoundary agir
+  sessionStorage.setItem(KEY, String(Date.now()))
+  e.preventDefault()
+  void hardRecoverFromStaleChunk()
+})
+
 // ── Global uppercase enforcement ─────────────────────────────────────────────
 // Transforms text input values to uppercase before React processes the event.
 // Skips: readonly, disabled, email, url, password, number, date/time inputs,
@@ -118,8 +133,14 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       retry: 2,
       gcTime: 1000 * 60 * 5,        // 5min — evita cache antigo
-      refetchOnWindowFocus: true,
-    },
+      // NÃO rebuscar ao focar a janela: causava "piscar" e formulários
+      // re-hidratavam do servidor, perdendo o que o usuário estava digitando
+      // ao trocar de aba/app e voltar.
+      refetchOnWindowFocus: false,
+      // Pausa o polling (refetchInterval) quando a aba está oculta/em segundo
+      // plano — só faz poll na aba ativa (corta requisições de abas minimizadas).
+      refetchIntervalInBackground: false,
+},
   },
 })
 

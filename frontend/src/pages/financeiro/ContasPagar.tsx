@@ -17,6 +17,7 @@ import type { ContaPagar } from '../../types/financeiro'
 import { UpperInput } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import { MedicaoDocLink } from '../../components/MedicaoDocLink'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
@@ -910,6 +911,9 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
               <AnexosList pedidoId={cp.pedido_id} />
             </>
           )}
+
+          {/* Documento da medição (contas geradas por con_faturar_medicao não têm pedido) */}
+          {cp.medicao_id && <MedicaoDocLink medicaoId={cp.medicao_id} />}
 
           <AuditoriaCard
             createdAt={cp.created_at}

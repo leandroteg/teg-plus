@@ -13,6 +13,7 @@ import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
+import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -42,6 +43,17 @@ const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof Clipbo
   { status: 'em_triagem',   label: 'Em Triagem CD',           icon: ClipboardList, statuses: ['em_triagem_cd'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
+]
+
+// Admin override: status em que um administrador pode cancelar a RC direto pela
+// modal (ex.: rascunho parado, RC duplicada). Exclui etapas pós-pedido para não
+// orfanar pedidos/financeiro, e 'cotacao_aprovada' (que já tem Cancelar próprio).
+const ADMIN_CANCELAVEL_STATUSES = [
+  'rascunho', 'aguardando_catalogo', 'devolvida_solicitante',
+  'em_triagem_cd', 'atendida_cd',
+  'pendente', 'em_aprovacao', 'em_esclarecimento',
+  'aprovada', 'em_cotacao', 'cotacao_enviada',
+  'cotacao_em_esclarecimento', 'cotacao_rejeitada', 'rejeitada',
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
@@ -266,7 +278,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe, isLocked, blockedByName, canOverrideLock, onAssumeControl }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
@@ -277,6 +289,8 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
   onDevolver: (motivo: string) => void; isDevolvendoEdicao: boolean
   onAbrirDetalhe: () => void
+  isLocked?: boolean; blockedByName?: string | null
+  canOverrideLock?: boolean; onAssumeControl?: () => void
 }) {
   const { perfil, isAdmin } = useAuth()
   const [observacao, setObservacao] = useState('')
@@ -320,6 +334,29 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Bloqueio de edição (presença) — com override de Admin */}
+          {isLocked && (
+            <div className={`rounded-xl p-3.5 flex items-start gap-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <AlertTriangle size={16} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+              <div>
+                <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                  {blockedByName ?? 'Outro usuário'} está editando
+                </p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                  A RC fica bloqueada para evitar conflito até a finalização da edição.
+                </p>
+                {canOverrideLock && (
+                  <button
+                    type="button"
+                    onClick={onAssumeControl}
+                    className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                    Assumir edição (Admin)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Resumo */}
           <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</p>
 
@@ -669,6 +706,25 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
+          {/* Admin: cancelar RC em qualquer etapa (RC duplicada/parada) */}
+          {isAdmin && ADMIN_CANCELAVEL_STATUSES.includes(r.status) && (
+            <div className={`pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+              <button
+                disabled={isCancelling}
+                onClick={onCancelar}
+                className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] disabled:opacity-50 ${
+                  isDark ? 'text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20'
+                    : 'text-red-500 bg-red-50 border-red-200 hover:bg-red-100'
+                }`}>
+                {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
+                Cancelar RC (Admin)
+              </button>
+              <p className={`mt-1.5 text-center text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Ação de administrador — encerra a requisição (ex.: duplicada ou parada).
+              </p>
+            </div>
+          )}
+
           {/* Botão ver detalhes completo */}
           <button onClick={onAbrirDetalhe}
             className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -687,7 +743,8 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
-  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
+  const { data: categorias = [] } = useCategorias()
 
   // Suporta ?tab=em_triagem|em_validacao|aprovada|pendente via URL
   // (usado p/ links de outros módulos, ex: Estoque -> Janela Crítica)
@@ -704,11 +761,18 @@ export default function ListaRequisicoes() {
   const [detail, setDetail] = useState<Requisicao | null>(null)
   const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
   const detailReqId = detail?.id
-  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName, canOverride: canOverrideDetailLock, assumeControl: assumeDetailControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: detailReqId,
     enabled: Boolean(detailReqId),
   })
+
+  // Validação técnica é por CATEGORIA (mesma regra do AprovAi/podeVerAprovacao):
+  // só o validador técnico configurado na categoria da RC — ou admin — decide.
+  // Antes usava canTechnicalApprove('compras'), que liberava qualquer diretor/admin
+  // (ex.: um diretor aprovava hardware de TI sem ser o validador técnico da categoria).
+  const ehValidadorTecnicoDetail = !!detail && !!perfil?.id
+    && categorias.find(c => c.codigo === detail.categoria)?.validador_tecnico_id === perfil.id
 
   const obras = useLookupObras()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
@@ -1085,11 +1149,15 @@ export default function ListaRequisicoes() {
           apr={aprovacaoMap.get(detail.id)}
           isDark={isDark}
           onClose={() => setDetail(null)}
+          isLocked={isDetailLocked}
+          blockedByName={detailBlockedByName}
+          canOverrideLock={canOverrideDetailLock}
+          onAssumeControl={assumeDetailControl}
           canDecide={
             podeAprovarCompras(perfil?.email) && (
               (
                 ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
-                && canTechnicalApprove('compras')
+                && (isAdmin || ehValidadorTecnicoDetail)
               )
               || (detail.status === 'cotacao_enviada' && isAdmin)
             )

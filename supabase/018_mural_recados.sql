@@ -76,15 +76,14 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Admin: acesso total (SELECT inclui inativos e fora do período)
+-- Corrigida em 181_security_admin_rpc_authz_20260703.sql: comparava com
+-- role = 'admin', valor que a CHECK constraint de sys_perfis.role não
+-- permite mais (só administrador/diretor/gestor/requisitante/visitante).
 DO $$ BEGIN
   CREATE POLICY "mural_banners_admin_all" ON mural_banners
     FOR ALL TO authenticated
-    USING (
-      EXISTS (SELECT 1 FROM sys_perfis WHERE auth_id = auth.uid() AND role = 'admin')
-    )
-    WITH CHECK (
-      EXISTS (SELECT 1 FROM sys_perfis WHERE auth_id = auth.uid() AND role = 'admin')
-    );
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── View: banners_vigentes ────────────────────────────────────────────────────

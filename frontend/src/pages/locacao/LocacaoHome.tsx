@@ -2,15 +2,24 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, DollarSign, AlertCircle, Wrench, Calendar, ArrowRight,
-  AlertTriangle, RefreshCw, KeySquare, TrendingUp, Zap, CalendarClock,
+  AlertTriangle, RefreshCw, KeySquare, TrendingUp, CalendarClock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useLocacaoKPIs, useFaturas, useEntradas, useSaidas, useSolicitacoesLocacao, useImoveis,
 } from '../../hooks/useLocacao'
 import {
-  ENTRADA_PIPELINE_STAGES, SAIDA_PIPELINE_STAGES, TIPO_FATURA_LABEL, STATUS_FATURA_LABEL, fmtEndereco,
+  TIPO_FATURA_LABEL, STATUS_FATURA_LABEL, fmtEndereco,
 } from '../../types/locacao'
+
+// Paleta categórica dos tipos de imóvel — validada (CVD ΔE 57.8+, bandas de
+// luminosidade claro/escuro). Identidade nunca é só cor: há legenda + rótulos.
+const TIPO_CFG = [
+  { key: 'ALOJ', label: 'Alojamento',             light: 'bg-indigo-500', dark: 'bg-indigo-500' },
+  { key: 'CANT', label: 'Canteiro',               light: 'bg-teal-500',   dark: 'bg-teal-600' },
+  { key: 'CD',   label: 'Centro de Distribuição', light: 'bg-amber-500',  dark: 'bg-amber-600' },
+  { key: 'ESC',  label: 'Escritório',             light: 'bg-purple-500', dark: 'bg-purple-500' },
+] as const
 
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
@@ -70,24 +79,36 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
           {emptyLabel}
         </div>
       ) : (
-        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          {segments.map(seg => {
-            if (seg.value === 0) return null
-            const pct = (seg.value / total) * 100
-            const showLabel = pct >= 14
-            const showValue = pct >= 22
-            return (
-              <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
-                style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
-                {showLabel && (
-                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
-                    {seg.label} {showValue ? seg.value : ''}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <>
+          <div className={`flex h-10 rounded-xl overflow-hidden gap-[2px] ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            {segments.map(seg => {
+              if (seg.value === 0) return null
+              const pct = (seg.value / total) * 100
+              const showLabel = pct >= 14
+              const showValue = pct >= 22
+              return (
+                <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
+                  style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
+                  {showLabel && (
+                    <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
+                      {seg.label} {showValue ? seg.value : ''}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Legenda: todo segmento tem rótulo + valor (nenhum fica só na cor) */}
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 mt-2.5">
+            {segments.filter(s => s.value > 0).map(seg => (
+              <span key={seg.key} className="inline-flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-sm shrink-0 ${seg.barClass}`} />
+                <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{seg.label}</span>
+                <span className={`text-[10px] font-bold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{seg.value}</span>
+              </span>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
@@ -127,6 +148,41 @@ export default function LocacaoHome() {
     const today = new Date().toISOString().split('T')[0]
     const lim = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
     return imoveis.filter(i => { const d = (i as any).contrato?.data_fim_previsto; return d && d >= today && d <= lim && i.status === 'ativo' })
+  }, [imoveis])
+  // janela curta p/ o indicador da Janela Crítica: a vencer nos próximos 30 dias
+  const contratosVencendo30 = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const lim = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+    return imoveis.filter(i => { const d = (i as any).contrato?.data_fim_previsto; return d && d >= today && d <= lim && i.status === 'ativo' })
+  }, [imoveis])
+
+  // Proporção por tipo de imóvel (imóveis em uso = tudo menos inativo)
+  const tipoData = useMemo(() => {
+    const emUso = imoveis.filter(i => i.status !== 'inativo')
+    const counts = new Map<string, number>()
+    emUso.forEach(i => { const k = i.tipo || 'OUTRO'; counts.set(k, (counts.get(k) ?? 0) + 1) })
+    const total = emUso.length
+    const rows = TIPO_CFG
+      .filter(c => (counts.get(c.key) ?? 0) > 0)
+      .map(c => ({ key: c.key as string, label: c.label as string, light: c.light as string, dark: c.dark as string,
+                   value: counts.get(c.key)!, pct: total ? (counts.get(c.key)! / total) * 100 : 0 }))
+    const outros = [...counts.entries()]
+      .filter(([k]) => !TIPO_CFG.some(c => c.key === k))
+      .reduce((s, [, v]) => s + v, 0)
+    if (outros > 0) rows.push({ key: 'OUTRO', label: 'Outro', light: 'bg-slate-400', dark: 'bg-slate-500',
+                                value: outros, pct: total ? (outros / total) * 100 : 0 })
+    return { rows, total }
+  }, [imoveis])
+
+  // Aluguel mensal por centro de custo (imóveis em uso)
+  const ccData = useMemo(() => {
+    const m = new Map<string, number>()
+    imoveis.filter(i => i.status !== 'inativo').forEach(i => {
+      const nome = (i as any).centro_custo?.descricao || 'Sem centro de custo'
+      m.set(nome, (m.get(nome) ?? 0) + (i.valor_aluguel_mensal ?? 0))
+    })
+    const rows = [...m.entries()].map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor)
+    return { rows, max: rows[0]?.valor ?? 0, total: rows.reduce((s, r) => s + r.valor, 0) }
   }, [imoveis])
 
   // Próximas faturas
@@ -170,7 +226,7 @@ export default function LocacaoHome() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
-            <KeySquare size={22} className="text-indigo-500" /> Locação de Imóveis
+            <KeySquare size={22} className="text-indigo-500" /> Gestão de Imóveis
           </h1>
           <p className={`text-xs mt-0.5 ${txtMuted}`}>Gestão de contratos, faturas e manutenções</p>
         </div>
@@ -218,16 +274,16 @@ export default function LocacaoHome() {
                 </h2>
               </div>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${contratosVencidos.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={14} className={contratosVencidos.length > 0 || contratosVencendo.length > 0 ? 'text-red-500' : 'text-slate-400'} />
+                <AlertTriangle size={14} className={contratosVencidos.length > 0 || contratosVencendo30.length > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 flex-1">
               <MiniInfoCard
-                label="Faturas vencendo"
-                value={kpis?.faturasVencendo ?? 0}
-                note="próximos 7 dias"
-                icon={Zap}
-                iconTone={(kpis?.faturasVencendo ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
+                label="Contratos"
+                value={contratosVencidos.length + contratosVencendo30.length}
+                note="vencidos / a vencer (30 dias)"
+                icon={CalendarClock}
+                iconTone={contratosVencidos.length + contratosVencendo30.length > 0 ? 'text-red-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
@@ -328,55 +384,65 @@ export default function LocacaoHome() {
         </div>
       </div>
 
-      {/* Entradas + Devoluções em Andamento */}
+      {/* Proporção por tipo + Aluguel por centro de custo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Proporção por tipo de imóvel */}
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-bold ${txt}`}>Entradas em Andamento</p>
-            <button onClick={() => nav('/locacoes/entradas')} className="text-xs text-indigo-500 hover:text-indigo-600 font-semibold flex items-center gap-1">Ver todas <ArrowRight size={12} /></button>
+            <p className={`text-sm font-bold ${txt}`}>Proporção por Tipo de Imóvel</p>
+            <span className={`text-[10px] font-semibold ${txtMuted}`}>{tipoData.total} em uso</span>
           </div>
-          {entradasAndamento.length === 0 ? (
-            <p className={`text-xs ${txtMuted}`}>Nenhuma entrada em andamento.</p>
+          {tipoData.total === 0 ? (
+            <p className={`text-xs ${txtMuted}`}>Nenhum imóvel em uso.</p>
           ) : (
-            <div className="space-y-2">
-              {entradasAndamento.slice(0, 5).map(e => {
-                const stage = ENTRADA_PIPELINE_STAGES.find(s => s.key === e.status)
-                return (
-                  <div key={e.id} className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-medium truncate block ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{e.endereco || e.imovel?.descricao || '—'}</span>
-                      <p className={`text-[10px] ${txtMuted}`}>{[e.cidade, e.uf].filter(Boolean).join(', ')}</p>
-                    </div>
-                    {stage && <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage.badgeClass}`}>{stage.label}</span>}
+            <>
+              <div className={`flex h-8 rounded-lg overflow-hidden gap-[2px] mb-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                {tipoData.rows.map(r => (
+                  <div key={r.key} className={`${isDark ? r.dark : r.light} flex items-center justify-center transition-all`}
+                    style={{ width: `${Math.max(r.pct, 3)}%` }} title={`${r.label}: ${r.value} (${Math.round(r.pct)}%)`}>
+                    {r.pct >= 12 && <span className="text-[10px] font-bold text-white drop-shadow-sm">{Math.round(r.pct)}%</span>}
                   </div>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                {tipoData.rows.map(r => (
+                  <div key={r.key} className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${isDark ? r.dark : r.light}`} />
+                    <span className={`flex-1 truncate text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{r.label}</span>
+                    <span className={`text-xs font-semibold tabular-nums ${txt}`}>{r.value}</span>
+                    <span className={`w-9 text-right text-[11px] tabular-nums ${txtMuted}`}>{Math.round(r.pct)}%</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
+        {/* Aluguel mensal por centro de custo */}
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-bold ${txt}`}>Devoluções em Andamento</p>
-            <button onClick={() => nav('/locacoes/saida')} className="text-xs text-indigo-500 hover:text-indigo-600 font-semibold flex items-center gap-1">Ver todas <ArrowRight size={12} /></button>
+            <p className={`text-sm font-bold ${txt}`}>Aluguel Mensal por Centro de Custo</p>
+            <span className={`text-[10px] font-semibold ${txtMuted}`}>{fmtCurrency(ccData.total)}/mês</span>
           </div>
-          {saidasAndamento.length === 0 ? (
-            <p className={`text-xs ${txtMuted}`}>Nenhuma devolução em andamento.</p>
+          {ccData.rows.length === 0 ? (
+            <p className={`text-xs ${txtMuted}`}>Nenhum imóvel em uso.</p>
           ) : (
-            <div className="space-y-2">
-              {saidasAndamento.slice(0, 5).map(s => {
-                const stage = SAIDA_PIPELINE_STAGES.find(st => st.key === s.status)
-                const isUrgent = s.data_limite_saida && new Date(s.data_limite_saida) <= new Date(Date.now() + 7 * 86400000)
-                return (
-                  <div key={s.id} className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-medium truncate block ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.imovel?.descricao ?? '—'}</span>
-                      {s.data_limite_saida && <p className={`text-[10px] ${isUrgent ? 'text-amber-600 font-semibold' : txtMuted}`}>Limite: {fmtDate(s.data_limite_saida)}</p>}
-                    </div>
-                    {stage && <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage.badgeClass}`}>{stage.label}</span>}
+            <div className="space-y-2.5">
+              {ccData.rows.slice(0, 6).map(r => (
+                <div key={r.nome}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className={`text-[11px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={r.nome}>{r.nome}</span>
+                    <span className={`text-[11px] font-semibold tabular-nums shrink-0 ${txt}`}>{fmtCurrency(r.valor)}</span>
                   </div>
-                )
-              })}
+                  <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+                    <div className={`h-full rounded-full ${isDark ? 'bg-emerald-600' : 'bg-emerald-500'}`}
+                      style={{ width: `${ccData.max ? (r.valor / ccData.max) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+              {ccData.rows.length > 6 && (
+                <p className={`text-[10px] pt-0.5 ${txtMuted}`}>+{ccData.rows.length - 6} outros centros de custo</p>
+              )}
             </div>
           )}
         </div>

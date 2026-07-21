@@ -84,6 +84,7 @@ export interface Contrato {
   contraparte_nome?: string
   valor_mensal?: number
   recorrente?: boolean
+  forma_faturamento?: 'parcela' | 'medicao'
   // Audit
   created_at: string
   updated_at: string
@@ -231,6 +232,9 @@ export interface ContratoMedicao {
   aprovado_por?: string
   aprovado_em?: string
   observacoes?: string
+  // Documento da medição (planilha/BM/NF) anexado no envio ao Financeiro.
+  arquivo_url?: string | null
+  arquivo_nome?: string | null
   created_at: string
   updated_at: string
   criado_por_nome?: string | null
@@ -332,8 +336,9 @@ export type CategoriaContrato =
 export type GrupoContrato =
   | 'locacao_imovel' | 'locacao_veiculos' | 'locacao_equipamentos'
   | 'equipe_pj' | 'prestacao_servicos' | 'servico_recorrente'
+  | 'telefonia_internet'
   | 'aquisicao' | 'subcontratacao_empreitada' | 'consultoria_juridico'
-  | 'apoio_operacional' | 'seguros' | 'outro'
+  | 'apoio_operacional' | 'seguros' | 'fornecimento' | 'outro'
 
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'critica'
 

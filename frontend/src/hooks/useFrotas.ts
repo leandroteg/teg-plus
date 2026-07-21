@@ -1345,7 +1345,7 @@ export function useTelSyncLog(limit = 20) {
       if (error) throw error
       return (data ?? []) as FroTelSyncLog[]
     },
-    refetchInterval: 60_000,   // acompanha os ciclos de sync (5/15 min) sem pesar
-    staleTime: 30_000,
+    refetchInterval: 300_000,  // os ciclos de sync rodam a cada 5/15 min — poll de 60s era desperdício
+    staleTime: 60_000,
   })
 }

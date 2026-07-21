@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// components/MuralPopup.tsx — Mural de Recados
+// components/MuralPopup.tsx — Mural TEG
 // Mobile: bottom-sheet · Desktop: centered floating modal
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, ChevronLeft, ChevronRight, Megaphone, Pin, Calendar, Newspaper } from 'lucide-react'
 import { useBanners, type MuralBanner } from '../hooks/useMural'
+import { useMuralJornalCards } from '../hooks/useJornal'
 import { useTheme } from '../contexts/ThemeContext'
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -92,8 +93,18 @@ function Dots({ total, current, onSelect }: {
 // ── Main component ──────────────────────────────────────────────────────────
 export default function MuralPopup({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { isLightSidebar: isLight } = useTheme()
+  const { data: jornal } = useMuralJornalCards()
   const { data: fetched = [] } = useBanners()
-  const slides = fetched.length > 0 ? fetched : DEFAULTS
+  // Prioridade: edição do Jornal publicada. Sem jornal → banners (fallback).
+  const jornalCards = jornal?.cards ?? []
+  const isJornal = jornalCards.length > 0
+  const slides: MuralBanner[] = isJornal
+    ? jornalCards.map(c => ({
+        id: c.id, titulo: c.titulo ?? '', subtitulo: c.subtitulo ?? undefined,
+        imagem_url: c.imagem_url, tipo: 'fixa', ativo: true, ordem: c.ordem,
+        created_at: '', updated_at: '',
+      }))
+    : (fetched.length > 0 ? fetched : DEFAULTS)
 
   const [current, setCurrent] = useState(0)
   const [visible, setVisible] = useState(false)
@@ -218,10 +229,12 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
               </div>
               <div>
                 <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                  Mural de Recados
+                  Mural TEG
                 </h2>
                 <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {slides.length} comunicado{slides.length !== 1 ? 's' : ''} · TEG+ Comunicados
+                  {isJornal
+                    ? `${jornal?.edicao?.titulo ?? 'Jornal TEG'} · ${slides.length} card${slides.length !== 1 ? 's' : ''}`
+                    : `${slides.length} comunicado${slides.length !== 1 ? 's' : ''} · TEG+ Comunicados`}
                 </p>
               </div>
             </div>
@@ -292,10 +305,12 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/5" />
 
-                  {/* Badge */}
-                  <div className="absolute top-3 right-3 z-20">
-                    <TypeBadge banner={slide} />
-                  </div>
+                  {/* Badge — só banners (o jornal não tem tipo campanha/fixa relevante) */}
+                  {!isJornal && (
+                    <div className="absolute top-3 right-3 z-20">
+                      <TypeBadge banner={slide} />
+                    </div>
+                  )}
 
                   {/* Content */}
                   <div
@@ -309,7 +324,7 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
                     <div className="flex items-center gap-1.5 mb-1">
                       <Megaphone size={8} className="text-teal-400/80" />
                       <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-teal-400/70">
-                        TEG+ Comunicados
+                        {isJornal ? (jornal?.edicao?.titulo ?? 'Mural TEG') : 'TEG+ Comunicados'}
                       </span>
                     </div>
 

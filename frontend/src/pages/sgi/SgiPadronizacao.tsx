@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
 import {
   ClipboardCheck, Search, X, LayoutList, LayoutGrid, Plus, Loader2,
-  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink,
+  FileText, Calendar, AlertTriangle, Clock, CheckSquare, ArrowUp, ArrowDown, Send, ExternalLink, Paperclip,
+  XCircle, CheckCircle2, MessageSquare,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useDocumentos, useCriarDocumento, usePublicarDocumento, useAdesaoDocumento } from '../../hooks/useSgi'
+import { useAuth } from '../../contexts/AuthContext'
+import { useDocumentos, useCriarDocumento, useAtualizarDocumento, usePublicarDocumento, useAdesaoDocumento, uploadSgiArquivo, abrirSgiArquivo } from '../../hooks/useSgi'
 import { STATUS_DOC_LABEL, TIPO_DOC_LABEL } from '../../types/sgi'
-import type { SgiDocumento, StatusDocumento, TipoDocumento } from '../../types/sgi'
+import type { SgiDocumento, StatusDocumento, TipoDocumento, SgiComentario } from '../../types/sgi'
 
 const fmtDate = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—')
 
@@ -47,10 +49,64 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
   const { data: adesao = [] } = useAdesaoDocumento(doc.requer_ciencia ? doc.id : undefined)
   const concl = adesao.filter(a => a.status === 'concluida').length
   const handlePublicar = async () => {
-    const r = await publicar.mutateAsync(doc.id)
-    if (r.ok) alert(r.requer_ciencia ? `Publicado e enviado: ${r.missoes_criadas ?? 0} missão(ões) de ciência criada(s) no Portal TEG.` : 'Documento publicado (vigente).')
-    else alert('Erro ao publicar: ' + (r.erro || ''))
+    try {
+      const r = await publicar.mutateAsync(doc.id)
+      if (r.ok) { alert(`Ciência publicada: ${r.missoes_criadas ?? 0} missão(ões) enviada(s) no Portal TEG.`); onClose() }
+      else alert('Erro ao publicar ciência: ' + (r.erro || ''))
+    } catch (e) { alert('Erro ao publicar ciência: ' + (e instanceof Error ? e.message : String(e))) }
   }
+  const atualizar = useAtualizarDocumento()
+  const [subindo, setSubindo] = useState(false)
+  async function anexar(f: File) {
+    setSubindo(true)
+    try {
+      const up = await uploadSgiArquivo(f, doc.id)
+      await atualizar.mutateAsync({ id: doc.id, arquivo_url: up.path, arquivo_nome: up.nome })
+    } catch (e) { alert('Erro ao anexar: ' + (e instanceof Error ? e.message : String(e))) }
+    setSubindo(false)
+  }
+  // Fluxo documental: rascunho → em_revisao → em_aprovacao → vigente → obsoleto
+  async function mover(novo: StatusDocumento, extra?: Partial<SgiDocumento>) {
+    try { await atualizar.mutateAsync({ id: doc.id, status: novo, ...(extra ?? {}) }); onClose() }
+    catch (e) { alert('Erro na transição: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+  // Solicitar ciência em doc já publicado sem ciência: liga requer_ciencia e publica
+  // (o RPC lê o doc fresco → cria missões; NOT EXISTS evita duplicar quem já é ciente).
+  const handleSolicitarCiencia = async () => {
+    if (!confirm('Solicitar ciência deste documento já publicado?\n\nSerá criada uma missão de ciência no Portal TEG para cada colaborador ativo do público-alvo (com notificação). Quem já deu ciência não é duplicado.')) return
+    try {
+      await atualizar.mutateAsync({ id: doc.id, requer_ciencia: true })
+      const r = await publicar.mutateAsync(doc.id)
+      if (r.ok) { alert(`Ciência solicitada: ${r.missoes_criadas ?? 0} missão(ões) enviada(s) no Portal TEG.`); onClose() }
+      else alert('Erro ao solicitar ciência: ' + (r.erro || ''))
+    } catch (e) { alert('Erro ao solicitar ciência: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+  const btnBase = 'flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all disabled:opacity-60'
+  const btnViolet = `${btnBase} bg-violet-600 hover:bg-violet-700 text-white shadow-sm`
+  const btnGhost = `${btnBase} border ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`
+  const pend = atualizar.isPending || publicar.isPending
+  const { perfil } = useAuth()
+  const autorNome = perfil?.nome || perfil?.email || 'Usuário'
+  const [coment, setComent] = useState('')
+  async function decidir(decisao: 'rejeitar' | 'esclarecer' | 'aprovar') {
+    const texto = coment.trim()
+    if (decisao === 'esclarecer' && !texto) return
+    let comentarios: SgiComentario[] | undefined
+    if (texto) {
+      const novo: SgiComentario = { acao: decisao === 'aprovar' ? 'comentario' : decisao, texto, autor: autorNome, data: new Date().toISOString() }
+      comentarios = [...(doc.comentarios ?? []), novo]
+    }
+    if (decisao === 'aprovar') {
+      // Aprovar apenas torna vigente (Políticas e Processos). A ciência é um passo à parte (botão Publicar no doc vigente).
+      await mover('vigente', { vigente_em: new Date().toISOString(), ...(comentarios ? { comentarios } : {}) })
+    } else {
+      await mover(decisao === 'rejeitar' ? 'rascunho' : 'em_revisao', comentarios ? { comentarios } : undefined)
+    }
+  }
+  const softBase = 'flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold active:scale-[0.98] transition-all disabled:opacity-50'
+  const softRed = `${softBase} ${isDark ? 'text-red-300 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20' : 'text-red-500 bg-red-50 border border-red-200 hover:bg-red-100'}`
+  const softAmber = `${softBase} ${isDark ? 'text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20' : 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'}`
+  const softEmerald = `${softBase} ${isDark ? 'text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' : 'text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -134,19 +190,74 @@ function DocDetailModal({ doc, onClose, isDark }: { doc: SgiDocumento; onClose: 
 
           <div className="space-y-2 pt-1">
             {doc.arquivo_url && (
-              <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
+              <button onClick={() => abrirSgiArquivo(doc.arquivo_url!, doc.arquivo_nome).catch(err => alert('Erro ao abrir: ' + (err instanceof Error ? err.message : String(err))))}
                 className={`w-full py-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-violet-500/30 text-violet-300 hover:bg-violet-500/10' : 'border-violet-200 text-violet-700 hover:bg-violet-50'}`}>
-                <ExternalLink size={15} /> Abrir documento
-              </a>
+                <ExternalLink size={15} /> Abrir documento{doc.arquivo_nome ? ` · ${doc.arquivo_nome}` : ''}
+              </button>
             )}
-            <div className="flex gap-2">
-              {doc.status !== 'obsoleto' && (
-                <button onClick={handlePublicar} disabled={publicar.isPending} className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60">
-                  {publicar.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {doc.status === 'vigente' ? (doc.requer_ciencia ? 'Republicar ciência' : 'Republicar') : 'Publicar'}
-                </button>
-              )}
-              <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
-            </div>
+            <label className={`w-full py-2.5 rounded-xl border border-dashed text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${isDark ? 'border-white/15 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'} ${subindo ? 'opacity-60 pointer-events-none' : ''}`}>
+              {subindo ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+              {doc.arquivo_url ? 'Trocar arquivo' : 'Anexar documento'}
+              <input type="file" className="hidden" disabled={subindo} onChange={e => { const f = e.target.files?.[0]; if (f) anexar(f); e.target.value = '' }} />
+            </label>
+            {/* Esclarecimentos / comentários registrados */}
+            {(doc.comentarios ?? []).length > 0 && (
+              <div className={`rounded-xl p-3 ${cardBg} space-y-2`}>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Esclarecimentos / Comentários</p>
+                {(doc.comentarios ?? []).slice().reverse().map((c, i) => (
+                  <div key={i} className="text-xs">
+                    <span className={`font-bold ${c.acao === 'rejeitar' ? 'text-red-500' : c.acao === 'esclarecer' ? 'text-amber-500' : txtMain}`}>{c.acao === 'rejeitar' ? 'Rejeição' : c.acao === 'esclarecer' ? 'Esclarecimento' : 'Comentário'}</span>
+                    <span className={txtMuted}> · {c.autor || '—'} · {fmtDate((c.data || '').split('T')[0])}</span>
+                    <p className={`mt-0.5 ${txtMain}`}>{c.texto}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {doc.status === 'em_aprovacao' ? (
+              <div className={`pt-3 space-y-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                <textarea rows={2} value={coment} onChange={e => setComent(e.target.value)} placeholder="Observação / motivo…"
+                  className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:ring-2 focus:ring-violet-500/30' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-violet-400/30'}`} />
+                <div className="flex gap-2">
+                  <button onClick={() => decidir('rejeitar')} disabled={pend} className={softRed}><XCircle size={14} /> Rejeitar</button>
+                  <button onClick={() => decidir('esclarecer')} disabled={pend || !coment.trim()} className={softAmber}><MessageSquare size={14} /> Esclarecer</button>
+                  <button onClick={() => decidir('aprovar')} disabled={pend} className={softEmerald}>
+                    {pend ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Aprovar
+                  </button>
+                </div>
+                <p className={`text-[10px] ${txtMuted}`}>Esclarecer devolve p/ revisão · Rejeitar volta p/ rascunho · Aprovar publica. O motivo fica registrado.</p>
+              </div>
+            ) : (
+              <div className="flex gap-2 [&>button]:flex-1">
+                {doc.status === 'rascunho' && (
+                  <button onClick={() => mover('em_revisao')} disabled={pend} className={btnViolet}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para revisão
+                  </button>
+                )}
+                {doc.status === 'em_revisao' && (<>
+                  <button onClick={() => mover('rascunho')} disabled={pend} className={btnGhost}>Devolver</button>
+                  <button onClick={() => mover('em_aprovacao')} disabled={pend} className={btnViolet}>
+                    {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para aprovação
+                  </button>
+                </>)}
+                {doc.status === 'vigente' && (<>
+                  <button onClick={() => mover('obsoleto', { obsoleto_em: new Date().toISOString() })} disabled={pend} className={btnGhost}>Tornar obsoleto</button>
+                  {doc.requer_ciencia ? (
+                    <button onClick={handlePublicar} disabled={pend} className={btnViolet}>
+                      {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {adesao.length > 0 ? 'Republicar ciência' : 'Publicar para ciência'}
+                    </button>
+                  ) : (
+                    <button onClick={handleSolicitarCiencia} disabled={pend} className={btnViolet}>
+                      {pend ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Solicitar ciência
+                    </button>
+                  )}
+                </>)}
+                {doc.status === 'obsoleto' && (
+                  <button onClick={() => mover('rascunho', { obsoleto_em: null })} disabled={pend} className={btnGhost}>Reativar</button>
+                )}
+              </div>
+            )}
+            <button onClick={onClose} className={`${btnGhost} w-full`}>Fechar</button>
           </div>
         </div>
       </div>
@@ -163,6 +274,8 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
   const [descricao, setDescricao] = useState('')
   const [requerCiencia, setRequerCiencia] = useState(false)
   const [periodicidade, setPeriodicidade] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [subindo, setSubindo] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -172,6 +285,13 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!titulo.trim()) return
+    let arquivo_url: string | undefined, arquivo_nome: string | undefined
+    if (file) {
+      setSubindo(true)
+      try { const up = await uploadSgiArquivo(file); arquivo_url = up.path; arquivo_nome = up.nome }
+      catch (err) { setSubindo(false); alert('Erro ao subir arquivo: ' + (err instanceof Error ? err.message : String(err))); return }
+      setSubindo(false)
+    }
     await criar.mutateAsync({
       titulo: titulo.trim(),
       tipo,
@@ -179,6 +299,8 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
       descricao: descricao || undefined,
       requer_ciencia: requerCiencia,
       periodicidade_revisao_meses: periodicidade ? Number(periodicidade) : undefined,
+      arquivo_url,
+      arquivo_nome,
     })
     onClose()
   }
@@ -221,11 +343,20 @@ function NovoDocModal({ onClose, isDark }: { onClose: () => void; isDark: boolea
               Exige ciência (Portal TEG)
             </label>
           </div>
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Arquivo (opcional)</label>
+            <label className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 border cursor-pointer ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              <Paperclip size={14} className="text-violet-500 shrink-0" />
+              <span className="truncate flex-1">{file ? file.name : 'Selecionar arquivo (PDF, DOCX, imagem...)'}</span>
+              {file && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); setFile(null) }} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={13} /></button>}
+              <input type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
-            <button type="submit" disabled={criar.isPending || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2">
-              {criar.isPending && <Loader2 size={14} className="animate-spin" />}
-              Criar Documento
+            <button type="submit" disabled={criar.isPending || subindo || !titulo.trim()} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {(criar.isPending || subindo) && <Loader2 size={14} className="animate-spin" />}
+              {subindo ? 'Enviando arquivo…' : 'Criar Documento'}
             </button>
           </div>
         </form>

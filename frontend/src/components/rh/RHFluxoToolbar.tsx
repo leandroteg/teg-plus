@@ -2,6 +2,7 @@
 // components/rh/RHFluxoToolbar.tsx — Barra de busca/ordenação/visão (padrão Compras)
 // Reutilizada nas telas de Admissão e Desligamento.
 // ─────────────────────────────────────────────────────────────────────────────
+import type { ReactNode } from 'react'
 import { Search, X, ArrowUp, ArrowDown, LayoutList, LayoutGrid } from 'lucide-react'
 
 export type ViewMode = 'list' | 'cards'
@@ -10,7 +11,7 @@ export interface SortOption { field: string; label: string }
 export default function RHFluxoToolbar({
   isDark, busca, setBusca, placeholder = 'Buscar...',
   sortOptions, sortField, setSortField, sortDir, setSortDir,
-  viewMode, setViewMode, count, total,
+  viewMode, setViewMode, count, total, children,
 }: {
   isDark: boolean
   busca: string
@@ -25,6 +26,7 @@ export default function RHFluxoToolbar({
   setViewMode: (v: ViewMode) => void
   count: number
   total: number
+  children?: ReactNode
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -60,6 +62,9 @@ export default function RHFluxoToolbar({
           {sortField === o.field && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
         </button>
       ))}
+
+      {/* Filtros injetados pela tela (base, mês, urgente, status…) */}
+      {children}
 
       {/* View toggle */}
       <div className={`flex border rounded-lg overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>

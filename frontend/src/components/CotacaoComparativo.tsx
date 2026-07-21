@@ -313,14 +313,17 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                     {getFornecedorEmail(f) && (
                       <div><span className="text-slate-400">E-mail:</span> {getFornecedorEmail(f)}</div>
                     )}
-                    {f.arquivo_url && (
+                    {(f.arquivo_urls ?? []).map((url, i) => (
                       <button
-                        onClick={(e) => { e.stopPropagation(); viewFile(f.arquivo_url!) }}
+                        key={url}
+                        onClick={(e) => { e.stopPropagation(); viewFile(url) }}
                         className="col-span-2 flex items-center gap-1.5 text-violet-600 hover:text-violet-800 font-semibold transition"
                       >
-                        <FileText size={12} /><span>Ver cotação anexa</span><ExternalLink size={10} />
+                        <FileText size={12} />
+                        <span>Ver cotação anexa{(f.arquivo_urls ?? []).length > 1 ? ` ${i + 1}` : ''}</span>
+                        <ExternalLink size={10} />
                       </button>
-                    )}
+                    ))}
                   </div>
                   {!readOnly && onSelect && !isSelected && (
                     <button
@@ -399,13 +402,19 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                         {f.condicao_pagamento ?? <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {f.arquivo_url ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); viewFile(f.arquivo_url!) }}
-                            className="inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800 font-semibold transition"
-                          >
-                            <FileText size={13} /><ExternalLink size={10} />
-                          </button>
+                        {(f.arquivo_urls ?? []).length > 0 ? (
+                          <div className="flex items-center justify-center gap-1">
+                            {(f.arquivo_urls ?? []).map((url, i) => (
+                              <button
+                                key={url}
+                                onClick={(e) => { e.stopPropagation(); viewFile(url) }}
+                                className="inline-flex items-center gap-0.5 text-[11px] text-violet-600 hover:text-violet-800 font-semibold transition"
+                                title={`Ver anexo ${i + 1}`}
+                              >
+                                <FileText size={13} /><ExternalLink size={10} />
+                              </button>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}

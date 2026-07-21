@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt, ScrollText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -532,7 +532,7 @@ export default function ModuleLayout({
       if (actionMenu) {
         const isOpen = openNavMenu?.id === to
         return (
-          <div key={to}>
+          <div key={`${to}:${label}`}>
             <button
               type="button"
               onClick={event => {
@@ -541,9 +541,10 @@ export default function ModuleLayout({
                   return
                 }
                 const rect = event.currentTarget.getBoundingClientRect()
+                // sobe o menu o suficiente p/ sobrar espaço; o resto scrolla internamente
                 setOpenNavMenu({
                   id: to,
-                  top: Math.min(rect.top, window.innerHeight - 260),
+                  top: Math.max(12, Math.min(rect.top, window.innerHeight - 340)),
                   left: rect.right + 12,
                 })
               }}
@@ -555,8 +556,8 @@ export default function ModuleLayout({
             {isOpen && (
               <div
                 data-nav-action-menu
-                className={`fixed z-[70] w-[340px] rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
-                style={{ top: openNavMenu.top, left: openNavMenu.left }}
+                className={`fixed z-[70] w-[340px] overflow-y-auto styled-scrollbar rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
+                style={{ top: openNavMenu.top, left: openNavMenu.left, maxHeight: `calc(100vh - ${openNavMenu.top + 12}px)` }}
               >
                 {actionMenu.title && (
                   <p className={`px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -596,7 +597,7 @@ export default function ModuleLayout({
       }
       if (action) {
         return (
-          <button key={to} onClick={action} className={accent
+          <button key={`${to}:${label}`} onClick={action} className={accent
             ? `w-full flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
               ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
             }`
@@ -608,7 +609,7 @@ export default function ModuleLayout({
       }
       if (accent) {
         return (
-          <NavLink key={to} to={to} end={end}
+          <NavLink key={`${to}:${label}`} to={to} end={end}
             className={`flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
               ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
             }`}>
@@ -618,7 +619,7 @@ export default function ModuleLayout({
         )
       }
       return (
-        <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+        <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
           <Icon size={16} className="shrink-0" />
           <span className={variant === 'compact' && adminOnly ? 'flex-1' : undefined}>{label}</span>
           {variant === 'compact' && adminOnly && (
@@ -633,7 +634,7 @@ export default function ModuleLayout({
     return (
       <>
         {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+          <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
           </NavLink>
@@ -645,7 +646,7 @@ export default function ModuleLayout({
               {section.label}
             </p>
             {section.items.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to} className={sidebarLinkClass}>
+              <NavLink key={`${to}:${label}`} to={to} className={sidebarLinkClass}>
                 <Icon size={16} className="shrink-0" />
                 <span>{label}</span>
               </NavLink>
@@ -660,7 +661,7 @@ export default function ModuleLayout({
     return (
       <>
         {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+          <NavLink key={`${to}:${label}`} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
           </NavLink>
@@ -721,7 +722,7 @@ export default function ModuleLayout({
             const active = location.pathname === to
             return (
               <NavLink
-                key={to}
+                key={`${to}:${label}`}
                 to={to}
                 end={end}
                 onClick={() => setGroupFlyout(null)}
@@ -923,6 +924,15 @@ export default function ModuleLayout({
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/logs') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <ScrollText size={15} className="shrink-0 opacity-50" />
+                Logs de Auditoria
               </button>
             </>
           )}
@@ -1241,7 +1251,7 @@ export default function ModuleLayout({
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
             {mobileBottomNav.map(({ to, icon: Icon, label, end }) => (
-              <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
+              <NavLink key={`${to}:${label}`} to={to} end={end} className={bottomLinkClass}>
                 <Icon className="w-5 h-5 mb-0.5" />
                 {truncateBottomLabels && label.length > 8 ? label.slice(0, 8) + '.' : label}
               </NavLink>

@@ -432,7 +432,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
       // 5b. Busca historico de esclarecimentos (cmp + fin)
       const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
-      const escIds = [...cmpIds, ...finIds]
+      const escIds = [...cmpIds, ...finIds, ...conIds]
       if (escIds.length > 0) {
         const { data: escData } = await supabase
           .from(TABLE_APR)
@@ -744,7 +744,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           ctx,
         ))
     },
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
     retry: 1,
     staleTime: 10_000,
   })
@@ -951,8 +951,10 @@ export function useAprovacaoKPIs() {
       }
     },
     enabled: !!perfil,
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    // KPIs custam ~9 queries por ciclo; a fila (aprovacoes-pendentes) continua
+    // em 60s e as decisões invalidam os KPIs — 3min de poll é suficiente aqui.
+    refetchInterval: 180_000,
+    staleTime: 60_000,
     retry: false,
   })
 }
@@ -1252,14 +1254,18 @@ export function useDecisaoGenerica() {
               .eq('id', entidadeId)
           }
         } else if (tipoAprovacao === 'cotacao') {
-          // Aprovação financeira da cotação — atualiza RC para cotacao_aprovada/rejeitada
+          // Aprovação financeira da cotação — atualiza RC para cotacao_aprovada, ou
+          // volta pra em_cotacao quando rejeitada. Antes ia pra 'cotacao_rejeitada',
+          // um status morto: some da Fila de Cotações (só mostra em_andamento/
+          // concluida) e o CotacaoForm fica read-only (cmp_cotacoes continuava
+          // 'concluida') — o comprador não tinha como localizar nem refazer.
           const now = new Date().toISOString()
           const updates: Record<string, unknown> = {}
           if (decisao === 'aprovada') {
             updates.status = 'cotacao_aprovada'
             updates.data_aprovacao = now
           } else if (decisao === 'rejeitada') {
-            updates.status = 'cotacao_rejeitada'
+            updates.status = 'em_cotacao'
           } else if (decisao === 'esclarecimento') {
             // Devolve ao comprador para esclarecer a cotação — fica na fila de cotações
             updates.status = 'cotacao_em_esclarecimento'
@@ -1272,6 +1278,23 @@ export function useDecisaoGenerica() {
               .from(TABLE_REQ)
               .update(updates)
               .eq('id', entidadeId)
+          }
+          if (decisao === 'rejeitada') {
+            // Reabre a cotação mais recente pra edição (senão CotacaoForm continua
+            // mostrando a tela read-only de "concluída" mesmo com a RC em_cotacao).
+            const { data: cot } = await supabase
+              .from('cmp_cotacoes')
+              .select('id')
+              .eq('requisicao_id', entidadeId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (cot?.id) {
+              await supabase
+                .from('cmp_cotacoes')
+                .update({ status: 'em_andamento' })
+                .eq('id', cot.id)
+            }
           }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
@@ -1332,26 +1355,43 @@ export function useDecisaoGenerica() {
 
       return { decisao }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
+      // Sempre: fila/histórico/KPIs de aprovações + dashboard (mostram pendências).
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
-      qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
-      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
-      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
-      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
-      qc.invalidateQueries({ queryKey: ['requisicoes'] })
-      qc.invalidateQueries({ queryKey: ['requisicao'] })
-      qc.invalidateQueries({ queryKey: ['cotacoes'] })
-      qc.invalidateQueries({ queryKey: ['cotacao'] })
-      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
-      qc.invalidateQueries({ queryKey: ['adiantamentos'] })
+
+      // Só as queries do módulo da entidade decidida — invalidar todos os
+      // módulos refazia dezenas de listas a cada decisão.
+      switch (vars.tipoAprovacao) {
+        case 'minuta_contratual':
+          qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
+          qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
+          break
+        case 'autorizacao_pagamento':
+          qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+          qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+          qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+          qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+          break
+        case 'requisicao_compra':
+        case 'cotacao':
+          qc.invalidateQueries({ queryKey: ['requisicoes'] })
+          qc.invalidateQueries({ queryKey: ['requisicao'] })
+          qc.invalidateQueries({ queryKey: ['cotacoes'] })
+          qc.invalidateQueries({ queryKey: ['cotacao'] })
+          qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+          break
+        case 'aprovacao_transporte':
+          qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+          break
+        case 'solicitacao_adiantamento':
+          qc.invalidateQueries({ queryKey: ['adiantamentos'] })
+          break
+      }
     },
   })
 }
@@ -1398,7 +1438,9 @@ export function useDecisaoRequisicao() {
           updates.status = 'aprovada'
         }
       } else if (decisao === 'rejeitada') {
-        updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
+        // Rejeição financeira volta pra em_cotacao (não 'cotacao_rejeitada' — status
+        // morto: some da Fila de Cotações e o comprador não localiza pra refazer).
+        updates.status = isFinancialApproval ? 'em_cotacao' : 'rejeitada'
       } else if (decisao === 'esclarecimento') {
         updates.status = isFinancialApproval ? 'cotacao_em_esclarecimento' : 'em_esclarecimento'
         updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
@@ -1412,6 +1454,24 @@ export function useDecisaoRequisicao() {
         .eq('id', requisicaoId)
 
       if (reqError) throw reqError
+
+      if (decisao === 'rejeitada' && isFinancialApproval) {
+        // Reabre a cotação mais recente pra edição (senão CotacaoForm continua
+        // mostrando a tela read-only de "concluída" mesmo com a RC em_cotacao).
+        const { data: cot } = await supabase
+          .from('cmp_cotacoes')
+          .select('id')
+          .eq('requisicao_id', requisicaoId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (cot?.id) {
+          await supabase
+            .from('cmp_cotacoes')
+            .update({ status: 'em_andamento' })
+            .eq('id', cot.id)
+        }
+      }
 
       // 2. Create apr_aprovacoes record (audit trail + feeds AprovAi)
       // tipo_aprovacao reflete a etapa em que a decisão foi tomada:

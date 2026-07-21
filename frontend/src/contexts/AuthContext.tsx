@@ -156,6 +156,10 @@ export interface Perfil {
   colaborador_id: string | null
   base_id: string | null
   pode_receber: boolean
+  /** Pode registrar devolução de cautela em OBRA — restrito à sua base de lotação. */
+  almoxarife: boolean
+  /** Pode registrar devolução de cautela na SEDE (Escritório Central). */
+  comprador: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string
@@ -174,11 +178,11 @@ export interface GrupoModulos {
 
 export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
   {
-    label: 'Projetos',
+    label: 'Operação',
     modulos: [
       { key: 'egp', label: 'EGP', icon: '📊' },
       { key: 'obras', label: 'Obras', icon: '🏗️' },
-      { key: 'ssma', label: 'SSMA', icon: '⛑️' },
+      { key: 'qsma', label: 'QSMA', icon: '🦺' },
     ],
   },
   {
@@ -189,7 +193,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
       { key: 'estoque', label: 'Estoque', icon: '📦' },
       { key: 'patrimonial', label: 'Patrimonial', icon: '🏛️' },
       { key: 'frotas', label: 'Frotas', icon: '🚛' },
-      { key: 'locacoes', label: 'Locação Imóveis', icon: '🏘️' },
+      { key: 'locacoes', label: 'Gestão de Imóveis', icon: '🏘️' },
     ],
   },
   {

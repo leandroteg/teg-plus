@@ -492,7 +492,7 @@ export function useColaboradoresAtivos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rh_colaboradores')
-        .select('id, nome, cargo, departamento, setor, base_id, foto_url, tipo_contrato, base:est_bases!base_id(nome)')
+        .select('id, nome, cargo, departamento, setor, base_id, foto_url, tipo_contrato, tamanho_camisa, tamanho_calca, tamanho_calcado, base:est_bases!base_id(nome)')
         .eq('ativo', true)
         .order('nome')
       if (error) return []
@@ -506,6 +506,9 @@ export function useColaboradoresAtivos() {
         base_nome: c.base?.nome ?? undefined,
         foto_url: c.foto_url ?? undefined,
         tipo_contrato: c.tipo_contrato ?? undefined,
+        tamanho_camisa: c.tamanho_camisa ?? undefined,
+        tamanho_calca: c.tamanho_calca ?? undefined,
+        tamanho_calcado: c.tamanho_calcado ?? undefined,
         papel_sugerido: papelSugerido(c.cargo, c.departamento),
       })) as ColaboradorAtivo[]
     },
@@ -631,6 +634,8 @@ export function useObrasKPIs() {
         prestacoes_pendentes: prestRes.count ?? 0,
       }
     },
-    refetchInterval: 60_000,
+    // KPIs de acompanhamento — 3min é suficiente para contadores de home.
+    refetchInterval: 180_000,
+    staleTime: 60_000,
   })
 }

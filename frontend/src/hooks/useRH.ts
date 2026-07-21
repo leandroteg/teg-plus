@@ -60,7 +60,23 @@ export function useRHColaborador(id?: string) {
         .eq('id', id!)
         .single()
       if (error) return null
-      return data as RHColaborador
+      // Salário é RESTRITO: não expõe na ficha (fica só no banco p/ totalizações em painéis)
+      const d = data as any
+      if (d) delete d.salario
+      return d as RHColaborador
+    },
+  })
+}
+
+// Departamentos cadastrados no sistema (distintos, para o select da ficha)
+export function useDepartamentos() {
+  return useQuery<string[]>({
+    queryKey: ['rh-departamentos'],
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_colaboradores').select('departamento')
+      const s = new Set<string>()
+      ;(data ?? []).forEach((r: any) => { if (r.departamento) s.add(r.departamento) })
+      return [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'))
     },
   })
 }
@@ -69,7 +85,7 @@ export function useSalvarRHColaborador() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<RHColaborador> & { id?: string }) => {
-      const { id, obra, base, gestor, ...rest } = payload as any
+      const { id, obra, base, gestor, salario, ...rest } = payload as any // salário restrito: nunca sobrescreve pela ficha
       if (id) {
         const { data, error } = await supabase.from('rh_colaboradores').update(rest).eq('id', id).select('*').single()
         if (error) throw error
@@ -326,6 +342,15 @@ export interface RHStats {
   admissoesMes: number
   desligamentosMes: number
   admissoesPendentes: number
+  // Movimento REAL de headcount (por data_admissao/data_demissao dos colaboradores) —
+  // fonte correta p/ turnover; rh_admissoes conta requisições e rh_desligamentos está vazia.
+  admitidosMes: number
+  desligadosMes: number
+  admitidosAno: number
+  desligadosAno: number
+  // Última folha lançada (rh_holerites, tipo mensal)
+  folhaTotal: number | null
+  folhaComp: string | null      // 'YYYY-MM' da última competência com holerite
   aniversariantes: RHColaborador[]
   porDepartamento: { departamento: string; total: number }[]
   porObra: { obra: string; total: number }[]
@@ -346,6 +371,13 @@ export function useRHStats() {
       const { data: desligamentos = [] } = await supabase
         .from('rh_desligamentos')
         .select('id, status, data_desligamento')
+
+      // Última folha lançada (holerites mensais) — soma o valor líquido da competência mais recente
+      const { data: holerites = [] } = await supabase
+        .from('rh_holerites')
+        .select('competencia, valor_liquido')
+        .eq('tipo', 'mensal')
+        .order('competencia', { ascending: false })
 
       const ativos = (todos as any[]).filter((c: any) => c.ativo)
       const inativos = (todos as any[]).filter((c: any) => !c.ativo)
@@ -397,6 +429,29 @@ export function useRHStats() {
         a.status === 'pendente' || a.status === 'avaliacao_documentos' || a.status === 'aguardando_cadastro'
       ).length
 
+      // Movimento real de headcount (datas de admissão/demissão dos colaboradores).
+      // Comparação por prefixo de string evita deslocamento de fuso (datas 'YYYY-MM-DD').
+      const anoStr = String(anoAtual)
+      const ymStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`
+      const admitidosAno = (todos as any[]).filter((c: any) => (c.data_admissao ?? '').startsWith(anoStr)).length
+      const desligadosAno = (todos as any[]).filter((c: any) => (c.data_demissao ?? '').startsWith(anoStr)).length
+      const admitidosMes = (todos as any[]).filter((c: any) => (c.data_admissao ?? '').startsWith(ymStr)).length
+      const desligadosMes = (todos as any[]).filter((c: any) => (c.data_demissao ?? '').startsWith(ymStr)).length
+
+      // Folha = CLT líquido (holerites da competência mais recente) + PJ (agregado)
+      let folhaComp: string | null = null
+      let cltLiquido = 0
+      if ((holerites as any[]).length > 0) {
+        folhaComp = String((holerites as any[])[0].competencia).slice(0, 7)
+        cltLiquido = (holerites as any[])
+          .filter((h: any) => String(h.competencia).slice(0, 7) === folhaComp)
+          .reduce((s: number, h: any) => s + Number(h.valor_liquido || 0), 0)
+      }
+      // Folha PJ — só o total agregado (valores individuais são sigilosos): RPC SECURITY DEFINER
+      const { data: pjTot } = await supabase.rpc('rh_folha_pj_total')
+      const folhaPJ = Number(pjTot || 0)
+      const folhaTotal: number | null = (cltLiquido + folhaPJ) > 0 ? cltLiquido + folhaPJ : null
+
       return {
         totalAtivos: ativos.length,
         totalInativos: inativos.length,
@@ -405,6 +460,12 @@ export function useRHStats() {
         admissoesMes,
         desligamentosMes,
         admissoesPendentes,
+        admitidosMes,
+        desligadosMes,
+        admitidosAno,
+        desligadosAno,
+        folhaTotal,
+        folhaComp,
         aniversariantes,
         porDepartamento,
         porObra,

@@ -1,8 +1,10 @@
 // pages/rh/paineis/ComposicaoHeadcount.tsx — composição do quadro por setor/cargo + tempo de empresa.
 import { useMemo, useState } from 'react'
 import { PieChart, Layers, Clock, ChevronDown, ChevronRight } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useHeadcountDataset } from '../../../hooks/useRH'
+import { supabase } from '../../../services/supabase'
 import {
   composicaoAtual, evolucaoPorSetor, tempoEmpresaDist, cargoParaSetor,
   listaMeses, ymLabel, parseData, tempoEmpresaTexto, type HeadcountRow,
@@ -13,6 +15,16 @@ export default function ComposicaoHeadcount({ de = '2026-01', ate }: { de?: stri
   const { isDark } = useTheme()
   const { data: rows = [], isLoading } = useHeadcountDataset()
   const [aberto, setAberto] = useState<string | null>(null)
+
+  // Total da folha (só agregado — RPC não expõe valor individual)
+  const { data: folha } = useQuery({
+    queryKey: ['rh_folha_total', ate],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('rh_folha_total', { p_ate: `${ate}-01` })
+      return (data ?? null) as { competencia: string; bruto: number; liquido: number; holerites: number } | null
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
   const dados = useMemo(() => {
     const comp = composicaoAtual(rows)
@@ -44,10 +56,13 @@ export default function ComposicaoHeadcount({ de = '2026-01', ate }: { de?: stri
   const pctC = (n: number) => contratos.total ? `${((n / contratos.total) * 100).toFixed(1)}%` : '0%'
   const maxTempo = Math.max(...tempo.map(t => t.ativos), 1)
   const hoje = new Date()
+  const fmtFolha = (n: number) => n >= 1_000_000 ? `R$ ${(n / 1_000_000).toFixed(2).replace('.', ',')} mi` : `R$ ${Math.round(n).toLocaleString('pt-BR')}`
+  const folhaMes = folha?.competencia ? new Date(folha.competencia + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('. de ', '/') : ''
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        <Kpi label="Última Folha" value={folha?.competencia ? fmtFolha(Number(folha.bruto)) : '—'} note={folha?.competencia ? `bruta · ${folhaMes}` : 'sem folha no período'} tone="teal" isDark={isDark} />
         <Kpi label="Total" value={contratos.total} tone="violet" note="ativos" isDark={isDark} />
         <Kpi label="CLT" value={contratos.clt} tone="emerald" note={pctC(contratos.clt)} isDark={isDark} />
         <Kpi label="PJ" value={contratos.pj} tone="amber" note={pctC(contratos.pj)} isDark={isDark} />

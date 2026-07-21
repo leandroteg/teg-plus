@@ -17,6 +17,9 @@ export interface RHColaborador {
   foto_url?: string
 
   // Flag de processo trabalhista (fonte: planilha RH/Processos)
+  // Cargo de confiança: não bate ponto, não é cadastrado no Secullum
+  cargo_confianca?: boolean
+
   tem_processo_trabalhista?: boolean
   processo_trabalhista_info?: string | null
 
@@ -51,6 +54,11 @@ export interface RHColaborador {
   conta?: string
   tipo_conta?: string
   pix_chave?: string
+
+  // Tamanhos de uniforme/EPI (fonte: etapa de Mobilização do Headcount)
+  tamanho_camisa?: string
+  tamanho_calca?: string
+  tamanho_calcado?: string
 
   // Contrato
   tipo_contrato?: string   // CLT | PJ | Estagiário | Temporário | Aprendiz
@@ -160,6 +168,7 @@ export interface RHAdmissaoAnexo {
   mime_type?: string
   uploaded_por?: string
   created_at: string
+  missao_assinatura_id?: string | null   // missão de assinatura no Portal (docs assináveis)
 }
 
 // Candidato individual dentro de uma requisição de admissão (RH-only)
@@ -171,10 +180,12 @@ export interface RHAdmissaoCandidato {
   data_nascimento?: string
   cargo?: string
   salario?: number
+  cargo_confianca?: boolean
   colaborador_id?: string
   dados_extras?: Record<string, unknown>
   created_at: string
   anexos?: RHAdmissaoAnexo[]
+  colaborador?: { id: string; departamento?: string | null }
 }
 
 export interface RHAdmissao {
@@ -198,6 +209,7 @@ export interface RHAdmissao {
 
   // Fluxo de admissão (RH-only)
   etapa?: EtapaAdmissaoFluxo
+  arquivada?: boolean
   status_aprovacao?: StatusAprovacaoAdmissao | null
   motivo?: string
   tipo_movimentacao?: TipoMovimentacaoAdmissao
@@ -235,6 +247,7 @@ export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'comprovante', label: 'Comprovante de Endereço', obrigatorio: false },
   { value: 'certidao', label: 'Certidão Nasc./Casamento', obrigatorio: false },
   { value: 'reservista', label: 'Reservista', obrigatorio: false },
+  { value: 'aso', label: 'Exame Admissional (ASO)', obrigatorio: false },
   { value: 'declaracao_etnia', label: 'Declaração de Etnia', obrigatorio: false },
   { value: 'pesquisa_historico', label: 'Pesquisa Histórico', obrigatorio: false },
   { value: 'proposta', label: 'Proposta', obrigatorio: false },

@@ -171,7 +171,17 @@ export interface ContaReceber {
   updated_at?: string
   criado_por_nome?: string | null
   atualizado_por_nome?: string | null
+  // Vínculo com o EGP (medição nasce no EGP; a CR referencia)
+  osc_id?: string | null
+  pmo_medicao_id?: string | null
+  osc?: { numero_os: string } | null // embed via osc_id
+  obra?: { nome: string; codigo?: string | null } | null // embed via projeto_id
+  bloqueio_tipo?: BloqueioCR
 }
+
+export type BloqueioCR =
+  | 'tecnico' | 'contratual' | 'rh' | 'financeiro'
+  | 'em_identificacao' | 'em_aprovacao' | 'resolvido' | 'sem_bloqueio'
 
 export interface DocumentoFinanceiro {
   id: string

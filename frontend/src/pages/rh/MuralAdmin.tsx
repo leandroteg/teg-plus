@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// pages/rh/MuralAdmin.tsx — Gestão do Mural de Recados (Admin)
+// pages/rh/MuralAdmin.tsx — Gestão do Mural TEG (Admin)
 // Imagens Fixas + Campanhas com data de vigência
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef } from 'react'
@@ -9,6 +9,7 @@ import {
   AlertTriangle, Eye, EyeOff, GripVertical, CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import {
   useBannersAdmin, useSalvarBanner, useExcluirBanner,
   useToggleBanner, useUploadBannerImagem,
@@ -420,6 +421,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export default function MuralAdmin() {
   const { isAdmin }  = useAuth()
+  const { isLightSidebar: isLight } = useTheme()
   const { data: banners = [], isLoading } = useBannersAdmin()
 
   const [tab, setTab]     = useState<TabKey>('todos')
@@ -444,9 +446,9 @@ export default function MuralAdmin() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <ImagePlay size={20} className="text-violet-400" />
-            Mural de Recados
+            Mural TEG
           </h1>
           <p className="text-sm text-slate-500">
             {banners.length} banner{banners.length !== 1 ? 's' : ''} cadastrado{banners.length !== 1 ? 's' : ''}

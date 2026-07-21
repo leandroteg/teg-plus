@@ -393,6 +393,86 @@ export function useMedicaoPorOSC(portfolioId?: string) {
   })
 }
 
+// ── Status descritivo por Obra (gerado pela IA) ───────────────────────────────
+export interface ObraStatusAcao { acao: string; dono?: string; prazo?: string }
+export interface ObraStatusRow { obra_id: string; status_texto: string | null; diagnostico: string | null; acoes: ObraStatusAcao[] | null; farol: string | null; gerado_por: string | null; updated_at: string | null }
+export function useObraStatus() {
+  return useQuery<ObraStatusRow[]>({
+    queryKey: ['pmo-obra-status'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_obra_status').select('obra_id, status_texto, diagnostico, acoes, farol, gerado_por, updated_at')
+      if (error) return []
+      return (data ?? []) as ObraStatusRow[]
+    },
+  })
+}
+
+// ── Snapshots de Status Report por projeto (versionado por data) ──────────────
+export interface ProjetoSnapshot { id: string; data_report: string; gerado_por: string | null; payload: unknown }
+export function useProjetoSnapshots(projetoId?: string | null) {
+  return useQuery<ProjetoSnapshot[]>({
+    queryKey: ['pmo-projeto-snapshots', projetoId],
+    enabled: !!projetoId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_status_report')
+        .select('id, data_report, gerado_por, payload')
+        .eq('projeto_id', projetoId!).not('payload', 'is', null)
+        .order('data_report', { ascending: false })
+      if (error) return []
+      return (data ?? []) as ProjetoSnapshot[]
+    },
+  })
+}
+export function useSalvarProjetoSnapshot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { projetoId: string; portfolioId?: string; dataReport: string; payload: unknown; geradoPor?: string | null }) => {
+      const { data, error } = await supabase.from('pmo_status_report')
+        .insert({ projeto_id: p.projetoId, portfolio_id: p.portfolioId ?? null, data_report: p.dataReport, periodo: p.dataReport.slice(0, 7), payload: p.payload, gerado_por: p.geradoPor ?? 'SuperTEG', status: 'publicado' })
+        .select('id').single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['pmo-projeto-snapshots', v.projetoId] }),
+  })
+}
+
+// ── Relatório consolidado do PROJETO gerado pelo SuperTEG (respostas às 10 perguntas) ─
+export interface ProjetoStatusCapItem { q: string; a: string; tabela?: { colunas: string[]; linhas: string[][] } | null; bullets?: string[] | null }
+export interface ProjetoStatusCap { key: string; titulo: string; itens: ProjetoStatusCapItem[] }
+export interface ProjetoStatusRow { projeto_id: string; farol: string | null; sintese: string | null; decisoes: string[] | null; capitulos: ProjetoStatusCap[] | null; gerado_por: string | null; gerado_em: string | null; updated_at: string | null }
+export function useProjetoStatus(projetoId?: string | null) {
+  return useQuery<ProjetoStatusRow | null>({
+    queryKey: ['pmo-projeto-status', projetoId],
+    enabled: !!projetoId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_projeto_status')
+        .select('projeto_id, farol, sintese, decisoes, capitulos, gerado_por, gerado_em, updated_at')
+        .eq('projeto_id', projetoId!).maybeSingle()
+      if (error) return null
+      return (data ?? null) as ProjetoStatusRow | null
+    },
+  })
+}
+
+// ── Estado DURÁVEL da geração de Status Report pelo SuperTEG (running/done/error) ─
+export interface StatusReportRun { projeto_id: string; run_id: string | null; status: 'running' | 'done' | 'error'; mensagem: string | null; n_obras: number | null; gravados: number | null; started_at: string; updated_at: string }
+export function useStatusReportRun(projetoId?: string | null) {
+  return useQuery<StatusReportRun | null>({
+    queryKey: ['pmo-status-run', projetoId],
+    enabled: !!projetoId,
+    // enquanto estiver gerando, recarrega a cada 4s p/ refletir a conclusão/erro
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? 4000 : false),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_status_report_run')
+        .select('projeto_id, run_id, status, mensagem, n_obras, gravados, started_at, updated_at')
+        .eq('projeto_id', projetoId!).maybeSingle()
+      if (error) return null
+      return (data ?? null) as StatusReportRun | null
+    },
+  })
+}
+
 // ── EAP Final (visão por polo, financeiro + físico ao vivo) ───────────────────
 export interface EAPPacote {
   n: string
@@ -535,17 +615,30 @@ export function useEAPFinal(portfolioId?: string) {
   })
 }
 
-// agrega os polos crus respeitando a seleção de OSCs (excludedOscs = ids ocultados)
-export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>): EAPPolo[] {
+// agrega os polos crus respeitando a seleção de OSCs (excludedOscs = ids ocultados).
+// secaoFat (opcional): `${numero_os}|${pacote}` → faturado no período escolhido (das medições).
+// Quando presente, o faturado (polo e pacote) vem do período; senão, do acumulado dos itens/saldo.
+export function aggregatePolos(raws: EAPPoloRaw[], excludedOscs: Set<string>, secaoFat?: Map<string, number>): EAPPolo[] {
   return raws.map(r => {
     const oscs = r.oscs.filter(o => o.etapa_atual !== 'cancelada' && !excludedOscs.has(o.id))
     const contr = oscs.reduce((s, o) => s + o.valor, 0)
-    const fat = oscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0), 0)
     const m = new Map<string, PacAcc>()
     for (const o of oscs) for (const [pac, a] of Object.entries(o.pacotes)) {
       let x = m.get(pac); if (!x) { x = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, x) }
-      x.valor += a.valor; x.fat += a.fat; x.qC += a.qC; x.qR += a.qR; if (a.uni) x.uni = a.uni
+      x.valor += a.valor; x.qC += a.qC; x.qR += a.qR; if (a.uni) x.uni = a.uni
+      if (!secaoFat) x.fat += a.fat
     }
+    if (secaoFat) {
+      // faturado por período das medições — inclui pacote que só existe na medição (ex.: Outros)
+      for (const o of oscs) for (const pac of PACOTES_ORD) {
+        const v = secaoFat.get(`${o.numero_os}|${pac}`); if (!v) continue
+        let x = m.get(pac); if (!x) { x = { valor: 0, fat: 0, qC: 0, qR: 0, uni: null }; m.set(pac, x) }
+        x.fat += v
+      }
+    }
+    const fat = secaoFat
+      ? [...m.values()].reduce((s, x) => s + x.fat, 0)
+      : oscs.reduce((s, o) => s + (o.saldo_reais != null ? Math.max(0, o.valor - o.saldo_reais) : 0), 0)
     let montTon = 0
     const pacotes: EAPPacote[] = PACOTES_ORD.filter(n => m.has(n)).map(n => {
       const a = m.get(n)!

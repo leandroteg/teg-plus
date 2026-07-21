@@ -33,6 +33,7 @@ const TONES: Record<string, { light: string; dark: string }> = {
   amber:   { light: 'text-amber-600',   dark: 'text-amber-400' },
   sky:     { light: 'text-sky-600',     dark: 'text-sky-400' },
   orange:  { light: 'text-orange-600',  dark: 'text-orange-400' },
+  teal:    { light: 'text-teal-600',    dark: 'text-teal-400' },
   slate:   { light: 'text-slate-500',   dark: 'text-slate-400' },
 }
 export function Kpi({ label, value, note, tone = 'violet', isDark }: {

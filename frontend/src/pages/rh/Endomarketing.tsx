@@ -6,9 +6,11 @@ import {
   Megaphone, Cake, UserPlus, Trophy, Calendar, GraduationCap,
   ShieldAlert, TrendingUp, Sparkles, Pencil, ArrowLeft, ArrowRight,
   Download, Save, CheckCircle2, Trash2, Plus, X, Image as ImageIcon,
-  Upload, Eye, Palette, History, FileText, XCircle, Search,
+  Upload, Eye, Palette, History, FileText, XCircle, Search, Newspaper,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import JornalSection from '../../components/rh/JornalSection'
+import RHTabRail, { type RHTab } from '../../components/rh/RHTabRail'
 import {
   useIdentidadeVisual, useSalvarIdentidadeVisual, useUploadLogo,
   useComunicados, useSalvarComunicado, useExcluirComunicado,
@@ -1255,18 +1257,30 @@ function TabIdentidadeVisual() {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-type TabKey = 'gerar' | 'historico' | 'identidade'
-const TABS: { key: TabKey; label: string; icon: typeof Sparkles }[] = [
-  { key: 'gerar',       label: 'Gerar Comunicado',  icon: Sparkles },
-  { key: 'historico',   label: 'Historico',          icon: History },
-  { key: 'identidade',  label: 'Identidade Visual',  icon: Palette },
+type TabKey = 'identidade' | 'comunicados' | 'mural'
+const TABS: RHTab[] = [
+  { key: 'identidade',   label: 'Identidade Visual',  icon: Palette,    cor: 'violet' },
+  { key: 'comunicados',  label: 'Comunicados',        icon: Megaphone,  cor: 'indigo' },
+  { key: 'mural',        label: 'Mural TEG',          icon: Newspaper,  cor: 'teal' },
+]
+
+type SubTab = 'gerar' | 'historico'
+const SUBTABS: { key: SubTab; label: string; icon: typeof Sparkles }[] = [
+  { key: 'gerar',     label: 'Gerar',     icon: Sparkles },
+  { key: 'historico', label: 'Histórico', icon: History },
 ]
 
 export default function Endomarketing() {
-  const { isLightSidebar: isLight } = useTheme()
-  const [tab, setTab] = useState<TabKey>('gerar')
+  const { isLightSidebar: isLight, isDark } = useTheme()
+  const [tab, setTab] = useState<TabKey>('comunicados')
+  const [sub, setSub] = useState<SubTab>('gerar')
   const { data: ivData } = useIdentidadeVisual()
   const identidade = ivData || DEFAULT_IDENTIDADE
+
+  const tabCls = (on: boolean) =>
+    `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+      on ? 'bg-indigo-600 text-white' : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
+    }`
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -1277,32 +1291,33 @@ export default function Endomarketing() {
           Endomarketing
         </h1>
         <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-          Comunicados internos, campanhas e identidade visual
+          Identidade visual, comunicados e o Mural TEG
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className={`flex gap-1 p-1 rounded-xl w-fit ${isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tab === t.key
-                ? 'bg-indigo-600 text-white'
-                : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <t.icon size={13} />
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — padrão RHTabRail (igual DP/Headcount), largura do conteúdo p/ 3 abas */}
+      <RHTabRail tabs={TABS} active={tab} onChange={k => setTab(k as TabKey)} isDark={isDark} fill={false} />
 
       {/* Content */}
-      {tab === 'gerar' && <TabGerarComunicado identidade={identidade} />}
-      {tab === 'historico' && <TabHistorico />}
       {tab === 'identidade' && <TabIdentidadeVisual />}
+
+      {tab === 'comunicados' && (
+        <div className="space-y-4">
+          {/* Sub-abas Gerar / Histórico */}
+          <div className={`flex gap-1 p-1 rounded-xl w-fit ${isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
+            {SUBTABS.map(s => (
+              <button key={s.key} onClick={() => setSub(s.key)} className={tabCls(sub === s.key)}>
+                <s.icon size={13} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+          {sub === 'gerar' && <TabGerarComunicado identidade={identidade} />}
+          {sub === 'historico' && <TabHistorico />}
+        </div>
+      )}
+
+      {tab === 'mural' && <JornalSection />}
     </div>
   )
 }

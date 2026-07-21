@@ -13,9 +13,11 @@ import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento, useRenegocia
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useBases } from '../hooks/useEstoque'
+import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import AuditoriaCard from '../components/AuditoriaCard'
+import VincularItemCatalogo from '../components/VincularItemCatalogo'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
@@ -150,7 +152,8 @@ export default function RequisicaoDetalhe() {
   const enviarParaAprovacao = useEnviarParaAprovacao()
   const [enviarMsg, setEnviarMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { data: bases = [] } = useBases()
-  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
+  const { data: categorias = [] } = useCategorias()
 
   // Cotação vinculada à RC
   const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_em_esclarecimento', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
@@ -180,9 +183,15 @@ export default function RequisicaoDetalhe() {
   // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada).
   // Compras exige tambem allowlist de aprovadores (mesma regra do AprovAi).
   const isAprovadorCompras = podeAprovarCompras(perfil?.email)
+  // Validação técnica é por CATEGORIA (mesma regra do AprovAi/podeVerAprovacao):
+  // só o validador técnico configurado na categoria da RC — ou admin — decide.
+  // Antes usava canTechnicalApprove('compras'), que liberava qualquer diretor/admin
+  // (ex.: um diretor aprovava hardware de TI sem ser o validador técnico da categoria).
+  const catPolitica = categorias.find(c => c.codigo === req?.categoria)
+  const ehValidadorTecnico = !!perfil?.id && catPolitica?.validador_tecnico_id === perfil.id
   const canDecideTechnical = !!req
     && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status)
-    && canTechnicalApprove('compras')
+    && (isAdmin || ehValidadorTecnico)
   const canDecideFinancial = !!req
     && req.status === 'cotacao_enviada'
     && isAdmin
@@ -207,7 +216,7 @@ export default function RequisicaoDetalhe() {
   const canMutateComprasReq = canDecide || canEmitPedido
     || canResponderEsteEsclarecimento
     || req?.status === 'devolvida_solicitante'
-  const { isLocked, blockedByName } = useEditorLock({
+  const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: id,
     enabled: Boolean(id) && canMutateComprasReq,
@@ -306,6 +315,14 @@ export default function RequisicaoDetalhe() {
             <p className="text-xs text-amber-600 mt-1">
               Esta requisição fica bloqueada para evitar conflito até a finalização da edição.
             </p>
+            {canOverride && (
+              <button
+                type="button"
+                onClick={assumeControl}
+                className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
+                Assumir edição (Admin)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -923,8 +940,10 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
-      {/* Aguardando catalogo — comprador vincula itens livres antes da aprovacao */}
-      {req?.status === 'aguardando_catalogo' && (isAdmin || isAprovadorCompras) && (() => {
+      {/* Aguardando catalogo — comprador vincula itens livres antes da aprovacao.
+          isAprovadorCompras é allowlist de aprovadores (financeiro/tecnico), nao de
+          compradores — usa tambem a flag sys_perfis.comprador p/ quem so cadastra. */}
+      {req?.status === 'aguardando_catalogo' && (isAdmin || isAprovadorCompras || perfil?.comprador) && (() => {
         const orfaos = (req.itens ?? []).filter(i => !(i as any).est_item_id)
         const podeEnviar = orfaos.length === 0
         return (
@@ -941,7 +960,7 @@ export default function RequisicaoDetalhe() {
             </div>
             {!podeEnviar && (
               <p className="text-xs text-orange-700">
-                Cadastre cada item livre no cat&aacute;logo de estoque — o v&iacute;nculo &eacute; autom&aacute;tico ao salvar. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
+                <b>Vincular</b>: se o item j&aacute; existe no cat&aacute;logo, aponte a linha para ele (funciona mesmo quando o texto livre tem marca e o cat&aacute;logo n&atilde;o). <b>Cadastrar</b>: s&oacute; se o item ainda n&atilde;o existe — ao salvar, a linha &eacute; vinculada sozinha. Aprovador n&atilde;o v&ecirc; descri&ccedil;&atilde;o livre.
               </p>
             )}
 
@@ -951,8 +970,13 @@ export default function RequisicaoDetalhe() {
                 {orfaos.map(i => (
                   <div key={i.id} className="flex items-center gap-2 px-3 py-2">
                     <span className="text-xs text-slate-700 flex-1 truncate" title={i.descricao}>{i.descricao}</span>
+                    <VincularItemCatalogo
+                      riId={i.id!}
+                      descricaoLivre={i.descricao}
+                      onDone={setEnviarMsg}
+                    />
                     <button
-                      onClick={() => window.open(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}`, '_blank', 'noopener')}
+                      onClick={() => navigate(`/cadastros/itens?descricao=${encodeURIComponent(i.descricao)}&ri=${i.id}&voltar=${encodeURIComponent(`/requisicoes/${req.id}`)}`)}
                       className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500 text-white text-[10px] font-bold hover:bg-orange-600 transition-all flex-shrink-0"
                     >
                       <ExternalLink size={11} /> Cadastrar
