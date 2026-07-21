@@ -64,6 +64,9 @@ export function gerarFolhaChecklistHtml(folha: DPFolha, itens: DPFolhaItem[], de
   }).join('')
 
   const totalDesvios = folha.qtd_desvios ?? desvios.length
+  const verificaveis = itens.filter(it => ['ok', 'desvio', 'atencao'].includes(it.resultado)).length
+  const okCount = itens.filter(it => it.resultado === 'ok').length
+  const assert = verificaveis ? Math.round((okCount / verificaveis) * 100) : null
   const dataGer = new Date(Date.now() - 3 * 3600_000).toLocaleString('pt-BR')
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
@@ -83,7 +86,7 @@ html,body{background:#e8edf3;}body{font-family:'Barlow',sans-serif;color:var(--t
 .hf{padding:8px 10px;border-right:1px solid var(--cinza);}.hf:last-child{border-right:none;}
 .hf .lb{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:7.6pt;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .hf .vl{font-weight:600;font-size:9pt;margin-top:3px;color:var(--azul);}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px 2px;}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px 2px;}
 .kpi{border:1px solid var(--cinza);border-radius:6px;padding:7px 9px;}
 .kpi .k{font-size:7.2pt;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;}
 .kpi .v{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13pt;color:var(--azul);}
@@ -129,6 +132,8 @@ ul.dv .sv{font-size:7pt;margin-right:3px;}ul.dv i{color:#94a3b8;}
   </div>
   <div class="kpis">
     <div class="kpi"><div class="k">Colaboradores</div><div class="v">${esc(r.colaboradores_folha ?? '—')}</div></div>
+    <div class="kpi"><div class="k">Nº de desvios</div><div class="v">${totalDesvios}</div></div>
+    <div class="kpi"><div class="k">Assertividade</div><div class="v">${assert != null ? assert + '%' : '—'}</div></div>
     <div class="kpi"><div class="k">Líquido total</div><div class="v">${fmtBRL(r.total_liquido)}</div></div>
     <div class="kpi"><div class="k">Bruto total</div><div class="v">${fmtBRL(r.total_bruto)}</div></div>
     <div class="kpi"><div class="k">Var. vs mês ant.</div><div class="v">${r.variacao_mes_anterior_pct != null ? esc(r.variacao_mes_anterior_pct) + '%' : '—'}</div></div>
