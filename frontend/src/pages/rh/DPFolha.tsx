@@ -392,21 +392,34 @@ function ChecklistReport({ folha, itens, desvios }: { folha: DPFolha; itens: DPF
         </button>
       </div>
 
-      {folha.resumo && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            ['Colaboradores', folha.resumo.colaboradores_folha ?? '—'],
-            ['Líquido total', fmtBRL(folha.resumo.total_liquido)],
-            ['Bruto total', fmtBRL(folha.resumo.total_bruto)],
-            ['Var. vs mês ant.', folha.resumo.variacao_mes_anterior_pct != null ? `${folha.resumo.variacao_mes_anterior_pct}%` : '—'],
-          ].map(([k, v]) => (
-            <div key={k as string} className={`rounded-xl border p-2.5 ${cardCls}`}>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">{k}</div>
-              <div className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{v as any}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {(folha.resumo || itens.length > 0) && (() => {
+        const r = folha.resumo || {}
+        const nDesvios = folha.qtd_desvios ?? desvios.length
+        const verificaveis = itens.filter(it => ['ok', 'desvio', 'atencao'].includes(it.resultado)).length
+        const okCount = itens.filter(it => it.resultado === 'ok').length
+        const assert = verificaveis ? Math.round((okCount / verificaveis) * 100) : null
+        const assertCor = assert == null ? '' : assert >= 90 ? 'text-emerald-600 dark:text-emerald-400' : assert >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+        const cards: [string, any, string?][] = [
+          // linha 1: colaboradores + os 2 pedidos
+          ['Colaboradores', r.colaboradores_folha ?? '—'],
+          ['Nº de desvios', nDesvios, nDesvios > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'],
+          ['Assertividade', assert != null ? `${assert}%` : '—', assertCor],
+          // linha 2: os 3 existentes
+          ['Líquido total', fmtBRL(r.total_liquido)],
+          ['Bruto total', fmtBRL(r.total_bruto)],
+          ['Var. vs mês ant.', r.variacao_mes_anterior_pct != null ? `${r.variacao_mes_anterior_pct}%` : '—'],
+        ]
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            {cards.map(([k, v, cor]) => (
+              <div key={k} className={`rounded-xl border p-2.5 ${cardCls}`}>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">{k}</div>
+                <div className={`text-sm font-bold ${cor || (isLight ? 'text-slate-700' : 'text-slate-100')}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
       {folha.resumo?.sintese && (
         <div className={`rounded-xl border p-3 text-sm ${cardCls} ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           <span className="font-semibold">Síntese: </span>{folha.resumo.sintese}
