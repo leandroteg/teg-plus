@@ -20,7 +20,8 @@ import {
   useFolhas, useFolhaArquivos, useFolhaItens, useFolhaDesvios, useCriarFolha, useRemoverFolha,
   useUploadFolhaArquivo, useRemoverFolhaArquivo, useEnviarVerificacao, useEnviarCorrecao,
   useMarcarCorrecao, useEnviarFechamento, useAprovarFolha, useEnviarPagamento, useCorrigirContaColaborador,
-  getFolhaArquivoUrl, type DPFolha, type FolhaStatus, type DPFolhaItem, type DPFolhaDesvio,
+  useColaboradoresSemConta,
+  getFolhaArquivoUrl, type DPFolha, type FolhaStatus, type DPFolhaItem, type DPFolhaDesvio, type ColaboradorSemConta,
 } from '../../hooks/useDPFolha'
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -620,10 +621,11 @@ function FechamentoModal({ folha, podeAprovar, onClose, onAprovado }: { folha: D
 // ── Envio Pagamento ──────────────────────────────────────────────────────────
 function PagamentoModal({ folha, onClose, onPago }: { folha: DPFolha; onClose: () => void; onPago: () => void }) {
   const { data: desvios = [] } = useFolhaDesvios(folha.id)
+  const { data: semConta = [] } = useColaboradoresSemConta()
   const enviar = useEnviarPagamento()
   const [dataPg, setDataPg] = useState('')
   const [erro, setErro] = useState<string | null>(null)
-  const semConta = desvios.filter(d => d.tipo === 'sem_conta' && d.status === 'aberto')
+  const [verContas, setVerContas] = useState(false)
   const naoPagar = desvios.filter(d => d.tipo === 'nao_pagar')
   return (
     <Modal open onClose={onClose} wide title={`Envio Pagamento — Folha ${compLabel(folha.competencia)}`}
@@ -656,42 +658,74 @@ function PagamentoModal({ folha, onClose, onPago }: { folha: DPFolha; onClose: (
           className="mt-1 w-full rounded-xl border px-3 py-2 text-sm bg-transparent border-slate-300 dark:border-white/[0.12]" />
       </label>
 
-      <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
-        <Landmark size={14} /> Dados bancários pendentes {semConta.length > 0 && <span className="text-rose-500">({semConta.length})</span>}
-      </h4>
-      {semConta.length === 0 ? (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400">Nenhum colaborador sem conta bancária. Tudo certo para pagamento.</p>
-      ) : (
-        <div className="space-y-2">
-          {semConta.map(d => <ContaFix key={d.id} desvio={d} />)}
+      <div className="rounded-xl border p-3 border-slate-200 dark:border-white/[0.08] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Landmark size={16} className={semConta.length > 0 ? 'text-amber-500' : 'text-emerald-500'} />
+          <div>
+            <div className={`text-sm font-bold ${semConta.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {semConta.length > 0 ? `${semConta.length} pessoa(s) sem conta bancária` : 'Nenhum colaborador sem conta bancária'}
+            </div>
+            <div className="text-[11px] text-slate-400">{semConta.length > 0 ? 'Preencha os dados bancários antes do pagamento.' : 'Tudo certo para pagamento.'}</div>
+          </div>
         </div>
-      )}
+        {semConta.length > 0 && (
+          <button onClick={() => setVerContas(true)} className={btnGhost}>Ver nomes</button>
+        )}
+      </div>
+
       <p className="text-[11px] text-slate-400 mt-3">A integração com o Financeiro será feita em seguida — por ora o envio registra a folha como concluída com a data de pagamento.</p>
       {erro && <div className="mt-3 text-xs rounded-lg px-3 py-2 bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{erro}</div>}
+      {verContas && <ContasPendentesModal onClose={() => setVerContas(false)} />}
     </Modal>
   )
 }
 
-function ContaFix({ desvio }: { desvio: DPFolhaDesvio }) {
+// ── Modal: colaboradores sem conta bancária + edição inline ──────────────────
+function ContasPendentesModal({ onClose }: { onClose: () => void }) {
+  const { data: colabs = [], isLoading } = useColaboradoresSemConta()
+  return (
+    <Modal open onClose={onClose} wide title="Colaboradores sem conta bancária"
+      subtitle={`${colabs.length} colaborador(es) ativo(s) sem banco/agência/conta no cadastro`}
+      footer={<button className={btnGhost} onClick={onClose}>Fechar</button>}>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-400 py-6 justify-center"><Loader2 size={16} className="animate-spin" /> carregando…</div>
+      ) : colabs.length === 0 ? (
+        <p className="text-sm text-emerald-600 dark:text-emerald-400 py-4 text-center">Todos os colaboradores ativos têm conta bancária cadastrada.</p>
+      ) : (
+        <div className="space-y-2">
+          {colabs.map(c => <ContaColabRow key={c.id} colab={c} />)}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function ContaColabRow({ colab }: { colab: ColaboradorSemConta }) {
   const corrigir = useCorrigirContaColaborador()
-  const [banco, setBanco] = useState('')
-  const [agencia, setAgencia] = useState('')
-  const [conta, setConta] = useState('')
-  const podeSalvar = !!desvio.colaborador_id && banco && agencia && conta
+  const [banco, setBanco] = useState(colab.banco ?? '')
+  const [agencia, setAgencia] = useState(colab.agencia ?? '')
+  const [conta, setConta] = useState(colab.conta ?? '')
+  const [salvo, setSalvo] = useState(false)
+  const podeSalvar = !!(banco && agencia && conta) && !corrigir.isPending
   return (
     <div className="rounded-xl border p-3 border-amber-300 bg-amber-50/40 dark:border-amber-500/25 dark:bg-amber-500/[0.06]">
-      <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{desvio.colaborador_nome ?? 'Colaborador'}</div>
-      <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{desvio.descricao}</div>
-      {desvio.colaborador_id ? (
-        <div className="flex flex-wrap items-end gap-2">
-          <input placeholder="Banco" value={banco} onChange={e => setBanco(e.target.value)} className="w-24 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
-          <input placeholder="Agência" value={agencia} onChange={e => setAgencia(e.target.value)} className="w-24 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
-          <input placeholder="Conta" value={conta} onChange={e => setConta(e.target.value)} className="w-28 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
-          <button disabled={!podeSalvar || corrigir.isPending}
-            onClick={() => corrigir.mutate({ colaboradorId: desvio.colaborador_id!, banco, agencia, conta, desvioId: desvio.id })}
-            className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold disabled:opacity-50">Salvar cadastro</button>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{colab.nome}</div>
+          <div className="text-[11px] text-slate-400">{[colab.matricula, colab.cargo].filter(Boolean).join(' · ') || '—'}</div>
         </div>
-      ) : <div className="text-xs text-amber-600 dark:text-amber-400">Colaborador não vinculado — corrigir manualmente no cadastro RH.</div>}
+        {salvo && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 shrink-0">salvo</span>}
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <input placeholder="Banco" value={banco} onChange={e => { setBanco(e.target.value); setSalvo(false) }} className="w-24 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
+        <input placeholder="Agência" value={agencia} onChange={e => { setAgencia(e.target.value); setSalvo(false) }} className="w-24 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
+        <input placeholder="Conta" value={conta} onChange={e => { setConta(e.target.value); setSalvo(false) }} className="w-28 rounded-lg border px-2 py-1 text-xs bg-transparent border-slate-200 dark:border-white/[0.1]" />
+        <button disabled={!podeSalvar}
+          onClick={() => corrigir.mutate({ colaboradorId: colab.id, banco, agencia, conta }, { onSuccess: () => setSalvo(true) })}
+          className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold disabled:opacity-50 inline-flex items-center gap-1">
+          {corrigir.isPending ? <Loader2 size={12} className="animate-spin" /> : null} Salvar
+        </button>
+      </div>
     </div>
   )
 }
