@@ -31,6 +31,8 @@ import EstoqueLayout from './components/EstoqueLayout'
 import LogisticaLayout from './components/LogisticaLayout'
 import TiLayout from './pages/ti/TiLayout'
 import { TiStaffRoute, TiAdminRoute } from './pages/ti/components/TiGuards'
+import MonLayout from './pages/monitoramento/MonLayout'
+import { MonAdminRoute } from './pages/monitoramento/MonGuards'
 import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
@@ -259,6 +261,11 @@ const TiRespostas = lazy(() => import('./pages/ti/Respostas'))
 const TiUsuarios = lazy(() => import('./pages/ti/Usuarios'))
 const MeusChamadosPessoal = lazy(() => import('./pages/ti/MeusChamadosPessoal'))
 
+// Monitoramento (CFTV Hikvision) — gated pelo módulo 'monitoramento'
+const MonCameras = lazy(() => import('./pages/monitoramento/Cameras'))
+const MonEventos = lazy(() => import('./pages/monitoramento/Eventos'))
+const MonConfig = lazy(() => import('./pages/monitoramento/Config'))
+
 // Orçamentação (Expansão)
 const OrcamentacaoHome = lazy(() => import('./pages/orcamentacao/OrcamentacaoHome'))
 const OrcamentosLista = lazy(() => import('./pages/orcamentacao/OrcamentosLista'))
@@ -335,6 +342,20 @@ export default function App() {
               <Route element={<TiAdminRoute />}>
                 <Route path="/ti/usuarios" element={<Lazy><TiUsuarios /></Lazy>} />
                 <Route path="/ti/configuracoes" element={<Lazy><TiConfiguracoes /></Lazy>} />
+              </Route>
+            </Route>
+          </Route>
+        </Route>
+
+        {/* ── Monitoramento (CFTV Hikvision): exige o módulo 'monitoramento'
+             liberado (admin sempre entra). Config só admin. ── */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<ModuleRoute moduleKey="monitoramento" />}>
+            <Route element={<MonLayout />}>
+              <Route path="/monitoramento" element={<Lazy><MonCameras /></Lazy>} />
+              <Route path="/monitoramento/eventos" element={<Lazy><MonEventos /></Lazy>} />
+              <Route element={<MonAdminRoute />}>
+                <Route path="/monitoramento/config" element={<Lazy><MonConfig /></Lazy>} />
               </Route>
             </Route>
           </Route>

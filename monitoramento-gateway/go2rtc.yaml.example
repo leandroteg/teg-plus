@@ -1,0 +1,29 @@
+# Configuração do go2rtc — gateway de vídeo do módulo Monitoramento (TEG+).
+# Roda na máquina on-prem (mesma rede do NVR). Copie para "go2rtc.yaml",
+# preencha IP/usuário/senha do NVR e uma linha por câmera.
+#
+# Convenção de canal Hikvision no NVR:
+#   Câmera 1 → 101 (main / alta) | 102 (sub / leve)
+#   Câmera 2 → 201 | 202
+#   Câmera 3 → 301 | 302  ...
+# Para a GRADE do ERP use o SUB-stream (102, 202...) — mais leve. Detalhe/tela
+# cheia pode usar o main (101...). O NOME do stream (ex.: "cam1") é o que você
+# digita no campo "stream_key" da câmera em /monitoramento (Configurações).
+
+streams:
+  cam1: rtsp://USUARIO:SENHA@IP_DO_NVR:554/Streaming/Channels/102
+  cam2: rtsp://USUARIO:SENHA@IP_DO_NVR:554/Streaming/Channels/202
+  cam3: rtsp://USUARIO:SENHA@IP_DO_NVR:554/Streaming/Channels/302
+  # ...uma linha por câmera
+
+# API/web do go2rtc (porta 1984) — é o que o túnel HTTPS vai expor.
+api:
+  listen: ":1984"
+
+# WebRTC (porta 8555) — funciona só na rede local; para acesso remoto o ERP
+# usa MSE (que passa pelo túnel HTTPS). Deixe como está.
+webrtc:
+  listen: ":8555"
+
+log:
+  level: info
