@@ -185,7 +185,7 @@ export interface RHAdmissaoCandidato {
   dados_extras?: Record<string, unknown>
   created_at: string
   anexos?: RHAdmissaoAnexo[]
-  colaborador?: { id: string; departamento?: string | null }
+  colaborador?: { id: string; departamento?: string | null; data_admissao?: string | null }
 }
 
 export interface RHAdmissao {
