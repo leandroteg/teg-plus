@@ -2,8 +2,9 @@
 // Fluxo completo: Apuração → Verificação (SuperTEG) → Correções → Fechamento
 // → Envio Pagamento → Concluído. Cada aba lista as folhas naquele estágio;
 // o card abre o modal da etapa.
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Calculator, SearchCheck, FileEdit, Lock, Send, CheckCircle2, Receipt, Plus, X, Upload,
   Loader2, FileText, Trash2, Download, ShieldCheck, Ban, Landmark,
@@ -208,6 +209,16 @@ export default function DPFolha() {
   const [selId, setSelId] = useState<string | null>(null)
   const [novaOpen, setNovaOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Abre o modal de nova folha quando acionado pelo flyout "Novo Registro" (?nova=1)
+  useEffect(() => {
+    if (searchParams.get('nova') === '1') {
+      setNovaOpen(true)
+      searchParams.delete('nova')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const { data: folhas = [] } = useFolhas()
   const grupos = useMemo(() => {
@@ -221,14 +232,11 @@ export default function DPFolha() {
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Receipt size={20} className="text-blue-400" /> Folha de Pagamento
-          </h1>
-          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Apuração, verificação pelo SuperTEG, correção, fechamento e envio</p>
-        </div>
-        <button onClick={() => setNovaOpen(true)} className={btnPrimary}><Plus size={16} /> Nova Folha</button>
+      <div>
+        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <Receipt size={20} className="text-blue-400" /> Folha de Pagamento
+        </h1>
+        <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Apuração, verificação pelo SuperTEG, correção, fechamento e envio</p>
       </div>
 
       <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} />
