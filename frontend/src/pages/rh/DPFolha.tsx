@@ -32,10 +32,10 @@ const STAGE_OF: Record<FolhaStatus, string> = {
 }
 
 const ARQ_TIPOS = [
-  { key: 'extrato', label: 'Extrato Mensal', hint: 'detalhe por colaborador' },
-  { key: 'resumo', label: 'Resumo Mensal', hint: 'totais da folha' },
+  { key: 'extrato', label: 'Extrato Mensal', hint: 'folha calculada — detalhe por colaborador' },
+  { key: 'resumo', label: 'Resumo Mensal', hint: 'totais da folha calculada' },
   { key: 'liquidos', label: 'Relatório Líquidos', hint: 'líquido por pessoa' },
-  { key: 'lancamentos', label: 'Lançamentos', hint: 'planilha (xls) — opcional' },
+  { key: 'lancamentos', label: 'Lançamentos', hint: 'o que o DP lançou — referência de benefícios/descontos' },
 ]
 
 const TABS: RHTab[] = [
