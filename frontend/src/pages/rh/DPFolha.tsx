@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { gerarFolhaChecklistHtml } from '../../utils/folha-checklist-html'
+import RHHolerites from './RHHolerites'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import RHTabRail, { type RHTab } from '../../components/rh/RHTabRail'
@@ -48,6 +49,7 @@ const TABS: RHTab[] = [
   { key: 'fechamento', label: 'Fechamento Folha', icon: Lock, cor: 'violet' },
   { key: 'envio_pagamento', label: 'Envio Pagamento', icon: Send, cor: 'teal' },
   { key: 'concluido', label: 'Concluído', icon: CheckCircle2, cor: 'emerald' },
+  { key: 'holerites', label: 'Holerites', icon: FileText, cor: 'slate' },
 ]
 
 const RESULT_BADGE: Record<string, { label: string; cls: string }> = {
@@ -231,7 +233,8 @@ export default function DPFolha() {
 
       <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} />
 
-      {/* Toggle lista / cards (padrão Compras) */}
+      {/* Toggle lista / cards (padrão Compras) — não na aba Holerites */}
+      {active !== 'holerites' && (
       <div className="flex justify-end">
         <div className={`flex border rounded-lg ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('list')} aria-label="Ver em lista"
@@ -244,6 +247,7 @@ export default function DPFolha() {
           </button>
         </div>
       </div>
+      )}
 
       {active === 'apuracao' && <StageList view={viewMode} titulo="Folhas em apuração" icon={Calculator} folhas={grupos.apuracao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em apuração. Clique em “Nova Folha” para lançar." />}
       {active === 'verificacao' && <StageList view={viewMode} titulo="Folhas em verificação" icon={SearchCheck} folhas={grupos.verificacao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em verificação." />}
@@ -251,6 +255,7 @@ export default function DPFolha() {
       {active === 'fechamento' && <StageList view={viewMode} titulo="Folhas aguardando fechamento" icon={Lock} folhas={grupos.fechamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aguardando fechamento." />}
       {active === 'envio_pagamento' && <StageList view={viewMode} titulo="Folhas aprovadas — envio de pagamento" icon={Send} folhas={grupos.envio_pagamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aprovada aguardando pagamento." />}
       {active === 'concluido' && <StageList view={viewMode} titulo="Folhas concluídas" icon={CheckCircle2} folhas={grupos.concluido} onOpen={f => setSelId(f.id)} empty="Nenhuma folha concluída ainda." />}
+      {active === 'holerites' && <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6"><RHHolerites /></div>}
 
       {novaOpen && <NovaFolhaModal onClose={() => setNovaOpen(false)} onCreated={id => { setNovaOpen(false); setActive('apuracao'); setSelId(id) }} />}
 
