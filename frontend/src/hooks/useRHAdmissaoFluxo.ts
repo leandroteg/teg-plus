@@ -19,7 +19,7 @@ const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.
 
 const SELECT =
   '*, centro_custo:sys_centros_custo!centro_custo_id(id,codigo,descricao), ' +
-  'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*), colaborador:rh_colaboradores!colaborador_id(id,departamento)), ' +
+  'candidatos:rh_admissao_candidatos(*, anexos:rh_admissao_anexos!candidato_id(*), colaborador:rh_colaboradores!colaborador_id(id,departamento,data_admissao)), ' +
   'anexos:rh_admissao_anexos!admissao_id(*)'
 
 // Bases operacionais (cadastro est_bases) — leitura para o select da requisição
