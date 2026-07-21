@@ -1,0 +1,6 @@
+node_modules/
+.env
+# Sessão do WhatsApp Web (NÃO versionar — contém credenciais do número pareado)
+.wwebjs_auth/
+.wwebjs_cache/
+*.log

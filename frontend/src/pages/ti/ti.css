@@ -1,0 +1,44 @@
+/* Classes de componente do helpdesk, ESCOPADAS em .ti-scope para não vazar/colidir
+   com o resto do TEG+. Aplicar `ti-scope` no elemento raiz de cada tela portada.
+   Cores: brand→sky, accent→teal.
+
+   ESPECIFICIDADE (importante):
+   - Regras de ESTILO (.btn*, .card, .label, borda/cor do .input) ficam em
+     `.ti-scope .x` (0,2,0). Precisam VENCER o reset do Tailwind Preflight
+     (`*{border-width:0}`, especificidade 0) — senão a borda/sombra do card e dos
+     inputs some. Não há `.input/.card/.btn` globais no TEG+, então não há colisão.
+   - Só a LARGURA do .input é declarada à parte em `:where(.ti-scope .input)`
+     (especificidade 0) para que utilitários como `w-auto`/`w-32` aplicados nas
+     telas (ex.: selects de filtro) sobreponham o `w-full` padrão. Sem isso os
+     selects de filtro ficavam full-width e empilhados.
+   Esse split reproduz o comportamento do `@layer components` do helpdesk (base <
+   componentes < utilitários) sem precisar de @layer neste arquivo isolado. */
+.ti-scope .btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+.ti-scope .btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 bg-sky-600 text-white hover:bg-sky-700;
+}
+.ti-scope .btn-accent {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 bg-teal-600 text-white hover:bg-teal-700;
+}
+.ti-scope .btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+}
+.ti-scope .btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 text-slate-600 hover:bg-slate-100;
+}
+/* Estilo do input (borda/cor/foco) — especificidade normal, vence o Preflight. */
+.ti-scope .input {
+  @apply rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200;
+}
+/* Largura padrão à parte (especificidade 0) — `w-auto`/`w-*` das telas sobrepõem. */
+:where(.ti-scope .input) {
+  @apply w-full;
+}
+.ti-scope .label {
+  @apply mb-1 block text-sm font-medium text-slate-700;
+}
+.ti-scope .card {
+  @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+}

@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, ChevronRight, ChevronLeft,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -144,7 +144,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(14,165,233,0.16)',
     accent: '#38BDF8',
     subs: [
-      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti', open: true },
+      { key: 'ti', label: 'TI', desc: 'Chamados, suporte e infraestrutura', Icon: Server, active: true, route: '/ti' },
       { key: 'ai', label: 'AI Agents', desc: 'Agentes inteligentes TEG+', Icon: Bot, active: false, route: '' },
     ],
   },
@@ -857,20 +857,31 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
 }) {
   const { data: minhasTarefas = [] } = useMinhasTarefas()
   const nTarefas = minhasTarefas.length
+  const { isAdmin, hasModule } = useAuth()
+  // Um ÚNICO botão ("Minha Área Pessoal") que expande a lista com todas as
+  // funções pessoais — padrão do flyout "Novo Registro" do EGP.
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => { if (!open) setExpanded(false) }, [open])
   if (!open) return null
 
-  const tiles = [
+  type Funcao = { label: string; icon: LucideIcon; path: string; tone: string; desc: string }
+  const funcoes: Funcao[] = [
     { label: 'Minhas Tarefas',       icon: CheckSquare,    path: '/minhas-tarefas',       tone: 'teal',    desc: 'Pendencias em todos os modulos' },
     { label: 'Minhas Solicitacoes',  icon: ClipboardList,  path: '/minhas-solicitacoes',  tone: 'indigo',  desc: 'Requisicoes e pedidos abertos' },
     { label: 'Minhas Despesas',      icon: Receipt,        path: '/despesas',             tone: 'rose',    desc: 'Adiantamentos e reembolsos' },
     { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
-  ] as const
+    // Helpdesk: chamados pessoais do usuário no módulo TI (some p/ quem não tem o módulo)
+    ...(isAdmin || hasModule('ti')
+      ? [{ label: 'Meus Chamados', icon: Headset, path: '/meus-chamados', tone: 'sky', desc: 'Seus chamados no Helpdesk de T.I.' } as Funcao]
+      : []),
+  ]
 
   const toneMap: Record<string, { bg: string; text: string; bgDark: string; textDark: string; ring: string; ringDark: string }> = {
     teal:   { bg: 'bg-teal-50',   text: 'text-teal-600',   bgDark: 'bg-teal-500/10',   textDark: 'text-teal-300',   ring: 'hover:ring-teal-300',   ringDark: 'hover:ring-teal-400/40' },
     indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', bgDark: 'bg-indigo-500/10', textDark: 'text-indigo-300', ring: 'hover:ring-indigo-300', ringDark: 'hover:ring-indigo-400/40' },
     rose:   { bg: 'bg-rose-50',   text: 'text-rose-600',   bgDark: 'bg-rose-500/10',   textDark: 'text-rose-300',   ring: 'hover:ring-rose-300',   ringDark: 'hover:ring-rose-400/40' },
     amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  bgDark: 'bg-amber-500/10',  textDark: 'text-amber-300',  ring: 'hover:ring-amber-300',  ringDark: 'hover:ring-amber-400/40' },
+    sky:    { bg: 'bg-sky-50',    text: 'text-sky-600',    bgDark: 'bg-sky-500/10',    textDark: 'text-sky-300',    ring: 'hover:ring-sky-300',    ringDark: 'hover:ring-sky-400/40' },
   }
 
   return (
@@ -906,37 +917,75 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
           </button>
         </div>
 
-        {/* Grid */}
-        <div className="p-5 grid grid-cols-2 gap-3">
-          {tiles.map(t => {
-            const clr = toneMap[t.tone]
-            const Icon = t.icon
-            return (
-              <button
-                key={t.path}
-                onClick={() => onNavigate(t.path)}
-                className={`group relative rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
-                  isLight
-                    ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
-                    : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
-                }`}
-              >
-                {t.path === '/minhas-tarefas' && nTarefas > 0 && (
+        {/* Corpo: um único botão que expande a lista de funções — padrão do
+            flyout "Novo Registro" do EGP */}
+        {!expanded ? (
+          <div className="p-5">
+            <button
+              onClick={() => setExpanded(true)}
+              className={`group flex w-full items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-white hover:shadow-lg hover:ring-teal-300 active:scale-[0.98]'
+                  : 'bg-white/[0.03] hover:bg-white/[0.06] hover:ring-teal-400/40 active:scale-[0.98]'
+              }`}
+            >
+              <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-110 ${isLight ? 'bg-teal-50' : 'bg-teal-500/10'}`}>
+                <User size={20} strokeWidth={2.2} className={isLight ? 'text-teal-600' : 'text-teal-300'} />
+                {nTarefas > 0 && (
                   <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
-                    style={{ minWidth: 22, height: 22, padding: '0 6px', fontSize: 11 }}
-                    title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                    style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
+                    title={`${nTarefas} tarefa${nTarefas !== 1 ? 's' : ''} pendente${nTarefas !== 1 ? 's' : ''}`}>
                     {nTarefas > 99 ? '99+' : nTarefas}
                   </span>
                 )}
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${isLight ? clr.bg : clr.bgDark}`}>
-                  <Icon size={20} strokeWidth={2.2} className={isLight ? clr.text : clr.textDark} />
-                </div>
-                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
-                <p className={`text-[10px] mt-1 leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
+              </div>
+              <div className="flex-1">
+                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>Minha Área Pessoal</p>
+                <p className={`mt-1 text-[10px] leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Tarefas, solicitações, despesas, cautelas e chamados</p>
+              </div>
+              <ChevronRight size={16} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
+            </button>
+          </div>
+        ) : (
+          <div className="p-3">
+            <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1">
+              <button
+                onClick={() => setExpanded(false)}
+                className={`rounded-lg p-1 transition-colors ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}
+                aria-label="Voltar"
+              >
+                <ChevronLeft size={14} />
               </button>
-            )
-          })}
-        </div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Área Pessoal</p>
+            </div>
+            {funcoes.map(f => {
+              const clr = toneMap[f.tone]
+              const Icon = f.icon
+              return (
+                <button
+                  key={f.path}
+                  onClick={() => onNavigate(f.path)}
+                  className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
+                >
+                  <span className={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
+                    <Icon size={16} />
+                    {f.path === '/minhas-tarefas' && nTarefas > 0 && (
+                      <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
+                        style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
+                        title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                        {nTarefas > 99 ? '99+' : nTarefas}
+                      </span>
+                    )}
+                  </span>
+                  <span>
+                    <span className={`block text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{f.label}</span>
+                    <span className={`mt-0.5 block text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{f.desc}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <style>{`
