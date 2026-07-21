@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import {
   Calculator, SearchCheck, FileEdit, Lock, Send, CheckCircle2, Receipt, Plus, X, Upload,
   Loader2, FileText, Trash2, Download, ShieldCheck, Ban, Landmark,
-  FileBarChart2, ChevronRight,
+  FileBarChart2, ChevronRight, LayoutList, LayoutGrid,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { gerarFolhaChecklistHtml } from '../../utils/folha-checklist-html'
@@ -147,9 +147,28 @@ function FolhaRow({ folha, onClick, isDark }: { folha: DPFolha; onClick: () => v
   )
 }
 
-// ── lista de estágio (section-card padrão Compras) ──────────────────────────
-function StageList({ titulo, icon: Icon, folhas, onOpen, empty }: {
-  titulo: string; icon: LucideIcon; folhas: DPFolha[]; onOpen: (f: DPFolha) => void; empty: string
+// ── card de folha (modo grade) ───────────────────────────────────────────────
+function FolhaCardTile({ folha, onClick, isDark }: { folha: DPFolha; onClick: () => void; isDark: boolean }) {
+  const s = STATUS_META[folha.status]
+  return (
+    <button type="button" onClick={onClick}
+      className={`text-left rounded-xl border p-4 transition-all hover:shadow-md ${isDark ? 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.16]' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Folha {compLabel(folha.competencia)}</span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{TIPO_LABEL[folha.tipo] ?? folha.tipo}</span>
+      </div>
+      <div className="mt-2">
+        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${s.cls}`}>{s.spin && <Loader2 size={10} className="animate-spin" />}{s.label}</span>
+      </div>
+      <p className={`mt-2 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{folhaInfo(folha)}</p>
+      {folha.resumo?.total_liquido != null && <p className={`mt-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Líquido: <b>{fmtBRL(folha.resumo.total_liquido)}</b></p>}
+    </button>
+  )
+}
+
+// ── lista de estágio (section-card padrão Compras) — list ou cards ───────────
+function StageList({ titulo, icon: Icon, folhas, onOpen, empty, view }: {
+  titulo: string; icon: LucideIcon; folhas: DPFolha[]; onOpen: (f: DPFolha) => void; empty: string; view: 'list' | 'cards'
 }) {
   const { isLightSidebar: isLight } = useTheme(); const isDark = !isLight
   const cardCls = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-100'
@@ -163,6 +182,10 @@ function StageList({ titulo, icon: Icon, folhas, onOpen, empty }: {
       </div>
       {folhas.length === 0 ? (
         <div className={`text-center text-sm py-12 px-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{empty}</div>
+      ) : view === 'cards' ? (
+        <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {folhas.map(f => <FolhaCardTile key={f.id} folha={f} onClick={() => onOpen(f)} isDark={isDark} />)}
+        </div>
       ) : (
         <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
           {folhas.map(f => <FolhaRow key={f.id} folha={f} onClick={() => onOpen(f)} isDark={isDark} />)}
@@ -182,6 +205,7 @@ export default function DPFolha() {
   const [active, setActive] = useState('apuracao')
   const [selId, setSelId] = useState<string | null>(null)
   const [novaOpen, setNovaOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list')
 
   const { data: folhas = [] } = useFolhas()
   const grupos = useMemo(() => {
@@ -207,12 +231,26 @@ export default function DPFolha() {
 
       <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} />
 
-      {active === 'apuracao' && <StageList titulo="Folhas em apuração" icon={Calculator} folhas={grupos.apuracao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em apuração. Clique em “Nova Folha” para lançar." />}
-      {active === 'verificacao' && <StageList titulo="Folhas em verificação" icon={SearchCheck} folhas={grupos.verificacao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em verificação." />}
-      {active === 'correcoes' && <StageList titulo="Folhas em correção" icon={FileEdit} folhas={grupos.correcoes} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em correção." />}
-      {active === 'fechamento' && <StageList titulo="Folhas aguardando fechamento" icon={Lock} folhas={grupos.fechamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aguardando fechamento." />}
-      {active === 'envio_pagamento' && <StageList titulo="Folhas aprovadas — envio de pagamento" icon={Send} folhas={grupos.envio_pagamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aprovada aguardando pagamento." />}
-      {active === 'concluido' && <StageList titulo="Folhas concluídas" icon={CheckCircle2} folhas={grupos.concluido} onOpen={f => setSelId(f.id)} empty="Nenhuma folha concluída ainda." />}
+      {/* Toggle lista / cards (padrão Compras) */}
+      <div className="flex justify-end">
+        <div className={`flex border rounded-lg ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <button onClick={() => setViewMode('list')} aria-label="Ver em lista"
+            className={`p-1.5 transition-all ${viewMode === 'list' ? isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500 hover:bg-white/5' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <LayoutList size={14} />
+          </button>
+          <button onClick={() => setViewMode('cards')} aria-label="Ver em cards"
+            className={`p-1.5 transition-all ${viewMode === 'cards' ? isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500 hover:bg-white/5' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <LayoutGrid size={14} />
+          </button>
+        </div>
+      </div>
+
+      {active === 'apuracao' && <StageList view={viewMode} titulo="Folhas em apuração" icon={Calculator} folhas={grupos.apuracao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em apuração. Clique em “Nova Folha” para lançar." />}
+      {active === 'verificacao' && <StageList view={viewMode} titulo="Folhas em verificação" icon={SearchCheck} folhas={grupos.verificacao} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em verificação." />}
+      {active === 'correcoes' && <StageList view={viewMode} titulo="Folhas em correção" icon={FileEdit} folhas={grupos.correcoes} onOpen={f => setSelId(f.id)} empty="Nenhuma folha em correção." />}
+      {active === 'fechamento' && <StageList view={viewMode} titulo="Folhas aguardando fechamento" icon={Lock} folhas={grupos.fechamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aguardando fechamento." />}
+      {active === 'envio_pagamento' && <StageList view={viewMode} titulo="Folhas aprovadas — envio de pagamento" icon={Send} folhas={grupos.envio_pagamento} onOpen={f => setSelId(f.id)} empty="Nenhuma folha aprovada aguardando pagamento." />}
+      {active === 'concluido' && <StageList view={viewMode} titulo="Folhas concluídas" icon={CheckCircle2} folhas={grupos.concluido} onOpen={f => setSelId(f.id)} empty="Nenhuma folha concluída ainda." />}
 
       {novaOpen && <NovaFolhaModal onClose={() => setNovaOpen(false)} onCreated={id => { setNovaOpen(false); setActive('apuracao'); setSelId(id) }} />}
 
