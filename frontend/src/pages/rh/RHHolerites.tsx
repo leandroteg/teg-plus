@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useMemo, useRef, useState } from 'react'
-import { Receipt, Upload, Loader2, X, Search, CheckCircle2, AlertTriangle, FileText, FilePlus2 } from 'lucide-react'
+import { Receipt, Upload, Loader2, X, Search, CheckCircle2, AlertTriangle, FileText } from 'lucide-react'
 import { useUploadHolerite, useHolerites, useRemoverHolerite, type TipoHolerite } from '../../hooks/useHolerites'
 import { useRHColaboradores } from '../../hooks/useRH'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -124,21 +124,14 @@ export default function RHHolerites() {
             Envie holerite por colaborador ou em lote (ZIP). Cada colaborador vê os seus no <strong>Portal TEG</strong>.
           </p>
         </div>
-        <button
-          onClick={() => setShowImportZip(true)}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors"
-          title="Subir vários holerites de uma vez via ZIP"
-        >
-          <FilePlus2 size={13} /> Importar ZIP
-        </button>
       </div>
 
       {showImportZip && (
         <ImportarHoleritesZipModal isLight={isLight} onClose={() => setShowImportZip(false)} />
       )}
 
-      {/* Lote consolidado → SuperTEG */}
-      <EnviarLoteHoleritesCard isDark={isDark} />
+      {/* Lote consolidado → SuperTEG (com atalho "Importar ZIP" no rodapé do bloco) */}
+      <EnviarLoteHoleritesCard isDark={isDark} onImportarZip={() => setShowImportZip(true)} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Form de upload */}
