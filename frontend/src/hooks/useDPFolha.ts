@@ -309,6 +309,32 @@ export function useEnviarPagamento() {
   })
 }
 
+// ── Colaboradores ATIVOS sem dados bancários completos no ERP ────────────────
+export interface ColaboradorSemConta {
+  id: string
+  nome: string
+  matricula: string | null
+  cargo: string | null
+  banco: string | null
+  agencia: string | null
+  conta: string | null
+}
+export function useColaboradoresSemConta() {
+  return useQuery<ColaboradorSemConta[]>({
+    queryKey: ['dp-colab-sem-conta'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_colaboradores')
+        .select('id, nome, matricula, cargo, banco, agencia, conta')
+        .eq('ativo', true).is('data_demissao', null)
+        .or('banco.is.null,agencia.is.null,conta.is.null')
+        .order('nome')
+      if (error) { console.error('useColaboradoresSemConta:', error); return [] }
+      return (data ?? []) as ColaboradorSemConta[]
+    },
+    staleTime: 30_000,
+  })
+}
+
 // ── Corrigir cadastro (conta bancária) direto no rh_colaboradores ────────────
 export function useCorrigirContaColaborador() {
   const qc = useQueryClient()
@@ -325,6 +351,7 @@ export function useCorrigirContaColaborador() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['dp-folha-desvios'] })
       qc.invalidateQueries({ queryKey: ['dp-folhas'] })
+      qc.invalidateQueries({ queryKey: ['dp-colab-sem-conta'] })
     },
   })
 }
