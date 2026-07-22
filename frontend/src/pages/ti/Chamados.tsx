@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Plus, Inbox, AlertTriangle, ChevronLeft, Headset, CheckCircle2, Package, X } from 'lucide-react'
+import { Search, Inbox, AlertTriangle, ChevronLeft, Headset, CheckCircle2, Package, X } from 'lucide-react'
 import { NovoChamadoForm } from './NovoChamado'
 import { listCategories, listSectors } from './data/meta'
 import { listTickets, type TicketFilters } from './data/tickets'
@@ -44,10 +44,10 @@ function ChamadosStaff() {
 
   return (
     <div className="ti-scope">
+      {/* Sem botão de ação: abrir chamado é pelo item "Nova Solicitação" do menu lateral */}
       <PageHeader
         title={staff ? 'Chamados' : 'Meus Chamados'}
         subtitle={staff ? 'Todos os chamados da T.I.' : 'Chamados que você abriu'}
-        action={<Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>}
       />
 
       <TiTabs />
