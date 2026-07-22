@@ -309,6 +309,66 @@ export function useEnviarPagamento() {
   })
 }
 
+// ── Percentuais de função do colaborador (rh_folha_individual, vigentes) ─────
+export interface FolhaIndividualRow {
+  id: string; colaborador_id: string; tipo: string; percentual: number | null
+  base_calculo: string | null; isento_he: boolean; funcao_na_epoca: string | null; vigencia_inicio: string | null
+}
+export function useFolhaIndividualColab(colaboradorId?: string) {
+  return useQuery<FolhaIndividualRow[]>({
+    queryKey: ['rh-folha-individual', colaboradorId],
+    enabled: !!colaboradorId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_folha_individual')
+        .select('id, colaborador_id, tipo, percentual, base_calculo, isento_he, funcao_na_epoca, vigencia_inicio')
+        .eq('colaborador_id', colaboradorId!).is('vigencia_fim', null).eq('ativo', true)
+      if (error) return []
+      return (data ?? []) as FolhaIndividualRow[]
+    },
+  })
+}
+
+const PCT_PADRAO_FUNCAO: Record<string, number> = { periculosidade: 30, cargo_confianca: 40 }
+// Liga (cria registro vigente) ou desliga (fecha vigencia_fim) um percentual de função.
+export function useTogglePercentualFuncao() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+  return useMutation({
+    mutationFn: async ({ colaboradorId, tipo, ativar, cargo, atualId }: {
+      colaboradorId: string; tipo: string; ativar: boolean; cargo?: string | null; atualId?: string
+    }) => {
+      const hoje = new Date().toISOString().slice(0, 10)
+      if (ativar) {
+        const { error } = await supabase.from('rh_folha_individual').insert({
+          colaborador_id: colaboradorId, tipo, percentual: PCT_PADRAO_FUNCAO[tipo] ?? null,
+          base_calculo: 'salario_base', funcao_na_epoca: cargo ?? null,
+          isento_he: tipo === 'cargo_confianca', vigencia_inicio: hoje, ativo: true,
+          criado_por: perfil?.id ?? null, criado_por_nome: perfil?.nome ?? null,
+        })
+        if (error) throw error
+      } else if (atualId) {
+        const { error } = await supabase.from('rh_folha_individual').update({ vigencia_fim: hoje, ativo: false }).eq('id', atualId)
+        if (error) throw error
+      }
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['rh-folha-individual', v.colaboradorId] }),
+  })
+}
+
+// Status da adesão ao plano de saúde (rh_beneficio_adesoes) — só leitura na ficha.
+export function usePlanoSaudeColab(colaboradorId?: string) {
+  return useQuery<{ id: string; dependentes: number | null } | null>({
+    queryKey: ['rh-plano-saude-colab', colaboradorId],
+    enabled: !!colaboradorId,
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_beneficio_adesoes')
+        .select('id, dependentes').eq('colaborador_id', colaboradorId!).eq('tipo', 'plano_saude')
+        .is('data_fim', null).limit(1).maybeSingle()
+      return (data as any) ?? null
+    },
+  })
+}
+
 // ── Evolução do custo (líquido) por competência — fonte rh_holerites ─────────
 export interface FolhaEvolucaoPonto { comp: string; total: number; n: number }
 export function useHoleritesEvolucao() {
