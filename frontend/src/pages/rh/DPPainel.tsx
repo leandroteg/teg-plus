@@ -13,6 +13,8 @@ import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePontoResumoPeriodo, usePontoHorasExtrasPeriodo, usePontoColabAtivos } from '../../hooks/usePonto'
 import { intervalToMin } from '../../lib/ponto'
+import { SpotlightMetric, MiniInfoCard } from '../../components/rh/DPPainelCards'
+import DPFolhaPainel from './DPFolhaPainel'
 
 // horas compactas p/ destaque: "28.080h"
 const hAbbr = (min: number) => `${Math.round(min / 60).toLocaleString('pt-BR')}h`
@@ -48,45 +50,12 @@ function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (
   )
 }
 
-function SpotlightMetric({ label, value, tone, note, isDark, aside, asideTitle }: {
-  label: string; value: string | number; tone: string; note?: string; isDark: boolean; aside?: string; asideTitle?: string
-}) {
-  const tones: Record<string, string> = {
-    amber: isDark ? 'text-amber-400' : 'text-amber-600',
-    blue: isDark ? 'text-blue-400' : 'text-blue-600',
-    violet: isDark ? 'text-violet-400' : 'text-violet-600',
-    slate: isDark ? 'text-slate-400' : 'text-slate-500',
-  }
-  return (
-    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      <p className={`text-[1.85rem] font-extrabold leading-none flex items-baseline gap-1.5 ${tones[tone] || tones.slate}`}>
-        <span>{value}</span>
-        {aside && <span title={asideTitle} className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-200/70 text-slate-600'}`}>{aside}</span>}
-      </p>
-      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
-    </div>
-  )
-}
-
-function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
-  label: string; value: string | number; note?: string; icon: LucideIcon; iconTone: string; isDark: boolean
-}) {
-  return (
-    <div className={`rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 flex-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-      <Icon size={16} className={iconTone} />
-      <p className={`text-2xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-      <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      {note && <p className={`text-[8px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
-    </div>
-  )
-}
-
 export default function DPPainel() {
   const { isDark } = useTheme()
   const nav = useNavigate()
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
+  const [view, setView] = useState<'ponto' | 'folha'>('ponto')
   const [de, setDe] = useState(ymHoje())
   const [ate, setAte] = useState(ymHoje())
 
@@ -145,23 +114,38 @@ export default function DPPainel() {
 
   return (
     <div className="space-y-3">
-      {/* Header + filtro de período (topo direito) */}
+      {/* Header + seletor de visão + filtro de período (topo direito) */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ponto · <span className="font-semibold">batida real</span> (sem inclusão manual/import)</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
-            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
-            <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {view === 'ponto' ? <>Ponto · <span className="font-semibold">batida real</span> (sem inclusão manual/import)</> : 'Folha · custo de pessoal, conferência e pagamento'}
+            </p>
           </div>
-          <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado
-          </span>
+          <select value={view} onChange={e => setView(e.target.value as 'ponto' | 'folha')}
+            className={`appearance-none rounded-lg pl-3 pr-7 py-1.5 border text-xs font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+            <option value="ponto">Ponto</option>
+            <option value="folha">Folha</option>
+          </select>
         </div>
+        {view === 'ponto' && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+              <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
+              <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+            </div>
+            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+              {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado
+            </span>
+          </div>
+        )}
       </div>
+
+      {view === 'folha' && <DPFolhaPainel isDark={isDark} cardClass={cardClass} />}
+      {view === 'ponto' && <>
+
 
       {/* Hero: Indicadores do mês + Janela Crítica */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
@@ -304,6 +288,7 @@ export default function DPPainel() {
           )}
         </section>
       </div>
+      </>}
     </div>
   )
 }
