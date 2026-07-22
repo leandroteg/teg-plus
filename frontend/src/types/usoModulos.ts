@@ -64,6 +64,37 @@ export interface RankingAcao {
   quantidade: number
 }
 
+// ── Drill-down de um módulo (RPC get_admin_uso_modulo_detalhe) ────────────────
+
+export interface ModuloDetalheResumo {
+  acessos: number
+  acoes: number
+  usuarios: number
+  base_usuarios: number
+  pct_adocao: number
+  acessos_prev: number
+  acoes_prev: number
+  usuarios_prev: number
+}
+
+export interface ModuloDetalheUsuario {
+  usuario_id: string
+  nome: string
+  role: string
+  acessos: number
+  acoes: number
+  dias_ativos: number
+  ultimo_uso: string | null
+}
+
+export interface ModuloDetalhePayload {
+  resumo: ModuloDetalheResumo
+  evolucao: { dia: string; acessos: number; acoes: number }[]
+  telas: { tela: string; acessos: number; usuarios: number }[]
+  usuarios: ModuloDetalheUsuario[]
+  acoes: { entidade_tipo: string; tipo: string; quantidade: number }[]
+}
+
 export interface UsoModulosPayload {
   resumo: UsoModulosResumo
   por_modulo: UsoPorModulo[]
