@@ -68,9 +68,10 @@ export default function TiLayout() {
       nav={isStaff ? NAV : navColaborador}
       navGroups={isStaff ? NAV_GROUPS : undefined}
       moduleSubtitle="Suporte de T.I."
-      maxWidth="max-w-6xl"
+      maxWidth="max-w-6xl mx-auto"
       bottomNavMaxItems={6}
-      headerExtra={<TiNotificationBell />}
+      truncateBottomLabels
+      headerExtra={<div className="flex justify-end"><TiNotificationBell /></div>}
       disableRequisitanteMode
     />
   )

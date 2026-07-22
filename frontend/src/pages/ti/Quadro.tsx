@@ -30,7 +30,7 @@ function Card({ ticket }: { ticket: Ticket }) {
       <Link
         to={`/ti/chamados/${ticket.id}`}
         draggable={false}
-        className="line-clamp-2 block text-sm font-medium text-slate-700 hover:text-sky-600"
+        className="line-clamp-2 text-sm font-medium text-slate-700 hover:text-sky-600"
       >
         {ticket.title}
       </Link>
@@ -47,7 +47,7 @@ function Column({ status, tickets, onMove }: { status: Status; tickets: Ticket[]
   const [over, setOver] = useState(false)
   const meta = STATUS_META[status]
   return (
-    <div className="flex w-72 shrink-0 flex-col">
+    <div className="flex min-w-[240px] flex-1 flex-col">
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
         <span className="text-sm font-semibold text-slate-700">{meta.label}</span>

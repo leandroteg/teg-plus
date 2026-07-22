@@ -142,7 +142,7 @@ export default function ChamadoDetalhe() {
         <div className="space-y-6 lg:col-span-2">
           <div className="card p-5">
             <h2 className="mb-2 text-sm font-semibold text-slate-700">Descrição</h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.description}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{t.description}</p>
           </div>
 
           <div className="card p-5">
@@ -178,7 +178,7 @@ export default function ChamadoDetalhe() {
                           </span>
                         )}
                       </div>
-                      <div className={`mt-1 whitespace-pre-wrap rounded-lg border p-3 text-sm ${
+                      <div className={`mt-1 whitespace-pre-wrap break-words rounded-lg border p-3 text-sm ${
                         item.comment.isInternal ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-100 bg-slate-50 text-slate-700'
                       }`}>
                         {item.comment.body}

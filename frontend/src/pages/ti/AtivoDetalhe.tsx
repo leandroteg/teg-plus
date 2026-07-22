@@ -105,7 +105,7 @@ export default function AtivoDetalhe() {
               {data.tickets.map((t) => (
                 <li key={t.id}>
                   <Link to={`/ti/chamados/${t.id}`} className="block rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-slate-400">{t.code}</span>
                       <StatusBadge status={t.status} />
                       <PriorityBadge priority={t.priority} />

@@ -37,7 +37,7 @@ export default function Artigo() {
           {!data.published && <span className="ml-2 align-middle rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">rascunho</span>}
         </h1>
         <p className="mt-1 text-xs text-slate-400">por {data.author.name} · atualizado em {formatDateTime(data.updatedAt)}</p>
-        <div className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{data.content}</div>
+        <div className="mt-5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{data.content}</div>
       </article>
     </div>
   )
