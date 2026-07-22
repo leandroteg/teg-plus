@@ -99,6 +99,24 @@ export function useOrdemServico(id: string) {
   })
 }
 
+// Histórico completo de OS de um veículo (todas as etapas), mais recente primeiro
+export function useHistoricoOSVeiculo(veiculoId?: string) {
+  return useQuery({
+    queryKey: ['fro_os_hist_veiculo', veiculoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_ordens_servico')
+        .select('*, fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,tipo)')
+        .eq('veiculo_id', veiculoId!)
+        .order('data_abertura', { ascending: false })
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as FroOrdemServico[]
+    },
+    enabled: !!veiculoId,
+  })
+}
+
 export function useCriarOS() {
   const qc = useQueryClient()
   return useMutation({
