@@ -3,10 +3,11 @@ import {
   Car, Cog, X, Tag, User, Radio, Building2,
   Gauge, Timer, FileText, ShieldAlert, Wrench, MapPin, ClipboardList, CornerDownLeft,
   Pencil, Check, Loader2, Activity, Navigation,
+  ChevronDown, Image as ImageIcon, Loader,
 } from 'lucide-react'
-import { useAtualizarAlocacao } from '../../hooks/useFrotas'
+import { useAtualizarAlocacao, useHistoricoOSVeiculo } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
-import type { FroVeiculo } from '../../types/frotas'
+import type { FroVeiculo, StatusOS, TipoOS } from '../../types/frotas'
 import { parseObsInfo } from './veiculoObs'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../constants/categoriaVeiculo'
 
@@ -56,6 +57,152 @@ const PROP_MAP = {
   propria: { label: 'Próprio', light: 'bg-emerald-50 text-emerald-700',  dark: 'bg-emerald-500/10 text-emerald-400' },
   locada:  { label: 'Locado',  light: 'bg-amber-50 text-amber-700',      dark: 'bg-amber-500/10 text-amber-400'    },
   cedida:  { label: 'Cedido',  light: 'bg-slate-100 text-slate-600',     dark: 'bg-slate-500/10 text-slate-400'    },
+}
+
+// ── Histórico de serviços (OS) ────────────────────────────────────────────────────
+
+const STATUS_OS_LABEL: Record<StatusOS, string> = {
+  pendente: 'Pendente', aberta: 'Pendente', em_cotacao: 'Cotação',
+  aguardando_aprovacao: 'Aprovação', aprovada: 'Aprovada', em_execucao: 'Em Execução',
+  concluida: 'Concluída', rejeitada: 'Rejeitada', cancelada: 'Cancelada',
+}
+const STATUS_OS_STYLE: Record<StatusOS, { light: string; dark: string }> = {
+  pendente:             { light: 'bg-amber-50 text-amber-700',    dark: 'bg-amber-500/10 text-amber-300' },
+  aberta:               { light: 'bg-amber-50 text-amber-700',    dark: 'bg-amber-500/10 text-amber-300' },
+  em_cotacao:           { light: 'bg-sky-50 text-sky-700',        dark: 'bg-sky-500/10 text-sky-300' },
+  aguardando_aprovacao: { light: 'bg-violet-50 text-violet-700',  dark: 'bg-violet-500/10 text-violet-300' },
+  aprovada:             { light: 'bg-indigo-50 text-indigo-700',  dark: 'bg-indigo-500/10 text-indigo-300' },
+  em_execucao:          { light: 'bg-blue-50 text-blue-700',      dark: 'bg-blue-500/10 text-blue-300' },
+  concluida:            { light: 'bg-emerald-50 text-emerald-700', dark: 'bg-emerald-500/10 text-emerald-300' },
+  rejeitada:            { light: 'bg-red-50 text-red-700',        dark: 'bg-red-500/10 text-red-300' },
+  cancelada:            { light: 'bg-slate-100 text-slate-500',   dark: 'bg-slate-500/10 text-slate-400' },
+}
+const TIPO_OS_LABEL: Record<TipoOS, string> = {
+  preventiva: 'Preventiva', corretiva: 'Corretiva', sinistro: 'Sinistro', revisao: 'Revisão',
+}
+const fmtDataOS = (d?: string) => (d ? new Date(d + (d.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('pt-BR') : '—')
+const BRL = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+function HistoricoServicos({ veiculoId, isLight }: { veiculoId: string; isLight: boolean }) {
+  const { data: os = [], isLoading } = useHistoricoOSVeiculo(veiculoId)
+  const [aberta, setAberta] = useState<string | null>(null)
+
+  const isDark = !isLight
+  const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const cardBg = isDark ? 'bg-white/[0.03]' : 'bg-slate-50'
+  const rowBg = isDark ? 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]' : 'bg-white border-slate-200 hover:bg-slate-50'
+
+  return (
+    <div className={`rounded-xl border p-4 ${border} ${cardBg}`}>
+      <div className="flex items-center justify-between mb-3">
+        <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${txtMuted}`}>
+          <Wrench size={11} /> Histórico de serviços
+        </p>
+        {!isLoading && <span className={`text-[10px] font-semibold ${txtMuted}`}>{os.length} OS</span>}
+      </div>
+
+      {isLoading ? (
+        <div className={`flex items-center justify-center gap-2 py-4 text-xs ${txtMuted}`}>
+          <Loader size={13} className="animate-spin" /> Carregando…
+        </div>
+      ) : os.length === 0 ? (
+        <p className={`text-xs text-center py-4 ${txtMuted}`}>Nenhum serviço registrado neste veículo.</p>
+      ) : (
+        <div className="space-y-2">
+          {os.map(o => {
+            const st = STATUS_OS_STYLE[o.status]
+            const valor = o.valor_final ?? o.valor_aprovado ?? o.valor_orcado
+            const isOpen = aberta === o.id
+            const anexos = [
+              o.foto_antes_url && { label: 'Foto antes', url: o.foto_antes_url },
+              o.foto_depois_url && { label: 'Foto depois', url: o.foto_depois_url },
+            ].filter(Boolean) as { label: string; url: string }[]
+            return (
+              <div key={o.id} className={`rounded-lg border overflow-hidden ${rowBg}`}>
+                <button
+                  onClick={() => setAberta(isOpen ? null : o.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                >
+                  <ChevronDown size={13} className={`shrink-0 transition-transform ${txtMuted} ${isOpen ? 'rotate-180' : ''}`} />
+                  <span className={`font-mono text-xs font-bold ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                    {o.numero_os || 'OS s/ nº'}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
+                    {TIPO_OS_LABEL[o.tipo]}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-auto ${isLight ? st.light : st.dark}`}>
+                    {STATUS_OS_LABEL[o.status]}
+                  </span>
+                </button>
+
+                <div className={`flex items-center gap-3 px-3 pb-2 text-[11px] ${txtMuted}`}>
+                  <span>{fmtDataOS(o.data_abertura)}</span>
+                  {valor != null && valor > 0 && (
+                    <span className={`font-semibold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{BRL(valor)}</span>
+                  )}
+                  {anexos.length > 0 && (
+                    <span className="ml-auto inline-flex items-center gap-1">
+                      <ImageIcon size={11} /> {anexos.length}
+                    </span>
+                  )}
+                </div>
+
+                {isOpen && (
+                  <div className={`px-3 pb-3 pt-1 border-t space-y-2 ${border}`}>
+                    {o.descricao_problema && (
+                      <div>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Problema</p>
+                        <p className={`text-xs whitespace-pre-wrap ${txtMain}`}>{o.descricao_problema}</p>
+                      </div>
+                    )}
+                    {o.descricao_servico && (
+                      <div>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Serviço executado</p>
+                        <p className={`text-xs whitespace-pre-wrap ${txtMain}`}>{o.descricao_servico}</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                      {o.fornecedor && (
+                        <div><span className={txtMuted}>Fornecedor: </span><span className={`font-semibold ${txtMain}`}>{o.fornecedor.nome_fantasia ?? o.fornecedor.razao_social}</span></div>
+                      )}
+                      {o.data_conclusao && (
+                        <div><span className={txtMuted}>Conclusão: </span><span className={`font-semibold ${txtMain}`}>{fmtDataOS(o.data_conclusao)}</span></div>
+                      )}
+                      {o.hodometro_entrada != null && (
+                        <div><span className={txtMuted}>Hodômetro: </span><span className={`font-semibold ${txtMain}`}>{fmtNum(o.hodometro_entrada)} km</span></div>
+                      )}
+                      {o.observacoes && (
+                        <div className="col-span-2"><span className={txtMuted}>Obs: </span><span className={txtMain}>{o.observacoes}</span></div>
+                      )}
+                    </div>
+                    {anexos.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {anexos.map(a => (
+                          <a
+                            key={a.url}
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                              isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+                            }`}
+                          >
+                            <ImageIcon size={11} /> {a.label}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────────
@@ -456,6 +603,9 @@ export default function VeiculoDetalhesModal({
               </div>
             </div>
           )}
+
+          {/* Histórico de serviços (OS) */}
+          <HistoricoServicos veiculoId={v.id} isLight={isLight} />
         </div>
 
         {/* Ações */}
