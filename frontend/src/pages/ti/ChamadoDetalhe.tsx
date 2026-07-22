@@ -119,8 +119,10 @@ export default function ChamadoDetalhe() {
     ...t.activities.filter((a) => a.type !== 'COMENTOU').map((a) => ({ kind: 'activity' as const, at: a.createdAt, activity: a })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
+  // Tela de LEITURA: limita a largura mesmo com o módulo em largura cheia,
+  // senão a descrição/timeline esticam demais em monitor grande.
   return (
-    <div className="ti-scope">
+    <div className="ti-scope mx-auto max-w-6xl">
       <Link to="/ti/chamados" className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-sky-600">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
