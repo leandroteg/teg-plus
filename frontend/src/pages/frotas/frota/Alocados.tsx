@@ -7,6 +7,7 @@ import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModa
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import FiltroCategoriaVeiculo from '../../../components/frotas/FiltroCategoriaVeiculo'
 import FiltroPropriedadeVeiculo from '../../../components/frotas/FiltroPropriedadeVeiculo'
+import MultiSelectPopover from '../../../components/MultiSelectPopover'
 import type { FroAlocacao, FroVeiculo, PropriedadeVeiculo } from '../../../types/frotas'
 import { CATEGORIA_VEICULO_ATIVAS, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 
@@ -325,8 +326,11 @@ export default function Alocados() {
   const [detalheAloc, setDetalheAloc] = useState<FroAlocacao | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [busca, setBusca] = useState('')
-  const [filtroObra, setFiltroObra] = useState<string>('todas')
+  const [filtroObra, setFiltroObra] = useState<Set<string>>(new Set())
   const [filtroResp, setFiltroResp] = useState<string>('todos')
+  const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: '', dir: 'asc' })
+  const toggleSort = (f: string) => setSort(s => s.field === f ? { field: f, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { field: f, dir: 'asc' })
+  const sortArrow = (f: string) => sort.field === f ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''
   const [tiposSelecionados, setTiposSelecionados] = useState<Set<CategoriaVeiculo>>(
     () => new Set(CATEGORIA_VEICULO_ATIVAS)
   )
@@ -376,7 +380,7 @@ export default function Alocados() {
           a.responsavel_nome?.toLowerCase().includes(q)
       })
     }
-    if (filtroObra !== 'todas') list = list.filter(a => a.obra?.nome === filtroObra)
+    if (filtroObra.size) list = list.filter(a => !!a.obra?.nome && filtroObra.has(a.obra.nome))
     if (filtroResp !== 'todos') list = list.filter(a => a.responsavel_nome === filtroResp)
     if (tiposSelecionados.size < CATEGORIA_VEICULO_ATIVAS.length) {
       list = list.filter(a => {
@@ -392,6 +396,26 @@ export default function Alocados() {
     }
     return list
   }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp, tiposSelecionados, propriedadesSelecionadas])
+
+  // Ordenação por coluna (clique no título)
+  const alocacoesOrd = useMemo(() => {
+    if (!sort.field) return alocacoes
+    const val = (a: typeof alocacoes[number]): string => {
+      const v = veicMap.get(a.veiculo_id)
+      switch (sort.field) {
+        case 'ativo':   return (v?.codigo_interno || a.veiculo?.placa || '').toLowerCase()
+        case 'obra':    return (a.obra?.nome || '').toLowerCase()
+        case 'resp':    return (a.responsavel_nome || '').toLowerCase()
+        case 'saida':   return a.data_saida || ''
+        case 'retorno': return a.data_retorno_prev || ''
+        default:        return ''
+      }
+    }
+    return [...alocacoes].sort((x, y) => {
+      const c = val(x).localeCompare(val(y))
+      return sort.dir === 'asc' ? c : -c
+    })
+  }, [alocacoes, sort, veicMap])
 
   // Contagem por categoria (para mostrar no dropdown)
   const contagemCategoria = useMemo(() => {
@@ -516,13 +540,7 @@ export default function Alocados() {
               }`}
             />
           </div>
-          <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)}
-            className={`rounded-xl border px-3 py-2 text-xs font-semibold outline-none max-w-[220px] ${
-              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
-            }`}>
-            <option value="todas">Todas obras</option>
-            {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <MultiSelectPopover label="Todas obras" options={obrasUnicas} selected={filtroObra} onChange={setFiltroObra} isLight={isLight} />
           <select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
             className={`rounded-xl border px-3 py-2 text-xs font-semibold outline-none max-w-[200px] ${
               isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
@@ -576,17 +594,17 @@ export default function Alocados() {
             <table className="w-full">
               <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
                 <tr>
-                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 220 }}>Ativo</th>
-                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 220, maxWidth: 280 }}>Obra / CC</th>
-                  <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 160 }}>Responsável</th>
-                  <th className={`${thCls} whitespace-nowrap`}>Saída</th>
-                  <th className={`${thCls} whitespace-nowrap`}>Ret. Previsto</th>
+                  <th className={`${thCls} whitespace-nowrap cursor-pointer select-none`} style={{ minWidth: 220 }} onClick={() => toggleSort('ativo')}>Ativo{sortArrow('ativo')}</th>
+                  <th className={`${thCls} whitespace-nowrap cursor-pointer select-none`} style={{ minWidth: 220, maxWidth: 280 }} onClick={() => toggleSort('obra')}>Obra / CC{sortArrow('obra')}</th>
+                  <th className={`${thCls} whitespace-nowrap cursor-pointer select-none`} style={{ minWidth: 160 }} onClick={() => toggleSort('resp')}>Responsável{sortArrow('resp')}</th>
+                  <th className={`${thCls} whitespace-nowrap cursor-pointer select-none`} onClick={() => toggleSort('saida')}>Saída{sortArrow('saida')}</th>
+                  <th className={`${thCls} whitespace-nowrap cursor-pointer select-none`} onClick={() => toggleSort('retorno')}>Ret. Previsto{sortArrow('retorno')}</th>
                   <th className={`${thCls} whitespace-nowrap`}>OS</th>
                   <th className={`${thCls} text-right whitespace-nowrap`}>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {alocacoes.map((a, idx) => {
+                {alocacoesOrd.map((a, idx) => {
                   const v = veicMap.get(a.veiculo_id)
                   const isMaquina = v?.tipo_ativo === 'maquina'
                   const { codigo, categoria } = v ? formatCodigoCategoria(v) : { codigo: a.veiculo?.placa ?? '—', categoria: '' }
@@ -705,7 +723,7 @@ export default function Alocados() {
       {/* Cards view */}
       {!isLoading && alocacoes.length > 0 && viewMode === 'cards' && (
         <div className="space-y-2">
-          {alocacoes.map(a => (
+          {alocacoesOrd.map(a => (
             <AlocacaoCard
               key={a.id}
               a={a}
