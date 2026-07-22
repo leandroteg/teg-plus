@@ -300,7 +300,7 @@ export interface FiltrosColaboradores {
   busca?: string
   tipo_contrato?: string
   ativo?: boolean
-  departamento?: string
+  departamento?: string[]
   setor?: string
   obra_id?: string
   base_id?: string
