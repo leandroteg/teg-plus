@@ -20,6 +20,7 @@ import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { HardHat, Ruler } from 'lucide-react'
 import { useCadObras } from '../../hooks/useCadastros'
 import { useBases } from '../../hooks/useEstoque'
+import { useFolhaIndividualColab, useTogglePercentualFuncao, usePlanoSaudeColab, type FolhaIndividualRow } from '../../hooks/useDPFolha'
 import { Lock } from 'lucide-react'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
@@ -170,6 +171,21 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
             <Field label="Nacionalidade" value={data?.nacionalidade} onChange={v => set('nacionalidade', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             <Field label="Email" value={data?.email} onChange={v => set('email', v)} editable={editMode} type="email" cls={inputCls} isLight={isLight} />
             <Field label="Telefone" value={data?.telefone} onChange={v => set('telefone', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            {/* Endereço (agrupado em Dados Pessoais) */}
+            <div className="col-span-2 sm:col-span-3 mt-1 flex items-center gap-2">
+              <MapPin size={12} className="text-emerald-400" />
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Endereço</span>
+              <div className={`flex-1 h-px ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+            </div>
+            <div className="col-span-2">
+              <Field label="Logradouro" value={data?.endereco} onChange={v => set('endereco', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            </div>
+            <Field label="Número" value={data?.numero} onChange={v => set('numero', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <Field label="Complemento" value={data?.complemento} onChange={v => set('complemento', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <Field label="Bairro" value={data?.bairro} onChange={v => set('bairro', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <Field label="Cidade" value={data?.cidade} onChange={v => set('cidade', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            <FieldSelect label="UF" value={data?.uf} onChange={v => set('uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
+            <Field label="CEP" value={data?.cep} onChange={v => set('cep', v)} editable={editMode} cls={inputCls} isLight={isLight} />
           </div>
         )}
       </div>
@@ -234,6 +250,8 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
               </div>
             </div>
             <Field label="Data Admissão" value={data?.data_admissao} onChange={v => set('data_admissao', v)} editable={editMode} type="date" cls={inputCls} isLight={isLight} />
+            {/* Folha: periculosidade / cargo de confiança / plano de saúde */}
+            <FolhaIndividualFields colaboradorId={id} cargo={data?.cargo} editMode={editMode} inputCls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Status</label>
               {editMode ? (
@@ -260,37 +278,18 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
           {openSections.documentos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
         {openSections.documentos && (
-          <div className={`px-5 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-3`}>
-            <Field label="RG" value={data?.rg} onChange={v => set('rg', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Órgão Emissor" value={data?.rg_orgao} onChange={v => set('rg_orgao', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <FieldSelect label="UF" value={data?.rg_uf} onChange={v => set('rg_uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="PIS/PASEP" value={data?.pis_pasep} onChange={v => set('pis_pasep', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="CTPS Número" value={data?.ctps_numero} onChange={v => set('ctps_numero', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="CTPS Série" value={data?.ctps_serie} onChange={v => set('ctps_serie', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <FieldSelect label="CTPS UF" value={data?.ctps_uf} onChange={v => set('ctps_uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
-          </div>
-        )}
-      </div>
-
-      {/* Endereço */}
-      <div className={sectionCls}>
-        <div className={headerCls} onClick={() => toggleSection('endereco')}>
-          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-            <MapPin size={14} className="text-emerald-400" /> Endereço
-          </h3>
-          {openSections.endereco ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </div>
-        {openSections.endereco && (
-          <div className={`px-5 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-3`}>
-            <div className="col-span-2">
-              <Field label="Logradouro" value={data?.endereco} onChange={v => set('endereco', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+          <div className="px-5 pb-4 space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Field label="RG" value={data?.rg} onChange={v => set('rg', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+              <Field label="Órgão Emissor" value={data?.rg_orgao} onChange={v => set('rg_orgao', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+              <FieldSelect label="UF" value={data?.rg_uf} onChange={v => set('rg_uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
+              <Field label="PIS/PASEP" value={data?.pis_pasep} onChange={v => set('pis_pasep', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+              <Field label="CTPS Número" value={data?.ctps_numero} onChange={v => set('ctps_numero', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+              <Field label="CTPS Série" value={data?.ctps_serie} onChange={v => set('ctps_serie', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+              <FieldSelect label="CTPS UF" value={data?.ctps_uf} onChange={v => set('ctps_uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
             </div>
-            <Field label="Número" value={data?.numero} onChange={v => set('numero', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Complemento" value={data?.complemento} onChange={v => set('complemento', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Bairro" value={data?.bairro} onChange={v => set('bairro', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="Cidade" value={data?.cidade} onChange={v => set('cidade', v)} editable={editMode} cls={inputCls} isLight={isLight} />
-            <FieldSelect label="UF" value={data?.uf} onChange={v => set('uf', v)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
-            <Field label="CEP" value={data?.cep} onChange={v => set('cep', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            {/* Documentos do OneDrive (movido pra dentro de Documentação) */}
+            <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
           </div>
         )}
       </div>
@@ -460,9 +459,6 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
       {/* Acesso ao Portal (PIN) */}
       <AcessoPortalPin colaboradorId={id} ativo={!!colab.ativo} sectionCls={sectionCls} isLight={isLight} />
 
-      {/* Documentos (OneDrive) */}
-      <OneDriveDocs colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
-
       {/* Relatório histórico (SuperTEG) */}
       <RelatorioHistorico colaboradorId={id} sectionCls={sectionCls} isLight={isLight} />
 
@@ -482,6 +478,47 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
       </div>
       </>)}
     </div>
+  )
+}
+
+// ── Campos de Folha (periculosidade / cargo de confiança / plano de saúde) ────
+function FolhaIndividualFields({ colaboradorId, cargo, editMode, inputCls, isLight }: {
+  colaboradorId: string; cargo?: string | null; editMode: boolean; inputCls: string; isLight: boolean
+}) {
+  const { data: rows = [] } = useFolhaIndividualColab(colaboradorId)
+  const { data: plano } = usePlanoSaudeColab(colaboradorId)
+  const toggle = useTogglePercentualFuncao()
+  const peric = rows.find(r => r.tipo === 'periculosidade')
+  const conf = rows.find(r => r.tipo === 'cargo_confianca')
+  const labelCls = `block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+
+  const toggleCell = (label: string, row: FolhaIndividualRow | undefined, tipo: string, pct: number) => (
+    <div>
+      <label className={labelCls}>{label}</label>
+      {editMode ? (
+        <select value={row ? 'sim' : 'nao'} disabled={toggle.isPending}
+          onChange={e => toggle.mutate({ colaboradorId, tipo, ativar: e.target.value === 'sim', cargo, atualId: row?.id })}
+          className={inputCls}>
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+        </select>
+      ) : (
+        <p className={`text-sm font-semibold ${row ? (isLight ? 'text-amber-600' : 'text-amber-400') : (isLight ? 'text-slate-400' : 'text-slate-500')}`}>
+          {row ? `Sim · ${row.percentual ?? pct}%` : '—'}
+        </p>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      {toggleCell('Periculosidade', peric, 'periculosidade', 30)}
+      {toggleCell('Cargo de confiança', conf, 'cargo_confianca', 40)}
+      <div>
+        <label className={labelCls}>Plano de Saúde</label>
+        <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{plano ? `Adesão: Sim${plano.dependentes ? ` · ${plano.dependentes} dep.` : ''}` : 'Adesão: Não'}</p>
+      </div>
+    </>
   )
 }
 
