@@ -309,6 +309,56 @@ export function useEnviarPagamento() {
   })
 }
 
+// ── Evolução do custo (líquido) por competência — fonte rh_holerites ─────────
+export interface FolhaEvolucaoPonto { comp: string; total: number; n: number }
+export function useHoleritesEvolucao() {
+  return useQuery<FolhaEvolucaoPonto[]>({
+    queryKey: ['dp-folha-evolucao'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_holerites').select('competencia, valor_liquido')
+      if (error) { console.error('useHoleritesEvolucao:', error); return [] }
+      const m = new Map<string, { total: number; n: number }>()
+      for (const r of data ?? []) {
+        const c = String(r.competencia ?? '').slice(0, 7)
+        if (!c) continue
+        const e = m.get(c) ?? { total: 0, n: 0 }
+        e.total += Number(r.valor_liquido ?? 0); e.n++
+        m.set(c, e)
+      }
+      return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([comp, v]) => ({ comp, total: v.total, n: v.n }))
+    },
+    staleTime: 60_000,
+  })
+}
+
+// ── Custo (líquido) por base numa competência — holerites × colaborador × base ─
+export interface CustoBase { nome: string; total: number }
+export function useCustoPorBase(competencia?: string) {
+  return useQuery<CustoBase[]>({
+    queryKey: ['dp-custo-base', competencia],
+    enabled: !!competencia,
+    queryFn: async () => {
+      const comp = /^\d{4}-\d{2}$/.test(competencia!) ? `${competencia}-01` : competencia!
+      const [{ data: hol }, { data: colabs }, { data: bases }] = await Promise.all([
+        supabase.from('rh_holerites').select('colaborador_id, valor_liquido').eq('competencia', comp),
+        supabase.from('rh_colaboradores').select('id, base_id'),
+        supabase.from('est_bases').select('id, nome'),
+      ])
+      if (!hol?.length) return []
+      const baseOf = new Map((colabs ?? []).map(c => [c.id as string, c.base_id as string | null]))
+      const nomeOf = new Map((bases ?? []).map(b => [b.id as string, b.nome as string]))
+      const m = new Map<string, number>()
+      for (const h of hol) {
+        const bid = baseOf.get(h.colaborador_id as string)
+        const nome = (bid && nomeOf.get(bid)) || 'Sem base'
+        m.set(nome, (m.get(nome) ?? 0) + Number(h.valor_liquido ?? 0))
+      }
+      return [...m.entries()].map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total)
+    },
+    staleTime: 60_000,
+  })
+}
+
 // ── Colaboradores ATIVOS sem dados bancários completos no ERP ────────────────
 export interface ColaboradorSemConta {
   id: string
