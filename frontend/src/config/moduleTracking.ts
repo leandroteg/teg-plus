@@ -66,6 +66,9 @@ export function moduleLabel(key: string): string {
   return MODULE_LABELS[key] ?? key.toUpperCase()
 }
 
+// Módulos rastreáveis por navegação — base para "módulos sem nenhum uso"
+export const TRACKED_MODULES: string[] = [...new Set(ROUTE_TO_MODULE.map((r) => r.modulo))]
+
 export function resolveModulo(pathname: string): string | null {
   const match = ROUTE_TO_MODULE.find(
     ({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`),

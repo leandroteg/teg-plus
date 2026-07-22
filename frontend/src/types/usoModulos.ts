@@ -7,6 +7,21 @@ export interface UsoModulosResumo {
   base_usuarios: number
   modulos_usados: number
   pct_adocao_geral: number
+  // período anterior de mesma duração, para os deltas dos KPIs
+  acessos_prev: number
+  acoes_prev: number
+  usuarios_prev: number
+}
+
+export interface UsuariosPorDiaPonto {
+  dia: string // 'YYYY-MM-DD'
+  usuarios: number
+}
+
+export interface PorHoraPonto {
+  hora: number // 0-23 (America/Sao_Paulo)
+  acessos: number
+  acoes: number
 }
 
 export interface UsoPorModulo {
@@ -31,6 +46,7 @@ export interface UsoPorUsuario {
   total_acessos: number
   total_acoes: number
   ultimo_uso: string | null
+  dias_ativos: number
   modulos_usados: string[]
 }
 
@@ -52,6 +68,8 @@ export interface UsoModulosPayload {
   resumo: UsoModulosResumo
   por_modulo: UsoPorModulo[]
   evolucao_diaria: EvolucaoDiariaPonto[]
+  usuarios_por_dia: UsuariosPorDiaPonto[]
+  por_hora: PorHoraPonto[]
   por_usuario: UsoPorUsuario[]
   ranking_telas: RankingTela[]
   ranking_acoes: RankingAcao[]
