@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
   Plus, Wrench, X, Clock, AlertTriangle, Car, Building2,
-  Search, LayoutList, LayoutGrid, ArrowUp, ArrowDown, CheckCircle2,
+  Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
   ClipboardCheck, ShieldCheck, Cog, FileSearch,
 } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
@@ -385,7 +385,7 @@ function OSDetailModal({ os, onClose, isDark }: { os: FroOrdemServico; onClose: 
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 type SortField = 'data' | 'placa' | 'prioridade'
-type ViewMode = 'cards' | 'list'
+type ViewMode = 'cards' | 'list' | 'quadro'
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data', label: 'Data' }, { field: 'placa', label: 'Placa' }, { field: 'prioridade', label: 'Prioridade' },
@@ -449,6 +449,27 @@ export default function OSAbertas() {
     })
     return items
   }, [grouped, activeTab, busca, sortField, sortDir])
+
+  // Quadro (kanban): todas as etapas como colunas, com busca + ordenação aplicadas
+  const quadroGrouped = useMemo(() => {
+    const q = busca.toLowerCase()
+    const out = new Map<StageKey, FroOrdemServico[]>()
+    STAGES.forEach(s => {
+      let items = [...(grouped.get(s.key) || [])]
+      if (busca) items = items.filter(o =>
+        [o.veiculo?.placa, o.veiculo?.modelo, o.numero_os, o.descricao_problema, o.fornecedor?.razao_social]
+          .some(v => v?.toLowerCase().includes(q)))
+      items.sort((a, b) => {
+        let c = 0
+        if (sortField === 'data') c = (a.data_abertura || '').localeCompare(b.data_abertura || '')
+        else if (sortField === 'placa') c = (a.veiculo?.placa || '').localeCompare(b.veiculo?.placa || '')
+        else c = PRIOR_ORDER[a.prioridade] - PRIOR_ORDER[b.prioridade]
+        return sortDir === 'asc' ? c : -c
+      })
+      out.set(s.key, items)
+    })
+    return out
+  }, [grouped, busca, sortField, sortDir])
 
   if (isLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -518,13 +539,34 @@ export default function OSAbertas() {
         <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('list')} className={`p-1.5 ${viewMode === 'list' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
           <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
+          <button onClick={() => setViewMode('quadro')} title="Quadro" className={`p-1.5 ${viewMode === 'quadro' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><Columns3 size={14} /></button>
         </div>
         <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{activeItems.length} item(s)</span>
       </div>
 
       {/* Content */}
       <div className="min-h-[200px]">
-        {activeItems.length === 0 ? (
+        {viewMode === 'quadro' ? (
+          <div className="flex gap-3 p-4 overflow-x-auto">
+            {STAGES.map(stage => {
+              const items = quadroGrouped.get(stage.key) || []
+              const a = isDark ? STAGE_ACCENT_DARK[stage.key] : STAGE_ACCENT[stage.key]
+              const Icon = stage.icon
+              return (
+                <div key={stage.key} className="min-w-[264px] w-[264px] shrink-0">
+                  <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl mb-2 text-xs font-bold border ${a.bgActive} ${a.textActive} ${a.border}`}>
+                    <Icon size={14} className="shrink-0" /> {stage.label}
+                    <span className={`ml-auto text-[10px] font-bold rounded-full min-w-[20px] px-1.5 py-0.5 ${a.badge}`}>{items.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {items.map(os => <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}
+                    {items.length === 0 && <p className={`text-[11px] text-center py-6 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</p>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : activeItems.length === 0 ? (
           <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
             <Wrench size={40} className="mb-3" /><p className="text-sm font-medium">Nenhuma OS nesta etapa</p>
           </div>
