@@ -151,7 +151,7 @@ export default function RHColaboradores() {
 
   // KPI calculations
   const kpis = useMemo(() => {
-    const ativos = todos.filter(c => c.ativo)
+    const ativos = filtered.filter(c => c.ativo)
     const clt = ativos.filter(c => (c.tipo_contrato || 'CLT').toUpperCase() === 'CLT').length
     const pj = ativos.filter(c => (c.tipo_contrato || '').toUpperCase() === 'PJ').length
     const aprendiz = ativos.filter(c => (c.tipo_contrato || '').toUpperCase() === 'APRENDIZ').length
@@ -159,7 +159,7 @@ export default function RHColaboradores() {
     const trintaDiasAtras = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000)
     const admissoes30d = ativos.filter(c => c.data_admissao && new Date(c.data_admissao) >= trintaDiasAtras).length
     return { ativos: ativos.length, clt, pj, aprendiz, admissoes30d }
-  }, [todos])
+  }, [filtered])
 
   const activeFilterCount = [
     filtros.tipo_contrato, filtros.departamento?.length, filtros.setor,
