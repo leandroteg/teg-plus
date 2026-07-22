@@ -70,8 +70,8 @@ export default function RHColaboradores() {
       if (expVencendo && !experienciaVencendo(c.data_admissao)) return false
       // Tipo contrato
       if (filtros.tipo_contrato && (c.tipo_contrato || 'CLT') !== filtros.tipo_contrato) return false
-      // Departamento
-      if (filtros.departamento && c.departamento !== filtros.departamento) return false
+      // Departamento (multi)
+      if (filtros.departamento?.length && !filtros.departamento.includes(c.departamento || '')) return false
       // Setor
       if (filtros.setor && c.setor !== filtros.setor) return false
       // Base
@@ -120,7 +120,7 @@ export default function RHColaboradores() {
   }, [todos])
 
   const activeFilterCount = [
-    filtros.tipo_contrato, filtros.departamento, filtros.setor,
+    filtros.tipo_contrato, filtros.departamento?.length, filtros.setor,
     filtros.base_id, filtros.idade_min, filtros.idade_max,
     filtros.tempo_empresa_min, filtros.tempo_empresa_max,
   ].filter(Boolean).length
@@ -324,11 +324,26 @@ export default function RHColaboradores() {
             </div>
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Departamento</label>
-              <select value={filtros.departamento || ''} onChange={e => setFiltros(f => ({ ...f, departamento: e.target.value || undefined }))}
-                className={`w-full px-2 py-1.5 rounded-lg border text-xs ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800 text-white'}`}>
-                <option value="">Todos</option>
-                {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+              <div className={`rounded-lg border max-h-44 overflow-y-auto p-1 ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800'}`}>
+                <label className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs font-bold ${isLight ? 'hover:bg-slate-50 text-slate-700 border-b border-slate-100' : 'hover:bg-white/5 text-slate-200 border-b border-slate-700'}`}>
+                  <input type="checkbox" className="accent-violet-500"
+                    checked={(filtros.departamento?.length ?? 0) === departamentos.length && departamentos.length > 0}
+                    onChange={e => setFiltros(f => ({ ...f, departamento: e.target.checked ? [...departamentos] : undefined }))} />
+                  Selecionar todos
+                </label>
+                {departamentos.map(d => (
+                  <label key={d} className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs ${isLight ? 'hover:bg-slate-50 text-slate-700' : 'hover:bg-white/5 text-slate-200'}`}>
+                    <input type="checkbox" className="accent-violet-500"
+                      checked={filtros.departamento?.includes(d) ?? false}
+                      onChange={() => setFiltros(f => {
+                        const cur = f.departamento ?? []
+                        const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d]
+                        return { ...f, departamento: next.length ? next : undefined }
+                      })} />
+                    {d}
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Setor</label>
