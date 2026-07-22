@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
-  UserCog, UserSearch, Server, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, ChevronRight, ChevronLeft, Video,
+  UserCog, UserSearch, Server, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun, Scale, ClipboardCheck, LayoutDashboard, Headset, Video,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -858,10 +858,6 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
   const { data: minhasTarefas = [] } = useMinhasTarefas()
   const nTarefas = minhasTarefas.length
   const { isAdmin, hasModule } = useAuth()
-  // Um ÚNICO botão ("Minha Área Pessoal") que expande a lista com todas as
-  // funções pessoais — padrão do flyout "Novo Registro" do EGP.
-  const [expanded, setExpanded] = useState(false)
-  useEffect(() => { if (!open) setExpanded(false) }, [open])
   if (!open) return null
 
   type Funcao = { label: string; icon: LucideIcon; path: string; tone: string; desc: string }
@@ -917,75 +913,35 @@ function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
           </button>
         </div>
 
-        {/* Corpo: um único botão que expande a lista de funções — padrão do
-            flyout "Novo Registro" do EGP */}
-        {!expanded ? (
-          <div className="p-5">
-            <button
-              onClick={() => setExpanded(true)}
-              className={`group flex w-full items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
-                isLight
-                  ? 'bg-slate-50 hover:bg-white hover:shadow-lg hover:ring-teal-300 active:scale-[0.98]'
-                  : 'bg-white/[0.03] hover:bg-white/[0.06] hover:ring-teal-400/40 active:scale-[0.98]'
-              }`}
-            >
-              <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-110 ${isLight ? 'bg-teal-50' : 'bg-teal-500/10'}`}>
-                <User size={20} strokeWidth={2.2} className={isLight ? 'text-teal-600' : 'text-teal-300'} />
-                {nTarefas > 0 && (
-                  <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
-                    style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
-                    title={`${nTarefas} tarefa${nTarefas !== 1 ? 's' : ''} pendente${nTarefas !== 1 ? 's' : ''}`}>
-                    {nTarefas > 99 ? '99+' : nTarefas}
-                  </span>
-                )}
-              </div>
-              <div className="flex-1">
-                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>Minha Área Pessoal</p>
-                <p className={`mt-1 text-[10px] leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Tarefas, solicitações, despesas, cautelas e chamados</p>
-              </div>
-              <ChevronRight size={16} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
-            </button>
-          </div>
-        ) : (
-          <div className="p-3">
-            <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1">
+        {/* Corpo: a lista das funções pessoais já aberta (sem passo intermediário) */}
+        <div className="p-3">
+          {funcoes.map(f => {
+            const clr = toneMap[f.tone]
+            const Icon = f.icon
+            return (
               <button
-                onClick={() => setExpanded(false)}
-                className={`rounded-lg p-1 transition-colors ${isLight ? 'text-slate-400 hover:bg-slate-100' : 'text-slate-500 hover:bg-white/[0.06]'}`}
-                aria-label="Voltar"
+                key={f.path}
+                onClick={() => onNavigate(f.path)}
+                className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
               >
-                <ChevronLeft size={14} />
+                <span className={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
+                  <Icon size={16} />
+                  {f.path === '/minhas-tarefas' && nTarefas > 0 && (
+                    <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
+                      style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
+                      title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
+                      {nTarefas > 99 ? '99+' : nTarefas}
+                    </span>
+                  )}
+                </span>
+                <span>
+                  <span className={`block text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{f.label}</span>
+                  <span className={`mt-0.5 block text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{f.desc}</span>
+                </span>
               </button>
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Área Pessoal</p>
-            </div>
-            {funcoes.map(f => {
-              const clr = toneMap[f.tone]
-              const Icon = f.icon
-              return (
-                <button
-                  key={f.path}
-                  onClick={() => onNavigate(f.path)}
-                  className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
-                >
-                  <span className={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isLight ? `${clr.bg} ${clr.text}` : `${clr.bgDark} ${clr.textDark}`}`}>
-                    <Icon size={16} />
-                    {f.path === '/minhas-tarefas' && nTarefas > 0 && (
-                      <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center rounded-full bg-red-500 text-white font-extrabold shadow-md ring-2 ring-white"
-                        style={{ minWidth: 20, height: 20, padding: '0 5px', fontSize: 10 }}
-                        title={`${nTarefas} pendente${nTarefas !== 1 ? 's' : ''}`}>
-                        {nTarefas > 99 ? '99+' : nTarefas}
-                      </span>
-                    )}
-                  </span>
-                  <span>
-                    <span className={`block text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{f.label}</span>
-                    <span className={`mt-0.5 block text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{f.desc}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
+            )
+          })}
+        </div>
       </div>
 
       <style>{`
