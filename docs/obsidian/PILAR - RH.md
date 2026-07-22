@@ -2,61 +2,30 @@
 title: "Pilar: RH"
 type: pilar
 status: ativo
-tags: [pilar, rh, headcount, cultura, dp, recrutamento, performance]
+tags: [pilar, rh, headcount, admissao, dp, ponto, treinamentos, cultura]
 criado: 2026-04-09
-atualizado: 2026-06-26
-relacionado: ["[[00 - TEG+ INDEX]]"]
+atualizado: 2026-07-21
+relacionado: ["[[00 - TEG+ INDEX]]", "[[51 - Módulo RH — Admissão]]", "[[52 - Módulo RH — Colaboradores]]", "[[53 - Módulo DP — Ponto]]"]
 ---
 
 # 🟠 Pilar RH
 
-> Gestão de pessoas: headcount, cultura organizacional e departamento pessoal.
+> Gestão de pessoas: admissão (esteira de onboarding), headcount/cadastro, departamento pessoal (ponto/folha), treinamentos e cultura.
 
 ---
 
-## Sub-módulos (5)
+## Sub-módulos
 
-| Sub-módulo | Status | Descrição |
-|------------|--------|-----------|
-| **Headcount** | ✅ Ativo | Admissão, colaboradores, movimentações, desligamento |
-| **Cultura** | ✅ Ativo | Engajamento, clima, mural de recados |
-| **R&S** | ⬜ Inativo | Recrutamento e seleção (Q2-Q3 2026) |
-| **Performance** | ⬜ Inativo | Avaliações, metas, feedbacks (Q2-Q3 2026) |
-| **DP** | ⬜ Inativo | Folha, ponto (Seculum), benefícios |
-
----
-
-## Docs detalhados
-
-| Doc | Descrição |
-|-----|-----------|
-| [[25 - Mural de Recados]] | Slideshow corporativo, gestão admin |
-| [[28 - Módulo Cadastros AI]] | Cadastro de colaboradores com CPF lookup |
-
-## Funcionalidades do Headcount (Jun/2026)
-
-### Ficha do colaborador (`RHColaboradorDetalhe.tsx`)
-
-- Seção **Contrato & Trabalho** inclui campo **Status (Ativo/Inativo)** editável
-- Campo ligado a `rh_colaboradores.ativo` (boolean)
-- Editável no modo edição; salvo pelo `useSalvarRHColaborador` (update padrão)
-- Filtros da lista (Ativos / Inativos) refletem o valor salvo
-
-### Verificações e Relatórios
-
-- Aba **Verificações**: checagem de docs assinados em lote (resolução fuzzy de pasta OneDrive, 3× paralelo)
-- Aba **Relatórios**: comandos ao SuperTEG viram PDF histórico (rh_colaborador_relatorios)
-
-### Estrutura organizacional
-
-- `base_id` = fonte de origem da obra para o Secullum
-- `departamento` = organograma (do cargo)
-- `setor` = subárea interna
-
-## Integrações futuras
-
-- [[45 - Mapa de Integrações]] — **Seculum** (ponto eletrônico para DP)
-- [[45 - Mapa de Integrações]] — **Nano Banana 3** (geração de imagem para endomarketing)
+| Sub-módulo | Status | Doc detalhado | Descrição |
+|------------|--------|---------------|-----------|
+| **Admissão** | ✅ Ativo | [[51 - Módulo RH — Admissão]] | Esteira de 9 etapas (requisição → liberação), GESET, painel |
+| **Headcount / Colaboradores** | ✅ Ativo | [[52 - Módulo RH — Colaboradores]] | Cadastro-mestre, ficha, filtros, CC/base/departamento |
+| **DP — Ponto** | ✅ Ativo | [[53 - Módulo DP — Ponto]] | Espelho do Secullum, HHt, extras, retificações |
+| **DP — Folha** | ✅ Ativo | — | Apuração → verificação → fechamento → pagamento |
+| **Treinamentos (matriz)** | ✅ Ativo | [[54 - Módulo QSMA — Matriz de Treinamentos]] | Matriz por cargo (QSMA), certificados do DOC GESET |
+| **Cultura / Endomarketing** | ✅ Ativo | [[25 - Mural de Recados]] | Mural, engajamento |
+| **R&S** | ⬜ Inativo | — | Recrutamento e seleção (futuro) |
+| **Performance** | ⬜ Inativo | — | Avaliações, metas, feedbacks (futuro) |
 
 ---
 
@@ -64,22 +33,37 @@ relacionado: ["[[00 - TEG+ INDEX]]"]
 
 ```mermaid
 flowchart LR
-    ADM[Admissão] --> COL[Colaborador\nAtivo]
+    ADM[Admissão\n9 etapas] --> COL[Colaborador\nAtivo]
+    COL --> PONTO[Ponto\nSecullum → HHt]
+    COL --> TREIN[Treinamentos\nMatriz QSMA]
     COL --> MOV[Movimentações\nPromoção/Transferência]
-    COL --> APT[Apontamentos\nde Obra]
-    COL --> CULT[Cultura\nMural/Engajamento]
+    PONTO --> FOLHA[Folha\nApuração]
     MOV --> DES[Desligamento]
-    
+
     style ADM fill:#EC4899,color:#fff
     style COL fill:#EC4899,color:#fff
-    style CULT fill:#EC4899,color:#fff
+    style PONTO fill:#8B5CF6,color:#fff
+    style FOLHA fill:#6366F1,color:#fff
 ```
+
+---
+
+## Integrações externas
+
+- **Secullum Ponto Web** (banco 157231) — ponto eletrônico → `rh_ponto_*` (ver [[53 - Módulo DP — Ponto]] e [[45 - Mapa de Integrações]])
+- **OneDrive (Graph)** — fichas e documentos dos funcionários; certificados de treinamento
+- **Portal TEG** (repo separado) — missões de documentação/assinatura e push
+- **n8n** — poller de e-mail `rh@`, IAs de preenchimento de ficha, sync de ponto (ver [[10 - n8n Workflows]])
+- **SuperTEG** — parecer CTPS × Matriz CEMIG
 
 ---
 
 ## Links
 
 - [[00 - TEG+ INDEX]]
+- [[51 - Módulo RH — Admissão]]
+- [[52 - Módulo RH — Colaboradores]]
+- [[53 - Módulo DP — Ponto]]
+- [[33 - Módulo SSMA]] — Treinamentos, SST, Meio Ambiente
 - [[PILAR - Projetos]] — Colaboradores alocados nas obras
-- [[PILAR - Backoffice]] — Folha/benefícios geram CP
 - [[50 - Fluxos Inter-Módulos]]
