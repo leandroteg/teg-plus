@@ -10,6 +10,7 @@ import DashboardSkeleton from './components/skeletons/DashboardSkeleton'
 import TableSkeleton from './components/skeletons/TableSkeleton'
 import OfflineBanner from './components/OfflineBanner'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
+import AccessTracker from './components/AccessTracker'
 import UpdateAvailable from './components/UpdateAvailable'
 import { useThemeColor } from './hooks/useThemeColor'
 
@@ -242,6 +243,7 @@ const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 const AdminLogs = lazy(() => import('./pages/admin/Logs'))
+const AdminUsoModulos = lazy(() => import('./pages/admin/UsoModulos'))
 
 // TI — Help Desk (Supabase-nativo). Telas legadas preservadas na branch backup/ti-chamados.
 const TiHome = lazy(() => import('./pages/ti/Home'))
@@ -681,9 +683,11 @@ export default function App() {
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
             <Route path="/admin/logs" element={<Lazy><AdminLogs /></Lazy>} />
+            <Route path="/admin/uso-modulos" element={<Lazy><AdminUsoModulos /></Lazy>} />
           </Route>
         </Route>
       </Routes>
+      <AccessTracker />
       <PWAInstallPrompt />
       <Suspense fallback={null}><SuperTEGChat /></Suspense>
     </AuthProvider>
