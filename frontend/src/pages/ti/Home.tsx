@@ -48,12 +48,12 @@ const TONE_ICON: Record<Tone, string> = {
 function Kpi({ label, value, icon: Icon, color }: { label: string; value: number; icon: ComponentType<{ className?: string }>; color: string }) {
   return (
     <div className="card flex items-center gap-4 p-4">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${color}`}>
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${color}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="text-2xl font-bold text-slate-800">{value}</div>
-        <div className="text-xs text-slate-500">{label}</div>
+        <div className="truncate text-xs text-slate-500">{label}</div>
       </div>
     </div>
   )
@@ -72,12 +72,12 @@ function StatHighlight({ label, value, hint, icon: Icon, tone = 'neutral' }: { l
   )
 }
 
-function ChartCard({ title, className = '', children }: { title: string; className?: string; children: ReactNode }) {
+function ChartCard({ title, className = '', empty, children }: { title: string; className?: string; empty?: ReactNode; children: ReactNode }) {
   return (
     <div className={`card p-5 ${className}`}>
       <h3 className="mb-4 text-sm font-semibold text-slate-700">{title}</h3>
       <div style={{ width: '100%', height: 240 }}>
-        <ResponsiveContainer>{children as React.ReactElement}</ResponsiveContainer>
+        {empty ?? <ResponsiveContainer>{children as React.ReactElement}</ResponsiveContainer>}
       </div>
     </div>
   )
@@ -110,7 +110,7 @@ function RecentList({ tickets, loading }: { tickets: Ticket[]; loading: boolean 
           <span className="font-mono text-xs text-slate-400">{t.code}</span>
           <span className="flex-1 truncate font-medium text-slate-700">{t.title}</span>
           {t.assignee && <Avatar name={t.assignee.name} size="sm" />}
-          <SlaBadge dueAt={t.dueAt} status={t.status} size="sm" />
+          <span className="hidden sm:contents"><SlaBadge dueAt={t.dueAt} status={t.status} size="sm" /></span>
           <PriorityBadge priority={t.priority} />
           <StatusBadge status={t.status} />
           <span className="hidden w-24 text-right text-xs text-slate-400 sm:block">{timeAgo(t.createdAt)}</span>
@@ -246,7 +246,7 @@ export default function TiHome() {
       {statsQ.isLoading || !stats ? (
         <Spinner />
       ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
           {kpis.map((k) => <Kpi key={k.label} {...k} />)}
         </div>
       )}
@@ -311,18 +311,17 @@ export default function TiHome() {
             </BarChart>
           </ChartCard>
 
-          <ChartCard title="Carga por responsável">
-            {agentData.length ? (
-              <BarChart data={agentData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="value" name="Em aberto" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-400">Sem dados no período</div>
-            )}
+          <ChartCard
+            title="Carga por responsável"
+            empty={agentData.length ? undefined : <div className="flex h-full items-center justify-center text-sm text-slate-400">Sem dados no período</div>}
+          >
+            <BarChart data={agentData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="value" name="Em aberto" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+            </BarChart>
           </ChartCard>
         </div>
       )}

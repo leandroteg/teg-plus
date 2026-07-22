@@ -66,7 +66,7 @@ function NewAssetModal({ onClose }: { onClose: () => void }) {
   })
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card max-h-[90vh] w-full max-w-md overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800">Novo ativo</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
@@ -145,7 +145,7 @@ export default function Ativos() {
         <Spinner />
       ) : (
         <div className="card overflow-auto" style={{ maxHeight: 'calc(100vh - 210px)' }}>
-          <table className="border-separate border-spacing-0 text-xs">
+          <table className="min-w-full border-separate border-spacing-0 text-xs">
             <thead>
               <tr>
                 <th className={`${TH} sticky left-0 z-20`}>Usuário</th>
@@ -169,7 +169,7 @@ export default function Ativos() {
                 return (
                   <tr key={p.key} className={bg}>
                     <td className={`${TD} sticky left-0 z-[1] ${bg} font-medium text-slate-800`}>
-                      <div>{p.holderName ?? '—'}</div>
+                      <div title={p.holderName ?? undefined} className="max-w-[160px] truncate sm:max-w-[240px]">{p.holderName ?? '—'}</div>
                       {p.holderName && <Link to={`/ti/termos?colaborador=${encodeURIComponent(p.holderName)}`} className="text-[10px] font-normal text-sky-600 hover:underline">Gerar termo</Link>}
                     </td>
                     <td className={`${TD} text-slate-600`}>{p.phoneLine ?? '—'}</td>

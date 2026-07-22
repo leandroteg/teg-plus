@@ -24,7 +24,7 @@ function Row({ item, table, invalidate }: { item: Category; table: NamedTable; i
   return (
     <li className="flex items-center gap-2 py-2">
       <input
-        className="input flex-1"
+        className="input min-w-0 flex-1"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={() => { if (name.trim() && name.trim() !== item.name) mut.mutate({ name: name.trim() }) }}
@@ -59,7 +59,7 @@ function Manager({ title, table, activeKey }: { title: string; table: NamedTable
       )}
       <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
         <input
-          className="input flex-1"
+          className="input min-w-0 flex-1"
           placeholder={`Novo(a) ${title.toLowerCase().slice(0, -1)}…`}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -158,7 +158,7 @@ function CustomFieldsManager() {
       </ul>
       <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="input flex-1" placeholder="Rótulo (ex.: Nº de patrimônio)" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <input className="input min-w-0 flex-1" placeholder="Rótulo (ex.: Nº de patrimônio)" value={label} onChange={(e) => setLabel(e.target.value)} />
           <select className="input w-auto" value={type} onChange={(e) => setType(e.target.value)}>
             <option value="TEXT">Texto</option>
             <option value="NUMBER">Número</option>

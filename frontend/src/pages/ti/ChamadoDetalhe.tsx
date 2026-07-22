@@ -119,8 +119,10 @@ export default function ChamadoDetalhe() {
     ...t.activities.filter((a) => a.type !== 'COMENTOU').map((a) => ({ kind: 'activity' as const, at: a.createdAt, activity: a })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
+  // Tela de LEITURA: limita a largura mesmo com o módulo em largura cheia,
+  // senão a descrição/timeline esticam demais em monitor grande.
   return (
-    <div className="ti-scope">
+    <div className="ti-scope mx-auto max-w-6xl">
       <Link to="/ti/chamados" className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-sky-600">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
@@ -142,7 +144,7 @@ export default function ChamadoDetalhe() {
         <div className="space-y-6 lg:col-span-2">
           <div className="card p-5">
             <h2 className="mb-2 text-sm font-semibold text-slate-700">Descrição</h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.description}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{t.description}</p>
           </div>
 
           <div className="card p-5">
@@ -178,7 +180,7 @@ export default function ChamadoDetalhe() {
                           </span>
                         )}
                       </div>
-                      <div className={`mt-1 whitespace-pre-wrap rounded-lg border p-3 text-sm ${
+                      <div className={`mt-1 whitespace-pre-wrap break-words rounded-lg border p-3 text-sm ${
                         item.comment.isInternal ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-100 bg-slate-50 text-slate-700'
                       }`}>
                         {item.comment.body}
