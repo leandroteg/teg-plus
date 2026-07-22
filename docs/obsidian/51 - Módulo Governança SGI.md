@@ -3,150 +3,209 @@ title: Módulo Governança / SGI
 type: modulo
 modulo: sgi
 status: ativo
-tags: [sgi, governanca, iso9001, pdca, melhoria-continua, padronizacao, objetivos, missoes, documentos]
+tags: [sgi, governanca, iso9001, pdca, melhoria-continua, padronizacao, objetivos, metas, okr, missoes, documentos]
 criado: 2026-06-26
-atualizado: 2026-06-26
-relacionado: ["[[00 - TEG+ INDEX]]", "[[49 - SuperTEG AI Agent]]", "[[PILAR - RH]]"]
+atualizado: 2026-07-22
+relacionado: ["[[00 - TEG+ INDEX]]", "[[49 - SuperTEG AI Agent]]", "[[31 - Módulo PMO-EGP]]", "[[33 - Módulo SSMA]]", "[[PILAR - RH]]"]
 ---
 
 # Módulo Governança / SGI
 
-> Sistema de Gestão Integrado (SGI) voltado a superar o SGI360. Pilar **Governança** do TEG+ ERP. Accent cor violeta. Fases 1–3 implementadas e em produção.
+> Sistema de Gestão Integrado (SGI) — pilar **Governança** do TEG+, criado para superar o SGI360 (referência: matriz RFP CEMIG QSMS). Accent cor **violeta**. Três disciplinas em produção: **Padronização** (controle documental ISO 9001 com versionamento e aprovação), **Melhoria Contínua** (registros + PDCA + análise de causa + ações) e **Objetivos e Metas** (OKR/farol com check-ins). 100% aditivo.
 
 ---
 
 ## Visão Geral
 
-O módulo SGI organiza a gestão da qualidade e governança corporativa em 4 disciplinas:
+O SGI organiza governança e qualidade em disciplinas que compartilham a mesma espinha (`sgi_acoes` como backbone de ações corretivas):
 
-1. **Padronização** — controle documental ISO 9001 (políticas, processos, procedimentos, formulários)
-2. **Melhoria Contínua** — kanban PDCA + registro de ações
-3. **Objetivos e Metas** — farol de indicadores com check-ins mensais e gatilho de alerta
-4. **(Futuro) Auditoria/Segurança** — reutiliza `sgi_acoes`, não implementado ainda
+1. **Padronização** — documentos ISO 9001 (`sgi_documentos`) com ciclo rascunho→revisão→aprovação→vigente, versionamento e workflow de aprovação. Documentos com `requer_ciencia` viram **Missões** no Portal do colaborador.
+2. **Melhoria Contínua (PDCA)** — captação de **registros/ocorrências** (`sgi_registros`), triagem em NC/registro, **análise de causa** (5 Porquês + Ishikawa 6M), **plano de ação** (`sgi_acoes`) e **verificação de eficácia**.
+3. **Objetivos e Metas** — objetivos anuais (`sgi_objetivos`) desdobrados em metas/KRs (`sgi_metas`) com **check-ins mensais** (`sgi_metas_checkin`) e **farol**.
+
+> `sgi_acoes` é reutilizada por outros módulos (ex.: QSMA grava ações com `origem_tipo` próprio) — é o registro único de ações corretivas do ERP.
 
 ---
 
 ## Estrutura de Rotas
 
+Gate: `<ModuleRoute moduleKey="sgi">`. Layout: `SgiLayout` (accent **violeta**). Dashboard via `ResponsivePainel` (desktop `SgiPainel` / mobile `SgiPainelMobile`).
+
 | Rota | Componente | Descrição |
 |------|-----------|-----------|
-| `/sgi` | `SgiPainel` / `SgiPainelMobile` | Dashboard executivo de metas e indicadores |
-| `/sgi/novo` | `SgiNovoRegistro` | Novo registro de ação / ocorrência |
-| `/sgi/objetivos` | `SgiObjetivos` | Objetivos e Metas com farol |
-| `/sgi/melhoria` | `SgiMelhoriaContinua` | Kanban PDCA de ações |
-| `/sgi/padronizacao` | `SgiPadronizacao` | Gestão documental ISO 9001 |
-
-**Layout:** `SgiLayout` (accent violeta; sidebar com 5 itens acima).
+| `/sgi` | `SgiPainel` / `SgiPainelMobile` | Painel executivo de metas/indicadores |
+| `/sgi/novo` | `SgiNovoRegistro` | Novo **registro/ocorrência** (entrada do PDCA) |
+| `/sgi/objetivos` | `SgiObjetivos` | Objetivos, metas/KRs e check-ins com farol |
+| `/sgi/melhoria` | `SgiMelhoriaContinua` | Board PDCA dos registros + ações |
+| `/sgi/padronizacao` | `SgiPadronizacao` | Controle documental ISO 9001 |
 
 ---
 
-## Tela: Painel (`SgiPainel.tsx`)
+## Disciplina 1 — Padronização (`SgiPadronizacao.tsx`)
 
-Dashboard de metas anuais dividido em 2 blocos lado a lado de igual altura:
+Controle documental ISO 9001 sobre **`sgi_documentos`** (⚠️ **não** `portalteg_documentos`).
 
-### Bloco esquerdo — Resultados Principais (1 linha, 3 cards grandes)
-| Meta | Indicador |
-|------|-----------|
-| Produção | R$ faturado acumulado (fonte: EGP painel) |
-| Lucratividade | Margem líquida % |
-| Acidentes | Nº de acidentes com afastamento |
+**Status (`StatusDocumento`):** `rascunho` → `em_revisao` → `em_aprovacao` → `vigente` → `obsoleto`
+**Tipos (`TipoDocumento`):** `politica` · `procedimento` · `instrucao` (Instrução de Trabalho) · `formulario` · `manual` · `outro`
 
-### Bloco direito — Pessoas & Crescimento (grid 2×2)
-| Meta | Indicador |
-|------|-----------|
-| Produtividade | R$/HH |
-| Novos Contratos | Nº de contratos novos |
-| Turnover | % de desligamentos |
-| Clima | NPS interno |
+**Campos-chave de `sgi_documentos`:** `codigo` (ISO, gerado), `titulo`, `tipo`, `area_processo`, `status`, `versao` (int), `requer_ciencia`, `publico_alvo` (jsonb), `arquivo_url`/`arquivo_nome`, `proxima_revisao` + `periodicidade_revisao_meses`, `vigente_em`, `obsoleto_em`, `comentarios` (jsonb — histórico de rejeições/esclarecimentos).
 
-**Números grandes** (`text-5xl sm:text-6xl`) nos 3 cards do bloco esquerdo; `text-3xl` nos demais.
+**Storage:** bucket **`sgi-documentos`** (`useSgi.ts` → `uploadDocumento` / `createSignedUrl` 1h).
 
-Check-ins de meta são registrados via `sgi_resultados` (um por mês por meta). A aba Produção do EGP é a fonte primária do valor de faturamento para o check-in de Produção.
+**Versionamento e aprovação:**
+- `sgi_documento_versoes` — histórico (versão, arquivo, motivo, quem alterou)
+- `sgi_documento_aprovacoes` — workflow (etapa, `decisao`, responsável, `decidido_em`)
+
+**RPCs:**
+| RPC | Uso |
+|-----|-----|
+| `sgi_proximo_codigo_documento(p_tipo, p_setor)` | Gera o código ISO seguinte por tipo/setor |
+| `sgi_documento_publicar(p_documento_id)` | Torna a versão `vigente` (aposenta a anterior) |
+| `sgi_documento_adesao(p_documento_id)` | Estatística de adesão/ciência do documento |
+
+**Ciência:** documento publicado com `requer_ciencia = true` gera **Missões** no Portal (ver seção Missões).
 
 ---
 
-## Tela: Padronização (`SgiPadronizacao.tsx`)
+## Disciplina 2 — Melhoria Contínua / PDCA
 
-Controle documental no padrão ISO 9001. Abas:
+### Registro (`sgi_registros`) — entrada do fluxo (`SgiNovoRegistro.tsx`)
+Captação de qualquer anomalia, desvio ou oportunidade.
 
-| Aba (status) | Label UI | Conteúdo |
-|-------------|---------|---------|
-| `vigente` | Políticas e Processos | Documentos publicados/vigentes |
-| `rascunho` | Em elaboração | Documentos em rascunho |
-| `obsoleto` | Obsoletos | Histórico |
+| Campo union | Valores |
+|-------------|---------|
+| `tipo` (`TipoRegistro`) | `anomalia` · `falha` · `desvio` · `quase_acidente` · `reclamacao` · `oportunidade` |
+| `origem` (`OrigemRegistro`) | `campo` · `auditoria` · `cliente` · `meta` · `inspecao` · `outro` |
+| `gravidade` (`Gravidade`) | `baixa` · `media` · `alta` · `critica` |
+| `classificacao` (`ClassificacaoRegistro`) | `pendente` · `nc` (não-conformidade) · `registro` · `dispensado` |
+| `status_pdca` (`StatusPdca`) | `pendente` · `analise_causa` · `plano_acao` · `execucao` · `verificacao` · `encerrado` |
 
-**Tipos de documento:**
-- `politica` — Política corporativa
-- `processo` — Processo (macro)
-- `procedimento` — Procedimento operacional (POP/IT)
-- `formulario` — Formulário padrão
-- `instrucao` — Instrução de trabalho
+`codigo` gerado por `sgi_proximo_codigo_registro()`.
 
-**Campos principais de `portalteg_documentos`:**
+### Board PDCA (`SgiMelhoriaContinua.tsx`)
+Colunas (`PDCA_STAGES`): **Pendente → Análise de Causa → Plano de Ação → Verificação e Revisão → Encerrado**.
 
+```mermaid
+flowchart LR
+    P[Pendente] --> AC[Análise\nde Causa]
+    AC --> PA[Plano\nde Ação]
+    PA --> V[Verificação\ne Revisão]
+    V --> E[Encerrado]
+    style P fill:#94A3B8,color:#fff
+    style AC fill:#3B82F6,color:#fff
+    style PA fill:#8B5CF6,color:#fff
+    style V fill:#06B6D4,color:#fff
+    style E fill:#10B981,color:#fff
+```
+
+### Análise de causa (`sgi_analise_causa`)
+Guardada em `conteudo` (jsonb). Dois métodos:
+- **5 Porquês** — `conteudo.porques: string[]`
+- **Ishikawa 6M** — `conteudo.ishikawa`: `metodo`, `maquina`, `mao_obra`, `material`, `medicao`, `meio_ambiente`
+- `causa_raiz` — conclusão textual
+
+### Ações (`sgi_acoes`) — o plano de ação
 | Campo | Descrição |
 |-------|-----------|
-| `codigo` | Código ISO (ex: POL-001, PRO-RH-001) |
-| `titulo` | Título do documento |
-| `tipo` | politica / processo / procedimento / formulario / instrucao |
-| `categoria` | Setor/área (ex: RH, Obras, Financeiro) |
-| `versao` | Número da versão |
-| `status` | vigente / rascunho / obsoleto |
-| `requer_ciencia` | boolean — exige confirmação do colaborador |
-| `arquivo_url` | Link do arquivo (OneDrive / Storage) |
-| `ordem` | Ordenação numérica dentro do tipo+categoria |
+| `origem_tipo` | `registro` · `meta` · `achado_auditoria` · `inspecao` · `avulsa` (+ origens de outros módulos, ex. QSMA) |
+| `origem_id` | FK para o registro/meta de origem |
+| `status` (`StatusAcao`) | `aberta` · `em_execucao` · `concluida` · `cancelada` |
+| `sla_horas`, `escalonado` | SLA e flag de escalonamento |
+| `evidencia_url`, `concluida_em` | Evidência de conclusão |
+| `comentarios` (jsonb) | Thread de comentários (texto, autor, data) |
 
-**Trigger:** `fn_portalteg_docs_unica_versao_ativa` — mantém apenas 1 documento ativo por `(tipo, categoria)`.
+### Verificação de eficácia (`sgi_verificacao`)
+Após a ação: `eficaz` (bool), `evidencia`, quem verificou — fecha o ciclo PDCA.
 
-**Modal de edição:** footer com botão "Abrir documento" (linha própria) + "Publicar/Republicar" e "Fechar" (linha inferior em `flex gap-2`).
+> Backup histórico: `sgi_acoes_bak_okr_t3_20260719` (snapshot do plano de ação OKR do T3/2026 — não é tabela operacional).
 
 ---
 
-## Tela: Objetivos e Metas (`SgiObjetivos.tsx`)
+## Disciplina 3 — Objetivos e Metas (`SgiObjetivos.tsx`)
 
-- Lista de metas anuais com farol de status (verde/amarelo/vermelho)
-- Gatilho automático de alerta quando meta está abaixo do limite
-- Integração com check-ins mensais de `sgi_resultados`
+Modelo em **três níveis** (OKR):
+
+```mermaid
+flowchart TD
+    O["sgi_objetivos\n(objetivo anual)"] --> M["sgi_metas\n(meta / KR)"]
+    M --> C["sgi_metas_checkin\n(check-in mensal + farol)"]
+```
+
+### Objetivo (`sgi_objetivos`)
+`ano`, `titulo`, `area_processo`, `indicador`, `unidade`, `direcao` (`maior_melhor` | `menor_melhor`), `status` (`ativo`/`concluido`/`cancelado`).
+
+### Meta / KR (`sgi_metas`)
+`objetivo_id`, `periodo` (`anual`|`trimestral`) + `trimestre`, `ano`, `alvo` (numérico) **ou** `descricao` (KR textual OKR) + `prazo`.
+- `status_checkin` (`StatusCheckinMeta`): `aberto` · `encerrado` · `cancelado`
+- `status_revisao` (`StatusRevisaoMeta`): `atingida` · `atingida_atraso` · `parcial` · `nao_atingida` · `cancelada`
+- `fonte_auto` (jsonb): configuração de check-in automático
+
+### Check-in (`sgi_metas_checkin`)
+`competencia` (mês), `realizado` (numérico), `farol`, `observacao`.
+
+**Farol (`Farol`):** `verde` (no alvo) · `azul` (entregue **com atraso**) · `amarelo` (atenção) · `vermelho` (crítico) · `cinza` (sem dado).
+
+**RPCs:**
+| RPC | Uso |
+|-----|-----|
+| `sgi_meta_checkin_lancar(p_meta_id, p_competencia, p_realizado, p_observacao)` | Lança/atualiza o check-in do mês (calcula o farol) |
+| `sgi_checkin_auto_egp(p_competencia)` | Check-in **automático** puxando faturamento da aba Produção do EGP |
 
 ---
 
-## Tela: Melhoria Contínua (`SgiMelhoriaContinua.tsx`)
+## Painel (`SgiPainel.tsx`)
 
-- Kanban PDCA: colunas Plan / Do / Check / Act
-- Cada card = uma ação (`sgi_acoes`) com responsável, prazo, status, evidências
-- Ações podem ser originadas de auditorias, não-conformidades ou oportunidades de melhoria
+Dashboard executivo que lê `sgi_objetivos` + `sgi_metas` + `sgi_metas_checkin` (via `useObjetivos` com embed `metas:sgi_metas(*, checkins:sgi_metas_checkin(*))`), mais KPIs de documentos, registros e ações (`useSgiKPIs`). O valor de faturamento do check-in de Produção vem do EGP.
+
+---
+
+## Hooks (`src/hooks/useSgi.ts`)
+
+**Padronização:** `useDocumentos`, `useCriarDocumento`, `useAtualizarDocumento`, `usePublicarDocumento`, `useAdesaoDocumento`, `uploadDocumento`
+**KPIs:** `useSgiKPIs`
+**Registros/PDCA:** `useRegistros`, `useCriarRegistro`, `useAtualizarRegistro`, `useAnaliseCausa`, `useSalvarAnaliseCausa`, `useVerificacao`, `useSalvarVerificacao`
+**Ações:** `useAcoes`, `useCriarAcao`, `useAtualizarAcao`, `useRemoverAcao`, `useComentarAcao`
+**Objetivos/Metas:** `useObjetivos`, `useSgiObjetivoContexto`, `useCriarObjetivo`, `useAtualizarObjetivo`, `useRemoverObjetivo`, `useCriarMeta`, `useAtualizarMeta`, `useRemoverMeta`, `useCheckins`, `useLancarCheckin`
+
+Tipos e label-maps: `src/types/sgi.ts` (unions, `STATUS_DOC_LABEL`, `PDCA_STAGES`, `ISHIKAWA_6M`, `FAROL_CFG`, `STATUS_CHECKIN_CFG`, `STATUS_REVISAO_CFG`).
 
 ---
 
 ## Schema do Banco
 
-Prefixo: `sgi_`
+Prefixo: `sgi_`. Migrations: `20260624000001_sgi_padronizacao`, `20260624000002_sgi_fase2_3_ciencia`, `20260625000001_sgi_metas_descricao_prazo`, `20260625000002_sgi_metas_status_checkin_revisao`. Design: `docs/plans/2026-06-24-modulo-sgi-governanca.md`.
 
 | Tabela | Descrição |
 |--------|-----------|
-| `sgi_objetivos` | Objetivos/metas anuais com título, tipo, unidade, alvo |
-| `sgi_resultados` | Check-ins mensais de resultado por objetivo |
-| `sgi_acoes` | Ações do PDCA (melhoria, auditoria, NC) |
-| `sgi_documentos` | (legado/planejado) — controle documental próprio do SGI |
+| `sgi_documentos` | Documentos ISO 9001 (versão, status, requer_ciencia, próxima revisão) |
+| `sgi_documento_versoes` | Histórico de versões de cada documento |
+| `sgi_documento_aprovacoes` | Workflow de aprovação (etapa/decisão) |
+| `sgi_registros` | Registros/ocorrências (entrada do PDCA) |
+| `sgi_analise_causa` | 5 Porquês / Ishikawa (jsonb) por registro |
+| `sgi_verificacao` | Verificação de eficácia da ação |
+| `sgi_acoes` | Ações corretivas (backbone — compartilhada com outros módulos) |
+| `sgi_objetivos` | Objetivos anuais |
+| `sgi_metas` | Metas/KRs por objetivo (período, alvo, status) |
+| `sgi_metas_checkin` | Check-ins mensais com farol |
 
-**Tabelas compartilhadas:**
+**Storage:** bucket `sgi-documentos`.
 
-| Tabela | Origem | Uso |
-|--------|--------|-----|
-| `portalteg_documentos` | Portal TEG | Documentos publicados (Padronização) |
-| `portalteg_missoes` | Portal TEG | Missões do colaborador (ciência de documentos) |
+**Tabelas do Portal usadas na ciência** (app separado — [[Portal TEG]]):
+| Tabela | Uso |
+|--------|-----|
+| `portalteg_missoes` | Missão de ciência de documento no Portal do colaborador |
+| `portalteg_documentos` | Espelho de documentos publicados para o colaborador baixar |
 
 ---
 
 ## Missões e Ciência de Documentos
 
-Quando um documento é publicado com `requer_ciencia = true`:
-- RPC `portalteg_documentos_lista(p_tipo)` lista documentos por tipo
-- Uma missão é criada em `portalteg_missoes` para cada colaborador elegível
-- O colaborador confirma ciência pelo **Portal TEG** (botão Missões)
-- O SGI acompanha a adesão via painel de missões
+Quando um `sgi_documentos` é publicado com `requer_ciencia = true`:
+1. Uma **missão** (`portalteg_missoes`, `categoria` de ciência) é criada para cada colaborador do `publico_alvo`.
+2. O colaborador confirma no **Portal TEG** (RPCs `portalteg_missao_concluir` / `portalteg_doc_concluir` / `portalteg_documentos_lista`).
+3. O SGI acompanha a adesão via `sgi_documento_adesao(p_documento_id)`.
 
-> Tela de Missões do colaborador no Portal TEG está na branch `claude/musing-perlman` (não mergeada na main ainda).
+> A tela de Missões do colaborador vive no **Portal TEG** (repo separado `leandroteg/portal-teg`) — ver [[Portal TEG]].
 
 ---
 
@@ -154,25 +213,17 @@ Quando um documento é publicado com `requer_ciencia = true`:
 
 | Módulo | Integração |
 |--------|-----------|
-| **Portal TEG** | Missões de ciência de documentos; procedimentos publicados aqui aparecem lá |
-| **EGP/PMO** | Aba Produção do EGP alimenta check-in de meta de Produção do SGI |
-| **RH** | Procedimentos de RH cadastrados na Padronização e espelhados no Portal |
+| **EGP/PMO** | `sgi_checkin_auto_egp` puxa faturamento da aba Produção para o check-in de meta |
+| **QSMA / SSMA** | Grava ações em `sgi_acoes` (origem própria) — backbone único de ações |
+| **Portal TEG** | Missões de ciência (`portalteg_missoes`) e espelho de documentos |
+| **RH** | Procedimentos de RH padronizados como `sgi_documentos` |
 | **Painéis** | `SgiPainel` registrado no hub `/paineis` (pilar Governança) |
-
----
-
-## Procedimentos de RH (Jun/2026)
-
-Procedimentos cadastrados na aba "Políticas e Processos" (tipo `procedimento`, categoria `RH`), numerados e ordenados por setor seguindo ISO 9001:
-
-- Arquivo em `G:\Meu Drive\20_TEG UNIÃO\07 - RH\Procedimentos\v1\`
-- Espelhados no Portal TEG (sem exigir ciência)
-- Ordenação numérica por setor via campo `ordem`
 
 ---
 
 ## Links Relacionados
 
-- [[49 - SuperTEG AI Agent]] — Missões e publicação de documentos via RPC
-- [[PILAR - RH]] — Procedimentos RH padronizados aqui
+- [[49 - SuperTEG AI Agent]] — Publicação de documentos e missões
 - [[31 - Módulo PMO-EGP]] — Fonte do check-in de Produção
+- [[33 - Módulo SSMA]] — Ações corretivas em `sgi_acoes`
+- [[PILAR - RH]] — Procedimentos RH padronizados aqui
