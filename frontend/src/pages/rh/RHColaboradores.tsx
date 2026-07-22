@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/rh/RHColaboradores.tsx — Gestão de Colaboradores (ficha completa + filtros top tier)
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
-  ChevronRight, Calendar, MapPin, Building2, HardHat, BadgeCheck,
+  ChevronRight, ChevronDown, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
   LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle, Hourglass,
 } from 'lucide-react'
@@ -38,6 +38,48 @@ function janelaExperiencia(dataAdmissao?: string | null): { label: string; title
   return null
 }
 const experienciaVencendo = (dataAdmissao?: string | null) => janelaExperiencia(dataAdmissao) !== null
+
+// Campo multi-seleção (popover que abre ao clicar) com "Selecionar todos"
+function MultiSelectField({ options, selected, onChange, isLight, placeholder = 'Todos' }: {
+  options: string[]; selected: string[]; onChange: (v: string[]) => void; isLight: boolean; placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const allSel = selected.length === options.length && options.length > 0
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+  const resumo = selected.length === 0 ? placeholder : allSel ? placeholder : selected.length === 1 ? selected[0] : `${selected.length} selecionados`
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border text-xs ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`}>
+        <span className={`truncate ${selected.length === 0 ? 'text-slate-400' : ''}`}>{resumo}</span>
+        <ChevronDown size={13} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className={`absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border shadow-lg p-1 ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
+          <label className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs font-bold border-b ${isLight ? 'hover:bg-slate-50 text-slate-700 border-slate-100' : 'hover:bg-white/5 text-slate-200 border-slate-700'}`}>
+            <input type="checkbox" className="accent-violet-500" checked={allSel}
+              onChange={e => onChange(e.target.checked ? [...options] : [])} />
+            Selecionar todos
+          </label>
+          {options.length === 0 && <p className="px-2 py-1.5 text-xs text-slate-400">Sem opções</p>}
+          {options.map(o => (
+            <label key={o} className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs ${isLight ? 'hover:bg-slate-50 text-slate-700' : 'hover:bg-white/5 text-slate-200'}`}>
+              <input type="checkbox" className="accent-violet-500" checked={selected.includes(o)} onChange={() => toggle(o)} />
+              {o}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function RHColaboradores() {
   const { isLightSidebar: isLight } = useTheme()
@@ -324,26 +366,8 @@ export default function RHColaboradores() {
             </div>
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Departamento</label>
-              <div className={`rounded-lg border max-h-44 overflow-y-auto p-1 ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-800'}`}>
-                <label className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs font-bold ${isLight ? 'hover:bg-slate-50 text-slate-700 border-b border-slate-100' : 'hover:bg-white/5 text-slate-200 border-b border-slate-700'}`}>
-                  <input type="checkbox" className="accent-violet-500"
-                    checked={(filtros.departamento?.length ?? 0) === departamentos.length && departamentos.length > 0}
-                    onChange={e => setFiltros(f => ({ ...f, departamento: e.target.checked ? [...departamentos] : undefined }))} />
-                  Selecionar todos
-                </label>
-                {departamentos.map(d => (
-                  <label key={d} className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer text-xs ${isLight ? 'hover:bg-slate-50 text-slate-700' : 'hover:bg-white/5 text-slate-200'}`}>
-                    <input type="checkbox" className="accent-violet-500"
-                      checked={filtros.departamento?.includes(d) ?? false}
-                      onChange={() => setFiltros(f => {
-                        const cur = f.departamento ?? []
-                        const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d]
-                        return { ...f, departamento: next.length ? next : undefined }
-                      })} />
-                    {d}
-                  </label>
-                ))}
-              </div>
+              <MultiSelectField options={departamentos} selected={filtros.departamento ?? []} isLight={isLight}
+                onChange={v => setFiltros(f => ({ ...f, departamento: v.length ? v : undefined }))} />
             </div>
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Setor</label>
