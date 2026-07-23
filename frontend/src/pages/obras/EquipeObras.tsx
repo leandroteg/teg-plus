@@ -969,7 +969,8 @@ function ProgramacaoView({
   }, [rows, alocacoesFrota])
 
   const today = new Date()
-  const COL_W = { pessoa: 340, semana: 96 }
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+  const COL_W = { pessoa: isMobile ? 190 : 340, semana: isMobile ? 72 : 96 }
   const leftW = COL_W.pessoa
   const toggle = (id: string) => setMinimizados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -1249,7 +1250,7 @@ function KanbanView({
 
       <div className="flex gap-3 overflow-x-auto pb-3 styled-scrollbar">
         {/* Pool disponiveis */}
-        <div className={`shrink-0 w-[260px] rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        <div className={`shrink-0 w-[80vw] max-w-[280px] lg:w-[260px] rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <p className={`text-[12px] font-extrabold uppercase tracking-wider ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>Disponíveis</p>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{disponiveisFiltrados.length}</span>
@@ -1289,7 +1290,7 @@ function KanbanView({
               key={o.id}
               onDragOver={e => e.preventDefault()}
               onDrop={() => onDrop(o.id)}
-              className={`shrink-0 w-[260px] rounded-2xl border p-3 ${dragColab ? (isDark ? 'bg-orange-500/5 border-orange-500/30' : 'bg-orange-50/40 border-orange-300') : isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}
+              className={`shrink-0 w-[80vw] max-w-[280px] lg:w-[260px] rounded-2xl border p-3 ${dragColab ? (isDark ? 'bg-orange-500/5 border-orange-500/30' : 'bg-orange-50/40 border-orange-300') : isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <p className={`text-[12px] font-extrabold uppercase tracking-wider truncate ${txtMain}`} title={o.nome}>{o.nome}</p>
