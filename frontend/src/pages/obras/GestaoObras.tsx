@@ -18,6 +18,7 @@ import ResumoTecnicoObras from './ResumoTecnicoObras'
 import PriorizacaoObras from './PriorizacaoObras'
 import PlanejamentoTecnico from './PlanejamentoTecnico'
 import { useObrasFiltros, ObrasFiltrosBar } from './obrasFiltros'
+import LancarProjetoModal from './LancarProjetoModal'
 
 const STEPS: FlowStep[] = [
   {
@@ -67,13 +68,17 @@ function GestaoObrasInner() {
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
   const fMed = useObrasFiltros()          // filtros padrão da aba Medições
   const [obraRdoId, setObraRdoId] = useState('')
+  const [lancarProj, setLancarProj] = useState(false)
   const obraRdo = obrasRdo.find(o => o.id === obraRdoId) ?? obrasRdo[0]
 
   useEffect(() => {
-    if (searchParams.get('novo_rdo') !== '1') return
-    setStep('diario'); setNovoRdo(true)
-    // limpa o parâmetro: senão o 2º clique no flyout não muda a URL e o efeito não roda
-    const p = new URLSearchParams(searchParams); p.delete('novo_rdo')
+    const novo = searchParams.get('novo_rdo') === '1'
+    const lancar = searchParams.get('lancar_projeto') === '1'
+    if (!novo && !lancar) return
+    if (novo) { setStep('diario'); setNovoRdo(true) }
+    if (lancar) setLancarProj(true)
+    // limpa os params: senão o 2º clique no flyout não muda a URL e o efeito não roda
+    const p = new URLSearchParams(searchParams); p.delete('novo_rdo'); p.delete('lancar_projeto')
     setSearchParams(p, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -129,6 +134,7 @@ function GestaoObrasInner() {
           </div>
         )}
       </ControladoriaFlow>
+      {lancarProj && <LancarProjetoModal portfolioId={portfolioId} onClose={() => setLancarProj(false)} />}
     </div>
   )
 }
