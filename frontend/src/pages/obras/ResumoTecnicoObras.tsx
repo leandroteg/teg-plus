@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Search, Building2, Ruler, TowerControl, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Search, Building2, Ruler, TowerControl, Loader2, FileBarChart2, X } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { usePortfolios, useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, type EGPOscRow } from '../../hooks/usePMO'
@@ -19,19 +19,32 @@ const fmtBRL = (v?: number | null) => v == null ? '—' : `R$ ${Math.round(v).to
 const fmtNum = (v?: number | null, dec = 0) => v == null || v === 0 ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: dec })
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
-// km de linha por OSC (só seção Lançamento) — 1 query agregada no cliente
-function useKmLinhaPorOsc() {
-  return useQuery<Map<string, number>>({
-    queryKey: ['obr-km-linha-por-osc'],
+// Métricas técnicas por OSC, derivadas dos itens. Cortes validados no dado:
+//  · km linha  = unidade km na seção "Lançamento"  (Transportes = km rodado de veículo, fora)
+//  · aço (t)   = unidade ton na seção "Montagem"   (Descarga de materiais, fora)
+//  · fundação  = unidade m³ na seção "Fundações"   (Grout em Serv. Complementares, fora)
+export interface TecOsc { km: number; aco: number; fund: number }
+const ZERO: TecOsc = { km: 0, aco: 0, fund: 0 }
+
+function useTecnicoPorOsc() {
+  return useQuery<Map<string, TecOsc>>({
+    queryKey: ['obr-tecnico-por-osc'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, secao, unidade, quantidade')
-      const m = new Map<string, number>()
+      const m = new Map<string, TecOsc>()
       if (error) return m
       for (const it of data ?? []) {
-        if (String(it.unidade ?? '').toLowerCase() !== 'km') continue
-        if (!/lan[cç]amento/i.test(String(it.secao ?? ''))) continue
+        const uni = String(it.unidade ?? '').toLowerCase().trim()
+        const sec = String(it.secao ?? '')
+        const q = Number(it.quantidade ?? 0)
+        if (!q) continue
         const k = String(it.fluxo_os_id)
-        m.set(k, (m.get(k) ?? 0) + Number(it.quantidade ?? 0))
+        const cur = m.get(k) ?? { ...ZERO }
+        if (uni === 'km' && /lan[cç]amento/i.test(sec)) cur.km += q
+        else if (uni === 'ton' && /montagem/i.test(sec)) cur.aco += q
+        else if ((uni === 'm³' || uni === 'm3') && /funda[cç]/i.test(sec)) cur.fund += q
+        else { m.set(k, cur); continue }
+        m.set(k, cur)
       }
       return m
     },
@@ -49,7 +62,8 @@ export default function ResumoTecnicoObras() {
   const { data: obras = [], isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
   const { data: projetos = [] } = useProjetos(portfolioId)
-  const { data: kmPorOsc } = useKmLinhaPorOsc()
+  const { data: tecPorOsc } = useTecnicoPorOsc()
+  const [tecObra, setTecObra] = useState<{ nome: string; oscs: EGPOscRow[] } | null>(null)
 
   const [q, setQ] = useState('')
   const [fTipo, setFTipo] = useState('')
@@ -59,7 +73,8 @@ export default function ResumoTecnicoObras() {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [fechados, setFechados] = useState<Set<string>>(new Set())
 
-  const km = (id: string) => kmPorOsc?.get(id) ?? 0
+  const tec = (id: string) => tecPorOsc?.get(id) ?? ZERO
+  const km = (id: string) => tec(id).km
 
   // OSCs por obra, aplicando filtros
   const oscByObra = useMemo(() => {
@@ -222,19 +237,24 @@ export default function ResumoTecnicoObras() {
               const exp = open.has(o.id)
               return (
                 <div key={o.id} className={`rounded-xl ${card} overflow-hidden`}>
-                  <button onClick={() => toggleObra(o.id)} className={`w-full ${GRID} px-3 py-2.5 text-left ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <div onClick={() => toggleObra(o.id)} className={`w-full ${GRID} px-3 py-2.5 text-left cursor-pointer ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                     <span className="flex items-center gap-2 min-w-0">
                       {exp ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
                       <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
                       {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
+                      <button onClick={e => { e.stopPropagation(); setTecObra({ nome: o.nome, oscs: arr }) }}
+                        title="Ver resumo técnico da obra"
+                        className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${isDark ? 'border-sky-500/30 text-sky-300 hover:bg-sky-500/10' : 'border-sky-200 text-sky-700 hover:bg-sky-50'}`}>
+                        <FileBarChart2 size={11} /> Resumo Técnico
+                      </button>
                     </span>
                     <span className={num}>{fmtNum(a.torres)}</span>
                     <span className={num}>{fmtNum(a.km, 1)}</span>
                     <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(a.valor)}</span>
                     <span className={dat}>{fmtData(a.ini)}</span>
                     <span className={dat}>{fmtData(a.fim)}</span>
-                  </button>
+                  </div>
 
                   {exp && (
                     <div className={`pb-1.5 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
@@ -264,6 +284,80 @@ export default function ResumoTecnicoObras() {
       <p className={`text-[10px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
         Torres = quantidade informada na OSC (nem toda OSC tem). Km de linha = itens em km da seção “Lançamento” (não inclui transporte).
       </p>
+
+      {tecObra && <ResumoTecnicoModal nome={tecObra.nome} oscs={tecObra.oscs} tec={tec} onClose={() => setTecObra(null)} isDark={isDark} />}
+    </div>
+  )
+}
+
+// ── Modal: resumo técnico consolidado da obra ────────────────────────────────
+function ResumoTecnicoModal({ nome, oscs, tec, onClose, isDark }: {
+  nome: string; oscs: EGPOscRow[]; tec: (id: string) => TecOsc; onClose: () => void; isDark: boolean
+}) {
+  const t = oscs.reduce((acc, o) => {
+    const x = tec(o.id)
+    return { torres: acc.torres + (o.qtd_torres ?? 0), aco: acc.aco + x.aco, fund: acc.fund + x.fund, km: acc.km + x.km, valor: acc.valor + (o.valor ?? 0) }
+  }, { torres: 0, aco: 0, fund: 0, km: 0, valor: 0 })
+  const acoPorTorre = t.torres > 0 ? t.aco / t.torres : null
+  const escPorTorre = t.torres > 0 ? t.fund / t.torres : null
+
+  const card = isDark ? 'bg-white/[0.03] border-white/[0.08]' : 'bg-slate-50 border-slate-200'
+  const KPI = ({ label, valor, un, nota }: { label: string; valor: string; un?: string; nota?: string }) => (
+    <div className={`rounded-xl border p-3 ${card}`}>
+      <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-2xl font-extrabold leading-none mt-1 ${isDark ? 'text-sky-300' : 'text-[#1a3a5c]'}`}>
+        {valor}{un && <span className="text-[11px] font-bold ml-0.5">{un}</span>}
+      </p>
+      {nota && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{nota}</p>}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className={`w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+        <div className={`flex items-start justify-between gap-3 p-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+          <div className="min-w-0">
+            <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{nome}</h3>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Resumo técnico · {oscs.length} OSC{oscs.length === 1 ? '' : 's'} · {fmtBRL(t.valor)}</p>
+          </div>
+          <button onClick={onClose} className={`p-1 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
+        </div>
+
+        <div className="p-4 overflow-y-auto space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <KPI label="Nº torres / est." valor={fmtNum(t.torres)} un="un" nota={t.aco > 0 ? `${fmtNum(t.aco, 1)} t metálico total` : undefined} />
+            <KPI label="Aço metálico total" valor={fmtNum(t.aco, 1)} un="t" nota="itens em ton · Montagem" />
+            <KPI label="Volume fundação" valor={fmtNum(t.fund, 0)} un="m³" nota="itens em m³ · Fundações" />
+            <KPI label="Aço médio/torre" valor={acoPorTorre ? acoPorTorre.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—'} un={acoPorTorre ? 't/un' : ''} nota={acoPorTorre ? `${fmtNum(t.aco, 1)} t ÷ ${t.torres}` : 'sem torres informadas'} />
+            <KPI label="Escavação média/torre" valor={escPorTorre ? escPorTorre.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—'} un={escPorTorre ? 'm³/un' : ''} nota={escPorTorre ? 'referência unitária' : 'sem torres informadas'} />
+            <KPI label="Lançamento de cabos" valor={fmtNum(t.km, 2)} un="km" nota="seção Lançamento" />
+          </div>
+
+          {/* OSCs da obra */}
+          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <div className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-[#1a3a5c] text-white'}`}>
+              <span>OSCs — Ordens de Serviço de Construção</span><span>Torres</span>
+            </div>
+            {oscs.map(o => (
+              <div key={o.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-800'}`}>{o.numero_os}</span>
+                <span className={`flex-1 truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{o.tipo_servico ?? o.tipo ?? '—'}</span>
+                <span className={`tabular-nums font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtNum(o.qtd_torres)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Projetos Técnicos (OneDrive) — pendente do vínculo da pasta */}
+          <div className={`rounded-xl border border-dashed p-4 text-center ${isDark ? 'border-white/[0.12] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
+            <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Projetos Técnicos (OneDrive)</p>
+            <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Vai listar os arquivos de “Características do Projeto” / “Característica da Linha” da pasta da obra.
+              Aguardando o vínculo da pasta em <span className="font-mono">TEG - OBRAS</span>.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
