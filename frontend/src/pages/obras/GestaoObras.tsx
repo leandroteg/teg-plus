@@ -10,6 +10,7 @@ import { FileBarChart2, ListOrdered, CalendarRange, ClipboardList, Ruler, Constr
 import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import RDO from './RDO'
+import ResumoTecnicoObras from './ResumoTecnicoObras'
 
 const STEPS: FlowStep[] = [
   {
@@ -66,7 +67,9 @@ export default function GestaoObras() {
         activeStep={step}
         onStepChange={setStep}
       >
-        {step === 'diario' ? (
+        {step === 'resumo_tecnico' ? (
+          <ResumoTecnicoObras />
+        ) : step === 'diario' ? (
           /* Tela existente de RDO carregada dentro da aba (arquivo intocado) */
           <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
             <RDO />
