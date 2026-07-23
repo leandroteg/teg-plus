@@ -231,8 +231,9 @@ function CorpoAbertura({ os, veiculo, isDark, onClose }: {
   const [foto, setFoto] = useState(os.foto_antes_url)
   const [erro, setErro] = useState<string>()
 
-  // Política SUP-PRO-001: corretiva exige foto + parecer.
-  const exigeEvidencia = os.tipo === 'corretiva' || os.tipo === 'sinistro'
+  // A SUP-PRO-001 exige foto + parecer na corretiva; aqui vale para TODO tipo.
+  // A abertura fica idêntica em preventiva, corretiva, sinistro e revisão: quem
+  // vai cotar precisa da mesma evidência, e o histórico não fica capenga por tipo.
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const inp = `w-full rounded-lg border px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
@@ -243,8 +244,8 @@ function CorpoAbertura({ os, veiculo, isDark, onClose }: {
   async function enviarParaCotacao() {
     setErro(undefined)
     if (!problema.trim()) return setErro('Descreva o problema.')
-    if (exigeEvidencia && !parecer.trim()) return setErro('Parecer técnico é obrigatório na corretiva (SUP-PRO-001).')
-    if (exigeEvidencia && !foto) return setErro('Foto do problema é obrigatória na corretiva (SUP-PRO-001).')
+    if (!parecer.trim()) return setErro('Parecer técnico é obrigatório para enviar à cotação.')
+    if (!foto) return setErro('Foto do problema é obrigatória para enviar à cotação.')
 
     await atualizar.mutateAsync({
       id: os.id,
@@ -298,7 +299,7 @@ function CorpoAbertura({ os, veiculo, isDark, onClose }: {
           </div>
           <div>
             <label className={lbl}>
-              Parecer técnico {exigeEvidencia && <span className="text-rose-500">*</span>}
+              Parecer técnico <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={2} value={parecer} onChange={e => setParecer(e.target.value)}
@@ -316,7 +317,7 @@ function CorpoAbertura({ os, veiculo, isDark, onClose }: {
         </div>
       </Secao>
 
-      <Secao titulo={`Foto do problema${exigeEvidencia ? ' *' : ''}`} isDark={isDark}>
+      <Secao titulo="Foto do problema *" isDark={isDark}>
         {foto ? (
           <div className="flex items-center gap-3">
             <a href={foto} target="_blank" rel="noopener noreferrer"
