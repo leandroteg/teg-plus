@@ -13,6 +13,7 @@ import RdoPdfModal from '../../components/obras/RdoPdfModal'
 import RDOEstruturado from './RDOEstruturado'
 import type { RdoReportRow } from '../../utils/rdo-report-html'
 import { buildRdoReportHtml } from '../../utils/rdo-report-html'
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
@@ -147,10 +148,12 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
     try {
       for (const r of selVisiveis) {
         const html = await buildRdoReportHtml({ id: r.id, obra_id: r.obra_id, obra_nome: r.obra?.nome ?? '—', data: r.data })
-        await supabase.functions.invoke('send-ti-email', {
-          body: { to: dest.split(',').map(s2 => s2.trim()).filter(Boolean),
-            subject: `RDO ${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`, html },
+        const resp = await fetch(`${N8N_BASE}/rdo-enviar-email`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ para: dest,
+            assunto: `RDO ${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`, html }),
         })
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       }
       setSel(new Set()); setEmailOpen(false); setEmailDest('')
       setAviso(`RDO(s) enviado(s) para ${dest}.`); setTimeout(() => setAviso(null), 4000)
