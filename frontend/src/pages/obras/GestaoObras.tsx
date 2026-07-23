@@ -4,7 +4,8 @@
 // · Diário de Obra · Medições. Estrutura criada; o conteúdo de cada aba entra
 // em seguida.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileBarChart2, ListOrdered, CalendarRange, ClipboardList, Ruler, Construction } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
@@ -47,7 +48,14 @@ export default function GestaoObras() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const [step, setStep] = useState('resumo_tecnico')
+  const [searchParams] = useSearchParams()
   const atual = STEPS.find(s => s.key === step) ?? STEPS[0]
+
+  // Veio do flyout "Novo Registro › Registrar RDO": abre direto na aba Diário
+  // (a própria tela de RDO consome o parâmetro e abre o modal).
+  useEffect(() => {
+    if (searchParams.get('novo_rdo') === '1') setStep('diario')
+  }, [searchParams])
 
   return (
     <div className="p-4 sm:p-6">
