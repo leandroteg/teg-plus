@@ -152,7 +152,10 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
         const resp = await fetch(`${N8N_BASE}/rdo-enviar-email`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ para: dest,
-            assunto: `RDO ${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`, html }),
+            // o n8n renderiza o HTML em PDF e ANEXA (assunto ganha o prefixo [SuperTEG - RDO] lá)
+            assunto: `${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+            arquivo: `RDO_${(r.obra?.nome ?? 'obra').split(/[\s-]/)[0]}_${r.data.replace(/-/g, '')}`,
+            html }),
         })
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       }
