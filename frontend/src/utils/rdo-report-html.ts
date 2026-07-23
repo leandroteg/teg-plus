@@ -194,10 +194,8 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   .foto img{width:100%;height:130px;object-fit:cover;display:block}
   .foto figcaption{font-size:10px;color:#64748b;padding:5px 7px}
   footer{padding:14px 28px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between}
-  .printbtn{position:fixed;top:14px;right:14px;background:#0d9488;color:#fff;border:0;border-radius:9px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25)}
   @media print{
     body{background:#fff}
-    .printbtn{display:none}
     @page{size:A4;margin:8mm 0 10mm}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .foto{break-inside:avoid}
@@ -205,7 +203,6 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   }
 </style></head>
 <body>
-<button class="printbtn" onclick="window.print()">Salvar PDF / Imprimir</button>
 <div class="page">
   <header>
     <div><img src="${logoUrl}" onerror="this.style.display='none'"/>
