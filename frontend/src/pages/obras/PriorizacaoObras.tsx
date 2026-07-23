@@ -184,7 +184,7 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
   return (
     <div className="space-y-3">
       {/* Filtros (mesmos do Resumo Técnico) */}
-      <div className={`rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
+      <div className={`relative z-50 rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
         <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{linhas.length} obras</span>
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
