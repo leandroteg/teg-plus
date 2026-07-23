@@ -18,9 +18,10 @@ import {
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
-  useCotacoesOS, useSalvarCotacao, useFornecedoresFrotas,
+  useCotacoesOS, useSalvarCotacao, useFornecedoresOS,
   useProgramarEntradaOS, useLiberarOS, useAlocacoes, useVeiculos, useChecklists,
 } from '../../../hooks/useFrotas'
+import FornecedorPicker from './FornecedorPicker'
 import ItensOSEditor, { type ItemEdit } from './ItensOSEditor'
 import type { FroOrdemServico, FroVeiculo, StatusOS, TipoOS, PrioridadeOS } from '../../../types/frotas'
 
@@ -370,7 +371,6 @@ function CorpoCotacao({ os, isDark, onClose }: {
   const { data: itensSalvos = [] } = useItensOS(os.id)
   const { data: precoHist } = useHistoricoPrecoItens()
   const { data: cotacoes = [] } = useCotacoesOS(os.id)
-  const { data: fornecedores = [] } = useFornecedoresFrotas()
   const salvarItens = useSalvarItensOS()
   const salvarCotacao = useSalvarCotacao()
   const atualizar = useAtualizarOS()
@@ -472,7 +472,7 @@ function CorpoCotacao({ os, isDark, onClose }: {
               )}
             </div>
           ))}
-          <NovaCotacao osId={os.id} fornecedores={fornecedores} isDark={isDark} onSalvar={salvarCotacao} />
+          <NovaCotacao osId={os.id} isDark={isDark} onSalvar={salvarCotacao} />
           {cotacoes.length < 2 && (
             <div className="pt-1">
               <label className={lbl}>Justificativa para seguir com menos de 2 orçamentos *</label>
@@ -491,20 +491,21 @@ function CorpoCotacao({ os, isDark, onClose }: {
         <ItensOSEditor itens={itens} onChange={setItens} isDark={isDark} precoHist={precoHist} />
       </Secao>
 
-      <Secao titulo="Oficina e agenda" isDark={isDark}>
-        <div className="grid grid-cols-2 gap-3">
+      <Secao titulo="Fornecedor e agenda" isDark={isDark}>
+        <div className="space-y-3">
           <div>
-            <label className={lbl}>Oficina (credenciada)</label>
-            <select value={fornecedorId} onChange={e => setFornecedorId(e.target.value)} className={inp}>
-              <option value="">Selecione...</option>
-              {fornecedores.map(f => (
-                <option key={f.id} value={f.id}>{f.nome_fantasia ?? f.razao_social}</option>
-              ))}
-            </select>
+            <label className={lbl}>Fornecedor (oficina, autopeças, distribuidora…)</label>
+            <FornecedorPicker
+              valorId={fornecedorId}
+              valorNome={os.fornecedor?.nome_fantasia ?? os.fornecedor?.razao_social}
+              onChange={f => setFornecedorId(f?.id ?? '')}
+              isDark={isDark}
+            />
           </div>
           <div>
             <label className={lbl}>Entrada prevista</label>
-            <input type="date" value={dataEntrada} onChange={e => setDataEntrada(e.target.value)} className={inp} />
+            <input type="date" value={dataEntrada} onChange={e => setDataEntrada(e.target.value)}
+              className={`${inp} max-w-[180px]`} />
           </div>
         </div>
       </Secao>
@@ -525,9 +526,8 @@ function CorpoCotacao({ os, isDark, onClose }: {
   )
 }
 
-function NovaCotacao({ osId, fornecedores, isDark, onSalvar }: {
+function NovaCotacao({ osId, isDark, onSalvar }: {
   osId: string
-  fornecedores: { id: string; razao_social: string; nome_fantasia?: string }[]
   isDark: boolean
   onSalvar: ReturnType<typeof useSalvarCotacao>
 }) {
@@ -556,10 +556,8 @@ function NovaCotacao({ osId, fornecedores, isDark, onSalvar }: {
 
   return (
     <div className={`rounded-lg border p-2.5 space-y-2 ${isDark ? 'border-white/[0.1]' : 'border-slate-200'}`}>
-      <select value={forn} onChange={e => setForn(e.target.value)} className={`${inp} w-full`}>
-        <option value="">Oficina...</option>
-        {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia ?? f.razao_social}</option>)}
-      </select>
+      <FornecedorPicker valorId={forn} onChange={f => setForn(f?.id ?? '')} isDark={isDark}
+        placeholder="Buscar fornecedor do orçamento..." />
       <div className="flex gap-2">
         <input type="number" placeholder="Valor R$" value={valor} onChange={e => setValor(e.target.value)} className={`${inp} flex-1`} />
         <input type="number" placeholder="Prazo (d)" value={prazo} onChange={e => setPrazo(e.target.value)} className={`${inp} w-[100px]`} />
