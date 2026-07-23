@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt, ScrollText, BarChart3 } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -541,10 +541,13 @@ export default function ModuleLayout({
                   return
                 }
                 const rect = event.currentTarget.getBoundingClientRect()
-                // sobe o menu o suficiente p/ sobrar espaço; o resto scrolla internamente
+                // Altura estimada pelo nº de itens (cada item tem título + descrição).
+                // Se não couber ancorado no botão, o painel SOBE até caber; só depois
+                // é que o excedente rola internamente (evita cortar item em tela baixa).
+                const estH = actionMenu.items.length * 76 + (actionMenu.title ? 44 : 0) + 16
                 setOpenNavMenu({
                   id: to,
-                  top: Math.max(12, Math.min(rect.top, window.innerHeight - 340)),
+                  top: Math.max(12, Math.min(rect.top, window.innerHeight - estH - 12)),
                   left: rect.right + 12,
                 })
               }}
@@ -924,24 +927,6 @@ export default function ModuleLayout({
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/logs') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <ScrollText size={15} className="shrink-0 opacity-50" />
-                Logs de Auditoria
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/uso-modulos') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <BarChart3 size={15} className="shrink-0 opacity-50" />
-                Uso dos Módulos
               </button>
             </>
           )}
