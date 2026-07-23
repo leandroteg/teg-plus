@@ -323,7 +323,7 @@ export default function OSAbertas() {
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [viewMode, setViewMode] = useState<ViewMode>('quadro')
 
   const { data: ordens = [], isLoading } = useOrdensServico()
   const { data: veiculosAll = [] } = useVeiculos()
@@ -457,26 +457,39 @@ export default function OSAbertas() {
           <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
           <button onClick={() => setViewMode('quadro')} title="Quadro" className={`p-1.5 ${viewMode === 'quadro' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><Columns3 size={14} /></button>
         </div>
-        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{activeItems.length} item(s)</span>
+        {/* No quadro o contador é do board inteiro; nas outras visões, da aba ativa. */}
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {viewMode === 'quadro'
+            ? [...quadroGrouped.values()].reduce((s, l) => s + l.length, 0)
+            : activeItems.length} item(s)
+        </span>
       </div>
 
       {/* Content */}
       <div className="min-h-[200px]">
         {viewMode === 'quadro' ? (
-          <div className="flex gap-3 p-4 overflow-x-auto">
+          // Colunas com altura de tela: o quadro não "encolhe" quando uma etapa
+          // está vazia, e cada coluna rola por dentro em vez de esticar a página.
+          <div className="flex gap-3 p-4 overflow-x-auto h-[calc(100vh-300px)] min-h-[420px]">
             {STAGES.map(stage => {
               const items = quadroGrouped.get(stage.key) || []
               const a = isDark ? STAGE_ACCENT_DARK[stage.key] : STAGE_ACCENT[stage.key]
               const Icon = stage.icon
               return (
-                <div key={stage.key} className="min-w-[264px] w-[264px] shrink-0">
-                  <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl mb-2 text-xs font-bold border ${a.bgActive} ${a.textActive} ${a.border}`}>
+                <div key={stage.key} className="min-w-[264px] w-[264px] shrink-0 flex flex-col h-full">
+                  <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl mb-2 text-xs font-bold border shrink-0 ${a.bgActive} ${a.textActive} ${a.border}`}>
                     <Icon size={14} className="shrink-0" /> {stage.label}
                     <span className={`ml-auto text-[10px] font-bold rounded-full min-w-[20px] px-1.5 py-0.5 ${a.badge}`}>{items.length}</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className={`flex-1 min-h-0 overflow-y-auto hide-scrollbar rounded-xl border border-dashed p-2 space-y-2 ${
+                    isDark ? 'border-white/[0.06] bg-white/[0.015]' : 'border-slate-200 bg-slate-50/50'
+                  }`}>
                     {items.map(os => <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}
-                    {items.length === 0 && <p className={`text-[11px] text-center py-6 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</p>}
+                    {items.length === 0 && (
+                      <div className={`h-full flex items-center justify-center text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+                        Nenhuma OS
+                      </div>
+                    )}
                   </div>
                 </div>
               )
