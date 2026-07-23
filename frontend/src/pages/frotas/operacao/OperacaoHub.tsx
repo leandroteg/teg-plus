@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CalendarDays, Fuel, AlertCircle, Radio } from 'lucide-react'
+import { CalendarDays, Fuel, AlertCircle, Radio, LayoutDashboard } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
+import ControleFrota from './ControleFrota'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
@@ -11,9 +12,10 @@ import TelemetriaLogistica from '../../logistica/TelemetriaLogistica'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'agenda' | 'telemetria' | 'abastecimentos' | 'multas'
+type TabKey = 'controle' | 'agenda' | 'telemetria' | 'abastecimentos' | 'multas'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: 'controle',        label: 'Controle'          },
   { key: 'agenda',          label: 'Agenda'            },
   { key: 'telemetria',      label: 'Telemetria'        },
   { key: 'abastecimentos',  label: 'Abastecimentos'    },
@@ -21,6 +23,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
+  controle:       LayoutDashboard,
   agenda:         CalendarDays,
   telemetria:     Radio,
   abastecimentos: Fuel,
@@ -30,6 +33,11 @@ const TAB_ICONS: Record<TabKey, React.ElementType> = {
 const TAB_ACCENT: Record<TabKey, {
   bg: string; bgActive: string; text: string; textActive: string; border: string
 }> = {
+  controle: {
+    bg: 'hover:bg-rose-50',      bgActive: 'bg-rose-50',
+    text: 'text-rose-600',       textActive: 'text-rose-800',
+    border: 'border-rose-500',
+  },
   agenda: {
     bg: 'hover:bg-sky-50',       bgActive: 'bg-sky-50',
     text: 'text-sky-600',        textActive: 'text-sky-800',
@@ -55,6 +63,11 @@ const TAB_ACCENT: Record<TabKey, {
 const TAB_ACCENT_DARK: Record<TabKey, {
   bg: string; bgActive: string; text: string; textActive: string; border: string
 }> = {
+  controle: {
+    bg: 'hover:bg-rose-500/10',    bgActive: 'bg-rose-500/15',
+    text: 'text-rose-400',         textActive: 'text-rose-200',
+    border: 'border-rose-500/40',
+  },
   agenda: {
     bg: 'hover:bg-sky-500/10',     bgActive: 'bg-sky-500/15',
     text: 'text-sky-400',          textActive: 'text-sky-200',
@@ -78,6 +91,7 @@ const TAB_ACCENT_DARK: Record<TabKey, {
 }
 
 const COMPS: Record<TabKey, React.ComponentType> = {
+  controle:       ControleFrota,
   agenda:         AgendaAlocacao,
   // Mesma tela da Logistica, sem o cabeçalho dela (a aba já nomeia).
   telemetria:     () => <TelemetriaLogistica hideHeader />,
@@ -88,7 +102,7 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function OperacaoHub() {
-  const [active, setActive] = useState<TabKey>('agenda')
+  const [active, setActive] = useState<TabKey>('controle')
 
   // "Registro Alocação" (menu lateral) cai aqui com ?novaAlocacao=1 — precisa
   // garantir a aba Agenda, senão o modal abriria numa aba que não o renderiza.
@@ -100,6 +114,7 @@ export default function OperacaoHub() {
   const { data: abastecimentos = [] } = useAbastecimentos()
   const { data: ocorrencias = [] } = useOcorrenciasTel()
   const counts: Record<TabKey, number> = {
+    controle: 0,
     agenda: 0,
     telemetria: 0,
     abastecimentos: abastecimentos.length,
