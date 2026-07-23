@@ -93,9 +93,24 @@ function useVeiculosAtivos() {
 export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObraChange }: {
   obraId: string; obraNome: string; onClose: () => void
   /** lista p/ trocar a obra sem sair do modal (opcional) */
-  obras?: { id: string; nome: string }[]
+  obras?: { id: string; nome: string; projeto_id: string | null; projeto_nome: string }[]
   onObraChange?: (id: string) => void
 }) {
+  // Projeto filtra a obra — escolher a frente primeiro encurta muito a lista
+  const [projSel, setProjSel] = useState('')
+  const projetosOpts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const o of obras ?? []) if (o.projeto_id) m.set(o.projeto_id, o.projeto_nome)
+    return [...m].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [obras])
+  const obrasOpts = useMemo(
+    () => (obras ?? []).filter(o => !projSel || o.projeto_id === projSel),
+    [obras, projSel],
+  )
+  // obra atual saiu do filtro → cai na primeira do projeto escolhido
+  useEffect(() => {
+    if (projSel && obrasOpts.length && !obrasOpts.some(o => o.id === obraId)) onObraChange?.(obrasOpts[0].id)
+  }, [projSel, obrasOpts, obraId, onObraChange])
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
@@ -235,10 +250,17 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             <div className="flex items-center gap-2 min-w-0">
               <h3 className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra —</h3>
               {obras?.length && onObraChange ? (
-                <select value={obraId} onChange={e => onObraChange(e.target.value)}
-                  className={`min-w-0 max-w-[420px] truncate rounded-lg px-2 py-1 border text-sm font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
-                  {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                </select>
+                <>
+                  <select value={projSel} onChange={e => setProjSel(e.target.value)}
+                    className={`shrink-0 max-w-[190px] truncate rounded-lg px-2 py-1 border text-sm font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <option value="">Todos os projetos</option>
+                    {projetosOpts.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                  <select value={obraId} onChange={e => onObraChange(e.target.value)}
+                    className={`min-w-0 max-w-[420px] truncate rounded-lg px-2 py-1 border text-sm font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                    {obrasOpts.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </select>
+                </>
               ) : (
                 <span className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{obraNome}</span>
               )}
