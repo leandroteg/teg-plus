@@ -68,7 +68,9 @@ function getStepComponent(step: string) {
   }
 }
 
-export default function TelemetriaLogistica() {
+/** `hideHeader` é usado quando a tela é embutida no hub de Operação (Frotas),
+ *  que já tem a aba "Telemetria" nomeando a tela. */
+export default function TelemetriaLogistica({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeStep = useMemo(() => {
     const etapa = searchParams.get('etapa')
@@ -79,6 +81,7 @@ export default function TelemetriaLogistica() {
     <ControladoriaFlow
       title="Telemetria"
       subtitle="Rastreamento em tempo real, alertas e indicadores de utilização da frota."
+      hideHeader={hideHeader}
       steps={STEPS}
       activeStep={activeStep}
       onStepChange={(step) => setSearchParams({ etapa: step })}
