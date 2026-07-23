@@ -332,9 +332,9 @@ export default function PlanejamentoEquipe() {
 
       {/* Create / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
+          <div className={`relative w-full max-w-lg max-h-[92vh] lg:max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
             ? 'bg-white border-slate-200'
             : 'bg-[#1e293b] border-white/[0.06]'
           }`}>
