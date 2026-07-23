@@ -27,6 +27,8 @@ interface ControladoriaFlowProps {
   badge?: string
   /** conteúdo opcional à direita do título (ex.: seletor de contrato) */
   headerRight?: ReactNode
+  /** Esconde título/subtítulo quando a tela é embutida num hub que já a nomeia. */
+  hideHeader?: boolean
 }
 
 export default function ControladoriaFlow({
@@ -38,28 +40,33 @@ export default function ControladoriaFlow({
   children,
   badge,
   headerRight,
+  hideHeader = false,
 }: ControladoriaFlowProps) {
   const { isLightSidebar: isLight } = useTheme()
   const currentStep = steps.find(step => step.key === activeStep) ?? steps[0]
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{title}</h1>
-            {badge && (
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
-                isLight ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
-              }`}>
-                {badge}
-              </span>
-            )}
+    <div className={hideHeader ? 'space-y-3' : 'space-y-5'}>
+      {!hideHeader && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{title}</h1>
+              {badge && (
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                  isLight ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
+                }`}>
+                  {badge}
+                </span>
+              )}
+            </div>
+            <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</p>
           </div>
-          <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</p>
+          {headerRight && <div className="shrink-0">{headerRight}</div>}
         </div>
-        {headerRight && <div className="shrink-0">{headerRight}</div>}
-      </div>
+      )}
+      {/* headerRight ainda precisa aparecer quando o cabeçalho está oculto */}
+      {hideHeader && headerRight && <div className="flex justify-end">{headerRight}</div>}
 
       <div className={`flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar ${
         isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
