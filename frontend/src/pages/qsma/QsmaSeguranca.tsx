@@ -272,42 +272,9 @@ export default function QsmaSeguranca() {
         if (subRisco === 'documentos') return <DocumentosSST subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />
         if (subRisco === 'matriz') return <MatrizRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
         return (
-        <div className="space-y-3">
-          <QsmaToolbar
-            isDark={isDark}
-            contagem={`${riscosF.length} risco${riscosF.length !== 1 ? 's' : ''}`}
-            busca={busca} onBusca={setBusca} placeholder="Buscar perigo, risco, tarefa…"
-            acoes={<BotaoNovo label="Novo Risco / APR" onClick={() => setModalRisco('novo')} />}
-          >
-            {subTabsRisco}
-            <ToolbarPills
-              isDark={isDark} value={escopoF} onChange={setEscopoF}
-              options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]}
-            />
-          </QsmaToolbar>
-          {riscosF.length === 0 ? (
-            <Vazio isDark={isDark} texto="Nenhum risco cadastrado — comece pelo inventário PGR ou uma APR" />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {riscosF.map(r => {
-                const nv = nivelRisco(r.probabilidade, r.severidade)
-                return (
-                  <button key={r.id} onClick={() => setModalRisco(r)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[10px] font-mono font-bold ${txtMuted}`}>{r.codigo} · {r.escopo.toUpperCase()}</span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: nv.cor }}>
-                        {nv.label} ({nv.valor})
-                      </span>
-                    </div>
-                    <p className={`text-sm font-bold ${txtMain}`}>{r.perigo}</p>
-                    <p className={`text-[11px] ${txtMuted}`}>{r.risco}</p>
-                    <p className={`text-[10px] mt-1 ${txtMuted}`}>{[(r as any).grupo, r.tarefa, r.ghe, r.obra_id ? obraNome(r.obra_id) : null].filter(Boolean).join(' · ')}</p>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+          <CatalogoRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+            riscos={riscosF} busca={busca} onBusca={setBusca} escopoF={escopoF} onEscopo={setEscopoF}
+            onNovo={() => setModalRisco('novo')} onAbrir={r => setModalRisco(r)} obraNome={obraNome} />
         )
       })()}
 
@@ -594,19 +561,50 @@ export default function QsmaSeguranca() {
   )
 }
 
-// ── Riscos › Documentos (PGR / PCMSO / LTCAT) — com semáforo de validade ─────
+// ── Riscos: header padrão (caixa com borda, subTabs SEMPRE primeiro) ────────
+function HdrRisco({ isDark, subTabs, children }: { isDark: boolean; subTabs?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {subTabs}
+      {children}
+    </div>
+  )
+}
+function VistaToggle({ isDark, vista, onVista }: { isDark: boolean; vista: 'lista' | 'cards'; onVista: (v: 'lista' | 'cards') => void }) {
+  return (
+    <div className={`inline-flex rounded-xl border overflow-hidden shrink-0 ml-auto ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+      {([['lista', LayoutList, 'Lista'], ['cards', LayoutGrid, 'Cards']] as const).map(([v, Ic, tt]) => (
+        <button key={v} onClick={() => onVista(v)} title={tt}
+          className={`px-2.5 py-2 transition-all ${vista === v
+            ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+            : isDark ? 'text-slate-400 hover:bg-white/[0.05]' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+          <Ic size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+const buscaCls = (isDark: boolean) =>
+  `flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[180px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`
+const thCls = (isDark: boolean) => `${isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}`
+const selCls2 = (isDark: boolean) =>
+  `text-[11px] rounded-lg px-2 py-1 border ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
+
+// ── Riscos › Documentos (PGR / PCMSO / LTCAT) — Lista/Cards + semáforo ──────
 function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
 }) {
   const { data: docs = [], isLoading } = useSstDocumentos()
   const salvar = useSalvarSstDocumento()
+  const [vista, setVista] = useState<'lista' | 'cards'>('lista')
+  const [busca, setBusca] = useState('')
   const hoje = new Date()
   const info = (d: SstDocumento) => {
-    if (!d.data_validade) return { txt: 'sem validade', cor: 'slate', dias: null as number | null }
+    if (!d.data_validade) return { txt: 'sem validade', cor: 'slate' }
     const dias = Math.ceil((new Date(d.data_validade + 'T12:00:00').getTime() - hoje.getTime()) / 864e5)
-    if (dias < 0) return { txt: `vencido há ${-dias}d`, cor: 'red', dias }
-    if (dias <= 90) return { txt: `vence em ${dias}d`, cor: 'amber', dias }
-    return { txt: `válido · ${dias}d`, cor: 'emerald', dias }
+    if (dias < 0) return { txt: `vencido há ${-dias}d`, cor: 'red' }
+    if (dias <= 90) return { txt: `vence em ${dias}d`, cor: 'amber' }
+    return { txt: `válido · ${dias}d`, cor: 'emerald' }
   }
   const CORES: Record<string, string> = {
     red: isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-700',
@@ -614,17 +612,62 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
     emerald: isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700',
     slate: isDark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600',
   }
+  const q = busca.trim().toLowerCase()
+  const lista = docs.filter(d => !q || d.titulo.toLowerCase().includes(q) || (d.tipo || '').includes(q))
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        {subTabs}
-        <span className={`text-xs ${txtMuted}`}>{docs.length} documento(s) — a validade alimenta o vencimento das APRs e OS</span>
-      </div>
+      <HdrRisco isDark={isDark} subTabs={subTabs}>
+        <div className={buscaCls(isDark)}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar documento…"
+            className={`bg-transparent outline-none w-full ${isDark ? 'text-slate-200' : 'text-slate-700'}`} />
+        </div>
+        <span className={`text-xs ${txtMuted}`}>{lista.length} documento(s)</span>
+        <VistaToggle isDark={isDark} vista={vista} onVista={setVista} />
+      </HdrRisco>
+
       {isLoading ? <p className={`text-xs ${txtMuted}`}>carregando…</p>
-        : docs.length === 0 ? <Vazio isDark={isDark} texto="Nenhum documento de SST cadastrado" />
-        : (
+        : lista.length === 0 ? <Vazio isDark={isDark} texto="Nenhum documento de SST cadastrado" />
+        : vista === 'lista' ? (
+        <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full min-w-[880px] text-sm">
+            <thead>
+              <tr className={thCls(isDark)}>
+                {['TIPO', 'DOCUMENTO', 'REVISÃO', 'EMISSÃO', 'DT. REVISÃO', 'VALIDADE', 'SITUAÇÃO', 'VIGÊNCIA'].map(h => (
+                  <th key={h} className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(d => {
+                const i = info(d)
+                return (
+                  <tr key={d.id} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100'}>
+                    <td className={`px-3 py-3 font-mono font-bold uppercase text-[13px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{d.tipo}</td>
+                    <td className={`px-3 py-3 font-semibold ${txtMain}`}>{d.titulo}
+                      <span className={`block text-[11px] font-normal ${txtMuted}`}>{[d.unidade, d.grau_risco ? `GR ${d.grau_risco}` : null].filter(Boolean).join(' · ')}</span>
+                    </td>
+                    <td className={`px-3 py-3 whitespace-nowrap ${txtMuted}`}>{d.revisao ?? '—'}</td>
+                    <td className={`px-3 py-3 tabular-nums whitespace-nowrap ${txtMuted}`}>{fmtData(d.data_emissao)}</td>
+                    <td className={`px-3 py-3 tabular-nums whitespace-nowrap ${txtMuted}`}>{fmtData(d.data_revisao)}</td>
+                    <td className={`px-3 py-3 tabular-nums whitespace-nowrap font-bold ${i.cor === 'red' ? 'text-red-500' : i.cor === 'amber' ? 'text-amber-500' : txtMain}`}>{fmtData(d.data_validade)}</td>
+                    <td className="px-3 py-3"><span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${CORES[i.cor]}`}>{i.txt}</span></td>
+                    <td className="px-3 py-3">
+                      <select value={d.meses_validade} disabled={salvar.isPending} className={selCls2(isDark)}
+                        onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}>
+                        {[12, 24, 36].map(m => <option key={m} value={m}>{m} meses</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {docs.map(d => {
+          {lista.map(d => {
             const i = info(d)
             return (
               <div key={d.id} className={`${card} p-4`}>
@@ -632,7 +675,7 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
                   <span className={`text-[10px] font-mono font-bold uppercase ${txtMuted}`}>{d.tipo} · {d.revisao ?? '—'}</span>
                   <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${CORES[i.cor]}`}>{i.txt}</span>
                 </div>
-                <p className={`text-sm font-bold ${txtMain}`}>{d.titulo}</p>
+                <p className={`text-[15px] font-bold ${txtMain}`}>{d.titulo}</p>
                 <p className={`text-[11px] ${txtMuted}`}>{[d.unidade, d.cnpj, d.grau_risco ? `Grau de Risco ${d.grau_risco}` : null].filter(Boolean).join(' · ')}</p>
                 <div className={`grid grid-cols-3 gap-2 mt-2.5 text-[11px] ${txtMuted}`}>
                   <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Emissão</span>{fmtData(d.data_emissao)}</div>
@@ -641,13 +684,11 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
                     <b className={i.cor === 'red' ? 'text-red-500' : i.cor === 'amber' ? 'text-amber-500' : ''}>{fmtData(d.data_validade)}</b></div>
                 </div>
                 <div className="flex items-center gap-2 mt-2.5">
-                  <label className={`text-[11px] ${txtMuted}`}>Validade (meses):</label>
-                  <select value={d.meses_validade} disabled={salvar.isPending}
-                    onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}
-                    className={`text-[11px] rounded-lg px-2 py-1 border ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
-                    {[12, 24, 36].map(m => <option key={m} value={m}>{m}</option>)}
+                  <label className={`text-[11px] ${txtMuted}`}>Vigência:</label>
+                  <select value={d.meses_validade} disabled={salvar.isPending} className={selCls2(isDark)}
+                    onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}>
+                    {[12, 24, 36].map(m => <option key={m} value={m}>{m} meses</option>)}
                   </select>
-                  {d.arquivo_nome && <span className={`text-[10px] truncate ${txtMuted}`} title={d.arquivo_nome}>📄 {d.arquivo_nome}</span>}
                 </div>
               </div>
             )
@@ -658,8 +699,85 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
   )
 }
 
+// ── Riscos › Catálogo de perigos — Lista/Cards ──────────────────────────────
+function CatalogoRiscos({ subTabs, isDark, card, txtMain, txtMuted, riscos, busca, onBusca, escopoF, onEscopo, onNovo, onAbrir, obraNome }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+  riscos: QsmaRisco[]; busca: string; onBusca: (v: string) => void
+  escopoF: string; onEscopo: (v: string) => void
+  onNovo: () => void; onAbrir: (r: QsmaRisco) => void; obraNome: (id?: string) => string
+}) {
+  const [vista, setVista] = useState<'lista' | 'cards'>('lista')
+  return (
+    <div className="space-y-3">
+      <HdrRisco isDark={isDark} subTabs={subTabs}>
+        <div className={buscaCls(isDark)}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => onBusca(e.target.value)} placeholder="Buscar perigo, risco, tarefa…"
+            className={`bg-transparent outline-none w-full ${isDark ? 'text-slate-200' : 'text-slate-700'}`} />
+        </div>
+        <ToolbarPills isDark={isDark} value={escopoF} onChange={onEscopo}
+          options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]} />
+        <span className={`text-xs ${txtMuted}`}>{riscos.length} risco(s)</span>
+        <BotaoNovo label="Novo Risco / APR" onClick={onNovo} />
+        <VistaToggle isDark={isDark} vista={vista} onVista={setVista} />
+      </HdrRisco>
+
+      {riscos.length === 0 ? (
+        <Vazio isDark={isDark} texto="Nenhum risco cadastrado — comece pelo inventário PGR ou uma APR" />
+      ) : vista === 'lista' ? (
+        <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full min-w-[900px] text-sm">
+            <thead>
+              <tr className={thCls(isDark)}>
+                {['CÓDIGO', 'GRUPO', 'PERIGO / FATOR DE RISCO', 'FONTES TÍPICAS', 'ESCOPO', 'NÍVEL'].map(h => (
+                  <th key={h} className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {riscos.map(r => {
+                const nv = nivelRisco(r.probabilidade, r.severidade)
+                return (
+                  <tr key={r.id} onClick={() => onAbrir(r)}
+                    className={`cursor-pointer transition-colors ${isDark ? 'border-t border-white/[0.04] hover:bg-white/[0.04]' : 'border-t border-slate-100 hover:bg-slate-50'}`}>
+                    <td className={`px-3 py-3 font-mono font-bold text-[13px] whitespace-nowrap ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{r.codigo}</td>
+                    <td className={`px-3 py-3 whitespace-nowrap ${txtMuted}`}>{(r as any).grupo ?? '—'}</td>
+                    <td className={`px-3 py-3 font-semibold ${txtMain}`}>{r.perigo}</td>
+                    <td className={`px-3 py-3 ${txtMuted}`}><span className="block truncate max-w-[300px]">{(r as any).fontes_tipicas ?? r.tarefa ?? '—'}</span></td>
+                    <td className={`px-3 py-3 uppercase text-[11px] font-bold ${txtMuted}`}>{r.escopo}</td>
+                    <td className="px-3 py-3">
+                      <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: nv.cor }}>{nv.label}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {riscos.map(r => {
+            const nv = nivelRisco(r.probabilidade, r.severidade)
+            return (
+              <button key={r.id} onClick={() => onAbrir(r)} className={`text-left ${card} p-4 hover:shadow-md transition-all`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-[11px] font-mono font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{r.codigo} · {r.escopo.toUpperCase()}</span>
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: nv.cor }}>{nv.label}</span>
+                </div>
+                <p className={`text-[15px] font-bold ${txtMain}`}>{r.perigo}</p>
+                <p className={`text-xs ${txtMuted}`}>{(r as any).grupo ?? ''}</p>
+                <p className={`text-[11px] mt-1 ${txtMuted}`}>{[(r as any).fontes_tipicas, r.tarefa, r.obra_id ? obraNome(r.obra_id) : null].filter(Boolean).join(' · ')}</p>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Riscos › Matriz FUNÇÃO × PERIGO (ajustável, igual EPI/Treinamentos) ──────
-function MatrizRiscos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
+function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string; isAdmin: boolean
 }) {
   const { data: riscos = [] } = useRiscos()
@@ -677,18 +795,19 @@ function MatrizRiscos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
   }, [celulas])
   const q = busca.trim().toLowerCase()
   const linhas = cargos.filter(c => !q || c.toLowerCase().includes(q))
-
   const GRUPO_COR: Record<string, string> = {
     'Acidente': '#ef4444', 'Ergonômico': '#8b5cf6', 'Físico': '#0ea5e9',
     'Químico': '#f59e0b', 'Biológico': '#10b981',
   }
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        {subTabs}
-        <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar função…"
-          className={`text-xs rounded-lg px-3 py-1.5 border w-52 ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200'}`} />
-        <span className={`text-xs ${txtMuted}`}>{linhas.length} funções × {cols.length} perigos — clique pra ajustar</span>
+      <HdrRisco isDark={isDark} subTabs={subTabs}>
+        <div className={buscaCls(isDark)}>
+          <Search size={14} className={txtMuted} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar função…"
+            className={`bg-transparent outline-none w-full ${isDark ? 'text-slate-200' : 'text-slate-700'}`} />
+        </div>
+        <span className={`text-xs ${txtMuted}`}>{linhas.length} funções × {cols.length} perigos</span>
         <span className="flex items-center gap-2 ml-auto flex-wrap">
           {Object.entries(GRUPO_COR).map(([g, c]) => (
             <span key={g} className={`inline-flex items-center gap-1 text-[10px] ${txtMuted}`}>
@@ -696,7 +815,7 @@ function MatrizRiscos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
             </span>
           ))}
         </span>
-      </div>
+      </HdrRisco>
       <div className={`rounded-xl border overflow-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`} style={{ maxHeight: '72vh' }}>
         <table className="w-full border-collapse text-xs" style={{ minWidth: 900 }}>
           <thead>
@@ -722,9 +841,8 @@ function MatrizRiscos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
                   const on = !!cel?.aplica
                   return (
                     <td key={c.id} className="text-center">
-                      <button
-                        disabled={!isAdmin || setCel.isPending}
-                        title={on ? `${c.perigo}\n${cel?.nivel_risco ?? ''} · ${cel?.classificacao ?? ''}\nEPI: ${cel?.epis ?? '—'}` : c.perigo}
+                      <button disabled={!isAdmin || setCel.isPending}
+                        title={on ? `${c.perigo} — ${cel?.nivel_risco ?? ''} · ${cel?.classificacao ?? ''} — EPI: ${cel?.epis ?? '—'}` : c.perigo}
                         onClick={() => setCel.mutate({ cargo, risco_id: c.id, aplica: !on })}
                         className="w-full h-6 flex items-center justify-center disabled:cursor-default">
                         {on
