@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, Radio, ChevronLeft, ChevronRight, Info as InfoIcon } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, AttributionControl } from 'react-leaflet'
 import * as L from 'leaflet'
@@ -89,6 +89,26 @@ function FitBounds({ positions }: { positions: TelUltimaPosicao[] }) {
   return null
 }
 
+// ── Revalida o tamanho do mapa ──────────────────────────────────────────────
+// O container agora tem altura calculada em runtime; sem invalidateSize o
+// Leaflet mantém as dimensões do primeiro render e desenha tiles cinzas.
+function AjustarAoContainer({ altura }: { altura?: number }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 60)
+    return () => clearTimeout(t)
+  }, [altura, map])
+
+  useEffect(() => {
+    const onResize = () => map.invalidateSize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [map])
+
+  return null
+}
+
 // ── Fly to selected ─────────────────────────────────────────────────────────
 
 function FlyTo({ position }: { position: [number, number] | null }) {
@@ -172,6 +192,23 @@ export default function MapaAoVivo() {
     return { movendo, ocioso, desligado }
   }, [posicoesFiltradas])
 
+  // Altura medida em runtime: mapa e lista ocupam o que sobra da janela.
+  // Fixo (era h-[520px]) desperdiça tela grande e estoura tela pequena.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [altura, setAltura] = useState<number>()
+  useEffect(() => {
+    const medir = () => {
+      const el = boxRef.current
+      if (!el) return
+      const topo = el.getBoundingClientRect().top
+      setAltura(Math.max(380, Math.round(window.innerHeight - topo - 16)))
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+    // isLoading/quantidade: enquanto não há dados o card nem existe no DOM.
+  }, [isLoading, posicoes.length])
+
   // ── Empty state ─────────────────────────────────────────────────────────
   if (!isLoading && posicoes.length === 0) {
     return (
@@ -189,7 +226,11 @@ export default function MapaAoVivo() {
     : 'bg-[#1e293b] border border-white/[0.06]'
 
   return (
-    <div className={`flex rounded-2xl overflow-hidden h-[520px] relative ${cardCls}`}>
+    <div
+      ref={boxRef}
+      style={altura ? { height: altura } : undefined}
+      className={`flex rounded-2xl overflow-hidden relative ${altura ? '' : 'h-[520px]'} ${cardCls}`}
+    >
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <div className={`flex flex-col shrink-0 border-r transition-all duration-300 ${
         sidebarAberta ? 'w-72' : 'w-0 border-r-0 overflow-hidden'
@@ -321,6 +362,7 @@ export default function MapaAoVivo() {
           {/* Atribuição à esquerda p/ liberar o canto inferior direito ao indicador de sync */}
           <AttributionControl position="bottomleft" prefix={false} />
 
+          <AjustarAoContainer altura={altura} />
           <FitBounds positions={posicoesFiltradas} />
           <FlyTo position={flyToPosition} />
 
