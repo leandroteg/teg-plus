@@ -583,7 +583,6 @@ export default function UsoModulos() {
 
   const nuncaUsados = (u: UsoPorUsuario) => modulosComUso.filter((m) => !u.modulos_usados.includes(m))
 
-  const bg = isLight ? 'bg-slate-50' : 'bg-[#0c1222]'
   const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
   const label = isLight ? 'text-slate-500' : 'text-slate-400'
   const heading = isLight ? 'text-slate-800' : 'text-slate-100'
@@ -601,8 +600,8 @@ export default function UsoModulos() {
     : { backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#e2e8f0' }
 
   return (
-    <div className={`min-h-screen ${bg}`}>
-      <div className="max-w-[1500px] mx-auto px-5 py-6">
+    <div>
+      <div className="max-w-[1500px] mx-auto">
         {/* Cabeçalho + período */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isLight ? 'bg-sky-50 text-sky-600' : 'bg-sky-500/15 text-sky-300'}`}>

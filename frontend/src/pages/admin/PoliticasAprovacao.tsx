@@ -5,7 +5,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, Loader2, Check, Save } from 'lucide-react'
+import {
+  Shield, ShieldCheck, Loader2, Check, Save, Lock, ArrowRight,
+  FileCheck2, CircleDollarSign, Layers,
+} from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -30,6 +33,13 @@ interface PerfilOpt {
 
 const fmtBRL = (v: number | null | undefined) =>
   (Number(v ?? 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
+
+const POLITICAS_GLOBAIS = [
+  { label: 'Solicitação de Adiantamento', valor: 'Qualquer Diretor' },
+  { label: 'Minutas Contratuais',         valor: 'Laucídio Cunha Junior' },
+  { label: 'Autorização de Pagamento',    valor: 'Laucídio Cunha Junior' },
+  { label: 'Aprovação de Transporte',     valor: 'Qualquer Diretor (provisório)' },
+]
 
 export default function PoliticasAprovacao() {
   const { isAdmin } = useAuth()
@@ -92,89 +102,195 @@ export default function PoliticasAprovacao() {
     salvar.mutate({ id: c.id, field: 'alcada1_limite', value: num })
   }
 
-  const cardCls = isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
-  const txt = isLight ? 'text-slate-800' : 'text-white'
-  const txtMuted = isLight ? 'text-slate-500' : 'text-slate-400'
-  const inputCls = `w-full px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    isLight ? 'bg-white border border-slate-200 text-slate-800' : 'bg-white/[0.04] border border-white/[0.08] text-white [&>option]:bg-slate-900'
+  // ── Classes de tema ─────────────────────────────────────────────────────────
+  const heading = isLight ? 'text-slate-800' : 'text-slate-100'
+  const label = isLight ? 'text-slate-500' : 'text-slate-400'
+  const faint = isLight ? 'text-slate-400' : 'text-slate-500'
+  const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
+  const inputCls = `w-full px-2.5 py-2 rounded-lg text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400/60 ${
+    isLight
+      ? 'bg-white border border-slate-200 text-slate-800 hover:border-slate-300'
+      : 'bg-white/[0.04] border border-white/[0.08] text-white hover:border-white/[0.16] [&>option]:bg-slate-900'
   }`
-  const thCls = `text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${txtMuted}`
+  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider ${faint}`
 
   if (!isAdmin) {
-    return <div className={`p-6 rounded-2xl ${cardCls}`}><p className={`text-sm ${txt}`}>Acesso restrito a administradores.</p></div>
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center">
+        <div className={`rounded-2xl border p-8 ${panel}`}>
+          <span className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl ${isLight ? 'bg-rose-50 text-rose-500' : 'bg-rose-500/15 text-rose-300'}`}>
+            <Lock size={22} />
+          </span>
+          <p className={`text-sm font-semibold ${heading}`}>Acesso restrito</p>
+          <p className={`text-xs mt-1 ${label}`}>Esta área é exclusiva para administradores.</p>
+        </div>
+      </div>
+    )
   }
 
   function renderSavedIndicator(c: CategoriaPolitica, field: string) {
     const key = `${c.id}-${field}`
-    if (salvouId === key) return <Check size={11} className="text-emerald-500 inline ml-1" />
+    if (salvouId === key) return <Check size={12} className="text-emerald-500 shrink-0" />
     if (salvar.isPending && salvar.variables?.id === c.id && salvar.variables?.field === field) {
-      return <Loader2 size={11} className="animate-spin text-slate-400 inline ml-1" />
+      return <Loader2 size={12} className="animate-spin text-slate-400 shrink-0" />
     }
-    return null
+    return <span className="w-3 shrink-0" />
   }
 
+  // ── Métricas derivadas ──────────────────────────────────────────────────────
+  const comValidador = categorias.filter(c => c.validador_tecnico_id).length
+  const comAlcada1 = categorias.filter(c => c.alcada1_aprovador_id).length
+  const comAlcada2 = categorias.filter(c => c.alcada2_aprovador_id).length
+
+  const kpis = [
+    { icon: Layers,           label: 'Categorias ativas',  value: categorias.length },
+    { icon: FileCheck2,       label: 'Com validador',      value: comValidador },
+    { icon: CircleDollarSign, label: 'Com alçada 1',       value: comAlcada1 },
+    { icon: ShieldCheck,      label: 'Com alçada 2',       value: comAlcada2 },
+  ]
+
+  const etapas = [
+    { icon: FileCheck2,       titulo: 'Validação técnica', desc: 'Confere especificação e necessidade', tone: isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300' },
+    { icon: CircleDollarSign, titulo: 'Alçada 1',          desc: 'Aprova até o limite definido',        tone: isLight ? 'bg-amber-50 text-amber-600' : 'bg-amber-500/15 text-amber-300' },
+    { icon: ShieldCheck,      titulo: 'Alçada 2',          desc: 'Aprova acima do limite',              tone: isLight ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-300' },
+  ]
+
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className={`text-xl font-extrabold ${txt} flex items-center gap-2`}>
-          <Shield size={20} className="text-rose-500" />
-          Políticas de Aprovação por Categoria
-        </h1>
-        <p className={`text-xs mt-1 ${txtMuted}`}>
-          Configura quem valida tecnicamente e quem aprova financeiramente cada categoria. Mudanças entram em vigor imediatamente.
-        </p>
+    <div className="max-w-6xl mx-auto space-y-5">
+
+      {/* ── Cabeçalho ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-sm">
+          <ShieldCheck size={19} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h1 className={`text-lg font-bold leading-tight ${heading}`}>Políticas de Aprovação</h1>
+          <p className={`text-[12px] ${label}`}>Quem valida e quem aprova cada categoria de compra. Mudanças valem imediatamente.</p>
+        </div>
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold
+          ${isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'}`}>
+          <Save size={11} /> Salvamento automático
+        </span>
       </div>
 
-      <section className={`rounded-2xl p-4 ${cardCls}`}>
+      {/* ── KPIs ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {kpis.map(({ icon: Icon, label: kLabel, value }) => (
+          <div key={kLabel} className={`rounded-2xl border p-3.5 ${panel}`}>
+            <div className="flex items-center gap-3">
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-500/15 text-indigo-300'}`}>
+                <Icon size={16} />
+              </span>
+              <div className="min-w-0">
+                {isLoading ? (
+                  <div className={`h-5 w-8 rounded animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+                ) : (
+                  <p className={`text-lg font-extrabold leading-none tabular-nums ${heading}`}>{value}</p>
+                )}
+                <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${faint}`}>{kLabel}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Como funciona o fluxo ── */}
+      <div className={`rounded-2xl border p-4 ${panel}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
+          {etapas.map((etapa, i) => (
+            <div key={etapa.titulo} className="flex items-center gap-2 sm:flex-1">
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${etapa.tone}`}>
+                <etapa.icon size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className={`text-[12px] font-semibold leading-tight ${heading}`}>
+                  <span className={`mr-1 text-[10px] font-bold ${faint}`}>{i + 1}.</span>
+                  {etapa.titulo}
+                </p>
+                <p className={`text-[11px] leading-tight ${label}`}>{etapa.desc}</p>
+              </div>
+              {i < etapas.length - 1 && (
+                <ArrowRight size={14} className={`hidden sm:block ml-auto shrink-0 ${faint}`} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tabela de categorias ── */}
+      <section className={`rounded-2xl border overflow-hidden ${panel}`}>
         {isLoading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={`h-9 w-40 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+                <div className={`h-9 flex-1 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+                <div className={`h-9 flex-1 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+                <div className={`h-9 w-28 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+                <div className={`h-9 flex-1 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+              </div>
+            ))}
+          </div>
+        ) : categorias.length === 0 ? (
+          <div className="py-14 text-center">
+            <Shield size={28} className={`mx-auto mb-2 ${faint}`} />
+            <p className={`text-sm font-semibold ${heading}`}>Nenhuma categoria ativa</p>
+            <p className={`text-xs mt-1 ${label}`}>Cadastre categorias de compras para configurar as políticas.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
+                <tr className={isLight ? 'bg-slate-50/80 border-b border-slate-100' : 'bg-white/[0.03] border-b border-white/[0.06]'}>
                   <th className={thCls}>Categoria</th>
-                  <th className={thCls}>Validação Técnica</th>
-                  <th className={thCls}>Aprovação Alçada 1</th>
-                  <th className={thCls + ' w-[130px]'}>Limite Alçada 1</th>
-                  <th className={thCls}>Aprovação Alçada 2</th>
+                  <th className={thCls}>Validação técnica</th>
+                  <th className={thCls}>Aprovação · Alçada 1</th>
+                  <th className={thCls + ' w-[140px]'}>Limite alçada 1</th>
+                  <th className={thCls}>Aprovação · Alçada 2</th>
                 </tr>
               </thead>
               <tbody>
                 {categorias.map(c => (
-                  <tr key={c.id} className={`border-t ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'}`}>
-                    <td className={`px-3 py-2 ${txt}`}>
-                      <p className="font-semibold">{c.nome}</p>
-                      <p className={`text-[10px] font-mono ${txtMuted}`}>{c.codigo}</p>
+                  <tr key={c.id} className={`border-t transition-colors ${isLight ? 'border-slate-100 hover:bg-slate-50/60' : 'border-white/[0.04] hover:bg-white/[0.02]'}`}>
+                    <td className={`px-4 py-2.5 ${heading}`}>
+                      <p className="text-[13px] font-semibold leading-tight">{c.nome}</p>
+                      <span className={`mt-0.5 inline-block rounded px-1 py-px text-[10px] font-mono
+                        ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
+                        {c.codigo}
+                      </span>
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className={inputCls}
-                        value={c.validador_tecnico_id ?? ''}
-                        onChange={e => handleSelectChange(c, 'validador_tecnico_id', e.target.value)}
-                      >
-                        <option value="">— Sem validador —</option>
-                        {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                      </select>
-                      {renderSavedIndicator(c, 'validador_tecnico_id')}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          className={inputCls}
+                          value={c.validador_tecnico_id ?? ''}
+                          onChange={e => handleSelectChange(c, 'validador_tecnico_id', e.target.value)}
+                        >
+                          <option value="">— Sem validador —</option>
+                          {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                        </select>
+                        {renderSavedIndicator(c, 'validador_tecnico_id')}
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className={inputCls}
-                        value={c.alcada1_aprovador_id ?? ''}
-                        onChange={e => handleSelectChange(c, 'alcada1_aprovador_id', e.target.value)}
-                      >
-                        <option value="">— Sem aprovador —</option>
-                        {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                      </select>
-                      {renderSavedIndicator(c, 'alcada1_aprovador_id')}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          className={inputCls}
+                          value={c.alcada1_aprovador_id ?? ''}
+                          onChange={e => handleSelectChange(c, 'alcada1_aprovador_id', e.target.value)}
+                        >
+                          <option value="">— Sem aprovador —</option>
+                          {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                        </select>
+                        {renderSavedIndicator(c, 'alcada1_aprovador_id')}
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
                         <input
                           type="text"
                           inputMode="decimal"
-                          className={`${inputCls} text-right`}
+                          className={`${inputCls} text-right font-semibold tabular-nums`}
                           value={limiteDraft[c.id] ?? fmtBRL(c.alcada1_limite ?? 0)}
                           onChange={e => setLimiteDraft({ ...limiteDraft, [c.id]: e.target.value })}
                           onFocus={() => setLimiteDraft({ ...limiteDraft, [c.id]: String(c.alcada1_limite ?? 0) })}
@@ -183,16 +299,18 @@ export default function PoliticasAprovacao() {
                         {renderSavedIndicator(c, 'alcada1_limite')}
                       </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className={inputCls}
-                        value={c.alcada2_aprovador_id ?? ''}
-                        onChange={e => handleSelectChange(c, 'alcada2_aprovador_id', e.target.value)}
-                      >
-                        <option value="">— Sem aprovador —</option>
-                        {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                      </select>
-                      {renderSavedIndicator(c, 'alcada2_aprovador_id')}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          className={inputCls}
+                          value={c.alcada2_aprovador_id ?? ''}
+                          onChange={e => handleSelectChange(c, 'alcada2_aprovador_id', e.target.value)}
+                        >
+                          <option value="">— Sem aprovador —</option>
+                          {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                        </select>
+                        {renderSavedIndicator(c, 'alcada2_aprovador_id')}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,21 +318,27 @@ export default function PoliticasAprovacao() {
             </table>
           </div>
         )}
-        <p className={`text-[11px] mt-3 flex items-center gap-1 ${txtMuted}`}>
-          <Save size={11} /> Salvamento automático ao editar cada campo
-        </p>
       </section>
 
-      <section className={`rounded-2xl p-4 ${cardCls}`}>
-        <h2 className={`text-sm font-bold mb-2 ${txt}`}>Políticas Globais (somente leitura)</h2>
-        <p className={`text-xs mb-3 ${txtMuted}`}>
-          Tipos de aprovação que NÃO dependem de categoria. Para alterar, é necessário deploy.
-        </p>
-        <div className={`text-xs space-y-1.5 ${txt}`}>
-          <div className="flex gap-3"><span className="font-bold w-56">Solicitação de Adiantamento:</span> Qualquer Diretor</div>
-          <div className="flex gap-3"><span className="font-bold w-56">Minutas Contratuais:</span> Laucídio Cunha Junior</div>
-          <div className="flex gap-3"><span className="font-bold w-56">Autorização de Pagamento:</span> Laucídio Cunha Junior</div>
-          <div className="flex gap-3"><span className="font-bold w-56">Aprovação de Transporte:</span> Qualquer Diretor (provisório)</div>
+      {/* ── Políticas globais ── */}
+      <section className={`rounded-2xl border p-4 sm:p-5 ${panel}`}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
+            <Lock size={14} />
+          </span>
+          <div>
+            <h2 className={`text-[13px] font-bold leading-tight ${heading}`}>Políticas globais</h2>
+            <p className={`text-[11px] ${label}`}>Aprovações que não dependem de categoria · somente leitura, alteração exige deploy</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {POLITICAS_GLOBAIS.map(({ label: pLabel, valor }) => (
+            <div key={pLabel} className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5
+              ${isLight ? 'border-slate-100 bg-slate-50/60' : 'border-white/[0.04] bg-white/[0.02]'}`}>
+              <span className={`text-[12px] font-medium ${label}`}>{pLabel}</span>
+              <span className={`text-[12px] font-semibold text-right ${heading}`}>{valor}</span>
+            </div>
+          ))}
         </div>
       </section>
     </div>

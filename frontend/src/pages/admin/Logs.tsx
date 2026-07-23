@@ -377,7 +377,6 @@ export default function Logs() {
     setBuscaInput('')
   }
 
-  const bg = isLight ? 'bg-slate-50' : 'bg-[#0c1222]'
   const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
   const label = isLight ? 'text-slate-500' : 'text-slate-400'
   const heading = isLight ? 'text-slate-800' : 'text-slate-100'
@@ -391,8 +390,7 @@ export default function Logs() {
   const optionCls = isLight ? 'text-slate-700 bg-white' : 'text-slate-100 bg-slate-800'
 
   return (
-    <div className={`min-h-screen ${bg}`}>
-      <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex items-center gap-3 mb-5">
           <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'}`}>
@@ -533,7 +531,6 @@ export default function Logs() {
             )}
           </div>
         )}
-      </div>
     </div>
   )
 }

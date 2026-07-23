@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import {
-  Users, UserPlus, Search, ChevronLeft, Shield,
+  Users, UserPlus, Search, Shield,
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
   Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2,
@@ -1621,7 +1620,6 @@ function BatchEditModal({
 
 export default function AdminUsuarios() {
   const { isDark } = useTheme()
-  const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
   const { data: bases = [] } = useBases()
   const bulkUpdate = useBulkUpdateUsers()
@@ -1888,25 +1886,27 @@ export default function AdminUsuarios() {
         />
       )}
 
-      <div className="space-y-4">
+      <div className="max-w-7xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/perfil')}
-            className={`w-8 h-8 rounded-lg shadow-card flex items-center justify-center ${isDark ? 'bg-white/[0.05] text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-navy'}`}>
-            <ChevronLeft size={18} />
-          </button>
-          <div className="flex-1">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm">
+            <Users size={19} />
+          </span>
+          <div className="flex-1 min-w-0">
             <h1 className={`text-lg font-black leading-tight ${isDark ? 'text-white' : 'text-navy'}`}>Usuários</h1>
             <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{perfis?.length ?? 0} contas · {perfis?.filter(p => p.ativo).length ?? 0} ativas</p>
           </div>
           <button
             onClick={() => refetch()}
-            className={`w-8 h-8 rounded-lg shadow-card flex items-center justify-center hover:text-primary ${isFetching ? 'animate-spin' : ''} ${isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-white text-slate-400'}`}>
+            title="Atualizar lista"
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors hover:text-primary
+              ${isFetching ? 'animate-spin' : ''}
+              ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-400 hover:border-primary/40'}`}>
             <RefreshCw size={15} />
           </button>
           <button
             onClick={() => setShowCadastro(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-lg hover:bg-indigo-500 active:scale-95 transition-all">
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all">
             <UserPlus size={14} /> Cadastrar
           </button>
         </div>
@@ -2239,7 +2239,7 @@ export default function AdminUsuarios() {
             {bulkUpdate.isError && (
               <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
                 <AlertCircle size={12} />
-                <span>{bulkUpdate.error instanceof Error ? bulkUpdate.error.message : 'Falha ao aplicar alteracoes em lote.'}</span>
+                <span>{bulkUpdate.error?.message ?? 'Falha ao aplicar alteracoes em lote.'}</span>
               </div>
             )}
 

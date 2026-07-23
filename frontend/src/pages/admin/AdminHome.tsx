@@ -231,7 +231,6 @@ export default function AdminHome() {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 
-  const bg = isLight ? 'bg-slate-50' : 'bg-[#0c1222]'
   const heading = isLight ? 'text-slate-800' : 'text-slate-100'
   const label = isLight ? 'text-slate-500' : 'text-slate-400'
   const sectionLabel = isLight ? 'text-slate-400' : 'text-slate-500'
@@ -241,8 +240,7 @@ export default function AdminHome() {
     : 'bg-white/[0.03] border-white/[0.06] hover:border-indigo-400/30 hover:bg-white/[0.05] hover:-translate-y-0.5'
 
   return (
-    <div className={`min-h-screen ${bg}`}>
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
 
         {/* ── Hero ── */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-700 px-6 py-7 sm:px-8">
@@ -381,7 +379,6 @@ export default function AdminHome() {
               </ul>
             )}
           </aside>
-        </div>
       </div>
     </div>
   )
