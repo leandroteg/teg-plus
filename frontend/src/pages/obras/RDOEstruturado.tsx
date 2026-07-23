@@ -83,7 +83,12 @@ function useVeiculosAtivos() {
   })
 }
 
-export default function RDOEstruturado({ obraId, obraNome, onClose }: { obraId: string; obraNome: string; onClose: () => void }) {
+export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObraChange }: {
+  obraId: string; obraNome: string; onClose: () => void
+  /** lista p/ trocar a obra sem sair do modal (opcional) */
+  obras?: { id: string; nome: string }[]
+  onObraChange?: (id: string) => void
+}) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
@@ -220,7 +225,17 @@ export default function RDOEstruturado({ obraId, obraNome, onClose }: { obraId: 
         {/* header */}
         <div className={`flex items-start justify-between gap-3 p-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
           <div className="min-w-0">
-            <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra — {obraNome}</h3>
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra —</h3>
+              {obras?.length && onObraChange ? (
+                <select value={obraId} onChange={e => onObraChange(e.target.value)}
+                  className={`min-w-0 max-w-[420px] truncate rounded-lg px-2 py-1 border text-sm font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                  {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                </select>
+              ) : (
+                <span className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{obraNome}</span>
+              )}
+            </div>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Preenchido por <b>{perfil?.nome ?? '—'}</b> · {new Date().toLocaleDateString('pt-BR')} · {estruturas.length} estrutura(s) · o avanço atualiza o <b>Realizado</b> do Planejamento
             </p>
