@@ -373,7 +373,8 @@ export default function Logs() {
     filtro.modulo || filtro.tipo || filtro.usuarioId || filtro.de || filtro.ate || filtro.busca,
   )
   function limparFiltros() {
-    setFiltro({})
+    // preserva o toggle de ações do sistema — é preferência de exibição, não filtro
+    setFiltro((f) => ({ mostrarSistema: f.mostrarSistema }))
     setBuscaInput('')
   }
 
@@ -430,13 +431,39 @@ export default function Logs() {
             />
           </div>
 
-          <div className="flex items-center gap-2 mb-2.5">
+          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
             <Filter size={14} className={label} />
             <span className={`text-[11px] font-bold uppercase tracking-wider ${label}`}>Filtros</span>
+            {/* Toggle: ações automáticas do sistema (ocultas por padrão) */}
+            <button
+              type="button"
+              onClick={() => setFiltro((f) => ({ ...f, mostrarSistema: !f.mostrarSistema }))}
+              title="Exibir também as alterações automáticas feitas pelo sistema (integrações, rotinas)"
+              className={`ml-auto inline-flex items-center gap-1.5 text-[11px] font-semibold transition-colors ${
+                filtro.mostrarSistema
+                  ? (isLight ? 'text-violet-600' : 'text-violet-300')
+                  : (isLight ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-slate-200')
+              }`}
+            >
+              <Cpu size={12} /> Ações do sistema
+              <span
+                className={`relative h-3.5 w-6 rounded-full transition-colors ${
+                  filtro.mostrarSistema
+                    ? 'bg-violet-500'
+                    : (isLight ? 'bg-slate-300' : 'bg-white/15')
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+                    filtro.mostrarSistema ? 'translate-x-2.5' : ''
+                  }`}
+                />
+              </span>
+            </button>
             {temFiltro && (
               <button
                 onClick={limparFiltros}
-                className={`ml-auto inline-flex items-center gap-1 text-[11px] font-semibold ${isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-100'}`}
+                className={`inline-flex items-center gap-1 text-[11px] font-semibold ${isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-100'}`}
               >
                 <X size={12} /> Limpar filtros
               </button>

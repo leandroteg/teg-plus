@@ -43,6 +43,8 @@ export interface LogsFiltro {
   de?: string
   /** ISO date (inclusive) — fim do intervalo */
   ate?: string
+  /** Exibe também ações automáticas do sistema (origem='sistema'). Padrão: oculto. */
+  mostrarSistema?: boolean
 }
 
 /**
@@ -66,6 +68,11 @@ export function useLogs(filtro: LogsFiltro) {
         .order('created_at', { ascending: false })
         .range(from, to)
 
+      // Logs automáticos (triggers sem usuário autenticado) são ocultados por
+      // padrão; o `is.null` preserva registros antigos gravados sem `origem`.
+      if (!filtro.mostrarSistema) {
+        q = q.or('dados->>origem.neq.sistema,dados->>origem.is.null')
+      }
       if (filtro.modulo) q = q.eq('modulo', filtro.modulo)
       if (filtro.tipo) q = q.eq('tipo', filtro.tipo)
       if (filtro.usuarioId) q = q.eq('usuario_id', filtro.usuarioId)

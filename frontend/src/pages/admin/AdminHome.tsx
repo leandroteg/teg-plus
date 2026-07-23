@@ -11,7 +11,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Users, ShieldCheck, ScrollText, BarChart3, Code2, Link2,
   ChevronRight, AlertTriangle, CheckCircle2,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,65 +21,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUsoModulos } from '../../hooks/useUsoModulos'
 import { useAprovacaoKPIs } from '../../hooks/useAprovacoes'
+import { moduleLabel } from '../../config/moduleTracking'
 import { supabase } from '../../services/supabase'
-
-// ── Navegação (mesmos grupos da sidebar do AdminLayout) ───────────────────────
-
-interface AdminItem {
-  to: string
-  icon: LucideIcon
-  title: string
-  description: string
-  badgeKey?: 'politicas'
-}
-
-interface AdminGroup {
-  label: string
-  items: AdminItem[]
-}
-
-const GROUPS: AdminGroup[] = [
-  {
-    label: 'Gestão',
-    items: [
-      {
-        to: '/admin/usuarios', icon: Users, title: 'Usuários',
-        description: 'Contas, permissões e módulos de cada colaborador',
-      },
-      {
-        to: '/admin/politicas-aprovacao', icon: ShieldCheck, title: 'Políticas de Aprovação',
-        description: 'Alçadas e fluxos de aprovação por categoria',
-        badgeKey: 'politicas',
-      },
-    ],
-  },
-  {
-    label: 'Monitoramento',
-    items: [
-      {
-        to: '/admin/logs', icon: ScrollText, title: 'Logs de Auditoria',
-        description: 'Quem fez o quê, quando e o que mudou no sistema',
-      },
-      {
-        to: '/admin/uso-modulos', icon: BarChart3, title: 'Uso de Módulos',
-        description: 'Acessos, adoção e engajamento por módulo',
-      },
-    ],
-  },
-  {
-    label: 'Sistema',
-    items: [
-      {
-        to: '/admin/integracoes', icon: Link2, title: 'Integrações',
-        description: 'Conexões com sistemas externos e configurações',
-      },
-      {
-        to: '/admin/desenvolvimento', icon: Code2, title: 'Desenvolvimento',
-        description: 'Roadmap, backlog e melhorias em andamento',
-      },
-    ],
-  },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -178,6 +120,13 @@ export default function AdminHome() {
     label: diaSemanaCurto(p.dia),
     usuarios: p.usuarios,
   }))
+  const topModulos = [...(uso?.por_modulo ?? [])]
+    .sort((a, b) => b.acessos - a.acessos)
+    .slice(0, 6)
+  const maxModuloAcessos = topModulos[0]?.acessos || 1
+  const topUsuarios = [...(uso?.por_usuario ?? [])]
+    .sort((a, b) => b.total_acessos - a.total_acessos)
+    .slice(0, 6)
 
   // Aprovações pendentes — mesma query do sininho do header (cache compartilhado)
   const { data: aprovacoes } = useAprovacaoKPIs()
@@ -254,9 +203,6 @@ export default function AdminHome() {
   const divide   = isLight ? 'divide-slate-200/80' : 'divide-white/[0.07]'
   const surface  = isLight ? 'bg-white' : 'bg-white/[0.02]'
   const rowHover = isLight ? 'hover:bg-indigo-50/40' : 'hover:bg-indigo-500/[0.06]'
-  const iconBox  = isLight
-    ? 'bg-indigo-50 text-indigo-600'
-    : 'bg-indigo-500/10 text-indigo-300'
   const skeleton = isLight ? 'bg-slate-100' : 'bg-white/[0.06]'
   const amber    = isLight ? 'text-amber-600' : 'text-amber-400'
   const emerald  = isLight ? 'text-emerald-600' : 'text-emerald-400'
@@ -438,52 +384,107 @@ export default function AdminHome() {
         </aside>
       </div>
 
-      {/* ── Navegação + Atividade recente ── */}
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr,340px] gap-x-5 gap-y-6 items-start">
+      {/* ── Módulos mais usados + Usuários mais ativos + Atividade ── */}
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
 
-        {/* Navegação agrupada */}
-        <div className="space-y-5">
-          {GROUPS.map((group) => (
-            <section key={group.label}>
-              <h2 className={`mb-2 text-[11.5px] font-bold uppercase tracking-[0.12em] ${muted}`}>
-                {group.label}
-              </h2>
-              <div className={`rounded-xl border overflow-hidden ${hairline} ${surface} divide-y ${divide}`}>
-                {group.items.map(({ to, icon: Icon, title, description, badgeKey }) => {
-                  const badge = badgeKey === 'politicas' && semAprovador > 0 ? semAprovador : null
-                  return (
-                    <Link
-                      key={to}
-                      to={to}
-                      className={`group flex items-center gap-3.5 px-4 py-3 transition-colors ${rowHover}`}
-                    >
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconBox}`}>
-                        <Icon size={15} strokeWidth={1.9} />
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className={`block text-[13.5px] font-semibold leading-tight ${heading}`}>{title}</span>
-                        <span className={`block text-[12px] leading-tight mt-0.5 ${muted}`}>{description}</span>
-                      </span>
-                      {badge != null && (
-                        <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold
-                          ${isLight ? 'bg-amber-50 text-amber-700' : 'bg-amber-500/10 text-amber-300'}`}>
-                          <AlertTriangle size={10} /> {badge}
-                        </span>
-                      )}
-                      <ChevronRight
-                        size={14}
-                        className={`shrink-0 transition-colors ${muted} ${isLight ? 'group-hover:text-indigo-600' : 'group-hover:text-indigo-300'}`}
-                      />
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+        {/* Módulos mais usados (7 dias) */}
+        <section className={`rounded-xl border ${hairline} ${surface}`}>
+          <div className={`px-4 py-3 border-b ${hairline}`}>
+            <h2 className={`text-[12px] font-semibold uppercase tracking-wider ${muted}`}>
+              Módulos mais usados
+            </h2>
+          </div>
+          {usoLoading ? (
+            <div className="px-4 py-3 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`h-8 rounded ${skeleton} animate-pulse`} />
+              ))}
+            </div>
+          ) : topModulos.length === 0 ? (
+            <p className={`px-4 py-10 text-center text-[12px] ${muted}`}>
+              Sem registros de uso no período.
+            </p>
+          ) : (
+            <ul className="px-4 py-2">
+              {topModulos.map((m) => (
+                <li key={m.modulo} className="py-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className={`truncate text-[12.5px] font-medium ${heading}`}>{moduleLabel(m.modulo)}</p>
+                    <p className={`shrink-0 text-[11.5px] tabular-nums ${muted}`}>
+                      {m.acessos.toLocaleString('pt-BR')} <span className="opacity-70">acessos</span>
+                    </p>
+                  </div>
+                  <div className={`mt-1.5 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
+                    <div
+                      className={`h-full rounded-full ${isLight ? 'bg-indigo-500' : 'bg-indigo-400'}`}
+                      style={{ width: `${Math.max(4, Math.round((m.acessos / maxModuloAcessos) * 100))}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={`border-t px-4 py-2.5 ${hairline}`}>
+            <Link
+              to="/admin/uso-modulos"
+              className={`text-[12px] font-semibold transition-colors ${
+                isLight ? 'text-indigo-600 hover:text-indigo-700' : 'text-indigo-300 hover:text-indigo-200'
+              }`}
+            >
+              Ver uso completo →
+            </Link>
+          </div>
+        </section>
+
+        {/* Usuários mais ativos (7 dias) */}
+        <section className={`rounded-xl border ${hairline} ${surface}`}>
+          <div className={`px-4 py-3 border-b ${hairline}`}>
+            <h2 className={`text-[12px] font-semibold uppercase tracking-wider ${muted}`}>
+              Usuários mais ativos
+            </h2>
+          </div>
+          {usoLoading ? (
+            <div className="px-4 py-3 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`h-8 rounded ${skeleton} animate-pulse`} />
+              ))}
+            </div>
+          ) : topUsuarios.length === 0 ? (
+            <p className={`px-4 py-10 text-center text-[12px] ${muted}`}>
+              Sem registros de uso no período.
+            </p>
+          ) : (
+            <ul className={`divide-y ${divide}`}>
+              {topUsuarios.map((u, i) => (
+                <li key={u.usuario_id} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className={`w-4 shrink-0 text-[11px] font-semibold tabular-nums ${muted}`}>{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`truncate text-[12.5px] font-medium ${heading}`}>{u.nome}</p>
+                    <p className={`text-[11px] ${muted}`}>
+                      {u.dias_ativos} dia{u.dias_ativos === 1 ? '' : 's'} ativo{u.dias_ativos === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <p className={`shrink-0 text-[11.5px] tabular-nums ${muted}`}>
+                    {u.total_acessos.toLocaleString('pt-BR')} <span className="opacity-70">acessos</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={`border-t px-4 py-2.5 ${hairline}`}>
+            <Link
+              to="/admin/usuarios"
+              className={`text-[12px] font-semibold transition-colors ${
+                isLight ? 'text-indigo-600 hover:text-indigo-700' : 'text-indigo-300 hover:text-indigo-200'
+              }`}
+            >
+              Gerenciar usuários →
+            </Link>
+          </div>
+        </section>
 
         {/* Atividade recente */}
-        <aside className={`rounded-xl border ${hairline} ${surface}`}>
+        <aside className={`rounded-xl border md:col-span-2 lg:col-span-1 ${hairline} ${surface}`}>
           <div className={`px-4 py-3 border-b ${hairline}`}>
             <h2 className={`text-[12px] font-semibold uppercase tracking-wider ${muted}`}>
               Atividade recente
