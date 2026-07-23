@@ -87,22 +87,9 @@ function GestaoObrasInner() {
           <PlanejamentoTecnico portfolioId={portfolioId} />
         ) : step === 'diario' ? (
           <>
-            {/* barra pra abrir o RDO estruturado (matriz do Planejamento) */}
-            <div className={`mb-3 rounded-2xl border p-3 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-              <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Novo RDO estruturado</span>
-              <select value={obraRdo?.id ?? ''} onChange={e => setObraRdoId(e.target.value)}
-                className={`appearance-none rounded-lg px-2.5 py-1.5 border text-xs font-semibold max-w-[320px] truncate ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
-                {obrasRdo.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-              </select>
-              <button onClick={() => setNovoRdo(true)} disabled={!obraRdo}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
-                <ClipboardList size={13} /> Preencher RDO
-              </button>
-              <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>avanço por estrutura · equipe e recursos pré-preenchidos</span>
-            </div>
-            {/* histórico: tela de RDO existente (arquivo intocado) */}
+            {/* histórico + filtros padrão; a obra escolhida lá é a do RDO estruturado */}
             <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
-              <RDO />
+              <RDO portfolioId={portfolioId} onObraChange={setObraRdoId} />
             </div>
             {novoRdo && obraRdo && (
               <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)} />
