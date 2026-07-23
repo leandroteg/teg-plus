@@ -14,6 +14,7 @@ import { ChevronDown, ChevronRight, Search, Building2, Ruler, TowerControl, Load
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, type EGPOscRow } from '../../hooks/usePMO'
+import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
 
 const fmtBRL = (v?: number | null) => v == null ? '—' : `R$ ${Math.round(v).toLocaleString('pt-BR')}`
 const fmtNum = (v?: number | null, dec = 0) => v == null || v === 0 ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: dec })
@@ -63,10 +64,8 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
   const [tecObra, setTecObra] = useState<{ id: string; nome: string; oscs: EGPOscRow[] } | null>(null)
 
   const [q, setQ] = useState('')
-  const [fTipo, setFTipo] = useState('')
-  const [fValor, setFValor] = useState('')
-  const [fAno, setFAno] = useState('')
   const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
+  const f = useObrasFiltros()
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [fechados, setFechados] = useState<Set<string>>(new Set())
 
@@ -81,25 +80,18 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
       const cancelada = o.etapa_atual === 'cancelada'
       if (fStatus === 'ativas' && cancelada) continue
       if (fStatus === 'canceladas' && !cancelada) continue
-      if (fTipo && o.tipo !== fTipo) continue
-      if (fAno && (o.data_osc ?? '').slice(0, 4) !== fAno) continue
-      if (fValor) {
-        const v = o.valor ?? 0
-        if (fValor === 'gt1m' && v <= 1_000_000) continue
-        if (fValor === 'mid' && !(v >= 100_000 && v <= 1_000_000)) continue
-        if (fValor === 'lt100k' && v >= 100_000) continue
-      }
       const arr = m.get(o.obra_id) ?? []; arr.push(o); m.set(o.obra_id, arr)
     }
     return m
-  }, [oscs, fStatus, fTipo, fAno, fValor])
+  }, [oscs, fStatus])
 
-  const filtroAtivo = !!(fTipo || fValor || fAno || fStatus !== 'ativas')
+  const filtroAtivo = fStatus !== 'ativas'
   const lista = useMemo(() => obras.filter(o => {
+    if (!obraPassa(o, oscByObra, f)) return false
     if (filtroAtivo && !(oscByObra.get(o.id)?.length)) return false
     const s = q.trim().toLowerCase()
     return !s || o.nome.toLowerCase().includes(s) || (o.codigo ?? '').toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
-  }), [obras, oscByObra, filtroAtivo, q])
+  }), [obras, oscByObra, filtroAtivo, q, f])
 
   // agrega uma obra a partir das suas OSCs
   const agg = (arr: EGPOscRow[]) => ({
@@ -125,8 +117,6 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
       .sort((a, b) => a.nome.localeCompare(b.nome))
   }, [lista, projetos])
 
-  const anos = useMemo(() => [...new Set(oscs.map(o => (o.data_osc ?? '').slice(0, 4)).filter(Boolean))].sort().reverse(), [oscs])
-  const tipos = useMemo(() => [...new Set(oscs.map(o => o.tipo).filter(Boolean))] as string[], [oscs])
 
   const totObras = lista.length
   const totGeral = lista.reduce((acc, o) => {
@@ -155,20 +145,7 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar..."
             className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-44 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
         </div>
-        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel}>
-          <option value="">Tipo: todos</option>
-          {tipos.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={fValor} onChange={e => setFValor(e.target.value)} className={sel}>
-          <option value="">Valor: todos</option>
-          <option value="gt1m">&gt; R$ 1 mi</option>
-          <option value="mid">R$ 100 mil – 1 mi</option>
-          <option value="lt100k">&lt; R$ 100 mil</option>
-        </select>
-        <select value={fAno} onChange={e => setFAno(e.target.value)} className={sel}>
-          <option value="">Ano: todos</option>
-          {anos.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} />
         <select value={fStatus} onChange={e => setFStatus(e.target.value as any)} className={sel}>
           <option value="ativas">Ativas</option>
           <option value="canceladas">Canceladas</option>
