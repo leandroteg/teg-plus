@@ -11,6 +11,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import RDO from './RDO'
 import ResumoTecnicoObras from './ResumoTecnicoObras'
+import PriorizacaoObras from './PriorizacaoObras'
+import PlanejamentoTecnico from './PlanejamentoTecnico'
 
 const STEPS: FlowStep[] = [
   {
@@ -69,6 +71,10 @@ export default function GestaoObras() {
       >
         {step === 'resumo_tecnico' ? (
           <ResumoTecnicoObras />
+        ) : step === 'priorizacao' ? (
+          <PriorizacaoObras />
+        ) : step === 'planejamento' ? (
+          <PlanejamentoTecnico />
         ) : step === 'diario' ? (
           /* Tela existente de RDO carregada dentro da aba (arquivo intocado) */
           <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
