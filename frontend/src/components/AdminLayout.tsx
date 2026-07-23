@@ -17,17 +17,17 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Análise',
+    label: 'Monitoramento',
     items: [
       { to: '/admin/logs',        icon: ScrollText, label: 'Logs'           },
       { to: '/admin/uso-modulos', icon: BarChart3,  label: 'Uso de Módulos' },
     ],
   },
   {
-    label: 'Desenvolvimento',
+    label: 'Sistema',
     items: [
-      { to: '/admin/desenvolvimento', icon: Code2, label: 'Desenvolvimento' },
       { to: '/admin/integracoes',     icon: Link2, label: 'Integrações'     },
+      { to: '/admin/desenvolvimento', icon: Code2, label: 'Desenvolvimento' },
     ],
   },
 ]
