@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CalendarDays, Fuel, AlertCircle, Radio } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
@@ -78,7 +79,8 @@ const TAB_ACCENT_DARK: Record<TabKey, {
 
 const COMPS: Record<TabKey, React.ComponentType> = {
   agenda:         AgendaAlocacao,
-  telemetria:     TelemetriaLogistica, // mesma tela da Logistica (reutilizada)
+  // Mesma tela da Logistica, sem o cabeçalho dela (a aba já nomeia).
+  telemetria:     () => <TelemetriaLogistica hideHeader />,
   abastecimentos: AbastecimentosOp,
   multas:         MultasPedagios,
 }
@@ -87,6 +89,13 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 
 export default function OperacaoHub() {
   const [active, setActive] = useState<TabKey>('agenda')
+
+  // "Registro Alocação" (menu lateral) cai aqui com ?novaAlocacao=1 — precisa
+  // garantir a aba Agenda, senão o modal abriria numa aba que não o renderiza.
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('novaAlocacao')) setActive('agenda')
+  }, [searchParams])
   const { isDark } = useTheme()
   const { data: abastecimentos = [] } = useAbastecimentos()
   const { data: ocorrencias = [] } = useOcorrenciasTel()
