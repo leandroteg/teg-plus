@@ -122,9 +122,23 @@ export interface FroOrdemServico {
   updated_at: string
   // joined
   veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'marca' | 'modelo' | 'status'>
-  fornecedor?: Pick<FroFornecedor, 'id' | 'razao_social' | 'nome_fantasia' | 'tipo'>
+  fornecedor?: FornecedorRefOS
   itens?: FroItemOS[]
   cotacoes?: FroCotacaoOS[]
+}
+
+/**
+ * Fornecedor resolvido a partir do cadastro corporativo `cmp_fornecedores`
+ * (o mesmo de Contas a Pagar, NF e Contratos). Não tem `tipo` nem avaliação —
+ * a antiga `fro_fornecedores` tinha, mas nasceu paralela e ficou vazia.
+ */
+export interface FornecedorRefOS {
+  id: string
+  razao_social: string
+  nome_fantasia?: string
+  cnpj?: string
+  cidade?: string
+  uf?: string
 }
 
 export interface FroItemOS {
@@ -136,6 +150,8 @@ export interface FroItemOS {
   valor_unitario: number
   garantia_km?: number
   garantia_dias?: number
+  /** Vínculo com o catálogo de materiais (est_itens), quando o item veio de lá. */
+  est_item_id?: string
   created_at: string
 }
 
@@ -149,7 +165,7 @@ export interface FroCotacaoOS {
   observacoes?: string
   selecionado: boolean
   created_at: string
-  fornecedor?: Pick<FroFornecedor, 'id' | 'razao_social' | 'nome_fantasia' | 'avaliacao_media'>
+  fornecedor?: FornecedorRefOS
 }
 
 export interface FroChecklist {
