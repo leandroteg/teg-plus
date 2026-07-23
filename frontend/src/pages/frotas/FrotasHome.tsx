@@ -138,7 +138,6 @@ export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel'
   }, [todosItensManut])
 
   const totalManutVencidas = manutPorVeiculo.reduce((s, v) => s + v.vencidos.length, 0)
-  const totalManutEmBreve = manutPorVeiculo.reduce((s, v) => s + v.emBreve.length, 0)
 
   const cardClass = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-800'
@@ -295,21 +294,14 @@ export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel'
                 <Settings2 size={14} className={(totalManutVencidas > 0 || (k?.os_criticas ?? 0) > 0) ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 flex-1">
+            {/* Só o que já estourou: "em breve" é planejamento, não ação agora. */}
+            <div className="grid grid-cols-2 gap-2 flex-1">
               <MiniInfoCard
                 label="Manut. Vencidas"
                 value={totalManutVencidas}
                 note="itens com troca atrasada"
                 icon={AlertTriangle}
                 iconTone={totalManutVencidas > 0 ? 'text-red-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Manut. Em Breve"
-                value={totalManutEmBreve}
-                note="próximos 2.000 km"
-                icon={Settings2}
-                iconTone={totalManutEmBreve > 0 ? 'text-amber-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
