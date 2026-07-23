@@ -11,7 +11,9 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import RDO from './RDO'
 import RDOEstruturado from './RDOEstruturado'
-import { usePortfolios, useObrasDoPortfolio } from '../../hooks/usePMO'
+import { useObrasDoPortfolio } from '../../hooks/usePMO'
+import { EGPContractProvider, useEGPPortfolioId } from '../../contexts/EGPContractContext'
+import { ContractSelector } from '../../components/EGPLayout'
 import ResumoTecnicoObras from './ResumoTecnicoObras'
 import PriorizacaoObras from './PriorizacaoObras'
 import PlanejamentoTecnico from './PlanejamentoTecnico'
@@ -49,7 +51,7 @@ const STEPS: FlowStep[] = [
   },
 ]
 
-export default function GestaoObras() {
+function GestaoObrasInner() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const [step, setStep] = useState('resumo_tecnico')
@@ -58,8 +60,8 @@ export default function GestaoObras() {
 
   // Veio do flyout "Novo Registro › Registrar RDO": abre a aba Diário + o modal
   const [novoRdo, setNovoRdo] = useState(false)
-  const { data: portfolios = [] } = usePortfolios()
-  const { data: obrasRdo = [] } = useObrasDoPortfolio(portfolios[0]?.id)
+  const portfolioId = useEGPPortfolioId()          // contrato do topo — filtra TODAS as abas
+  const { data: obrasRdo = [] } = useObrasDoPortfolio(portfolioId)
   const [obraRdoId, setObraRdoId] = useState('')
   const obraRdo = obrasRdo.find(o => o.id === obraRdoId) ?? obrasRdo[0]
 
@@ -68,7 +70,11 @@ export default function GestaoObras() {
   }, [searchParams])
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-4 sm:p-6 space-y-3">
+      {/* Contrato no topo da visão — mesma seleção persistida do EGP */}
+      <div className="flex items-center justify-end">
+        <ContractSelector />
+      </div>
       <ControladoriaFlow
         title="Gestão de Obras"
         subtitle="Priorização, planejamento, diário de obra e medições"
@@ -77,11 +83,11 @@ export default function GestaoObras() {
         onStepChange={setStep}
       >
         {step === 'resumo_tecnico' ? (
-          <ResumoTecnicoObras />
+          <ResumoTecnicoObras portfolioId={portfolioId} />
         ) : step === 'priorizacao' ? (
-          <PriorizacaoObras />
+          <PriorizacaoObras portfolioId={portfolioId} />
         ) : step === 'planejamento' ? (
-          <PlanejamentoTecnico />
+          <PlanejamentoTecnico portfolioId={portfolioId} />
         ) : step === 'diario' ? (
           <>
             {/* barra pra abrir o RDO estruturado (matriz do Planejamento) */}
@@ -123,5 +129,14 @@ export default function GestaoObras() {
         )}
       </ControladoriaFlow>
     </div>
+  )
+}
+
+// Provider do contrato (mesmo do EGP) envolvendo a visão inteira
+export default function GestaoObras() {
+  return (
+    <EGPContractProvider>
+      <GestaoObrasInner />
+    </EGPContractProvider>
   )
 }
