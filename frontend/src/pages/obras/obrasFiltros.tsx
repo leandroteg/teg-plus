@@ -30,6 +30,25 @@ export const VALOR_OPTS = [
 ]
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()
 
+// ── status da OBRA (sys_obras.status) ────────────────────────────────────────
+// O banco tem 'ativa' e 'ativo' para a mesma coisa — normalizamos aqui.
+export const STATUS_OPTS = [
+  { value: 'ativa', label: 'Ativa' },
+  { value: 'em_andamento', label: 'Em andamento' },
+  { value: 'concluida', label: 'Concluída' },
+  { value: 'cancelada', label: 'Cancelada' },
+]
+/** o que vem marcado ao abrir a tela — concluída e cancelada ficam de fora */
+export const STATUS_PADRAO = ['ativa', 'em_andamento']
+
+export function statusObra(s?: string | null): string {
+  const v = (s ?? '').toLowerCase()
+  if (v === 'ativo') return 'ativa'
+  if (v.startsWith('conclu')) return 'concluida'
+  if (v.startsWith('cancel')) return 'cancelada'
+  return v || 'ativa'
+}
+
 /** OSCs válidas agrupadas por obra (exclui canceladas) */
 export function agruparOscsPorObra(oscs: EGPOscRow[]) {
   const m = new Map<string, EGPOscRow[]>()
