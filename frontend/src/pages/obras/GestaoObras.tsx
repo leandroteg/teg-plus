@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { FileBarChart2, ListOrdered, CalendarRange, ClipboardList, Ruler, Construction } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
+import RDO from './RDO'
 
 const STEPS: FlowStep[] = [
   {
@@ -57,20 +58,27 @@ export default function GestaoObras() {
         activeStep={step}
         onStepChange={setStep}
       >
-        <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-          <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${atual.accent.bgActive}`}>
-              <atual.icon size={22} className={atual.accent.text} />
-            </div>
-            <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              Conteúdo de “{atual.label}” em construção
-            </p>
-            <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {atual.description}
-            </p>
-            <Construction size={16} className={`mt-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+        {step === 'diario' ? (
+          /* Tela existente de RDO carregada dentro da aba (arquivo intocado) */
+          <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+            <RDO />
           </div>
-        </div>
+        ) : (
+          <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${atual.accent.bgActive}`}>
+                <atual.icon size={22} className={atual.accent.text} />
+              </div>
+              <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Conteúdo de “{atual.label}” em construção
+              </p>
+              <p className={`text-xs mt-1 max-w-md ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {atual.description}
+              </p>
+              <Construction size={16} className={`mt-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+            </div>
+          </div>
+        )}
       </ControladoriaFlow>
     </div>
   )
