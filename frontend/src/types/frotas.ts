@@ -270,6 +270,8 @@ export interface FrotasKPIs {
   taxa_disponibilidade: number      // %
   os_abertas: number
   os_criticas: number
+  /** OS não encerradas que passaram da previsão (ou sem previsão há mais de 15 dias). */
+  os_atrasadas: number
   preventivas_vencidas: number
   preventivas_proximas_7d: number
   abastecimentos_mes: number
