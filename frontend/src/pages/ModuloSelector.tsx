@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, Megaphone, User, Link2, Code2, ClipboardList, HandHelping, CheckSquare,
+  LogOut, X, Lock, Megaphone, User, ClipboardList, HandHelping, CheckSquare,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
@@ -353,21 +353,12 @@ export default function ModuloSelector() {
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
-                {'Usu\u00e1rios'}
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/politicas-aprovacao') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <ShieldCheck size={15} className="shrink-0 opacity-50" />
-                {'Pol\u00edticas de Aprova\u00e7\u00e3o'}
+                {'Administra\u00e7\u00e3o'}
               </button>
               <button
                 type="button"
@@ -377,24 +368,6 @@ export default function ModuloSelector() {
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <Link2 size={15} className="shrink-0 opacity-50" />
-                {'Integra\u00e7\u00f5es'}
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
-                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <Code2 size={15} className="shrink-0 opacity-50" />
-                Desenvolvimento
               </button>
             </>
           )}

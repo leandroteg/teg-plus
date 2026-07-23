@@ -95,6 +95,21 @@ export interface ModuloDetalhePayload {
   acoes: { entidade_tipo: string; tipo: string; quantidade: number }[]
 }
 
+// ── Análise de IA (edge function uso-modulos-insights) ────────────────────────
+
+export interface UsoInsightDestaque {
+  tipo: 'positivo' | 'negativo' | 'neutro'
+  titulo: string
+  detalhe: string
+}
+
+export interface UsoInsights {
+  resumo_executivo: string
+  destaques: UsoInsightDestaque[]
+  alertas: string[]
+  recomendacoes: string[]
+}
+
 export interface UsoModulosPayload {
   resumo: UsoModulosResumo
   por_modulo: UsoPorModulo[]

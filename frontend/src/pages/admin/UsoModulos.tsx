@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart3, MousePointerClick, PencilLine, Users, LayoutGrid, Info, Search,
-  TrendingUp, TrendingDown, Percent, X, Target,
+  TrendingUp, TrendingDown, Percent, X, Target, Sparkles, TriangleAlert, Lightbulb, RefreshCw,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -9,7 +9,8 @@ import {
 } from 'recharts'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
-  useUsoModulos, useUsoModuloDetalhe, useUsoMetas, useSalvarMeta, type PeriodoDias,
+  useUsoModulos, useUsoModuloDetalhe, useUsoMetas, useSalvarMeta,
+  useUltimaAnalise, useGerarAnalise, type PeriodoDias,
 } from '../../hooks/useUsoModulos'
 import { moduleLabel, TRACKED_MODULES } from '../../config/moduleTracking'
 import type { UsoPorUsuario } from '../../types/usoModulos'
@@ -111,6 +112,151 @@ function ModuloChips({ modulos, dim, isLight }: { modulos: string[]; dim?: boole
           {moduleLabel(m)}
         </span>
       ))}
+    </div>
+  )
+}
+
+// ── Análise Inteligente (IA) ──────────────────────────────────────────────────
+
+function AnaliseIA({ dias, isLight }: { dias: PeriodoDias; isLight: boolean }) {
+  // Fluxo assíncrono (SuperTEG via n8n): após solicitar, fica revalidando o
+  // cache até o callback gravar a nova análise (ou até 15 min).
+  const [aguardandoDesde, setAguardandoDesde] = useState<number | null>(null)
+  const { data: cache, isLoading } = useUltimaAnalise(dias, aguardandoDesde ? 15_000 : false)
+  const gerar = useGerarAnalise()
+
+  useEffect(() => {
+    if (aguardandoDesde && cache?.gerado_em && new Date(cache.gerado_em).getTime() > aguardandoDesde) {
+      setAguardandoDesde(null)
+    }
+  }, [aguardandoDesde, cache?.gerado_em])
+
+  useEffect(() => {
+    if (!aguardandoDesde) return
+    const t = setTimeout(() => setAguardandoDesde(null), 15 * 60_000)
+    return () => clearTimeout(t)
+  }, [aguardandoDesde])
+
+  const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
+  const label = isLight ? 'text-slate-500' : 'text-slate-400'
+  const heading = isLight ? 'text-slate-800' : 'text-slate-100'
+
+  const ocupado = gerar.isPending || aguardandoDesde !== null
+  const analise = gerar.data?.analise ?? cache?.analise
+  const geradoEm = gerar.data?.gerado_em ?? cache?.gerado_em
+
+  const toneDestaque: Record<string, string> = {
+    positivo: isLight ? 'bg-emerald-50 border-emerald-100' : 'bg-emerald-500/[0.06] border-emerald-500/20',
+    negativo: isLight ? 'bg-rose-50 border-rose-100' : 'bg-rose-500/[0.06] border-rose-500/20',
+    neutro: isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/[0.08]',
+  }
+  const toneTitulo: Record<string, string> = {
+    positivo: isLight ? 'text-emerald-700' : 'text-emerald-300',
+    negativo: isLight ? 'text-rose-700' : 'text-rose-300',
+    neutro: heading,
+  }
+
+  return (
+    <div className={`rounded-2xl border p-4 mb-4 ${panel}`}>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'}`}>
+          <Sparkles size={15} />
+        </span>
+        <h2 className={`text-sm font-semibold mr-auto ${heading}`}>
+          Análise Inteligente
+          <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-semibold align-middle ${isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'}`}>
+            IA
+          </span>
+        </h2>
+        {geradoEm && (
+          <span className={`text-[11px] ${label}`}>Gerada em {fmtDataHora(geradoEm)}</span>
+        )}
+        <button
+          type="button"
+          disabled={ocupado}
+          onClick={() =>
+            gerar.mutate(dias, {
+              onSuccess: (d) => { if (d.processando) setAguardandoDesde(Date.now()) },
+            })
+          }
+          className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60 ${
+            isLight ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-violet-500/80 text-white hover:bg-violet-500'
+          }`}
+        >
+          <RefreshCw size={13} className={ocupado ? 'animate-spin' : ''} />
+          {ocupado ? 'Analisando…' : analise ? 'Gerar nova análise' : 'Gerar análise'}
+        </button>
+      </div>
+
+      {gerar.isError && (
+        <div className={`rounded-xl border p-3 mb-3 text-[12px] ${isLight ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+          {(gerar.error as Error)?.message ?? 'Erro ao gerar a análise.'}
+        </div>
+      )}
+
+      {!analise && !ocupado && !isLoading && (
+        <p className={`text-[13px] ${label}`}>
+          Clique em <strong>Gerar análise</strong> para o SuperTEG resumir o uso dos últimos {dias} dias:
+          destaques, alertas de adoção e recomendações práticas.
+        </p>
+      )}
+
+      {aguardandoDesde !== null && (
+        <div className={`flex items-start gap-2 rounded-xl border p-3 mb-3 text-[12px] ${isLight ? 'bg-violet-50 border-violet-100 text-violet-700' : 'bg-violet-500/10 border-violet-500/20 text-violet-300'}`}>
+          <Sparkles size={13} className="mt-0.5 shrink-0" />
+          <span>
+            Análise solicitada ao <strong>SuperTEG</strong> — pode levar alguns minutos.
+            O resultado aparece aqui automaticamente quando ficar pronto.
+          </span>
+        </div>
+      )}
+
+      {gerar.isPending && !analise && (
+        <div className="animate-pulse space-y-2">
+          <div className={`h-4 w-3/4 rounded ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+          <div className={`h-4 w-2/3 rounded ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+          <div className={`h-20 rounded-xl ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`} />
+        </div>
+      )}
+
+      {analise && (
+        <div className="space-y-3">
+          <p className={`text-[13px] leading-relaxed ${heading}`}>{analise.resumo_executivo}</p>
+
+          {analise.destaques.length > 0 && (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+              {analise.destaques.map((d, i) => (
+                <div key={i} className={`rounded-xl border p-3 ${toneDestaque[d.tipo] ?? toneDestaque.neutro}`}>
+                  <div className={`text-[12px] font-semibold mb-0.5 ${toneTitulo[d.tipo] ?? heading}`}>{d.titulo}</div>
+                  <div className={`text-[12px] leading-snug ${label}`}>{d.detalhe}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {analise.alertas.length > 0 && (
+            <div className="space-y-1.5">
+              {analise.alertas.map((a, i) => (
+                <div key={i} className={`flex items-start gap-2 text-[12px] ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>
+                  <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+                  <span>{a}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {analise.recomendacoes.length > 0 && (
+            <div className="space-y-1.5">
+              {analise.recomendacoes.map((r, i) => (
+                <div key={i} className={`flex items-start gap-2 text-[12px] ${label}`}>
+                  <Lightbulb size={13} className={`mt-0.5 shrink-0 ${isLight ? 'text-sky-500' : 'text-sky-400'}`} />
+                  <span>{r}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -546,6 +692,9 @@ export default function UsoModulos() {
                 </span>
               </div>
             )}
+
+            {/* Análise de IA */}
+            <AnaliseIA dias={dias} isLight={isLight} />
 
             {/* Evolução + distribuição */}
             <div className="grid xl:grid-cols-3 gap-4 mb-4">

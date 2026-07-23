@@ -40,6 +40,7 @@ import SgiLayout from './components/SgiLayout'
 import QsmaLayout from './components/QsmaLayout'
 import OrcamentacaoLayout from './components/OrcamentacaoLayout'
 import PaineisLayout from './components/PaineisLayout'
+import AdminLayout from './components/AdminLayout'
 import ResponsivePainel from './components/paineis-mobile/ResponsivePainel'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
@@ -235,8 +236,11 @@ const ScannerQR = lazy(() => import('./pages/patrimonial/ScannerQR'))
 const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 
 // Admin
+const AdminHome = lazy(() => import('./pages/admin/AdminHome'))
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
 const PoliticasAprovacao = lazy(() => import('./pages/admin/PoliticasAprovacao'))
+const AdminLogs = lazy(() => import('./pages/admin/Logs'))
+const AdminUsoModulos = lazy(() => import('./pages/admin/UsoModulos'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 
 // TI / Help Desk
@@ -618,9 +622,12 @@ export default function App() {
 
         {/* ── Admin ─────────────────────────────────────────── */}
         <Route element={<AdminRoute />}>
-          <Route element={<Layout />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<Lazy><AdminHome /></Lazy>} />
             <Route path="/admin/usuarios" element={<Lazy><AdminUsuarios /></Lazy>} />
             <Route path="/admin/politicas-aprovacao" element={<Lazy><PoliticasAprovacao /></Lazy>} />
+            <Route path="/admin/logs" element={<Lazy><AdminLogs /></Lazy>} />
+            <Route path="/admin/uso-modulos" element={<Lazy><AdminUsoModulos /></Lazy>} />
             <Route path="/admin/integracoes" element={<Lazy><Configuracoes /></Lazy>} />
             <Route path="/admin/desenvolvimento" element={<Lazy><Desenvolvimento /></Lazy>} />
           </Route>

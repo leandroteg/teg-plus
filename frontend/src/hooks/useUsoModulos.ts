@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import type { ModuloDetalhePayload, UsoModulosPayload } from '../types/usoModulos'
+import type { ModuloDetalhePayload, UsoInsights, UsoModulosPayload } from '../types/usoModulos'
 
 export type PeriodoDias = 7 | 30 | 90
 
@@ -44,6 +44,56 @@ export function useUsoMetas() {
       return out
     },
     staleTime: 60_000,
+  })
+}
+
+// Última análise de IA em cache para o período (sys_uso_insights, RLS admin).
+// pollMs: quando uma análise assíncrona (SuperTEG) está em andamento, o painel
+// passa um intervalo para revalidar até o callback gravar o resultado.
+export function useUltimaAnalise(dias: PeriodoDias, pollMs: number | false = false) {
+  return useQuery({
+    queryKey: ['uso-insights', dias],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sys_uso_insights')
+        .select('payload, modelo, created_at')
+        .eq('periodo_dias', dias)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return data
+        ? { analise: data.payload as UsoInsights, modelo: data.modelo as string | null, gerado_em: data.created_at as string }
+        : null
+    },
+    staleTime: 60_000,
+    refetchInterval: pollMs,
+  })
+}
+
+export interface GerarAnaliseResposta {
+  ok: boolean
+  sincrono?: boolean
+  processando?: boolean
+  run_id?: string
+  analise?: UsoInsights
+  gerado_em?: string
+}
+
+// Solicita uma nova análise ao SuperTEG (Claude na VPS) via edge function/n8n.
+// Resposta pode ser síncrona ({ analise }) ou assíncrona ({ processando: true }).
+export function useGerarAnalise() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (dias: PeriodoDias) => {
+      const { data, error } = await supabase.functions.invoke('uso-modulos-insights', {
+        body: { dias },
+      })
+      if (error) throw error
+      if (!data?.ok) throw new Error(data?.motivo ?? 'Falha ao solicitar a análise.')
+      return data as GerarAnaliseResposta
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uso-insights'] }),
   })
 }
 
