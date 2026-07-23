@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
-  Plus, Wrench, X, Clock, Building2,
+  Wrench, X, Clock, Building2,
   Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
   ClipboardCheck, ShieldCheck, Cog, FileSearch, CalendarClock,
 } from 'lucide-react'
@@ -80,6 +80,9 @@ const STAGE_ACCENT_DARK: Record<StageKey, AccentSet> = {
 }
 
 // ── Modal Nova OS ────────────────────────────────────────────────────────────
+// Mantido sem gatilho na tela: o botão "Nova OS" saiu do cabeçalho a pedido.
+// Hoje nenhum outro ponto do sistema abre uma OS direto (o menu lateral cria
+// Solicitação, que é outra coisa), então isto fica pronto para ser religado.
 function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
   const criar = useCriarOS()
   const { data: veiculos = [] } = useVeiculos()
@@ -315,7 +318,6 @@ const PRIOR_ORDER: Record<PrioridadeOS, number> = { critica: 0, alta: 1, media: 
 
 export default function OSAbertas() {
   const { isDark } = useTheme()
-  const [novaOS, setNovaOS] = useState(false)
   const [activeTab, setActiveTab] = useState<StageKey>('pendente')
   const [detail, setDetail] = useState<FroOrdemServico | null>(null)
   const [busca, setBusca] = useState('')
@@ -401,19 +403,7 @@ export default function OSAbertas() {
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div>
-          <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Wrench size={18} className="text-rose-500" /> Ordens de Serviço
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de manutenção</p>
-        </div>
-        <button onClick={() => setNovaOS(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors">
-          <Plus size={14} /> Nova OS
-        </button>
-      </div>
+      {/* Sem cabeçalho: a aba do hub já identifica a tela — a grade começa no topo. */}
 
       {/* Pipeline tabs */}
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
@@ -517,7 +507,6 @@ export default function OSAbertas() {
           onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }}
         />
       )}
-      {novaOS && <NovaOSModal onClose={() => setNovaOS(false)} isDark={isDark} />}
       {detalheVeic && (
         <VeiculoDetalhesModal
           veiculo={detalheVeic.v}
