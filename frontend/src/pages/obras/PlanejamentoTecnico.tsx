@@ -14,41 +14,10 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useObrasDoPortfolio, useOSCsDoPortfolio, useProjetos } from '../../hooks/usePMO'
 import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
+import { useCatalogoAtividades, coresDoCatalogo } from './catalogoAtividades'
 
 
 // Catálogo padrão (planilha ACOMPANHAMENTO MODELO — 32 atividades por seção)
-const CATALOGO: { secao: string; atividades: string[] }[] = [
-  { secao: 'Preliminar Fundação', atividades: [
-    'CONFERÊNCIA TOPOGRÁFICA', 'LOCAÇÃO DE CAVAS', 'ABERTURA E IDENTIFICAÇÃO DE ACESSO',
-  ]},
-  { secao: 'Fundação', atividades: [
-    'ARMAÇÃO/MONTAGEM DE FERRAGENS', 'ESCAVAÇÃO DE CAVAS', 'NIVELAMENTO DE STUBS E FORMAS',
-    'CONCRETAGEM DE FUNDAÇÃO', 'RETIRADA DE FORMAS',
-  ]},
-  { secao: 'Aterramento', atividades: [
-    'INSTALAÇÃO DE FIO CONTRAPESO', 'MEDIÇÃO DE RESISTÊNCIA',
-  ]},
-  { secao: 'Montagem', atividades: [
-    'CONFERÊNCIA DE POSIÇÕES', 'TRANSPORTE DE FERRAGENS PARA O CAMPO', 'PRÉ-MONTAGEM DE ESTRUTURAS',
-    'MONTAGEM DE ESTRUTURAS', 'REVISÃO DE ESTRUTURAS',
-  ]},
-  { secao: 'Lançamento', atividades: [
-    'ABERTURA DE FAIXA DE SERVIDÃO', 'PREPARAÇÃO CONDUTOR', 'LANÇAMENTO DE CABOS CONDUTORES',
-    'NIVELAMENTO DE CABOS CONDUTOR', 'GRAMPEAÇÃO E ENCABEÇAMENTO DE CONDUTOR', 'REVISÃO FINAL DE CABO CONDUTOR',
-    'PREPARAÇÃO DE CABO PARA-RAIO', 'LANÇAMENTO DE CABO PARA-RAIO', 'NIVELAMENTO DE CABO PARA-RAIO',
-    'GRAMPEAÇÃO E ENCABEÇAMENTO DE PARA-RAIO', 'REVISÃO FINAL DE CABO PARA-RAIO', 'INSTALAÇÃO DE SINALIZAÇÃO AÉREA',
-  ]},
-  { secao: 'Acabamento', atividades: [
-    'SECCIONAMENTO E ATERRAMENTO DE CERCAS', 'PINTURA, NUMERAÇÃO, ETC', 'ACABAMENTO FINAL DE SOLO - PRAD',
-  ]},
-  { secao: 'Outros', atividades: [
-    'COMISSIONAMENTO FINAL', 'ENERGIZAÇÃO',
-  ]},
-]
-const SECAO_COR: Record<string, string> = {
-  'Preliminar Fundação': '#64748b', 'Fundação': '#f59e0b', 'Aterramento': '#10b981',
-  'Montagem': '#6366f1', 'Lançamento': '#0ea5e9', 'Acabamento': '#8b5cf6', 'Outros': '#94a3b8',
-}
 
 interface Estrutura { id: string; obra_id: string; nome: string; tipo: string | null; peso_ton: number | null; dist_prox_m: number | null; ordem: number }
 interface Celula { id: string; estrutura_id: string; atividade: string; data: string | null; avanco: number; data_prev: string | null; avanco_prev: number; responsavel_nome: string | null }
@@ -98,6 +67,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   const obraSel = (obraId && obrasFiltradas.some(o => o.id === obraId)) ? obraId : obrasFiltradas[0]?.id
   const { data: estruturas = [], isLoading } = useEstruturas(obraSel)
   const { data: celulas = [] } = useCelulas(obraSel)
+  const { data: CATALOGO = [] } = useCatalogoAtividades(obraSel)
+  const SECAO_COR = useMemo(() => coresDoCatalogo(CATALOGO), [CATALOGO])
 
   const [qTorre, setQTorre] = useState('')
   const [addOpen, setAddOpen] = useState(false)
