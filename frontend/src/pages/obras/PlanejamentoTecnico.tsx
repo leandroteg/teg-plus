@@ -308,9 +308,11 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
               <tr>
                 <th className={`sticky left-0 z-10 px-2 py-1.5 text-left ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
                 <th className={`sticky left-[86px] z-10 px-2 py-1.5 text-left ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`}>Prev</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`}>Exec</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`}>%</th>
+                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
+                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Executado (qtd)">Exec.</th>
+                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Executado (%)">%</th>
+                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Faltante (qtd)">Falt.</th>
+                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Faltante (%)">%</th>
                 {cols.map(e => (
                   <th key={e.id} className={`px-1 py-1.5 text-center min-w-[74px] ${isDark ? 'border-l border-white/[0.05]' : 'border-l border-slate-100'}`}>
                     <div className={`text-[11px] font-extrabold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{e.nome}</div>
@@ -326,6 +328,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
                 const prev = cols.length
                 const exec = cols.reduce((s, e) => s + Math.min(1, cel.get(`${e.id}|${atv}`)?.avanco ?? 0), 0)
                 const pct = prev ? Math.round((exec / prev) * 100) : 0
+                const falt = Math.max(0, prev - exec)          // planilha: FALTANTE (qtd)
+                const pctFalt = prev ? Math.round((falt / prev) * 100) : 0
                 return (
                   <tr key={g.secao + atv} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}>
                     {ai === 0 && (
@@ -337,6 +341,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
                     <td className={`px-1.5 py-1 text-right tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{prev || '—'}</td>
                     <td className={`px-1.5 py-1 text-right tabular-nums font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{exec ? exec.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
                     <td className={`px-1.5 py-1 text-right tabular-nums font-bold ${pct >= 100 ? 'text-emerald-500' : pct > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{pct ? `${pct}%` : '—'}</td>
+                    <td className={`px-1.5 py-1 text-right tabular-nums ${falt > 0 ? (isDark ? 'text-slate-300' : 'text-slate-600') : 'text-slate-400'}`}>{prev ? falt.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
+                    <td className={`px-1.5 py-1 text-right tabular-nums ${pctFalt > 0 ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>{prev ? `${pctFalt}%` : '—'}</td>
                     {cols.map(e => {
                       const c = cel.get(`${e.id}|${atv}`)
                       const av = c?.avanco ?? 0
