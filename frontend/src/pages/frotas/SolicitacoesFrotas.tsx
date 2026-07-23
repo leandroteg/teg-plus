@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Car, Wrench, Building2, CalendarDays, User, FileText, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useVeiculos } from '../../hooks/useFrotas'
@@ -13,7 +14,12 @@ const TIPO_OPTS: { value: TipoSolicitacao; label: string; desc: string; icon: ty
 export default function SolicitacoesFrotas() {
   const { isDark } = useTheme()
   const isLight = !isDark
-  const [tipo, setTipo]           = useState<TipoSolicitacao>('emprestimo')
+  // O menu lateral abre já no tipo escolhido (Requisição de Frota / Manutenção).
+  const [searchParams] = useSearchParams()
+  const tipoUrl = searchParams.get('tipo')
+  const [tipo, setTipo] = useState<TipoSolicitacao>(
+    tipoUrl === 'manutencao' || tipoUrl === 'emprestimo' ? tipoUrl : 'emprestimo',
+  )
   const [veiculoId, setVeiculoId] = useState('')
   const [destino, setDestino]     = useState('')
   const [dataInicio, setDataInicio] = useState('')
