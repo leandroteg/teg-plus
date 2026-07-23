@@ -14,8 +14,7 @@ import { ChevronDown, ChevronRight, Search, Building2, Ruler, TowerControl, Load
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, type EGPOscRow } from '../../hooks/usePMO'
-import { useObrasFiltros, ObrasFiltrosBar, obraPassa, STATUS_OPTS, statusObra, STATUS_PADRAO } from './obrasFiltros'
-import { MultiSelect, togFiltro } from '../pmo/paineis/egpFiltros'
+import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
 
 const fmtBRL = (v?: number | null) => v == null ? '—' : `R$ ${Math.round(v).toLocaleString('pt-BR')}`
 const fmtNum = (v?: number | null, dec = 0) => v == null || v === 0 ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: dec })
@@ -65,8 +64,7 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
   const [tecObra, setTecObra] = useState<{ id: string; nome: string; oscs: EGPOscRow[] } | null>(null)
 
   const [q, setQ] = useState('')
-  const [fStatus, setFStatus] = useState<Set<string>>(() => new Set(STATUS_PADRAO))
-  const f = useObrasFiltros()
+  const f = useObrasFiltros({ tipoPadrao: true })
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [fechados, setFechados] = useState<Set<string>>(new Set())
 
@@ -84,11 +82,10 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
   }, [oscs])
 
   const lista = useMemo(() => obras.filter(o => {
-    if (fStatus.size && !fStatus.has(statusObra(o.status))) return false
     if (!obraPassa(o, oscByObra, f)) return false
     const s = q.trim().toLowerCase()
     return !s || o.nome.toLowerCase().includes(s) || (o.codigo ?? '').toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
-  }), [obras, oscByObra, q, f, fStatus])
+  }), [obras, oscByObra, q, f])
 
   // agrega uma obra a partir das suas OSCs
   const agg = (arr: EGPOscRow[]) => ({
@@ -143,8 +140,6 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
             className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-44 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
         </div>
         <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} />
-        <MultiSelect label="Status" options={STATUS_OPTS} selected={fStatus}
-          onToggle={v => togFiltro(v, setFStatus)} onClear={() => setFStatus(new Set())} isDark={isDark} compacto />
       </div>
 
       {/* Cabeçalho de colunas + total geral (mesma grade das linhas) */}
