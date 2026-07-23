@@ -84,7 +84,7 @@ export function obraPassa(
   return true
 }
 
-export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children }: {
+export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children, projetoPorUltimo }: {
   projetos: { id: string; nome: string }[]
   oscs: EGPOscRow[]
   f: ObrasFiltros
@@ -93,6 +93,8 @@ export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children 
   onChange?: () => void
   /** controles extras à direita (busca, contador, botões) */
   children?: ReactNode
+  /** joga o Projeto para o fim da barra — usado onde ele fica colado no seletor de Obra */
+  projetoPorUltimo?: boolean
 }) {
   const projetosOrd = useMemo(() => [...projetos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [projetos])
   const tipos = useMemo(() => ([...new Set(oscs.map(o => o.tipo).filter(Boolean))] as string[])
@@ -103,10 +105,14 @@ export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children 
   const tog = (v: string, set: React.Dispatch<React.SetStateAction<Set<string>>>) => { togFiltro(v, set); onChange?.() }
   const lim = (set: React.Dispatch<React.SetStateAction<Set<string>>>) => { set(new Set()); onChange?.() }
 
+  const boxProjeto = (
+    <MultiSelect label="Projeto" options={projetosOrd.map(p => ({ value: p.id, label: p.nome }))} selected={f.fProjeto}
+      onToggle={v => tog(v, f.setFProjeto)} onClear={() => lim(f.setFProjeto)} isDark={isDark} compacto />
+  )
+
   return (
     <>
-      <MultiSelect label="Projeto" options={projetosOrd.map(p => ({ value: p.id, label: p.nome }))} selected={f.fProjeto}
-        onToggle={v => tog(v, f.setFProjeto)} onClear={() => lim(f.setFProjeto)} isDark={isDark} compacto />
+      {!projetoPorUltimo && boxProjeto}
       <MultiSelect label="Tipo" options={tipos.map(t => ({ value: t, label: cap(t) }))} selected={f.fTipo}
         onToggle={v => tog(v, f.setFTipo)} onClear={() => lim(f.setFTipo)} isDark={isDark} compacto />
       <MultiSelect label="Valor" options={VALOR_OPTS} selected={f.fValor}
@@ -115,6 +121,7 @@ export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children 
         onToggle={v => tog(v, f.setFAno)} onClear={() => lim(f.setFAno)} isDark={isDark} compacto />
       <MultiSelect label="Status" options={STATUS_OPTS} selected={f.fStatus}
         onToggle={v => tog(v, f.setFStatus)} onClear={() => lim(f.setFStatus)} isDark={isDark} compacto />
+      {projetoPorUltimo && boxProjeto}
       {children}
     </>
   )
