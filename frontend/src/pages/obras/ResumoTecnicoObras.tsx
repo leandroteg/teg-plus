@@ -127,6 +127,12 @@ export default function ResumoTecnicoObras() {
   const toggleObra = (id: string) => setOpen(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleGrupo = (id: string) => setFechados(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
+  // grade única — frente, obra e OSC usam as MESMAS colunas (alinham na vertical)
+  const GRID = 'grid grid-cols-[minmax(0,1fr)_76px_88px_124px_92px_92px] gap-3 items-center'
+  const num = `text-right tabular-nums text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+  const dat = `text-right text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+  const th = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`
+
   return (
     <div className="space-y-3">
       {/* Filtros */}
@@ -161,12 +167,22 @@ export default function ResumoTecnicoObras() {
             {portfolios.map(p => <option key={p.id} value={p.id}>{p.nome_obra}</option>)}
           </select>
         )}
-        <div className="flex-1" />
-        <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          <span className="font-bold">{fmtBRL(totGeral.valor)}</span>
-          <span className="flex items-center gap-1"><TowerControl size={12} /> {fmtNum(totGeral.torres)}</span>
-          <span className="flex items-center gap-1"><Ruler size={12} /> {fmtNum(totGeral.km, 1)} km</span>
-        </div>
+      </div>
+
+      {/* Cabeçalho de colunas + total geral (mesma grade das linhas) */}
+      <div className={`rounded-xl ${card} px-3 py-2 ${GRID}`}>
+        <span className={th}>Obra / OSC</span>
+        <span className={`${th} text-right flex items-center justify-end gap-1`}><TowerControl size={10} /> Torres</span>
+        <span className={`${th} text-right flex items-center justify-end gap-1`}><Ruler size={10} /> Km linha</span>
+        <span className={`${th} text-right`}>Valor</span>
+        <span className={`${th} text-right`}>Início</span>
+        <span className={`${th} text-right`}>Prazo</span>
+
+        <span className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total · {totObras} obras</span>
+        <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtNum(totGeral.torres)}</span>
+        <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtNum(totGeral.km, 1)}</span>
+        <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{fmtBRL(totGeral.valor)}</span>
+        <span /><span />
       </div>
 
       {isLoading ? (
@@ -186,16 +202,18 @@ export default function ResumoTecnicoObras() {
         const aberto = !fechados.has(g.id)
         return (
           <div key={g.id} className="space-y-1">
-            {/* Cabeçalho da frente */}
+            {/* Frente */}
             <button onClick={() => toggleGrupo(g.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-100/70'}`}>
-              {aberto ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
-              <span className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{g.nome}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-200 text-slate-600'}`}>{g.obras.length} obras</span>
-              <div className="flex-1" />
-              <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{fmtBRL(tot.valor)}</span>
-              <span className={`text-[11px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><TowerControl size={11} /> {fmtNum(tot.torres)}</span>
-              <span className={`text-[11px] flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Ruler size={11} /> {fmtNum(tot.km, 1)} km</span>
+              className={`w-full ${GRID} px-3 py-2 rounded-xl ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-100/70'}`}>
+              <span className="flex items-center gap-2 min-w-0">
+                {aberto ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+                <span className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{g.nome}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-200 text-slate-600'}`}>{g.obras.length} obras</span>
+              </span>
+              <span className={`${num} font-bold`}>{fmtNum(tot.torres)}</span>
+              <span className={`${num} font-bold`}>{fmtNum(tot.km, 1)}</span>
+              <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(tot.valor)}</span>
+              <span /><span />
             </button>
 
             {aberto && g.obras.map(o => {
@@ -204,32 +222,34 @@ export default function ResumoTecnicoObras() {
               const exp = open.has(o.id)
               return (
                 <div key={o.id} className={`rounded-xl ${card} overflow-hidden`}>
-                  <button onClick={() => toggleObra(o.id)} className={`w-full flex items-center gap-2 px-3 py-2.5 text-left ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                    {exp ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
-                    <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
-                    {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
-                    <div className="flex-1" />
-                    <span className={`text-xs font-bold shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{fmtBRL(a.valor)}</span>
-                    <span className={`text-[11px] shrink-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><TowerControl size={11} /> {fmtNum(a.torres)}</span>
-                    <span className={`text-[11px] shrink-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Ruler size={11} /> {fmtNum(a.km, 1)} km</span>
-                    <span className={`text-[10px] shrink-0 hidden sm:block ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{fmtData(a.ini)} · {fmtData(a.fim)}</span>
+                  <button onClick={() => toggleObra(o.id)} className={`w-full ${GRID} px-3 py-2.5 text-left ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      {exp ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
+                      <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
+                      {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
+                    </span>
+                    <span className={num}>{fmtNum(a.torres)}</span>
+                    <span className={num}>{fmtNum(a.km, 1)}</span>
+                    <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(a.valor)}</span>
+                    <span className={dat}>{fmtData(a.ini)}</span>
+                    <span className={dat}>{fmtData(a.fim)}</span>
                   </button>
 
                   {exp && (
-                    <div className={`px-3 pb-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-                      <div className={`grid grid-cols-[1.4fr_auto_auto_auto_auto_auto] gap-2 px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                        <span>OSC</span><span>Tipo</span><span className="text-right">Torres</span><span className="text-right">Km linha</span><span className="text-right">Valor</span><span className="text-right">Prazo</span>
-                      </div>
-                      {arr.length === 0 && <p className={`text-xs px-2 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma OSC neste filtro.</p>}
+                    <div className={`pb-1.5 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+                      {arr.length === 0 && <p className={`text-xs px-5 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma OSC neste filtro.</p>}
                       {arr.map(osc => (
-                        <div key={osc.id} className={`grid grid-cols-[1.4fr_auto_auto_auto_auto_auto] gap-2 items-center px-2 py-1.5 rounded-lg text-xs ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                          <span className={`font-semibold truncate ${isDark ? 'text-sky-300' : 'text-sky-700'}`}>{osc.numero_os}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>{osc.tipo ?? '—'}</span>
-                          <span className={`text-right tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{fmtNum(osc.qtd_torres)}</span>
-                          <span className={`text-right tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{fmtNum(km(osc.id), 1)}</span>
-                          <span className={`text-right font-semibold tabular-nums ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(osc.valor)}</span>
-                          <span className={`text-right ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtData(osc.vencimento)}</span>
+                        <div key={osc.id} className={`${GRID} px-3 py-1.5 ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                          <span className="flex items-center gap-2 min-w-0 pl-6">
+                            <span className={`text-xs font-semibold truncate ${isDark ? 'text-sky-300' : 'text-sky-700'}`}>{osc.numero_os}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>{osc.tipo ?? '—'}</span>
+                          </span>
+                          <span className={num}>{fmtNum(osc.qtd_torres)}</span>
+                          <span className={num}>{fmtNum(km(osc.id), 1)}</span>
+                          <span className={`text-right tabular-nums text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(osc.valor)}</span>
+                          <span className={dat}>{fmtData(osc.data_osc)}</span>
+                          <span className={dat}>{fmtData(osc.vencimento)}</span>
                         </div>
                       ))}
                     </div>
