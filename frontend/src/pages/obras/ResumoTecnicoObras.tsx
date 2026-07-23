@@ -132,7 +132,7 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
   // grade única — frente, obra e OSC usam as MESMAS colunas (alinham na vertical)
   const GRID = 'grid grid-cols-[minmax(0,1fr)_76px_88px_124px_92px_92px] gap-3 items-center'
   const num = `text-right tabular-nums text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`
-  const dat = `text-right text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+  const dat = `text-right text-[11px] tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-700'}`
   const th = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`
 
   return (
