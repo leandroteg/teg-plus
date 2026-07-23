@@ -373,26 +373,26 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+        className={`w-full max-w-5xl max-h-[92vh] lg:max-h-[92vh] flex flex-col rounded-t-2xl lg:rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
         {/* header */}
         <div className={`flex items-start justify-between gap-3 p-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra —</h3>
+            <div className="flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-2 min-w-0">
+              <h3 className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra</h3>
               {obras?.length && onObraChange ? (
-                <>
+                <div className="flex items-center gap-1.5 min-w-0">
                   <select value={projSel} onChange={e => setProjSel(e.target.value)}
-                    className={`shrink-0 max-w-[190px] truncate rounded-lg px-2 py-1 border text-sm font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    className={`shrink min-w-0 max-w-[130px] lg:max-w-[190px] truncate rounded-lg px-2 py-1 border text-sm font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
                     <option value="">Todos os projetos</option>
                     {projetosOpts.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
                   </select>
                   <select value={obraId} onChange={e => onObraChange(e.target.value)}
-                    className={`min-w-0 max-w-[420px] truncate rounded-lg px-2 py-1 border text-sm font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                    className={`min-w-0 flex-1 lg:flex-none lg:max-w-[420px] truncate rounded-lg px-2 py-1 border text-sm font-bold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.12] text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
                     {obrasOpts.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
                   </select>
-                </>
+                </div>
               ) : (
                 <span className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{obraNome}</span>
               )}
@@ -416,7 +416,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             <input value={horasImp} onChange={e => setHorasImp(e.target.value)} className={`${inp} w-24`} /></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 flex-1 min-w-[180px]">MOTIVO
             <input value={motivoImp} onChange={e => setMotivoImp(e.target.value)} placeholder="chuva, aguardando liberação…" className={inp} /></label>
-          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[190px]">FISCAL CEMIG
+          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 w-full sm:w-auto sm:min-w-[190px]">FISCAL CEMIG
             <div className="flex items-center gap-1 flex-wrap">
               {fiscais.map(n => (
                 <span key={n} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-white/[0.08] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
@@ -428,7 +428,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                 placeholder="nome + Enter" className={`${inp} w-32`} />
             </div>
           </div>
-          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[200px]">TST ALOCADO
+          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 w-full sm:w-auto sm:min-w-[200px]">TST ALOCADO
             <div className="flex items-center gap-1 flex-wrap">
               {tstSel.map(t => (
                 <span key={t.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
