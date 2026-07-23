@@ -92,7 +92,7 @@ function GestaoObrasInner() {
         ) : step === 'diario' ? (
           <>
             {/* histórico + filtros padrão; a obra escolhida lá é a do RDO estruturado */}
-            <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+            <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6 -mt-3">
               <RDO portfolioId={portfolioId} onObraChange={setObraRdoId} embutido />
             </div>
             {novoRdo && obraRdo && (
