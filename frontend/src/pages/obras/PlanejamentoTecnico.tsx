@@ -174,7 +174,7 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   return (
     <div className="space-y-3">
       {/* Filtros — todos na 1ª linha, mesmo padrão de caixa de seleção múltipla */}
-      <div className={`relative z-50 rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
+      <div className={`relative z-20 rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
         <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} onChange={() => setObraId('')} />
         <select value={obraSel ?? ''} onChange={e => setObraId(e.target.value)} className={`${sel} max-w-[280px] truncate font-bold`}>
           {obrasFiltradas.length === 0 && <option value="">— nenhuma obra no filtro —</option>}
@@ -218,15 +218,15 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
           <table className="border-collapse text-xs min-w-full">
             <thead>
               <tr>
-                <th rowSpan={2} className={`sticky left-0 top-0 z-40 px-2 py-1.5 text-left align-bottom ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
-                <th rowSpan={2} className={`sticky left-[86px] top-0 z-40 px-2 py-1.5 text-left align-bottom ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
-                <th rowSpan={2} className={`sticky top-0 z-30 px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
-                <th rowSpan={2} className={`sticky top-0 z-30 px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (qtd)">Exec.</th>
-                <th rowSpan={2} className={`sticky top-0 z-30 px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (%)">%</th>
-                <th rowSpan={2} className={`sticky top-0 z-30 px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (qtd)">Falt.</th>
-                <th rowSpan={2} className={`sticky top-0 z-30 px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (%)">%</th>
+                <th rowSpan={2} className={`sticky left-0 top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
+                <th rowSpan={2} className={`sticky left-[86px] top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
+                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
+                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (qtd)">Exec.</th>
+                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (%)">%</th>
+                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (qtd)">Falt.</th>
+                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (%)">%</th>
                 {cols.map(e => (
-                  <th key={e.id} colSpan={2} className={`sticky top-0 z-30 h-[56px] px-1 py-1 text-center min-w-[120px] ${isDark ? 'bg-teal-500/[0.10] border-l border-white/[0.12]' : 'bg-teal-50 border-l border-slate-300'}`}>
+                  <th key={e.id} colSpan={2} className={`sticky top-0 z-[11] h-[56px] px-1 py-1 text-center min-w-[120px] ${isDark ? 'bg-teal-500/[0.10] border-l border-white/[0.12]' : 'bg-teal-50 border-l border-slate-300'}`}>
                     <div className={`text-[11px] font-extrabold ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{e.nome}</div>
                     <div className={`text-[9px] font-semibold ${isDark ? 'text-teal-400/70' : 'text-teal-600/80'}`}>{e.tipo ?? '—'}{e.peso_ton ? ` · ${e.peso_ton}t` : ''}</div>
                     {e.dist_prox_m != null && <div className="text-[9px] text-sky-500 font-semibold">→ {e.dist_prox_m.toLocaleString('pt-BR')} m</div>}
@@ -237,8 +237,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
               {/* sub-cabeçalho: cada torre tem Previsto | Realizado */}
               <tr>
                 {cols.map(e => [
-                  <th key={e.id + '-p'} className={`sticky top-[56px] z-30 px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-sky-500/[0.16] text-sky-300 border-l border-white/[0.12]' : 'bg-sky-100 text-sky-700 border-l border-slate-300'}`}>Prev</th>,
-                  <th key={e.id + '-r'} className={`sticky top-[56px] z-30 px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-emerald-500/[0.16] text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>Real</th>,
+                  <th key={e.id + '-p'} className={`sticky top-[56px] z-[11] px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-sky-500/[0.16] text-sky-300 border-l border-white/[0.12]' : 'bg-sky-100 text-sky-700 border-l border-slate-300'}`}>Prev</th>,
+                  <th key={e.id + '-r'} className={`sticky top-[56px] z-[11] px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-emerald-500/[0.16] text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>Real</th>,
                 ])}
               </tr>
             </thead>
