@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Wrench, Gauge, Plus } from 'lucide-react'
+import { LayoutDashboard, Truck, Wrench, Gauge, Plus, Car, CalendarPlus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 
@@ -8,13 +8,38 @@ export default function FrotasLayout() {
   const NAV = [
     { to: '/frotas',            icon: LayoutDashboard, label: 'Painel',          end: true },
     {
-      to: '/frotas/solicitacoes',
+      to: 'frotas-nova-solicitacao',
       icon: Plus,
       label: 'Nova Solicitação',
       end: false,
       accent: true,
       requisitanteAllowed: true,
-      action: () => navigate(`/frotas/solicitacoes?nova=${Date.now()}`),
+      actionMenu: {
+        title: 'Nova solicitação',
+        items: [
+          {
+            icon: Car,
+            label: 'Requisição de Frota',
+            description: 'Solicitar veículo ou máquina para uma obra / centro de custo.',
+            tone: 'sky' as const,
+            action: () => navigate(`/frotas/solicitacoes?nova=${Date.now()}&tipo=emprestimo`),
+          },
+          {
+            icon: Wrench,
+            label: 'Solicitação de Manutenção',
+            description: 'Reportar um problema ou agendar revisão de um ativo.',
+            tone: 'rose' as const,
+            action: () => navigate(`/frotas/solicitacoes?nova=${Date.now()}&tipo=manutencao`),
+          },
+          {
+            icon: CalendarPlus,
+            label: 'Registro Alocação',
+            description: 'Registrar diretamente a saída de um ativo para a obra.',
+            tone: 'emerald' as const,
+            action: () => navigate(`/frotas/operacao?novaAlocacao=1&t=${Date.now()}`),
+          },
+        ],
+      },
     },
     { to: '/frotas/frota',      icon: Truck,           label: 'Frota & Máquinas' },
     { to: '/frotas/manutencao', icon: Wrench,          label: 'Manutenção'       },
