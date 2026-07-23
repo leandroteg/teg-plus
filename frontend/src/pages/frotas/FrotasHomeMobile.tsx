@@ -71,7 +71,6 @@ export default function FrotasHomeMobile() {
   }, [todosItensManut])
 
   const totalManutVencidas = manutPorVeiculo.reduce((s, v) => s + v.vencidos.length, 0)
-  const totalManutEmBreve = manutPorVeiculo.reduce((s, v) => s + v.emBreve.length, 0)
 
   const k = kpis as FrotasKPIs | undefined
 
@@ -147,8 +146,8 @@ export default function FrotasHomeMobile() {
         <KpiCard label="Custo Mês" value={BRL(custoMensal)} tone="amber" note="manut. + abast." icon={DollarSign} />
       </KpiGrid>
 
-      {/* Janela Crítica — o que exige ação agora */}
-      <KpiGrid cols={3}>
+      {/* Janela Crítica — só o que já estourou */}
+      <KpiGrid cols={2}>
         <StatTile
           label="Manut. Vencidas"
           value={totalManutVencidas}
@@ -157,18 +156,11 @@ export default function FrotasHomeMobile() {
           note="troca atrasada"
         />
         <StatTile
-          label="Manut. Em Breve"
-          value={totalManutEmBreve}
-          icon={Settings2}
-          tone={totalManutEmBreve > 0 ? 'amber' : 'slate'}
-          note="próx. 2.000 km"
-        />
-        <StatTile
-          label="OS Críticas"
-          value={k?.os_criticas ?? 0}
+          label="OS em Atraso"
+          value={k?.os_atrasadas ?? 0}
           icon={Wrench}
-          tone={(k?.os_criticas ?? 0) > 0 ? 'amber' : 'slate'}
-          note="em andamento"
+          tone={(k?.os_atrasadas ?? 0) > 0 ? 'red' : 'slate'}
+          note="passaram da previsão"
         />
       </KpiGrid>
 
