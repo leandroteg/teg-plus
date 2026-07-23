@@ -12,7 +12,7 @@ import { Plus, X, Loader2, Search } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { usePortfolios, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, useProjetos, type EGPOscRow } from '../../hooks/usePMO'
+import { useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, useProjetos, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
 import { MultiSelect, togFiltro } from '../pmo/paineis/egpFiltros'
 
@@ -82,14 +82,11 @@ function useCelulas(obraId?: string) {
   })
 }
 
-export default function PlanejamentoTecnico() {
+export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: string }) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
   const qc = useQueryClient()
-  const { data: portfolios = [] } = usePortfolios()
-  const [pid, setPid] = useState('')
-  const portfolioId = pid || portfolios[0]?.id
   const { data: obras = [] } = useObrasDoPortfolio(portfolioId)
   const { data: projetos = [] } = useProjetos(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
@@ -244,11 +241,6 @@ export default function PlanejamentoTecnico() {
     <div className="space-y-3">
       {/* Filtros — todos na 1ª linha (padrão EGP): Contrato · Projeto · Tipo · Valor · Ano · %s · Obra */}
       <div className={`rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
-        {portfolios.length > 1 && (
-          <select value={portfolioId ?? ''} onChange={e => { setPid(e.target.value); setObraId(''); setFProjeto('') }} className={`${sel} max-w-[180px] truncate`}>
-            {portfolios.map(p => <option key={p.id} value={p.id}>{p.nome_obra}</option>)}
-          </select>
-        )}
         <select value={fProjeto} onChange={e => { setFProjeto(e.target.value); setObraId('') }} className={`${sel} max-w-[180px] truncate`}>
           <option value="">Projeto: todos</option>
           {projetos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
@@ -283,8 +275,9 @@ export default function PlanejamentoTecnico() {
         </div>
         <div className="flex-1" />
         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasFiltradas.length} obra(s) · {estruturas.length} estrutura(s)</span>
-        <button onClick={() => setAddOpen(v => !v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white">
-          <Plus size={13} /> Estrutura
+        <button onClick={() => setAddOpen(v => !v)} title="Adicionar estrutura/torre"
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-orange-600 hover:bg-orange-700 text-white">
+          <Plus size={15} />
         </button>
       </div>
 
