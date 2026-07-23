@@ -48,7 +48,7 @@ export default function ControladoriaFlow({
   return (
     <div className={hideHeader ? 'space-y-3' : 'space-y-5'}>
       {!hideHeader && (
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 lg:gap-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{title}</h1>
@@ -62,7 +62,7 @@ export default function ControladoriaFlow({
             </div>
             <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</p>
           </div>
-          {headerRight && <div className="shrink-0">{headerRight}</div>}
+          {headerRight && <div className="shrink-0 w-full lg:w-auto">{headerRight}</div>}
         </div>
       )}
       {/* headerRight ainda precisa aparecer quando o cabeçalho está oculto */}
