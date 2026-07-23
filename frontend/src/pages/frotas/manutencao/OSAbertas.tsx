@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import {
   Wrench, X, Clock, Building2,
   Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
@@ -337,6 +337,26 @@ export default function OSAbertas() {
     setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
   }
 
+  // Altura do quadro medida em runtime: ocupa o que sobra da janela a partir de
+  // onde o board realmente começa. Número fixo não serve — a barra de etapas muda
+  // de altura conforme a largura, e cada monitor/zoom deixa um espaço diferente.
+  const boardRef = useRef<HTMLDivElement>(null)
+  const [boardH, setBoardH] = useState<number>()
+  useEffect(() => {
+    if (viewMode !== 'quadro') return
+    const medir = () => {
+      const el = boardRef.current
+      if (!el) return
+      const topo = el.getBoundingClientRect().top
+      setBoardH(Math.max(360, Math.round(window.innerHeight - topo - 16)))
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+    // isLoading nas deps: enquanto carrega a tela mostra o spinner e o board nem
+    // existe no DOM — sem isso a medição rodaria uma vez, com o ref vazio, e parava.
+  }, [viewMode, isLoading])
+
   const grouped = useMemo(() => {
     const map = new Map<StageKey, FroOrdemServico[]>()
     STAGES.forEach(s => map.set(s.key, []))
@@ -470,7 +490,11 @@ export default function OSAbertas() {
         {viewMode === 'quadro' ? (
           // Colunas com altura de tela: o quadro não "encolhe" quando uma etapa
           // está vazia, e cada coluna rola por dentro em vez de esticar a página.
-          <div className="flex gap-3 p-4 overflow-x-auto h-[calc(100vh-300px)] min-h-[420px]">
+          <div
+            ref={boardRef}
+            style={boardH ? { height: boardH } : undefined}
+            className="flex gap-3 p-4 overflow-x-auto min-h-[360px]"
+          >
             {STAGES.map(stage => {
               const items = quadroGrouped.get(stage.key) || []
               const a = isDark ? STAGE_ACCENT_DARK[stage.key] : STAGE_ACCENT[stage.key]
