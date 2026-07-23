@@ -10,7 +10,8 @@
 // Ociosidade depende de telemetria: ativo sem rastreador aparece como "—".
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo } from 'react'
-import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog } from 'lucide-react'
+import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer } from 'lucide-react'
+import { imprimirQrAtivos } from '../../../components/frotas/QrAtivo'
 import { useVeiculos, useAlocacoes, useOrdensServico } from '../../../hooks/useFrotas'
 import { useUtilizacaoVeiculos } from '../../../hooks/useTelemetria'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -225,7 +226,18 @@ export default function ControleFrota() {
           </button>
         )}
 
-        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
+        <button
+          onClick={() => imprimirQrAtivos(ordenadas.map(l => l.v), 'QR de Ativos — Frota')}
+          disabled={!ordenadas.length}
+          title="Imprimir o QR de todos os ativos filtrados"
+          className={`ml-auto flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-colors disabled:opacity-40 ${
+            isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-100' : 'border-white/[0.1] text-slate-300 hover:bg-white/[0.06]'
+          }`}
+        >
+          <Printer size={13} /> QR ({ordenadas.length})
+        </button>
+
+        <div className={`flex items-center rounded-lg border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
           <button onClick={() => setViewMode('list')} title="Lista"
             className={`p-1.5 ${viewMode === 'list' ? (isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white') : txtMuted}`}>
             <LayoutList size={14} />
