@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { X, Check, RotateCcw } from 'lucide-react'
+import { X, Check, RotateCcw, LayoutList, LayoutGrid, ChevronRight } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useIntervalosPreventiva, useSalvarIntervalosCategoria, useResetarIntervalosCategoria } from '../../../hooks/useFrotas'
 import type { CategoriaVeiculo } from '../../../types/frotas'
@@ -15,6 +15,7 @@ export default function Planejamento() {
   const { isLightSidebar: isLight } = useTheme()
   const { data: veiculos = [] } = useVeiculos()
   const [editCategoria, setEditCategoria] = useState<CategoriaVeiculo | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list')
 
   const countPorCategoria = useMemo(() => {
     const map: Record<string, number> = {}
@@ -28,35 +29,77 @@ export default function Planejamento() {
     ? 'bg-white border border-slate-200 shadow-sm'
     : 'bg-[#1e293b] border border-white/[0.06]'
 
+  const txtMuted = isLight ? 'text-slate-400' : 'text-slate-500'
+  const txtMain = isLight ? 'text-slate-800' : 'text-white'
+
   return (
-    <div className="space-y-4 p-1">
-      <div>
-        <h2 className={`text-sm font-extrabold mb-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          Planos Preventivos por Tipo de Veículo
-        </h2>
-        <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Defina os intervalos de troca de cada item para cada categoria. Veículos herdam o plano do seu tipo.
+    /* Sem cabeçalho e sem padding próprio: o hub já nomeia a tela e dá o espaço. */
+    <div className="pb-4 space-y-3">
+      {/* Barra de ação — mesmo padrão de OS e Histórico */}
+      <div className="flex items-center gap-2">
+        <p className={`text-xs ${txtMuted}`}>
+          Cada categoria tem seu plano de troca; os veículos herdam o plano do próprio tipo.
         </p>
+        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
+          <button onClick={() => setViewMode('list')} title="Lista"
+            className={`p-1.5 ${viewMode === 'list' ? (isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white') : txtMuted}`}>
+            <LayoutList size={14} />
+          </button>
+          <button onClick={() => setViewMode('cards')} title="Cards"
+            className={`p-1.5 ${viewMode === 'cards' ? (isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white') : txtMuted}`}>
+            <LayoutGrid size={14} />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {CATEGORIAS.map(cat => {
-          const count = countPorCategoria[cat.key] ?? 0
-          return (
-            <button
-              key={cat.key}
-              onClick={() => setEditCategoria(cat.key)}
-              className={`rounded-2xl p-4 text-left transition-all hover:shadow-md ${cardCls}`}
-            >
-              <div className="text-2xl mb-2">{cat.icon}</div>
-              <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{cat.label}</p>
-              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                {count} veículo{count !== 1 ? 's' : ''}
-              </p>
-            </button>
-          )
-        })}
-      </div>
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {CATEGORIAS.map(cat => {
+            const count = countPorCategoria[cat.key] ?? 0
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setEditCategoria(cat.key)}
+                className={`rounded-2xl p-4 text-left transition-all hover:shadow-md ${cardCls}`}
+              >
+                <div className="text-2xl mb-2">{cat.icon}</div>
+                <p className={`text-sm font-bold ${txtMain}`}>{cat.label}</p>
+                <p className={`text-xs mt-0.5 ${txtMuted}`}>
+                  {count} veículo{count !== 1 ? 's' : ''}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
+          <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+            isLight ? 'border-slate-100 text-slate-400' : 'border-white/[0.06] text-slate-600'
+          }`}>
+            <span className="w-6" /><span className="flex-1">Categoria</span>
+            <span className="w-[90px] text-right">Veículos</span><span className="w-4" />
+          </div>
+          {CATEGORIAS.map(cat => {
+            const count = countPorCategoria[cat.key] ?? 0
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setEditCategoria(cat.key)}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left border-b transition-all ${
+                  isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.04]'
+                }`}
+              >
+                <span className="w-6 text-lg leading-none">{cat.icon}</span>
+                <span className={`flex-1 text-sm font-bold truncate ${txtMain}`}>{cat.label}</span>
+                <span className={`w-[90px] text-right text-xs ${count === 0 ? txtMuted : txtMain}`}>
+                  {count} veículo{count !== 1 ? 's' : ''}
+                </span>
+                <ChevronRight size={14} className={`w-4 shrink-0 ${txtMuted}`} />
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {editCategoria && (
         <ModalIntervalos
