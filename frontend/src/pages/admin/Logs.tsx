@@ -163,7 +163,7 @@ function LogDetalhe({ log, isLight }: { log: LogAtividade; isLight: boolean }) {
   if (!entradas.length) return <p className={`text-xs ${subCls}`}>Sem detalhes registrados.</p>
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 max-h-80 overflow-y-auto styled-scrollbar pr-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-2 max-h-80 overflow-y-auto styled-scrollbar pr-1">
       {entradas.map(([k, v]) => (
         <div key={k} className="flex flex-col gap-0.5 min-w-0">
           <span className={`text-[10px] font-semibold uppercase tracking-wide ${subCls}`}>{campoLabel(k)}</span>
@@ -391,7 +391,7 @@ export default function Logs() {
   const optionCls = isLight ? 'text-slate-700 bg-white' : 'text-slate-100 bg-slate-800'
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
         {/* Cabeçalho */}
         <div className="flex items-center gap-3 mb-5">
           <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'}`}>
@@ -405,8 +405,12 @@ export default function Logs() {
           </div>
         </div>
 
+        {/* Duas colunas em telas largas: painel lateral (stats + filtros) fixo
+            ao rolar e lista ocupando todo o restante. Empilha abaixo de xl. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-4 items-start">
+        <div className="space-y-3 xl:sticky xl:top-0">
         {/* Estatísticas (sobre o que já foi carregado) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-2.5">
           <StatCard icon={ScrollText} label="Eventos carregados" valor={String(logs.length)} tone="violet" isLight={isLight} />
           <StatCard icon={PlusCircle} label="Criações" valor={String(stats.criacoes)} tone="emerald" isLight={isLight} />
           <StatCard icon={PencilLine} label="Alterações" valor={String(stats.alteracoes)} tone="amber" isLight={isLight} />
@@ -414,7 +418,7 @@ export default function Logs() {
         </div>
 
         {/* Filtros */}
-        <div className={`rounded-2xl border p-3 mb-4 ${panel}`}>
+        <div className={`rounded-2xl border p-3 ${panel}`}>
           {/* Busca em destaque */}
           <div className="relative mb-2.5">
             <Search size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${label}`} />
@@ -469,9 +473,11 @@ export default function Logs() {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          {/* No modo coluna lateral (xl) os selects ocupam a linha inteira e as
+              datas ficam lado a lado; abaixo disso mantém a grade horizontal. */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-2 gap-2">
             <select
-              className={inputCls}
+              className={`${inputCls} xl:col-span-2`}
               value={filtro.modulo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, modulo: e.target.value || undefined }))}
             >
@@ -481,7 +487,7 @@ export default function Logs() {
               ))}
             </select>
             <select
-              className={inputCls}
+              className={`${inputCls} xl:col-span-2`}
               value={filtro.tipo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, tipo: e.target.value || undefined }))}
             >
@@ -491,7 +497,7 @@ export default function Logs() {
               <option className={optionCls} value="DELETE">Exclusão</option>
             </select>
             <select
-              className={inputCls}
+              className={`${inputCls} xl:col-span-2`}
               value={filtro.usuarioId ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, usuarioId: e.target.value || undefined }))}
             >
@@ -516,8 +522,10 @@ export default function Logs() {
             />
           </div>
         </div>
+        </div>
 
-        {/* Lista */}
+        {/* Lista (coluna principal) */}
+        <div className="min-w-0">
         {isLoading ? (
           <div className={`flex items-center justify-center gap-2 py-16 text-sm ${label}`}>
             <Loader2 size={16} className="animate-spin" /> Carregando logs…
@@ -558,6 +566,8 @@ export default function Logs() {
             )}
           </div>
         )}
+        </div>
+        </div>
     </div>
   )
 }
