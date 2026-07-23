@@ -69,8 +69,8 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
   const oscsPorObra = useMemo(() => agruparOscsPorObra(oscs), [oscs])
   // ids das obras que passam nos filtros — '' = sem filtro (todas)
   const obrasOk = useMemo(() => {
-    const ativo = f.fProjeto.size || f.fTipo.size || f.fValor.size || f.fAno.size
-    if (!ativo) return null
+    const ativo = f.fProjeto.size || f.fTipo.size || f.fValor.size || f.fAno.size || f.fStatus.size
+    if (!ativo || !obrasPmo.length) return null
     return new Set(obrasPmo.filter(o => obraPassa(o, oscsPorObra, f)).map(o => o.id))
   }, [obrasPmo, oscsPorObra, f])
 
