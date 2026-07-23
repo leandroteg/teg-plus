@@ -32,7 +32,7 @@ const STEPS: FlowStep[] = [
     accent: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
   },
   {
-    key: 'planejamento', label: 'Planejamento',
+    key: 'planejamento', label: 'Plan. Técnico',
     description: 'Planeje a execução das obras priorizadas.',
     icon: CalendarRange,
     accent: { bg: 'hover:bg-blue-50', bgActive: 'bg-blue-50', text: 'text-blue-600', textActive: 'text-blue-800', border: 'border-blue-500', badge: 'bg-blue-100 text-blue-700' },
