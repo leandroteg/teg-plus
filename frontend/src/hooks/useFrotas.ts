@@ -54,13 +54,39 @@ export function useSalvarVeiculo() {
 
 // ── Ordens de Serviço ─────────────────────────────────────────────────────────
 
+// ── Fornecedores: cadastro corporativo (cmp_fornecedores) ─────────────────────
+// A tabela fro_fornecedores nasceu paralela e ficou vazia; o cadastro real da
+// empresa — o mesmo de Contas a Pagar, NF e Contratos — é cmp_fornecedores.
+// O vínculo é resolvido por JOIN em JS, não por embed do PostgREST: embed exige
+// FK e, se a FK muda, a consulta INTEIRA volta vazia em silêncio.
+interface FornecedorRef { id: string; razao_social: string; nome_fantasia?: string }
+
+async function mapaFornecedores(ids: (string | undefined | null)[]) {
+  const unicos = [...new Set(ids.filter(Boolean) as string[])]
+  if (!unicos.length) return new Map<string, FornecedorRef>()
+  const { data } = await supabase
+    .from('cmp_fornecedores')
+    .select('id, razao_social, nome_fantasia')
+    .in('id', unicos)
+  return new Map((data ?? []).map(f => [f.id as string, f as FornecedorRef]))
+}
+
+/** Anexa `fornecedor` a registros que tenham `fornecedor_id`. */
+async function comFornecedor<T extends { fornecedor_id?: string | null }>(linhas: T[]) {
+  const mapa = await mapaFornecedores(linhas.map(l => l.fornecedor_id))
+  return linhas.map(l => ({
+    ...l,
+    fornecedor: l.fornecedor_id ? mapa.get(l.fornecedor_id) : undefined,
+  }))
+}
+
 export function useOrdensServico(filtros?: { status?: StatusOS | StatusOS[]; prioridade?: PrioridadeOS }) {
   return useQuery({
     queryKey: ['fro_os', filtros],
     queryFn: async () => {
       let q = supabase
         .from('fro_ordens_servico')
-        .select('*, veiculo:fro_veiculos(id,placa,marca,modelo,status), fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,tipo)')
+        .select('*, veiculo:fro_veiculos(id,placa,marca,modelo,status)')
         .order('prioridade', { ascending: true })
         .order('created_at', { ascending: false })
 
@@ -72,7 +98,7 @@ export function useOrdensServico(filtros?: { status?: StatusOS | StatusOS[]; pri
 
       const { data, error } = await q
       if (error) throw error
-      return data as FroOrdemServico[]
+      return await comFornecedor(data ?? []) as unknown as FroOrdemServico[]
     },
   })
 }
@@ -86,14 +112,22 @@ export function useOrdemServico(id: string) {
         .select(`
           *,
           veiculo:fro_veiculos(id,placa,marca,modelo,status,hodometro_atual),
-          fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,tipo),
           itens:fro_itens_os(*),
-          cotacoes:fro_cotacoes_os(*, fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,avaliacao_media))
+          cotacoes:fro_cotacoes_os(*)
         `)
         .eq('id', id)
         .single()
       if (error) throw error
-      return data as FroOrdemServico
+
+      const os = data as FroOrdemServico & { cotacoes?: FroCotacaoOS[] }
+      const mapa = await mapaFornecedores([
+        os.fornecedor_id, ...(os.cotacoes ?? []).map(c => c.fornecedor_id),
+      ])
+      return {
+        ...os,
+        fornecedor: os.fornecedor_id ? mapa.get(os.fornecedor_id) : undefined,
+        cotacoes: (os.cotacoes ?? []).map(c => ({ ...c, fornecedor: mapa.get(c.fornecedor_id) })),
+      } as unknown as FroOrdemServico
     },
     enabled: !!id,
   })
@@ -106,12 +140,12 @@ export function useHistoricoOSVeiculo(veiculoId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fro_ordens_servico')
-        .select('*, fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,tipo)')
+        .select('*')
         .eq('veiculo_id', veiculoId!)
         .order('data_abertura', { ascending: false })
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as FroOrdemServico[]
+      return await comFornecedor(data ?? []) as unknown as FroOrdemServico[]
     },
     enabled: !!veiculoId,
   })
@@ -592,11 +626,11 @@ export function useCotacoesOS(osId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fro_cotacoes_os')
-        .select('*, fornecedor:fro_fornecedores(id,razao_social,nome_fantasia,avaliacao_media)')
+        .select('*')
         .eq('os_id', osId)
         .order('valor_total')
       if (error) throw error
-      return data as FroCotacaoOS[]
+      return await comFornecedor(data ?? []) as unknown as FroCotacaoOS[]
     },
     enabled: !!osId,
   })
@@ -838,6 +872,100 @@ export function useAtualizarOcorrencia() {
 
 // ── Fornecedores ──────────────────────────────────────────────────────────────
 
+/**
+ * Fornecedores para a OS — cadastro corporativo `cmp_fornecedores` (o mesmo de
+ * Contas a Pagar/NF/Contratos). Busca por nome/fantasia/CNPJ porque são ~1.6 mil
+ * registros: lista fechada não serve.
+ *
+ * Não há classificação de tipo no cadastro (oficina, autopeças, distribuidora),
+ * então não dá para filtrar por categoria — quem já foi usado em OS aparece
+ * primeiro, e a lista de frota se cura sozinha com o uso.
+ */
+export function useFornecedoresOS(busca?: string) {
+  return useQuery({
+    queryKey: ['os_fornecedores', busca ?? ''],
+    queryFn: async () => {
+      const termo = (busca ?? '').trim()
+
+      // Já usados em OS: viram os primeiros da lista.
+      const { data: usados } = await supabase
+        .from('fro_ordens_servico').select('fornecedor_id').not('fornecedor_id', 'is', null)
+      const idsUsados = new Set((usados ?? []).map(u => u.fornecedor_id as string))
+
+      let q = supabase
+        .from('cmp_fornecedores')
+        .select('id, razao_social, nome_fantasia, cnpj, cidade, uf')
+        .eq('ativo', true)
+        .order('razao_social')
+        .limit(termo ? 50 : 30)
+
+      if (termo) {
+        q = q.or(`razao_social.ilike.%${termo}%,nome_fantasia.ilike.%${termo}%,cnpj.ilike.%${termo}%`)
+      } else if (idsUsados.size) {
+        q = q.in('id', [...idsUsados])
+      }
+
+      const { data, error } = await q
+      if (error) throw error
+      const lista = (data ?? []) as FornecedorOS[]
+      return lista
+        .map(f => ({ ...f, jaUsado: idsUsados.has(f.id) }))
+        .sort((a, b) => Number(b.jaUsado) - Number(a.jaUsado))
+    },
+    staleTime: 60_000,
+  })
+}
+
+export interface FornecedorOS {
+  id: string
+  razao_social: string
+  nome_fantasia?: string
+  cnpj?: string
+  cidade?: string
+  uf?: string
+  jaUsado?: boolean
+}
+
+/**
+ * Catálogo de itens (est_itens, ~3 mil) filtrado nas categorias que interessam
+ * a Frotas. Óleos e lubrificantes ficam em USO E CONSUMO, por isso a categoria
+ * sozinha não basta — a busca livre alcança o catálogo inteiro.
+ */
+const CATEGORIAS_FROTA = ['PECAS PARA MANUTENCAO', 'MAQUINAS E VEICULOS', 'Frotas e Veículos (Operacional)']
+
+export interface ItemCatalogo {
+  id: string
+  codigo?: string
+  descricao: string
+  categoria?: string
+  unidade?: string
+  valor_medio?: number
+}
+
+export function useCatalogoItensFrota(busca?: string, todoCatalogo = false) {
+  return useQuery({
+    queryKey: ['est_itens_frota', busca ?? '', todoCatalogo],
+    queryFn: async () => {
+      const termo = (busca ?? '').trim()
+      let q = supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, categoria, unidade, valor_medio')
+        .eq('ativo', true)
+        .order('descricao')
+        .limit(80)
+
+      if (!todoCatalogo) q = q.in('categoria', CATEGORIAS_FROTA)
+      if (termo) q = q.ilike('descricao', `%${termo}%`)
+
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as ItemCatalogo[]
+    },
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** @deprecated Cadastro paralelo `fro_fornecedores` — ficou vazio. Use useFornecedoresOS. */
 export function useFornecedoresFrotas(apenasAtivos = true) {
   return useQuery({
     queryKey: ['fro_fornecedores', apenasAtivos],
