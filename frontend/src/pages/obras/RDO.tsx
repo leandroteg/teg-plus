@@ -186,7 +186,7 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
       <div className="flex flex-wrap gap-2 items-center">
         <Filter size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
         <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={!isLight}
-          onChange={() => { setObraFilter(''); onObraChange?.('') }} />
+          onChange={() => { setObraFilter(''); onObraChange?.('') }} projetoPorUltimo />
         <select value={obraFilter} onChange={e => { setObraFilter(e.target.value); onObraChange?.(e.target.value) }}
           className={`${selectClass} max-w-[280px] truncate`}>
           <option value="">Todas as obras</option>
