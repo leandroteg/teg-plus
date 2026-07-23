@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users2, Truck, ClipboardList, Plus, FileText,
+  LayoutDashboard, Users2, Truck, ClipboardList, Plus, FileText, FolderSearch,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -24,6 +24,13 @@ export default function ObrasLayout() {
             description: 'Criar um novo Relatório Diário de Obra.',
             tone: 'amber' as const,
             action: () => navigate('/obras/gestao?novo_rdo=1'),
+          },
+          {
+            icon: FolderSearch,
+            label: 'Lançar Projeto Técnico',
+            description: 'Ler os documentos da pasta do projeto e preencher a obra/OSC.',
+            tone: 'emerald' as const,
+            action: () => navigate('/obras/gestao?lancar_projeto=1'),
           },
         ],
       },
