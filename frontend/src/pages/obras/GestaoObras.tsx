@@ -96,7 +96,8 @@ function GestaoObrasInner() {
               <RDO portfolioId={portfolioId} onObraChange={setObraRdoId} embutido />
             </div>
             {novoRdo && obraRdo && (
-              <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)} />
+              <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)}
+                obras={obrasRdo.map(o => ({ id: o.id, nome: o.nome }))} onObraChange={setObraRdoId} />
             )}
           </>
         ) : (
