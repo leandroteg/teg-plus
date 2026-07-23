@@ -21,6 +21,8 @@ import {
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
   useCatalogoTreinamentos, useMatrizTreinamentos, useSetMatrizCelula,
+  useSstDocumentos, useSalvarSstDocumento, useMatrizRisco, useSetMatrizRiscoCelula,
+  type SstDocumento, type MatrizRiscoCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
   useEstoqueEpi,
@@ -29,7 +31,7 @@ import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
-import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText, Link as LinkIcon, Check } from 'lucide-react'
+import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText, Link as LinkIcon, Check, Grid3x3 } from 'lucide-react'
 import { ObraPicker, ColaboradorPicker, VeiculoPicker, pickerInputCls, pickerLabelCls } from '../../components/qsma/Pickers'
 import { useObrasComProjeto, useColaboradoresAtivos } from '../../hooks/useObras'
 import { useBases } from '../../hooks/useEstoque'
@@ -207,6 +209,7 @@ export default function QsmaSeguranca() {
   const [dataAteOco, setDataAteOco] = useState('')
   const [quickTre, setQuickTre] = useState('todos')
   const [subTreino, setSubTreino] = useState<'integracao' | 'controle' | 'matriz'>('controle')
+  const [subRisco, setSubRisco] = useState<'documentos' | 'riscos' | 'matriz'>('documentos')
   const [treinoColab, setTreinoColab] = useState<string | null>(null)
   const [quickFicha, setQuickFicha] = useState('todos')
   const [vistaOco, setVistaOco] = useState<'lista' | 'cards' | 'kanban'>('cards')
@@ -253,7 +256,22 @@ export default function QsmaSeguranca() {
       onStepChange={setAba}
     >
       {/* ── Riscos ── */}
-      {aba === 'riscos' && (
+      {aba === 'riscos' && (() => {
+        const subTabsRisco = (
+          <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+            {([['documentos', 'Documentos', FileText], ['riscos', 'Riscos', AlertTriangle], ['matriz', 'Matriz', Grid3x3]] as const).map(([k, lbl, Ic]) => (
+              <button key={k} onClick={() => setSubRisco(k)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  subRisco === k
+                    ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-white text-amber-700 shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}><Ic size={13} /> {lbl}</button>
+            ))}
+          </div>
+        )
+        if (subRisco === 'documentos') return <DocumentosSST subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />
+        if (subRisco === 'matriz') return <MatrizRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
+        return (
         <div className="space-y-3">
           <QsmaToolbar
             isDark={isDark}
@@ -261,6 +279,7 @@ export default function QsmaSeguranca() {
             busca={busca} onBusca={setBusca} placeholder="Buscar perigo, risco, tarefa…"
             acoes={<BotaoNovo label="Novo Risco / APR" onClick={() => setModalRisco('novo')} />}
           >
+            {subTabsRisco}
             <ToolbarPills
               isDark={isDark} value={escopoF} onChange={setEscopoF}
               options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]}
@@ -282,14 +301,15 @@ export default function QsmaSeguranca() {
                     </div>
                     <p className={`text-sm font-bold ${txtMain}`}>{r.perigo}</p>
                     <p className={`text-[11px] ${txtMuted}`}>{r.risco}</p>
-                    <p className={`text-[10px] mt-1 ${txtMuted}`}>{[r.tarefa, r.ghe, r.obra_id ? obraNome(r.obra_id) : null].filter(Boolean).join(' · ')}</p>
+                    <p className={`text-[10px] mt-1 ${txtMuted}`}>{[(r as any).grupo, r.tarefa, r.ghe, r.obra_id ? obraNome(r.obra_id) : null].filter(Boolean).join(' · ')}</p>
                   </button>
                 )
               })}
             </div>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* ── EPIs ── */}
       {aba === 'epis' && (() => {
@@ -571,6 +591,155 @@ export default function QsmaSeguranca() {
       {modalTreinamento && <TreinamentoModal isDark={isDark} treinamento={modalTreinamento === 'novo' ? null : modalTreinamento} onClose={() => setModalTreinamento(null)} />}
       {modalOcorrencia && <OcorrenciaModal isDark={isDark} ocorrencia={modalOcorrencia === 'novo' ? null : modalOcorrencia} onClose={() => setModalOcorrencia(null)} />}
     </ControladoriaFlow>
+  )
+}
+
+// ── Riscos › Documentos (PGR / PCMSO / LTCAT) — com semáforo de validade ─────
+function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+}) {
+  const { data: docs = [], isLoading } = useSstDocumentos()
+  const salvar = useSalvarSstDocumento()
+  const hoje = new Date()
+  const info = (d: SstDocumento) => {
+    if (!d.data_validade) return { txt: 'sem validade', cor: 'slate', dias: null as number | null }
+    const dias = Math.ceil((new Date(d.data_validade + 'T12:00:00').getTime() - hoje.getTime()) / 864e5)
+    if (dias < 0) return { txt: `vencido há ${-dias}d`, cor: 'red', dias }
+    if (dias <= 90) return { txt: `vence em ${dias}d`, cor: 'amber', dias }
+    return { txt: `válido · ${dias}d`, cor: 'emerald', dias }
+  }
+  const CORES: Record<string, string> = {
+    red: isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-700',
+    amber: isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700',
+    emerald: isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700',
+    slate: isDark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600',
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        {subTabs}
+        <span className={`text-xs ${txtMuted}`}>{docs.length} documento(s) — a validade alimenta o vencimento das APRs e OS</span>
+      </div>
+      {isLoading ? <p className={`text-xs ${txtMuted}`}>carregando…</p>
+        : docs.length === 0 ? <Vazio isDark={isDark} texto="Nenhum documento de SST cadastrado" />
+        : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {docs.map(d => {
+            const i = info(d)
+            return (
+              <div key={d.id} className={`${card} p-4`}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className={`text-[10px] font-mono font-bold uppercase ${txtMuted}`}>{d.tipo} · {d.revisao ?? '—'}</span>
+                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${CORES[i.cor]}`}>{i.txt}</span>
+                </div>
+                <p className={`text-sm font-bold ${txtMain}`}>{d.titulo}</p>
+                <p className={`text-[11px] ${txtMuted}`}>{[d.unidade, d.cnpj, d.grau_risco ? `Grau de Risco ${d.grau_risco}` : null].filter(Boolean).join(' · ')}</p>
+                <div className={`grid grid-cols-3 gap-2 mt-2.5 text-[11px] ${txtMuted}`}>
+                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Emissão</span>{fmtData(d.data_emissao)}</div>
+                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Revisão</span>{fmtData(d.data_revisao)}</div>
+                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Validade</span>
+                    <b className={i.cor === 'red' ? 'text-red-500' : i.cor === 'amber' ? 'text-amber-500' : ''}>{fmtData(d.data_validade)}</b></div>
+                </div>
+                <div className="flex items-center gap-2 mt-2.5">
+                  <label className={`text-[11px] ${txtMuted}`}>Validade (meses):</label>
+                  <select value={d.meses_validade} disabled={salvar.isPending}
+                    onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}
+                    className={`text-[11px] rounded-lg px-2 py-1 border ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+                    {[12, 24, 36].map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {d.arquivo_nome && <span className={`text-[10px] truncate ${txtMuted}`} title={d.arquivo_nome}>📄 {d.arquivo_nome}</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Riscos › Matriz FUNÇÃO × PERIGO (ajustável, igual EPI/Treinamentos) ──────
+function MatrizRiscos({ subTabs, isDark, card, txtMain, txtMuted, isAdmin }: {
+  subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string; isAdmin: boolean
+}) {
+  const { data: riscos = [] } = useRiscos()
+  const { data: celulas = [] } = useMatrizRisco()
+  const setCel = useSetMatrizRiscoCelula()
+  const [busca, setBusca] = useState('')
+
+  const cols = useMemo(() => riscos.filter(r => (r as any).documento_id)
+    .sort((a, b) => (((a as any).grupo ?? '') + a.perigo).localeCompare(((b as any).grupo ?? '') + b.perigo, 'pt-BR')), [riscos])
+  const cargos = useMemo(() => [...new Set(celulas.map(c => c.cargo))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [celulas])
+  const mapa = useMemo(() => {
+    const m = new Map<string, MatrizRiscoCelula>()
+    celulas.forEach(c => m.set(c.cargo + '|' + c.risco_id, c))
+    return m
+  }, [celulas])
+  const q = busca.trim().toLowerCase()
+  const linhas = cargos.filter(c => !q || c.toLowerCase().includes(q))
+
+  const GRUPO_COR: Record<string, string> = {
+    'Acidente': '#ef4444', 'Ergonômico': '#8b5cf6', 'Físico': '#0ea5e9',
+    'Químico': '#f59e0b', 'Biológico': '#10b981',
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        {subTabs}
+        <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar função…"
+          className={`text-xs rounded-lg px-3 py-1.5 border w-52 ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200'}`} />
+        <span className={`text-xs ${txtMuted}`}>{linhas.length} funções × {cols.length} perigos — clique pra ajustar</span>
+        <span className="flex items-center gap-2 ml-auto flex-wrap">
+          {Object.entries(GRUPO_COR).map(([g, c]) => (
+            <span key={g} className={`inline-flex items-center gap-1 text-[10px] ${txtMuted}`}>
+              <span className="w-2 h-2 rounded-full" style={{ background: c }} />{g}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className={`rounded-xl border overflow-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`} style={{ maxHeight: '72vh' }}>
+        <table className="w-full border-collapse text-xs" style={{ minWidth: 900 }}>
+          <thead>
+            <tr>
+              <th className={`sticky left-0 top-0 z-30 w-[230px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Função</th>
+              {cols.map(c => (
+                <th key={c.id} title={`${(c as any).grupo ?? ''} · ${c.perigo}`}
+                  className={`sticky top-0 z-20 h-[150px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                  <div className="relative h-full w-[26px]">
+                    <span className="absolute bottom-6 left-1 origin-bottom-left rotate-[-55deg] whitespace-nowrap text-[10px] leading-none">{c.perigo.slice(0, 34)}</span>
+                    <span className="absolute bottom-1.5 left-2 w-2 h-2 rounded-full" style={{ background: GRUPO_COR[(c as any).grupo] ?? '#94a3b8' }} />
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((cargo, i) => (
+              <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                <td title={cargo} className={`sticky left-0 z-10 px-3 py-1.5 font-semibold truncate max-w-[230px] ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                {cols.map(c => {
+                  const cel = mapa.get(cargo + '|' + c.id)
+                  const on = !!cel?.aplica
+                  return (
+                    <td key={c.id} className="text-center">
+                      <button
+                        disabled={!isAdmin || setCel.isPending}
+                        title={on ? `${c.perigo}\n${cel?.nivel_risco ?? ''} · ${cel?.classificacao ?? ''}\nEPI: ${cel?.epis ?? '—'}` : c.perigo}
+                        onClick={() => setCel.mutate({ cargo, risco_id: c.id, aplica: !on })}
+                        className="w-full h-6 flex items-center justify-center disabled:cursor-default">
+                        {on
+                          ? <span className="w-3 h-3 rounded-full" style={{ background: GRUPO_COR[(c as any).grupo] ?? '#94a3b8' }} />
+                          : <span className={`w-2.5 h-2.5 rounded-full border ${isDark ? 'border-white/15' : 'border-slate-200'}`} />}
+                      </button>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
