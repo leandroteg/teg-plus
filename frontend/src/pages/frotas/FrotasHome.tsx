@@ -290,8 +290,8 @@ export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel'
                   O que exige ação agora
                 </h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(totalManutVencidas > 0 || (k?.os_criticas ?? 0) > 0) ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <Settings2 size={14} className={(totalManutVencidas > 0 || (k?.os_criticas ?? 0) > 0) ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(totalManutVencidas > 0 || (k?.os_atrasadas ?? 0) > 0) ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <Settings2 size={14} className={(totalManutVencidas > 0 || (k?.os_atrasadas ?? 0) > 0) ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             {/* Só o que já estourou: "em breve" é planejamento, não ação agora. */}
@@ -305,11 +305,11 @@ export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel'
                 isDark={isDark}
               />
               <MiniInfoCard
-                label="OS Críticas"
-                value={k?.os_criticas ?? 0}
-                note="abertas / em andamento"
+                label="OS em Atraso"
+                value={k?.os_atrasadas ?? 0}
+                note="passaram da previsão"
                 icon={Wrench}
-                iconTone={(k?.os_criticas ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
+                iconTone={(k?.os_atrasadas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
                 isDark={isDark}
               />
             </div>
