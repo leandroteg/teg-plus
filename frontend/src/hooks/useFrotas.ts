@@ -117,6 +117,217 @@ export function useHistoricoOSVeiculo(veiculoId?: string) {
   })
 }
 
+// ── Itens da OS (peça / mão de obra) ──────────────────────────────────────────
+// Nascem na etapa de Cotação (fluxo ORG-PRO-001 etapa 5: quem abre a OS só sabe o
+// problema; a solução aparece quando Suprimentos cota com a oficina credenciada).
+
+export function useItensOS(osId?: string) {
+  return useQuery({
+    queryKey: ['fro_itens_os', osId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_itens_os')
+        .select('*')
+        .eq('os_id', osId!)
+        .order('created_at')
+      if (error) throw error
+      return data as FroItemOS[]
+    },
+    enabled: !!osId,
+  })
+}
+
+/** Substitui todos os itens da OS e sincroniza o valor informado na OS (orçado ou final). */
+export function useSalvarItensOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      osId: string
+      itens: Omit<FroItemOS, 'id' | 'os_id' | 'created_at'>[]
+      /** Qual campo de valor da OS recebe a soma dos itens. */
+      campoValor?: 'valor_orcado' | 'valor_aprovado' | 'valor_final'
+    }) => {
+      const { error: eDel } = await supabase.from('fro_itens_os').delete().eq('os_id', params.osId)
+      if (eDel) throw eDel
+
+      if (params.itens.length) {
+        const { error: eIns } = await supabase
+          .from('fro_itens_os')
+          .insert(params.itens.map(i => ({ ...i, os_id: params.osId })))
+        if (eIns) throw eIns
+      }
+
+      if (params.campoValor) {
+        const total = params.itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
+        const { error: eUpd } = await supabase
+          .from('fro_ordens_servico')
+          .update({ [params.campoValor]: total })
+          .eq('id', params.osId)
+        if (eUpd) throw eUpd
+      }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['fro_itens_os', vars.osId] })
+      qc.invalidateQueries({ queryKey: ['fro_os'] })
+      qc.invalidateQueries({ queryKey: ['fro_os_hist_veiculo'] })
+      qc.invalidateQueries({ queryKey: ['fro_itens_preco_hist'] })
+    },
+  })
+}
+
+/**
+ * Preço histórico por descrição de item (peças), para alertar desvio na cotação.
+ * A descrição é livre — normalizamos em minúsculas/sem espaço extra para casar.
+ */
+export function useHistoricoPrecoItens() {
+  return useQuery({
+    queryKey: ['fro_itens_preco_hist'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_itens_os')
+        .select('descricao, valor_unitario, tipo')
+      if (error) throw error
+
+      const mapa = new Map<string, { descricao: string; media: number; amostras: number }>()
+      const acc = new Map<string, { desc: string; soma: number; n: number }>()
+      for (const it of (data ?? []) as Pick<FroItemOS, 'descricao' | 'valor_unitario' | 'tipo'>[]) {
+        const chave = (it.descricao ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+        if (!chave) continue
+        const cur = acc.get(chave) ?? { desc: it.descricao, soma: 0, n: 0 }
+        cur.soma += Number(it.valor_unitario) || 0
+        cur.n += 1
+        acc.set(chave, cur)
+      }
+      for (const [chave, v] of acc) {
+        mapa.set(chave, { descricao: v.desc, media: v.soma / v.n, amostras: v.n })
+      }
+      return mapa
+    },
+    staleTime: 5 * 60_000,
+  })
+}
+
+export interface GarantiaVigente {
+  item: FroItemOS
+  osNumero?: string
+  osId: string
+  concluidaEm: string
+  hodometroSaida?: number
+  /** Dias restantes de garantia (null = não tem garantia por prazo). */
+  diasRestantes: number | null
+  /** Km restantes de garantia (null = não tem garantia por km ou falta hodômetro). */
+  kmRestantes: number | null
+}
+
+/**
+ * Garantias ainda vigentes de um veículo — alerta na abertura de nova OS para
+ * acionar a garantia em vez de pagar o serviço de novo.
+ */
+export function useGarantiasVigentes(veiculoId?: string, hodometroAtual?: number) {
+  return useQuery({
+    queryKey: ['fro_garantias_vigentes', veiculoId, hodometroAtual],
+    queryFn: async () => {
+      const { data: oss, error: eOs } = await supabase
+        .from('fro_ordens_servico')
+        .select('id, numero_os, data_conclusao, hodometro_saida')
+        .eq('veiculo_id', veiculoId!)
+        .eq('status', 'concluida')
+        .not('data_conclusao', 'is', null)
+      if (eOs) throw eOs
+      if (!oss?.length) return [] as GarantiaVigente[]
+
+      const ids = oss.map(o => o.id)
+      const { data: itens, error: eIt } = await supabase
+        .from('fro_itens_os')
+        .select('*')
+        .in('os_id', ids)
+        .or('garantia_dias.not.is.null,garantia_km.not.is.null')
+      if (eIt) throw eIt
+
+      const porOs = new Map(oss.map(o => [o.id, o]))
+      const agora = Date.now()
+      const out: GarantiaVigente[] = []
+
+      for (const item of (itens ?? []) as FroItemOS[]) {
+        const os = porOs.get(item.os_id)
+        if (!os?.data_conclusao) continue
+
+        const diasCorridos = Math.floor((agora - new Date(os.data_conclusao).getTime()) / 86_400_000)
+        const diasRestantes = item.garantia_dias != null ? item.garantia_dias - diasCorridos : null
+
+        let kmRestantes: number | null = null
+        if (item.garantia_km != null && os.hodometro_saida != null && hodometroAtual != null) {
+          kmRestantes = item.garantia_km - (hodometroAtual - os.hodometro_saida)
+        }
+
+        // Vigente se qualquer critério informado ainda não estourou.
+        const vigentePorDias = diasRestantes != null && diasRestantes > 0
+        const vigentePorKm   = kmRestantes != null && kmRestantes > 0
+        // Garantia só por km sem hodômetro de referência: mantém como vigente (não dá para descartar).
+        const semComoAferirKm = item.garantia_km != null && kmRestantes == null && item.garantia_dias == null
+
+        if (vigentePorDias || vigentePorKm || semComoAferirKm) {
+          out.push({
+            item,
+            osId: os.id,
+            osNumero: os.numero_os ?? undefined,
+            concluidaEm: os.data_conclusao,
+            hodometroSaida: os.hodometro_saida ?? undefined,
+            diasRestantes,
+            kmRestantes,
+          })
+        }
+      }
+      return out.sort((a, b) => (a.diasRestantes ?? 9e9) - (b.diasRestantes ?? 9e9))
+    },
+    enabled: !!veiculoId,
+  })
+}
+
+/** Upload de foto da OS (antes/depois). Reusa o bucket de fotos de frotas, prefixo os/. */
+export function useUploadFotoOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ osId, file, campo }: {
+      osId: string; file: File; campo: 'foto_antes_url' | 'foto_depois_url'
+    }) => {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `os/${osId}/${campo}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('fro-checklist-fotos')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('fro-checklist-fotos').getPublicUrl(path)
+      const { error: dbErr } = await supabase
+        .from('fro_ordens_servico').update({ [campo]: publicUrl }).eq('id', osId)
+      if (dbErr) throw dbErr
+      return publicUrl
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_os'] })
+      qc.invalidateQueries({ queryKey: ['fro_os_hist_veiculo'] })
+    },
+  })
+}
+
+/** Atualiza campos avulsos da OS (parecer, status_detalhe, datas do fluxo…). */
+export function useAtualizarOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...campos }: { id: string } & Partial<FroOrdemServico>) => {
+      const { veiculo, fornecedor, itens, cotacoes, ...limpo } = campos as Record<string, unknown>
+      void veiculo; void fornecedor; void itens; void cotacoes
+      const { error } = await supabase.from('fro_ordens_servico').update(limpo).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_os'] })
+      qc.invalidateQueries({ queryKey: ['fro_os_detail'] })
+      qc.invalidateQueries({ queryKey: ['fro_os_hist_veiculo'] })
+    },
+  })
+}
+
 export function useCriarOS() {
   const qc = useQueryClient()
   return useMutation({
