@@ -174,7 +174,7 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   return (
     <div className="space-y-3">
       {/* Filtros — todos na 1ª linha, mesmo padrão de caixa de seleção múltipla */}
-      <div className={`rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
+      <div className={`relative z-50 rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
         <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} onChange={() => setObraId('')} />
         <select value={obraSel ?? ''} onChange={e => setObraId(e.target.value)} className={`${sel} max-w-[280px] truncate font-bold`}>
           {obrasFiltradas.length === 0 && <option value="">— nenhuma obra no filtro —</option>}
