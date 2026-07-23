@@ -455,6 +455,69 @@ export function useToggleAcaoQsma() {
   })
 }
 
+// ── Documentos-fonte de SST (PGR / PCMSO / LTCAT) ────────────────────────────
+
+export type SstDocumento = {
+  id: string; tipo: 'pgr' | 'pcmso' | 'ltcat' | 'outro'; titulo: string
+  unidade?: string; cnpj?: string; cnae?: string; grau_risco?: number
+  revisao?: string; data_emissao?: string; data_revisao?: string
+  meses_validade: number; data_validade?: string
+  arquivo_url?: string; arquivo_nome?: string; observacoes?: string; ativo: boolean
+}
+export function useSstDocumentos() {
+  return useQuery({
+    queryKey: ['qsma_sst_documentos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_sst_documentos')
+        .select('*').order('data_revisao', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as SstDocumento[]
+    },
+  })
+}
+export function useSalvarSstDocumento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: Partial<SstDocumento> & { id: string }) => {
+      const { id, ...rest } = p
+      const { error } = await supabase.from('qsma_sst_documentos').update(rest).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_sst_documentos'] }),
+  })
+}
+
+// ── Matriz FUNÇÃO × RISCO (alimenta APR por função e a OS) ───────────────────
+
+export type MatrizRiscoCelula = {
+  id: string; cargo: string; risco_id: string; aplica: boolean; ghe?: number
+  severidade?: string; probabilidade?: string; nivel_risco?: string; classificacao?: string
+  tempo_exposicao?: string; tipo_exposicao?: string
+  fontes?: string; epis?: string; medidas_administrativas?: string; origem: string
+}
+export function useMatrizRisco() {
+  return useQuery({
+    queryKey: ['qsma_matriz_risco'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_matriz_risco').select('*')
+      if (error) throw error
+      return (data ?? []) as MatrizRiscoCelula[]
+    },
+  })
+}
+export function useSetMatrizRiscoCelula() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { cargo: string; risco_id: string; aplica: boolean }) => {
+      const { error } = await supabase.from('qsma_matriz_risco')
+        .upsert({ ...p, origem: 'manual', updated_at: new Date().toISOString() },
+                { onConflict: 'cargo,risco_id' })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_matriz_risco'] }),
+  })
+}
+
 // ── Riscos (PGR / APR) ───────────────────────────────────────────────────────
 
 export function useRiscos() {
