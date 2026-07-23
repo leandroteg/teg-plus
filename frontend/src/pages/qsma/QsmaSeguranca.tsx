@@ -274,7 +274,7 @@ export default function QsmaSeguranca() {
         return (
           <CatalogoRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
             riscos={riscosF} busca={busca} onBusca={setBusca} escopoF={escopoF} onEscopo={setEscopoF}
-            onNovo={() => setModalRisco('novo')} onAbrir={r => setModalRisco(r)} obraNome={obraNome} />
+            onAbrir={r => setModalRisco(r)} obraNome={obraNome} />
         )
       })()}
 
@@ -699,25 +699,24 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
           </table>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {lista.map(d => {
             const i = info(d)
             return (
-              <div key={d.id} className={`${card} p-4`}>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className={`text-[10px] font-mono font-bold uppercase ${txtMuted}`}>{d.tipo} · {d.revisao ?? '—'}</span>
-                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${CORES[i.cor]}`}>{i.txt}</span>
+              <div key={d.id} className={`${card} p-3.5`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className={`text-sm font-bold ${txtMain}`}>{d.titulo}</p>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${CORES[i.cor]}`}>{i.txt}</span>
                 </div>
-                <p className={`text-[15px] font-bold ${txtMain}`}>{d.titulo}</p>
-                <p className={`text-[11px] ${txtMuted}`}>{[d.unidade, d.cnpj, d.grau_risco ? `Grau de Risco ${d.grau_risco}` : null].filter(Boolean).join(' · ')}</p>
-                <div className={`grid grid-cols-3 gap-2 mt-2.5 text-[11px] ${txtMuted}`}>
-                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Emissão</span>{fmtData(d.data_emissao)}</div>
-                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Revisão</span>{fmtData(d.data_revisao)}</div>
-                  <div><span className="block text-[9px] uppercase tracking-wide opacity-70">Validade</span>
-                    <b className={i.cor === 'red' ? 'text-red-500' : i.cor === 'amber' ? 'text-amber-500' : ''}>{fmtData(d.data_validade)}</b></div>
-                </div>
-                <div className="flex items-center gap-2 mt-2.5">
-                  <label className={`text-[11px] ${txtMuted}`}>Vigência:</label>
+                <p className={`text-[11px] mt-0.5 ${txtMuted}`}>
+                  <b className="uppercase">{d.tipo}</b> · {d.revisao ?? '—'} · emissão {fmtData(d.data_emissao)}
+                </p>
+                <p className={`text-[11px] ${i.cor === 'red' ? 'text-red-500 font-semibold' : i.cor === 'amber' ? 'text-amber-500 font-semibold' : txtMuted}`}>
+                  revisão {fmtData(d.data_revisao)} · vence {fmtData(d.data_validade)}
+                </p>
+                <p className={`text-[11px] truncate ${txtMuted}`}>{[d.unidade, d.grau_risco ? `GR ${d.grau_risco}` : null].filter(Boolean).join(' · ')}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className={`text-[10px] uppercase tracking-wide ${txtMuted}`}>Vigência</span>
                   <select value={d.meses_validade} disabled={salvar.isPending} className={selCls2(isDark)}
                     onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}>
                     {[12, 24, 36].map(m => <option key={m} value={m}>{m} meses</option>)}
@@ -733,11 +732,11 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
 }
 
 // ── Riscos › Catálogo de perigos — Lista/Cards ──────────────────────────────
-function CatalogoRiscos({ subTabs, isDark, card, txtMain, txtMuted, riscos, busca, onBusca, escopoF, onEscopo, onNovo, onAbrir, obraNome }: {
+function CatalogoRiscos({ subTabs, isDark, card, txtMain, txtMuted, riscos, busca, onBusca, escopoF, onEscopo, onAbrir, obraNome }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
   riscos: QsmaRisco[]; busca: string; onBusca: (v: string) => void
   escopoF: string; onEscopo: (v: string) => void
-  onNovo: () => void; onAbrir: (r: QsmaRisco) => void; obraNome: (id?: string) => string
+  onAbrir: (r: QsmaRisco) => void; obraNome: (id?: string) => string
 }) {
   const [vista, setVista] = useState<'lista' | 'cards'>('lista')
   return (
@@ -751,7 +750,6 @@ function CatalogoRiscos({ subTabs, isDark, card, txtMain, txtMuted, riscos, busc
         <ToolbarPills isDark={isDark} value={escopoF} onChange={onEscopo}
           options={[{ value: 'todos', label: 'Todos' }, { value: 'pgr', label: 'PGR' }, { value: 'apr', label: 'APR' }]} />
         <span className={`text-xs ${txtMuted}`}>{riscos.length} risco(s)</span>
-        <BotaoNovo label="Novo Risco / APR" onClick={onNovo} />
         <VistaToggle isDark={isDark} vista={vista} onVista={setVista} />
       </HdrRisco>
 
@@ -1493,19 +1491,19 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
         const selCls = `text-xs rounded-lg px-2 py-1.5 border outline-none ${isDark ? 'bg-white/[0.05] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
         return (
           <div className="space-y-1.5">
-            <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl border p-2 flex items-center gap-1.5 flex-nowrap overflow-x-auto ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               {subTabs}
-              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs w-[190px] shrink-0 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
-                <Search size={14} className={txtMuted} />
-                <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
+              <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs w-[150px] shrink-0 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+                <Search size={13} className={`shrink-0 ${txtMuted}`} />
+                <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Colaborador…" className={`bg-transparent outline-none w-full min-w-0 ${txtMain}`} />
               </div>
               <CheckDropdown label="Bases" options={bases} selected={fBase} onChange={setFBase} isDark={isDark} />
               <CheckDropdown label="Posições" options={cargos} selected={fCargo} onChange={setFCargo} isDark={isDark} />
               <CheckDropdown label="Setores" options={setores} selected={fSetor} onChange={setFSetor} isDark={isDark} />
-              <span className={`flex items-center gap-1 text-[11px] ${txtMuted}`} title="Data de admissão">
+              <span className={`flex items-center gap-1 text-[11px] shrink-0 ${txtMuted}`} title="Data de admissão">
                 Adm.
-                <input type="date" value={fAdmDe} onChange={e => setFAdmDe(e.target.value)} className={selCls} />
-                <input type="date" value={fAdmAte} onChange={e => setFAdmAte(e.target.value)} className={selCls} />
+                <input type="date" value={fAdmDe} onChange={e => setFAdmDe(e.target.value)} className={`${selCls} w-[118px] px-1`} />
+                <input type="date" value={fAdmAte} onChange={e => setFAdmAte(e.target.value)} className={`${selCls} w-[118px] px-1`} />
               </span>
               <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
                 title={quick === 'pendencia' ? 'Mostrando só quem tem pendência — clique p/ ver todos' : 'Mostrar só quem tem pendência'}
