@@ -284,6 +284,128 @@ export function useGarantiasVigentes(veiculoId?: string, hodometroAtual?: number
   })
 }
 
+/**
+ * Etapa PROGRAMAÇÃO → EXECUÇÃO (fluxo ORG-PRO-001 etapa 7).
+ * Confirma a entrada na oficina, desaloca o veículo da obra e, se houver,
+ * coloca o substituto no lugar. É o marco que inicia o tempo de oficina.
+ */
+export function useProgramarEntradaOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      osId: string
+      veiculoId: string
+      dataEntrada: string
+      hodometroEntrada?: number
+      /** Alocação ativa a encerrar (o veículo sai da obra para a oficina). */
+      alocacaoId?: string
+      /** Substituto que assume a obra no lugar dele. */
+      substitutoId?: string
+      obraId?: string
+      centroCustoId?: string
+      responsavelNome?: string
+    }) => {
+      const { error: eOs } = await supabase.from('fro_ordens_servico').update({
+        status: 'em_execucao',
+        data_entrada_oficina: p.dataEntrada,
+        ...(p.hodometroEntrada != null ? { hodometro_entrada: p.hodometroEntrada } : {}),
+      }).eq('id', p.osId)
+      if (eOs) throw eOs
+
+      if (p.alocacaoId) {
+        const { error } = await supabase.from('fro_alocacoes').update({
+          status: 'encerrada',
+          data_retorno_real: p.dataEntrada,
+          hodometro_retorno: p.hodometroEntrada,
+          observacoes: 'Encerrada por entrada em manutenção (OS)',
+        }).eq('id', p.alocacaoId)
+        if (error) throw error
+      }
+
+      if (p.substitutoId && p.obraId) {
+        const { error } = await supabase.from('fro_alocacoes').insert({
+          veiculo_id: p.substitutoId,
+          obra_id: p.obraId,
+          centro_custo_id: p.centroCustoId,
+          responsavel_nome: p.responsavelNome,
+          data_saida: p.dataEntrada,
+          status: 'ativa',
+          observacoes: 'Substituto durante manutenção',
+        })
+        if (error) throw error
+        await supabase.from('fro_veiculos').update({ status: 'em_uso' }).eq('id', p.substitutoId)
+      }
+
+      // Só depois de mexer nas alocações: o veículo da OS fica em manutenção.
+      const { error: eV } = await supabase.from('fro_veiculos')
+        .update({ status: 'em_manutencao' }).eq('id', p.veiculoId)
+      if (eV) throw eV
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_os'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+    },
+  })
+}
+
+/**
+ * Etapa LIBERADO (fluxo ORG-PRO-001 etapas 8-9).
+ * Diferente do antigo useConcluirOS, NÃO assume checklist: o campo
+ * checklist_saida_ok recebe o que de fato aconteceu ("veículo não liberado sem
+ * checklist pós-manutenção assinado").
+ */
+export function useLiberarOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      osId: string
+      veiculoId: string
+      valorFinal: number
+      hodometroSaida?: number
+      descricaoServico?: string
+      checklistOk: boolean
+      /** Realocar o veículo ao voltar (obra de origem ou outra). */
+      realocar?: { obraId?: string; centroCustoId?: string; responsavelNome?: string }
+    }) => {
+      const { error } = await supabase.from('fro_ordens_servico').update({
+        status: 'concluida',
+        valor_final: p.valorFinal,
+        hodometro_saida: p.hodometroSaida,
+        descricao_servico: p.descricaoServico,
+        data_conclusao: new Date().toISOString(),
+        checklist_saida_ok: p.checklistOk,
+      }).eq('id', p.osId)
+      if (error) throw error
+
+      if (p.realocar?.obraId) {
+        const { error: eA } = await supabase.from('fro_alocacoes').insert({
+          veiculo_id: p.veiculoId,
+          obra_id: p.realocar.obraId,
+          centro_custo_id: p.realocar.centroCustoId,
+          responsavel_nome: p.realocar.responsavelNome,
+          data_saida: new Date().toISOString(),
+          status: 'ativa',
+          hodometro_saida: p.hodometroSaida,
+          observacoes: 'Realocado após manutenção',
+        })
+        if (eA) throw eA
+      }
+
+      await supabase.from('fro_veiculos').update({
+        status: p.realocar?.obraId ? 'em_uso' : 'disponivel',
+        ...(p.hodometroSaida != null ? { hodometro_atual: p.hodometroSaida } : {}),
+      }).eq('id', p.veiculoId)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_os'] })
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+      qc.invalidateQueries({ queryKey: ['fro_os_hist_veiculo'] })
+    },
+  })
+}
+
 /** Upload de foto da OS (antes/depois). Reusa o bucket de fotos de frotas, prefixo os/. */
 export function useUploadFotoOS() {
   const qc = useQueryClient()
