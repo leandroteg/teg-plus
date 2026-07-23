@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -9,6 +9,8 @@ import {
 } from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
 import type { ObraRDO, CondicaoClimatica, StatusRDO } from '../../types/obras'
+import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
+import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,15 +55,36 @@ const EMPTY_FORM = {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function RDO() {
+export default function RDO({ portfolioId, onObraChange }: { portfolioId?: string; onObraChange?: (id: string) => void } = {}) {
   const { isLightSidebar: isLight } = useTheme()
   const obras = useLookupObras()
 
   const [obraFilter, setObraFilter] = useState('')
 
-  const { data: rdos = [], isLoading } = useRDOs({
+  // filtros padrão da Gestão de Obras (Projeto · Tipo · Valor · Ano)
+  const f = useObrasFiltros()
+  const { data: projetos = [] } = useProjetos(portfolioId)
+  const { data: obrasPmo = [] } = useObrasDoPortfolio(portfolioId)
+  const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
+  const oscsPorObra = useMemo(() => agruparOscsPorObra(oscs), [oscs])
+  // ids das obras que passam nos filtros — '' = sem filtro (todas)
+  const obrasOk = useMemo(() => {
+    const ativo = f.fProjeto.size || f.fTipo.size || f.fValor.size || f.fAno.size
+    if (!ativo) return null
+    return new Set(obrasPmo.filter(o => obraPassa(o, oscsPorObra, f)).map(o => o.id))
+  }, [obrasPmo, oscsPorObra, f])
+
+  const { data: rdosRaw = [], isLoading } = useRDOs({
     obra_id: obraFilter || undefined,
   })
+  const rdos = useMemo(
+    () => obrasOk ? rdosRaw.filter(r => r.obra_id && obrasOk.has(r.obra_id)) : rdosRaw,
+    [rdosRaw, obrasOk],
+  )
+  const obrasSel = useMemo(
+    () => obrasOk ? obras.filter(o => obrasOk.has(o.id)) : obras,
+    [obras, obrasOk],
+  )
 
   const criarRDO = useCriarRDO()
   const atualizarRDO = useAtualizarRDO()
@@ -160,11 +183,14 @@ export default function RDO() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-wrap gap-2 items-center">
         <Filter size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-        <select value={obraFilter} onChange={e => setObraFilter(e.target.value)} className={selectClass}>
+        <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={!isLight}
+          onChange={() => { setObraFilter(''); onObraChange?.('') }} />
+        <select value={obraFilter} onChange={e => { setObraFilter(e.target.value); onObraChange?.(e.target.value) }}
+          className={`${selectClass} max-w-[280px] truncate`}>
           <option value="">Todas as obras</option>
-          {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          {obrasSel.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
       </div>
 
