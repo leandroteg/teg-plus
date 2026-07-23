@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight, ChevronDown,
-  CheckCircle2, XCircle, Circle, Upload, User,
+  CheckCircle2, XCircle, Circle, Upload, User, X,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -631,6 +631,14 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
   const salvar = useSalvarSstDocumento()
   const [vista, setVista] = useState<'lista' | 'cards'>('lista')
   const [busca, setBusca] = useState('')
+  const [verDoc, setVerDoc] = useState<SstDocumento | null>(null)
+  const [verUrl, setVerUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    setVerUrl(null)
+    if (verDoc?.arquivo_url) evidenciaUrl(verDoc.arquivo_url).then(u => { if (vivo) setVerUrl(u) })
+    return () => { vivo = false }
+  }, [verDoc])
   const hoje = new Date()
   const info = (d: SstDocumento) => {
     if (!d.data_validade) return { txt: 'sem validade', cor: 'slate' }
@@ -667,7 +675,7 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
           <table className="w-full min-w-[880px] text-sm">
             <thead>
               <tr className={thCls(isDark)}>
-                {['TIPO', 'DOCUMENTO', 'REVISÃO', 'EMISSÃO', 'DT. REVISÃO', 'VALIDADE', 'SITUAÇÃO', 'VIGÊNCIA'].map(h => (
+                {['TIPO', 'DOCUMENTO', 'REVISÃO', 'EMISSÃO', 'DT. REVISÃO', 'VALIDADE', 'SITUAÇÃO', 'VIGÊNCIA', ''].map(h => (
                   <th key={h} className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -691,6 +699,14 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
                         onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}>
                         {[12, 24, 36].map(m => <option key={m} value={m}>{m} meses</option>)}
                       </select>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {d.arquivo_url && (
+                        <button onClick={() => setVerDoc(d)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>
+                          <FileText size={12} /> Ver
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )
@@ -721,10 +737,50 @@ function DocumentosSST({ subTabs, isDark, card, txtMain, txtMuted }: {
                     onChange={e => salvar.mutate({ id: d.id, meses_validade: Number(e.target.value) })}>
                     {[12, 24, 36].map(m => <option key={m} value={m}>{m} meses</option>)}
                   </select>
+                  {d.arquivo_url && (
+                    <button onClick={() => setVerDoc(d)}
+                      className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDark ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>
+                      <FileText size={12} /> Ver
+                    </button>
+                  )}
                 </div>
               </div>
             )
           })}
+        </div>
+      )}
+
+      {verDoc && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60"
+          onClick={() => setVerDoc(null)}>
+          <div onClick={e => e.stopPropagation()}
+            className={`w-full max-w-5xl h-[88vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+            <div className={`flex items-center gap-2 px-4 py-3 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold truncate ${txtMain}`}>{verDoc.titulo}</p>
+                <p className={`text-[11px] truncate ${txtMuted}`}>
+                  <b className="uppercase">{verDoc.tipo}</b> · {verDoc.revisao ?? '—'} · vence {fmtData(verDoc.data_validade)}
+                </p>
+              </div>
+              {verUrl && (
+                <a href={verUrl} download={verDoc.arquivo_nome ?? undefined} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-600 text-white hover:bg-amber-700">
+                  <FileDown size={13} /> Baixar
+                </a>
+              )}
+              <button onClick={() => setVerDoc(null)}
+                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className={`flex-1 ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
+              {verUrl
+                ? <iframe title={verDoc.titulo} src={verUrl} className="w-full h-full border-0" />
+                : <div className={`h-full flex items-center justify-center text-xs ${txtMuted}`}>
+                    <Loader2 size={18} className="animate-spin mr-2" /> abrindo documento…
+                  </div>}
+            </div>
+          </div>
         </div>
       )}
     </div>
