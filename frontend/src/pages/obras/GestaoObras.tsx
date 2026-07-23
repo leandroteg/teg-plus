@@ -10,6 +10,8 @@ import { FileBarChart2, ListOrdered, CalendarRange, ClipboardList, Ruler, Constr
 import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import RDO from './RDO'
+import RDOEstruturado from './RDOEstruturado'
+import { usePortfolios, useObrasDoPortfolio } from '../../hooks/usePMO'
 import ResumoTecnicoObras from './ResumoTecnicoObras'
 import PriorizacaoObras from './PriorizacaoObras'
 import PlanejamentoTecnico from './PlanejamentoTecnico'
@@ -54,10 +56,15 @@ export default function GestaoObras() {
   const [searchParams] = useSearchParams()
   const atual = STEPS.find(s => s.key === step) ?? STEPS[0]
 
-  // Veio do flyout "Novo Registro › Registrar RDO": abre direto na aba Diário
-  // (a própria tela de RDO consome o parâmetro e abre o modal).
+  // Veio do flyout "Novo Registro › Registrar RDO": abre a aba Diário + o modal
+  const [novoRdo, setNovoRdo] = useState(false)
+  const { data: portfolios = [] } = usePortfolios()
+  const { data: obrasRdo = [] } = useObrasDoPortfolio(portfolios[0]?.id)
+  const [obraRdoId, setObraRdoId] = useState('')
+  const obraRdo = obrasRdo.find(o => o.id === obraRdoId) ?? obrasRdo[0]
+
   useEffect(() => {
-    if (searchParams.get('novo_rdo') === '1') setStep('diario')
+    if (searchParams.get('novo_rdo') === '1') { setStep('diario'); setNovoRdo(true) }
   }, [searchParams])
 
   return (
@@ -76,10 +83,28 @@ export default function GestaoObras() {
         ) : step === 'planejamento' ? (
           <PlanejamentoTecnico />
         ) : step === 'diario' ? (
-          /* Tela existente de RDO carregada dentro da aba (arquivo intocado) */
-          <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
-            <RDO />
-          </div>
+          <>
+            {/* barra pra abrir o RDO estruturado (matriz do Planejamento) */}
+            <div className={`mb-3 rounded-2xl border p-3 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+              <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Novo RDO estruturado</span>
+              <select value={obraRdo?.id ?? ''} onChange={e => setObraRdoId(e.target.value)}
+                className={`appearance-none rounded-lg px-2.5 py-1.5 border text-xs font-semibold max-w-[320px] truncate ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                {obrasRdo.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              </select>
+              <button onClick={() => setNovoRdo(true)} disabled={!obraRdo}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
+                <ClipboardList size={13} /> Preencher RDO
+              </button>
+              <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>avanço por estrutura · equipe e recursos pré-preenchidos</span>
+            </div>
+            {/* histórico: tela de RDO existente (arquivo intocado) */}
+            <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+              <RDO />
+            </div>
+            {novoRdo && obraRdo && (
+              <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)} />
+            )}
+          </>
         ) : (
           <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
             <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
