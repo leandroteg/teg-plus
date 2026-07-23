@@ -103,11 +103,11 @@ function tempoRelativo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diffMs / 60_000)
   if (min < 1) return 'agora'
-  if (min < 60) return `${min} min`
+  if (min < 60) return `há ${min} min`
   const h = Math.floor(min / 60)
-  if (h < 24) return `${h} h`
+  if (h < 24) return `há ${h} h`
   const d = Math.floor(h / 24)
-  return `${d} d`
+  return `há ${d} d`
 }
 
 function primeiroNome(nome: string | null | undefined): string {
@@ -190,7 +190,9 @@ export default function AdminHome() {
     staleTime: 5 * 60_000,
   })
 
-  // Ações registradas hoje (auditoria)
+  // Ações de usuários hoje (auditoria). usuario_id nulo = integrações/robôs
+  // (sync de ponto, telemetria de frota etc., dezenas de milhares por dia) —
+  // fora do KPI para medir atividade humana, não de máquinas.
   const { data: acoesHoje, isLoading: acoesLoading } = useQuery({
     queryKey: ['admin-home-acoes-hoje'],
     queryFn: async () => {
@@ -200,19 +202,22 @@ export default function AdminHome() {
         .from('sys_log_atividades')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', inicio.toISOString())
+        .not('usuario_id', 'is', null)
       if (error) throw error
       return count ?? 0
     },
     staleTime: 60_000,
   })
 
-  // Últimas atividades (feed lateral)
+  // Últimas atividades humanas (feed lateral) — sem usuario_id é integração
+  // e afogaria o feed em "Sistema alterou X" a cada poucos minutos.
   const { data: recentes = [], isLoading: recentesLoading } = useQuery({
     queryKey: ['admin-home-logs-recentes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sys_log_atividades')
         .select('id, modulo, entidade_tipo, tipo, usuario_nome, created_at')
+        .not('usuario_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(7)
       if (error) throw error
@@ -287,7 +292,7 @@ export default function AdminHome() {
           <KpiCard
             icon={Activity} label="Ações hoje" isLight={isLight}
             value={acoesHoje?.toLocaleString('pt-BR')}
-            loading={acoesLoading} note="registros de auditoria"
+            loading={acoesLoading} note="por usuários · sem integrações"
           />
         </div>
 
@@ -371,7 +376,7 @@ export default function AdminHome() {
                           {' '}{meta.verbo}{' '}
                           <span className="font-medium">{entidadeLabel(log.entidade_tipo)}</span>
                         </p>
-                        <p className={`text-[11px] mt-0.5 ${label}`}>{tempoRelativo(log.created_at)} atrás</p>
+                        <p className={`text-[11px] mt-0.5 ${label}`}>{tempoRelativo(log.created_at)}</p>
                       </div>
                     </li>
                   )
