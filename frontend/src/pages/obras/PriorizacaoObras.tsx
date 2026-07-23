@@ -13,7 +13,7 @@ import { Search, GripVertical, ChevronUp, ChevronDown, Loader2 } from 'lucide-re
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { usePortfolios, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
+import { useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
 
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
@@ -60,14 +60,11 @@ function useFinPorOsc() {
   })
 }
 
-export default function PriorizacaoObras() {
+export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string }) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
   const qc = useQueryClient()
-  const { data: portfolios = [] } = usePortfolios()
-  const [pid, setPid] = useState('')
-  const portfolioId = pid || portfolios[0]?.id
 
   const { data: obras = [], isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
@@ -223,11 +220,6 @@ export default function PriorizacaoObras() {
           <option value="canceladas">Canceladas</option>
           <option value="todas">Todas</option>
         </select>
-        {portfolios.length > 1 && (
-          <select value={portfolioId ?? ''} onChange={e => setPid(e.target.value)} className={`${sel} max-w-[220px] truncate`}>
-            {portfolios.map(p => <option key={p.id} value={p.id}>{p.nome_obra}</option>)}
-          </select>
-        )}
         <div className="flex-1" />
         {salvando && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> salvando ordem…</span>}
         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>arraste ou use as setas pra ordenar</span>
