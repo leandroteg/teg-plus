@@ -64,7 +64,7 @@ const STEPS: FlowStep[] = [
     accent: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', badge: 'bg-violet-100 text-violet-700' },
   },
   {
-    key: 'riscos', label: 'Riscos (PGR/APR)',
+    key: 'riscos', label: 'Riscos',
     description: 'Inventário de riscos por GHE e análise preliminar por tarefa — matriz 5×5.',
     icon: AlertTriangle,
     accent: { bg: 'hover:bg-amber-50', bgActive: 'bg-amber-50', text: 'text-amber-600', textActive: 'text-amber-800', border: 'border-amber-500', badge: 'bg-amber-100 text-amber-700' },
@@ -561,6 +561,39 @@ export default function QsmaSeguranca() {
   )
 }
 
+// Rótulo curto p/ a coluna da matriz (o nome completo fica no tooltip).
+// Ex.: "Radiação não ionizantes - Exposição Solar" -> "Radiação solar"
+//      "Produtos de Limpeza (domissanitários)"     -> "Prod. limpeza"
+const PERIGO_ABREV: Record<string, string> = {
+  'radiação não ionizantes - exposição solar': 'Radiação solar',
+  'produtos de limpeza (domissanitários)': 'Prod. limpeza',
+  'trabalho com telas de processamento de dados': 'Telas/monitor',
+  'trabalho intensivo com teclado ou outros dispositivos de entrada de dados': 'Teclado intensivo',
+  'postura sentada por longos períodos': 'Postura sentada',
+  'postura de trabalho em pé por longos períodos': 'Postura em pé',
+  'frequente deslocamento a pé durante a jornada de trabalho': 'Deslocamento a pé',
+  'objetos cortantes e/ou perfurocortantes': 'Perfurocortante',
+  'queda no mesmo nível': 'Queda mesmo nível',
+  'queda de objetos': 'Queda de objetos',
+  'animais peçonhentos': 'Animais peçonh.',
+  'acidentes de trânsito': 'Trânsito',
+  'ferramentas manuais': 'Ferram. manuais',
+}
+function abrevPerigo(nome: string): string {
+  const n = (nome || '').trim()
+  const hit = PERIGO_ABREV[n.toLowerCase()]
+  if (hit) return hit
+  let t = n.replace(/\([^)]*\)/g, ' ')            // tira parênteses
+  if (t.includes(' - ')) t = t.split(' - ')[0]     // fica com a 1ª parte
+  t = t.replace(/\s+/g, ' ').trim()
+  if (t.length <= 18) return t
+  const stop = new Set(['de', 'do', 'da', 'dos', 'das', 'com', 'por', 'e', 'ou', 'em', 'no', 'na', 'ao', 'à', 'a', 'o', 'para'])
+  const ps = t.split(' ').filter(w => !stop.has(w.toLowerCase()))
+  let out = ''
+  for (const w of ps) { if ((out + ' ' + w).trim().length > 18) break; out = (out + ' ' + w).trim() }
+  return (out || t.slice(0, 18)) + '…'
+}
+
 // ── Riscos: header padrão (caixa com borda, subTabs SEMPRE primeiro) ────────
 function HdrRisco({ isDark, subTabs, children }: { isDark: boolean; subTabs?: ReactNode; children?: ReactNode }) {
   return (
@@ -784,6 +817,7 @@ function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
   const { data: celulas = [] } = useMatrizRisco()
   const setCel = useSetMatrizRiscoCelula()
   const [busca, setBusca] = useState('')
+  const [exSetor, setExSetor] = useState<Set<string> | null>(null)
 
   const cols = useMemo(() => riscos.filter(r => (r as any).documento_id)
     .sort((a, b) => (((a as any).grupo ?? '') + a.perigo).localeCompare(((b as any).grupo ?? '') + b.perigo, 'pt-BR')), [riscos])
@@ -793,8 +827,18 @@ function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
     celulas.forEach(c => m.set(c.cargo + '|' + c.risco_id, c))
     return m
   }, [celulas])
+  const setorDe = useMemo(() => {
+    const m = new Map<string, string>()
+    celulas.forEach(c => { if (c.setor) m.set(c.cargo, c.setor) })
+    return m
+  }, [celulas])
+  const setores = useMemo(() =>
+    [...new Set(celulas.map(c => c.setor).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [celulas])
   const q = busca.trim().toLowerCase()
-  const linhas = cargos.filter(c => !q || c.toLowerCase().includes(q))
+  const linhas = cargos.filter(c =>
+    (!q || c.toLowerCase().includes(q)) &&
+    (!exSetor || exSetor.has(setorDe.get(c) ?? '—')))
   const GRUPO_COR: Record<string, string> = {
     'Acidente': '#ef4444', 'Ergonômico': '#8b5cf6', 'Físico': '#0ea5e9',
     'Químico': '#f59e0b', 'Biológico': '#10b981',
@@ -807,6 +851,7 @@ function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar função…"
             className={`bg-transparent outline-none w-full ${isDark ? 'text-slate-200' : 'text-slate-700'}`} />
         </div>
+        <CheckDropdown label="Setores" isDark={isDark} options={setores} selected={exSetor} onChange={setExSetor} />
         <span className={`text-xs ${txtMuted}`}>{linhas.length} funções × {cols.length} perigos</span>
         <span className="flex items-center gap-2 ml-auto flex-wrap">
           {Object.entries(GRUPO_COR).map(([g, c]) => (
@@ -823,10 +868,10 @@ function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
               <th className={`sticky left-0 top-0 z-30 w-[230px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Função</th>
               {cols.map(c => (
                 <th key={c.id} title={`${(c as any).grupo ?? ''} · ${c.perigo}`}
-                  className={`sticky top-0 z-20 h-[150px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                  className={`sticky top-0 z-20 h-[104px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
                   <div className="relative h-full w-[26px]">
-                    <span className="absolute bottom-6 left-1 origin-bottom-left rotate-[-55deg] whitespace-nowrap text-[10px] leading-none">{c.perigo.slice(0, 34)}</span>
-                    <span className="absolute bottom-1.5 left-2 w-2 h-2 rounded-full" style={{ background: GRUPO_COR[(c as any).grupo] ?? '#94a3b8' }} />
+                    <span className="absolute bottom-5 left-1.5 origin-bottom-left rotate-[-50deg] whitespace-nowrap text-[10px] leading-none">{abrevPerigo(c.perigo)}</span>
+                    <span className="absolute bottom-1 left-2 w-2 h-2 rounded-full" style={{ background: GRUPO_COR[(c as any).grupo] ?? '#94a3b8' }} />
                   </div>
                 </th>
               ))}
@@ -835,7 +880,10 @@ function MatrizRiscos({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
           <tbody>
             {linhas.map((cargo, i) => (
               <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
-                <td title={cargo} className={`sticky left-0 z-10 px-3 py-1.5 font-semibold truncate max-w-[230px] ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                <td title={`${cargo} — ${setorDe.get(cargo) ?? ''}`} className={`sticky left-0 z-10 px-3 py-1.5 truncate max-w-[230px] ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>
+                  <span className={`block font-semibold truncate ${txtMain}`}>{cargo}</span>
+                  <span className={`block text-[9px] uppercase tracking-wide truncate ${txtMuted}`}>{setorDe.get(cargo) ?? ''}</span>
+                </td>
                 {cols.map(c => {
                   const cel = mapa.get(cargo + '|' + c.id)
                   const on = !!cel?.aplica
@@ -1356,7 +1404,7 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
   const { data: catalogo = [] } = useCatalogoTreinamentos()
   const { data: treinos = [] } = useTreinamentos()
   const [busca, setBusca] = useState('')
-  const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
+  const [quick, setQuick] = useState<'todos' | 'pendencia'>('pendencia')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
   const [fBase, setFBase] = useState<Set<string> | null>(null)
   const [fCargo, setFCargo] = useState<Set<string> | null>(null)
@@ -1447,7 +1495,7 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
           <div className="space-y-1.5">
             <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               {subTabs}
-              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
+              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs w-[190px] shrink-0 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
                 <Search size={14} className={txtMuted} />
                 <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…" className={`bg-transparent outline-none w-full ${txtMain}`} />
               </div>
@@ -1460,10 +1508,14 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
                 <input type="date" value={fAdmAte} onChange={e => setFAdmAte(e.target.value)} className={selCls} />
               </span>
               <button onClick={() => setQuick(quick === 'pendencia' ? 'todos' : 'pendencia')}
-                className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${quick === 'pendencia' ? 'bg-red-100 text-red-700 border-red-300' : (isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}`}>
-                <AlertTriangle size={12} /> Com pendência
+                title={quick === 'pendencia' ? 'Mostrando só quem tem pendência — clique p/ ver todos' : 'Mostrar só quem tem pendência'}
+                aria-pressed={quick === 'pendencia'}
+                className={`ml-auto p-1.5 rounded-lg border shrink-0 transition-colors ${quick === 'pendencia'
+                  ? 'bg-red-100 text-red-700 border-red-300'
+                  : (isDark ? 'border-white/10 text-slate-400 hover:text-slate-200' : 'border-slate-200 text-slate-500 hover:text-slate-700')}`}>
+                <AlertTriangle size={15} />
               </button>
-              <div className={`inline-flex p-0.5 rounded-lg ml-auto ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
+              <div className={`inline-flex p-0.5 rounded-lg ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
                 <button onClick={() => setVista('tabela')} title="Tabela"
                   className={`p-1.5 rounded-md ${vista === 'tabela' ? (isDark ? 'bg-white/10 text-sky-300' : 'bg-white text-sky-700 shadow-sm') : txtMuted}`}><List size={15} /></button>
                 <button onClick={() => setVista('cards')} title="Cards"
