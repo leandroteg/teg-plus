@@ -405,9 +405,9 @@ export default function OSAbertas() {
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
         <div>
           <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Wrench size={18} className="text-rose-500" /> OS Abertas
+            <Wrench size={18} className="text-rose-500" /> Ordens de Serviço
           </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de manutencao</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de manutenção</p>
         </div>
         <button onClick={() => setNovaOS(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors">
