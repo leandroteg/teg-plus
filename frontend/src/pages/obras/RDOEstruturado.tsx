@@ -23,7 +23,14 @@ export const CATALOGO_RDO: { secao: string; atividades: string[] }[] = [
   { secao: 'Acabamento', atividades: ['SECCIONAMENTO E ATERRAMENTO DE CERCAS', 'PINTURA, NUMERAÇÃO, ETC', 'ACABAMENTO FINAL DE SOLO - PRAD'] },
   { secao: 'Outros', atividades: ['COMISSIONAMENTO FINAL', 'ENERGIZAÇÃO'] },
 ]
-const CLIMAS = ['bom', 'nublado', 'chuvoso', 'impraticavel'] as const
+// valores aceitos pelo CHECK de obr_rdo.condicao_climatica — não inventar outros
+const CLIMAS = [
+  { v: 'sol', l: 'Sol' },
+  { v: 'nublado', l: 'Nublado' },
+  { v: 'chuva', l: 'Chuva' },
+  { v: 'chuva_forte', l: 'Chuva forte' },
+  { v: 'tempestade', l: 'Tempestade' },
+] as const
 
 interface Estrutura { id: string; nome: string; tipo: string | null }
 
@@ -95,7 +102,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   const qc = useQueryClient()
 
   const [data, setData] = useState(new Date().toISOString().slice(0, 10))
-  const [clima, setClima] = useState<typeof CLIMAS[number]>('bom')
+  const [clima, setClima] = useState<typeof CLIMAS[number]['v']>('sol')
   const [resumo, setResumo] = useState('')
   const [ocorrencias, setOcorrencias] = useState('')
   const [horasImp, setHorasImp] = useState('0')
@@ -249,7 +256,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             <input type="date" value={data} onChange={e => setData(e.target.value)} className={inp} /></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">CLIMA
             <select value={clima} onChange={e => setClima(e.target.value as never)} className={inp}>
-              {CLIMAS.map(c => <option key={c} value={c}>{c}</option>)}
+              {CLIMAS.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
             </select></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">HS IMPRODUTIVAS
             <input value={horasImp} onChange={e => setHorasImp(e.target.value)} className={`${inp} w-24`} /></label>
