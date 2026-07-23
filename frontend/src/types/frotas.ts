@@ -108,6 +108,16 @@ export interface FroOrdemServico {
   foto_antes_url?: string
   foto_depois_url?: string
   observacoes?: string
+  /** Sub-status livre durante a execução (ex: "Aguardando peça"). Lido pelo Painel de Disponibilidade. */
+  status_detalhe?: string
+  /** Parecer técnico da abertura — obrigatório na corretiva/sinistro (SUP-PRO-001). */
+  parecer_tecnico?: string
+  /** Envio a Suprimentos: inicia o SLA de 5 dias da categoria Manutenção de Frota. */
+  data_envio_cotacao?: string
+  /** Data programada de entrada na oficina (etapa Programação). */
+  data_programada_entrada?: string
+  /** Justificativa quando a OS segue com menos de 2 orçamentos. */
+  justificativa_excecao?: string
   created_at: string
   updated_at: string
   // joined
