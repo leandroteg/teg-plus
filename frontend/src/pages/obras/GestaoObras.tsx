@@ -70,17 +70,14 @@ function GestaoObrasInner() {
   }, [searchParams])
 
   return (
-    <div className="p-4 sm:p-6 space-y-3">
-      {/* Contrato no topo da visão — mesma seleção persistida do EGP */}
-      <div className="flex items-center justify-end">
-        <ContractSelector />
-      </div>
+    <div className="p-4 sm:p-6">
       <ControladoriaFlow
         title="Gestão de Obras"
         subtitle="Priorização, planejamento, diário de obra e medições"
         steps={STEPS}
         activeStep={step}
         onStepChange={setStep}
+        headerRight={<ContractSelector />}   /* contrato na MESMA linha do título */
       >
         {step === 'resumo_tecnico' ? (
           <ResumoTecnicoObras portfolioId={portfolioId} />
