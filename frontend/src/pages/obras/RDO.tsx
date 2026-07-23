@@ -13,12 +13,13 @@ import RdoPdfModal from '../../components/obras/RdoPdfModal'
 import RDOEstruturado from './RDOEstruturado'
 import type { RdoReportRow } from '../../utils/rdo-report-html'
 import { buildRdoReportHtml } from '../../utils/rdo-report-html'
-const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
 import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
 import { useQueryClient } from '@tanstack/react-query'
+
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
