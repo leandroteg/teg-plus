@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   CalendarDays,
-  Plus,
   CornerDownLeft,
   X,
   LayoutList,
@@ -384,9 +384,10 @@ function ViewToggle({
     { key: 'calendario', icon: CalendarDays, label: 'Calendário' },
   ]
 
+  // Só ícone: cabe na mesma linha dos filtros. O nome fica no tooltip.
   return (
     <div
-      className={`inline-flex rounded-xl p-1 ${
+      className={`inline-flex shrink-0 rounded-xl p-1 ${
         isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/5 border border-white/8'
       }`}
     >
@@ -396,7 +397,10 @@ function ViewToggle({
           <button
             key={v.key}
             onClick={() => setViewMode(v.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            title={v.label}
+            aria-label={v.label}
+            aria-pressed={active}
+            className={`p-1.5 rounded-lg transition-all ${
               active
                 ? isLight
                   ? 'bg-white text-rose-600 shadow-sm'
@@ -406,8 +410,7 @@ function ViewToggle({
                   : 'text-slate-400 hover:text-white'
             }`}
           >
-            <v.icon size={13} />
-            <span className="hidden sm:inline">{v.label}</span>
+            <v.icon size={14} />
           </button>
         )
       })}
@@ -1043,6 +1046,17 @@ export default function AgendaAlocacao() {
   }, [veiculosList])
 
   const [novaModal, setNovaModal] = useState(false)
+
+  // O botão "Nova Alocação" saiu daqui e virou item do menu lateral
+  // (Nova Solicitação › Registro Alocação), que navega com ?novaAlocacao=1.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (!searchParams.get('novaAlocacao')) return
+    setNovaModal(true)
+    const limpo = new URLSearchParams(searchParams)
+    limpo.delete('novaAlocacao')
+    setSearchParams(limpo, { replace: true })
+  }, [searchParams, setSearchParams])
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
   const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
 
@@ -1079,34 +1093,10 @@ export default function AgendaAlocacao() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1
-            className={`text-xl font-bold flex items-center gap-2 ${
-              isLight ? 'text-slate-800' : 'text-white'
-            }`}
-          >
-            <CalendarDays size={20} className="text-rose-500" />
-            Agenda de Alocação
-          </h1>
-          <p className="text-sm text-slate-500">
-            {alocacoesAtivas.length} ativo{alocacoesAtivas.length !== 1 ? 's' : ''} em campo
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <ViewToggle viewMode={viewMode} setViewMode={setViewMode} isLight={isLight} />
-          <button
-            onClick={() => setNovaModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-sm shadow-rose-500/20 text-sm text-white font-semibold"
-          >
-            <Plus size={15} /> Nova Alocação
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros — em uma unica linha com scroll horizontal em mobile */}
+      {/* Sem cabeçalho: a aba do hub já nomeia a tela. O seletor de visão virou
+          ícone e subiu para a linha dos filtros, liberando altura para o board. */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <ViewToggle viewMode={viewMode} setViewMode={setViewMode} isLight={isLight} />
         <select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)}
           className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroAtivo
