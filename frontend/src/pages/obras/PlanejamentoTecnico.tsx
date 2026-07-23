@@ -269,9 +269,10 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
           {obrasFiltradas.length === 0 && <option value="">— nenhuma obra no filtro —</option>}
           {obrasFiltradas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
-        <div className="relative">
+        {/* cresce/encolhe com a tela, sem estourar a linha */}
+        <div className="relative flex-1 min-w-[110px] max-w-[240px]">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={qTorre} onChange={e => setQTorre(e.target.value)} placeholder="filtrar torre..." className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-32 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
+          <input value={qTorre} onChange={e => setQTorre(e.target.value)} placeholder="filtrar torre..." className={`w-full pl-7 pr-3 py-1.5 rounded-lg border text-xs ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
         </div>
         <div className="flex-1" />
         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obrasFiltradas.length} obra(s) · {estruturas.length} estrutura(s)</span>
