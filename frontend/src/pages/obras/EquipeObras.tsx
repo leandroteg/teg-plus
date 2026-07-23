@@ -16,6 +16,7 @@ import type {
   ObraPlanejamentoEquipe, ColaboradorAtivo, PapelEquipe,
   CategoriaEquipePlan, StatusEquipePlan,
 } from '../../types/obras'
+import { MultiSelect, togFiltro } from '../pmo/paineis/egpFiltros'
 import { useVeiculos, useAlocacoes } from '../../hooks/useFrotas'
 import type { FroVeiculo, FroAlocacao } from '../../types/frotas'
 import { CATEGORIA_LABEL } from '../../constants/categoriaVeiculo'
@@ -1189,13 +1190,27 @@ function KanbanView({
     return Array.from(m.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [obras])
 
-  const [projetoSel, setProjetoSel] = useState<string>(() => projetos[0]?.id ?? 'todos')
+  const [fProj, setFProj] = useState<Set<string>>(new Set())
+  const [fObra, setFObra] = useState<Set<string>>(new Set())
+  const [qPessoa, setQPessoa] = useState('')
   const [dragColab, setDragColab] = useState<string | null>(null)
 
-  const obrasDoProjeto = useMemo(
-    () => projetoSel === 'todos' ? obras : obras.filter(o => o.projeto_id === projetoSel),
-    [obras, projetoSel],
-  )
+  const obrasDoProjeto = useMemo(() => obras.filter(o =>
+    (fProj.size === 0 || (o.projeto_id && fProj.has(o.projeto_id))) &&
+    (fObra.size === 0 || fObra.has(o.id))
+  ), [obras, fProj, fObra])
+
+  const obrasOpts = useMemo(() => obras
+    .filter(o => fProj.size === 0 || (o.projeto_id && fProj.has(o.projeto_id)))
+    .map(o => ({ id: o.id, nome: o.nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [obras, fProj])
+
+  // busca por pessoa (aplica no pool "Disponíveis" e nos cards das obras)
+  const buscaOk = useCallback((nome?: string | null) => {
+    const q = qPessoa.trim().toLowerCase()
+    return !q || (nome ?? '').toLowerCase().includes(q)
+  }, [qPessoa])
+  const disponiveisFiltrados = useMemo(() => disponiveis.filter(c => buscaOk(c.nome)), [disponiveis, buscaOk])
 
   // alocacoes ativas por obra (somente lideres + apoio aparecem como cards; time vai junto)
   const ativosByObra = useMemo(() => {
@@ -1214,22 +1229,18 @@ function KanbanView({
 
   return (
     <div className="space-y-3">
-      {/* Seletor de projeto */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-[11px] font-semibold ${txtMuted}`}>Projeto:</span>
-        <div className="flex gap-1 flex-wrap">
-          <button
-            onClick={() => setProjetoSel('todos')}
-            className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border transition-colors ${projetoSel === 'todos' ? 'bg-orange-500 text-white border-orange-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >Todos</button>
-          {projetos.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setProjetoSel(p.id)}
-              className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border transition-colors ${projetoSel === p.id ? 'bg-orange-500 text-white border-orange-500' : isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-            >{p.nome}</button>
-          ))}
+      {/* Filtros — mesmo padrão de caixa de seleção da Gestão de Obras */}
+      <div className={`rounded-2xl border p-3 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        <MultiSelect label="Projeto" options={projetos.map(p => ({ value: p.id, label: p.nome }))} selected={fProj}
+          onToggle={v => { togFiltro(v, setFProj); setFObra(new Set()) }} onClear={() => { setFProj(new Set()); setFObra(new Set()) }} isDark={isDark} compacto />
+        <MultiSelect label="Obra" options={obrasOpts.map(o => ({ value: o.id, label: o.nome }))} selected={fObra}
+          onToggle={v => togFiltro(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} compacto />
+        <div className="relative flex-1 min-w-[140px] max-w-[280px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={qPessoa} onChange={e => setQPessoa(e.target.value)} placeholder="filtrar pessoa..."
+            className={`w-full rounded-xl border pl-8 pr-2.5 py-1.5 text-[11px] ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`} />
         </div>
+        <span className={`text-[11px] font-semibold ml-auto ${txtMuted}`}>{obrasDoProjeto.length} obra(s) · {disponiveisFiltrados.length} disponível(is)</span>
       </div>
 
       <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
@@ -1241,12 +1252,12 @@ function KanbanView({
         <div className={`shrink-0 w-[260px] rounded-2xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <p className={`text-[12px] font-extrabold uppercase tracking-wider ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>Disponíveis</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{disponiveis.length}</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{disponiveisFiltrados.length}</span>
           </div>
           <div className="space-y-1.5 max-h-[60vh] overflow-y-auto styled-scrollbar">
-            {disponiveis.length === 0 ? (
-              <p className={`text-[11px] italic text-center py-4 ${txtMuted}`}>Todos alocados</p>
-            ) : disponiveis.slice(0, 200).map(c => (
+            {disponiveisFiltrados.length === 0 ? (
+              <p className={`text-[11px] italic text-center py-4 ${txtMuted}`}>{qPessoa ? 'Ninguém encontrado' : 'Todos alocados'}</p>
+            ) : disponiveisFiltrados.slice(0, 200).map(c => (
               <div
                 key={c.id}
                 draggable
@@ -1264,14 +1275,14 @@ function KanbanView({
                 </div>
               </div>
             ))}
-            {disponiveis.length > 200 && <p className={`text-[10px] italic ${txtMuted}`}>+ {disponiveis.length - 200} (use a Lista para filtrar)</p>}
+            {disponiveisFiltrados.length > 200 && <p className={`text-[10px] italic ${txtMuted}`}>+ {disponiveisFiltrados.length - 200} (refine a busca)</p>}
           </div>
         </div>
 
         {/* Colunas de obras */}
         {obrasDoProjeto.map(o => {
           const rows = ativosByObra.get(o.id) ?? []
-          const cards = rows.filter(r => r.papel !== 'time') // time vai junto do lider
+          const cards = rows.filter(r => r.papel !== 'time' && buscaOk(r.nome)) // time vai junto do lider
           const timeCount = rows.filter(r => r.papel === 'time').length
           return (
             <div
