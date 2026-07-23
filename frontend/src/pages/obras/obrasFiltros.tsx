@@ -81,13 +81,13 @@ export function ObrasFiltrosBar({ projetos, oscs, f, isDark, onChange, children 
   return (
     <>
       <MultiSelect label="Projeto" options={projetosOrd.map(p => ({ value: p.id, label: p.nome }))} selected={f.fProjeto}
-        onToggle={v => tog(v, f.setFProjeto)} onClear={() => lim(f.setFProjeto)} isDark={isDark} />
+        onToggle={v => tog(v, f.setFProjeto)} onClear={() => lim(f.setFProjeto)} isDark={isDark} compacto />
       <MultiSelect label="Tipo" options={tipos.map(t => ({ value: t, label: cap(t) }))} selected={f.fTipo}
-        onToggle={v => tog(v, f.setFTipo)} onClear={() => lim(f.setFTipo)} isDark={isDark} />
+        onToggle={v => tog(v, f.setFTipo)} onClear={() => lim(f.setFTipo)} isDark={isDark} compacto />
       <MultiSelect label="Valor" options={VALOR_OPTS} selected={f.fValor}
-        onToggle={v => tog(v, f.setFValor)} onClear={() => lim(f.setFValor)} isDark={isDark} />
+        onToggle={v => tog(v, f.setFValor)} onClear={() => lim(f.setFValor)} isDark={isDark} compacto />
       <MultiSelect label="Ano" options={anos.map(a => ({ value: a, label: a }))} selected={f.fAno}
-        onToggle={v => tog(v, f.setFAno)} onClear={() => lim(f.setFAno)} isDark={isDark} />
+        onToggle={v => tog(v, f.setFAno)} onClear={() => lim(f.setFAno)} isDark={isDark} compacto />
       {children}
     </>
   )
