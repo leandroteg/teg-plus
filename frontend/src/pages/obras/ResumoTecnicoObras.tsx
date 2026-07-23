@@ -124,7 +124,10 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
   const toggleGrupo = (id: string) => setFechados(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   // grade única — frente, obra e OSC usam as MESMAS colunas (alinham na vertical)
-  const GRID = 'grid grid-cols-[minmax(0,1fr)_76px_88px_124px_92px_92px] gap-3 items-center'
+  // MOBILE: 3 colunas (obra · torres · km) — valor/datas viram 2ª linha no nome.
+  // lg+ mantém a grade original de 6 colunas.
+  const GRID = 'grid grid-cols-[minmax(0,1fr)_46px_58px] lg:grid-cols-[minmax(0,1fr)_76px_88px_124px_92px_92px] gap-2 lg:gap-3 items-center'
+  const soDesk = 'hidden lg:block'
   const num = `text-right tabular-nums text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`
   const dat = `text-right text-[11px] tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-700'}`
   const th = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`
@@ -134,10 +137,10 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
       {/* Filtros */}
       <div className={`relative z-20 rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
         <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totObras} obras</span>
-        <div className="relative">
+        <div className="relative flex-1 min-w-[140px] lg:flex-none">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar..."
-            className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-44 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
+            className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-full lg:w-44 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
         </div>
         <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} />
       </div>
@@ -147,15 +150,15 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
         <span className={th}>Obra / OSC</span>
         <span className={`${th} text-right flex items-center justify-end gap-1`}><TowerControl size={10} /> Torres</span>
         <span className={`${th} text-right flex items-center justify-end gap-1`}><Ruler size={10} /> Km linha</span>
-        <span className={`${th} text-right`}>Valor</span>
-        <span className={`${th} text-right`}>Início</span>
-        <span className={`${th} text-right`}>Prazo</span>
+        <span className={`${th} text-right ${soDesk}`}>Valor</span>
+        <span className={`${th} text-right ${soDesk}`}>Início</span>
+        <span className={`${th} text-right ${soDesk}`}>Prazo</span>
 
         <span className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Total · {totObras} obras</span>
         <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtNum(totGeral.torres)}</span>
         <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtNum(totGeral.km, 1)}</span>
-        <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{fmtBRL(totGeral.valor)}</span>
-        <span /><span />
+        <span className={`text-right tabular-nums text-xs font-bold ${soDesk} ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{fmtBRL(totGeral.valor)}</span>
+        <span className={soDesk} /><span className={soDesk} />
       </div>
 
       {isLoading ? (
@@ -178,15 +181,18 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
             {/* Frente */}
             <button onClick={() => toggleGrupo(g.id)}
               className={`w-full ${GRID} px-3 py-2 rounded-xl ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-100/70'}`}>
-              <span className="flex items-center gap-2 min-w-0">
-                {aberto ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
-                <span className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{g.nome}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-200 text-slate-600'}`}>{g.obras.length} obras</span>
+              <span className="flex flex-col lg:flex-row lg:items-center gap-0.5 lg:gap-2 min-w-0 text-left">
+                <span className="flex items-center gap-2 min-w-0">
+                  {aberto ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+                  <span className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{g.nome}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-200 text-slate-600'}`}>{g.obras.length} obras</span>
+                </span>
+                <span className={`lg:hidden text-[10px] tabular-nums pl-6 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{fmtBRL(tot.valor)}</span>
               </span>
               <span className={`${num} font-bold`}>{fmtNum(tot.torres)}</span>
               <span className={`${num} font-bold`}>{fmtNum(tot.km, 1)}</span>
-              <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(tot.valor)}</span>
-              <span /><span />
+              <span className={`text-right tabular-nums text-xs font-bold ${soDesk} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(tot.valor)}</span>
+              <span className={soDesk} /><span className={soDesk} />
             </button>
 
             {aberto && g.obras.map(o => {
@@ -196,22 +202,29 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
               return (
                 <div key={o.id} className={`rounded-xl ${card} overflow-hidden`}>
                   <div onClick={() => toggleObra(o.id)} className={`w-full ${GRID} px-3 py-2.5 text-left cursor-pointer ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                    <span className="flex items-center gap-2 min-w-0">
-                      {exp ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
-                      <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
-                      {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
-                      <button onClick={e => { e.stopPropagation(); setTecObra({ id: o.id, nome: o.nome, oscs: arr }) }}
-                        title="Ver resumo técnico da obra"
-                        className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${isDark ? 'border-sky-500/30 text-sky-300 hover:bg-sky-500/10' : 'border-sky-200 text-sky-700 hover:bg-sky-50'}`}>
-                        <FileBarChart2 size={11} /> Resumo Técnico
-                      </button>
+                    <span className="flex flex-col gap-1 min-w-0">
+                      <span className="flex items-center gap-2 min-w-0">
+                        {exp ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
+                        <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5 flex-wrap pl-6">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
+                        {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
+                        <button onClick={e => { e.stopPropagation(); setTecObra({ id: o.id, nome: o.nome, oscs: arr }) }}
+                          title="Ver resumo técnico da obra"
+                          className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${isDark ? 'border-sky-500/30 text-sky-300 hover:bg-sky-500/10' : 'border-sky-200 text-sky-700 hover:bg-sky-50'}`}>
+                          <FileBarChart2 size={11} /> Resumo Técnico
+                        </button>
+                        <span className={`lg:hidden text-[10px] tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {fmtBRL(a.valor)}{a.fim ? ` · prazo ${fmtData(a.fim)}` : ''}
+                        </span>
+                      </span>
                     </span>
                     <span className={num}>{fmtNum(a.torres)}</span>
                     <span className={num}>{fmtNum(a.km, 1)}</span>
-                    <span className={`text-right tabular-nums text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(a.valor)}</span>
-                    <span className={dat}>{fmtData(a.ini)}</span>
-                    <span className={dat}>{fmtData(a.fim)}</span>
+                    <span className={`text-right tabular-nums text-xs font-bold ${soDesk} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(a.valor)}</span>
+                    <span className={`${dat} ${soDesk}`}>{fmtData(a.ini)}</span>
+                    <span className={`${dat} ${soDesk}`}>{fmtData(a.fim)}</span>
                   </div>
 
                   {exp && (
@@ -219,15 +232,16 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
                       {arr.length === 0 && <p className={`text-xs px-5 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma OSC neste filtro.</p>}
                       {arr.map(osc => (
                         <div key={osc.id} className={`${GRID} px-3 py-1.5 ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                          <span className="flex items-center gap-2 min-w-0 pl-6">
+                          <span className="flex items-center gap-2 min-w-0 pl-6 flex-wrap">
                             <span className={`text-xs font-semibold truncate ${isDark ? 'text-sky-300' : 'text-sky-700'}`}>{osc.numero_os}</span>
                             <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>{osc.tipo ?? '—'}</span>
+                            <span className={`lg:hidden text-[10px] tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{fmtBRL(osc.valor)}</span>
                           </span>
                           <span className={num}>{fmtNum(osc.qtd_torres)}</span>
                           <span className={num}>{fmtNum(km(osc.id), 1)}</span>
-                          <span className={`text-right tabular-nums text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(osc.valor)}</span>
-                          <span className={dat}>{fmtData(osc.data_osc)}</span>
-                          <span className={dat}>{fmtData(osc.vencimento)}</span>
+                          <span className={`text-right tabular-nums text-xs font-semibold ${soDesk} ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmtBRL(osc.valor)}</span>
+                          <span className={`${dat} ${soDesk}`}>{fmtData(osc.data_osc)}</span>
+                          <span className={`${dat} ${soDesk}`}>{fmtData(osc.vencimento)}</span>
                         </div>
                       ))}
                     </div>
@@ -271,9 +285,9 @@ function ResumoTecnicoModal({ obraId, nome, oscs, tec, onClose, isDark }: {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+        className={`w-full max-w-2xl max-h-[92vh] lg:max-h-[88vh] flex flex-col rounded-t-2xl lg:rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
         <div className={`flex items-start justify-between gap-3 p-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
           <div className="min-w-0">
             <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{nome}</h3>
