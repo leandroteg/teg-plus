@@ -13,8 +13,9 @@ import { Search, GripVertical, ChevronUp, ChevronDown, Loader2 } from 'lucide-re
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
+import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
+import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
 
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -22,7 +23,8 @@ const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 interface PrioRow {
   obra_id: string
   ordem: number | null
-  prazo_cliente: string | null
+  inicio_previsto: string | null
+  termino_previsto: string | null
   frentes_liberadas: string | null
   bloqueios: string | null
   comentarios: string | null
@@ -68,15 +70,14 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
 
   const { data: obras = [], isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
+  const { data: projetos = [] } = useProjetos(portfolioId)
   const { data: raw } = useEAPFinal(portfolioId)
   const { data: prio = [] } = usePriorizacao()
   const { data: finPorOsc } = useFinPorOsc()
 
   const [q, setQ] = useState('')
-  const [fTipo, setFTipo] = useState('')
-  const [fValor, setFValor] = useState('')
-  const [fAno, setFAno] = useState('')
   const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
+  const f = useObrasFiltros()
   const [dragId, setDragId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
 
@@ -95,25 +96,18 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
       const cancelada = o.etapa_atual === 'cancelada'
       if (fStatus === 'ativas' && cancelada) continue
       if (fStatus === 'canceladas' && !cancelada) continue
-      if (fTipo && o.tipo !== fTipo) continue
-      if (fAno && (o.data_osc ?? '').slice(0, 4) !== fAno) continue
-      if (fValor) {
-        const v = o.valor ?? 0
-        if (fValor === 'gt1m' && v <= 1_000_000) continue
-        if (fValor === 'mid' && !(v >= 100_000 && v <= 1_000_000)) continue
-        if (fValor === 'lt100k' && v >= 100_000) continue
-      }
       const arr = m.get(o.obra_id) ?? []; arr.push(o); m.set(o.obra_id, arr)
     }
     return m
-  }, [oscs, fStatus, fTipo, fAno, fValor])
+  }, [oscs, fStatus])
 
   const prioMap = useMemo(() => new Map(prio.map(p => [p.obra_id, p])), [prio])
-  const filtroAtivo = !!(fTipo || fValor || fAno || fStatus !== 'ativas')
+  const filtroAtivo = fStatus !== 'ativas'
 
   // linhas: obras filtradas, ordenadas por ordem salva (sem ordem → fim, por prazo)
   const linhas = useMemo(() => {
     const base = obras.filter(o => {
+      if (!obraPassa(o, oscByObra, f)) return false
       if (filtroAtivo && !(oscByObra.get(o.id)?.length)) return false
       const s = q.trim().toLowerCase()
       return !s || o.nome.toLowerCase().includes(s) || o.polo_nome.toLowerCase().includes(s)
@@ -137,7 +131,7 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
       return (a.prazo ?? '9999') < (b.prazo ?? '9999') ? -1 : 1
     })
     return base
-  }, [obras, oscByObra, filtroAtivo, q, fisPorNome, finPorOsc, prioMap])
+  }, [obras, oscByObra, filtroAtivo, q, fisPorNome, finPorOsc, prioMap, f])
 
   // ── persistência ────────────────────────────────────────────────────────────
   const upsert = useMutation({
@@ -154,11 +148,8 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
     setSalvando(true)
     try {
       const rows = ids.map((obra_id, i) => ({
+        // upsert só atualiza as colunas enviadas — os demais campos ficam intactos
         obra_id, ordem: i + 1,
-        prazo_cliente: prioMap.get(obra_id)?.prazo_cliente ?? null,
-        frentes_liberadas: prioMap.get(obra_id)?.frentes_liberadas ?? null,
-        bloqueios: prioMap.get(obra_id)?.bloqueios ?? null,
-        comentarios: prioMap.get(obra_id)?.comentarios ?? null,
         atualizado_por_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
       }))
       await supabase.from('obr_priorizacao').upsert(rows, { onConflict: 'obra_id' })
@@ -183,8 +174,6 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
     salvarOrdem(ids)
   }
 
-  const anos = useMemo(() => [...new Set(oscs.map(o => (o.data_osc ?? '').slice(0, 4)).filter(Boolean))].sort().reverse(), [oscs])
-  const tipos = useMemo(() => [...new Set(oscs.map(o => o.tipo).filter(Boolean))] as string[], [oscs])
 
   const card = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const sel = `appearance-none rounded-lg px-2.5 py-1.5 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`
@@ -201,20 +190,7 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="buscar..." className={`pl-7 pr-3 py-1.5 rounded-lg border text-xs w-44 ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`} />
         </div>
-        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className={sel}>
-          <option value="">Tipo: todos</option>
-          {tipos.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={fValor} onChange={e => setFValor(e.target.value)} className={sel}>
-          <option value="">Valor: todos</option>
-          <option value="gt1m">&gt; R$ 1 mi</option>
-          <option value="mid">R$ 100 mil – 1 mi</option>
-          <option value="lt100k">&lt; R$ 100 mil</option>
-        </select>
-        <select value={fAno} onChange={e => setFAno(e.target.value)} className={sel}>
-          <option value="">Ano: todos</option>
-          {anos.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} />
         <select value={fStatus} onChange={e => setFStatus(e.target.value as never)} className={sel}>
           <option value="ativas">Ativas</option>
           <option value="canceladas">Canceladas</option>
@@ -228,10 +204,10 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
       {/* Cabeçalho */}
       <div className={`rounded-xl ${card} overflow-x-auto`}>
         <div className="min-w-[1180px]">
-          <div className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_96px_130px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500 border-b border-white/[0.06]' : 'text-slate-400 border-b border-slate-100'}`}>
+          <div className={`grid grid-cols-[44px_28px_minmax(200px,1.1fr)_58px_58px_92px_124px_124px_minmax(140px,1fr)_minmax(140px,1fr)_minmax(140px,1fr)] gap-2 items-center px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500 border-b border-white/[0.06]' : 'text-slate-400 border-b border-slate-100'}`}>
             <span>#</span><span /><span>Obra</span>
             <span>% Fís</span><span>% Fin</span>
-            <span>Prazo OSC</span><span>Prazo Acordado</span>
+            <span>Prazo OSC</span><span>Início Previsto</span><span>Término Previsto</span>
             <span>Frentes liberadas</span><span>Bloqueios e impeditivos</span><span>Comentários</span>
           </div>
 
@@ -243,7 +219,7 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
               onDragStart={() => setDragId(o.id)}
               onDragOver={e => e.preventDefault()}
               onDrop={() => dropSobre(o.id)}
-              className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_96px_130px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.02]' : 'border-b border-slate-50 hover:bg-slate-50/60'} ${dragId === o.id ? 'opacity-40' : ''}`}>
+              className={`grid grid-cols-[44px_28px_minmax(200px,1.1fr)_58px_58px_92px_124px_124px_minmax(140px,1fr)_minmax(140px,1fr)_minmax(140px,1fr)] gap-2 items-center px-3 py-2 ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.02]' : 'border-b border-slate-50 hover:bg-slate-50/60'} ${dragId === o.id ? 'opacity-40' : ''}`}>
               {/* posição + setas */}
               <span className="flex items-center gap-1">
                 <span className={`text-sm font-extrabold w-6 text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{idx + 1}</span>
@@ -261,10 +237,11 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFis)}`}>{o.pctFis != null ? `${o.pctFis}%` : '—'}</span>
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFin)}`}>{o.pctFin != null ? `${o.pctFin}%` : '—'}</span>
               <span className={`text-center text-xs font-semibold tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{fmtData(o.prazo)}</span>
-              <CampoData valor={o.prio?.prazo_cliente ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, prazo_cliente: v || null, frentes_liberadas: o.prio?.frentes_liberadas ?? null, bloqueios: o.prio?.bloqueios ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} />
-              <CampoTexto valor={o.prio?.frentes_liberadas ?? ''} placeholder="frentes liberadas…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, frentes_liberadas: v || null, prazo_cliente: o.prio?.prazo_cliente ?? null, bloqueios: o.prio?.bloqueios ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} />
-              <CampoTexto valor={o.prio?.bloqueios ?? ''} placeholder="bloqueios…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, bloqueios: v || null, prazo_cliente: o.prio?.prazo_cliente ?? null, frentes_liberadas: o.prio?.frentes_liberadas ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} alerta={!!o.prio?.bloqueios} />
-              <CampoTexto valor={o.prio?.comentarios ?? ''} placeholder="comentários…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, comentarios: v || null, prazo_cliente: o.prio?.prazo_cliente ?? null, frentes_liberadas: o.prio?.frentes_liberadas ?? null, bloqueios: o.prio?.bloqueios ?? null })} cls={inp} />
+              <CampoData valor={o.prio?.inicio_previsto ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, inicio_previsto: v || null })} cls={inp} />
+              <CampoData valor={o.prio?.termino_previsto ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, termino_previsto: v || null })} cls={inp} />
+              <CampoTexto valor={o.prio?.frentes_liberadas ?? ''} placeholder="frentes liberadas…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, frentes_liberadas: v || null })} cls={inp} />
+              <CampoTexto valor={o.prio?.bloqueios ?? ''} placeholder="bloqueios…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, bloqueios: v || null })} cls={inp} alerta={!!o.prio?.bloqueios} />
+              <CampoTexto valor={o.prio?.comentarios ?? ''} placeholder="comentários…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, comentarios: v || null })} cls={inp} />
             </div>
           ))}
           {!isLoading && linhas.length === 0 && (
