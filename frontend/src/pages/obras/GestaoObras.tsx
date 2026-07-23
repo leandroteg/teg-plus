@@ -5,11 +5,17 @@
 // em seguida.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
-import { ListOrdered, CalendarRange, ClipboardList, Ruler, Construction } from 'lucide-react'
+import { FileBarChart2, ListOrdered, CalendarRange, ClipboardList, Ruler, Construction } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 
 const STEPS: FlowStep[] = [
+  {
+    key: 'resumo_tecnico', label: 'Resumo Técnico',
+    description: 'Visão técnica consolidada das obras.',
+    icon: FileBarChart2,
+    accent: { bg: 'hover:bg-sky-50', bgActive: 'bg-sky-50', text: 'text-sky-600', textActive: 'text-sky-800', border: 'border-sky-500', badge: 'bg-sky-100 text-sky-700' },
+  },
   {
     key: 'priorizacao', label: 'Priorização',
     description: 'Ordene as obras por prioridade de execução.',
@@ -39,7 +45,7 @@ const STEPS: FlowStep[] = [
 export default function GestaoObras() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const [step, setStep] = useState('priorizacao')
+  const [step, setStep] = useState('resumo_tecnico')
   const atual = STEPS.find(s => s.key === step) ?? STEPS[0]
 
   return (
