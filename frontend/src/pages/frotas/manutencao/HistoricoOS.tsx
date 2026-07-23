@@ -1,274 +1,224 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// HistoricoOS — acervo de OS encerradas (concluídas, rejeitadas, canceladas).
+// Usa os mesmos cartão/linha da tela de OS (OSCards) para que a mesma OS não
+// tenha duas aparências no sistema.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo } from 'react'
-import { History, CheckCircle2, XCircle, Ban, TrendingUp } from 'lucide-react'
-import { useOrdensServico, useVeiculos } from '../../../hooks/useFrotas'
+import { Search, X, LayoutList, LayoutGrid, CheckCircle2, XCircle, Ban } from 'lucide-react'
+import { useOrdensServico, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
-import type { TipoOS, StatusOS } from '../../../types/frotas'
+import { OSCard, OSRow, TIPO_LABEL, BRL } from '../../../components/frotas/os/OSCards'
+import OSModal from '../../../components/frotas/os/OSModal'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import type { TipoOS, StatusOS, FroOrdemServico, FroVeiculo, FroAlocacao } from '../../../types/frotas'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-
-function fmtDate(d?: string) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-}
-
-function mesAtual() {
-  return new Date().toISOString().slice(0, 7)
-}
-
-const TIPO_LABEL: Record<TipoOS, string> = {
-  preventiva: 'Preventiva',
-  corretiva:  'Corretiva',
-  sinistro:   'Sinistro',
-  revisao:    'Revisão',
-}
+type ViewMode = 'list' | 'cards'
 
 const STATUS_CFG: Record<string, { label: string; cls: string; icon: React.ElementType }> = {
-  concluida:  { label: 'Concluída',  cls: 'bg-emerald-500/15 text-emerald-400', icon: CheckCircle2 },
-  rejeitada:  { label: 'Rejeitada',  cls: 'bg-red-500/15 text-red-400',         icon: XCircle      },
-  cancelada:  { label: 'Cancelada',  cls: 'bg-slate-500/15 text-slate-400',     icon: Ban          },
+  concluida: { label: 'Concluídas', cls: 'text-emerald-500', icon: CheckCircle2 },
+  rejeitada: { label: 'Rejeitadas', cls: 'text-red-500',     icon: XCircle },
+  cancelada: { label: 'Canceladas', cls: 'text-slate-400',   icon: Ban },
 }
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
-function KPICard({
-  label,
-  value,
-  sub,
-  isLight,
-}: {
-  label: string
-  value: string | number
-  sub?: string
-  isLight: boolean
-}) {
-  return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${
-      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
-    }`}>
-      <p className={`text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-        {label}
-      </p>
-      <p className={`text-2xl font-extrabold leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
-        {value}
-      </p>
-      {sub && (
-        <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{sub}</p>
-      )}
-    </div>
-  )
-}
+const mesAtual = () => new Date().toISOString().slice(0, 7)
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function HistoricoOS() {
   const { isDark } = useTheme()
   const isLight = !isDark
 
-  const [mes, setMes]         = useState(mesAtual())
-  const [filtroTipo, setFiltroTipo]     = useState<TipoOS | ''>('')
-  const [filtroVeiculo, setFiltroVeiculo] = useState('')
+  const [mes, setMes] = useState(mesAtual())
+  const [semFiltroMes, setSemFiltroMes] = useState(false)
+  const [filtroTipo, setFiltroTipo] = useState<TipoOS | ''>('')
+  const [filtroStatus, setFiltroStatus] = useState<StatusOS | ''>('')
+  const [busca, setBusca] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [detail, setDetail] = useState<FroOrdemServico | null>(null)
 
   const { data: historico = [], isLoading } = useOrdensServico({
     status: ['concluida', 'rejeitada', 'cancelada'] as StatusOS[],
   })
   const { data: veiculos = [] } = useVeiculos()
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
 
-  // ── Filtragem ──────────────────────────────────────────────────────────────
+  const veicMap = useMemo(() => new Map(veiculos.map(v => [v.id, v])), [veiculos])
+  const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+  const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
+  const openVeicDetalhe = (veiculo_id: string) => {
+    const v = veicMap.get(veiculo_id)
+    if (v) setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
+  }
+
+  // Busca casa com placa, código de frota, nº da OS, modelo e problema.
   const filtrado = useMemo(() => {
-    const inicioMes = mes + '-01'
-    const fimMes    = mes + '-31'
+    const q = busca.trim().toLowerCase()
     return historico.filter(os => {
-      const ref = os.data_conclusao ?? os.data_abertura
-      if (ref < inicioMes || ref > fimMes) return false
+      if (!semFiltroMes) {
+        const ref = os.data_conclusao ?? os.data_abertura
+        if (ref < mes + '-01' || ref > mes + '-31') return false
+      }
       if (filtroTipo && os.tipo !== filtroTipo) return false
-      if (filtroVeiculo && os.veiculo_id !== filtroVeiculo) return false
+      if (filtroStatus && os.status !== filtroStatus) return false
+      if (q) {
+        const v = veicMap.get(os.veiculo_id)
+        const codigo = v ? formatCodigoCategoria(v).codigo : ''
+        const alvo = [
+          os.veiculo?.placa, codigo, os.numero_os, os.veiculo?.modelo,
+          os.veiculo?.marca, os.descricao_problema,
+        ].filter(Boolean).join(' ').toLowerCase()
+        if (!alvo.includes(q)) return false
+      }
       return true
     })
-  }, [historico, mes, filtroTipo, filtroVeiculo])
+  }, [historico, mes, semFiltroMes, filtroTipo, filtroStatus, busca, veicMap])
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-  const concluidas  = filtrado.filter(os => os.status === 'concluida')
-  const valorTotal  = concluidas.reduce((s, os) => s + (os.valor_final ?? 0), 0)
+  const concluidas = filtrado.filter(os => os.status === 'concluida')
+  const valorTotal = concluidas.reduce((s, os) => s + (os.valor_final ?? 0), 0)
 
-  const porTipo = useMemo(() => {
-    const map: Partial<Record<TipoOS, number>> = {}
-    concluidas.forEach(os => {
-      map[os.tipo] = (map[os.tipo] ?? 0) + 1
-    })
-    return map
-  }, [concluidas])
+  const temFiltro = !!(filtroTipo || filtroStatus || busca.trim() || semFiltroMes)
+  const limpar = () => {
+    setFiltroTipo(''); setFiltroStatus(''); setBusca(''); setSemFiltroMes(false); setMes(mesAtual())
+  }
 
-  // ── Estilos ────────────────────────────────────────────────────────────────
-  const card = isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = isLight ? 'border-slate-100' : 'border-white/[0.04]'
-  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`
-  const td = `px-3 py-2.5 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`
-  const trEven = isLight ? 'bg-slate-50/60' : 'bg-white/[0.02]'
-  const inp = `px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-400/40 transition-colors ${
-    isLight
-      ? 'bg-white border border-slate-200 shadow-sm text-slate-800'
-      : 'bg-white/6 border border-white/12 text-white'
+  const inp = `px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-400/30 ${
+    isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-white/[0.04] border-white/[0.1] text-slate-200'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const card = isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
+  const txtMuted = isLight ? 'text-slate-400' : 'text-slate-500'
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-6xl">
-      {/* Header */}
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <History size={20} className="text-teal-500" />
-          Histórico de OS
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          OS concluídas, rejeitadas e canceladas
-        </p>
-      </div>
+    /* O hub já dá o padding lateral e o espaço abaixo das abas. */
+    <div className="pb-4 space-y-3">
+      {/* Filtros — tudo numa linha, quebrando quando não couber */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <Search size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${txtMuted}`} />
+          <input
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Placa, código, nº da OS..."
+            className={`${inp} pl-8 w-[210px]`}
+          />
+        </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="month"
-          className={inp}
-          value={mes}
-          onChange={e => setMes(e.target.value)}
-        />
-        <select
-          className={sel}
-          value={filtroTipo}
-          onChange={e => setFiltroTipo(e.target.value as TipoOS | '')}
-        >
+        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoOS | '')}
+          className={`${inp} w-[140px] truncate`}>
           <option value="">Todos os tipos</option>
           {(Object.keys(TIPO_LABEL) as TipoOS[]).map(k => (
-            <option key={k} value={k}>{TIPO_LABEL[k]}</option>
+            <option key={k} value={k}>{TIPO_LABEL[k].label}</option>
           ))}
         </select>
-        <select
-          className={sel}
-          value={filtroVeiculo}
-          onChange={e => setFiltroVeiculo(e.target.value)}
-        >
-          <option value="">Todos os veículos</option>
-          {veiculos.map(v => (
-            <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>
+
+        <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as StatusOS | '')}
+          className={`${inp} w-[140px] truncate`}>
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_CFG).map(([k, c]) => (
+            <option key={k} value={k}>{c.label}</option>
           ))}
         </select>
-      </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KPICard
-          label="Concluídas no Período"
-          value={concluidas.length}
-          sub={`de ${filtrado.length} no total`}
-          isLight={isLight}
-        />
-        <KPICard
-          label="Valor Total"
-          value={BRL(valorTotal)}
-          sub="OS concluídas"
-          isLight={isLight}
-        />
-        <KPICard
-          label="Preventivas"
-          value={porTipo.preventiva ?? 0}
-          sub="concluídas"
-          isLight={isLight}
-        />
-        <KPICard
-          label="Corretivas"
-          value={porTipo.corretiva ?? 0}
-          sub="concluídas"
-          isLight={isLight}
-        />
-      </div>
+        <input type="month" value={mes} disabled={semFiltroMes}
+          onChange={e => setMes(e.target.value)}
+          className={`${inp} w-[150px] ${semFiltroMes ? 'opacity-40' : ''}`} />
 
-      {/* OS por tipo badges */}
-      {(Object.keys(TIPO_LABEL) as TipoOS[]).some(k => (porTipo[k] ?? 0) > 0) && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <TrendingUp size={12} className="text-slate-500" />
-          {(Object.keys(TIPO_LABEL) as TipoOS[]).map(k => {
-            const count = porTipo[k] ?? 0
-            if (count === 0) return null
-            return (
-              <span
-                key={k}
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/8 text-slate-300'
-                }`}
-              >
-                {TIPO_LABEL[k]}: {count}
-              </span>
-            )
-          })}
+        <label className={`flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer ${txtMuted}`}>
+          <input type="checkbox" checked={semFiltroMes} className="accent-teal-500"
+            onChange={e => setSemFiltroMes(e.target.checked)} />
+          Todo o período
+        </label>
+
+        {temFiltro && (
+          <button onClick={limpar}
+            className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/[0.06]'
+            }`}>
+            <X size={12} /> Limpar
+          </button>
+        )}
+
+        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
+          <button onClick={() => setViewMode('list')} title="Lista"
+            className={`p-1.5 ${viewMode === 'list' ? (isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white') : txtMuted}`}>
+            <LayoutList size={14} />
+          </button>
+          <button onClick={() => setViewMode('cards')} title="Cards"
+            className={`p-1.5 ${viewMode === 'cards' ? (isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white') : txtMuted}`}>
+            <LayoutGrid size={14} />
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Tabela */}
-      <div className={`rounded-2xl border overflow-hidden ${card}`}>
+      {/* Resumo do que está filtrado */}
+      <div className="flex items-center gap-4 flex-wrap">
+        {Object.entries(STATUS_CFG).map(([k, c]) => {
+          const n = filtrado.filter(os => os.status === k).length
+          const Icon = c.icon
+          return (
+            <span key={k} className={`flex items-center gap-1.5 text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+              <Icon size={13} className={c.cls} /> {n} {c.label.toLowerCase()}
+            </span>
+          )
+        })}
+        <span className={`ml-auto text-xs font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>
+          {BRL(valorTotal)} <span className={`font-normal ${txtMuted}`}>em serviços concluídos</span>
+        </span>
+      </div>
+
+      {/* Conteúdo */}
+      <div className={`rounded-2xl overflow-hidden ${card}`}>
         {isLoading ? (
-          <div className="space-y-2 p-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className={`h-10 rounded-xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
-            ))}
+          <div className="flex justify-center py-12">
+            <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtrado.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-12">
-            Nenhuma OS encontrada para os filtros selecionados
+          <p className={`text-sm text-center py-14 ${txtMuted}`}>
+            Nenhuma OS encontrada para os filtros selecionados.
           </p>
+        ) : viewMode === 'cards' ? (
+          <div className="space-y-2 p-4">
+            {filtrado.map(os => (
+              <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+            ))}
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className={`border-b ${divider}`}>
-                <th className={th}>OS#</th>
-                <th className={th}>Veículo</th>
-                <th className={th}>Tipo</th>
-                <th className={th}>Fornecedor</th>
-                <th className={th}>Abertura</th>
-                <th className={th}>Conclusão</th>
-                <th className={th}>Valor</th>
-                <th className={th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtrado.map((os, idx) => {
-                const sCfg = STATUS_CFG[os.status] ?? STATUS_CFG['cancelada']
-                const SIcon = sCfg.icon
-                return (
-                  <tr key={os.id} className={idx % 2 === 1 ? trEven : ''}>
-                    <td className={td + ' font-bold'}>{os.numero_os ?? '—'}</td>
-                    <td className={td}>
-                      <span className="font-semibold">{os.veiculo?.placa ?? '—'}</span>
-                      <span className={`ml-1.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-                        {os.veiculo?.modelo}
-                      </span>
-                    </td>
-                    <td className={td}>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/8 text-slate-300'
-                      }`}>
-                        {TIPO_LABEL[os.tipo]}
-                      </span>
-                    </td>
-                    <td className={td}>{os.fornecedor?.razao_social ?? '—'}</td>
-                    <td className={td}>{fmtDate(os.data_abertura)}</td>
-                    <td className={td}>{fmtDate(os.data_conclusao)}</td>
-                    <td className={td + ' font-bold'}>
-                      {os.valor_final ? BRL(os.valor_final) : os.status !== 'concluida' ? '—' : '—'}
-                    </td>
-                    <td className={td}>
-                      <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full w-fit ${sCfg.cls}`}>
-                        <SIcon size={10} />
-                        {sCfg.label}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div>
+            <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+              isLight ? 'border-slate-100 text-slate-400' : 'border-white/[0.06] text-slate-600'
+            }`}>
+              <span className="w-[3px]" /><span className="w-2" /><span className="flex-1">Veículo</span>
+              <span className="w-[60px]">Tipo</span><span className="w-[60px]">Prior.</span>
+              <span className="w-[50px] text-right">Dias</span><span className="w-[70px] text-right">Valor</span>
+            </div>
+            {filtrado.map(os => (
+              <OSRow key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+            ))}
           </div>
         )}
       </div>
+
+      {detail && (
+        <OSModal os={detail} veiculo={veicMap.get(detail.veiculo_id)} isDark={isDark}
+          onClose={() => setDetail(null)}
+          onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }} />
+      )}
+      {detalheVeic && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeic.v}
+          isLight={isLight}
+          onClose={() => setDetalheVeic(null)}
+          alocacaoInfo={detalheVeic.a ? {
+            id: detalheVeic.a.id,
+            obraId: detalheVeic.a.obra_id,
+            obra: detalheVeic.a.obra?.nome,
+            responsavel: detalheVeic.a.responsavel_nome,
+            dataSaida: detalheVeic.a.data_saida,
+            dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+            observacoes: detalheVeic.a.observacoes,
+          } : undefined}
+        />
+      )}
     </div>
   )
 }
