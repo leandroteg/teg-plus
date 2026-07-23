@@ -1092,13 +1092,17 @@ export default function AgendaAlocacao() {
   const th = `text-[10px] font-bold uppercase tracking-wide text-slate-500 px-4 py-3 text-left`
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
+    /* O hub já aplica o padding lateral e o espaço abaixo das abas — aqui só o
+       respiro de baixo, senão sobra um vão entre as abas e os filtros. */
+    <div className="pb-4 space-y-3">
       {/* Sem cabeçalho: a aba do hub já nomeia a tela. O seletor de visão virou
           ícone e subiu para a linha dos filtros, liberando altura para o board. */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      {/* flex-wrap em vez de scroll: nomes de obra são longos e estouravam a
+          linha. Os selects têm largura fixa + truncate para não esticar. */}
+      <div className="flex items-center gap-2 flex-wrap">
         <ViewToggle viewMode={viewMode} setViewMode={setViewMode} isLight={isLight} />
         <select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)}
-          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 w-[150px] truncate px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroAtivo
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1107,7 +1111,7 @@ export default function AgendaAlocacao() {
           {veiculosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select value={filtroPessoa} onChange={e => setFiltroPessoa(e.target.value)}
-          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 w-[150px] truncate px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroPessoa
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1116,7 +1120,7 @@ export default function AgendaAlocacao() {
           {pessoasUnicas.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)}
-          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 w-[150px] truncate px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroObra
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1126,7 +1130,7 @@ export default function AgendaAlocacao() {
         </select>
         {viewMode !== 'tabela' && (
           <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as '' | 'ativa' | 'encerrada' | 'cancelada')}
-            className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`shrink-0 w-[150px] truncate px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
               filtroStatus
                 ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
                 : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
