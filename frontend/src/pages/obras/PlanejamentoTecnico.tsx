@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Loader2, Search } from 'lucide-react'
+import { Plus, X, Loader2, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -144,6 +144,27 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
     onSuccess: () => { setEdit(null); qc.invalidateQueries({ queryKey: ['obr-ativ-avanco', obraSel] }) },
   })
 
+  // apaga só o lado editado (Prev ou Real); se o outro lado também ficar vazio, remove a linha
+  const apagarCel = useMutation({
+    mutationFn: async (p: { estrutura_id: string; atividade: string; cel?: Celula; lado: 'prev' | 'real' }) => {
+      const outroVazio = p.lado === 'prev'
+        ? !p.cel?.data && !(p.cel?.avanco ?? 0)
+        : !p.cel?.data_prev && !(p.cel?.avanco_prev ?? 0)
+      if (outroVazio) {
+        const { error } = await supabase.from('obr_atividade_avanco').delete()
+          .eq('estrutura_id', p.estrutura_id).eq('atividade', p.atividade)
+        if (error) throw error
+        return
+      }
+      const campos = p.lado === 'prev' ? { data_prev: null, avanco_prev: 0 } : { data: null, avanco: 0 }
+      const { error } = await supabase.from('obr_atividade_avanco').update({
+        ...campos, responsavel_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
+      }).eq('estrutura_id', p.estrutura_id).eq('atividade', p.atividade)
+      if (error) throw error
+    },
+    onSuccess: () => { setEdit(null); qc.invalidateQueries({ queryKey: ['obr-ativ-avanco', obraSel] }) },
+  })
+
   const card = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const sel = `appearance-none rounded-lg px-2.5 py-1.5 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`
   const th = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
@@ -205,9 +226,9 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
                 <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Faltante (qtd)">Falt.</th>
                 <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Faltante (%)">%</th>
                 {cols.map(e => (
-                  <th key={e.id} colSpan={2} className={`px-1 py-1.5 text-center min-w-[120px] ${isDark ? 'border-l border-white/[0.12]' : 'border-l border-slate-300'}`}>
-                    <div className={`text-[11px] font-extrabold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{e.nome}</div>
-                    <div className="text-[9px] text-slate-400">{e.tipo ?? '—'}{e.peso_ton ? ` · ${e.peso_ton}t` : ''}</div>
+                  <th key={e.id} colSpan={2} className={`px-1 py-1.5 text-center min-w-[120px] ${isDark ? 'bg-teal-500/[0.10] border-l border-white/[0.12]' : 'bg-teal-50 border-l border-slate-300'}`}>
+                    <div className={`text-[11px] font-extrabold ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{e.nome}</div>
+                    <div className={`text-[9px] font-semibold ${isDark ? 'text-teal-400/70' : 'text-teal-600/80'}`}>{e.tipo ?? '—'}{e.peso_ton ? ` · ${e.peso_ton}t` : ''}</div>
                     {e.dist_prox_m != null && <div className="text-[9px] text-sky-500 font-semibold">→ {e.dist_prox_m.toLocaleString('pt-BR')} m</div>}
                     <button onClick={() => { if (confirm(`Remover ${e.nome}?`)) delEstrutura.mutate(e.id) }} className="text-slate-300 hover:text-rose-500"><X size={10} /></button>
                   </th>
@@ -216,8 +237,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
               {/* sub-cabeçalho: cada torre tem Previsto | Realizado */}
               <tr>
                 {cols.map(e => [
-                  <th key={e.id + '-p'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500 border-l border-white/[0.12]' : 'text-slate-400 border-l border-slate-300'}`}>Prev</th>,
-                  <th key={e.id + '-r'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Real</th>,
+                  <th key={e.id + '-p'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-sky-500/[0.10] text-sky-300 border-l border-white/[0.12]' : 'bg-sky-50 text-sky-700 border-l border-slate-300'}`}>Prev</th>,
+                  <th key={e.id + '-r'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'bg-emerald-500/[0.10] text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>Real</th>,
                 ])}
               </tr>
             </thead>
@@ -284,6 +305,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
           onClose={() => setEdit(null)}
           lado={edit.lado}
           onSave={(data, avanco) => salvarCel.mutate({ estrutura_id: edit.est.id, atividade: edit.atividade, data, avanco, lado: edit.lado })}
+          onDelete={() => apagarCel.mutate({ estrutura_id: edit.est.id, atividade: edit.atividade, cel: edit.cel, lado: edit.lado })}
+          apagando={apagarCel.isPending}
           salvando={salvarCel.isPending}
           isDark={isDark}
         />
@@ -292,13 +315,15 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   )
 }
 
-function CelulaEditor({ est, atividade, cel, lado, onClose, onSave, salvando, isDark }: {
+function CelulaEditor({ est, atividade, cel, lado, onClose, onSave, onDelete, salvando, apagando, isDark }: {
   est: Estrutura; atividade: string; cel?: Celula; lado: 'prev' | 'real'; onClose: () => void
-  onSave: (data: string | null, avanco: number) => void; salvando: boolean; isDark: boolean
+  onSave: (data: string | null, avanco: number) => void; onDelete: () => void
+  salvando: boolean; apagando: boolean; isDark: boolean
 }) {
   const ehPrev = lado === 'prev'
   const [data, setData] = useState((ehPrev ? cel?.data_prev : cel?.data) ?? new Date().toISOString().slice(0, 10))
   const [av, setAv] = useState(String(Math.round(((ehPrev ? cel?.avanco_prev : cel?.avanco) ?? 0) * 100)))
+  const temRegistro = ehPrev ? !!(cel?.data_prev || cel?.avanco_prev) : !!(cel?.data || cel?.avanco)
   const inp = `rounded-lg border px-2 py-1.5 text-xs ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -318,10 +343,17 @@ function CelulaEditor({ est, atividade, cel, lado, onClose, onSave, salvando, is
             <select value={av} onChange={e => setAv(e.target.value)} className={inp}>
               {['0', '25', '50', '75', '100'].map(p => <option key={p} value={p}>{p}%</option>)}
             </select></label>
-          <button onClick={() => onSave(data || null, Number(av) / 100)} disabled={salvando}
+          <button onClick={() => onSave(data || null, Number(av) / 100)} disabled={salvando || apagando}
             className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white disabled:opacity-50">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : 'Salvar'}
           </button>
+          {temRegistro && (
+            <button onClick={() => { if (confirm('Apagar este registro?')) onDelete() }} disabled={salvando || apagando}
+              title="Apagar registro"
+              className={`p-1.5 rounded-lg disabled:opacity-50 ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}>
+              {apagando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            </button>
+          )}
         </div>
         {cel?.responsavel_nome && <p className="text-[10px] text-slate-400 mt-2">último registro por {cel.responsavel_nome}</p>}
       </div>
