@@ -63,7 +63,7 @@ export default function ResumoTecnicoObras() {
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
   const { data: projetos = [] } = useProjetos(portfolioId)
   const { data: tecPorOsc } = useTecnicoPorOsc()
-  const [tecObra, setTecObra] = useState<{ nome: string; oscs: EGPOscRow[] } | null>(null)
+  const [tecObra, setTecObra] = useState<{ id: string; nome: string; oscs: EGPOscRow[] } | null>(null)
 
   const [q, setQ] = useState('')
   const [fTipo, setFTipo] = useState('')
@@ -243,7 +243,7 @@ export default function ResumoTecnicoObras() {
                       <span className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>{arr.length} OSC{arr.length === 1 ? '' : 's'}</span>
                       {o.status && <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>{o.status}</span>}
-                      <button onClick={e => { e.stopPropagation(); setTecObra({ nome: o.nome, oscs: arr }) }}
+                      <button onClick={e => { e.stopPropagation(); setTecObra({ id: o.id, nome: o.nome, oscs: arr }) }}
                         title="Ver resumo técnico da obra"
                         className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${isDark ? 'border-sky-500/30 text-sky-300 hover:bg-sky-500/10' : 'border-sky-200 text-sky-700 hover:bg-sky-50'}`}>
                         <FileBarChart2 size={11} /> Resumo Técnico
@@ -285,14 +285,14 @@ export default function ResumoTecnicoObras() {
         Torres = quantidade informada na OSC (nem toda OSC tem). Km de linha = itens em km da seção “Lançamento” (não inclui transporte).
       </p>
 
-      {tecObra && <ResumoTecnicoModal nome={tecObra.nome} oscs={tecObra.oscs} tec={tec} onClose={() => setTecObra(null)} isDark={isDark} />}
+      {tecObra && <ResumoTecnicoModal obraId={tecObra.id} nome={tecObra.nome} oscs={tecObra.oscs} tec={tec} onClose={() => setTecObra(null)} isDark={isDark} />}
     </div>
   )
 }
 
 // ── Modal: resumo técnico consolidado da obra ────────────────────────────────
-function ResumoTecnicoModal({ nome, oscs, tec, onClose, isDark }: {
-  nome: string; oscs: EGPOscRow[]; tec: (id: string) => TecOsc; onClose: () => void; isDark: boolean
+function ResumoTecnicoModal({ obraId, nome, oscs, tec, onClose, isDark }: {
+  obraId: string; nome: string; oscs: EGPOscRow[]; tec: (id: string) => TecOsc; onClose: () => void; isDark: boolean
 }) {
   const t = oscs.reduce((acc, o) => {
     const x = tec(o.id)
@@ -348,15 +348,64 @@ function ResumoTecnicoModal({ nome, oscs, tec, onClose, isDark }: {
             ))}
           </div>
 
-          {/* Projetos Técnicos (OneDrive) — pendente do vínculo da pasta */}
-          <div className={`rounded-xl border border-dashed p-4 text-center ${isDark ? 'border-white/[0.12] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
-            <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Projetos Técnicos (OneDrive)</p>
-            <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              Vai listar os arquivos de “Características do Projeto” / “Característica da Linha” da pasta da obra.
-              Aguardando o vínculo da pasta em <span className="font-mono">TEG - OBRAS</span>.
-            </p>
-          </div>
+          <ProjetosTecnicos obraId={obraId} isDark={isDark} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Projetos Técnicos: pastas "Características do Projeto / da Linha" no OneDrive ──
+interface DocItem { id: string; nome: string; pasta: boolean; tamanho: number | null; web_url: string | null; download_url: string | null }
+interface DocGrupo { nome: string; id: string; web_url: string | null; itens: DocItem[] }
+
+function ProjetosTecnicos({ obraId, isDark }: { obraId: string; isDark: boolean }) {
+  const { data, isLoading } = useQuery<{ ok: boolean; encontrado?: boolean; motivo?: string; pasta_web_url?: string | null; grupos?: DocGrupo[] }>({
+    queryKey: ['obra-onedrive', obraId],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('obra-onedrive', { body: { obra_id: obraId } })
+      if (error) throw error
+      return data as never
+    },
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+
+  const box = isDark ? 'border-white/[0.08]' : 'border-slate-200'
+  const abrir = (it: DocItem) => { const u = it.download_url || it.web_url; if (u) window.open(u, '_blank', 'noopener,noreferrer') }
+  const fmtTam = (b: number | null) => !b ? '' : b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${box}`}>
+      <div className={`px-3 py-2 flex items-center justify-between ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Projetos Técnicos (OneDrive)</span>
+        {data?.pasta_web_url && (
+          <a href={data.pasta_web_url} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline">abrir pasta</a>
+        )}
+      </div>
+      <div className="p-3">
+        {isLoading ? (
+          <p className={`text-xs flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Loader2 size={12} className="animate-spin" /> buscando no OneDrive…</p>
+        ) : !data?.ok || data.encontrado === false || !data.grupos?.length ? (
+          <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{data?.motivo ?? 'Nenhum documento técnico localizado para esta obra.'}</p>
+        ) : data.grupos.map(g => (
+          <div key={g.id} className="mb-2 last:mb-0">
+            <p className={`text-[11px] font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{g.nome}</p>
+            <div className="space-y-1">
+              {g.itens.filter(i => !i.pasta).map(it => (
+                <button key={it.id} onClick={() => abrir(it)}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs border ${isDark ? 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] text-slate-300' : 'border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-slate-700'}`}>
+                  <FileBarChart2 size={12} className="text-sky-500 shrink-0" />
+                  <span className="truncate flex-1">{it.nome}</span>
+                  <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>{fmtTam(it.tamanho)}</span>
+                </button>
+              ))}
+              {g.itens.filter(i => !i.pasta).length === 0 && (
+                <p className={`text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>pasta sem arquivos</p>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
