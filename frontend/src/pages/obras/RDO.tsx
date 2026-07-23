@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save } from 'lucide-react'
+import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save, Eye } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useRDOs,
@@ -9,6 +9,9 @@ import {
 } from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
 import type { ObraRDO, CondicaoClimatica, StatusRDO } from '../../types/obras'
+import RdoPdfModal from '../../components/obras/RdoPdfModal'
+import RDOEstruturado from './RDOEstruturado'
+import type { RdoPdfData } from '../../utils/rdo-pdf'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
 import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
 
@@ -94,6 +97,23 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
   const [editing, setEditing] = useState<ObraRDO | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [pdfRdo, setPdfRdo] = useState<RdoPdfData | null>(null)
+  const [editRdo, setEditRdo] = useState<ObraRDO | null>(null)
+
+  // monta os dados p/ o PDF a partir da linha (select '*' traz os campos extras)
+  const toPdf = (rdo: ObraRDO): RdoPdfData => {
+    const r = rdo as ObraRDO & Record<string, unknown>
+    return {
+      id: rdo.id, obra_id: rdo.obra_id, obra_nome: rdo.obra?.nome ?? '—',
+      data: rdo.data, condicao_climatica: rdo.condicao_climatica,
+      horas_improdutivas: rdo.horas_improdutivas, motivo_improdutividade: rdo.motivo_improdutividade ?? null,
+      resumo_atividades: rdo.resumo_atividades ?? null, ocorrencias: rdo.ocorrencias ?? null,
+      impeditivos: (r.impeditivos as string) ?? null, notas: (r.notas as string) ?? null,
+      fiscal_cemig: (r.fiscal_cemig as string) ?? null, fiscais_cemig: (r.fiscais_cemig as string[]) ?? null,
+      tst_nome: (r.tst_nome as string) ?? null, tst_nomes: (r.tst_nomes as string[]) ?? null,
+      preenchido_por_nome: (r.preenchido_por_nome as string) ?? null,
+    }
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -105,24 +125,8 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
   // lança avanço por estrutura e atualiza o Realizado do Planejamento.
   // Esta tela fica só como histórico — não abre mais o modal antigo sozinha.
 
-  const openEdit = (rdo: ObraRDO) => {
-    setEditing(rdo)
-    setForm({
-      obra_id: rdo.obra_id,
-      data: rdo.data,
-      condicao_climatica: rdo.condicao_climatica,
-      efetivo_proprio: rdo.efetivo_proprio,
-      efetivo_terceiro: rdo.efetivo_terceiro,
-      equipamentos_operando: rdo.equipamentos_operando,
-      equipamentos_parados: rdo.equipamentos_parados,
-      resumo_atividades: rdo.resumo_atividades ?? '',
-      ocorrencias: rdo.ocorrencias ?? '',
-      horas_improdutivas: rdo.horas_improdutivas,
-      motivo_improdutividade: rdo.motivo_improdutividade ?? '',
-      status: rdo.status,
-    })
-    setShowModal(true)
-  }
+  // Editar agora abre o RDO ESTRUTURADO (mesmo padrão do Registrar), em modo edição.
+  const openEdit = (rdo: ObraRDO) => setEditRdo(rdo)
 
   const handleSave = async () => {
     const payload = {
@@ -237,6 +241,7 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
                   <span className="flex items-center gap-1"><Wrench size={12} /> {rdo.equipamentos_operando + rdo.equipamentos_parados}</span>
                   {rdo.horas_improdutivas > 0 && <span className="text-red-500 font-bold">{rdo.horas_improdutivas}h improd.</span>}
                   <span className="ml-auto flex items-center gap-1">
+                    <button onClick={() => setPdfRdo(toPdf(rdo))} title="Ver PDF" className={`p-1.5 rounded-lg ${isLight ? 'text-slate-400 active:text-teal-600' : 'text-slate-500 active:text-teal-400'}`}><Eye size={14} /></button>
                     <button onClick={() => openEdit(rdo)} className={`p-1.5 rounded-lg ${isLight ? 'text-slate-400 active:text-blue-600' : 'text-slate-500 active:text-blue-400'}`}><Pencil size={14} /></button>
                     <button onClick={() => setDeleteConfirm(rdo.id)} className={`p-1.5 rounded-lg ${isLight ? 'text-slate-400 active:text-red-600' : 'text-slate-500 active:text-red-400'}`}><Trash2 size={14} /></button>
                   </span>
@@ -335,6 +340,16 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button
+                            onClick={() => setPdfRdo(toPdf(rdo))}
+                            className={`p-1.5 rounded-lg transition-colors ${isLight
+                              ? 'hover:bg-slate-100 text-slate-400 hover:text-teal-600'
+                              : 'hover:bg-white/[0.06] text-slate-500 hover:text-teal-400'
+                            }`}
+                            title="Ver PDF"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
                             onClick={() => openEdit(rdo)}
                             className={`p-1.5 rounded-lg transition-colors ${isLight
                               ? 'hover:bg-slate-100 text-slate-400 hover:text-blue-600'
@@ -388,7 +403,20 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
         </>
       )}
 
-      {/* Create / Edit Modal */}
+      {/* Editar no padrão estruturado */}
+      {editRdo && (
+        <RDOEstruturado
+          rdoId={editRdo.id}
+          obraId={editRdo.obra_id}
+          obraNome={editRdo.obra?.nome ?? '—'}
+          onClose={() => setEditRdo(null)}
+        />
+      )}
+
+      {/* Visualizador de PDF */}
+      {pdfRdo && <RdoPdfModal rdo={pdfRdo} onClose={() => setPdfRdo(null)} />}
+
+      {/* Modal antigo (apenas Novo, quando acionado internamente) */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
