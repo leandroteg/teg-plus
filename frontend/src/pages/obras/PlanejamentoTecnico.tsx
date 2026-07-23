@@ -12,17 +12,9 @@ import { Plus, X, Loader2, Search } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, useProjetos, type EGPOscRow } from '../../hooks/usePMO'
-import { buildTree } from '../pmo/paineis/cronogramaEngine'
-import { MultiSelect, togFiltro } from '../pmo/paineis/egpFiltros'
+import { useObrasDoPortfolio, useOSCsDoPortfolio, useProjetos } from '../../hooks/usePMO'
+import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
 
-// faixas de % (padrão da tela do EGP: 0 / 1–25 / 26–50 / 51–75 / 76–90 / 91–99 / 100)
-const BANDS: [string, string, (p: number) => boolean][] = [
-  ['0', '0%', p => p <= 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50],
-  ['51-75', '51–75%', p => p >= 51 && p <= 75], ['76-90', '76–90%', p => p >= 76 && p <= 90],
-  ['91-99', '91–99%', p => p >= 91 && p <= 99], ['100', '100%', p => p >= 100],
-]
-const normNome = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
 // Catálogo padrão (planilha ACOMPANHAMENTO MODELO — 32 atividades por seção)
 const CATALOGO: { secao: string; atividades: string[] }[] = [
@@ -59,7 +51,7 @@ const SECAO_COR: Record<string, string> = {
 }
 
 interface Estrutura { id: string; obra_id: string; nome: string; tipo: string | null; peso_ton: number | null; dist_prox_m: number | null; ordem: number }
-interface Celula { id: string; estrutura_id: string; atividade: string; data: string | null; avanco: number; responsavel_nome: string | null }
+interface Celula { id: string; estrutura_id: string; atividade: string; data: string | null; avanco: number; data_prev: string | null; avanco_prev: number; responsavel_nome: string | null }
 
 function useEstruturas(obraId?: string) {
   return useQuery<Estrutura[]>({
@@ -76,7 +68,7 @@ function useCelulas(obraId?: string) {
     queryKey: ['obr-ativ-avanco', obraId],
     enabled: !!obraId,
     queryFn: async () => {
-      const { data } = await supabase.from('obr_atividade_avanco').select('id, estrutura_id, atividade, data, avanco, responsavel_nome').eq('obra_id', obraId!)
+      const { data } = await supabase.from('obr_atividade_avanco').select('id, estrutura_id, atividade, data, avanco, data_prev, avanco_prev, responsavel_nome').eq('obra_id', obraId!)
       return (data ?? []) as Celula[]
     },
   })
@@ -90,102 +82,18 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   const { data: obras = [] } = useObrasDoPortfolio(portfolioId)
   const { data: projetos = [] } = useProjetos(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
-  const { data: raw } = useEAPFinal(portfolioId)
   const [obraId, setObraId] = useState('')
 
-  // filtros (todos na 1ª linha, padrão EGP)
-  const [fProjeto, setFProjeto] = useState('')
-  const [fTipo, setFTipo] = useState('')
-  const [fValor, setFValor] = useState('')
-  const [fAno, setFAno] = useState('')
-  const [fFat, setFFat] = useState<Set<string>>(new Set())
-  const [fPrazo, setFPrazo] = useState<Set<string>>(new Set())
-  const [fExec, setFExec] = useState<Set<string>>(new Set())
+  // filtros padrão da Gestão de Obras (compartilhados entre as abas)
+  const f = useObrasFiltros()
 
   // métricas por obra (OSCs + medição + engine EAP) pra alimentar os filtros
-  const oscsPorObra = useMemo(() => {
-    const m = new Map<string, EGPOscRow[]>()
-    for (const o of oscs) {
-      if (!o.obra_id || o.etapa_atual === 'cancelada') continue
-      const a = m.get(o.obra_id) ?? []; a.push(o); m.set(o.obra_id, a)
-    }
-    return m
-  }, [oscs])
-  const { data: finPorOsc } = useQuery<Map<string, { acum: number; valor: number }>>({
-    queryKey: ['obr-fin-por-osc'],
-    queryFn: async () => {
-      const { data } = await supabase.from('pmo_osc_itens').select('fluxo_os_id, valor, valor_acum')
-      const m = new Map<string, { acum: number; valor: number }>()
-      for (const it of data ?? []) {
-        const k = String(it.fluxo_os_id)
-        const cur = m.get(k) ?? { acum: 0, valor: 0 }
-        cur.acum += Number(it.valor_acum ?? 0); cur.valor += Number(it.valor ?? 0)
-        m.set(k, cur)
-      }
-      return m
-    },
-    staleTime: 5 * 60_000,
-  })
-  const fisPorNome = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const f of buildTree(raw)) for (const o of f.obras) m.set(normNome(o.nome), o.pctFis)
-    return m
-  }, [raw])
+  const oscsPorObra = useMemo(() => agruparOscsPorObra(oscs), [oscs])
 
-  const hoje = new Date().toISOString().slice(0, 10)
-  const metricas = useMemo(() => {
-    const m = new Map<string, { pctFat: number | null; pctPrazo: number | null; pctExec: number | null }>()
-    for (const o of obras) {
-      const arr = oscsPorObra.get(o.id) ?? []
-      let acum = 0, valor = 0
-      let minI: string | null = null, maxP: string | null = null
-      for (const x of arr) {
-        const f = finPorOsc?.get(x.id); if (f) { acum += f.acum; valor += f.valor }
-        const di = x.data_osc?.slice(0, 10); if (di && (!minI || di < minI)) minI = di
-        const dv = x.vencimento?.slice(0, 10); if (dv && (!maxP || dv > maxP)) maxP = dv
-      }
-      let pctPrazo: number | null = null
-      if (minI && maxP && maxP > minI) {
-        const tot = new Date(maxP).getTime() - new Date(minI).getTime()
-        const dec = new Date(hoje).getTime() - new Date(minI).getTime()
-        pctPrazo = Math.max(0, Math.min(100, Math.round((dec / tot) * 100)))
-      }
-      m.set(o.id, {
-        pctFat: valor > 0 ? Math.round((acum / valor) * 100) : null,
-        pctPrazo,
-        pctExec: fisPorNome.get(normNome(o.nome)) ?? null,
-      })
-    }
-    return m
-  }, [obras, oscsPorObra, finPorOsc, fisPorNome, hoje])
 
-  const bandOk = (sel: Set<string>, p: number | null) =>
-    sel.size === 0 || (p != null && BANDS.some(b => sel.has(b[0]) && b[2](p)))
-
-  const anos = useMemo(() => [...new Set(oscs.map(o => (o.data_osc ?? '').slice(0, 4)).filter(Boolean))].sort().reverse(), [oscs])
-  const tipos = useMemo(() => [...new Set(oscs.map(o => o.tipo).filter(Boolean))] as string[], [oscs])
 
   // obras filtradas → alimentam o select de Obra
-  const obrasFiltradas = useMemo(() => obras.filter(o => {
-    if (fProjeto && o.pmo_projeto_id !== fProjeto) return false
-    const arr = oscsPorObra.get(o.id) ?? []
-    if (fTipo && !arr.some(x => x.tipo === fTipo)) return false
-    if (fAno && !arr.some(x => (x.data_osc ?? '').slice(0, 4) === fAno)) return false
-    if (fValor) {
-      const ok = arr.some(x => {
-        const v = x.valor ?? 0
-        if (fValor === 'gt1m') return v > 1_000_000
-        if (fValor === 'mid') return v >= 100_000 && v <= 1_000_000
-        return v < 100_000
-      })
-      if (!ok) return false
-    }
-    const met = metricas.get(o.id)
-    if (!bandOk(fFat, met?.pctFat ?? null)) return false
-    if (!bandOk(fPrazo, met?.pctPrazo ?? null)) return false
-    if (!bandOk(fExec, met?.pctExec ?? null)) return false
-    return true
-  }), [obras, fProjeto, fTipo, fAno, fValor, oscsPorObra, metricas, fFat, fPrazo, fExec])
+  const obrasFiltradas = useMemo(() => obras.filter(o => obraPassa(o, oscsPorObra, f)), [obras, oscsPorObra, f])
 
   const obraSel = (obraId && obrasFiltradas.some(o => o.id === obraId)) ? obraId : obrasFiltradas[0]?.id
   const { data: estruturas = [], isLoading } = useEstruturas(obraSel)
@@ -194,7 +102,7 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   const [qTorre, setQTorre] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [novo, setNovo] = useState({ nome: '', tipo: '', peso: '', dist: '' })
-  const [edit, setEdit] = useState<{ est: Estrutura; atividade: string; cel?: Celula } | null>(null)
+  const [edit, setEdit] = useState<{ est: Estrutura; atividade: string; cel?: Celula; lado: 'prev' | 'real' } | null>(null)
 
   const cel = useMemo(() => {
     const m = new Map<string, Celula>()
@@ -222,10 +130,14 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['obr-estruturas', obraSel] }); qc.invalidateQueries({ queryKey: ['obr-ativ-avanco', obraSel] }) },
   })
   const salvarCel = useMutation({
-    mutationFn: async (p: { estrutura_id: string; atividade: string; data: string | null; avanco: number }) => {
+    mutationFn: async (p: { estrutura_id: string; atividade: string; data: string | null; avanco: number; lado: 'prev' | 'real' }) => {
+      // upsert só grava as colunas enviadas — o outro lado (prev/real) fica intacto
+      const campos = p.lado === 'prev'
+        ? { data_prev: p.data, avanco_prev: p.avanco }
+        : { data: p.data, avanco: p.avanco }
       const { error } = await supabase.from('obr_atividade_avanco').upsert({
         obra_id: obraSel, estrutura_id: p.estrutura_id, atividade: p.atividade,
-        data: p.data, avanco: p.avanco, responsavel_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
+        ...campos, responsavel_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
       }, { onConflict: 'estrutura_id,atividade' })
       if (error) throw error
     },
@@ -235,36 +147,14 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   const card = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const sel = `appearance-none rounded-lg px-2.5 py-1.5 border text-xs font-semibold cursor-pointer ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`
   const th = `text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+  const prevCor = (av: number) => av >= 1 ? 'bg-sky-500 text-white' : av > 0 ? 'bg-sky-200 text-sky-900' : (isDark ? 'bg-white/[0.03] text-slate-600' : 'bg-slate-50 text-slate-400')
   const celCor = (av: number) => av >= 1 ? 'bg-emerald-500 text-white' : av > 0 ? 'bg-amber-400 text-slate-900' : (isDark ? 'bg-white/[0.04] text-slate-600' : 'bg-slate-100 text-slate-400')
 
   return (
     <div className="space-y-3">
-      {/* Filtros — todos na 1ª linha (padrão EGP): Contrato · Projeto · Tipo · Valor · Ano · %s · Obra */}
+      {/* Filtros — todos na 1ª linha, mesmo padrão de caixa de seleção múltipla */}
       <div className={`rounded-2xl ${card} p-3 flex items-center gap-2 flex-wrap`}>
-        <select value={fProjeto} onChange={e => { setFProjeto(e.target.value); setObraId('') }} className={`${sel} max-w-[180px] truncate`}>
-          <option value="">Projeto: todos</option>
-          {projetos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-        </select>
-        <select value={fTipo} onChange={e => { setFTipo(e.target.value); setObraId('') }} className={sel}>
-          <option value="">Tipo: todos</option>
-          {tipos.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={fValor} onChange={e => { setFValor(e.target.value); setObraId('') }} className={sel}>
-          <option value="">Valor: todos</option>
-          <option value="gt1m">&gt; R$ 1 mi</option>
-          <option value="mid">R$ 100 mil – 1 mi</option>
-          <option value="lt100k">&lt; R$ 100 mil</option>
-        </select>
-        <select value={fAno} onChange={e => { setFAno(e.target.value); setObraId('') }} className={sel}>
-          <option value="">Ano: todos</option>
-          {anos.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <MultiSelect label="% Faturado" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fFat}
-          onToggle={v => { togFiltro(v, setFFat); setObraId('') }} onClear={() => setFFat(new Set())} isDark={isDark} compacto />
-        <MultiSelect label="% Prazo" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPrazo}
-          onToggle={v => { togFiltro(v, setFPrazo); setObraId('') }} onClear={() => setFPrazo(new Set())} isDark={isDark} compacto />
-        <MultiSelect label="% Executado" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fExec}
-          onToggle={v => { togFiltro(v, setFExec); setObraId('') }} onClear={() => setFExec(new Set())} isDark={isDark} compacto />
+        <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={f} isDark={isDark} onChange={() => setObraId('')} />
         <select value={obraSel ?? ''} onChange={e => setObraId(e.target.value)} className={`${sel} max-w-[280px] truncate font-bold`}>
           {obrasFiltradas.length === 0 && <option value="">— nenhuma obra no filtro —</option>}
           {obrasFiltradas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
@@ -307,21 +197,28 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
           <table className="border-collapse text-xs min-w-full">
             <thead>
               <tr>
-                <th className={`sticky left-0 z-10 px-2 py-1.5 text-left ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
-                <th className={`sticky left-[86px] z-10 px-2 py-1.5 text-left ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Executado (qtd)">Exec.</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Executado (%)">%</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Faltante (qtd)">Falt.</th>
-                <th className={`px-1.5 py-1.5 ${th} text-right`} title="Faltante (%)">%</th>
+                <th rowSpan={2} className={`sticky left-0 z-10 px-2 py-1.5 text-left align-bottom ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
+                <th rowSpan={2} className={`sticky left-[86px] z-10 px-2 py-1.5 text-left align-bottom ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
+                <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
+                <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Executado (qtd)">Exec.</th>
+                <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Executado (%)">%</th>
+                <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Faltante (qtd)">Falt.</th>
+                <th rowSpan={2} className={`px-1.5 py-1.5 align-bottom ${th} text-right`} title="Faltante (%)">%</th>
                 {cols.map(e => (
-                  <th key={e.id} className={`px-1 py-1.5 text-center min-w-[74px] ${isDark ? 'border-l border-white/[0.05]' : 'border-l border-slate-100'}`}>
+                  <th key={e.id} colSpan={2} className={`px-1 py-1.5 text-center min-w-[120px] ${isDark ? 'border-l border-white/[0.12]' : 'border-l border-slate-300'}`}>
                     <div className={`text-[11px] font-extrabold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{e.nome}</div>
                     <div className="text-[9px] text-slate-400">{e.tipo ?? '—'}{e.peso_ton ? ` · ${e.peso_ton}t` : ''}</div>
                     {e.dist_prox_m != null && <div className="text-[9px] text-sky-500 font-semibold">→ {e.dist_prox_m.toLocaleString('pt-BR')} m</div>}
                     <button onClick={() => { if (confirm(`Remover ${e.nome}?`)) delEstrutura.mutate(e.id) }} className="text-slate-300 hover:text-rose-500"><X size={10} /></button>
                   </th>
                 ))}
+              </tr>
+              {/* sub-cabeçalho: cada torre tem Previsto | Realizado */}
+              <tr>
+                {cols.map(e => [
+                  <th key={e.id + '-p'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500 border-l border-white/[0.12]' : 'text-slate-400 border-l border-slate-300'}`}>Prev</th>,
+                  <th key={e.id + '-r'} className={`px-0.5 pb-1 text-center text-[8px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Real</th>,
+                ])}
               </tr>
             </thead>
             <tbody>
@@ -346,17 +243,24 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
                     <td className={`px-1.5 py-1 text-right tabular-nums ${pctFalt > 0 ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>{prev ? `${pctFalt}%` : '—'}</td>
                     {cols.map(e => {
                       const c = cel.get(`${e.id}|${atv}`)
-                      const av = c?.avanco ?? 0
-                      return (
-                        <td key={e.id} className={`px-0.5 py-0.5 text-center ${isDark ? 'border-l border-white/[0.05]' : 'border-l border-slate-100'}`}>
-                          <button onClick={() => setEdit({ est: e, atividade: atv, cel: c })}
-                            className={`w-full rounded px-1 py-1 text-[10px] font-bold transition-colors hover:opacity-80 ${celCor(av)}`}
-                            title={c?.data ? `${atv} · ${e.nome} · ${c.data}` : `${atv} · ${e.nome}`}>
-                            {av >= 1 ? '✓' : av > 0 ? `${Math.round(av * 100)}%` : '·'}
-                            {c?.data && <span className="block text-[8px] font-normal opacity-80">{c.data.slice(8, 10)}/{c.data.slice(5, 7)}</span>}
-                          </button>
-                        </td>
+                      const avP = c?.avanco_prev ?? 0     // Previsto (manual)
+                      const avR = c?.avanco ?? 0          // Realizado (manual ou via RDO)
+                      const mini = (av: number, dt: string | null | undefined, lado: 'prev' | 'real', cor: string) => (
+                        <button onClick={() => setEdit({ est: e, atividade: atv, cel: c, lado })}
+                          className={`w-full rounded px-1 py-1 text-[10px] font-bold transition-colors hover:opacity-80 ${cor}`}
+                          title={`${atv} · ${e.nome} · ${lado === 'prev' ? 'Previsto' : 'Realizado'}${dt ? ` · ${dt}` : ''}`}>
+                          {av >= 1 ? '✓' : av > 0 ? `${Math.round(av * 100)}%` : '·'}
+                          {dt && <span className="block text-[8px] font-normal opacity-80">{dt.slice(8, 10)}/{dt.slice(5, 7)}</span>}
+                        </button>
                       )
+                      return [
+                        <td key={e.id + '-p'} className={`px-0.5 py-0.5 text-center ${isDark ? 'border-l border-white/[0.12]' : 'border-l border-slate-300'}`}>
+                          {mini(avP, c?.data_prev, 'prev', prevCor(avP))}
+                        </td>,
+                        <td key={e.id + '-r'} className="px-0.5 py-0.5 text-center">
+                          {mini(avR, c?.data, 'real', celCor(avR))}
+                        </td>,
+                      ]
                     })}
                   </tr>
                 )
@@ -378,7 +282,8 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
         <CelulaEditor
           est={edit.est} atividade={edit.atividade} cel={edit.cel}
           onClose={() => setEdit(null)}
-          onSave={(data, avanco) => salvarCel.mutate({ estrutura_id: edit.est.id, atividade: edit.atividade, data, avanco })}
+          lado={edit.lado}
+          onSave={(data, avanco) => salvarCel.mutate({ estrutura_id: edit.est.id, atividade: edit.atividade, data, avanco, lado: edit.lado })}
           salvando={salvarCel.isPending}
           isDark={isDark}
         />
@@ -387,12 +292,13 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   )
 }
 
-function CelulaEditor({ est, atividade, cel, onClose, onSave, salvando, isDark }: {
-  est: Estrutura; atividade: string; cel?: Celula; onClose: () => void
+function CelulaEditor({ est, atividade, cel, lado, onClose, onSave, salvando, isDark }: {
+  est: Estrutura; atividade: string; cel?: Celula; lado: 'prev' | 'real'; onClose: () => void
   onSave: (data: string | null, avanco: number) => void; salvando: boolean; isDark: boolean
 }) {
-  const [data, setData] = useState(cel?.data ?? new Date().toISOString().slice(0, 10))
-  const [av, setAv] = useState(String(Math.round((cel?.avanco ?? 0) * 100)))
+  const ehPrev = lado === 'prev'
+  const [data, setData] = useState((ehPrev ? cel?.data_prev : cel?.data) ?? new Date().toISOString().slice(0, 10))
+  const [av, setAv] = useState(String(Math.round(((ehPrev ? cel?.avanco_prev : cel?.avanco) ?? 0) * 100)))
   const inp = `rounded-lg border px-2 py-1.5 text-xs ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -401,6 +307,7 @@ function CelulaEditor({ est, atividade, cel, onClose, onSave, salvando, isDark }
           <div>
             <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{est.nome} <span className="text-slate-400 font-normal">· {est.tipo ?? ''}</span></p>
             <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{atividade}</p>
+            <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${ehPrev ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>{ehPrev ? 'PREVISTO' : 'REALIZADO'}</span>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
         </div>
