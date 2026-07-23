@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save, Eye } from 'lucide-react'
+import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save, Eye, CheckCircle2, Mail, Loader2, Square, CheckSquare } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useRDOs,
@@ -11,9 +11,13 @@ import { useLookupObras } from '../../hooks/useLookups'
 import type { ObraRDO, CondicaoClimatica, StatusRDO } from '../../types/obras'
 import RdoPdfModal from '../../components/obras/RdoPdfModal'
 import RDOEstruturado from './RDOEstruturado'
-import type { RdoPdfData } from '../../utils/rdo-pdf'
+import type { RdoReportRow } from '../../utils/rdo-report-html'
+import { buildRdoReportHtml } from '../../utils/rdo-report-html'
+import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
 import { useObrasFiltros, ObrasFiltrosBar, agruparOscsPorObra, obraPassa } from './obrasFiltros'
+import { useQueryClient } from '@tanstack/react-query'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,9 +40,11 @@ const WEATHER_LABEL: Record<CondicaoClimatica, string> = {
   tempestade:   'Tempestade',
 }
 
-const STATUS_CONFIG: Record<StatusRDO, { label: string; light: string; dark: string }> = {
-  rascunho:   { label: 'Rascunho',   light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-300' },
-  finalizado: { label: 'Finalizado', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-300' },
+const STATUS_CONFIG: Record<string, { label: string; light: string; dark: string }> = {
+  pendente:   { label: 'Pendente',   light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-300' },
+  aprovado:   { label: 'Aprovado',   light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-300' },
+  rascunho:   { label: 'Pendente',   light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-300' },
+  finalizado: { label: 'Aprovado',   light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-300' },
 }
 
 const EMPTY_FORM = {
@@ -92,27 +98,59 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
   const criarRDO = useCriarRDO()
   const atualizarRDO = useAtualizarRDO()
   const excluirRDO = useExcluirRDO()
+  const queryClient = useQueryClient()
 
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<ObraRDO | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [pdfRdo, setPdfRdo] = useState<RdoPdfData | null>(null)
+  const [pdfRdo, setPdfRdo] = useState<RdoReportRow | null>(null)
   const [editRdo, setEditRdo] = useState<ObraRDO | null>(null)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [acaoBusy, setAcaoBusy] = useState<'aprovar' | 'email' | null>(null)
+  const { perfil } = useAuth()
 
-  // monta os dados p/ o PDF a partir da linha (select '*' traz os campos extras)
-  const toPdf = (rdo: ObraRDO): RdoPdfData => {
-    const r = rdo as ObraRDO & Record<string, unknown>
-    return {
-      id: rdo.id, obra_id: rdo.obra_id, obra_nome: rdo.obra?.nome ?? '—',
-      data: rdo.data, condicao_climatica: rdo.condicao_climatica,
-      horas_improdutivas: rdo.horas_improdutivas, motivo_improdutividade: rdo.motivo_improdutividade ?? null,
-      resumo_atividades: rdo.resumo_atividades ?? null, ocorrencias: rdo.ocorrencias ?? null,
-      impeditivos: (r.impeditivos as string) ?? null, notas: (r.notas as string) ?? null,
-      fiscal_cemig: (r.fiscal_cemig as string) ?? null, fiscais_cemig: (r.fiscais_cemig as string[]) ?? null,
-      tst_nome: (r.tst_nome as string) ?? null, tst_nomes: (r.tst_nomes as string[]) ?? null,
-      preenchido_por_nome: (r.preenchido_por_nome as string) ?? null,
-    }
+  const toPdf = (rdo: ObraRDO): RdoReportRow =>
+    ({ id: rdo.id, obra_id: rdo.obra_id, obra_nome: rdo.obra?.nome ?? '—', data: rdo.data })
+
+  const toggleSel = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const selVisiveis = rdos.filter(r => sel.has(r.id))
+
+  // ── Aprovar em lote (Pendente → Aprovado) ─────────────────────────────────────
+  const aprovar = async () => {
+    if (!selVisiveis.length || acaoBusy) return
+    setAcaoBusy('aprovar')
+    try {
+      const ids = selVisiveis.filter(r => (r.status as string) !== 'aprovado' && r.status !== 'finalizado').map(r => r.id)
+      if (ids.length) {
+        await supabase.from('obr_rdo').update({
+          status: 'aprovado', aprovado_por_nome: perfil?.nome ?? null, aprovado_em: new Date().toISOString(),
+        }).in('id', ids)
+      }
+      setSel(new Set())
+      queryClient.invalidateQueries({ queryKey: ['obr-rdos'] })
+    } finally { setAcaoBusy(null) }
+  }
+
+  // ── Enviar por e-mail (edge send-ti-email; padrão server-side) ─────────────────
+  const enviarEmail = async () => {
+    if (!selVisiveis.length || acaoBusy) return
+    const dest = window.prompt('Enviar RDO(s) para qual e-mail? (separe por vírgula)')?.trim()
+    if (!dest) return
+    setAcaoBusy('email')
+    try {
+      for (const r of selVisiveis) {
+        const html = await buildRdoReportHtml({ id: r.id, obra_id: r.obra_id, obra_nome: r.obra?.nome ?? '—', data: r.data })
+        await supabase.functions.invoke('send-ti-email', {
+          body: { to: dest.split(',').map(s2 => s2.trim()).filter(Boolean),
+            subject: `RDO ${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`, html },
+        })
+      }
+      setSel(new Set())
+      alert(`RDO(s) enviado(s) para ${dest}.`)
+    } catch (e) {
+      alert('Falha ao enviar: ' + String((e as Error).message))
+    } finally { setAcaoBusy(null) }
   }
 
   const openCreate = () => {
@@ -197,6 +235,18 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
           {obrasSel.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
         {embutido && <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{rdos.length} registro(s)</span>}
+        {/* Ações em lote — discretas, alinhadas à direita */}
+        <div className="ml-auto flex items-center gap-1.5">
+          {sel.size > 0 && <span className={`text-[11px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{sel.size} selecionado(s)</span>}
+          <button onClick={aprovar} disabled={!sel.size || !!acaoBusy} title="Aprovar selecionados"
+            className={`p-1.5 rounded-lg border transition-colors disabled:opacity-40 ${isLight ? 'border-slate-200 text-emerald-600 hover:bg-emerald-50' : 'border-white/[0.08] text-emerald-400 hover:bg-emerald-500/10'}`}>
+            {acaoBusy === 'aprovar' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+          </button>
+          <button onClick={enviarEmail} disabled={!sel.size || !!acaoBusy} title="Enviar por e-mail"
+            className={`p-1.5 rounded-lg border transition-colors disabled:opacity-40 ${isLight ? 'border-slate-200 text-sky-600 hover:bg-sky-50' : 'border-white/[0.08] text-sky-400 hover:bg-sky-500/10'}`}>
+            {acaoBusy === 'email' ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -227,8 +277,9 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
           {rdos.map(rdo => {
             const st = STATUS_CONFIG[rdo.status] ?? STATUS_CONFIG.rascunho
             return (
-              <div key={rdo.id} className={`rounded-2xl border p-3 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+              <div key={rdo.id} className={`rounded-2xl border p-3 ${sel.has(rdo.id) ? (isLight ? 'border-teal-400 bg-teal-50/40' : 'border-teal-500/40 bg-teal-500/[0.06]') : (isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]')}`}>
                 <div className="flex items-start gap-2">
+                  <button onClick={() => toggleSel(rdo.id)} className={`mt-0.5 ${sel.has(rdo.id) ? 'text-teal-500' : 'text-slate-400'}`}>{sel.has(rdo.id) ? <CheckSquare size={16} /> : <Square size={16} />}</button>
                   <span className="text-xl leading-none" title={WEATHER_LABEL[rdo.condicao_climatica]}>{WEATHER_ICON[rdo.condicao_climatica] ?? '—'}</span>
                   <div className="min-w-0 flex-1">
                     <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtDate(rdo.data)}</p>
@@ -263,6 +314,12 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
                   ? 'bg-slate-50 text-slate-600'
                   : 'bg-white/[0.02] text-slate-400'
                 } text-xs font-semibold uppercase tracking-wider`}>
+                  <th className="px-3 py-3 w-8 text-center">
+                    <button onClick={() => setSel(s2 => s2.size === rdos.length ? new Set() : new Set(rdos.map(r => r.id)))}
+                      className={sel.size === rdos.length && rdos.length ? 'text-teal-500' : 'text-slate-400'} title="Selecionar todos">
+                      {sel.size === rdos.length && rdos.length ? <CheckSquare size={15} /> : <Square size={15} />}
+                    </button>
+                  </th>
                   <th className="text-left px-4 py-3">Data</th>
                   <th className="text-left px-4 py-3">Obra</th>
                   <th className="text-center px-4 py-3">Clima</th>
@@ -292,8 +349,13 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
                       className={`border-b ${isLight
                         ? 'border-slate-100 hover:bg-slate-50'
                         : 'border-white/[0.04] hover:bg-white/[0.02]'
-                      } transition-colors`}
+                      } transition-colors ${sel.has(rdo.id) ? (isLight ? 'bg-teal-50/50' : 'bg-teal-500/[0.06]') : ''}`}
                     >
+                      <td className="px-3 py-3 text-center">
+                        <button onClick={() => toggleSel(rdo.id)} className={sel.has(rdo.id) ? 'text-teal-500' : 'text-slate-400 hover:text-slate-500'}>
+                          {sel.has(rdo.id) ? <CheckSquare size={15} /> : <Square size={15} />}
+                        </button>
+                      </td>
                       <td className={`px-4 py-3 text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                         {fmtDate(rdo.data)}
                       </td>
