@@ -11,11 +11,12 @@ import HistoricoOS          from './HistoricoOS'
 
 type TabKey = 'planejamento' | 'checklists' | 'os' | 'historico'
 
+// Ordem pelo uso do dia a dia: a OS é a tela de trabalho, o plano é consulta.
 const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'planejamento', label: 'Planejamento' },
-  { key: 'checklists',   label: 'Checklists'   },
-  { key: 'os',           label: 'OS Abertas'   },
-  { key: 'historico',    label: 'Histórico'     },
+  { key: 'os',           label: 'OS'                },
+  { key: 'historico',    label: 'Histórico'         },
+  { key: 'checklists',   label: 'Checklists'        },
+  { key: 'planejamento', label: 'Plano Manutenção'  },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
@@ -85,7 +86,7 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ManutencaoHub() {
-  const [active, setActive] = useState<TabKey>('planejamento')
+  const [active, setActive] = useState<TabKey>('os')
   const { isDark } = useTheme()
   const { data: ordens = [] } = useOrdensServico()
   const { data: checklists = [] } = useChecklists()
@@ -95,7 +96,7 @@ export default function ManutencaoHub() {
     os: ordens.filter(o => !['concluida', 'cancelada', 'rejeitada'].includes(o.status)).length,
     historico: ordens.filter(o => o.status === 'concluida').length,
   }
-  const Comp = COMPS[active] ?? Planejamento
+  const Comp = COMPS[active] ?? OSAbertas
 
   return (
     <div className="flex flex-col h-full -mx-4 md:mx-0">
