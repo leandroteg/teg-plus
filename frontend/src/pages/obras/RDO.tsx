@@ -217,7 +217,37 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
           </p>
         </div>
       ) : (
-        <div className={`rounded-2xl border overflow-hidden ${isLight
+        <>
+        {/* MOBILE: um card por RDO */}
+        <div className="lg:hidden space-y-2">
+          {rdos.map(rdo => {
+            const st = STATUS_CONFIG[rdo.status] ?? STATUS_CONFIG.rascunho
+            return (
+              <div key={rdo.id} className={`rounded-2xl border p-3 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                <div className="flex items-start gap-2">
+                  <span className="text-xl leading-none" title={WEATHER_LABEL[rdo.condicao_climatica]}>{WEATHER_ICON[rdo.condicao_climatica] ?? '—'}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtDate(rdo.data)}</p>
+                    <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{rdo.obra?.nome ?? '—'}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isLight ? st.light : st.dark}`}>{st.label}</span>
+                </div>
+                <div className={`mt-2 flex items-center gap-3 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <span className="flex items-center gap-1"><Users size={12} /> {rdo.efetivo_proprio + rdo.efetivo_terceiro}</span>
+                  <span className="flex items-center gap-1"><Wrench size={12} /> {rdo.equipamentos_operando + rdo.equipamentos_parados}</span>
+                  {rdo.horas_improdutivas > 0 && <span className="text-red-500 font-bold">{rdo.horas_improdutivas}h improd.</span>}
+                  <span className="ml-auto flex items-center gap-1">
+                    <button onClick={() => openEdit(rdo)} className={`p-1.5 rounded-lg ${isLight ? 'text-slate-400 active:text-blue-600' : 'text-slate-500 active:text-blue-400'}`}><Pencil size={14} /></button>
+                    <button onClick={() => setDeleteConfirm(rdo.id)} className={`p-1.5 rounded-lg ${isLight ? 'text-slate-400 active:text-red-600' : 'text-slate-500 active:text-red-400'}`}><Trash2 size={14} /></button>
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* DESKTOP: tabela */}
+        <div className={`hidden lg:block rounded-2xl border overflow-hidden ${isLight
           ? 'bg-white border-slate-200 shadow-sm'
           : 'bg-white/[0.03] border-white/[0.06]'
         }`}>
@@ -355,13 +385,14 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* Create / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
+          <div className={`relative w-full max-w-lg max-h-[92vh] lg:max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
             ? 'bg-white border-slate-200'
             : 'bg-[#1e293b] border-white/[0.06]'
           }`}>
