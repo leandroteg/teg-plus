@@ -2,7 +2,7 @@
 
 export type CondicaoClimatica = 'sol' | 'nublado' | 'chuva' | 'chuva_forte' | 'tempestade'
 export type StatusApontamento = 'rascunho' | 'confirmado' | 'validado'
-export type StatusRDO = 'rascunho' | 'finalizado'
+export type StatusRDO = 'pendente' | 'aprovado' | 'rascunho' | 'finalizado'
 export type StatusAdiantamento = 'solicitado' | 'aprovado' | 'parcial' | 'prestado' | 'vencido'
 
 export type CategoriaPrestacao =
