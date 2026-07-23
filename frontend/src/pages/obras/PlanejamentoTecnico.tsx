@@ -268,11 +268,11 @@ export default function PlanejamentoTecnico() {
           {anos.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <MultiSelect label="% Faturado" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fFat}
-          onToggle={v => { togFiltro(v, setFFat); setObraId('') }} onClear={() => setFFat(new Set())} isDark={isDark} />
+          onToggle={v => { togFiltro(v, setFFat); setObraId('') }} onClear={() => setFFat(new Set())} isDark={isDark} compacto />
         <MultiSelect label="% Prazo" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fPrazo}
-          onToggle={v => { togFiltro(v, setFPrazo); setObraId('') }} onClear={() => setFPrazo(new Set())} isDark={isDark} />
+          onToggle={v => { togFiltro(v, setFPrazo); setObraId('') }} onClear={() => setFPrazo(new Set())} isDark={isDark} compacto />
         <MultiSelect label="% Executado" options={BANDS.map(b => ({ value: b[0], label: b[1] }))} selected={fExec}
-          onToggle={v => { togFiltro(v, setFExec); setObraId('') }} onClear={() => setFExec(new Set())} isDark={isDark} />
+          onToggle={v => { togFiltro(v, setFExec); setObraId('') }} onClear={() => setFExec(new Set())} isDark={isDark} compacto />
         <select value={obraSel ?? ''} onChange={e => setObraId(e.target.value)} className={`${sel} max-w-[280px] truncate font-bold`}>
           {obrasFiltradas.length === 0 && <option value="">— nenhuma obra no filtro —</option>}
           {obrasFiltradas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
