@@ -11,12 +11,13 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import RDO from './RDO'
 import RDOEstruturado from './RDOEstruturado'
-import { useObrasDoPortfolio } from '../../hooks/usePMO'
+import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio } from '../../hooks/usePMO'
 import { EGPContractProvider, useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import { ContractSelector } from '../../components/EGPLayout'
 import ResumoTecnicoObras from './ResumoTecnicoObras'
 import PriorizacaoObras from './PriorizacaoObras'
 import PlanejamentoTecnico from './PlanejamentoTecnico'
+import { useObrasFiltros, ObrasFiltrosBar } from './obrasFiltros'
 
 const STEPS: FlowStep[] = [
   {
@@ -62,6 +63,9 @@ function GestaoObrasInner() {
   const [novoRdo, setNovoRdo] = useState(false)
   const portfolioId = useEGPPortfolioId()          // contrato do topo — filtra TODAS as abas
   const { data: obrasRdo = [] } = useObrasDoPortfolio(portfolioId)
+  const { data: projetos = [] } = useProjetos(portfolioId)
+  const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
+  const fMed = useObrasFiltros()          // filtros padrão da aba Medições
   const [obraRdoId, setObraRdoId] = useState('')
   const obraRdo = obrasRdo.find(o => o.id === obraRdoId) ?? obrasRdo[0]
 
@@ -89,13 +93,19 @@ function GestaoObrasInner() {
           <>
             {/* histórico + filtros padrão; a obra escolhida lá é a do RDO estruturado */}
             <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
-              <RDO portfolioId={portfolioId} onObraChange={setObraRdoId} />
+              <RDO portfolioId={portfolioId} onObraChange={setObraRdoId} embutido />
             </div>
             {novoRdo && obraRdo && (
               <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)} />
             )}
           </>
         ) : (
+          <div className="space-y-3">
+            {step === 'medicoes' && (
+              <div className={`rounded-2xl border p-3 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+                <ObrasFiltrosBar projetos={projetos} oscs={oscs} f={fMed} isDark={isDark} />
+              </div>
+            )}
           <div className={`rounded-2xl border p-4 sm:p-5 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
             <div className={`rounded-xl border border-dashed flex flex-col items-center justify-center text-center py-14 px-6 ${isDark ? 'border-white/[0.10] bg-white/[0.02]' : 'border-slate-300 bg-slate-50/60'}`}>
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${atual.accent.bgActive}`}>
@@ -109,6 +119,7 @@ function GestaoObrasInner() {
               </p>
               <Construction size={16} className={`mt-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
             </div>
+          </div>
           </div>
         )}
       </ControladoriaFlow>
