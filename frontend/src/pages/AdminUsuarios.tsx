@@ -1889,8 +1889,9 @@ export default function AdminUsuarios() {
       <div className="max-w-7xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm">
-            <Users size={19} />
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border
+            ${isDark ? 'bg-white/[0.04] border-white/[0.07] text-slate-400' : 'bg-slate-50 border-slate-200/80 text-slate-500'}`}>
+            <Users size={18} strokeWidth={1.75} />
           </span>
           <div className="flex-1 min-w-0">
             <h1 className={`text-lg font-black leading-tight ${isDark ? 'text-white' : 'text-navy'}`}>Usuários</h1>
@@ -1906,7 +1907,7 @@ export default function AdminUsuarios() {
           </button>
           <button
             onClick={() => setShowCadastro(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all">
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary-dark active:scale-95 transition-all">
             <UserPlus size={14} /> Cadastrar
           </button>
         </div>

@@ -1,16 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/admin/AdminHome.tsx
-// Painel do administrador (/admin). Hero com saudação, KPIs reais (RPC
-// get_admin_uso_modulos + contagens leves), atalhos agrupados como na sidebar
-// do AdminLayout (Gestão / Análise / Desenvolvimento) e feed de atividade
-// recente (sys_log_atividades). Acesso restrito via <AdminRoute>.
+// Painel do administrador (/admin). Visão geral sóbria: cabeçalho compacto,
+// régua de KPIs (RPC get_admin_uso_modulos + contagens leves), navegação
+// agrupada em listas (Gestão / Análise / Desenvolvimento) e feed de atividade
+// humana recente (sys_log_atividades). Acesso restrito via <AdminRoute>.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Shield, Users, ShieldCheck, ScrollText, BarChart3, Code2, Link2,
-  ArrowRight, ArrowUpRight, ArrowDownRight, Activity, UserCheck,
-  PlusCircle, PencilLine, Trash2, ChevronRight, Gauge,
+  Users, ShieldCheck, ScrollText, BarChart3, Code2, Link2,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -18,64 +17,57 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useUsoModulos } from '../../hooks/useUsoModulos'
 import { supabase } from '../../services/supabase'
 
-// ── Atalhos (mesmos grupos da sidebar do AdminLayout) ─────────────────────────
+// ── Navegação (mesmos grupos da sidebar do AdminLayout) ───────────────────────
 
-interface AdminCard {
+interface AdminItem {
   to: string
   icon: LucideIcon
   title: string
   description: string
-  gradient: string
 }
 
 interface AdminGroup {
   label: string
-  cards: AdminCard[]
+  items: AdminItem[]
 }
 
 const GROUPS: AdminGroup[] = [
   {
     label: 'Gestão',
-    cards: [
+    items: [
       {
         to: '/admin/usuarios', icon: Users, title: 'Usuários',
-        description: 'Contas, permissões e módulos de cada colaborador.',
-        gradient: 'from-indigo-500 to-blue-500',
+        description: 'Contas, permissões e módulos de cada colaborador',
       },
       {
         to: '/admin/politicas-aprovacao', icon: ShieldCheck, title: 'Políticas de Aprovação',
-        description: 'Alçadas e fluxos de aprovação por módulo.',
-        gradient: 'from-emerald-500 to-teal-500',
+        description: 'Alçadas e fluxos de aprovação por categoria',
       },
     ],
   },
   {
     label: 'Análise',
-    cards: [
+    items: [
       {
         to: '/admin/logs', icon: ScrollText, title: 'Logs de Auditoria',
-        description: 'Quem fez o quê, quando e o que mudou no sistema.',
-        gradient: 'from-violet-500 to-purple-500',
+        description: 'Quem fez o quê, quando e o que mudou no sistema',
       },
       {
         to: '/admin/uso-modulos', icon: BarChart3, title: 'Uso de Módulos',
-        description: 'Acessos, adoção e engajamento por módulo.',
-        gradient: 'from-sky-500 to-cyan-500',
+        description: 'Acessos, adoção e engajamento por módulo',
       },
     ],
   },
   {
     label: 'Desenvolvimento',
-    cards: [
+    items: [
       {
         to: '/admin/desenvolvimento', icon: Code2, title: 'Desenvolvimento',
-        description: 'Roadmap, backlog e melhorias em andamento.',
-        gradient: 'from-amber-500 to-orange-500',
+        description: 'Roadmap, backlog e melhorias em andamento',
       },
       {
         to: '/admin/integracoes', icon: Link2, title: 'Integrações',
-        description: 'Conexões com sistemas externos e configurações.',
-        gradient: 'from-rose-500 to-pink-500',
+        description: 'Conexões com sistemas externos e configurações',
       },
     ],
   },
@@ -83,10 +75,10 @@ const GROUPS: AdminGroup[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TIPO_META: Record<string, { verbo: string; icon: LucideIcon; light: string; dark: string }> = {
-  INSERT: { verbo: 'criou',    icon: PlusCircle, light: 'bg-emerald-50 text-emerald-600', dark: 'bg-emerald-500/15 text-emerald-300' },
-  UPDATE: { verbo: 'alterou',  icon: PencilLine, light: 'bg-amber-50 text-amber-600',     dark: 'bg-amber-500/15 text-amber-300'     },
-  DELETE: { verbo: 'excluiu',  icon: Trash2,     light: 'bg-rose-50 text-rose-600',       dark: 'bg-rose-500/15 text-rose-300'       },
+const TIPO_META: Record<string, { verbo: string; dot: string }> = {
+  INSERT: { verbo: 'criou',   dot: 'bg-emerald-500' },
+  UPDATE: { verbo: 'alterou', dot: 'bg-amber-500' },
+  DELETE: { verbo: 'excluiu', dot: 'bg-rose-500' },
 }
 
 /** 'fin_contas_pagar' → 'Contas Pagar' */
@@ -103,11 +95,11 @@ function tempoRelativo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diffMs / 60_000)
   if (min < 1) return 'agora'
-  if (min < 60) return `há ${min} min`
+  if (min < 60) return `${min} min`
   const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h} h`
+  if (h < 24) return `${h} h`
   const d = Math.floor(h / 24)
-  return `há ${d} d`
+  return `${d} d`
 }
 
 function primeiroNome(nome: string | null | undefined): string {
@@ -121,49 +113,6 @@ interface LogRecente {
   tipo: string
   usuario_nome: string | null
   created_at: string
-}
-
-// ── KPI card ──────────────────────────────────────────────────────────────────
-
-function KpiCard({ icon: Icon, label, value, delta, note, isLight, loading }: {
-  icon: LucideIcon
-  label: string
-  value: string | number | null | undefined
-  delta?: number | null
-  note?: string
-  isLight: boolean
-  loading: boolean
-}) {
-  const up = (delta ?? 0) >= 0
-  const DeltaIcon = up ? ArrowUpRight : ArrowDownRight
-  return (
-    <div className={`rounded-2xl border p-4 ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-      <div className="flex items-center justify-between mb-2.5">
-        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-500/15 text-indigo-300'}`}>
-          <Icon size={15} />
-        </span>
-        {delta != null && Number.isFinite(delta) && (
-          <span className={`flex items-center gap-0.5 text-[11px] font-bold tabular-nums
-            ${up
-              ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
-              : (isLight ? 'text-rose-600' : 'text-rose-400')}`}
-          >
-            <DeltaIcon size={12} />
-            {Math.abs(delta).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%
-          </span>
-        )}
-      </div>
-      {loading ? (
-        <div className={`h-7 w-16 rounded-md animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-      ) : (
-        <p className={`text-[1.6rem] font-extrabold leading-none tabular-nums ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          {value ?? '—'}
-        </p>
-      )}
-      <p className={`text-[10.5px] font-bold uppercase tracking-wider mt-1.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</p>
-      {note && <p className={`text-[10.5px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{note}</p>}
-    </div>
-  )
 }
 
 // ── Página ────────────────────────────────────────────────────────────────────
@@ -219,7 +168,7 @@ export default function AdminHome() {
         .select('id, modulo, entidade_tipo, tipo, usuario_nome, created_at')
         .not('usuario_id', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(7)
+        .limit(8)
       if (error) throw error
       return (data ?? []) as LogRecente[]
     },
@@ -227,7 +176,7 @@ export default function AdminHome() {
   })
 
   const deltaAcessos = resumo && resumo.acessos_prev > 0
-    ? ((resumo.total_acessos - resumo.acessos_prev) / resumo.acessos_prev) * 100
+    ? Math.round(((resumo.total_acessos - resumo.acessos_prev) / resumo.acessos_prev) * 100)
     : null
 
   const hora = new Date().getHours()
@@ -236,154 +185,184 @@ export default function AdminHome() {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 
-  const heading = isLight ? 'text-slate-800' : 'text-slate-100'
-  const label = isLight ? 'text-slate-500' : 'text-slate-400'
-  const sectionLabel = isLight ? 'text-slate-400' : 'text-slate-500'
-  const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
-  const card = isLight
-    ? 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-500/[0.07] hover:-translate-y-0.5'
-    : 'bg-white/[0.03] border-white/[0.06] hover:border-indigo-400/30 hover:bg-white/[0.05] hover:-translate-y-0.5'
+  // ── Tokens de tema ──────────────────────────────────────────────────────────
+  const heading  = isLight ? 'text-slate-900' : 'text-slate-100'
+  const body     = isLight ? 'text-slate-600' : 'text-slate-300'
+  const muted    = isLight ? 'text-slate-500' : 'text-slate-400'
+  const faint    = isLight ? 'text-slate-400' : 'text-slate-500'
+  const hairline = isLight ? 'border-slate-200/80' : 'border-white/[0.07]'
+  const divide   = isLight ? 'divide-slate-200/80' : 'divide-white/[0.07]'
+  const surface  = isLight ? 'bg-white' : 'bg-white/[0.02]'
+  const rowHover = isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.03]'
+  const iconBox  = isLight
+    ? 'bg-slate-50 border-slate-200/80 text-slate-500'
+    : 'bg-white/[0.04] border-white/[0.07] text-slate-400'
+  const skeleton = isLight ? 'bg-slate-100' : 'bg-white/[0.06]'
+
+  const kpis = [
+    {
+      label: 'Usuários ativos',
+      value: totalUsuarios?.toLocaleString('pt-BR'),
+      note: 'contas habilitadas',
+      loading: usuariosLoading,
+    },
+    {
+      label: 'Ativos na semana',
+      value: resumo?.usuarios_ativos_uso?.toLocaleString('pt-BR'),
+      note: resumo ? `de ${resumo.base_usuarios} usuários` : '—',
+      loading: usoLoading,
+    },
+    {
+      label: 'Acessos · 7 dias',
+      value: resumo?.total_acessos?.toLocaleString('pt-BR'),
+      note: deltaAcessos == null ? 'últimos 7 dias' : 'vs. semana anterior',
+      delta: deltaAcessos,
+      loading: usoLoading,
+    },
+    {
+      label: 'Ações hoje',
+      value: acoesHoje?.toLocaleString('pt-BR'),
+      note: 'por usuários, sem integrações',
+      loading: acoesLoading,
+    },
+  ]
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto">
 
-        {/* ── Hero ── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-700 px-6 py-7 sm:px-8">
-          {/* textura sutil */}
-          <div className="pointer-events-none absolute inset-0 opacity-[0.12]"
-            style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
-          <div className="pointer-events-none absolute -right-10 -top-14 opacity-[0.09]">
-            <Shield size={230} strokeWidth={1} className="text-white" />
-          </div>
-          <div className="relative">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[10.5px] font-bold uppercase tracking-wider text-indigo-100 backdrop-blur-sm">
-              <Shield size={11} /> Painel do administrador
-            </span>
-            <h1 className="mt-3 text-[1.6rem] sm:text-3xl font-extrabold text-white leading-tight">
-              {saudacao}, {primeiroNome(perfil?.nome)}
-            </h1>
-            <p className="mt-1 text-[13px] text-indigo-100/90 first-letter:uppercase">{dataLonga}</p>
-            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-indigo-100/80">
-              Central de gestão, análise e desenvolvimento do TEG+ — usuários, aprovações,
-              auditoria e integrações em um só lugar.
+      {/* ── Cabeçalho ── */}
+      <div className={`flex flex-wrap items-end justify-between gap-2 border-b pb-5 ${hairline}`}>
+        <div>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${faint}`}>
+            Painel administrativo
+          </p>
+          <h1 className={`mt-1 text-xl font-semibold tracking-tight ${heading}`}>
+            {saudacao}, {primeiroNome(perfil?.nome)}
+          </h1>
+        </div>
+        <p className={`text-[12.5px] first-letter:uppercase ${muted}`}>{dataLonga}</p>
+      </div>
+
+      {/* ── KPIs ── */}
+      <div className={`mt-6 rounded-xl border ${hairline} ${surface} grid grid-cols-2 lg:grid-cols-4`}>
+        {kpis.map(({ label: kLabel, value, note, delta, loading }, i) => (
+          <div
+            key={kLabel}
+            className={`px-5 py-4 ${hairline} ${
+              ['', 'border-l', 'max-lg:border-t lg:border-l', 'border-l max-lg:border-t'][i]
+            }`}
+          >
+            <p className={`text-[11px] font-medium uppercase tracking-wider ${faint}`}>{kLabel}</p>
+            {loading ? (
+              <div className={`mt-2 h-6 w-14 rounded ${skeleton} animate-pulse`} />
+            ) : (
+              <p className={`mt-1.5 text-[1.45rem] font-semibold leading-none tabular-nums tracking-tight ${heading}`}>
+                {value ?? '—'}
+              </p>
+            )}
+            <p className={`mt-1.5 text-[11.5px] ${faint}`}>
+              {delta != null && (
+                <span className={`font-medium tabular-nums mr-1 ${
+                  delta >= 0
+                    ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+                    : (isLight ? 'text-rose-600' : 'text-rose-400')
+                }`}>
+                  {delta >= 0 ? '+' : ''}{delta}%
+                </span>
+              )}
+              {note}
             </p>
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard
-            icon={Users} label="Usuários ativos" isLight={isLight}
-            value={totalUsuarios?.toLocaleString('pt-BR')}
-            loading={usuariosLoading} note="contas habilitadas"
-          />
-          <KpiCard
-            icon={UserCheck} label="Ativos na semana" isLight={isLight}
-            value={resumo?.usuarios_ativos_uso?.toLocaleString('pt-BR')}
-            loading={usoLoading}
-            note={resumo ? `de ${resumo.base_usuarios} usuários` : undefined}
-          />
-          <KpiCard
-            icon={Gauge} label="Acessos · 7 dias" isLight={isLight}
-            value={resumo?.total_acessos?.toLocaleString('pt-BR')}
-            delta={deltaAcessos} loading={usoLoading}
-            note="vs. semana anterior"
-          />
-          <KpiCard
-            icon={Activity} label="Ações hoje" isLight={isLight}
-            value={acoesHoje?.toLocaleString('pt-BR')}
-            loading={acoesLoading} note="por usuários · sem integrações"
-          />
-        </div>
+      {/* ── Navegação + Atividade ── */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr,340px] gap-x-8 gap-y-8 items-start">
 
-        {/* ── Atalhos + Atividade recente ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-
-          {/* Atalhos agrupados */}
-          <div className="lg:col-span-2 space-y-6">
-            {GROUPS.map((group) => (
-              <section key={group.label}>
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <h2 className={`text-[11px] font-bold uppercase tracking-wider ${sectionLabel}`}>
-                    {group.label}
-                  </h2>
-                  <div className={`h-px flex-1 ${isLight ? 'bg-slate-200/80' : 'bg-white/[0.06]'}`} />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {group.cards.map(({ to, icon: Icon, title, description, gradient }) => (
-                    <Link
-                      key={to}
-                      to={to}
-                      className={`group flex items-start gap-3.5 rounded-2xl border p-4 transition-all duration-200 ${card}`}
-                    >
-                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} text-white shadow-sm`}>
-                        <Icon size={18} />
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className={`flex items-center gap-1.5 text-[13.5px] font-semibold ${heading}`}>
-                          {title}
-                          <ArrowRight size={13} className="opacity-0 -translate-x-1 transition-all duration-200 group-hover:opacity-60 group-hover:translate-x-0" />
-                        </span>
-                        <span className={`block text-[12px] leading-snug mt-0.5 ${label}`}>{description}</span>
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-
-          {/* Atividade recente */}
-          <aside className={`rounded-2xl border ${panel}`}>
-            <div className={`flex items-center justify-between px-4 pt-4 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-              <h2 className={`text-[13px] font-bold ${heading}`}>Atividade recente</h2>
-              <Link
-                to="/admin/logs"
-                className={`flex items-center gap-0.5 text-[11.5px] font-semibold transition-colors
-                  ${isLight ? 'text-indigo-600 hover:text-indigo-700' : 'text-indigo-300 hover:text-indigo-200'}`}
-              >
-                Ver logs <ChevronRight size={13} />
-              </Link>
-            </div>
-
-            {recentesLoading ? (
-              <div className="p-4 space-y-3.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-lg animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-                    <div className="flex-1 space-y-1.5">
-                      <div className={`h-2.5 w-3/4 rounded animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-                      <div className={`h-2 w-1/2 rounded animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-                    </div>
-                  </div>
+        {/* Navegação agrupada */}
+        <div className="space-y-7">
+          {GROUPS.map((group) => (
+            <section key={group.label}>
+              <h2 className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${faint}`}>
+                {group.label}
+              </h2>
+              <div className={`rounded-xl border overflow-hidden ${hairline} ${surface} divide-y ${divide}`}>
+                {group.items.map(({ to, icon: Icon, title, description }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`group flex items-center gap-3.5 px-4 py-3 transition-colors ${rowHover}`}
+                  >
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${iconBox}`}>
+                      <Icon size={15} strokeWidth={1.75} />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className={`block text-[13px] font-medium leading-tight ${heading}`}>{title}</span>
+                      <span className={`block text-[12px] leading-tight mt-0.5 ${muted}`}>{description}</span>
+                    </span>
+                    <ChevronRight
+                      size={14}
+                      className={`shrink-0 transition-colors ${faint} ${isLight ? 'group-hover:text-slate-600' : 'group-hover:text-slate-300'}`}
+                    />
+                  </Link>
                 ))}
               </div>
-            ) : recentes.length === 0 ? (
-              <p className={`px-4 py-8 text-center text-[12px] ${label}`}>Nenhuma atividade registrada ainda.</p>
-            ) : (
-              <ul className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-white/[0.04]'}`}>
-                {recentes.map((log) => {
-                  const meta = TIPO_META[log.tipo] ?? TIPO_META.UPDATE
-                  const TipoIcon = meta.icon
-                  return (
-                    <li key={log.id} className="flex items-start gap-3 px-4 py-3">
-                      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isLight ? meta.light : meta.dark}`}>
-                        <TipoIcon size={14} />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-[12.5px] leading-snug ${heading}`}>
-                          <span className="font-semibold">{log.usuario_nome ?? 'Sistema'}</span>
-                          {' '}{meta.verbo}{' '}
-                          <span className="font-medium">{entidadeLabel(log.entidade_tipo)}</span>
-                        </p>
-                        <p className={`text-[11px] mt-0.5 ${label}`}>{tempoRelativo(log.created_at)}</p>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </aside>
+            </section>
+          ))}
+        </div>
+
+        {/* Atividade recente */}
+        <aside className={`rounded-xl border ${hairline} ${surface}`}>
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${hairline}`}>
+            <h2 className={`text-[12px] font-semibold uppercase tracking-wider ${muted}`}>
+              Atividade recente
+            </h2>
+          </div>
+
+          {recentesLoading ? (
+            <div className="px-4 py-3 space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-1.5 py-1">
+                  <div className={`h-2.5 w-4/5 rounded ${skeleton} animate-pulse`} />
+                  <div className={`h-2 w-1/3 rounded ${skeleton} animate-pulse`} />
+                </div>
+              ))}
+            </div>
+          ) : recentes.length === 0 ? (
+            <p className={`px-4 py-10 text-center text-[12px] ${muted}`}>
+              Nenhuma atividade de usuários registrada.
+            </p>
+          ) : (
+            <ul className={`divide-y ${divide}`}>
+              {recentes.map((log) => {
+                const meta = TIPO_META[log.tipo] ?? TIPO_META.UPDATE
+                return (
+                  <li key={log.id} className="flex items-baseline gap-2.5 px-4 py-2.5">
+                    <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full self-start translate-y-[5px] ${meta.dot}`} />
+                    <p className={`flex-1 min-w-0 text-[12.5px] leading-snug ${body}`}>
+                      <span className={`font-medium ${heading}`}>{log.usuario_nome ?? 'Sistema'}</span>
+                      {' '}{meta.verbo}{' '}{entidadeLabel(log.entidade_tipo)}
+                    </p>
+                    <span className={`shrink-0 text-[11px] tabular-nums whitespace-nowrap ${faint}`}>
+                      {tempoRelativo(log.created_at)}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className={`border-t px-4 py-2.5 ${hairline}`}>
+            <Link
+              to="/admin/logs"
+              className={`text-[12px] font-medium transition-colors ${
+                isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Ver todos os logs →
+            </Link>
+          </div>
+        </aside>
       </div>
     </div>
   )

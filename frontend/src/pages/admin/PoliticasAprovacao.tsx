@@ -160,8 +160,9 @@ export default function PoliticasAprovacao() {
 
       {/* ── Cabeçalho ── */}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-sm">
-          <ShieldCheck size={19} />
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border
+          ${isLight ? 'bg-slate-50 border-slate-200/80 text-slate-500' : 'bg-white/[0.04] border-white/[0.07] text-slate-400'}`}>
+          <ShieldCheck size={18} strokeWidth={1.75} />
         </span>
         <div className="flex-1 min-w-0">
           <h1 className={`text-lg font-bold leading-tight ${heading}`}>Políticas de Aprovação</h1>
@@ -178,8 +179,9 @@ export default function PoliticasAprovacao() {
         {kpis.map(({ icon: Icon, label: kLabel, value }) => (
           <div key={kLabel} className={`rounded-2xl border p-3.5 ${panel}`}>
             <div className="flex items-center gap-3">
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-500/15 text-indigo-300'}`}>
-                <Icon size={16} />
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border
+                ${isLight ? 'bg-slate-50 border-slate-200/80 text-slate-500' : 'bg-white/[0.04] border-white/[0.07] text-slate-400'}`}>
+                <Icon size={15} strokeWidth={1.75} />
               </span>
               <div className="min-w-0">
                 {isLoading ? (
