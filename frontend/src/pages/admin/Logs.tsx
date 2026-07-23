@@ -405,12 +405,8 @@ export default function Logs() {
           </div>
         </div>
 
-        {/* Duas colunas em telas largas: painel lateral (stats + filtros) fixo
-            ao rolar e lista ocupando todo o restante. Empilha abaixo de xl. */}
-        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-4 items-start">
-        <div className="space-y-3 xl:sticky xl:top-0">
         {/* Estatísticas (sobre o que já foi carregado) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-4">
           <StatCard icon={ScrollText} label="Eventos carregados" valor={String(logs.length)} tone="violet" isLight={isLight} />
           <StatCard icon={PlusCircle} label="Criações" valor={String(stats.criacoes)} tone="emerald" isLight={isLight} />
           <StatCard icon={PencilLine} label="Alterações" valor={String(stats.alteracoes)} tone="amber" isLight={isLight} />
@@ -418,7 +414,7 @@ export default function Logs() {
         </div>
 
         {/* Filtros */}
-        <div className={`rounded-2xl border p-3 ${panel}`}>
+        <div className={`rounded-2xl border p-3 mb-4 ${panel}`}>
           {/* Busca em destaque */}
           <div className="relative mb-2.5">
             <Search size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${label}`} />
@@ -473,11 +469,9 @@ export default function Logs() {
               </button>
             )}
           </div>
-          {/* No modo coluna lateral (xl) os selects ocupam a linha inteira e as
-              datas ficam lado a lado; abaixo disso mantém a grade horizontal. */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
             <select
-              className={`${inputCls} xl:col-span-2`}
+              className={inputCls}
               value={filtro.modulo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, modulo: e.target.value || undefined }))}
             >
@@ -487,7 +481,7 @@ export default function Logs() {
               ))}
             </select>
             <select
-              className={`${inputCls} xl:col-span-2`}
+              className={inputCls}
               value={filtro.tipo ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, tipo: e.target.value || undefined }))}
             >
@@ -497,7 +491,7 @@ export default function Logs() {
               <option className={optionCls} value="DELETE">Exclusão</option>
             </select>
             <select
-              className={`${inputCls} xl:col-span-2`}
+              className={inputCls}
               value={filtro.usuarioId ?? ''}
               onChange={(e) => setFiltro((f) => ({ ...f, usuarioId: e.target.value || undefined }))}
             >
@@ -522,10 +516,8 @@ export default function Logs() {
             />
           </div>
         </div>
-        </div>
 
-        {/* Lista (coluna principal) */}
-        <div className="min-w-0">
+        {/* Lista */}
         {isLoading ? (
           <div className={`flex items-center justify-center gap-2 py-16 text-sm ${label}`}>
             <Loader2 size={16} className="animate-spin" /> Carregando logs…
@@ -566,8 +558,6 @@ export default function Logs() {
             )}
           </div>
         )}
-        </div>
-        </div>
     </div>
   )
 }
