@@ -77,7 +77,7 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
 
   const [q, setQ] = useState('')
   const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
-  const f = useObrasFiltros()
+  const f = useObrasFiltros({ tipoPadrao: true })
   const [dragId, setDragId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
 
