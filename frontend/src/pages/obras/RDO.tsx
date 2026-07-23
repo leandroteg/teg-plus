@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -78,6 +79,17 @@ export default function RDO() {
     setShowModal(true)
   }
 
+  // Acionado pelo flyout "Novo Registro › Registrar RDO" (?novo_rdo=1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('novo_rdo') === '1') {
+      openCreate()
+      searchParams.delete('novo_rdo')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   const openEdit = (rdo: ObraRDO) => {
     setEditing(rdo)
     setForm({
@@ -153,15 +165,6 @@ export default function RDO() {
             {rdos.length} registros
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${isLight
-            ? 'bg-teal-600 hover:bg-teal-700 shadow-sm'
-            : 'bg-teal-600 hover:bg-teal-500'
-          }`}
-        >
-          <Plus size={15} /> Novo RDO
-        </button>
       </div>
 
       {/* Filters */}
