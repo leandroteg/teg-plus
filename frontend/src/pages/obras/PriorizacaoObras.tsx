@@ -198,11 +198,12 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
         </select>
         <div className="flex-1" />
         {salvando && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> salvando ordem…</span>}
-        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>arraste ou use as setas pra ordenar</span>
+        <span className={`hidden lg:inline text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>arraste ou use as setas pra ordenar</span>
+        <span className={`lg:hidden text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>use as setas pra ordenar</span>
       </div>
 
-      {/* Cabeçalho */}
-      <div className={`rounded-xl ${card} overflow-x-auto`}>
+      {/* ── DESKTOP (lg+): grade larga com scroll horizontal ── */}
+      <div className={`hidden lg:block rounded-xl ${card} overflow-x-auto`}>
         <div className="min-w-[1180px]">
           <div className={`grid grid-cols-[44px_28px_minmax(200px,1.1fr)_58px_58px_92px_124px_124px_minmax(140px,1fr)_minmax(140px,1fr)_minmax(140px,1fr)] gap-2 items-center px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500 border-b border-white/[0.06]' : 'text-slate-400 border-b border-slate-100'}`}>
             <span>#</span><span /><span>Obra</span>
@@ -248,6 +249,45 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
             <div className="py-12 text-center text-sm text-slate-400">Nenhuma obra encontrada</div>
           )}
         </div>
+      </div>
+
+      {/* ── MOBILE: um card por obra, mesmos campos ── */}
+      <div className="lg:hidden space-y-2">
+        {isLoading ? (
+          <div className={`rounded-xl ${card} py-10 text-center text-sm text-slate-400 flex items-center justify-center gap-2`}><Loader2 size={15} className="animate-spin" /> carregando…</div>
+        ) : linhas.length === 0 ? (
+          <div className={`rounded-xl ${card} py-10 text-center text-sm text-slate-400`}>Nenhuma obra encontrada</div>
+        ) : linhas.map((o, idx) => (
+          <div key={o.id} className={`rounded-xl ${card} p-3 space-y-2`}>
+            <div className="flex items-start gap-2">
+              <span className={`text-base font-extrabold w-7 text-center shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{idx + 1}</span>
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold leading-tight ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{o.nome}</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo_nome}</p>
+              </div>
+              <div className="flex flex-col shrink-0">
+                <button onClick={() => mover(idx, -1)} className="p-1 text-slate-400 active:text-sky-500"><ChevronUp size={16} /></button>
+                <button onClick={() => mover(idx, 1)} className="p-1 text-slate-400 active:text-sky-500"><ChevronDown size={16} /></button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Físico <b className={pctCls(o.pctFis)}>{o.pctFis != null ? `${o.pctFis}%` : '—'}</b></span>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Financ. <b className={pctCls(o.pctFin)}>{o.pctFin != null ? `${o.pctFin}%` : '—'}</b></span>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Prazo OSC <b className={isDark ? 'text-slate-300' : 'text-slate-600'}>{fmtData(o.prazo)}</b></span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 flex flex-col gap-1">Início previsto
+                <CampoData valor={o.prio?.inicio_previsto ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, inicio_previsto: v || null })} cls={inp} /></label>
+              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 flex flex-col gap-1">Término previsto
+                <CampoData valor={o.prio?.termino_previsto ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, termino_previsto: v || null })} cls={inp} /></label>
+            </div>
+            <div className="space-y-1.5">
+              <CampoTexto valor={o.prio?.frentes_liberadas ?? ''} placeholder="frentes liberadas…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, frentes_liberadas: v || null })} cls={inp} />
+              <CampoTexto valor={o.prio?.bloqueios ?? ''} placeholder="bloqueios e impeditivos…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, bloqueios: v || null })} cls={inp} alerta={!!o.prio?.bloqueios} />
+              <CampoTexto valor={o.prio?.comentarios ?? ''} placeholder="comentários…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, comentarios: v || null })} cls={inp} />
+            </div>
+          </div>
+        ))}
       </div>
 
       <p className={`text-[10px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
