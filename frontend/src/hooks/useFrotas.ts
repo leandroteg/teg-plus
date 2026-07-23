@@ -1044,6 +1044,18 @@ export function useSalvarPlanoPreventiva() {
 
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 
+/**
+ * OS em atraso: passou da previsão de conclusão. Quando a OS foi aberta sem
+ * previsão, considera atrasada acima de SLA_OS_DIAS em aberto — senão a OS que
+ * ninguém datou nunca apareceria como atrasada, que é justamente a pior delas.
+ */
+const SLA_OS_DIAS = 15
+function osAtrasada(o: { data_previsao?: string | null; data_abertura?: string | null }, hoje: string) {
+  if (o.data_previsao) return o.data_previsao < hoje
+  if (!o.data_abertura) return false
+  return (Date.now() - new Date(o.data_abertura).getTime()) / 86_400_000 > SLA_OS_DIAS
+}
+
 export function useFrotasKPIs() {
   return useQuery({
     queryKey: ['fro_kpis'],
@@ -1054,8 +1066,8 @@ export function useFrotasKPIs() {
 
       const [vsRes, osRes, abastRes, manutCustoRes, otelRes, prevRes] = await Promise.all([
         supabase.from('fro_veiculos').select('status').neq('status', 'baixado'),
-        supabase.from('fro_ordens_servico').select('status, prioridade')
-          .in('status', ['aberta','em_cotacao','aguardando_aprovacao','aprovada','em_execucao']),
+        supabase.from('fro_ordens_servico').select('status, prioridade, data_previsao, data_abertura')
+          .in('status', ['pendente','aberta','em_cotacao','aguardando_aprovacao','aprovada','em_execucao']),
         supabase.from('fro_abastecimentos').select('valor_total')
           .gte('data_abastecimento', inicioMes),
         supabase.from('fro_ordens_servico').select('valor_final')
@@ -1095,6 +1107,7 @@ export function useFrotasKPIs() {
         taxa_disponibilidade: total ? Math.round((disponiveis / total) * 100) : 0,
         os_abertas:           os.length,
         os_criticas:          os.filter(o => o.prioridade === 'critica').length,
+        os_atrasadas:         os.filter(o => osAtrasada(o, hoje)).length,
         preventivas_vencidas,
         preventivas_proximas_7d,
         abastecimentos_mes:     (abastRes.data ?? []).length,
