@@ -312,7 +312,7 @@ export default function Apontamentos() {
 
       {/* Create / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className={`relative w-full max-w-lg rounded-2xl border shadow-xl p-6 ${isLight
             ? 'bg-white border-slate-200'
