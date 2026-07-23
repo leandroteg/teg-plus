@@ -182,20 +182,20 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
       )}
 
       {/* Matriz */}
-      <div className={`rounded-xl ${card} overflow-auto max-h-[calc(100vh-300px)]`}>
+      <div className={`rounded-xl ${card} overflow-auto max-h-[calc(100vh-260px)] lg:max-h-[calc(100vh-300px)]`}>
         {isLoading ? (
           <div className="py-12 text-center text-sm text-slate-400 flex items-center justify-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</div>
         ) : (
           <table className="border-collapse text-xs min-w-full">
             <thead>
               <tr>
-                <th rowSpan={2} className={`sticky left-0 top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
-                <th rowSpan={2} className={`sticky left-[86px] top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
+                <th rowSpan={2} className={`hidden lg:table-cell sticky left-0 top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Seção</th>
+                <th rowSpan={2} className={`sticky left-0 lg:left-[86px] top-0 z-[12] px-2 py-1.5 text-left align-bottom ${th} min-w-[150px] lg:min-w-[230px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}>Atividade</th>
                 <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Quantidade prevista (estruturas)">Qtd prev.</th>
                 <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (qtd)">Exec.</th>
                 <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Executado (%)">%</th>
-                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (qtd)">Falt.</th>
-                <th rowSpan={2} className={`sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (%)">%</th>
+                <th rowSpan={2} className={`hidden lg:table-cell sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (qtd)">Falt.</th>
+                <th rowSpan={2} className={`hidden lg:table-cell sticky top-0 z-[11] px-1.5 py-1.5 align-bottom ${th} text-right ${isDark ? 'bg-[#111827]' : 'bg-white'}`} title="Faltante (%)">%</th>
                 {cols.map(e => (
                   <th key={e.id} colSpan={2} className={`sticky top-0 z-[11] h-[56px] px-1 py-1 text-center min-w-[120px] ${isDark ? 'bg-teal-500/[0.10] border-l border-white/[0.12]' : 'bg-teal-50 border-l border-slate-300'}`}>
                     <div className={`text-[11px] font-extrabold ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{e.nome}</div>
@@ -224,15 +224,18 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
                   <tr key={g.secao + atv} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}>
                     {ai === 0 && (
                       <td rowSpan={g.atividades.length}
-                        className={`sticky left-0 z-10 px-2 py-1 align-top text-[10px] font-bold w-[86px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}
+                        className={`hidden lg:table-cell sticky left-0 z-10 px-2 py-1 align-top text-[10px] font-bold w-[86px] ${isDark ? 'bg-[#111827]' : 'bg-white'}`}
                         style={{ color: SECAO_COR[g.secao] }}>{g.secao}</td>
                     )}
-                    <td className={`sticky left-[86px] z-10 px-2 py-1 text-[11px] ${isDark ? 'bg-[#111827] text-slate-300' : 'bg-white text-slate-600'}`}>{atv}</td>
+                    <td className={`sticky left-0 lg:left-[86px] z-10 px-2 py-1 text-[10px] lg:text-[11px] ${isDark ? 'bg-[#111827] text-slate-300' : 'bg-white text-slate-600'}`}>
+                      <span className="lg:hidden text-[8px] font-bold uppercase block" style={{ color: SECAO_COR[g.secao] }}>{g.secao}</span>
+                      {atv}
+                    </td>
                     <td className={`px-1.5 py-1 text-right tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{prev || '—'}</td>
                     <td className={`px-1.5 py-1 text-right tabular-nums font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{exec ? exec.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
                     <td className={`px-1.5 py-1 text-right tabular-nums font-bold ${pct >= 100 ? 'text-emerald-500' : pct > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{pct ? `${pct}%` : '—'}</td>
-                    <td className={`px-1.5 py-1 text-right tabular-nums ${falt > 0 ? (isDark ? 'text-slate-300' : 'text-slate-600') : 'text-slate-400'}`}>{prev ? falt.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
-                    <td className={`px-1.5 py-1 text-right tabular-nums ${pctFalt > 0 ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>{prev ? `${pctFalt}%` : '—'}</td>
+                    <td className={`hidden lg:table-cell px-1.5 py-1 text-right tabular-nums ${falt > 0 ? (isDark ? 'text-slate-300' : 'text-slate-600') : 'text-slate-400'}`}>{prev ? falt.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
+                    <td className={`hidden lg:table-cell px-1.5 py-1 text-right tabular-nums ${pctFalt > 0 ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>{prev ? `${pctFalt}%` : '—'}</td>
                     {cols.map(e => {
                       const c = cel.get(`${e.id}|${atv}`)
                       const avP = c?.avanco_prev ?? 0     // Previsto (manual)
@@ -297,8 +300,8 @@ function CelulaEditor({ est, atividade, cel, lado, onClose, onSave, onDelete, sa
   const temRegistro = ehPrev ? !!(cel?.data_prev || cel?.avanco_prev) : !!(cel?.data || cel?.avanco)
   const inp = `rounded-lg border px-2 py-1.5 text-xs ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200'}`
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className={`w-full max-w-sm rounded-2xl border shadow-2xl p-4 ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className={`w-full max-w-sm rounded-t-2xl lg:rounded-2xl border shadow-2xl p-4 ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
         <div className="flex items-start justify-between gap-2 mb-3">
           <div>
             <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{est.nome} <span className="text-slate-400 font-normal">· {est.tipo ?? ''}</span></p>
