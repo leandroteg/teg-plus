@@ -13,12 +13,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock,
+  FileSearch, Send, Building2, Clock, CalendarClock,
 } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
   useCotacoesOS, useSalvarCotacao, useFornecedoresFrotas,
+  useProgramarEntradaOS, useLiberarOS, useAlocacoes, useVeiculos, useChecklists,
 } from '../../../hooks/useFrotas'
 import ItensOSEditor, { type ItemEdit } from './ItensOSEditor'
 import type { FroOrdemServico, FroVeiculo, StatusOS, TipoOS, PrioridadeOS } from '../../../types/frotas'
@@ -171,6 +172,12 @@ export default function OSModal({
             <CorpoCotacao os={os} isDark={isDark} onClose={onClose} />
           ) : os.status === 'aguardando_aprovacao' ? (
             <CorpoAprovacao os={os} isDark={isDark} onClose={onClose} />
+          ) : os.status === 'aprovada' ? (
+            <CorpoProgramacao os={os} veiculo={veiculo} isDark={isDark} onClose={onClose} />
+          ) : os.status === 'em_execucao' ? (
+            <CorpoExecucao os={os} isDark={isDark} onClose={onClose} />
+          ) : os.status === 'concluida' ? (
+            <CorpoLiberado os={os} isDark={isDark} />
           ) : (
             <CorpoResumo os={os} isDark={isDark} />
           )}
@@ -590,10 +597,13 @@ function CorpoAprovacao({ os, isDark, onClose }: {
   const { data: cotacoes = [] } = useCotacoesOS(os.id)
   const aprovar = useAprovarOS()
 
+  const salvarItens = useSalvarItensOS()
   const [modo, setModo] = useState<'ver' | 'ajustar' | 'rejeitar'>('ver')
   const [valorAjuste, setValorAjuste] = useState(os.valor_orcado?.toString() ?? '')
   const [motivo, setMotivo] = useState('')
   const [erro, setErro] = useState<string>()
+  const [detalhando, setDetalhando] = useState(false)
+  const [itensNovos, setItensNovos] = useState<ItemEdit[]>([])
 
   const total = os.valor_orcado ?? itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
   const alc = alcadaDe(total)
@@ -644,9 +654,49 @@ function CorpoAprovacao({ os, isDark, onClose }: {
         </Secao>
       )}
 
-      {/* O que será feito */}
-      <Secao titulo="O que será feito" isDark={isDark}>
-        <ItensOSEditor itens={itensEdit} onChange={() => {}} isDark={isDark} precoHist={precoHist} readOnly />
+      {/* O que será feito — OS antiga pode não ter itens; permite detalhar aqui. */}
+      <Secao titulo="O que será feito" isDark={isDark} acento={itens.length === 0 ? 'alerta' : 'normal'}>
+        {itens.length === 0 && !detalhando ? (
+          <div className="space-y-2">
+            <p className={`text-xs ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
+              Esta OS foi orçada em <span className="font-bold">{BRL(total)}</span> sem detalhamento de
+              peças e mão de obra — aprovar assim é decidir no escuro, e o valor não entra nos indicadores
+              de custo por tipo nem no histórico de preço.
+            </p>
+            <button
+              onClick={() => { setDetalhando(true); setItensNovos([{ tipo: 'peca', descricao: '', quantidade: 1, valor_unitario: total }]) }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-colors ${
+                isDark ? 'border-amber-500/30 text-amber-200 hover:bg-amber-500/10' : 'border-amber-300 text-amber-800 hover:bg-amber-100'
+              }`}
+            >
+              <FileSearch size={12} /> Detalhar os itens agora
+            </button>
+          </div>
+        ) : detalhando ? (
+          <div className="space-y-2">
+            <ItensOSEditor itens={itensNovos} onChange={setItensNovos} isDark={isDark} precoHist={precoHist} />
+            <div className="flex gap-2">
+              <button onClick={() => setDetalhando(false)}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold ${txtMuted}`}>
+                Cancelar
+              </button>
+              <button
+                disabled={salvarItens.isPending}
+                onClick={async () => {
+                  const validos = itensNovos.filter(i => i.descricao.trim() && i.valor_unitario > 0)
+                  if (!validos.length) return setErro('Preencha descrição e valor dos itens.')
+                  await salvarItens.mutateAsync({ osId: os.id, itens: validos, campoValor: 'valor_orcado' })
+                  setDetalhando(false)
+                }}
+                className="flex-1 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-bold disabled:opacity-50"
+              >
+                {salvarItens.isPending ? 'Salvando…' : 'Salvar itens'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <ItensOSEditor itens={itensEdit} onChange={() => {}} isDark={isDark} precoHist={precoHist} readOnly />
+        )}
       </Secao>
 
       {/* Orçamentos concorrentes */}
@@ -741,8 +791,506 @@ function CorpoAprovacao({ os, isDark, onClose }: {
   )
 }
 
-// ── Demais etapas (Programação / Execução / Liberado) ────────────────────────
-// Resumo com os itens estruturados. As ações destas etapas entram na sequência.
+// ── 4 · PROGRAMAÇÃO ──────────────────────────────────────────────────────────
+// Etapa 7 do fluxo oficial: tirar o veículo da operação de forma controlada.
+function CorpoProgramacao({ os, veiculo, isDark, onClose }: {
+  os: FroOrdemServico; veiculo?: FroVeiculo; isDark: boolean; onClose: () => void
+}) {
+  const { data: itens = [] } = useItensOS(os.id)
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa', veiculo_id: os.veiculo_id })
+  const { data: veiculos = [] } = useVeiculos()
+  const programar = useProgramarEntradaOS()
+
+  const alocacao = alocacoes[0]
+  const hoje = new Date().toISOString().slice(0, 10)
+  const [dataEntrada, setDataEntrada] = useState(os.data_programada_entrada || hoje)
+  const [hodometro, setHodometro] = useState(veiculo?.hodometro_atual?.toString() ?? '')
+  const [desalocar, setDesalocar] = useState(true)
+  const [substituto, setSubstituto] = useState('')
+  const [erro, setErro] = useState<string>()
+
+  // Candidatos a substituto: mesma categoria, disponíveis, exceto o próprio.
+  const candidatos = useMemo(
+    () => veiculos.filter(v =>
+      v.id !== os.veiculo_id && v.status === 'disponivel' && v.categoria === veiculo?.categoria),
+    [veiculos, os.veiculo_id, veiculo?.categoria],
+  )
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const inp = `w-full rounded-lg border px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isDark ? 'bg-white/[0.04] border-white/[0.1] text-white' : 'bg-white border-slate-200 text-slate-800'
+  }`
+  const lbl = `block text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`
+
+  async function confirmar() {
+    setErro(undefined)
+    if (!dataEntrada) return setErro('Informe a data de entrada na oficina.')
+    await programar.mutateAsync({
+      osId: os.id,
+      veiculoId: os.veiculo_id,
+      dataEntrada: new Date(dataEntrada + 'T12:00:00').toISOString(),
+      hodometroEntrada: hodometro ? +hodometro : undefined,
+      alocacaoId: desalocar ? alocacao?.id : undefined,
+      substitutoId: substituto || undefined,
+      obraId: alocacao?.obra_id,
+      centroCustoId: alocacao?.centro_custo_id,
+      responsavelNome: alocacao?.responsavel_nome,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="space-y-4">
+      <Secao titulo="Aprovado" isDark={isDark}>
+        <div className="flex items-baseline justify-between mb-2">
+          <span className={`text-xs ${txtMuted}`}>
+            {os.fornecedor?.nome_fantasia ?? os.fornecedor?.razao_social ?? 'Oficina não definida'}
+          </span>
+          <span className={`text-lg font-black ${txt}`}>{BRL(os.valor_aprovado ?? os.valor_orcado ?? 0)}</span>
+        </div>
+        {itens.length > 0 && (
+          <ul className={`text-[11px] space-y-0.5 ${txtMuted}`}>
+            {itens.map(i => (
+              <li key={i.id}>• {i.descricao} — {i.quantidade}× {BRL(i.valor_unitario)}</li>
+            ))}
+          </ul>
+        )}
+      </Secao>
+
+      <Secao titulo="Entrada na oficina" isDark={isDark}>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={lbl}>Data de entrada *</label>
+            <input type="date" value={dataEntrada} onChange={e => setDataEntrada(e.target.value)} className={inp} />
+          </div>
+          <div>
+            <label className={lbl}>Hodômetro de entrada</label>
+            <input type="number" value={hodometro} onChange={e => setHodometro(e.target.value)} className={inp} />
+          </div>
+        </div>
+        <p className={`text-[10px] mt-2 ${txtMuted}`}>
+          A partir daqui conta o tempo de oficina — a espera até aqui fica registrada como espera administrativa.
+        </p>
+      </Secao>
+
+      <Secao titulo="Veículo na obra" isDark={isDark}>
+        {alocacao ? (
+          <div className="space-y-3">
+            <p className={`text-xs ${txt}`}>
+              Alocado em <span className="font-bold">{alocacao.obra?.nome ?? '—'}</span>
+              {alocacao.responsavel_nome && <span className={txtMuted}> · {alocacao.responsavel_nome}</span>}
+            </p>
+            <label className={`flex items-center gap-2 text-xs font-semibold ${txt}`}>
+              <input type="checkbox" checked={desalocar} onChange={e => setDesalocar(e.target.checked)} className="accent-rose-500" />
+              Encerrar a alocação (o veículo sai da obra)
+            </label>
+            {desalocar && (
+              <div>
+                <label className={lbl}>Substituto para a obra (opcional)</label>
+                <select value={substituto} onChange={e => setSubstituto(e.target.value)} className={inp}>
+                  <option value="">Sem substituto</option>
+                  {candidatos.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.codigo_interno || v.placa} — {v.marca} {v.modelo}
+                    </option>
+                  ))}
+                </select>
+                {candidatos.length === 0 && (
+                  <p className={`text-[10px] mt-1 ${txtMuted}`}>
+                    Nenhum veículo disponível da mesma categoria.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className={`text-xs ${txtMuted}`}>Veículo sem alocação ativa — nada a desalocar.</p>
+        )}
+      </Secao>
+
+      <Erro msg={erro} />
+
+      <button
+        onClick={confirmar} disabled={programar.isPending}
+        className="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+      >
+        {programar.isPending ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}
+        Confirmar entrada na oficina
+      </button>
+    </div>
+  )
+}
+
+// ── 5 · EXECUÇÃO ─────────────────────────────────────────────────────────────
+const SUB_STATUS = ['Em serviço', 'Aguardando peça', 'Aguardando NF', 'Pronto p/ retirada']
+
+function CorpoExecucao({ os, isDark, onClose }: {
+  os: FroOrdemServico; isDark: boolean; onClose: () => void
+}) {
+  const { data: itens = [] } = useItensOS(os.id)
+  const { data: precoHist } = useHistoricoPrecoItens()
+  const atualizar = useAtualizarOS()
+  const [liberando, setLiberando] = useState(false)
+
+  const diasOficina = diasDesde(os.data_entrada_oficina)
+  const atrasado = os.data_previsao ? new Date(os.data_previsao) < new Date() : false
+
+  const itensEdit = useMemo<ItemEdit[]>(() => itens.map(i => ({
+    tipo: i.tipo, descricao: i.descricao, quantidade: i.quantidade,
+    valor_unitario: i.valor_unitario,
+    garantia_dias: i.garantia_dias ?? undefined, garantia_km: i.garantia_km ?? undefined,
+  })), [itens])
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+
+  if (liberando) {
+    return <CorpoLiberacao os={os} isDark={isDark} onClose={onClose} onVoltar={() => setLiberando(false)} />
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Contador de oficina */}
+      <div className={`rounded-xl border p-3 ${
+        isDark ? 'bg-violet-500/[0.06] border-violet-500/20' : 'bg-violet-50/60 border-violet-200'
+      }`}>
+        <p className={`text-sm font-bold ${isDark ? 'text-violet-200' : 'text-violet-900'}`}>
+          {diasOficina != null ? `${diasOficina} dias na oficina` : 'Entrada na oficina não registrada'}
+        </p>
+        <p className={`text-[11px] ${isDark ? 'text-violet-300/80' : 'text-violet-700'}`}>
+          {os.fornecedor?.nome_fantasia ?? os.fornecedor?.razao_social ?? 'Oficina não definida'}
+          {os.data_previsao && (
+            <span className={atrasado ? ' text-red-500 font-bold' : ''}>
+              {' · '}previsão {fmtData(os.data_previsao)}{atrasado && ' (atrasado)'}
+            </span>
+          )}
+        </p>
+      </div>
+
+      {/* Sub-status — campo já lido pelo Painel de Disponibilidade */}
+      <Secao titulo="Situação na oficina" isDark={isDark}>
+        <div className="flex flex-wrap gap-1.5">
+          {SUB_STATUS.map(s => {
+            const ativo = os.status_detalhe === s
+            return (
+              <button
+                key={s}
+                onClick={() => atualizar.mutate({ id: os.id, status_detalhe: ativo ? undefined : s })}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                  ativo
+                    ? 'bg-rose-500 text-white'
+                    : isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {s}
+              </button>
+            )
+          })}
+        </div>
+        {os.status_detalhe && !SUB_STATUS.includes(os.status_detalhe) && (
+          <p className={`text-[11px] mt-2 ${txtMuted}`}>Atual: {os.status_detalhe}</p>
+        )}
+      </Secao>
+
+      {itens.length > 0 && (
+        <Secao titulo="Serviço aprovado" isDark={isDark}>
+          <ItensOSEditor itens={itensEdit} onChange={() => {}} isDark={isDark} precoHist={precoHist} readOnly />
+        </Secao>
+      )}
+
+      <Secao titulo="Problema" isDark={isDark}>
+        <p className={`text-xs whitespace-pre-wrap ${txt}`}>{os.descricao_problema}</p>
+      </Secao>
+
+      <button
+        onClick={() => setLiberando(true)}
+        className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors"
+      >
+        <Check size={14} /> Concluir e Liberar veículo
+      </button>
+    </div>
+  )
+}
+
+// ── 6 · LIBERAÇÃO (fechamento) ───────────────────────────────────────────────
+// Checklist pós-manutenção é BLOQUEANTE: "veículo não liberado sem checklist
+// pós-manutenção assinado" (ORG-PRO-001).
+function CorpoLiberacao({ os, isDark, onClose, onVoltar }: {
+  os: FroOrdemServico; isDark: boolean; onClose: () => void; onVoltar: () => void
+}) {
+  const { data: itens = [] } = useItensOS(os.id)
+  const { data: precoHist } = useHistoricoPrecoItens()
+  const { data: checklists = [] } = useChecklists({ veiculo_id: os.veiculo_id, tipo: 'pos_manutencao', limit: 10 })
+  const { data: obras = [] } = useAlocacoes({ status: 'ativa' })
+  const salvarItens = useSalvarItensOS()
+  const liberar = useLiberarOS()
+  const upload = useUploadFotoOS()
+
+  const [itensReais, setItensReais] = useState<ItemEdit[]>([])
+  const [hodometro, setHodometro] = useState(os.hodometro_saida?.toString() ?? '')
+  const [servico, setServico] = useState(os.descricao_servico ?? '')
+  const [foto, setFoto] = useState(os.foto_depois_url)
+  const [destino, setDestino] = useState<'patio' | 'obra'>('patio')
+  const [obraId, setObraId] = useState('')
+  const [erro, setErro] = useState<string>()
+
+  useEffect(() => {
+    if (itens.length) {
+      setItensReais(itens.map(i => ({
+        tipo: i.tipo, descricao: i.descricao, quantidade: i.quantidade,
+        valor_unitario: i.valor_unitario,
+        garantia_dias: i.garantia_dias ?? undefined, garantia_km: i.garantia_km ?? undefined,
+      })))
+    }
+  }, [itens])
+
+  // Checklist pós-manutenção posterior à entrada na oficina.
+  const checklistOk = useMemo(() => {
+    const ref = os.data_entrada_oficina ? new Date(os.data_entrada_oficina).getTime() : 0
+    return checklists.some(c => new Date(c.data_checklist).getTime() >= ref)
+  }, [checklists, os.data_entrada_oficina])
+
+  const total = itensReais.reduce((s, i) => s + (i.quantidade || 0) * (i.valor_unitario || 0), 0)
+  const aprovado = os.valor_aprovado ?? os.valor_orcado ?? 0
+  const desvio = aprovado > 0 ? (total - aprovado) / aprovado : null
+
+  const obrasUnicas = useMemo(() => {
+    const m = new Map<string, string>()
+    obras.forEach(a => { if (a.obra_id && a.obra?.nome) m.set(a.obra_id, a.obra.nome) })
+    return [...m].map(([id, nome]) => ({ id, nome }))
+  }, [obras])
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const inp = `w-full rounded-lg border px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isDark ? 'bg-white/[0.04] border-white/[0.1] text-white' : 'bg-white border-slate-200 text-slate-800'
+  }`
+  const lbl = `block text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`
+
+  async function confirmar() {
+    setErro(undefined)
+    const validos = itensReais.filter(i => i.descricao.trim() && i.valor_unitario > 0)
+    if (!validos.length) return setErro('Confirme os itens realizados.')
+    if (!checklistOk) return setErro('Checklist pós-manutenção é obrigatório para liberar o veículo.')
+    if (destino === 'obra' && !obraId) return setErro('Escolha a obra de destino.')
+
+    await salvarItens.mutateAsync({ osId: os.id, itens: validos })
+    await liberar.mutateAsync({
+      osId: os.id,
+      veiculoId: os.veiculo_id,
+      valorFinal: total,
+      hodometroSaida: hodometro ? +hodometro : undefined,
+      descricaoServico: servico.trim() || undefined,
+      checklistOk: true,
+      realocar: destino === 'obra' ? { obraId } : undefined,
+    })
+    onClose()
+  }
+
+  const salvando = salvarItens.isPending || liberar.isPending
+
+  return (
+    <div className="space-y-4">
+      <button onClick={onVoltar} className={`text-[11px] font-semibold ${txtMuted} hover:underline`}>
+        ← voltar ao acompanhamento
+      </button>
+
+      <Secao titulo="① Itens realizados" isDark={isDark}>
+        <ItensOSEditor itens={itensReais} onChange={setItensReais} isDark={isDark} precoHist={precoHist} />
+        <div className={`flex items-center justify-between mt-2 pt-2 border-t text-[11px] ${
+          isDark ? 'border-white/[0.06]' : 'border-slate-200'
+        }`}>
+          <span className={txtMuted}>Aprovado {BRL(aprovado)} → Real {BRL(total)}</span>
+          {desvio != null && Math.abs(desvio) > 0.001 && (
+            <span className={`font-bold ${desvio > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              {desvio > 0 ? '+' : ''}{Math.round(desvio * 100)}%
+            </span>
+          )}
+        </div>
+      </Secao>
+
+      <Secao titulo="② Evidências" isDark={isDark}>
+        <div className="space-y-3">
+          <div>
+            <label className={lbl}>Serviço executado</label>
+            <textarea rows={2} value={servico} onChange={e => setServico(e.target.value)}
+              className={`${inp} resize-none`} placeholder="O que a oficina fez..." />
+          </div>
+          <div>
+            <label className={lbl}>Hodômetro de saída</label>
+            <input type="number" value={hodometro} onChange={e => setHodometro(e.target.value)}
+              className={`${inp} max-w-[160px]`} />
+          </div>
+          {foto ? (
+            <a href={foto} target="_blank" rel="noopener noreferrer"
+              className="text-xs font-semibold text-rose-500 hover:underline inline-flex items-center gap-1">
+              <Camera size={13} /> Ver foto do serviço
+            </a>
+          ) : (
+            <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-xs font-semibold ${
+              isDark ? 'border-white/[0.1] text-slate-300' : 'border-slate-200 text-slate-600'
+            }`}>
+              {upload.isPending ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+              Anexar foto do serviço
+              <input type="file" accept="image/*" className="hidden"
+                onChange={async e => {
+                  const f = e.target.files?.[0]
+                  if (f) setFoto(await upload.mutateAsync({ osId: os.id, file: f, campo: 'foto_depois_url' }))
+                }} />
+            </label>
+          )}
+        </div>
+      </Secao>
+
+      {/* Checklist bloqueante */}
+      <div className={`rounded-xl border p-4 ${
+        checklistOk
+          ? isDark ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50/60 border-emerald-200'
+          : isDark ? 'bg-red-500/[0.06] border-red-500/20' : 'bg-red-50/60 border-red-200'
+      }`}>
+        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
+          checklistOk ? (isDark ? 'text-emerald-300' : 'text-emerald-700') : (isDark ? 'text-red-300' : 'text-red-700')
+        }`}>
+          ③ Checklist pós-manutenção
+        </p>
+        <p className={`text-xs font-semibold ${checklistOk ? txt : isDark ? 'text-red-200' : 'text-red-800'}`}>
+          {checklistOk
+            ? '✓ Checklist registrado após a entrada na oficina'
+            : 'Sem checklist pós-manutenção — o veículo não pode ser liberado'}
+        </p>
+        {!checklistOk && (
+          <p className={`text-[10px] mt-1 ${isDark ? 'text-red-300/80' : 'text-red-600'}`}>
+            Faça o checklist na aba Checklists (tipo pós-manutenção) e volte aqui. Regra do fluxo ORG-PRO-001.
+          </p>
+        )}
+      </div>
+
+      <Secao titulo="④ Destino do veículo" isDark={isDark}>
+        <div className="space-y-2">
+          <label className={`flex items-center gap-2 text-xs font-semibold ${txt}`}>
+            <input type="radio" checked={destino === 'patio'} onChange={() => setDestino('patio')} className="accent-rose-500" />
+            Deixar disponível no pátio
+          </label>
+          <label className={`flex items-center gap-2 text-xs font-semibold ${txt}`}>
+            <input type="radio" checked={destino === 'obra'} onChange={() => setDestino('obra')} className="accent-rose-500" />
+            Realocar para obra
+          </label>
+          {destino === 'obra' && (
+            <select value={obraId} onChange={e => setObraId(e.target.value)} className={inp}>
+              <option value="">Selecione a obra...</option>
+              {obrasUnicas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+            </select>
+          )}
+        </div>
+      </Secao>
+
+      <Erro msg={erro} />
+
+      <button
+        onClick={confirmar} disabled={salvando || !checklistOk}
+        title={!checklistOk ? 'Checklist pós-manutenção obrigatório' : undefined}
+        className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        {salvando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+        Liberar veículo · {BRL(total)}
+      </button>
+    </div>
+  )
+}
+
+// ── Liberado (já concluída) ──────────────────────────────────────────────────
+function CorpoLiberado({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
+  const { data: itens = [] } = useItensOS(os.id)
+  const { data: precoHist } = useHistoricoPrecoItens()
+
+  const itensEdit = useMemo<ItemEdit[]>(() => itens.map(i => ({
+    tipo: i.tipo, descricao: i.descricao, quantidade: i.quantidade,
+    valor_unitario: i.valor_unitario,
+    garantia_dias: i.garantia_dias ?? undefined, garantia_km: i.garantia_km ?? undefined,
+  })), [itens])
+
+  const esperaAdm = os.aprovado_em && os.data_entrada_oficina
+    ? Math.max(0, Math.floor((new Date(os.data_entrada_oficina).getTime() - new Date(os.aprovado_em).getTime()) / 86_400_000))
+    : null
+  const naOficina = os.data_entrada_oficina && os.data_conclusao
+    ? Math.max(0, Math.floor((new Date(os.data_conclusao).getTime() - new Date(os.data_entrada_oficina).getTime()) / 86_400_000))
+    : null
+  const totalParado = diasDesde(os.data_abertura) != null && os.data_conclusao
+    ? Math.floor((new Date(os.data_conclusao).getTime() - new Date(os.data_abertura).getTime()) / 86_400_000)
+    : null
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+
+  return (
+    <div className="space-y-4">
+      <Secao titulo="Serviço executado" isDark={isDark}>
+        <p className={`text-xs whitespace-pre-wrap ${txt}`}>
+          {os.descricao_servico || os.descricao_problema}
+        </p>
+        <div className="flex gap-3 mt-2">
+          {os.foto_antes_url && (
+            <a href={os.foto_antes_url} target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-semibold text-rose-500 hover:underline inline-flex items-center gap-1">
+              <Camera size={11} /> Antes
+            </a>
+          )}
+          {os.foto_depois_url && (
+            <a href={os.foto_depois_url} target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-semibold text-rose-500 hover:underline inline-flex items-center gap-1">
+              <Camera size={11} /> Depois
+            </a>
+          )}
+          {!os.checklist_saida_ok && (
+            <span className="text-[11px] font-bold text-amber-500 inline-flex items-center gap-1">
+              <TriangleAlert size={11} /> Liberado sem checklist
+            </span>
+          )}
+        </div>
+      </Secao>
+
+      {itens.length > 0 && (
+        <Secao titulo="Itens trocados" isDark={isDark}>
+          <ItensOSEditor itens={itensEdit} onChange={() => {}} isDark={isDark} precoHist={precoHist} readOnly />
+        </Secao>
+      )}
+
+      {/* Decomposição do tempo parado — onde o veículo perdeu dias */}
+      <Secao titulo="Tempo parado" isDark={isDark}>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          {([
+            ['Espera adm.', esperaAdm],
+            ['Na oficina', naOficina],
+            ['Total', totalParado],
+          ] as [string, number | null][]).map(([l, v]) => (
+            <div key={l}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{l}</p>
+              <p className={`text-sm font-black ${txt}`}>{v != null ? `${v}d` : '—'}</p>
+            </div>
+          ))}
+        </div>
+      </Secao>
+
+      <Secao titulo="Valores" isDark={isDark}>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          {([
+            ['Orçado', os.valor_orcado],
+            ['Aprovado', os.valor_aprovado],
+            ['Realizado', os.valor_final],
+          ] as [string, number | undefined][]).map(([l, v]) => (
+            <div key={l}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{l}</p>
+              <p className={`text-sm font-black ${txt}`}>{v != null ? BRL(v) : '—'}</p>
+            </div>
+          ))}
+        </div>
+      </Secao>
+    </div>
+  )
+}
+
+// ── Fallback (rejeitada / cancelada) ─────────────────────────────────────────
 function CorpoResumo({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
   const { data: itens = [] } = useItensOS(os.id)
   const { data: precoHist } = useHistoricoPrecoItens()
