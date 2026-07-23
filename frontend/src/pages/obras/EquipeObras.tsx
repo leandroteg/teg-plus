@@ -1040,7 +1040,7 @@ function ProgramacaoView({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-          <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas · clique numa pessoa p/ editar · arraste p/ outra obra (início = hoje)
+          <CalendarRange size={12} /> {rows.length} alocação(ões) · {weeks.length} semanas
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select value={projFiltro} onChange={e => { setProjFiltro(e.target.value); setObraFiltro('todas') }} className={selCls}>
