@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2, Users, Truck, ClipboardList, Check, Save, ChevronDown, ChevronRight, Plus, AlertTriangle } from 'lucide-react'
+import { X, Loader2, Users, Truck, ClipboardList, Check, Save, ChevronDown, ChevronRight, Plus, AlertTriangle, Camera } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useCatalogoAtividades, coresDoCatalogo } from './catalogoAtividades'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -48,7 +48,7 @@ const NATUREZAS = [
   { v: 'ocorrencia', l: 'Ocorrência' },
   { v: 'improdutividade', l: 'Improdutividade' },
 ] as const
-interface EventoRDO { natureza: string; tipo: string; horas: string; descricao: string }
+interface EventoRDO { natureza: string; tipo: string; horas: string; descricao: string; fotos: File[] }
 
 // valores aceitos pelo CHECK de obr_rdo.condicao_climatica — não inventar outros
 const CLIMAS = [
@@ -220,17 +220,20 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   // equipe/recursos marcados (pré-preenchidos pela alocação)
   const [equipe, setEquipe] = useState<Record<string, { nome: string; funcao: string | null; presente: boolean }>>({})
   const [recursos, setRecursos] = useState<Record<string, { descricao: string; operando: boolean }>>({})
+  const [fotosAtiv, setFotosAtiv] = useState<Record<string, File[]>>({})
   const [addColab, setAddColab] = useState('')
   const [addVeic, setAddVeic] = useState('')
 
+  // trocou de obra → zera tudo que é da obra (senão fica a equipe/recurso da anterior)
   useEffect(() => {
-    if (!equipeAloc.length) return
-    setEquipe(prev => Object.keys(prev).length ? prev : Object.fromEntries(
+    setEquipe({}); setRecursos({}); setAvancos({}); setFotosAtiv({}); setTstSel([]); setAbertas(new Set())
+  }, [obraId])
+  useEffect(() => {
+    setEquipe(Object.fromEntries(
       equipeAloc.filter(e => e.colaborador_id).map(e => [e.colaborador_id!, { nome: e.nome, funcao: e.funcao, presente: true }])))
   }, [equipeAloc])
   useEffect(() => {
-    if (!recursosAloc.length) return
-    setRecursos(prev => Object.keys(prev).length ? prev : Object.fromEntries(
+    setRecursos(Object.fromEntries(
       recursosAloc.map(r => [r.veiculo_id, { descricao: r.descricao, operando: true }])))
   }, [recursosAloc])
 
@@ -279,14 +282,48 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
       }
 
       // 2b) eventos padronizados (impeditivo / ocorrência / improdutividade)
+      const fotosRows: Record<string, unknown>[] = []
+      const subirFoto = async (f: File, sufixo: string) => {
+        const ext = f.name.split('.').pop() || 'jpg'
+        const path = `${obraId}/${rdoId}/${sufixo}-${Math.round(performance.now())}-${f.name.replace(/[^\w.-]/g, '_')}.${ext === f.name ? 'jpg' : ext}`
+        const { error } = await supabase.storage.from('obr-rdo-fotos').upload(path, f, { upsert: true })
+        if (error) throw error
+        return { path, url: supabase.storage.from('obr-rdo-fotos').getPublicUrl(path).data.publicUrl }
+      }
+
       if (eventos.length) {
-        const { error: eE } = await supabase.from('obr_rdo_eventos').insert(eventos.map(ev => ({
+        const { data: evIns, error: eE } = await supabase.from('obr_rdo_eventos').insert(eventos.map(ev => ({
           rdo_id: rdoId, obra_id: obraId, data,
           natureza: ev.natureza, tipo: ev.tipo,
           horas_perdidas: Number(ev.horas) || 0, descricao: ev.descricao || null,
           criado_por_nome: perfil?.nome ?? null,
-        })))
+        }))).select('id')
         if (eE) throw eE
+        // fotos de cada evento (mesma ordem do insert)
+        for (let i = 0; i < eventos.length; i++) {
+          for (const f of eventos[i].fotos) {
+            const up = await subirFoto(f, `evento-${i}`)
+            fotosRows.push({
+              rdo_id: rdoId, obra_id: obraId, data, escopo: 'evento',
+              evento_id: (evIns ?? [])[i]?.id ?? null, ...up, criado_por_nome: perfil?.nome ?? null,
+            })
+          }
+        }
+      }
+
+      // fotos por atividade
+      for (const [atv, arq] of Object.entries(fotosAtiv)) {
+        for (const f of arq) {
+          const up = await subirFoto(f, `ativ-${atv.slice(0, 12).replace(/[^\w]/g, '')}`)
+          fotosRows.push({
+            rdo_id: rdoId, obra_id: obraId, data, escopo: 'atividade',
+            atividade: atv, ...up, criado_por_nome: perfil?.nome ?? null,
+          })
+        }
+      }
+      if (fotosRows.length) {
+        const { error: eF } = await supabase.from('obr_rdo_fotos').insert(fotosRows)
+        if (eF) throw eF
       }
 
       // 3) equipe e recursos
@@ -301,6 +338,28 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
       onClose()
     },
   })
+
+  // botão de câmera reutilizado nos eventos e nas atividades
+  const BotaoFoto = ({ arquivos, onAdd, onDel, titulo }: {
+    arquivos: File[]; onAdd: (fs: File[]) => void; onDel: (i: number) => void; titulo: string
+  }) => (
+    <span className="inline-flex items-center gap-1">
+      <label title={titulo}
+        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-lg cursor-pointer text-[10px] font-bold ${arquivos.length
+          ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-50 text-sky-700')
+          : (isDark ? 'text-slate-500 hover:bg-white/[0.06]' : 'text-slate-400 hover:bg-slate-100')}`}>
+        <Camera size={13} />{arquivos.length > 0 && arquivos.length}
+        <input type="file" accept="image/*" multiple capture="environment" className="hidden"
+          onChange={e => { onAdd([...(e.target.files ?? [])]); e.currentTarget.value = '' }} />
+      </label>
+      {arquivos.map((f, i) => (
+        <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] max-w-[110px] ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+          <span className="truncate">{f.name}</span>
+          <button onClick={() => onDel(i)} className="hover:text-rose-500 shrink-0"><X size={9} /></button>
+        </span>
+      ))}
+    </span>
+  )
 
   const card = isDark ? 'bg-white/[0.03] border-white/[0.08]' : 'bg-slate-50 border-slate-200'
   const inp = `rounded-lg border px-2 py-1.5 text-xs ${isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`
@@ -430,7 +489,14 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                       </tr>,
                       ...(abertas.has(g.secao) ? g.atividades : []).map(atv => (
                       <tr key={g.secao + atv} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}>
-                        <td className={`sticky left-0 z-10 px-2 py-1 pl-6 text-[11px] whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-white text-slate-600'}`}>{atv}</td>
+                        <td className={`sticky left-0 z-10 px-2 py-1 pl-6 text-[11px] whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-white text-slate-600'}`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            {atv}
+                            <BotaoFoto arquivos={fotosAtiv[atv] ?? []} titulo={`fotos de ${atv}`}
+                              onAdd={fs => setFotosAtiv(p => ({ ...p, [atv]: [...(p[atv] ?? []), ...fs] }))}
+                              onDel={k => setFotosAtiv(p => ({ ...p, [atv]: (p[atv] ?? []).filter((_, z) => z !== k) }))} />
+                          </span>
+                        </td>
                         {estruturas.map(e => {
                           const k = `${e.id}|${atv}`
                           const hoje = avancos[k]
@@ -531,7 +597,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
               <AlertTriangle size={13} className="text-amber-500" />
               <span className={`text-[11px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Ocorrências e impeditivos</span>
               <span className="text-[10px] text-slate-400">tipo padronizado — permite filtrar eventos por obra</span>
-              <button onClick={() => setEventos(l => [...l, { natureza: 'impeditivo', tipo: 'clima_chuva', horas: '', descricao: '' }])}
+              <button onClick={() => setEventos(l => [...l, { natureza: 'impeditivo', tipo: 'clima_chuva', horas: '', descricao: '', fotos: [] }])}
                 className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white">
                 <Plus size={12} /> Adicionar
               </button>
@@ -558,6 +624,9 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                       placeholder="hs" className={`${inp} w-14`} />
                     <input value={ev.descricao} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, descricao: e.target.value } : x))}
                       placeholder="detalhe (opcional)" className={`${inp} flex-1 min-w-[160px]`} />
+                    <BotaoFoto arquivos={ev.fotos} titulo="fotos desta ocorrência"
+                      onAdd={fs => setEventos(l => l.map((x, j) => j === i ? { ...x, fotos: [...x.fotos, ...fs] } : x))}
+                      onDel={k => setEventos(l => l.map((x, j) => j === i ? { ...x, fotos: x.fotos.filter((_, z) => z !== k) } : x))} />
                     <button onClick={() => setEventos(l => l.filter((_, j) => j !== i))} className="text-slate-400 hover:text-rose-500"><X size={13} /></button>
                   </div>
                 ))}
