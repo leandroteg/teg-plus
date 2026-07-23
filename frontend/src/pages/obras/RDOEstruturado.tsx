@@ -8,21 +8,48 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2, Users, Truck, ClipboardList, Check, Save } from 'lucide-react'
+import { X, Loader2, Users, Truck, ClipboardList, Check, Save, ChevronDown, ChevronRight, Plus, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../services/supabase'
+import { useCatalogoAtividades, coresDoCatalogo } from './catalogoAtividades'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 
-// mesmo catálogo do Planejamento Técnico
-export const CATALOGO_RDO: { secao: string; atividades: string[] }[] = [
-  { secao: 'Preliminar Fundação', atividades: ['CONFERÊNCIA TOPOGRÁFICA', 'LOCAÇÃO DE CAVAS', 'ABERTURA E IDENTIFICAÇÃO DE ACESSO'] },
-  { secao: 'Fundação', atividades: ['ARMAÇÃO/MONTAGEM DE FERRAGENS', 'ESCAVAÇÃO DE CAVAS', 'NIVELAMENTO DE STUBS E FORMAS', 'CONCRETAGEM DE FUNDAÇÃO', 'RETIRADA DE FORMAS'] },
-  { secao: 'Aterramento', atividades: ['INSTALAÇÃO DE FIO CONTRAPESO', 'MEDIÇÃO DE RESISTÊNCIA'] },
-  { secao: 'Montagem', atividades: ['CONFERÊNCIA DE POSIÇÕES', 'TRANSPORTE DE FERRAGENS PARA O CAMPO', 'PRÉ-MONTAGEM DE ESTRUTURAS', 'MONTAGEM DE ESTRUTURAS', 'REVISÃO DE ESTRUTURAS'] },
-  { secao: 'Lançamento', atividades: ['ABERTURA DE FAIXA DE SERVIDÃO', 'PREPARAÇÃO CONDUTOR', 'LANÇAMENTO DE CABOS CONDUTORES', 'NIVELAMENTO DE CABOS CONDUTOR', 'GRAMPEAÇÃO E ENCABEÇAMENTO DE CONDUTOR', 'REVISÃO FINAL DE CABO CONDUTOR', 'PREPARAÇÃO DE CABO PARA-RAIO', 'LANÇAMENTO DE CABO PARA-RAIO', 'NIVELAMENTO DE CABO PARA-RAIO', 'GRAMPEAÇÃO E ENCABEÇAMENTO DE PARA-RAIO', 'REVISÃO FINAL DE CABO PARA-RAIO', 'INSTALAÇÃO DE SINALIZAÇÃO AÉREA'] },
-  { secao: 'Acabamento', atividades: ['SECCIONAMENTO E ATERRAMENTO DE CERCAS', 'PINTURA, NUMERAÇÃO, ETC', 'ACABAMENTO FINAL DE SOLO - PRAD'] },
-  { secao: 'Outros', atividades: ['COMISSIONAMENTO FINAL', 'ENERGIZAÇÃO'] },
+// Catálogo padronizado de eventos do RDO → permite filtrar/contar por obra.
+// O texto livre continua existindo, como complemento da descrição.
+export const EVENTO_TIPOS: { grupo: string; itens: { v: string; l: string }[] }[] = [
+  { grupo: 'Clima', itens: [
+    { v: 'clima_chuva', l: 'Chuva' }, { v: 'clima_solo', l: 'Solo encharcado' },
+    { v: 'clima_vento', l: 'Vento forte' }, { v: 'clima_descarga', l: 'Descarga atmosférica' } ] },
+  { grupo: 'Fundiário / acesso', itens: [
+    { v: 'fund_proprietario', l: 'Proprietário não autoriza' }, { v: 'fund_acesso', l: 'Acesso interditado' },
+    { v: 'fund_faixa', l: 'Faixa não liberada' }, { v: 'fund_benfeitoria', l: 'Benfeitoria a indenizar' } ] },
+  { grupo: 'Material', itens: [
+    { v: 'mat_falta', l: 'Falta de material' }, { v: 'mat_avaria', l: 'Material avariado' },
+    { v: 'mat_fornecedor', l: 'Atraso do fornecedor' } ] },
+  { grupo: 'Equipamento', itens: [
+    { v: 'eqp_quebra', l: 'Quebra' }, { v: 'eqp_manutencao', l: 'Manutenção' },
+    { v: 'eqp_indisponivel', l: 'Indisponível' } ] },
+  { grupo: 'Equipe', itens: [
+    { v: 'eqe_efetivo', l: 'Efetivo insuficiente' }, { v: 'eqe_lideranca', l: 'Falta de encarregado' },
+    { v: 'eqe_documento', l: 'Treinamento/ASO vencido' } ] },
+  { grupo: 'Cliente / CEMIG', itens: [
+    { v: 'cli_desligamento', l: 'Desligamento não liberado' }, { v: 'cli_projeto', l: 'Projeto em revisão' },
+    { v: 'cli_fiscal', l: 'Aguardando fiscal' } ] },
+  { grupo: 'QSMA', itens: [
+    { v: 'qsma_interdicao', l: 'Interdição QSMA' }, { v: 'qsma_incidente', l: 'Incidente' },
+    { v: 'qsma_licenca', l: 'Licença/condicionante' } ] },
+  { grupo: 'Outros', itens: [{ v: 'outro', l: 'Outro' }] },
 ]
+export const EVENTO_LABEL: Record<string, string> =
+  Object.fromEntries(EVENTO_TIPOS.flatMap(g => g.itens.map(i => [i.v, `${g.grupo} · ${i.l}`])))
+
+const NATUREZAS = [
+  { v: 'impeditivo', l: 'Impeditivo' },
+  { v: 'ocorrencia', l: 'Ocorrência' },
+  { v: 'improdutividade', l: 'Improdutividade' },
+] as const
+interface EventoRDO { natureza: string; tipo: string; horas: string; descricao: string }
+
 // valores aceitos pelo CHECK de obr_rdo.condicao_climatica — não inventar outros
 const CLIMAS = [
   { v: 'sol', l: 'Sol' },
@@ -79,6 +106,20 @@ function useColaboradoresAtivos() {
     staleTime: 5 * 60_000,
   })
 }
+// TSTs do headcount (RH) — cargo de segurança do trabalho
+function useTSTs() {
+  return useQuery<{ id: string; nome: string; cargo: string | null }[]>({
+    queryKey: ['rdo-tsts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('rh_colaboradores')
+        .select('id, nome, cargo').eq('ativo', true)
+        .or('cargo.ilike.%SEGURAN%,cargo.ilike.%TST%').order('nome')
+      return (data ?? []) as { id: string; nome: string; cargo: string | null }[]
+    },
+    staleTime: 10 * 60_000,
+  })
+}
+
 function useVeiculosAtivos() {
   return useQuery<{ id: string; descricao: string }[]>({
     queryKey: ['rdo-veiculos-ativos'],
@@ -119,14 +160,17 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   const [data, setData] = useState(new Date().toISOString().slice(0, 10))
   const [clima, setClima] = useState<typeof CLIMAS[number]['v']>('sol')
   const [resumo, setResumo] = useState('')
-  const [ocorrencias, setOcorrencias] = useState('')
   const [horasImp, setHorasImp] = useState('0')
   const [motivoImp, setMotivoImp] = useState('')
   // cabeçalho do padrão "Modelo RDOs" (CEMIG)
-  const [fiscal, setFiscal] = useState('')
-  const [tst, setTst] = useState('')
-  const [impeditivos, setImpeditivos] = useState('')
+  const [fiscais, setFiscais] = useState<string[]>([])
+  const [addFiscal, setAddFiscal] = useState('')
+  const [tstSel, setTstSel] = useState<{ id: string; nome: string }[]>([])
+  const [eventos, setEventos] = useState<EventoRDO[]>([])
   const [notas, setNotas] = useState('')
+  // seções (frentes) da matriz de avanço — começam FECHADAS
+  const [abertas, setAbertas] = useState<Set<string>>(new Set())
+  const togSecao = (k: string) => setAbertas(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const [aba, setAba] = useState<'avanco' | 'equipe' | 'recursos'>('avanco')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -158,6 +202,18 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   const { data: recursosAloc = [] } = useRecursosDaObra(obraId)
   const { data: colabs = [] } = useColaboradoresAtivos()
   const { data: veiculos = [] } = useVeiculosAtivos()
+  const { data: tsts = [] } = useTSTs()
+  const { data: CATALOGO_RDO = [] } = useCatalogoAtividades(obraId)
+  const SECAO_COR_RDO = useMemo(() => coresDoCatalogo(CATALOGO_RDO), [CATALOGO_RDO])
+
+  // TST já alocado nesta obra vem marcado sozinho
+  useEffect(() => {
+    if (!tsts.length || !equipeAloc.length) return
+    const ids = new Set(tsts.map(t => t.id))
+    const naObra = equipeAloc.filter(e => e.colaborador_id && ids.has(e.colaborador_id))
+      .map(e => ({ id: e.colaborador_id!, nome: e.nome }))
+    if (naObra.length) setTstSel(prev => prev.length ? prev : naObra)
+  }, [tsts, equipeAloc])
 
   // avanços informados hoje: chave estrutura|atividade → 0..1
   const [avancos, setAvancos] = useState<Record<string, number>>({})
@@ -190,11 +246,17 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
         obra_id: obraId, data, condicao_climatica: clima,
         efetivo_proprio: nEquipe, efetivo_terceiro: 0,
         equipamentos_operando: nRec, equipamentos_parados: Object.values(recursos).filter(r => !r.operando).length,
-        resumo_atividades: resumo || null, ocorrencias: ocorrencias || null,
+        resumo_atividades: resumo || null,
+        ocorrencias: eventos.filter(e => e.natureza === 'ocorrencia')
+          .map(e => [EVENTO_LABEL[e.tipo], e.descricao].filter(Boolean).join(': ')).join(' | ') || null,
         horas_improdutivas: Number(horasImp) || 0, motivo_improdutividade: motivoImp || null,
         preenchido_por_nome: perfil?.nome ?? null, preenchido_em: new Date().toISOString(),
-        fiscal_cemig: fiscal || null, tst_nome: tst || null,
-        impeditivos: impeditivos || null, notas: notas || null,
+        fiscal_cemig: fiscais.join(' · ') || null, fiscais_cemig: fiscais,
+        tst_nome: tstSel.map(t => t.nome).join(' · ') || null,
+        tst_ids: tstSel.map(t => t.id), tst_nomes: tstSel.map(t => t.nome),
+        impeditivos: eventos.filter(e => e.natureza === 'impeditivo')
+          .map(e => [EVENTO_LABEL[e.tipo], e.descricao].filter(Boolean).join(': ')).join(' | ') || null,
+        notas: notas || null,
         status: 'rascunho',
       }).select('id').single()
       if (e1 || !rdo) throw e1 ?? new Error('Falha ao criar o RDO')
@@ -214,6 +276,17 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             data, avanco: l.avanco, responsavel_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
           })), { onConflict: 'estrutura_id,atividade' })
         if (e3) throw e3
+      }
+
+      // 2b) eventos padronizados (impeditivo / ocorrência / improdutividade)
+      if (eventos.length) {
+        const { error: eE } = await supabase.from('obr_rdo_eventos').insert(eventos.map(ev => ({
+          rdo_id: rdoId, obra_id: obraId, data,
+          natureza: ev.natureza, tipo: ev.tipo,
+          horas_perdidas: Number(ev.horas) || 0, descricao: ev.descricao || null,
+          criado_por_nome: perfil?.nome ?? null,
+        })))
+        if (eE) throw eE
       }
 
       // 3) equipe e recursos
@@ -284,10 +357,34 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             <input value={horasImp} onChange={e => setHorasImp(e.target.value)} className={`${inp} w-24`} /></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 flex-1 min-w-[180px]">MOTIVO
             <input value={motivoImp} onChange={e => setMotivoImp(e.target.value)} placeholder="chuva, aguardando liberação…" className={inp} /></label>
-          <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[150px]">FISCAL CEMIG
-            <input value={fiscal} onChange={e => setFiscal(e.target.value)} placeholder="nome do fiscal" className={inp} /></label>
-          <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[150px]">TST ALOCADO
-            <input value={tst} onChange={e => setTst(e.target.value)} placeholder="téc. segurança" className={inp} /></label>
+          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[190px]">FISCAL CEMIG
+            <div className="flex items-center gap-1 flex-wrap">
+              {fiscais.map(n => (
+                <span key={n} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-white/[0.08] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
+                  {n}<button onClick={() => setFiscais(f => f.filter(x => x !== n))} className="hover:text-rose-500"><X size={10} /></button>
+                </span>
+              ))}
+              <input value={addFiscal} onChange={e => setAddFiscal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && addFiscal.trim()) { setFiscais(f => [...new Set([...f, addFiscal.trim()])]); setAddFiscal('') } }}
+                placeholder="nome + Enter" className={`${inp} w-32`} />
+            </div>
+          </div>
+          <div className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 min-w-[200px]">TST ALOCADO
+            <div className="flex items-center gap-1 flex-wrap">
+              {tstSel.map(t => (
+                <span key={t.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+                  {t.nome.trim().split(' ')[0]}<button onClick={() => setTstSel(l => l.filter(x => x.id !== t.id))} className="hover:text-rose-500"><X size={10} /></button>
+                </span>
+              ))}
+              <select value="" onChange={e => {
+                const t = tsts.find(x => x.id === e.target.value)
+                if (t) setTstSel(l => l.some(x => x.id === t.id) ? l : [...l, { id: t.id, nome: t.nome }])
+              }} className={`${inp} w-36`}>
+                <option value="">+ técnico…</option>
+                {tsts.filter(t => !tstSel.some(x => x.id === t.id)).map(t => <option key={t.id} value={t.id}>{t.nome.trim()}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="flex items-center gap-1.5">
             {tab('avanco', 'Avanço', <ClipboardList size={13} />, nAv)}
             {tab('equipe', 'Equipe', <Users size={13} />, nEquipe)}
@@ -317,9 +414,23 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                     </tr>
                   </thead>
                   <tbody>
-                    {CATALOGO_RDO.map(g => g.atividades.map(atv => (
+                    {CATALOGO_RDO.map(g => [
+                      // cabeçalho da FRENTE — clique abre/fecha
+                      <tr key={g.secao} className={isDark ? 'border-t border-white/[0.08]' : 'border-t border-slate-200'}>
+                        <td colSpan={estruturas.length + 1} className="p-0">
+                          <button onClick={() => togSecao(g.secao)}
+                            className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left ${isDark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                            {abertas.has(g.secao) ? <ChevronDown size={13} className="text-slate-400" /> : <ChevronRight size={13} className="text-slate-400" />}
+                            <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: SECAO_COR_RDO[g.secao] }}>{g.secao}</span>
+                            <span className="text-[10px] text-slate-400">{g.atividades.length} atividade(s)</span>
+                            {(() => { const n = g.atividades.filter(a => estruturas.some(e => avancos[`${e.id}|${a}`] != null)).length
+                              return n > 0 ? <span className="text-[10px] font-bold text-orange-500">· {n} lançada(s)</span> : null })()}
+                          </button>
+                        </td>
+                      </tr>,
+                      ...(abertas.has(g.secao) ? g.atividades : []).map(atv => (
                       <tr key={g.secao + atv} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}>
-                        <td className={`sticky left-0 z-10 px-2 py-1 text-[11px] whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-white text-slate-600'}`}>{atv}</td>
+                        <td className={`sticky left-0 z-10 px-2 py-1 pl-6 text-[11px] whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-white text-slate-600'}`}>{atv}</td>
                         {estruturas.map(e => {
                           const k = `${e.id}|${atv}`
                           const hoje = avancos[k]
@@ -338,7 +449,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                           )
                         })}
                       </tr>
-                    )))}
+                    ))])}
                   </tbody>
                 </table>
                 <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -410,12 +521,48 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
           <div className="grid sm:grid-cols-2 gap-2">
             <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">RESUMO DAS ATIVIDADES
               <textarea rows={2} value={resumo} onChange={e => setResumo(e.target.value)} className={`${inp} resize-none`} /></label>
-            <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">OCORRÊNCIAS
-              <textarea rows={2} value={ocorrencias} onChange={e => setOcorrencias(e.target.value)} className={`${inp} resize-none`} /></label>
-            <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">IMPEDITIVOS
-              <textarea rows={2} value={impeditivos} onChange={e => setImpeditivos(e.target.value)} placeholder="fundiário, acesso, liberação de faixa…" className={`${inp} resize-none`} /></label>
             <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">NOTAS
               <textarea rows={2} value={notas} onChange={e => setNotas(e.target.value)} className={`${inp} resize-none`} /></label>
+          </div>
+
+          {/* ── EVENTOS PADRONIZADOS (impeditivo · ocorrência · improdutividade) ── */}
+          <div className={`rounded-xl border p-3 ${card}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={13} className="text-amber-500" />
+              <span className={`text-[11px] font-bold uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Ocorrências e impeditivos</span>
+              <span className="text-[10px] text-slate-400">tipo padronizado — permite filtrar eventos por obra</span>
+              <button onClick={() => setEventos(l => [...l, { natureza: 'impeditivo', tipo: 'clima_chuva', horas: '', descricao: '' }])}
+                className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white">
+                <Plus size={12} /> Adicionar
+              </button>
+            </div>
+            {eventos.length === 0 ? (
+              <p className="text-[11px] text-slate-400 py-2">Nenhum evento no dia.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {eventos.map((ev, i) => (
+                  <div key={i} className="flex items-center gap-1.5 flex-wrap">
+                    <select value={ev.natureza} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, natureza: e.target.value } : x))}
+                      className={`${inp} w-[130px]`}>
+                      {NATUREZAS.map(n => <option key={n.v} value={n.v}>{n.l}</option>)}
+                    </select>
+                    <select value={ev.tipo} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, tipo: e.target.value } : x))}
+                      className={`${inp} w-[200px]`}>
+                      {EVENTO_TIPOS.map(g => (
+                        <optgroup key={g.grupo} label={g.grupo}>
+                          {g.itens.map(it => <option key={it.v} value={it.v}>{it.l}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <input value={ev.horas} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, horas: e.target.value } : x))}
+                      placeholder="hs" className={`${inp} w-14`} />
+                    <input value={ev.descricao} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, descricao: e.target.value } : x))}
+                      placeholder="detalhe (opcional)" className={`${inp} flex-1 min-w-[160px]`} />
+                    <button onClick={() => setEventos(l => l.filter((_, j) => j !== i))} className="text-slate-400 hover:text-rose-500"><X size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {erro && <p className="text-xs rounded-lg px-3 py-2 bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{erro}</p>}
         </div>
