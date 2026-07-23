@@ -544,7 +544,8 @@ export default function ModuleLayout({
                 // Altura estimada pelo nº de itens (cada item tem título + descrição).
                 // Se não couber ancorado no botão, o painel SOBE até caber; só depois
                 // é que o excedente rola internamente (evita cortar item em tela baixa).
-                const estH = actionMenu.items.length * 76 + (actionMenu.title ? 44 : 0) + 16
+                // estimativa inicial generosa (100px/item); o ref acima corrige com a altura real
+                const estH = actionMenu.items.length * 100 + (actionMenu.title ? 44 : 0) + 24
                 setOpenNavMenu({
                   id: to,
                   top: Math.max(12, Math.min(rect.top, window.innerHeight - estH - 12)),
@@ -559,6 +560,15 @@ export default function ModuleLayout({
             {isOpen && (
               <div
                 data-nav-action-menu
+                // mede a altura REAL do conteúdo e sobe o painel até caber (sem estimativa)
+                ref={el => {
+                  if (!el || !openNavMenu || openNavMenu.id !== to) return
+                  const alvo = Math.min(el.scrollHeight + 2, window.innerHeight - 24)
+                  const topMax = Math.max(12, window.innerHeight - alvo - 12)
+                  if (openNavMenu.top > topMax) {
+                    setOpenNavMenu(prev => (prev && prev.id === to ? { ...prev, top: topMax } : prev))
+                  }
+                }}
                 className={`fixed z-[70] w-[340px] overflow-y-auto styled-scrollbar rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
                 style={{ top: openNavMenu.top, left: openNavMenu.left, maxHeight: `calc(100vh - ${openNavMenu.top + 12}px)` }}
               >
