@@ -56,7 +56,7 @@ function GestaoObrasInner() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const [step, setStep] = useState('resumo_tecnico')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const atual = STEPS.find(s => s.key === step) ?? STEPS[0]
 
   // Veio do flyout "Novo Registro › Registrar RDO": abre a aba Diário + o modal
@@ -70,8 +70,12 @@ function GestaoObrasInner() {
   const obraRdo = obrasRdo.find(o => o.id === obraRdoId) ?? obrasRdo[0]
 
   useEffect(() => {
-    if (searchParams.get('novo_rdo') === '1') { setStep('diario'); setNovoRdo(true) }
-  }, [searchParams])
+    if (searchParams.get('novo_rdo') !== '1') return
+    setStep('diario'); setNovoRdo(true)
+    // limpa o parâmetro: senão o 2º clique no flyout não muda a URL e o efeito não roda
+    const p = new URLSearchParams(searchParams); p.delete('novo_rdo')
+    setSearchParams(p, { replace: true })
+  }, [searchParams, setSearchParams])
 
   return (
     <div className="p-4 sm:p-6">
@@ -97,7 +101,8 @@ function GestaoObrasInner() {
             </div>
             {novoRdo && obraRdo && (
               <RDOEstruturado obraId={obraRdo.id} obraNome={obraRdo.nome} onClose={() => setNovoRdo(false)}
-                obras={obrasRdo.map(o => ({ id: o.id, nome: o.nome }))} onObraChange={setObraRdoId} />
+                obras={obrasRdo.map(o => ({ id: o.id, nome: o.nome, projeto_id: o.pmo_projeto_id, projeto_nome: o.polo_nome }))}
+                onObraChange={setObraRdoId} />
             )}
           </>
         ) : (
