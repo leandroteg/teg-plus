@@ -25,6 +25,8 @@ interface ControladoriaFlowProps {
   onStepChange: (step: string) => void
   children: ReactNode
   badge?: string
+  /** conteúdo opcional à direita do título (ex.: seletor de contrato) */
+  headerRight?: ReactNode
 }
 
 export default function ControladoriaFlow({
@@ -35,6 +37,7 @@ export default function ControladoriaFlow({
   onStepChange,
   children,
   badge,
+  headerRight,
 }: ControladoriaFlowProps) {
   const { isLightSidebar: isLight } = useTheme()
   const currentStep = steps.find(step => step.key === activeStep) ?? steps[0]
@@ -55,6 +58,7 @@ export default function ControladoriaFlow({
           </div>
           <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</p>
         </div>
+        {headerRight && <div className="shrink-0">{headerRight}</div>}
       </div>
 
       <div className={`flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar ${
