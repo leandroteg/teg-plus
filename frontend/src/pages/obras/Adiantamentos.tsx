@@ -300,7 +300,7 @@ export default function Adiantamentos() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
           <div className={`relative w-full max-w-md rounded-2xl border shadow-xl p-6 ${isLight
             ? 'bg-white border-slate-200'
@@ -364,7 +364,7 @@ export default function Adiantamentos() {
 
       {/* Approve Modal */}
       {showApproveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowApproveModal(null)} />
           <div className={`relative w-full max-w-sm rounded-2xl border shadow-xl p-6 ${isLight
             ? 'bg-white border-slate-200'
