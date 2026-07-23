@@ -55,7 +55,7 @@ const EMPTY_FORM = {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function RDO({ portfolioId, onObraChange }: { portfolioId?: string; onObraChange?: (id: string) => void } = {}) {
+export default function RDO({ portfolioId, onObraChange, embutido }: { portfolioId?: string; onObraChange?: (id: string) => void; embutido?: boolean } = {}) {
   const { isLightSidebar: isLight } = useTheme()
   const obras = useLookupObras()
 
@@ -167,10 +167,10 @@ export default function RDO({ portfolioId, onObraChange }: { portfolioId?: strin
   const isSaving = criarRDO.isPending || atualizarRDO.isPending
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className={embutido ? "p-4 sm:p-6 pt-0 space-y-3" : "p-4 sm:p-6 space-y-5"}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header — escondido quando embutido na Gestão de Obras (a aba já titula) */}
+      {!embutido && <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <CloudSun size={20} className={isLight ? 'text-amber-600' : 'text-amber-400'} />
@@ -180,7 +180,7 @@ export default function RDO({ portfolioId, onObraChange }: { portfolioId?: strin
             {rdos.length} registros
           </p>
         </div>
-      </div>
+      </div>}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
@@ -192,6 +192,7 @@ export default function RDO({ portfolioId, onObraChange }: { portfolioId?: strin
           <option value="">Todas as obras</option>
           {obrasSel.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
+        {embutido && <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{rdos.length} registro(s)</span>}
       </div>
 
       {/* Table */}
