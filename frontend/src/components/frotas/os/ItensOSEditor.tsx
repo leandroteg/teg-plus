@@ -4,7 +4,9 @@
 // (confirmação do realizado). A descrição tem autocomplete das já usadas para
 // que o histórico de preço e o casamento de garantia consigam agrupar.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Trash2, TriangleAlert, PackageSearch } from 'lucide-react'
+import { useCatalogoItensFrota } from '../../../hooks/useFrotas'
 import type { TipoItemOS } from '../../../types/frotas'
 
 export interface ItemEdit {
@@ -14,6 +16,8 @@ export interface ItemEdit {
   valor_unitario: number
   garantia_dias?: number
   garantia_km?: number
+  /** Vínculo com o catálogo de materiais (est_itens). */
+  est_item_id?: string
 }
 
 export const ITEM_VAZIO: ItemEdit = { tipo: 'peca', descricao: '', quantidade: 1, valor_unitario: 0 }
@@ -26,6 +30,88 @@ const TIPO_ITEM: { value: TipoItemOS; label: string }[] = [
 
 const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const chave = (d: string) => d.trim().toLowerCase().replace(/\s+/g, ' ')
+
+/**
+ * Busca no catálogo de materiais (est_itens). Por padrão mostra só as categorias
+ * de Frotas; óleos e lubrificantes vivem em USO E CONSUMO, então há o escape
+ * "todo o catálogo". Texto livre continua permitido — item fora de catálogo
+ * existe (serviço de oficina, peça avulsa), só não fica vinculado.
+ */
+function BuscaCatalogo({
+  valor, vinculado, disabled, isDark, inpClass, onDigitar, onEscolher,
+}: {
+  valor: string
+  vinculado: boolean
+  disabled?: boolean
+  isDark: boolean
+  inpClass: string
+  onDigitar: (v: string) => void
+  onEscolher: (c: { id: string; descricao: string; valor_medio?: number }) => void
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [tudo, setTudo] = useState(false)
+  const { data: catalogo = [] } = useCatalogoItensFrota(aberto ? valor : undefined, tudo)
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  return (
+    <div className="relative">
+      <input
+        value={valor}
+        onChange={e => { onDigitar(e.target.value); setAberto(true) }}
+        onFocus={() => setAberto(true)}
+        onBlur={() => setTimeout(() => setAberto(false), 150)}
+        disabled={disabled}
+        placeholder="Buscar peça no catálogo ou digitar livre"
+        className={`${inpClass} w-full ${vinculado ? 'border-emerald-400/60' : ''}`}
+      />
+      {vinculado && (
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-500">
+          catálogo
+        </span>
+      )}
+
+      {aberto && !disabled && (
+        <div className={`absolute z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border shadow-lg ${
+          isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'
+        }`}>
+          {catalogo.length === 0 ? (
+            <p className={`px-3 py-2 text-[11px] ${txtMuted}`}>
+              Nada no catálogo — o texto digitado será usado como está.
+            </p>
+          ) : catalogo.map(c => (
+            <button
+              key={c.id} type="button"
+              onMouseDown={e => { e.preventDefault(); onEscolher(c); setAberto(false) }}
+              className={`w-full flex items-start gap-2 px-3 py-1.5 text-left transition-colors ${
+                isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'
+              }`}
+            >
+              <PackageSearch size={11} className={`mt-0.5 shrink-0 ${txtMuted}`} />
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[11px] font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                  {c.descricao}
+                </span>
+                <span className={`block text-[9px] truncate ${txtMuted}`}>
+                  {c.categoria}{c.valor_medio ? ` · méd. ${BRL(c.valor_medio)}` : ''}
+                </span>
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onMouseDown={e => { e.preventDefault(); setTudo(t => !t) }}
+            className={`w-full px-3 py-1.5 text-left text-[10px] font-bold border-t ${
+              isDark ? 'border-white/10 text-rose-300 hover:bg-white/[0.06]' : 'border-slate-100 text-rose-600 hover:bg-slate-50'
+            }`}
+          >
+            {tudo ? '← só categorias de Frotas' : 'buscar em todo o catálogo →'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ItensOSEditor({
   itens, onChange, isDark, precoHist, readOnly = false,
@@ -52,12 +138,10 @@ export default function ItensOSEditor({
   // Sugestões de descrição já usadas (autocomplete → agrupa histórico de preço).
   const sugestoes = precoHist ? [...precoHist.values()].map(v => v.descricao) : []
 
+  void sugestoes // histórico de OS agora entra pela busca do catálogo
+
   return (
     <div className="space-y-2">
-      <datalist id="os-itens-descricoes">
-        {sugestoes.map(s => <option key={s} value={s} />)}
-      </datalist>
-
       {itens.length === 0 && (
         <p className={`text-xs text-center py-4 ${txtMuted}`}>
           Nenhum item lançado.{!readOnly && ' Adicione as peças e serviços do orçamento.'}
@@ -83,14 +167,21 @@ export default function ItensOSEditor({
               >
                 {TIPO_ITEM.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
-              <input
-                list="os-itens-descricoes"
-                value={item.descricao}
-                onChange={e => set(idx, { descricao: e.target.value })}
-                disabled={readOnly}
-                placeholder="Descrição (ex: Pastilha de freio dianteira)"
-                className={`${inp} flex-1 min-w-0`}
-              />
+              <div className="flex-1 min-w-0">
+                <BuscaCatalogo
+                  valor={item.descricao}
+                  vinculado={!!item.est_item_id}
+                  disabled={readOnly}
+                  isDark={isDark}
+                  inpClass={inp}
+                  onDigitar={d => set(idx, { descricao: d, est_item_id: undefined })}
+                  onEscolher={c => set(idx, {
+                    descricao: c.descricao,
+                    est_item_id: c.id,
+                    ...(item.valor_unitario === 0 && c.valor_medio ? { valor_unitario: c.valor_medio } : {}),
+                  })}
+                />
+              </div>
               {!readOnly && (
                 <button
                   type="button"
