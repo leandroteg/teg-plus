@@ -1,22 +1,20 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
-  Plus, Wrench, X, Clock, AlertTriangle, Car, Building2,
+  Plus, Wrench, X, Clock, Building2,
   Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
-  ClipboardCheck, ShieldCheck, Cog, FileSearch,
+  ClipboardCheck, ShieldCheck, Cog, FileSearch, CalendarClock,
 } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
 import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import OSModal from '../../../components/frotas/os/OSModal'
 import type { FroOrdemServico, PrioridadeOS, TipoOS, StatusOS, FroVeiculo, FroAlocacao } from '../../../types/frotas'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const BRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
-
-const fmtDate = (d?: string) =>
-  d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
 function diasEmAberto(dataAbertura: string): number {
   return Math.floor((Date.now() - new Date(dataAbertura).getTime()) / 86_400_000)
@@ -50,9 +48,9 @@ const STAGES: Stage[] = [
   { key: 'pendente',             label: 'Pendente',     icon: ClipboardCheck },
   { key: 'em_cotacao',           label: 'Cotação',      icon: FileSearch },
   { key: 'aguardando_aprovacao', label: 'Aprovação',    icon: ShieldCheck },
-  { key: 'aprovada',             label: 'Aprovada',     icon: CheckCircle2 },
-  { key: 'em_execucao',          label: 'Em Execução',  icon: Cog },
-  { key: 'concluida',            label: 'Concluída',    icon: CheckCircle2 },
+  { key: 'aprovada',             label: 'Programação',  icon: CalendarClock },
+  { key: 'em_execucao',          label: 'Execução',     icon: Cog },
+  { key: 'concluida',            label: 'Liberado',     icon: CheckCircle2 },
 ]
 
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -305,84 +303,6 @@ function OSRow({ os, veicFull, isDark, onClick, onVeicClick }: {
   )
 }
 
-// ── Detail Modal ─────────────────────────────────────────────────────────────
-function OSDetailModal({ os, onClose, isDark }: { os: FroOrdemServico; onClose: () => void; isDark: boolean }) {
-  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const cardBg = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'
-  const indigoBg = isDark ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-100'
-  const p = PRIOR[os.prioridade]
-  const t = TIPO_LABEL[os.tipo]
-  const dias = diasEmAberto(os.data_abertura)
-  const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
-  const statusKey = (os.status === 'aberta' ? 'pendente' : os.status) as StageKey
-  const accent = isDark ? STAGE_ACCENT_DARK[statusKey] : STAGE_ACCENT[statusKey]
-  const stageLabel = STAGES.find(s => s.key === statusKey)?.label || os.status
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className={`relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl ${bg}`} onClick={e => e.stopPropagation()}>
-        <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b rounded-t-2xl ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <Wrench size={18} className="text-rose-500 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${txt}`}>{os.numero_os || 'Ordem de Servico'}</h3>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${accent.bgActive} ${accent.textActive}`}>
-              <span className={`w-2 h-2 rounded-full ${accent.dot}`} /> {stageLabel}
-            </span>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
-          </div>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Veiculo */}
-          <div className={`rounded-xl p-4 border ${indigoBg}`}>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-rose-400 mb-3">Veiculo</p>
-            <div className="flex items-center gap-2">
-              <Car size={16} className={txtMuted} />
-              <p className={`text-sm font-bold ${txt}`}>{os.veiculo?.placa ?? '—'}</p>
-              {os.veiculo?.modelo && <span className={`text-xs ${txtMuted}`}>{os.veiculo.marca} {os.veiculo.modelo}</span>}
-            </div>
-          </div>
-          {/* Dados */}
-          <div className={`rounded-xl p-4 border ${cardBg}`}>
-            <p className={`text-[9px] font-bold uppercase tracking-wider mb-3 ${txtMuted}`}>Dados da OS</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-              <div><p className={`text-[9px] ${txtMuted}`}>Tipo</p><span className={`px-1.5 py-0.5 rounded-md font-bold text-[10px] ${t.cls}`}>{t.label}</span></div>
-              <div><p className={`text-[9px] ${txtMuted}`}>Prioridade</p><span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${p.badge}`}>{p.label}</span></div>
-              <div><p className={`text-[9px] ${txtMuted}`}>Abertura</p><p className={`font-semibold ${txt}`}>{fmtDate(os.data_abertura)}</p></div>
-              <div><p className={`text-[9px] ${txtMuted}`}>Dias em aberto</p><p className={`font-semibold ${dias > 14 ? 'text-red-500' : dias > 7 ? 'text-amber-500' : txt}`}>{dias} dias</p></div>
-              {os.data_previsao && <div><p className={`text-[9px] ${txtMuted}`}>Previsao</p><p className={`font-semibold ${txt}`}>{fmtDate(os.data_previsao)}</p></div>}
-              {valor != null && valor > 0 && <div><p className={`text-[9px] ${txtMuted}`}>Valor</p><p className={`font-bold ${isDark ? 'text-green-400' : 'text-green-700'}`}>{BRL(valor)}</p></div>}
-            </div>
-          </div>
-          {/* Descricao */}
-          {os.descricao_problema && (
-            <div className={`rounded-xl p-4 border ${cardBg}`}>
-              <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Descricao do Problema</p>
-              <p className={`text-xs whitespace-pre-wrap ${txt}`}>{os.descricao_problema}</p>
-            </div>
-          )}
-          {/* Fornecedor */}
-          {os.fornecedor && (
-            <div className={`rounded-xl p-4 border ${cardBg}`}>
-              <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Fornecedor</p>
-              <p className={`text-sm font-semibold ${txt}`}>{os.fornecedor.nome_fantasia ?? os.fornecedor.razao_social}</p>
-            </div>
-          )}
-          <div className="flex gap-2 pt-2">
-            <button onClick={onClose} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
-              Fechar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main ─────────────────────────────────────────────────────────────────────
 type SortField = 'data' | 'placa' | 'prioridade'
 type ViewMode = 'cards' | 'list' | 'quadro'
@@ -418,9 +338,15 @@ export default function OSAbertas() {
   const grouped = useMemo(() => {
     const map = new Map<StageKey, FroOrdemServico[]>()
     STAGES.forEach(s => map.set(s.key, []))
+    // "Liberado" é vitrine do que saiu há pouco — o acervo completo fica na aba Histórico.
+    const corteLiberado = Date.now() - 30 * 86_400_000
     ordens.forEach(o => {
       // Tratar 'aberta' como 'pendente' (ambos são estágio inicial)
       const key = (o.status === 'aberta' ? 'pendente' : o.status) as StageKey
+      if (key === 'concluida') {
+        const ref = o.data_conclusao ?? o.data_abertura
+        if (ref && new Date(ref).getTime() < corteLiberado) return
+      }
       map.get(key)?.push(o)
     })
     return map
@@ -582,7 +508,15 @@ export default function OSAbertas() {
         )}
       </div>
 
-      {detail && <OSDetailModal os={detail} onClose={() => setDetail(null)} isDark={isDark} />}
+      {detail && (
+        <OSModal
+          os={detail}
+          veiculo={veicMap.get(detail.veiculo_id)}
+          isDark={isDark}
+          onClose={() => setDetail(null)}
+          onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }}
+        />
+      )}
       {novaOS && <NovaOSModal onClose={() => setNovaOS(false)} isDark={isDark} />}
       {detalheVeic && (
         <VeiculoDetalhesModal
