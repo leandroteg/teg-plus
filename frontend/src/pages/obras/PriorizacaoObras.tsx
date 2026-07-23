@@ -236,10 +236,10 @@ export default function PriorizacaoObras() {
       {/* Cabeçalho */}
       <div className={`rounded-xl ${card} overflow-x-auto`}>
         <div className="min-w-[1180px]">
-          <div className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_86px_120px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.06]' : 'text-slate-400 border-b border-slate-100'}`}>
+          <div className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_96px_130px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500 border-b border-white/[0.06]' : 'text-slate-400 border-b border-slate-100'}`}>
             <span>#</span><span /><span>Obra</span>
-            <span className="text-right">% Fís</span><span className="text-right">% Fin</span>
-            <span className="text-right">Prazo</span><span>Prazo cliente</span>
+            <span>% Fís</span><span>% Fin</span>
+            <span>Prazo OSC</span><span>Prazo Acordado</span>
             <span>Frentes liberadas</span><span>Bloqueios e impeditivos</span><span>Comentários</span>
           </div>
 
@@ -251,7 +251,7 @@ export default function PriorizacaoObras() {
               onDragStart={() => setDragId(o.id)}
               onDragOver={e => e.preventDefault()}
               onDrop={() => dropSobre(o.id)}
-              className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_86px_120px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.02]' : 'border-b border-slate-50 hover:bg-slate-50/60'} ${dragId === o.id ? 'opacity-40' : ''}`}>
+              className={`grid grid-cols-[44px_28px_minmax(220px,1.2fr)_60px_60px_96px_130px_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] gap-2 items-center px-3 py-2 ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.02]' : 'border-b border-slate-50 hover:bg-slate-50/60'} ${dragId === o.id ? 'opacity-40' : ''}`}>
               {/* posição + setas */}
               <span className="flex items-center gap-1">
                 <span className={`text-sm font-extrabold w-6 text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{idx + 1}</span>
@@ -268,7 +268,7 @@ export default function PriorizacaoObras() {
               </span>
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFis)}`}>{o.pctFis != null ? `${o.pctFis}%` : '—'}</span>
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFin)}`}>{o.pctFin != null ? `${o.pctFin}%` : '—'}</span>
-              <span className={`text-right text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{fmtData(o.prazo)}</span>
+              <span className={`text-center text-xs font-semibold tabular-nums ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{fmtData(o.prazo)}</span>
               <CampoData valor={o.prio?.prazo_cliente ?? ''} onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, prazo_cliente: v || null, frentes_liberadas: o.prio?.frentes_liberadas ?? null, bloqueios: o.prio?.bloqueios ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} />
               <CampoTexto valor={o.prio?.frentes_liberadas ?? ''} placeholder="frentes liberadas…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, frentes_liberadas: v || null, prazo_cliente: o.prio?.prazo_cliente ?? null, bloqueios: o.prio?.bloqueios ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} />
               <CampoTexto valor={o.prio?.bloqueios ?? ''} placeholder="bloqueios…" onSave={v => upsert.mutate({ obra_id: o.id, ordem: o.prio?.ordem ?? idx + 1, bloqueios: v || null, prazo_cliente: o.prio?.prazo_cliente ?? null, frentes_liberadas: o.prio?.frentes_liberadas ?? null, comentarios: o.prio?.comentarios ?? null })} cls={inp} alerta={!!o.prio?.bloqueios} />
