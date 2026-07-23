@@ -490,7 +490,7 @@ export function useSalvarSstDocumento() {
 // ── Matriz FUNÇÃO × RISCO (alimenta APR por função e a OS) ───────────────────
 
 export type MatrizRiscoCelula = {
-  id: string; cargo: string; risco_id: string; aplica: boolean; ghe?: number
+  id: string; cargo: string; risco_id: string; aplica: boolean; ghe?: number; setor?: string
   severidade?: string; probabilidade?: string; nivel_risco?: string; classificacao?: string
   tempo_exposicao?: string; tipo_exposicao?: string
   fontes?: string; epis?: string; medidas_administrativas?: string; origem: string
