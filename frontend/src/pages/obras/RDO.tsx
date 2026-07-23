@@ -83,13 +83,17 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
     return new Set(obrasPmo.filter(o => obraPassa(o, oscsPorObra, f)).map(o => o.id))
   }, [obrasPmo, oscsPorObra, f])
 
+  const [dataIni, setDataIni] = useState('')
+  const [dataFim, setDataFim] = useState('')
   const { data: rdosRaw = [], isLoading } = useRDOs({
     obra_id: obraFilter || undefined,
   })
-  const rdos = useMemo(
-    () => obrasOk ? rdosRaw.filter(r => r.obra_id && obrasOk.has(r.obra_id)) : rdosRaw,
-    [rdosRaw, obrasOk],
-  )
+  const rdos = useMemo(() => {
+    let arr = obrasOk ? rdosRaw.filter(r => r.obra_id && obrasOk.has(r.obra_id)) : rdosRaw
+    if (dataIni) arr = arr.filter(r => r.data >= dataIni)
+    if (dataFim) arr = arr.filter(r => r.data <= dataFim)
+    return arr
+  }, [rdosRaw, obrasOk, dataIni, dataFim])
   const obrasSel = useMemo(
     () => obrasOk ? obras.filter(o => obrasOk.has(o.id)) : obras,
     [obras, obrasOk],
@@ -108,6 +112,9 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
   const [editRdo, setEditRdo] = useState<ObraRDO | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [acaoBusy, setAcaoBusy] = useState<'aprovar' | 'email' | null>(null)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [emailDest, setEmailDest] = useState('')
+  const [aviso, setAviso] = useState<string | null>(null)
   const { perfil } = useAuth()
 
   const toPdf = (rdo: ObraRDO): RdoReportRow =>
@@ -134,9 +141,8 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
 
   // ── Enviar por e-mail (edge send-ti-email; padrão server-side) ─────────────────
   const enviarEmail = async () => {
-    if (!selVisiveis.length || acaoBusy) return
-    const dest = window.prompt('Enviar RDO(s) para qual e-mail? (separe por vírgula)')?.trim()
-    if (!dest) return
+    const dest = emailDest.trim()
+    if (!selVisiveis.length || !dest || acaoBusy) return
     setAcaoBusy('email')
     try {
       for (const r of selVisiveis) {
@@ -146,10 +152,10 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
             subject: `RDO ${r.obra?.nome ?? ''} — ${new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR')}`, html },
         })
       }
-      setSel(new Set())
-      alert(`RDO(s) enviado(s) para ${dest}.`)
+      setSel(new Set()); setEmailOpen(false); setEmailDest('')
+      setAviso(`RDO(s) enviado(s) para ${dest}.`); setTimeout(() => setAviso(null), 4000)
     } catch (e) {
-      alert('Falha ao enviar: ' + String((e as Error).message))
+      setAviso('Falha ao enviar: ' + String((e as Error).message)); setTimeout(() => setAviso(null), 5000)
     } finally { setAcaoBusy(null) }
   }
 
@@ -234,6 +240,16 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
           <option value="">Todas as obras</option>
           {obrasSel.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
+        {/* período (dia início — dia fim) */}
+        <div className="flex items-center gap-1">
+          <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} title="De"
+            className={`${selectClass} px-2 py-1.5`} />
+          <span className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>–</span>
+          <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} title="Até"
+            className={`${selectClass} px-2 py-1.5`} />
+          {(dataIni || dataFim) && <button onClick={() => { setDataIni(''); setDataFim('') }} title="limpar período"
+            className="text-slate-400 hover:text-rose-500"><X size={13} /></button>}
+        </div>
         {embutido && <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{rdos.length} registro(s)</span>}
         {/* Ações em lote — discretas, alinhadas à direita */}
         <div className="ml-auto flex items-center gap-1.5">
@@ -242,7 +258,7 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
             className={`p-1.5 rounded-lg border transition-colors disabled:opacity-40 ${isLight ? 'border-slate-200 text-emerald-600 hover:bg-emerald-50' : 'border-white/[0.08] text-emerald-400 hover:bg-emerald-500/10'}`}>
             {acaoBusy === 'aprovar' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
           </button>
-          <button onClick={enviarEmail} disabled={!sel.size || !!acaoBusy} title="Enviar por e-mail"
+          <button onClick={() => setEmailOpen(true)} disabled={!sel.size || !!acaoBusy} title="Enviar por e-mail"
             className={`p-1.5 rounded-lg border transition-colors disabled:opacity-40 ${isLight ? 'border-slate-200 text-sky-600 hover:bg-sky-50' : 'border-white/[0.08] text-sky-400 hover:bg-sky-500/10'}`}>
             {acaoBusy === 'email' ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
           </button>
@@ -463,6 +479,37 @@ export default function RDO({ portfolioId, onObraChange, embutido }: { portfolio
           </div>
         </div>
         </>
+      )}
+
+      {/* Aviso (substitui alert do navegador) */}
+      {aviso && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl shadow-lg text-sm font-semibold bg-slate-800 text-white">
+          {aviso}
+        </div>
+      )}
+
+      {/* Modal de envio por e-mail (substitui prompt do navegador) */}
+      {emailOpen && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-black/50" onClick={() => setEmailOpen(false)}>
+          <div onClick={e => e.stopPropagation()} className={`w-full max-w-sm rounded-2xl border shadow-2xl p-5 ${isLight ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.08]'}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Mail size={17} className="text-sky-500" />
+              <h3 className={`font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Enviar {sel.size} RDO(s) por e-mail</h3>
+            </div>
+            <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Destinatário(s)</label>
+            <input value={emailDest} onChange={e => setEmailDest(e.target.value)} autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') enviarEmail() }}
+              placeholder="email@teg... (vírgula p/ vários)"
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-white/[0.06] border-white/[0.1] text-slate-200'}`} />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setEmailOpen(false)} className={`px-4 py-2 rounded-xl text-sm font-medium border ${isLight ? 'border-slate-300 text-slate-600' : 'border-white/[0.1] text-slate-300'}`}>Cancelar</button>
+              <button onClick={enviarEmail} disabled={!emailDest.trim() || acaoBusy === 'email'}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-40">
+                {acaoBusy === 'email' ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Enviar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Editar no padrão estruturado */}
