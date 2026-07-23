@@ -77,10 +77,10 @@ const PILLARS: Pillar[] = [
     accent: '#2DD4BF',
     subs: [
       { key: 'compras', label: 'Compras', desc: 'Requisições, cotações e pedidos', Icon: ShoppingCart, active: true, route: '/compras' },
-      { key: 'logistica', label: 'Logística', desc: 'Transportes e expedição', Icon: Truck, active: true, route: '/logistica' },
+      { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
       { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
-      { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
+      { key: 'logistica', label: 'Logística', desc: 'Transportes e expedição', Icon: Truck, active: true, route: '/logistica' },
       { key: 'locacoes', label: 'Gestão de Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
     ],
   },
