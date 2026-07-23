@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Search, Building2, Ruler, TowerControl, Loader2, FileBarChart2, X } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePortfolios, useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, type EGPOscRow } from '../../hooks/usePMO'
+import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, type EGPOscRow } from '../../hooks/usePMO'
 
 const fmtBRL = (v?: number | null) => v == null ? '—' : `R$ ${Math.round(v).toLocaleString('pt-BR')}`
 const fmtNum = (v?: number | null, dec = 0) => v == null || v === 0 ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: dec })
@@ -52,12 +52,9 @@ function useTecnicoPorOsc() {
   })
 }
 
-export default function ResumoTecnicoObras() {
+export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: string }) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const { data: portfolios = [] } = usePortfolios()
-  const [pid, setPid] = useState<string>('')
-  const portfolioId = pid || portfolios[0]?.id
 
   const { data: obras = [], isLoading } = useObrasDoPortfolio(portfolioId)
   const { data: oscs = [] } = useOSCsDoPortfolio(portfolioId)
@@ -177,11 +174,6 @@ export default function ResumoTecnicoObras() {
           <option value="canceladas">Canceladas</option>
           <option value="todas">Todas</option>
         </select>
-        {portfolios.length > 1 && (
-          <select value={portfolioId ?? ''} onChange={e => setPid(e.target.value)} className={`${sel} max-w-[220px] truncate`}>
-            {portfolios.map(p => <option key={p.id} value={p.id}>{p.nome_obra}</option>)}
-          </select>
-        )}
       </div>
 
       {/* Cabeçalho de colunas + total geral (mesma grade das linhas) */}
