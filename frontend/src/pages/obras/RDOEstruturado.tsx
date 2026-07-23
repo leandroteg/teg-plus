@@ -131,8 +131,10 @@ function useVeiculosAtivos() {
   })
 }
 
-export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObraChange }: {
+export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObraChange, rdoId: rdoIdProp }: {
   obraId: string; obraNome: string; onClose: () => void
+  /** quando presente, edita um RDO existente (carrega e ATUALIZA em vez de criar) */
+  rdoId?: string
   /** lista p/ trocar a obra sem sair do modal (opcional) */
   obras?: { id: string; nome: string; projeto_id: string | null; projeto_nome: string }[]
   onObraChange?: (id: string) => void
@@ -203,6 +205,39 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   const { data: colabs = [] } = useColaboradoresAtivos()
   const { data: veiculos = [] } = useVeiculosAtivos()
   const { data: tsts = [] } = useTSTs()
+
+  // ── modo edição: carrega o RDO existente e seus filhos ──────────────────────
+  const { data: edicao } = useQuery({
+    queryKey: ['rdo-edicao', rdoIdProp],
+    enabled: !!rdoIdProp,
+    queryFn: async () => {
+      const [cab, av, ev, eq, rc] = await Promise.all([
+        supabase.from('obr_rdo').select('*').eq('id', rdoIdProp!).single(),
+        supabase.from('obr_rdo_avanco').select('estrutura_id, atividade, avanco').eq('rdo_id', rdoIdProp!),
+        supabase.from('obr_rdo_eventos').select('natureza, tipo, horas_perdidas, descricao').eq('rdo_id', rdoIdProp!),
+        supabase.from('obr_rdo_equipe').select('colaborador_id, nome, funcao, presente').eq('rdo_id', rdoIdProp!),
+        supabase.from('obr_rdo_recurso').select('veiculo_id, descricao, operando').eq('rdo_id', rdoIdProp!),
+      ])
+      return { cab: cab.data, av: av.data ?? [], ev: ev.data ?? [], eq: eq.data ?? [], rc: rc.data ?? [] }
+    },
+  })
+  useEffect(() => {
+    if (!edicao?.cab) return
+    const c = edicao.cab as Record<string, unknown>
+    setData((c.data as string) ?? new Date().toISOString().slice(0, 10))
+    setClima((c.condicao_climatica as never) ?? 'sol')
+    setResumo((c.resumo_atividades as string) ?? '')
+    setHorasImp(String(c.horas_improdutivas ?? '0'))
+    setMotivoImp((c.motivo_improdutividade as string) ?? '')
+    setNotas((c.notas as string) ?? '')
+    setFiscais((c.fiscais_cemig as string[]) ?? ((c.fiscal_cemig as string) ? [(c.fiscal_cemig as string)] : []))
+    const ids = (c.tst_ids as string[]) ?? [], nomes = (c.tst_nomes as string[]) ?? []
+    setTstSel(ids.map((id, i) => ({ id, nome: nomes[i] ?? '' })))
+    setEventos(edicao.ev.map(e => ({ natureza: e.natureza as string, tipo: e.tipo as string, horas: String(e.horas_perdidas ?? ''), descricao: (e.descricao as string) ?? '', fotos: [] })))
+    setAvancos(Object.fromEntries(edicao.av.map(a => [`${a.estrutura_id}|${a.atividade}`, Number(a.avanco)])))
+    setEquipe(Object.fromEntries(edicao.eq.filter(e => e.colaborador_id).map(e => [e.colaborador_id as string, { nome: e.nome as string, funcao: e.funcao as string | null, presente: e.presente as boolean }])))
+    setRecursos(Object.fromEntries(edicao.rc.map(r => [r.veiculo_id as string, { descricao: r.descricao as string, operando: r.operando as boolean }])))
+  }, [edicao])
   const { data: CATALOGO_RDO = [] } = useCatalogoAtividades(obraId)
   const SECAO_COR_RDO = useMemo(() => coresDoCatalogo(CATALOGO_RDO), [CATALOGO_RDO])
 
@@ -226,8 +261,9 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
 
   // trocou de obra → zera tudo que é da obra (senão fica a equipe/recurso da anterior)
   useEffect(() => {
+    if (rdoIdProp) return   // em edição a obra é fixa; não zera o que foi hidratado
     setEquipe({}); setRecursos({}); setAvancos({}); setFotosAtiv({}); setTstSel([]); setAbertas(new Set())
-  }, [obraId])
+  }, [obraId, rdoIdProp])
   useEffect(() => {
     setEquipe(Object.fromEntries(
       equipeAloc.filter(e => e.colaborador_id).map(e => [e.colaborador_id!, { nome: e.nome, funcao: e.funcao, presente: true }])))
@@ -244,8 +280,8 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
 
   const salvar = useMutation({
     mutationFn: async () => {
-      // 1) cabeçalho do RDO
-      const { data: rdo, error: e1 } = await supabase.from('obr_rdo').insert({
+      // 1) cabeçalho do RDO (cria ou atualiza)
+      const cab = {
         obra_id: obraId, data, condicao_climatica: clima,
         efetivo_proprio: nEquipe, efetivo_terceiro: 0,
         equipamentos_operando: nRec, equipamentos_parados: Object.values(recursos).filter(r => !r.operando).length,
@@ -260,10 +296,24 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
         impeditivos: eventos.filter(e => e.natureza === 'impeditivo')
           .map(e => [EVENTO_LABEL[e.tipo], e.descricao].filter(Boolean).join(': ')).join(' | ') || null,
         notas: notas || null,
-        status: 'rascunho',
-      }).select('id').single()
-      if (e1 || !rdo) throw e1 ?? new Error('Falha ao criar o RDO')
-      const rdoId = rdo.id as string
+      }
+      let novoId = rdoIdProp ?? ''
+      if (rdoIdProp) {
+        const { error: eU } = await supabase.from('obr_rdo').update(cab).eq('id', rdoIdProp)
+        if (eU) throw eU
+        // limpa filhos regraváveis (fotos existentes são preservadas)
+        await Promise.all([
+          supabase.from('obr_rdo_avanco').delete().eq('rdo_id', rdoIdProp),
+          supabase.from('obr_rdo_eventos').delete().eq('rdo_id', rdoIdProp),
+          supabase.from('obr_rdo_equipe').delete().eq('rdo_id', rdoIdProp),
+          supabase.from('obr_rdo_recurso').delete().eq('rdo_id', rdoIdProp),
+        ])
+      } else {
+        const { data: rdo, error: e1 } = await supabase.from('obr_rdo').insert({ ...cab, status: 'rascunho' }).select('id').single()
+        if (e1 || !rdo) throw e1 ?? new Error('Falha ao criar o RDO')
+        novoId = rdo.id as string
+      }
+      const rdoId = novoId
 
       // 2) avanços do dia + propagação para a matriz do Planejamento
       const linhas = Object.entries(avancos).map(([k, v]) => {
@@ -398,7 +448,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
               )}
             </div>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Preenchido por <b>{perfil?.nome ?? '—'}</b> · {new Date().toLocaleDateString('pt-BR')} · {estruturas.length} estrutura(s) · o avanço atualiza o <b>Realizado</b> do Planejamento
+              {rdoIdProp ? 'Editando' : 'Preenchido por'} <b>{perfil?.nome ?? '—'}</b> · {new Date().toLocaleDateString('pt-BR')} · {estruturas.length} estrutura(s) · o avanço atualiza o <b>Realizado</b> do Planejamento
             </p>
           </div>
           <button onClick={onClose} className={`p-1 rounded-lg ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
@@ -646,7 +696,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             <button onClick={() => { setErro(null); setSalvando(true); salvar.mutate(undefined, { onError: e => setErro(String((e as Error).message)), onSettled: () => setSalvando(false) }) }}
               disabled={salvando}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
-              {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar RDO
+              {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} {rdoIdProp ? 'Salvar alterações' : 'Salvar RDO'}
             </button>
           </div>
         </div>
