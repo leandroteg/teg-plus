@@ -46,40 +46,36 @@ const esc = (s?: string | null) =>
 
 const LOGO = () => `${location.origin}/logo-teg-transicao.png`
 
+// Cartaz enxuto para colar no veículo: sem cabeçalho e sem categoria — só logo,
+// código, identificação curta e QR. Altura menor → 3 por A4.
+// height é mínima (não fixa) e o rodapé tem folga, senão ele é cortado quando o
+// código ou o modelo ocupam duas linhas.
 const PRINT_CSS = `
-  @page{size:A4 portrait;margin:12mm}
+  @page{size:A4 portrait;margin:10mm}
   *{box-sizing:border-box;font-family:'Segoe UI',system-ui,Arial,sans-serif}
   body{margin:0;color:#0f172a}
-  .bar{position:sticky;top:0;background:#fff;padding:10px 0;text-align:center}
+  .bar{position:sticky;top:0;background:#fff;padding:10px 0;text-align:center;z-index:2}
   .bar button{padding:9px 20px;border:0;border-radius:8px;background:#e11d48;color:#fff;font-weight:700;font-size:14px;cursor:pointer}
   @media print{.bar{display:none}}
-  .card{height:128mm;border:2px solid #e11d48;border-radius:14px;padding:8mm;margin:0 auto 8mm;
-        display:flex;flex-direction:column;align-items:center;page-break-inside:avoid;max-width:180mm}
-  .card header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8mm;
-               border-bottom:1px solid #e2e8f0;padding-bottom:4mm}
-  .card header img{height:15mm;object-fit:contain}
-  .card .cat{font-size:13pt;font-weight:800;color:#334155;text-align:right}
-  .ativo{display:flex;flex-direction:column;align-items:center;margin-top:4mm}
-  .ativo .lbl{font-size:12pt;letter-spacing:.3em;color:#64748b;font-weight:700}
-  .ativo .num{font-family:'Consolas',monospace;font-size:44pt;font-weight:900;color:#e11d48;line-height:1}
-  .ativo .desc{font-size:11pt;color:#475569;margin-top:2mm;text-align:center}
-  .qr{width:58mm;height:58mm;margin:3mm 0}
-  footer{margin-top:auto;font-size:10pt;color:#64748b;text-align:center}`
+  .card{min-height:84mm;border:2px solid #e11d48;border-radius:12px;padding:6mm 6mm 5mm;margin:0 auto 6mm;
+        display:flex;flex-direction:column;align-items:center;page-break-inside:avoid;max-width:120mm}
+  .card .logo{height:9mm;object-fit:contain;margin-bottom:1mm}
+  .card .num{font-family:'Consolas',monospace;font-size:34pt;font-weight:900;color:#e11d48;
+             line-height:1;letter-spacing:.02em;text-align:center;word-break:break-all}
+  .card .desc{font-size:9.5pt;color:#475569;margin-top:1.5mm;text-align:center}
+  .qr{width:46mm;height:46mm;margin:3mm 0 2mm}
+  footer{font-size:8pt;color:#64748b;text-align:center;line-height:1.35;padding-top:1mm}`
 
 async function cartao(v: FroVeiculo, logo: string) {
   const codigo = codigoDoAtivo(v)
-  const { categoria } = formatCodigoCategoria(v)
   const dataUrl = await QRCode.toDataURL(frotaUrl(codigo), { width: 480, margin: 1 })
   const desc = [v.marca, v.modelo].filter(Boolean).join(' ')
   return `<section class="card">
-    <header><img src="${logo}" alt="TEG"/><div class="cat">${esc(categoria || '')}</div></header>
-    <div class="ativo">
-      <span class="lbl">ATIVO</span>
-      <span class="num">${esc(codigo)}</span>
-      <span class="desc">${esc(desc)}${v.placa ? ` · ${esc(v.placa)}` : ''}</span>
-    </div>
+    <img class="logo" src="${logo}" alt="TEG"/>
+    <div class="num">${esc(codigo)}</div>
+    <div class="desc">${esc(desc)}${v.placa && v.placa !== codigo ? ` · ${esc(v.placa)}` : ''}</div>
     <img class="qr" src="${dataUrl}" alt="QR"/>
-    <footer>Escaneie no <b>Portal TEG</b> para o <b>Check-in Diário</b> ou o <b>Checklist de Inspeção</b></footer>
+    <footer>Escaneie no <b>Portal TEG</b><br/>Check-in Diário ou Checklist de Inspeção</footer>
   </section>`
 }
 
