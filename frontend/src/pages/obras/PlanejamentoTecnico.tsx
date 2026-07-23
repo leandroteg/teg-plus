@@ -85,7 +85,7 @@ export default function PlanejamentoTecnico({ portfolioId }: { portfolioId?: str
   const [obraId, setObraId] = useState('')
 
   // filtros padrão da Gestão de Obras (compartilhados entre as abas)
-  const f = useObrasFiltros()
+  const f = useObrasFiltros({ tipoPadrao: true })
 
   // métricas por obra (OSCs + medição + engine EAP) pra alimentar os filtros
   const oscsPorObra = useMemo(() => agruparOscsPorObra(oscs), [oscs])
