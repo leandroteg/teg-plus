@@ -9,13 +9,13 @@ export const PROD_BANDS: [string, string, (p: number) => boolean][] = [
   ['0', '0%', p => p === 0], ['1-25', '1–25%', p => p >= 1 && p <= 25], ['26-50', '26–50%', p => p >= 26 && p <= 50], ['51-75', '51–75%', p => p >= 51 && p <= 75], ['75-85', '75–85%', p => p > 75 && p <= 85], ['85-95', '85–95%', p => p > 85 && p <= 95], ['95+', '>95%', p => p > 95],
 ]
 
-export function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark }: { label: string; icon?: ReactNode; options: { value: string; label: string }[]; selected: Set<string>; onToggle: (v: string) => void; onClear: () => void; isDark: boolean }) {
+export function MultiSelect({ label, icon, options, selected, onToggle, onClear, isDark, compacto }: { label: string; icon?: ReactNode; options: { value: string; label: string }[]; selected: Set<string>; onToggle: (v: string) => void; onClear: () => void; isDark: boolean; compacto?: boolean }) {
   const [open, setOpen] = useState(false); const n = selected.size
-  const resumo = n === 0 ? 'todas' : n === 1 ? (options.find(o => selected.has(o.value))?.label ?? `${n}`) : `${n} selecionadas`
+  const resumo = n === 0 ? (compacto ? '' : 'todas') : n === 1 ? (options.find(o => selected.has(o.value))?.label ?? `${n}`) : `${n}`
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border text-[11px] font-semibold transition min-w-[160px] ${n > 0 ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
-        {icon}<span className="opacity-70">{label}</span><span className="flex-1 text-left truncate">{resumo}</span><ChevronDown size={12} className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} />
+      <button onClick={() => setOpen(o => !o)} className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-xl border text-[11px] font-semibold transition ${compacto ? '' : 'min-w-[160px]'} ${n > 0 ? (isDark ? 'bg-teal-500/15 border-teal-500/40 text-teal-300' : 'bg-teal-50 border-teal-300 text-teal-700') : (isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-white border-slate-200 text-slate-600')}`}>
+        {icon}<span className={compacto ? '' : 'opacity-70'}>{label}</span>{resumo && <span className={`${compacto ? 'font-bold' : 'flex-1 text-left'} truncate`}>{resumo}</span>}<ChevronDown size={12} className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (<><div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
         <div className={`absolute left-0 z-30 mt-1.5 min-w-full w-max max-w-[300px] max-h-72 overflow-auto rounded-xl border shadow-xl p-1 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
