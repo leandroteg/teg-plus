@@ -65,6 +65,12 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   }
   const frentesOrd = [...frentes.values()].sort((a, b) => a.ordem - b.ordem)
 
+  // % avanço FÍSICO do dia = estruturas-equivalentes concluídas hoje ÷ (torres × atividades)
+  const nAtividades = new Set(cat.map(c => c.atividade)).size
+  const nEstruturas = estMap.size
+  const totalCells = nEstruturas * nAtividades
+  const pctFisicoDia = totalCells ? (totalDia / totalCells) * 100 : 0
+
   // avanços agrupados por frente → atividade → [torres]
   const porFrenteAtv = new Map<string, Map<string, { est: string; av: number }[]>>()
   for (const a of avancos) {
@@ -107,9 +113,29 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
     return `<div class="ev"><span class="ev-tag" style="background:${n.cor}">${esc(n.l)}</span><span>${esc(det)}</span></div>`
   }).join('') : '<p class="empty">Sem ocorrências no dia.</p>'
 
-  const chip = (t: string) => `<span class="pill">${esc(t)}</span>`
   const equipePres = equipe.filter(e => e.presente)
   const recOper = recursos.filter(r2 => r2.operando)
+
+  // agrupa por chave (função / categoria), ordenado, cada grupo é um <details open>
+  const grupoLista = (itens: string[], chaveDe: (s: string) => string, rotuloDe: (s: string) => string) => {
+    const g = new Map<string, string[]>()
+    for (const it of itens) { const k = chaveDe(it) || 'Outros'; const a = g.get(k) ?? []; a.push(rotuloDe(it)); g.set(k, a) }
+    return [...g.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR')).map(([k, arr]) =>
+      `<details open class="grp"><summary>${esc(k)} <b>(${arr.length})</b></summary>
+        <ul>${arr.sort((x, y) => x.localeCompare(y, 'pt-BR')).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>`
+    ).join('')
+  }
+  // função "normalizada" (tira o nível romano/numérico do fim, ex.: "Servente II" → "Servente")
+  const funcaoBase = (f: string) => f.replace(/\s+(I{1,3}|IV|V|VI|\d+)\s*$/i, '').trim() || 'Sem função'
+  const equipeHtml = equipePres.length
+    ? grupoLista(equipePres.map(e => `${e.nome}||${e.funcao ?? ''}`),
+        s2 => funcaoBase(s2.split('||')[1]), s2 => { const [n, f] = s2.split('||'); return f ? `${n} — ${f}` : n })
+    : '<p class="empty">Nenhum colaborador presente.</p>'
+  // categoria do recurso = último segmento após " · "
+  const recHtml = recOper.length
+    ? grupoLista(recOper.map(r2 => r2.descricao),
+        d => { const p2 = d.split('·').map(x => x.trim()); return p2[p2.length - 1] || 'Recurso' }, d => d)
+    : '<p class="empty">Nenhum recurso operando.</p>'
 
   const fotosHtml = fotos.filter(f => f.url).map(f => {
     const cap = f.escopo === 'atividade' ? (f.atividade ?? '') : (f.legenda ?? 'Ocorrência')
@@ -137,7 +163,7 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px}
   .f label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:700}
   .f div{font-size:13px;color:#1e293b;font-weight:600;margin-top:1px}
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:4px 0 6px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 6px}
   .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center}
   .kpi-v{font-size:22px;font-weight:800}
   .kpi-l{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:700;margin-top:2px}
@@ -156,7 +182,11 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   .torre.tmid{background:#fbbf24;color:#1e293b}
   .ev{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
   .ev-tag{color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
-  .pill{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:3px 10px;font-size:11.5px;margin:2px 3px 2px 0;color:#334155}
+  .grp{border:1px solid #e2e8f0;border-radius:10px;margin:6px 0;overflow:hidden;background:#fff}
+  .grp>summary{cursor:default;list-style:none;padding:7px 12px;background:#f8fafc;font-size:12px;font-weight:700;color:#334155;border-bottom:1px solid #eef2f6}
+  .grp>summary::-webkit-details-marker{display:none}
+  .grp ul{margin:0;padding:6px 12px 8px 26px;columns:2;column-gap:20px}
+  .grp li{font-size:12px;color:#475569;margin:1px 0;break-inside:avoid}
   .txt{white-space:pre-wrap;color:#1e293b}
   .empty{color:#94a3b8;font-style:italic}
   .fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -199,10 +229,12 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
 
     <h2>Avanço do dia</h2>
     <div class="kpis">
-      ${kpi('Estruturas-equivalentes', totalDia.toFixed(1))}
+      ${kpi('Avanço físico do dia', `${pctFisicoDia.toFixed(2)}%`, '#059669')}
+      ${kpi('Estruturas-equiv.', totalDia.toFixed(1))}
       ${kpi('Lançamentos', String(avancos.length), '#6366f1')}
       ${kpi('Frentes ativas', String(frentesOrd.length), '#0ea5e9')}
     </div>
+    <p style="font-size:10.5px;color:#94a3b8;margin:-2px 0 8px">Avanço físico do dia = estruturas-equivalentes concluídas hoje ÷ (${nEstruturas} torres × ${nAtividades} atividades).</p>
     ${frenteBars || '<p class="empty">Nenhum avanço lançado neste RDO.</p>'}
     ${avancoDetalhe ? `<table style="margin-top:10px">${avancoDetalhe}</table>` : ''}
 
@@ -212,11 +244,10 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
     ${cab.resumo_atividades ? `<h2>Resumo das atividades</h2><p class="txt">${esc(cab.resumo_atividades)}</p>` : ''}
     ${cab.notas ? `<h2>Notas</h2><p class="txt">${esc(cab.notas)}</p>` : ''}
 
-    <h2>Equipe e recursos</h2>
-    <div class="f"><label>Equipe presente (${equipePres.length})</label>
-      <div style="margin-top:4px">${equipePres.length ? equipePres.map(e => chip(`${e.nome}${e.funcao ? ` — ${e.funcao}` : ''}`)).join('') : '<span class="empty">—</span>'}</div></div>
-    <div class="f" style="margin-top:10px"><label>Recursos operando (${recOper.length})</label>
-      <div style="margin-top:4px">${recOper.length ? recOper.map(r2 => chip(r2.descricao)).join('') : '<span class="empty">—</span>'}</div></div>
+    <h2>Equipe presente (${equipePres.length})</h2>
+    ${equipeHtml}
+    <h2>Recursos operando (${recOper.length})</h2>
+    ${recHtml}
 
     ${fotosHtml ? `<h2>Registro fotográfico</h2><div class="fotos">${fotosHtml}</div>` : ''}
   </div>
