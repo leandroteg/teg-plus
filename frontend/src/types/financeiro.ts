@@ -90,6 +90,8 @@ export interface ContaPagar {
   loc_fatura_id?: string
   numero_documento?: string
   status: StatusCP
+  /** Há uma solicitação de cancelamento pendente de aprovação para este documento. */
+  cancelamento_pendente?: boolean
   aprovado_por?: string
   aprovado_em?: string
   omie_cp_id?: number
@@ -159,6 +161,8 @@ export interface ContaReceber {
   projeto_id?: string
   natureza?: string
   status: StatusCR
+  /** Há uma solicitação de cancelamento pendente de aprovação para este documento. */
+  cancelamento_pendente?: boolean
   autorizado_por?: string
   autorizado_em?: string
   danfe_url?: string

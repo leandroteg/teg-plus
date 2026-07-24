@@ -160,6 +160,8 @@ export interface Perfil {
   almoxarife: boolean
   /** Pode registrar devolução de cautela na SEDE (Escritório Central). */
   comprador: boolean
+  /** Pode aprovar/recusar solicitações de cancelamento de documentos financeiros (CP/CR). */
+  aprova_cancelamento_fin: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string
