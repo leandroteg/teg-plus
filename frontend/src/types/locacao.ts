@@ -40,7 +40,12 @@ export type TipoSolicitacao = 'servico' | 'manutencao' | 'acordo' | 'renovacao'
 
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'urgente'
 
-export type StatusSolicitacao = 'aberta' | 'em_andamento' | 'concluida' | 'cancelada'
+// Espelha o CHECK de loc_solicitacoes. 'aberta'/'em_andamento' são os status
+// legados, mantidos aceitos; a tela os mapeia para Pendente/Execução.
+export type StatusSolicitacao =
+  | 'pendente' | 'aberta'
+  | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'em_andamento'
+  | 'concluida' | 'cancelada' | 'rejeitada'
 
 export type TipoAcordo = 'benfeitoria' | 'abatimento' | 'multa' | 'negociacao' | 'outro'
 
@@ -330,6 +335,11 @@ export interface LocSolicitacao {
   cmp_requisicao_id?: string
   con_contrato_id?: string
   data_limite?: string
+  data_programada?: string
+  data_conclusao?: string
+  valor_estimado?: number
+  valor_final?: number
+  fornecedor_id?: string
   /** Portal grava URL pública; o ERP grava caminho no bucket locacao-faturas. */
   anexo_url?: string
   anexo_nome?: string
@@ -439,10 +449,16 @@ export const STATUS_FATURA_LABEL: Record<StatusFatura, { label: string; dot: str
 }
 
 export const STATUS_SOLICITACAO_LABEL: Record<StatusSolicitacao, { label: string; dot: string; bg: string; text: string }> = {
+  pendente:    { label: 'Pendente',     dot: 'bg-slate-400', bg: 'bg-slate-50',  text: 'text-slate-600' },
   aberta:      { label: 'Aberta',       dot: 'bg-blue-400',  bg: 'bg-blue-50',   text: 'text-blue-700' },
+  em_cotacao:  { label: 'Cotacao',      dot: 'bg-sky-500',   bg: 'bg-sky-50',    text: 'text-sky-700' },
+  aguardando_aprovacao: { label: 'Aprovacao', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
+  aprovada:    { label: 'Programacao',  dot: 'bg-teal-500',  bg: 'bg-teal-50',   text: 'text-teal-700' },
+  em_execucao: { label: 'Execucao',     dot: 'bg-violet-500',bg: 'bg-violet-50', text: 'text-violet-700' },
   em_andamento:{ label: 'Em Andamento', dot: 'bg-amber-400', bg: 'bg-amber-50',  text: 'text-amber-700' },
-  concluida:   { label: 'Concluida',    dot: 'bg-green-500', bg: 'bg-green-50',  text: 'text-green-700' },
+  concluida:   { label: 'Liberado',     dot: 'bg-green-500', bg: 'bg-green-50',  text: 'text-green-700' },
   cancelada:   { label: 'Cancelada',    dot: 'bg-slate-400', bg: 'bg-slate-100', text: 'text-slate-500' },
+  rejeitada:   { label: 'Rejeitada',    dot: 'bg-red-500',   bg: 'bg-red-50',    text: 'text-red-700' },
 }
 
 export const STATUS_ADITIVO_LABEL: Record<StatusAditivo, { label: string; dot: string; bg: string; text: string }> = {
