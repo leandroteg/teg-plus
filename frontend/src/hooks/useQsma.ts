@@ -966,6 +966,67 @@ export interface ColabTreino {
   id: string; nome: string; cargo: string | null; setor: string | null
   departamento: string | null; data_admissao: string | null; base: string | null
 }
+// ── Nada Consta (desligamento): conta a pagar do colaborador ─────────────────
+// Consolida cautelas em aberto (todas, não só EPI) + repasses não prestados.
+export interface NadaConstaLinha {
+  origem: 'cautela' | 'repasse'
+  colaborador_id: string | null
+  colaborador_norm: string
+  solicitante_nome: string | null
+  ref_id: string
+  descricao: string
+  quantidade: number
+  local: string
+  data_ini: string | null
+  data_lim: string | null
+  valor: number
+  valor_manual: boolean
+  status: string
+}
+
+// Passe colaboradorId (cautela casa por id) e o nome normalizado (repasse casa por nome).
+export function useNadaConsta(colaboradorId?: string, colaboradorNome?: string) {
+  return useQuery({
+    queryKey: ['qsma_nada_consta', colaboradorId, colaboradorNome],
+    enabled: !!colaboradorId,
+    queryFn: async (): Promise<NadaConstaLinha[]> => {
+      const norm = (colaboradorNome ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+      const { data, error } = await supabase.from('vw_qsma_nada_consta').select('*')
+        .or(`colaborador_id.eq.${colaboradorId}${norm ? `,colaborador_norm.eq.${norm}` : ''}`)
+      if (error) throw error
+      return (data ?? []) as NadaConstaLinha[]
+    },
+  })
+}
+
+export function useDefinirValorCautela() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { item: string; valor: number; obs?: string; quem?: string }) => {
+      const { error } = await supabase.rpc('qsma_cautela_definir_valor', {
+        p_item: p.item, p_valor: p.valor, p_obs: p.obs ?? null, p_quem: p.quem ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_nada_consta'] }),
+  })
+}
+
+export function useBaixarNadaConsta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { item: string; tipo: 'devolucao' | 'perda'; quemId?: string; quemNome?: string }) => {
+      const { data, error } = await supabase.rpc('qsma_nada_consta_baixar', {
+        p_item: p.item, p_tipo: p.tipo, p_quem_id: p.quemId ?? null, p_quem_nome: p.quemNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (r && !r.ok) throw new Error(r.erro || 'falha na baixa')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_nada_consta'] }),
+  })
+}
+
 export function useColaboradoresTreino() {
   return useQuery({
     queryKey: ['qsma_colab_treino'],
