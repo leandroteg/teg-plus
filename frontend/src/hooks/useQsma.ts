@@ -641,12 +641,140 @@ export function useCriarFichaEpi() {
       }))
       const { error: e2 } = await supabase.from('qsma_epi_entregas').insert(rows)
       if (e2) throw e2
-      return data as { id: string; codigo: string }
+
+      // Baixa no almoxarifado + cautela do colaborador (validade = vida útil do EPI).
+      // A RPC resolve a variante de estoque pelo tamanho do colaborador e nunca bloqueia
+      // a entrega: falta de saldo volta em `avisos` (e o saldo pode ficar negativo).
+      let avisos: string[] = []
+      const { data: baixa, error: e3 } = await supabase.rpc('qsma_epi_entregar', { p_ficha_id: fichaId })
+      if (e3) {
+        console.error('qsma_epi_entregar:', e3)
+        avisos = [`Ficha criada, mas a baixa no estoque falhou: ${e3.message}`]
+      } else {
+        const r = baixa as { ok: boolean; erro?: string; avisos?: { epi: string; aviso: string }[] } | null
+        if (r && !r.ok) avisos = [r.erro ?? 'baixa no estoque não efetuada']
+        else avisos = (r?.avisos ?? []).map(a => `${a.epi}: ${a.aviso}`)
+      }
+      return { ...(data as { id: string; codigo: string }), avisos }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] })
       qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
       qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_saldo'] })
+    },
+  })
+}
+
+// ── EPI × Estoque ────────────────────────────────────────────────────────────
+// O catálogo QSMA (com CA) aponta para N itens do almoxarifado (variantes de
+// tamanho/cor) via qsma_epi_itens. O saldo exibido vem do estoque, não daqui.
+export interface QsmaEpiVariante {
+  id: string; epi_id: string; item_id: string
+  tamanho: string | null; cor: string | null; padrao: boolean
+  item?: { codigo: string; descricao: string; unidade: string | null } | null
+}
+
+export function useEpiVariantes(epiId?: string) {
+  return useQuery({
+    queryKey: ['qsma_epi_itens', epiId ?? 'todos'],
+    queryFn: async () => {
+      let q = supabase.from('qsma_epi_itens')
+        .select('*, item:est_itens(codigo, descricao, unidade)')
+      if (epiId) q = q.eq('epi_id', epiId)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as QsmaEpiVariante[]
+    },
+  })
+}
+
+export function useSalvarEpiVariante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id?: string; epi_id: string; item_id: string; tamanho?: string | null; cor?: string | null; padrao?: boolean }) => {
+      const { id, ...rest } = p
+      if (id) {
+        const { error } = await supabase.from('qsma_epi_itens').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_epi_itens').insert(rest)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_epi_itens'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_saldo'] })
+    },
+  })
+}
+
+export function useRemoverEpiVariante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('qsma_epi_itens').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_epi_itens'] }),
+  })
+}
+
+// Saldo por EPI (soma das variantes). Se baseId vier, filtra a base do canteiro.
+export function useSaldoEpi(baseId?: string) {
+  return useQuery({
+    queryKey: ['qsma_epi_saldo', baseId ?? 'todas'],
+    queryFn: async () => {
+      let q = supabase.from('vw_qsma_epi_saldo').select('epi_id, base_id, saldo')
+      if (baseId) q = q.eq('base_id', baseId)
+      const { data, error } = await q
+      if (error) throw error
+      const por = new Map<string, number>()
+      for (const r of (data ?? []) as { epi_id: string; saldo: number }[]) {
+        por.set(r.epi_id, (por.get(r.epi_id) ?? 0) + Number(r.saldo ?? 0))
+      }
+      return por
+    },
+  })
+}
+
+// Itens de estoque da categoria EPI/EPC ainda não vinculados a nenhum EPI —
+// alimenta o picker "Adicionar do estoque" (evita poluir o catálogo).
+export function useItensEstoqueEpi(busca?: string) {
+  return useQuery({
+    queryKey: ['est_itens_epi', busca ?? ''],
+    queryFn: async () => {
+      let q = supabase.from('est_itens')
+        .select('id, codigo, descricao, unidade')
+        .eq('categoria', 'EPI/EPC').eq('ativo', true)
+        .order('descricao').limit(200)
+      if (busca && busca.trim()) q = q.ilike('descricao', `%${busca.trim()}%`)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as { id: string; codigo: string; descricao: string; unidade: string | null }[]
+    },
+  })
+}
+
+// Cautelas de EPI/equipamento em aberto do colaborador — usado no Nada Consta
+// do desligamento. 'depreciado' (passou da vida útil) não é pendência.
+export interface QsmaCautelaPendencia {
+  cautela_item_id: string; cautela_id: string; numero: string | null
+  colaborador_id: string; item_desc: string; epi_nome: string | null
+  quantidade: number; quantidade_devolvida: number | null
+  data_retirada: string; vence_em: string | null; status: 'em_uso' | 'depreciado' | 'devolvido'
+}
+
+export function useCautelasColaborador(colaboradorId?: string) {
+  return useQuery({
+    queryKey: ['qsma_cautela_status', colaboradorId],
+    enabled: !!colaboradorId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_qsma_epi_cautela_status')
+        .select('*').eq('colaborador_id', colaboradorId!)
+        .order('data_retirada', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaCautelaPendencia[]
     },
   })
 }
