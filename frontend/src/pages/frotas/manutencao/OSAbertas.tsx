@@ -360,7 +360,8 @@ export default function OSAbertas() {
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Sem cabeçalho: a aba do hub já identifica a tela — a grade começa no topo. */}
 
-      {/* Pipeline tabs */}
+      {/* Pipeline tabs — escondidas no quadro, onde as colunas já são as etapas. */}
+      {viewMode !== 'quadro' && (
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {STAGES.map(stage => {
           const count = grouped.get(stage.key)?.length || 0
@@ -384,6 +385,7 @@ export default function OSAbertas() {
           )
         })}
       </div>
+      )}
 
       {/* Toolbar */}
       <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
