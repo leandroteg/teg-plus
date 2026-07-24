@@ -5,11 +5,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, Plus,
+  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useSolicitacoesLocacao } from '../../../hooks/useLocacao'
-import NovaSolicitacaoModal from '../../../components/locacao/NovaSolicitacaoModal'
 import SolicitacaoModal from './SolicitacaoModal'
 import { SolicitacaoCard, SolicitacaoRow, URGENCIA_ORDER, imovelLabel } from './SolicitacaoCards'
 import {
@@ -36,7 +35,6 @@ export default function SolicitacoesPipeline() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [detail, setDetail] = useState<LocSolicitacao | null>(null)
-  const [showNova, setShowNova] = useState(false)
 
   // Deep link do Portal ("Fechar OS"): ?imovel=<id> recorta neste imóvel e, se
   // houver uma única solicitação viva, abre o modal dela já na etapa certa.
@@ -131,7 +129,8 @@ export default function SolicitacoesPipeline() {
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-      {/* Etapas */}
+      {/* Etapas — escondidas no quadro, onde as colunas já são as etapas. */}
+      {viewMode !== 'quadro' && (
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${
         isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
       }`}>
@@ -157,6 +156,7 @@ export default function SolicitacoesPipeline() {
           )
         })}
       </div>
+      )}
 
       {/* Toolbar */}
       <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
@@ -193,11 +193,7 @@ export default function SolicitacoesPipeline() {
           <button onClick={() => setViewMode('quadro')} title="Quadro"
             className={`p-1.5 ${viewMode === 'quadro' ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><Columns3 size={14} /></button>
         </div>
-        <button onClick={() => setShowNova(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors">
-          <Plus size={14} /> Nova Solicitação
-        </button>
-        <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           {viewMode === 'quadro'
             ? [...quadroGrouped.values()].reduce((s, l) => s + l.length, 0)
             : activeItems.length} item(s)
@@ -260,7 +256,6 @@ export default function SolicitacoesPipeline() {
       </div>
 
       {detail && <SolicitacaoModal sol={detail} isDark={isDark} onClose={() => setDetail(null)} />}
-      {showNova && <NovaSolicitacaoModal onClose={() => setShowNova(false)} />}
     </div>
   )
 }
