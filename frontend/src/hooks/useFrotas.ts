@@ -328,7 +328,7 @@ export function useProgramarEntradaOS() {
   return useMutation({
     mutationFn: async (p: {
       osId: string
-      veiculoId: string
+      veiculoId?: string
       dataEntrada: string
       hodometroEntrada?: number
       /** Alocação ativa a encerrar (o veículo sai da obra para a oficina). */
@@ -371,9 +371,12 @@ export function useProgramarEntradaOS() {
       }
 
       // Só depois de mexer nas alocações: o veículo da OS fica em manutenção.
-      const { error: eV } = await supabase.from('fro_veiculos')
-        .update({ status: 'em_manutencao' }).eq('id', p.veiculoId)
-      if (eV) throw eV
+      // Demanda de suprimento (sem veículo) não tem ativo a marcar.
+      if (p.veiculoId) {
+        const { error: eV } = await supabase.from('fro_veiculos')
+          .update({ status: 'em_manutencao' }).eq('id', p.veiculoId)
+        if (eV) throw eV
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_os'] })
@@ -394,7 +397,7 @@ export function useLiberarOS() {
   return useMutation({
     mutationFn: async (p: {
       osId: string
-      veiculoId: string
+      veiculoId?: string
       valorFinal: number
       hodometroSaida?: number
       descricaoServico?: string
@@ -412,7 +415,7 @@ export function useLiberarOS() {
       }).eq('id', p.osId)
       if (error) throw error
 
-      if (p.realocar?.obraId) {
+      if (p.realocar?.obraId && p.veiculoId) {
         const { error: eA } = await supabase.from('fro_alocacoes').insert({
           veiculo_id: p.veiculoId,
           obra_id: p.realocar.obraId,
@@ -426,10 +429,12 @@ export function useLiberarOS() {
         if (eA) throw eA
       }
 
-      await supabase.from('fro_veiculos').update({
-        status: p.realocar?.obraId ? 'em_uso' : 'disponivel',
-        ...(p.hodometroSaida != null ? { hodometro_atual: p.hodometroSaida } : {}),
-      }).eq('id', p.veiculoId)
+      if (p.veiculoId) {
+        await supabase.from('fro_veiculos').update({
+          status: p.realocar?.obraId ? 'em_uso' : 'disponivel',
+          ...(p.hodometroSaida != null ? { hodometro_atual: p.hodometroSaida } : {}),
+        }).eq('id', p.veiculoId)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_os'] })
@@ -503,16 +508,12 @@ export function useCriarOS() {
         if (eItem) throw eItem
       }
 
-      // Bloqueio imediato para OS crítica
-      if (osData.prioridade === 'critica') {
+      // Reflete no ativo — só quando a demanda é de um veículo cadastrado.
+      // Demandas de suprimento (compra, ativo sem placa) não têm veículo a bloquear.
+      if (osData.veiculo_id) {
         await supabase
           .from('fro_veiculos')
-          .update({ status: 'bloqueado' })
-          .eq('id', osData.veiculo_id)
-      } else {
-        await supabase
-          .from('fro_veiculos')
-          .update({ status: 'em_manutencao' })
+          .update({ status: osData.prioridade === 'critica' ? 'bloqueado' : 'em_manutencao' })
           .eq('id', osData.veiculo_id)
       }
 

@@ -62,6 +62,12 @@ const diasDesde = (d?: string) =>
 const TIPO_LABEL: Record<TipoOS, string> = {
   preventiva: 'Preventiva', corretiva: 'Corretiva', sinistro: 'Sinistro', revisao: 'Revisão',
 }
+const NATUREZA_LABEL: Record<string, string> = {
+  material: 'Material/Compra', servico: 'Serviço', manutencao: 'Manutenção',
+}
+/** Rótulo de classificação: tipo de manutenção, ou natureza quando é demanda de suprimento. */
+const classifOS = (os: FroOrdemServico) =>
+  os.tipo ? TIPO_LABEL[os.tipo] : (os.natureza ? NATUREZA_LABEL[os.natureza] : 'Demanda')
 const PRIOR_LABEL: Record<PrioridadeOS, string> = {
   critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa',
 }
@@ -153,13 +159,13 @@ export default function OSModal({
             <Car size={15} className={txtMuted} />
             <div className="min-w-0">
               <p className={`text-sm font-bold ${txt} ${onVeiculoClick ? 'hover:underline decoration-dotted' : ''}`}>
-                {veiculo?.codigo_interno || os.veiculo?.placa || '—'}
+                {veiculo?.codigo_interno || os.veiculo?.placa || os.ativo_livre || 'Demanda de suprimentos'}
                 <span className={`ml-2 text-xs font-normal ${txtMuted}`}>
                   {os.veiculo?.marca} {os.veiculo?.modelo}
                 </span>
               </p>
               <p className={`text-[11px] ${txtMuted}`}>
-                {TIPO_LABEL[os.tipo]} · Prioridade {PRIOR_LABEL[os.prioridade]} · Aberta {fmtData(os.data_abertura)}
+                {classifOS(os)} · Prioridade {PRIOR_LABEL[os.prioridade]} · Aberta {fmtData(os.data_abertura)}
               </p>
             </div>
           </button>
@@ -642,7 +648,7 @@ function CorpoAprovacao({ os, isDark, onClose }: {
           Veículo parado há {diasParado ?? '—'} dias
         </p>
         <p className={`text-[11px] ${isDark ? 'text-red-300/80' : 'text-red-700'}`}>
-          {TIPO_LABEL[os.tipo]} · prioridade {PRIOR_LABEL[os.prioridade]}
+          {classifOS(os)} · prioridade {PRIOR_LABEL[os.prioridade]}
         </p>
       </div>
 

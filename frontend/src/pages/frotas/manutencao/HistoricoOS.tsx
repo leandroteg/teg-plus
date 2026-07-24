@@ -51,7 +51,8 @@ export default function HistoricoOS() {
   const veicMap = useMemo(() => new Map(veiculos.map(v => [v.id, v])), [veiculos])
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
   const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
-  const openVeicDetalhe = (veiculo_id: string) => {
+  const openVeicDetalhe = (veiculo_id?: string) => {
+    if (!veiculo_id) return
     const v = veicMap.get(veiculo_id)
     if (v) setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
   }
@@ -68,7 +69,7 @@ export default function HistoricoOS() {
       if (filtroTipo && os.tipo !== filtroTipo) return false
       if (filtroStatus && os.status !== filtroStatus) return false
       if (q) {
-        const v = veicMap.get(os.veiculo_id)
+        const v = os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined
         const codigo = v ? formatCodigoCategoria(v).codigo : ''
         const alvo = [
           os.veiculo?.placa, codigo, os.numero_os, os.veiculo?.modelo,
@@ -185,8 +186,8 @@ export default function HistoricoOS() {
         ) : viewMode === 'cards' ? (
           <div className="space-y-2 p-4">
             {filtrado.map(os => (
-              <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
-                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+              <OSCard key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />
             ))}
           </div>
         ) : (
@@ -199,17 +200,17 @@ export default function HistoricoOS() {
               <span className="w-[50px] text-right">Dias</span><span className="w-[70px] text-right">Valor</span>
             </div>
             {filtrado.map(os => (
-              <OSRow key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
-                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+              <OSRow key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />
             ))}
           </div>
         )}
       </div>
 
       {detail && (
-        <OSModal os={detail} veiculo={veicMap.get(detail.veiculo_id)} isDark={isDark}
+        <OSModal os={detail} veiculo={detail.veiculo_id ? veicMap.get(detail.veiculo_id) : undefined} isDark={isDark}
           onClose={() => setDetail(null)}
-          onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }} />
+          onVeiculoClick={detail.veiculo_id ? () => { setDetail(null); openVeicDetalhe(detail.veiculo_id) } : undefined} />
       )}
       {detalheVeic && (
         <VeiculoDetalhesModal

@@ -12,7 +12,7 @@ import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import OSModal from '../../../components/frotas/os/OSModal'
 import { OSCard, OSRow, PRIOR, TIPO_LABEL, BRL, diasEmAberto } from '../../../components/frotas/os/OSCards'
-import type { FroOrdemServico, PrioridadeOS, TipoOS, StatusOS, FroVeiculo, FroAlocacao } from '../../../types/frotas'
+import type { FroOrdemServico, PrioridadeOS, TipoOS, NaturezaOS, StatusOS, FroVeiculo, FroAlocacao } from '../../../types/frotas'
 
 // ── Pipeline stages ──────────────────────────────────────────────────────────
 type StageKey = StatusOS
@@ -62,23 +62,43 @@ const STAGE_ACCENT_DARK: Record<StageKey, AccentSet> = {
 // Mantido sem gatilho na tela: o botão "Nova OS" saiu do cabeçalho a pedido.
 // Hoje nenhum outro ponto do sistema abre uma OS direto (o menu lateral cria
 // Solicitação, que é outra coisa), então isto fica pronto para ser religado.
+// Natureza da demanda define o que o formulário pede: manutenção puxa um veículo
+// cadastrado + tipo de manutenção; material/serviço pedem só o ativo em texto.
+const NATUREZAS: { key: NaturezaOS; label: string; hint: string }[] = [
+  { key: 'manutencao', label: 'Manutenção de veículo', hint: 'Reparo/revisão de um ativo cadastrado' },
+  { key: 'material',   label: 'Compra de material',    hint: 'Peça, EPI, insumo — qualquer compra' },
+  { key: 'servico',    label: 'Serviço de terceiro',   hint: 'Oficina, guincho, borracharia, sem placa' },
+]
+
 function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
   const criar = useCriarOS()
   const { data: veiculos = [] } = useVeiculos()
   const [form, setForm] = useState({
-    veiculo_id: '', tipo: 'corretiva' as TipoOS,
+    natureza: 'manutencao' as NaturezaOS,
+    veiculo_id: '', ativo_livre: '', tipo: 'corretiva' as TipoOS,
     prioridade: 'media' as PrioridadeOS,
     descricao_problema: '', data_previsao: '',
   })
+  const eManutencao = form.natureza === 'manutencao'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await criar.mutateAsync({
-      veiculo_id: form.veiculo_id, tipo: form.tipo,
-      prioridade: form.prioridade,
-      descricao_problema: form.descricao_problema,
-      data_previsao: form.data_previsao || undefined,
-    })
+    await criar.mutateAsync(
+      eManutencao
+        ? {
+            natureza: 'manutencao', veiculo_id: form.veiculo_id, tipo: form.tipo,
+            prioridade: form.prioridade,
+            descricao_problema: form.descricao_problema,
+            data_previsao: form.data_previsao || undefined,
+          }
+        : {
+            // Demanda de suprimento: sem veículo, sem tipo de manutenção.
+            natureza: form.natureza, ativo_livre: form.ativo_livre || undefined,
+            prioridade: form.prioridade,
+            descricao_problema: form.descricao_problema,
+            data_previsao: form.data_previsao || undefined,
+          },
+    )
     onClose()
   }
 
@@ -102,23 +122,58 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className={lbl}>Veiculo / Maquina *</label>
-            <select className={inp} value={form.veiculo_id}
-              onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
-              <option value="">Selecione...</option>
-              {veiculos.map(v => <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>)}
-            </select>
+            <label className={lbl}>Natureza da demanda *</label>
+            <div className="grid grid-cols-3 gap-2">
+              {NATUREZAS.map(n => (
+                <button type="button" key={n.key}
+                  onClick={() => setForm(f => ({ ...f, natureza: n.key }))}
+                  title={n.hint}
+                  className={`rounded-xl border px-2 py-2 text-center transition-all ${
+                    form.natureza === n.key
+                      ? 'border-rose-500 bg-rose-500/10'
+                      : isDark ? 'border-white/10 hover:border-white/20' : 'border-slate-200 hover:border-slate-300'
+                  }`}>
+                  <p className={`text-[11px] font-extrabold leading-tight ${
+                    form.natureza === n.key ? (isDark ? 'text-rose-300' : 'text-rose-700') : (isDark ? 'text-slate-300' : 'text-slate-600')
+                  }`}>{n.label}</p>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          {eManutencao ? (
             <div>
-              <label className={lbl}>Tipo</label>
-              <select className={inp} value={form.tipo}
-                onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoOS }))}>
-                {(Object.entries(TIPO_LABEL) as [TipoOS, typeof TIPO_LABEL[TipoOS]][]).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
+              <label className={lbl}>Veiculo / Maquina *</label>
+              <select className={inp} value={form.veiculo_id}
+                onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
+                <option value="">Selecione...</option>
+                {veiculos.map(v => <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>)}
               </select>
             </div>
+          ) : (
+            <div>
+              <label className={lbl}>Ativo / Item</label>
+              <input className={inp} value={form.ativo_livre}
+                placeholder={form.natureza === 'material' ? 'Ex.: EPI, filtro, óleo…' : 'Ex.: Gerador base, guincho…'}
+                onChange={e => setForm(f => ({ ...f, ativo_livre: e.target.value }))} />
+              <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Demanda sem veículo cadastrado — entra no mesmo quadro.
+              </p>
+            </div>
+          )}
+
+          <div className={`grid gap-3 ${eManutencao ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {eManutencao && (
+              <div>
+                <label className={lbl}>Tipo</label>
+                <select className={inp} value={form.tipo}
+                  onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoOS }))}>
+                  {(Object.entries(TIPO_LABEL) as [TipoOS, typeof TIPO_LABEL[TipoOS]][]).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className={lbl}>Prioridade</label>
               <select className={inp} value={form.prioridade}
@@ -130,9 +185,9 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
             </div>
           </div>
           <div>
-            <label className={lbl}>Descricao do Problema *</label>
+            <label className={lbl}>{eManutencao ? 'Descricao do Problema *' : 'Descricao da Demanda *'}</label>
             <UpperTextarea className={`${inp} resize-none`} rows={3} required
-              placeholder="Descreva o problema identificado..."
+              placeholder={eManutencao ? 'Descreva o problema identificado...' : 'Descreva o que precisa ser comprado / o serviço...'}
               value={form.descricao_problema}
               onChange={e => setForm(f => ({ ...f, descricao_problema: e.target.value }))} />
           </div>
@@ -171,6 +226,7 @@ export default function OSAbertas() {
   const { isDark } = useTheme()
   const [activeTab, setActiveTab] = useState<StageKey>('pendente')
   const [detail, setDetail] = useState<FroOrdemServico | null>(null)
+  const [novaAberta, setNovaAberta] = useState(false)
   const [busca, setBusca] = useState('')
 
   // Deep link do Portal (?veiculo=<id>): restringe o pipeline àquele ativo.
@@ -197,12 +253,19 @@ export default function OSAbertas() {
     setActiveTab((alvo.status === 'aberta' ? 'pendente' : alvo.status) as StageKey)
     setDetail(alvo)
   }, [veiculoLink, ordens])
+
+  // Deep link do flyout "Nova Demanda (OS)": /frotas/manutencao?tab=os&nova=<ts>
+  const abriuNova = useRef(false)
+  useEffect(() => {
+    if (searchParams.get('nova') && !abriuNova.current) { abriuNova.current = true; setNovaAberta(true) }
+  }, [searchParams])
   const { data: veiculosAll = [] } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
   const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
-  const openVeicDetalhe = (veiculo_id: string) => {
+  const openVeicDetalhe = (veiculo_id?: string) => {
+    if (!veiculo_id) return
     const v = veicMap.get(veiculo_id)
     if (!v) return
     setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
@@ -256,7 +319,7 @@ export default function OSAbertas() {
     if (busca) {
       const q = busca.toLowerCase()
       items = items.filter(o =>
-        [o.veiculo?.placa, o.veiculo?.modelo, o.numero_os, o.descricao_problema, o.fornecedor?.razao_social]
+        [o.veiculo?.placa, o.veiculo?.modelo, o.ativo_livre, o.numero_os, o.descricao_problema, o.fornecedor?.razao_social]
           .some(v => v?.toLowerCase().includes(q))
       )
     }
@@ -277,7 +340,7 @@ export default function OSAbertas() {
     STAGES.forEach(s => {
       let items = [...(grouped.get(s.key) || [])]
       if (busca) items = items.filter(o =>
-        [o.veiculo?.placa, o.veiculo?.modelo, o.numero_os, o.descricao_problema, o.fornecedor?.razao_social]
+        [o.veiculo?.placa, o.veiculo?.modelo, o.ativo_livre, o.numero_os, o.descricao_problema, o.fornecedor?.razao_social]
           .some(v => v?.toLowerCase().includes(q)))
       items.sort((a, b) => {
         let c = 0
@@ -380,7 +443,7 @@ export default function OSAbertas() {
                   <div className={`flex-1 min-h-0 overflow-y-auto hide-scrollbar rounded-xl border border-dashed p-2 space-y-2 ${
                     isDark ? 'border-white/[0.06] bg-white/[0.015]' : 'border-slate-200 bg-slate-50/50'
                   }`}>
-                    {items.map(os => <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}
+                    {items.map(os => <OSCard key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />)}
                     {items.length === 0 && (
                       <div className={`h-full flex items-center justify-center text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                         Nenhuma OS
@@ -396,13 +459,13 @@ export default function OSAbertas() {
             <Wrench size={40} className="mb-3" /><p className="text-sm font-medium">Nenhuma OS nesta etapa</p>
           </div>
         ) : viewMode === 'cards' ? (
-          <div className="space-y-2 p-4">{activeItems.map(os => <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}</div>
+          <div className="space-y-2 p-4">{activeItems.map(os => <OSCard key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />)}</div>
         ) : (
           <div>
             <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
               <span className="w-[3px]" /><span className="w-2" /><span className="flex-1">Veiculo</span><span className="w-[60px]">Tipo</span><span className="w-[60px]">Prior.</span><span className="w-[50px] text-right">Dias</span><span className="w-[70px] text-right">Valor</span>
             </div>
-            {activeItems.map(os => <OSRow key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}
+            {activeItems.map(os => <OSRow key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />)}
           </div>
         )}
       </div>
@@ -410,10 +473,10 @@ export default function OSAbertas() {
       {detail && (
         <OSModal
           os={detail}
-          veiculo={veicMap.get(detail.veiculo_id)}
+          veiculo={detail.veiculo_id ? veicMap.get(detail.veiculo_id) : undefined}
           isDark={isDark}
           onClose={() => setDetail(null)}
-          onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }}
+          onVeiculoClick={detail.veiculo_id ? () => { setDetail(null); openVeicDetalhe(detail.veiculo_id) } : undefined}
         />
       )}
       {detalheVeic && (
@@ -432,6 +495,7 @@ export default function OSAbertas() {
           } : undefined}
         />
       )}
+      {novaAberta && <NovaOSModal onClose={() => setNovaAberta(false)} isDark={isDark} />}
     </div>
   )
 }

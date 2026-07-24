@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Wrench, Gauge, Plus, Car, CalendarPlus } from 'lucide-react'
+import { LayoutDashboard, Truck, Wrench, Gauge, Plus, Car, CalendarPlus, ClipboardList } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 
@@ -30,6 +30,13 @@ export default function FrotasLayout() {
             description: 'Reportar um problema ou agendar revisão de um ativo.',
             tone: 'rose' as const,
             action: () => navigate(`/frotas/solicitacoes?nova=${Date.now()}&tipo=manutencao`),
+          },
+          {
+            icon: ClipboardList,
+            label: 'Nova Demanda (OS)',
+            description: 'Abrir uma OS direto no quadro — reparo de veículo, compra de material ou serviço de terceiro.',
+            tone: 'amber' as const,
+            action: () => navigate(`/frotas/manutencao?tab=os&nova=${Date.now()}`),
           },
           {
             icon: CalendarPlus,

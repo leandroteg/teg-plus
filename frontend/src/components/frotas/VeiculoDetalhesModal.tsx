@@ -131,7 +131,7 @@ function HistoricoServicos({ veiculoId, isLight }: { veiculoId: string; isLight:
                     {o.numero_os || 'OS s/ nº'}
                   </span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
-                    {TIPO_OS_LABEL[o.tipo]}
+                    {o.tipo ? TIPO_OS_LABEL[o.tipo] : '—'}
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-auto ${isLight ? st.light : st.dark}`}>
                     {STATUS_OS_LABEL[o.status]}

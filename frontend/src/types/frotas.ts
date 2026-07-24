@@ -10,6 +10,7 @@ export type CombustivelVeiculo = 'flex' | 'gasolina' | 'diesel' | 'etanol' | 'el
 export type PropriedadeVeiculo = 'propria' | 'locada' | 'cedida'
 export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'bloqueado' | 'baixado' | 'em_entrada' | 'aguardando_saida'
 export type TipoOS             = 'preventiva' | 'corretiva' | 'sinistro' | 'revisao'
+export type NaturezaOS         = 'manutencao' | 'material' | 'servico'
 export type PrioridadeOS       = 'critica' | 'alta' | 'media' | 'baixa'
 export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'concluida' | 'rejeitada' | 'cancelada'
 export type TipoItemOS         = 'peca' | 'mao_obra' | 'outros'
@@ -83,8 +84,14 @@ export interface FroFornecedor {
 export interface FroOrdemServico {
   id: string
   numero_os?: string
-  veiculo_id: string
-  tipo: TipoOS
+  /** Nulo quando a demanda não é de um veículo cadastrado (compra, ativo sem placa). */
+  veiculo_id?: string
+  /** Rótulo do ativo quando não há veículo (ex.: "GERADOR BASE"). */
+  ativo_livre?: string
+  /** manutencao = reparo de veículo | material = compra | servico = serviço de terceiro. */
+  natureza?: NaturezaOS
+  /** Só nas demandas de manutenção de veículo. */
+  tipo?: TipoOS
   prioridade: PrioridadeOS
   status: StatusOS
   hodometro_entrada?: number
@@ -283,8 +290,10 @@ export interface FrotasKPIs {
 // ── Payloads ──────────────────────────────────────────────────────────────────
 
 export interface CriarOSPayload {
-  veiculo_id: string
-  tipo: TipoOS
+  veiculo_id?: string
+  ativo_livre?: string
+  natureza?: NaturezaOS
+  tipo?: TipoOS
   prioridade: PrioridadeOS
   descricao_problema: string
   hodometro_entrada?: number

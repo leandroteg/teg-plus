@@ -100,6 +100,7 @@ export default function ControleFrota() {
   const osByVeic = useMemo(() => {
     const m = new Map<string, FroOrdemServico[]>()
     ordens.forEach(o => {
+      if (!o.veiculo_id) return
       const l = m.get(o.veiculo_id) ?? []
       l.push(o)
       m.set(o.veiculo_id, l)
