@@ -8,7 +8,9 @@ import {
 import { UpperTextarea } from '../../../components/UpperInput'
 import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
+import MultiSelectPopover from '../../../components/MultiSelectPopover'
+import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import OSModal from '../../../components/frotas/os/OSModal'
 import { OSCard, OSRow, PRIOR, TIPO_LABEL, BRL, diasEmAberto } from '../../../components/frotas/os/OSCards'
@@ -221,6 +223,7 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 ]
 
 const PRIOR_ORDER: Record<PrioridadeOS, number> = { critica: 0, alta: 1, media: 2, baixa: 3 }
+const PROP_LABEL: Record<string, string> = { propria: 'Próprio', locada: 'Locado', cedida: 'Cedido' }
 
 export default function OSAbertas() {
   const { isDark } = useTheme()
@@ -228,6 +231,14 @@ export default function OSAbertas() {
   const [detail, setDetail] = useState<FroOrdemServico | null>(null)
   const [novaAberta, setNovaAberta] = useState(false)
   const [busca, setBusca] = useState('')
+  // Filtros por dimensão da frota — mesmo conjunto da aba Controle.
+  const [fCategoria, setFCategoria] = useState<Set<string>>(new Set())
+  const [fSituacao, setFSituacao] = useState<Set<string>>(new Set())
+  const [fPropriedade, setFPropriedade] = useState<Set<string>>(new Set())
+  const [fObra, setFObra] = useState<Set<string>>(new Set())
+  const [fBase, setFBase] = useState<Set<string>>(new Set())
+  const [dataIni, setDataIni] = useState('')
+  const [dataFim, setDataFim] = useState('')
 
   // Deep link do Portal (?veiculo=<id>): restringe o pipeline àquele ativo.
   const [searchParams] = useSearchParams()
@@ -271,6 +282,64 @@ export default function OSAbertas() {
     setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
   }
 
+  // Dimensões de filtro de cada OS, derivadas do veículo (via veicMap) e da
+  // alocação ativa (obra). Demanda de suprimento (sem veículo) fica com campos
+  // vazios — só é excluída quando o usuário escolhe um valor naquele filtro.
+  const stageLabel = (status: string) =>
+    STAGES.find(s => s.key === (status === 'aberta' ? 'pendente' : status))?.label ?? ''
+  const metaOS = useCallback((os: FroOrdemServico) => {
+    const v = os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined
+    const aloc = os.veiculo_id ? alocByVeic.get(os.veiculo_id) : undefined
+    const obs = v ? parseObsInfo(v.observacoes) : null
+    const catFmt = v ? formatCodigoCategoria(v).categoria : ''
+    return {
+      categoria: v ? (catFmt || CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] || v.categoria) : '',
+      situacao: stageLabel(os.status),
+      propriedade: v ? (PROP_LABEL[v.propriedade] ?? v.propriedade) : '',
+      obra: aloc?.obra?.nome ?? '',
+      base: obs?.local ?? '',
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [veicMap, alocByVeic])
+
+  // Opções dos dropdowns — extraídas de TODAS as OS (antes de filtrar).
+  const filtroOpts = useMemo(() => {
+    const cat = new Set<string>(), prop = new Set<string>(), obra = new Set<string>(), base = new Set<string>()
+    ordens.forEach(o => {
+      const m = metaOS(o)
+      if (m.categoria) cat.add(m.categoria)
+      if (m.propriedade) prop.add(m.propriedade)
+      if (m.obra) obra.add(m.obra)
+      if (m.base) base.add(m.base)
+    })
+    return {
+      categoria: [...cat].sort(),
+      situacao: STAGES.map(s => s.label),
+      propriedade: [...prop].sort(),
+      obra: [...obra].sort(),
+      base: [...base].sort(),
+    }
+  }, [ordens, metaOS])
+
+  // Passa nos filtros ativos (Sets vazios = tudo). Data recorta data_abertura.
+  const passaFiltros = useCallback((o: FroOrdemServico) => {
+    const m = metaOS(o)
+    if (fCategoria.size && !fCategoria.has(m.categoria)) return false
+    if (fSituacao.size && !fSituacao.has(m.situacao)) return false
+    if (fPropriedade.size && !fPropriedade.has(m.propriedade)) return false
+    if (fObra.size && !fObra.has(m.obra)) return false
+    if (fBase.size && !fBase.has(m.base)) return false
+    if (dataIni && (o.data_abertura || '') < dataIni) return false
+    if (dataFim && (o.data_abertura || '') > dataFim) return false
+    return true
+  }, [metaOS, fCategoria, fSituacao, fPropriedade, fObra, fBase, dataIni, dataFim])
+
+  const temFiltro = fCategoria.size || fSituacao.size || fPropriedade.size || fObra.size || fBase.size || !!dataIni || !!dataFim
+  const limparFiltros = () => {
+    setFCategoria(new Set()); setFSituacao(new Set()); setFPropriedade(new Set())
+    setFObra(new Set()); setFBase(new Set()); setDataIni(''); setDataFim('')
+  }
+
   // Altura do quadro medida em runtime: ocupa o que sobra da janela a partir de
   // onde o board realmente começa. Número fixo não serve — a barra de etapas muda
   // de altura conforme a largura, e cada monitor/zoom deixa um espaço diferente.
@@ -298,6 +367,7 @@ export default function OSAbertas() {
     const corteLiberado = Date.now() - 30 * 86_400_000
     ordens.forEach(o => {
       if (veiculoLink && o.veiculo_id !== veiculoLink) return
+      if (!passaFiltros(o)) return
       // Tratar 'aberta' como 'pendente' (ambos são estágio inicial)
       const key = (o.status === 'aberta' ? 'pendente' : o.status) as StageKey
       if (key === 'concluida') {
@@ -307,7 +377,7 @@ export default function OSAbertas() {
       map.get(key)?.push(o)
     })
     return map
-  }, [ordens, veiculoLink])
+  }, [ordens, veiculoLink, passaFiltros])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -397,6 +467,25 @@ export default function OSAbertas() {
             }`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>
+
+        {/* Filtros por dimensão da frota — mesmo padrão da aba Controle */}
+        <MultiSelectPopover label="Categoria"   options={filtroOpts.categoria}   selected={fCategoria}   onChange={setFCategoria}   isLight={!isDark} />
+        <MultiSelectPopover label="Situação"    options={filtroOpts.situacao}    selected={fSituacao}    onChange={setFSituacao}    isLight={!isDark} />
+        <MultiSelectPopover label="Propriedade" options={filtroOpts.propriedade} selected={fPropriedade} onChange={setFPropriedade} isLight={!isDark} />
+        <MultiSelectPopover label="Obra"        options={filtroOpts.obra}        selected={fObra}        onChange={setFObra}        isLight={!isDark} />
+        <MultiSelectPopover label="Base"        options={filtroOpts.base}        selected={fBase}        onChange={setFBase}        isLight={!isDark} />
+        <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} title="Aberta a partir de"
+          className={`px-2 py-1.5 rounded-lg border text-[11px] w-[130px] focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`} />
+        <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>a</span>
+        <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} title="Aberta até"
+          className={`px-2 py-1.5 rounded-lg border text-[11px] w-[130px] focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`} />
+        {temFiltro ? (
+          <button onClick={limparFiltros} title="Limpar filtros"
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold ${isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}>
+            <X size={11} /> Limpar
+          </button>
+        ) : null}
+
         <div className="flex items-center gap-0.5">
           {SORT_OPTIONS.map(opt => (
             <button key={opt.field} onClick={() => toggleSort(opt.field)}
