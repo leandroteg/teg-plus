@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, ChevronRight, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -29,6 +29,8 @@ export interface NavItem {
   to: string
   icon: LucideIcon
   label: string
+  /** rótulo curto usado SÓ na barra inferior do mobile (evita quebra de linha) */
+  mobileLabel?: string
   end?: boolean
   adminOnly?: boolean
   /** Permite que requisitantes acessem este item (ex: nova solicitação) */
@@ -896,12 +898,21 @@ export default function ModuleLayout({
               <div className={`h-px mx-3 my-1 ${ls ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin') }}
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Shield size={15} className="shrink-0 opacity-50" />
-                Administração
+                Usuários
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/politicas-aprovacao') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Shield size={15} className="shrink-0 opacity-50" />
+                Políticas de Aprovação
               </button>
               <button
                 onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
@@ -910,6 +921,24 @@ export default function ModuleLayout({
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Link2 size={15} className="shrink-0 opacity-50" />
+                Integrações
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Code2 size={15} className="shrink-0 opacity-50" />
+                Desenvolvimento
               </button>
             </>
           )}
@@ -1093,6 +1122,9 @@ export default function ModuleLayout({
   //  FULL VARIANT  (default — lg breakpoint, sidebar + bottom nav, user card)
   // ══════════════════════════════════════════════════════════════════════════════
 
+  // actionMenu aberto na barra inferior do MOBILE (o flyout do desktop é outro)
+  const [mobileMenu, setMobileMenu] = useState<NavItem['actionMenu'] | null>(null)
+
   const mobileBottomNav = useMemo(() => {
     const flatNav = config.navGroups
       ? [...visibleNavForRole, ...config.navGroups.flatMap(g => g.items)]
@@ -1227,14 +1259,72 @@ export default function ModuleLayout({
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
-            {mobileBottomNav.map(({ to, icon: Icon, label, end }) => (
-              <NavLink key={`${to}:${label}`} to={to} end={end} className={bottomLinkClass}>
-                <Icon className="w-5 h-5 mb-0.5" />
-                {truncateBottomLabels && label.length > 8 ? label.slice(0, 8) + '.' : label}
-              </NavLink>
-            ))}
+            {mobileBottomNav.map(item => {
+              const { to, icon: Icon, label, mobileLabel, end, action, actionMenu } = item
+              const texto = mobileLabel ?? (truncateBottomLabels && label.length > 8 ? label.slice(0, 8) + '.' : label)
+              const conteudo = (
+                <>
+                  <Icon className="w-5 h-5 mb-0.5" />
+                  <span className="whitespace-nowrap leading-none">{texto}</span>
+                </>
+              )
+              // itens de AÇÃO não são rota: viram botão (no mobile abre a folha de opções)
+              if (actionMenu || action) {
+                return (
+                  <button key={`${to}:${label}`} type="button"
+                    onClick={() => (actionMenu ? setMobileMenu(actionMenu) : action?.())}
+                    className={bottomLinkClass({ isActive: false })}>
+                    {conteudo}
+                  </button>
+                )
+              }
+              return (
+                <NavLink key={`${to}:${label}`} to={to} end={end} className={bottomLinkClass}>
+                  {conteudo}
+                </NavLink>
+              )
+            })}
           </div>
         </nav>
+
+        {/* ── MOBILE: folha de opções do actionMenu (o flyout do desktop não abre no toque) ── */}
+        {mobileMenu && (
+          <div className="lg:hidden fixed inset-0 z-[60] flex items-end bg-black/50" onClick={() => setMobileMenu(null)}>
+            <div onClick={e => e.stopPropagation()}
+              className={`w-full rounded-t-3xl border-t p-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-2xl ${ls ? 'bg-white border-slate-200' : 'bg-[#0B1523] border-white/[0.08]'}`}>
+              <div className={`mx-auto mb-2 h-1 w-10 rounded-full ${ls ? 'bg-slate-300' : 'bg-white/20'}`} />
+              {mobileMenu.title && (
+                <p className={`px-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {mobileMenu.title}
+                </p>
+              )}
+              {mobileMenu.items.map(item => {
+                const ItemIcon = item.icon
+                return (
+                  <button key={item.label} type="button"
+                    onClick={() => { setMobileMenu(null); item.action() }}
+                    className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3.5 text-left ${ls ? 'active:bg-slate-100' : 'active:bg-white/[0.06]'}`}>
+                    <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${navActionMenuToneClasses(item.tone)}`}>
+                      <ItemIcon size={16} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className={`block text-sm font-bold ${ls ? 'text-slate-900' : 'text-white'}`}>{item.label}</span>
+                      {item.description && (
+                        <span className={`mt-0.5 block text-xs leading-snug ${ls ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {item.description}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+              <button type="button" onClick={() => setMobileMenu(null)}
+                className={`mt-1 w-full rounded-2xl py-3 text-sm font-bold ${ls ? 'text-slate-500 active:bg-slate-100' : 'text-slate-400 active:bg-white/[0.06]'}`}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
     </RequisitanteCtx.Provider>
