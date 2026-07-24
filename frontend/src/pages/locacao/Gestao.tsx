@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { Building2, Receipt, Wrench, FileSignature, BedDouble, FileText } from 'lucide-react'
 import { gerarTabelaPdf } from '../../utils/tabela-pdf'
@@ -41,6 +42,14 @@ export default function Gestao() {
   const { isDark } = useTheme()
   const [tab, setTab] = useState<Tab>('ativos')
   const contentRef = useRef<HTMLDivElement>(null)
+
+  // Deep link do Portal TEG (QR do alojamento → "Fechar OS"):
+  // /locacoes/gestao?tab=servicos&imovel=<id>. O ?imovel é lido pela própria aba.
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && TABS.some(x => x.key === t)) setTab(t as Tab)
+  }, [searchParams])
 
   function gerarRelatorio() {
     const table = contentRef.current?.querySelector('table')

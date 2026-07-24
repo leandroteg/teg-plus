@@ -329,6 +329,11 @@ export interface LocSolicitacao {
   status: StatusSolicitacao
   cmp_requisicao_id?: string
   con_contrato_id?: string
+  data_limite?: string
+  /** Portal grava URL pública; o ERP grava caminho no bucket locacao-faturas. */
+  anexo_url?: string
+  anexo_nome?: string
+  criado_por_nome?: string
   created_at: string
   updated_at: string
 }

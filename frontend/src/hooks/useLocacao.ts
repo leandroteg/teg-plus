@@ -617,6 +617,54 @@ export function useCriarSolicitacaoLocacao() {
   })
 }
 
+// ── Limpezas (lançadas no Portal TEG) ─────────────────────────────────────────
+
+export interface LocLimpeza {
+  id: string
+  imovel_id: string
+  colaborador_nome: string | null
+  data: string
+  tipo: 'rotina' | 'profunda' | 'pos_saida'
+  areas: { area: string; estado: 'ok' | 'pendente' | 'na' }[]
+  observacao: string | null
+  fotos: string[]
+  created_at: string
+}
+
+export function useLimpezas(filtros?: { imovel_id?: string }) {
+  return useQuery({
+    queryKey: ['loc_limpezas', filtros],
+    queryFn: async () => {
+      let q = supabase
+        .from('loc_limpezas')
+        .select('*')
+        .order('data', { ascending: false })
+        .order('created_at', { ascending: false })
+      if (filtros?.imovel_id) q = q.eq('imovel_id', filtros.imovel_id)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as LocLimpeza[]
+    },
+  })
+}
+
+export function useAtualizarSolicitacaoLocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string } & Partial<LocSolicitacao>) => {
+      const { data, error } = await supabase
+        .from('loc_solicitacoes')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LocSolicitacao
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_solicitacoes'] }),
+  })
+}
+
 // ── Acordos ───────────────────────────────────────────────────────────────────
 
 export function useAcordos(filtros?: { imovel_id?: string }) {
