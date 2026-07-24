@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Wrench, X, Clock, Building2,
   Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
@@ -171,6 +172,10 @@ export default function OSAbertas() {
   const [activeTab, setActiveTab] = useState<StageKey>('pendente')
   const [detail, setDetail] = useState<FroOrdemServico | null>(null)
   const [busca, setBusca] = useState('')
+
+  // Deep link do Portal (?veiculo=<id>): restringe o pipeline àquele ativo.
+  const [searchParams] = useSearchParams()
+  const veiculoLink = searchParams.get('veiculo')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('quadro')
@@ -213,6 +218,7 @@ export default function OSAbertas() {
     // "Liberado" é vitrine do que saiu há pouco — o acervo completo fica na aba Histórico.
     const corteLiberado = Date.now() - 30 * 86_400_000
     ordens.forEach(o => {
+      if (veiculoLink && o.veiculo_id !== veiculoLink) return
       // Tratar 'aberta' como 'pendente' (ambos são estágio inicial)
       const key = (o.status === 'aberta' ? 'pendente' : o.status) as StageKey
       if (key === 'concluida') {
@@ -222,7 +228,7 @@ export default function OSAbertas() {
       map.get(key)?.push(o)
     })
     return map
-  }, [ordens])
+  }, [ordens, veiculoLink])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')

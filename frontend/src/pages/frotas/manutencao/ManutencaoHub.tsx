@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CalendarDays, ClipboardList, Wrench, History } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useOrdensServico, useChecklists } from '../../../hooks/useFrotas'
@@ -87,6 +88,14 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 
 export default function ManutencaoHub() {
   const [active, setActive] = useState<TabKey>('os')
+
+  // Deep link vindo do Portal TEG (QR do ativo): ?tab=historico|os&veiculo=<id>
+  // Abre a aba certa; a tela filtra o veículo pelo mesmo parâmetro.
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && ['os', 'historico', 'checklists', 'planejamento'].includes(t)) setActive(t as TabKey)
+  }, [searchParams])
   const { isDark } = useTheme()
   const { data: ordens = [] } = useOrdensServico()
   const { data: checklists = [] } = useChecklists()

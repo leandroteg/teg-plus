@@ -3,7 +3,8 @@
 // Usa os mesmos cartão/linha da tela de OS (OSCards) para que a mesma OS não
 // tenha duas aparências no sistema.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, X, LayoutList, LayoutGrid, CheckCircle2, XCircle, Ban } from 'lucide-react'
 import { useOrdensServico, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -29,6 +30,12 @@ export default function HistoricoOS() {
 
   const [mes, setMes] = useState(mesAtual())
   const [semFiltroMes, setSemFiltroMes] = useState(false)
+
+  // Deep link do Portal (?veiculo=<id>): já abre filtrado naquele ativo,
+  // sem recorte de mês — o analista quer o histórico inteiro dele.
+  const [searchParams] = useSearchParams()
+  const veiculoLink = searchParams.get('veiculo')
+  useEffect(() => { if (veiculoLink) setSemFiltroMes(true) }, [veiculoLink])
   const [filtroTipo, setFiltroTipo] = useState<TipoOS | ''>('')
   const [filtroStatus, setFiltroStatus] = useState<StatusOS | ''>('')
   const [busca, setBusca] = useState('')
@@ -53,6 +60,7 @@ export default function HistoricoOS() {
   const filtrado = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return historico.filter(os => {
+      if (veiculoLink && os.veiculo_id !== veiculoLink) return false
       if (!semFiltroMes) {
         const ref = os.data_conclusao ?? os.data_abertura
         if (ref < mes + '-01' || ref > mes + '-31') return false
@@ -70,7 +78,7 @@ export default function HistoricoOS() {
       }
       return true
     })
-  }, [historico, mes, semFiltroMes, filtroTipo, filtroStatus, busca, veicMap])
+  }, [historico, mes, semFiltroMes, filtroTipo, filtroStatus, busca, veicMap, veiculoLink])
 
   const concluidas = filtrado.filter(os => os.status === 'concluida')
   const valorTotal = concluidas.reduce((s, os) => s + (os.valor_final ?? 0), 0)
