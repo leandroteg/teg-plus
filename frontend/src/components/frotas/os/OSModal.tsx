@@ -13,7 +13,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock,
+  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,
 } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
@@ -84,6 +84,19 @@ export default function OSModal({
 }) {
   const etapaAtual = etapaDe(os.status)
   const encerrada = os.status === 'rejeitada' || os.status === 'cancelada'
+  const emEspera = os.status === 'aguardando'
+
+  // Pausar: leva a OS para "Aguardando" (para mas não cancela nem conclui),
+  // guardando a etapa de origem para retomar depois. Motivo vai em status_detalhe.
+  const mudarStatus = useAtualizarStatusOS()
+  const [pausando, setPausando] = useState(false)
+  const [motivoPausa, setMotivoPausa] = useState('')
+  const pausar = () => {
+    mudarStatus.mutate(
+      { id: os.id, status: 'aguardando', extra: { status_anterior: os.status, status_detalhe: motivoPausa || null } },
+      { onSuccess: onClose },
+    )
+  }
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'
@@ -112,7 +125,7 @@ export default function OSModal({
           </div>
 
           {/* Stepper — cada etapa com a data em que a OS entrou nela */}
-          {!encerrada && (
+          {!encerrada && !emEspera && (
             <div className="flex items-center gap-1 mt-2.5 overflow-x-auto pb-0.5">
               {FLUXO.map((e, i) => {
                 const passou = i < etapaAtual
@@ -146,6 +159,12 @@ export default function OSModal({
               {os.motivo_rejeicao && ` · ${os.motivo_rejeicao}`}
             </span>
           )}
+          {emEspera && (
+            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-orange-500/15 text-orange-500">
+              <PauseCircle size={11} /> Aguardando
+              {os.status_detalhe && ` · ${os.status_detalhe}`}
+            </span>
+          )}
         </div>
 
         {/* Veículo */}
@@ -171,6 +190,32 @@ export default function OSModal({
           </button>
         </div>
 
+        {/* Pausar → Aguardando (disponível em qualquer etapa ativa) */}
+        {!encerrada && !emEspera && os.status !== 'concluida' && (
+          <div className={`px-5 py-2 border-b ${border}`}>
+            {pausando ? (
+              <div className="flex items-center gap-2">
+                <input autoFocus value={motivoPausa} onChange={e => setMotivoPausa(e.target.value)}
+                  placeholder="Motivo (opcional): peça em falta, aguardando terceiro…"
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg border text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                    isDark ? 'bg-white/[0.04] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                  }`} />
+                <button onClick={pausar} disabled={mudarStatus.isPending}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50">
+                  {mudarStatus.isPending ? <Loader2 size={12} className="animate-spin" /> : <PauseCircle size={12} />} Confirmar
+                </button>
+                <button onClick={() => { setPausando(false); setMotivoPausa('') }}
+                  className={`px-2 py-1.5 rounded-lg text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Cancelar</button>
+              </div>
+            ) : (
+              <button onClick={() => setPausando(true)}
+                className={`flex items-center gap-1.5 text-[11px] font-semibold ${isDark ? 'text-orange-400 hover:text-orange-300' : 'text-orange-600 hover:text-orange-700'}`}>
+                <PauseCircle size={13} /> Colocar em Aguardando
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Corpo por etapa */}
         <div className="p-5">
           {os.status === 'pendente' || os.status === 'aberta' ? (
@@ -183,6 +228,8 @@ export default function OSModal({
             <CorpoProgramacao os={os} veiculo={veiculo} isDark={isDark} onClose={onClose} />
           ) : os.status === 'em_execucao' ? (
             <CorpoExecucao os={os} isDark={isDark} onClose={onClose} />
+          ) : os.status === 'aguardando' ? (
+            <CorpoAguardando os={os} isDark={isDark} onClose={onClose} />
           ) : os.status === 'concluida' ? (
             <CorpoLiberado os={os} isDark={isDark} />
           ) : (
@@ -1343,6 +1390,66 @@ function CorpoResumo({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
           <p className={`text-xs font-semibold ${txt}`}>{os.status_detalhe}</p>
         </Secao>
       )}
+    </div>
+  )
+}
+
+// ── AGUARDANDO (em espera) ────────────────────────────────────────────────────
+// A OS parou mas não foi cancelada nem concluída. Daqui ela RETOMA para a etapa
+// de onde saiu (status_anterior), ou pode ser cancelada.
+const STAGE_RETOMA_LABEL: Record<string, string> = {
+  pendente: 'Pendente', aberta: 'Pendente', em_cotacao: 'Cotação',
+  aguardando_aprovacao: 'Aprovação', aprovada: 'Programação', em_execucao: 'Execução',
+}
+function CorpoAguardando({ os, isDark, onClose }: {
+  os: FroOrdemServico; isDark: boolean; onClose: () => void
+}) {
+  const mudarStatus = useAtualizarStatusOS()
+  const txt = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  // Para onde volta: a etapa de origem; sem registro, cai em Cotação.
+  const destino = (os.status_anterior && STAGE_RETOMA_LABEL[os.status_anterior]) ? os.status_anterior : 'em_cotacao'
+  const destinoLabel = STAGE_RETOMA_LABEL[destino] ?? 'Cotação'
+  const desde = os.updated_at ? Math.floor((Date.now() - new Date(os.updated_at).getTime()) / 86_400_000) : null
+
+  const retomar = () =>
+    mudarStatus.mutate({ id: os.id, status: destino as StatusOS, extra: { status_anterior: null } }, { onSuccess: onClose })
+  const cancelar = () =>
+    mudarStatus.mutate({ id: os.id, status: 'cancelada' }, { onSuccess: onClose })
+
+  return (
+    <div className="space-y-4">
+      <Secao titulo="Em espera" isDark={isDark} acento="alerta">
+        <p className={`text-xs ${txt}`}>
+          {os.status_detalhe || 'Sem motivo registrado.'}
+        </p>
+        {desde != null && (
+          <p className={`text-[11px] mt-1 flex items-center gap-1 ${txtMuted}`}>
+            <Clock size={11} /> parada há {desde} {desde === 1 ? 'dia' : 'dias'}
+          </p>
+        )}
+      </Secao>
+
+      <Secao titulo="Problema" isDark={isDark}>
+        <p className={`text-xs whitespace-pre-wrap ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+          {os.descricao_problema}
+        </p>
+      </Secao>
+
+      <div className="flex items-center gap-2">
+        <button onClick={retomar} disabled={mudarStatus.isPending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50">
+          {mudarStatus.isPending ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
+          Retomar para {destinoLabel}
+        </button>
+        <button onClick={cancelar} disabled={mudarStatus.isPending}
+          className={`px-3 py-2.5 rounded-xl text-xs font-bold border ${
+            isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+          } disabled:opacity-50`}>
+          Cancelar OS
+        </button>
+      </div>
     </div>
   )
 }

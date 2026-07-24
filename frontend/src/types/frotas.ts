@@ -12,7 +12,7 @@ export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'bl
 export type TipoOS             = 'preventiva' | 'corretiva' | 'sinistro' | 'revisao'
 export type NaturezaOS         = 'manutencao' | 'material' | 'servico'
 export type PrioridadeOS       = 'critica' | 'alta' | 'media' | 'baixa'
-export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'concluida' | 'rejeitada' | 'cancelada'
+export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'aguardando' | 'concluida' | 'rejeitada' | 'cancelada'
 export type TipoItemOS         = 'peca' | 'mao_obra' | 'outros'
 export type TipoPagamento      = 'cartao_frota' | 'dinheiro' | 'pix' | 'boleto'
 export type TipoChecklist      = 'pre_viagem' | 'pos_viagem' | 'pos_manutencao'
@@ -117,6 +117,8 @@ export interface FroOrdemServico {
   observacoes?: string
   /** Sub-status livre durante a execução (ex: "Aguardando peça"). Lido pelo Painel de Disponibilidade. */
   status_detalhe?: string
+  /** Etapa de origem ao ir para Aguardando — para onde retorna ao ser retomada. */
+  status_anterior?: string
   /** Parecer técnico da abertura — obrigatório na corretiva/sinistro (SUP-PRO-001). */
   parecer_tecnico?: string
   /** Envio a Suprimentos: inicia o SLA de 5 dias da categoria Manutenção de Frota. */

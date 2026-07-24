@@ -65,6 +65,7 @@ const PROP_MAP = {
 const STATUS_OS_LABEL: Record<StatusOS, string> = {
   pendente: 'Pendente', aberta: 'Pendente', em_cotacao: 'Cotação',
   aguardando_aprovacao: 'Aprovação', aprovada: 'Aprovada', em_execucao: 'Em Execução',
+  aguardando: 'Aguardando',
   concluida: 'Concluída', rejeitada: 'Rejeitada', cancelada: 'Cancelada',
 }
 const STATUS_OS_STYLE: Record<StatusOS, { light: string; dark: string }> = {
@@ -74,6 +75,7 @@ const STATUS_OS_STYLE: Record<StatusOS, { light: string; dark: string }> = {
   aguardando_aprovacao: { light: 'bg-violet-50 text-violet-700',  dark: 'bg-violet-500/10 text-violet-300' },
   aprovada:             { light: 'bg-indigo-50 text-indigo-700',  dark: 'bg-indigo-500/10 text-indigo-300' },
   em_execucao:          { light: 'bg-blue-50 text-blue-700',      dark: 'bg-blue-500/10 text-blue-300' },
+  aguardando:           { light: 'bg-orange-50 text-orange-700',  dark: 'bg-orange-500/10 text-orange-300' },
   concluida:            { light: 'bg-emerald-50 text-emerald-700', dark: 'bg-emerald-500/10 text-emerald-300' },
   rejeitada:            { light: 'bg-red-50 text-red-700',        dark: 'bg-red-500/10 text-red-300' },
   cancelada:            { light: 'bg-slate-100 text-slate-500',   dark: 'bg-slate-500/10 text-slate-400' },

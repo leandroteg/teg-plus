@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Wrench, X, Clock, Building2,
   Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, CheckCircle2,
-  ClipboardCheck, ShieldCheck, Cog, FileSearch, CalendarClock,
+  ClipboardCheck, ShieldCheck, Cog, FileSearch, CalendarClock, PauseCircle,
 } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
 import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
@@ -31,6 +31,7 @@ const STAGES: Stage[] = [
   { key: 'aguardando_aprovacao', label: 'Aprovação',    icon: ShieldCheck },
   { key: 'aprovada',             label: 'Programação',  icon: CalendarClock },
   { key: 'em_execucao',          label: 'Execução',     icon: Cog },
+  { key: 'aguardando',           label: 'Aguardando',   icon: PauseCircle },
   { key: 'concluida',            label: 'Liberado',     icon: CheckCircle2 },
 ]
 
@@ -43,6 +44,7 @@ const STAGE_ACCENT: Record<StageKey, AccentSet> = {
   aguardando_aprovacao: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
   aprovada:             { bg:'bg-teal-50',    bgActive:'bg-teal-100',    text:'text-teal-500',    textActive:'text-teal-800',    dot:'bg-teal-500',    badge:'bg-teal-200/80 text-teal-700',     border:'border-teal-200' },
   em_execucao:          { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700', border:'border-violet-200' },
+  aguardando:           { bg:'bg-orange-50',  bgActive:'bg-orange-100',  text:'text-orange-500',  textActive:'text-orange-800',  dot:'bg-orange-500',  badge:'bg-orange-200/80 text-orange-700', border:'border-orange-200' },
   concluida:            { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700',border:'border-emerald-200' },
   rejeitada:            { bg:'bg-red-50',     bgActive:'bg-red-100',     text:'text-red-500',     textActive:'text-red-800',     dot:'bg-red-500',     badge:'bg-red-200/80 text-red-700',       border:'border-red-200' },
   cancelada:            { bg:'bg-slate-50',   bgActive:'bg-slate-100',   text:'text-slate-400',   textActive:'text-slate-600',   dot:'bg-slate-400',   badge:'bg-slate-200/80 text-slate-500',   border:'border-slate-200' },
@@ -55,6 +57,7 @@ const STAGE_ACCENT_DARK: Record<StageKey, AccentSet> = {
   aguardando_aprovacao: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15', text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',     border:'border-amber-500/20' },
   aprovada:             { bg:'bg-teal-500/5',    bgActive:'bg-teal-500/15',  text:'text-teal-400',    textActive:'text-teal-200',    dot:'bg-teal-400',    badge:'bg-teal-500/15 text-teal-300',       border:'border-teal-500/20' },
   em_execucao:          { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',   border:'border-violet-500/20' },
+  aguardando:           { bg:'bg-orange-500/5',  bgActive:'bg-orange-500/15',text:'text-orange-400',  textActive:'text-orange-200',  dot:'bg-orange-400',  badge:'bg-orange-500/15 text-orange-300',   border:'border-orange-500/20' },
   concluida:            { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15',text:'text-emerald-400',textActive:'text-emerald-200',dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
   rejeitada:            { bg:'bg-red-500/5',     bgActive:'bg-red-500/15',   text:'text-red-400',     textActive:'text-red-200',     dot:'bg-red-400',     badge:'bg-red-500/15 text-red-300',         border:'border-red-500/20' },
   cancelada:            { bg:'bg-white/[0.02]',  bgActive:'bg-white/[0.06]', text:'text-slate-500',   textActive:'text-slate-400',   dot:'bg-slate-500',   badge:'bg-white/[0.06] text-slate-500',     border:'border-white/[0.08]' },
@@ -224,6 +227,12 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 const PRIOR_ORDER: Record<PrioridadeOS, number> = { critica: 0, alta: 1, media: 2, baixa: 3 }
 const PROP_LABEL: Record<string, string> = { propria: 'Próprio', locada: 'Locado', cedida: 'Cedido' }
+// Situação do VEÍCULO (não da OS) — mesmo conjunto da aba Controle.
+const STATUS_VEIC_LABEL: Record<string, string> = {
+  disponivel: 'Disponível', em_uso: 'Em Uso', em_manutencao: 'Em Manutenção',
+  bloqueado: 'Bloqueado', em_entrada: 'Em Entrada', aguardando_saida: 'Aguardando Saída',
+  baixado: 'Baixado',
+}
 
 export default function OSAbertas() {
   const { isDark } = useTheme()
@@ -259,7 +268,7 @@ export default function OSAbertas() {
     if (!abertas.length) return
     abriuLink.current = true
     // A mais avançada primeiro: é a que está pronta para ser encerrada.
-    const ordem: StageKey[] = ['em_execucao', 'aprovada', 'aguardando_aprovacao', 'em_cotacao', 'pendente', 'aberta']
+    const ordem: StageKey[] = ['em_execucao', 'aprovada', 'aguardando_aprovacao', 'em_cotacao', 'aguardando', 'pendente', 'aberta']
     const alvo = [...abertas].sort((a, b) => ordem.indexOf(a.status as StageKey) - ordem.indexOf(b.status as StageKey))[0]
     setActiveTab((alvo.status === 'aberta' ? 'pendente' : alvo.status) as StageKey)
     setDetail(alvo)
@@ -285,8 +294,6 @@ export default function OSAbertas() {
   // Dimensões de filtro de cada OS, derivadas do veículo (via veicMap) e da
   // alocação ativa (obra). Demanda de suprimento (sem veículo) fica com campos
   // vazios — só é excluída quando o usuário escolhe um valor naquele filtro.
-  const stageLabel = (status: string) =>
-    STAGES.find(s => s.key === (status === 'aberta' ? 'pendente' : status))?.label ?? ''
   const metaOS = useCallback((os: FroOrdemServico) => {
     const v = os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined
     const aloc = os.veiculo_id ? alocByVeic.get(os.veiculo_id) : undefined
@@ -294,7 +301,8 @@ export default function OSAbertas() {
     const catFmt = v ? formatCodigoCategoria(v).categoria : ''
     return {
       categoria: v ? (catFmt || CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] || v.categoria) : '',
-      situacao: stageLabel(os.status),
+      // Situação do VEÍCULO (Disponível/Em Uso/Em Manutenção…), como na aba Controle.
+      situacao: v ? (STATUS_VEIC_LABEL[v.status] ?? v.status) : '',
       propriedade: v ? (PROP_LABEL[v.propriedade] ?? v.propriedade) : '',
       obra: aloc?.obra?.nome ?? '',
       base: obs?.local ?? '',
@@ -304,17 +312,18 @@ export default function OSAbertas() {
 
   // Opções dos dropdowns — extraídas de TODAS as OS (antes de filtrar).
   const filtroOpts = useMemo(() => {
-    const cat = new Set<string>(), prop = new Set<string>(), obra = new Set<string>(), base = new Set<string>()
+    const cat = new Set<string>(), sit = new Set<string>(), prop = new Set<string>(), obra = new Set<string>(), base = new Set<string>()
     ordens.forEach(o => {
       const m = metaOS(o)
       if (m.categoria) cat.add(m.categoria)
+      if (m.situacao) sit.add(m.situacao)
       if (m.propriedade) prop.add(m.propriedade)
       if (m.obra) obra.add(m.obra)
       if (m.base) base.add(m.base)
     })
     return {
       categoria: [...cat].sort(),
-      situacao: STAGES.map(s => s.label),
+      situacao: [...sit].sort(),
       propriedade: [...prop].sort(),
       obra: [...obra].sort(),
       base: [...base].sort(),

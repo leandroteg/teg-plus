@@ -32,7 +32,7 @@ const TIPO_LABEL: Record<TipoOS, string> = {
 const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_cotacao: 'Em Cotacao',
   aguardando_aprovacao: 'Ag. Aprovacao', aprovada: 'Aprovada',
-  em_execucao: 'Em Execucao', concluida: 'Concluida',
+  em_execucao: 'Em Execucao', aguardando: 'Aguardando', concluida: 'Concluida',
   rejeitada: 'Rejeitada', cancelada: 'Cancelada',
 }
 

@@ -57,6 +57,7 @@ function tituloOS(os: FroOrdemServico, veicFull?: FroVeiculo): { codigo: string;
 export const STATUS_DOT: Record<StatusOS, string> = {
   pendente: 'bg-slate-400', aberta: 'bg-slate-400', em_cotacao: 'bg-sky-500',
   aguardando_aprovacao: 'bg-amber-500', aprovada: 'bg-teal-500', em_execucao: 'bg-violet-500',
+  aguardando: 'bg-orange-500',
   concluida: 'bg-emerald-500', rejeitada: 'bg-red-500', cancelada: 'bg-slate-400',
 }
 
