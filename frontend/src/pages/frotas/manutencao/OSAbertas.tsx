@@ -176,11 +176,27 @@ export default function OSAbertas() {
   // Deep link do Portal (?veiculo=<id>): restringe o pipeline àquele ativo.
   const [searchParams] = useSearchParams()
   const veiculoLink = searchParams.get('veiculo')
+  const abriuLink = useRef(false)
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('quadro')
 
   const { data: ordens = [], isLoading } = useOrdensServico()
+
+  // Deep link "Fechar OS" do Portal: abre direto o modal da OS em aberto do
+  // ativo, já na etapa em que ela está. Sem OS aberta, fica só o filtro.
+  useEffect(() => {
+    if (!veiculoLink || abriuLink.current || !ordens.length) return
+    const abertas = ordens.filter(o =>
+      o.veiculo_id === veiculoLink && !['concluida', 'cancelada', 'rejeitada'].includes(o.status))
+    if (!abertas.length) return
+    abriuLink.current = true
+    // A mais avançada primeiro: é a que está pronta para ser encerrada.
+    const ordem: StageKey[] = ['em_execucao', 'aprovada', 'aguardando_aprovacao', 'em_cotacao', 'pendente', 'aberta']
+    const alvo = [...abertas].sort((a, b) => ordem.indexOf(a.status as StageKey) - ordem.indexOf(b.status as StageKey))[0]
+    setActiveTab((alvo.status === 'aberta' ? 'pendente' : alvo.status) as StageKey)
+    setDetail(alvo)
+  }, [veiculoLink, ordens])
   const { data: veiculosAll = [] } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])

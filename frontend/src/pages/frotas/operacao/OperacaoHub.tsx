@@ -108,7 +108,10 @@ export default function OperacaoHub() {
   // garantir a aba Agenda, senão o modal abriria numa aba que não o renderiza.
   const [searchParams] = useSearchParams()
   useEffect(() => {
-    if (searchParams.get('novaAlocacao')) setActive('agenda')
+    if (searchParams.get('novaAlocacao')) { setActive('agenda'); return }
+    // Deep link do Portal (QR do ativo): ?tab=controle&veiculo=<id>
+    const t = searchParams.get('tab')
+    if (t && ['controle','agenda','telemetria','abastecimentos','multas'].includes(t)) setActive(t as TabKey)
   }, [searchParams])
   const { isDark } = useTheme()
   const { data: abastecimentos = [] } = useAbastecimentos()

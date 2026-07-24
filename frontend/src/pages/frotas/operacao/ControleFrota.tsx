@@ -9,7 +9,8 @@
 //
 // Ociosidade depende de telemetria: ativo sem rastreador aparece como "—".
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer } from 'lucide-react'
 import { imprimirQrAtivos } from '../../../components/frotas/QrAtivo'
 import { useVeiculos, useAlocacoes, useOrdensServico } from '../../../hooks/useFrotas'
@@ -74,12 +75,27 @@ export default function ControleFrota() {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'codigo', dir: 'asc' })
   const [detalhe, setDetalhe] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
 
+  // Deep link do Portal (QR do ativo): ?veiculo=<id> abre a ficha completa dele,
+  // que já traz alocação, QR e histórico de serviços.
+  const [searchParams] = useSearchParams()
+  const veiculoLink = searchParams.get('veiculo')
+  const abriuLink = useRef(false)
+
   const { data: veiculos = [], isLoading } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const { data: ordens = [] } = useOrdensServico()
   const { data: utilizacao = [] } = useUtilizacaoVeiculos(inicio, fim)
 
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+
+  // Abre a ficha assim que os dados chegam (uma vez só).
+  useEffect(() => {
+    if (!veiculoLink || abriuLink.current || !veiculos.length) return
+    const v = veiculos.find(x => x.id === veiculoLink)
+    if (!v) return
+    abriuLink.current = true
+    setDetalhe({ v, a: alocByVeic.get(v.id) })
+  }, [veiculoLink, veiculos, alocByVeic])
   const utilByVeic = useMemo(() => new Map(utilizacao.map(u => [u.veiculo_id, u])), [utilizacao])
   const osByVeic = useMemo(() => {
     const m = new Map<string, FroOrdemServico[]>()
