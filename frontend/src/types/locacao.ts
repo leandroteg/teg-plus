@@ -36,7 +36,7 @@ export type TipoFatura =
 
 export type StatusFatura = 'previsto' | 'lancado' | 'enviado_pagamento' | 'pago'
 
-export type TipoSolicitacao = 'servico' | 'manutencao' | 'acordo' | 'renovacao'
+export type TipoSolicitacao = 'servico' | 'manutencao' | 'limpeza' | 'acordo' | 'renovacao'
 
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'urgente'
 
@@ -340,6 +340,9 @@ export interface LocSolicitacao {
   valor_estimado?: number
   valor_final?: number
   fornecedor_id?: string
+  /** Itens conferidos (limpeza): [{ area, estado }]. */
+  checklist?: { area: string; estado: 'ok' | 'pendente' | 'na' }[]
+  fotos?: string[]
   /** Portal grava URL pública; o ERP grava caminho no bucket locacao-faturas. */
   anexo_url?: string
   anexo_nome?: string
@@ -430,6 +433,7 @@ export const TIPO_FATURA_LABEL: Record<TipoFatura, string> = {
 export const TIPO_SOLICITACAO_LABEL: Record<TipoSolicitacao, string> = {
   servico: 'Servico',
   manutencao: 'Manutencao',
+  limpeza: 'Limpeza',
   acordo: 'Acordo',
   renovacao: 'Renovacao',
 }

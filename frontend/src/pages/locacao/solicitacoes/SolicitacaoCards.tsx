@@ -3,7 +3,7 @@
 // Espelha components/frotas/os/OSCards para que a mesma solicitação tenha a
 // mesma aparência no pipeline, no histórico e no quadro.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Wrench, FileText, Handshake, RefreshCw, Clock, Paperclip } from 'lucide-react'
+import { Wrench, FileText, Handshake, RefreshCw, Clock, Paperclip, Sparkles } from 'lucide-react'
 import type { LocSolicitacao, TipoSolicitacao, UrgenciaSolicitacao } from '../../../types/locacao'
 
 export const BRL = (v?: number | null) =>
@@ -19,6 +19,7 @@ export const diasEmAberto = (s: LocSolicitacao) => {
 export const TIPO_CFG: Record<TipoSolicitacao, { label: string; icon: React.ElementType; cls: string }> = {
   manutencao: { label: 'Manutenção', icon: Wrench,    cls: 'text-orange-600 bg-orange-50' },
   servico:    { label: 'Serviço',    icon: FileText,  cls: 'text-sky-600 bg-sky-50' },
+  limpeza:    { label: 'Limpeza',    icon: Sparkles,  cls: 'text-cyan-600 bg-cyan-50' },
   acordo:     { label: 'Acordo',     icon: Handshake, cls: 'text-emerald-600 bg-emerald-50' },
   renovacao:  { label: 'Renovação',  icon: RefreshCw, cls: 'text-violet-600 bg-violet-50' },
 }
@@ -92,7 +93,7 @@ export function SolicitacaoCard({ sol, isDark, onClick, onImovelClick }: Props) 
         <span className={`inline-flex items-center gap-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           <Clock size={9} /> {dias}d
         </span>
-        {sol.anexo_url && (
+        {(sol.anexo_url || (sol.fotos ?? []).length > 0) && (
           <Paperclip size={10} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
         )}
         {valor != null && (

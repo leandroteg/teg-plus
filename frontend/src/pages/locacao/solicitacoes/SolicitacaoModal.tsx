@@ -172,6 +172,39 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
             </div>
           )}
 
+          {/* Limpeza: o que foi conferido em campo */}
+          {(sol.checklist ?? []).length > 0 && (
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Áreas conferidas</p>
+              <div className="flex flex-wrap gap-1.5">
+                {sol.checklist!.map(a => (
+                  <span key={a.area} className={`text-[10px] font-semibold px-2 py-1 rounded-lg ${
+                    a.estado === 'ok'
+                      ? (isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700')
+                      : a.estado === 'pendente'
+                        ? (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700')
+                        : (isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500')
+                  }`}>
+                    {a.area}{a.estado === 'pendente' ? ' · pendente' : a.estado === 'na' ? ' · n/a' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(sol.fotos ?? []).length > 0 && (
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Fotos</p>
+              <div className="flex flex-wrap gap-2">
+                {sol.fotos!.map(url => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <img src={url} alt="" className={`w-20 h-20 rounded-xl object-cover border ${border}`} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── O que a etapa atual pede ─────────────────────────────────── */}
           {etapa === 'em_cotacao' && !encerrada && (
             <div className={`rounded-xl border p-3 ${isDark ? 'border-sky-500/20 bg-sky-500/5' : 'border-sky-200 bg-sky-50/60'}`}>
