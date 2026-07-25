@@ -17,6 +17,16 @@ export const ESCALA: Record<number, { label: string; icon: React.ElementType; co
 
 const VAZIO = 'text-slate-300'
 
+/** Traço de "sem check-in". Embrulhado porque svg puro é display:block e
+ *  escaparia do text-center da célula. */
+function SemDado({ size }: { size: number }) {
+  return (
+    <span title="Sem check-in" className="inline-flex">
+      <Minus size={size} className={VAZIO} strokeWidth={2.5} aria-label="sem check-in" />
+    </span>
+  )
+}
+
 /** Nota 1..5 como ícone. Sem check-in ainda → traço discreto, nunca um zero falso. */
 export function NotaIcone({ nota, size = 17, titulo }: {
   nota: number | null | undefined
@@ -25,11 +35,10 @@ export function NotaIcone({ nota, size = 17, titulo }: {
   titulo?: string
 }) {
   if (nota == null) {
-    return <Minus size={size} className={VAZIO} strokeWidth={2.5}
-      aria-label="sem check-in" />
+    return <SemDado size={size} />
   }
   const e = ESCALA[nota]
-  if (!e) return <Minus size={size} className={VAZIO} strokeWidth={2.5} />
+  if (!e) return <SemDado size={size} />
   const Icon = e.icon
   return (
     <span title={`${titulo ? titulo + ': ' : ''}${e.label}`} className="inline-flex">
@@ -45,7 +54,7 @@ export function AvariaIcone({ temAvaria, descricao, size = 17 }: {
   size?: number
 }) {
   if (temAvaria == null) {
-    return <Minus size={size} className={VAZIO} strokeWidth={2.5} aria-label="sem check-in" />
+    return <SemDado size={size} />
   }
   return temAvaria ? (
     <span title={descricao ? `Avaria: ${descricao}` : 'Avaria registrada'} className="inline-flex">
