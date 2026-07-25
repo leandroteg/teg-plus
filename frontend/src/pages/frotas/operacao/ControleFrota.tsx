@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer } from 'lucide-react'
+import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer, Camera } from 'lucide-react'
 import { imprimirQrAtivos } from '../../../components/frotas/QrAtivo'
 import { useVeiculos, useAlocacoes, useOrdensServico, useUltimosCheckins } from '../../../hooks/useFrotas'
 import { useUtilizacaoVeiculos } from '../../../hooks/useTelemetria'
@@ -135,8 +135,17 @@ export default function ControleFrota() {
 
       const { codigo, categoria } = formatCodigoCategoria(v)
       const ck = checkinByVeic.get(v.id)
+
+      // Hodômetro: o do cadastro manda. Sem ele (nulo ou zerado), cai para o
+      // km do último check-in — mas SÓ se veio com foto do painel, que é a
+      // prova de que o número foi lido do veículo e não digitado de memória.
+      const hodoAtivo = v.hodometro_atual != null && v.hodometro_atual > 0 ? v.hodometro_atual : null
+      const kmCheckin = ck?.km_informado != null && ck.foto_painel_url ? Number(ck.km_informado) : null
+      const hodometro = hodoAtivo ?? (kmCheckin && kmCheckin > 0 ? kmCheckin : null)
+      const hodoDeCheckin = hodoAtivo == null && hodometro != null
+
       return {
-        v, aloc, obs, diasOS, disp, ocio, ck,
+        v, aloc, obs, diasOS, disp, ocio, ck, hodometro, hodoDeCheckin,
         codigo, categoriaLabel: categoria || (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria),
         obra: aloc?.obra?.nome ?? '',
         local: obs.local ?? '',
@@ -180,7 +189,7 @@ export default function ControleFrota() {
         case 'categoria': return dir * a.categoriaLabel.localeCompare(b.categoriaLabel)
         case 'status':    return dir * (STATUS_LABEL[a.v.status] ?? '').localeCompare(STATUS_LABEL[b.v.status] ?? '')
         case 'obra':      return dir * a.obra.localeCompare(b.obra)
-        case 'hodometro': return dir * ((a.v.hodometro_atual ?? 0) - (b.v.hodometro_atual ?? 0))
+        case 'hodometro': return dir * ((a.hodometro ?? 0) - (b.hodometro ?? 0))
         case 'disp':      return dir * (a.disp - b.disp)
         case 'ocio':      return dir * ((a.ocio ?? -1) - (b.ocio ?? -1))
         default:          return dir * a.codigo.localeCompare(b.codigo)
@@ -401,7 +410,15 @@ export default function ControleFrota() {
                       <AvariaIcone temAvaria={l.ck ? l.ck.tem_avaria : null} descricao={l.ck?.avarias_novas} />
                     </td>
                     <td className={`px-2.5 py-2 text-right text-xs tabular-nums ${txtMuted}`}>
-                      {l.v.hodometro_atual != null ? l.v.hodometro_atual.toLocaleString('pt-BR') : '—'}
+                      {l.hodometro == null ? '—' : (
+                        <span className="inline-flex items-center justify-end gap-1"
+                          title={l.hodoDeCheckin
+                            ? `Do check-in de ${new Date(l.ck!.created_at).toLocaleDateString('pt-BR')} — foto do painel confirmada`
+                            : undefined}>
+                          {l.hodoDeCheckin && <Camera size={11} className="text-blue-500 shrink-0" />}
+                          {l.hodometro.toLocaleString('pt-BR')}
+                        </span>
+                      )}
                     </td>
                     <td className={`px-2.5 py-2 text-right text-sm font-bold tabular-nums ${corPct(l.disp)}`}
                       title={`${l.diasOS.toFixed(1)} dia(s) parado em OS no período`}>
