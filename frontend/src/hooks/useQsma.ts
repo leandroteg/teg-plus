@@ -966,6 +966,70 @@ export interface ColabTreino {
   id: string; nome: string; cargo: string | null; setor: string | null
   departamento: string | null; data_admissao: string | null; base: string | null
 }
+// ── Desligamento — fluxo de 6 etapas sobre rh_desligamentos ───────────────────
+export type EtapaDeslig = 'requisicao' | 'aprovacao' | 'preparo' | 'nada_consta' | 'rescisao' | 'encerrados'
+export const ORDEM_ETAPAS: EtapaDeslig[] = ['requisicao', 'aprovacao', 'preparo', 'nada_consta', 'rescisao', 'encerrados']
+
+export interface Desligamento {
+  id: string
+  colaborador_id: string
+  colaborador_nome: string | null
+  cargo: string | null
+  base_nome: string | null
+  data_admissao: string | null
+  colaborador_ativo: boolean | null
+  tipo: string | null
+  motivo: string | null
+  data_aviso: string | null
+  data_desligamento: string | null
+  cumpriu_aviso: boolean | null
+  observacoes: string | null
+  checklist: { label: string; done: boolean }[] | null
+  status: EtapaDeslig
+  created_by_nome: string | null
+  created_at: string
+}
+
+export function useDesligamentos() {
+  return useQuery({
+    queryKey: ['rh_desligamentos'],
+    queryFn: async (): Promise<Desligamento[]> => {
+      const { data, error } = await supabase.from('vw_rh_desligamentos').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Desligamento[]
+    },
+  })
+}
+
+export function useCriarDesligamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { colaborador_id: string; tipo: string; motivo?: string; data_aviso?: string; data_desligamento?: string; cumpriu_aviso?: boolean; observacoes?: string; criadoPor?: string }) => {
+      const { error } = await supabase.from('rh_desligamentos').insert({
+        colaborador_id: p.colaborador_id, tipo: p.tipo, motivo: p.motivo ?? null,
+        data_aviso: p.data_aviso || null, data_desligamento: p.data_desligamento || null,
+        cumpriu_aviso: p.cumpriu_aviso ?? null, observacoes: p.observacoes ?? null,
+        status: 'requisicao', created_by_nome: p.criadoPor ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh_desligamentos'] }),
+  })
+}
+
+export function useAtualizarDesligamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; patch: Partial<Desligamento> }) => {
+      const { id, patch } = p
+      const { colaborador_nome, cargo, base_nome, data_admissao, colaborador_ativo, created_at, ...limpo } = patch as any
+      const { error } = await supabase.from('rh_desligamentos').update({ ...limpo, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh_desligamentos'] }),
+  })
+}
+
 // ── Nada Consta (desligamento): conta a pagar do colaborador ─────────────────
 // Consolida cautelas em aberto (todas, não só EPI) + repasses não prestados.
 export interface NadaConstaLinha {
