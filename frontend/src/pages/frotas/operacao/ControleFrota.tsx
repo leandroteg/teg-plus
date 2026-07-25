@@ -211,7 +211,7 @@ export default function ControleFrota() {
   const inp = `px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
     isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-white/[0.04] border-white/[0.1] text-slate-200'
   }`
-  const th = `px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none ${txtMuted}`
+  const th = `px-2.5 py-2 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none ${txtMuted}`
 
   const corPct = (p: number, invertido = false) => {
     const bom = invertido ? p < 30 : p > 85
@@ -222,7 +222,9 @@ export default function ControleFrota() {
   }
 
   return (
-    <div className="pb-4 space-y-3">
+    // pb generoso: o botão flutuante do assistente cobre o canto inferior direito
+    // e escondia a última linha da tabela.
+    <div className="pb-20 space-y-3">
       {/* Filtros — tudo em uma linha, caixas selecionáveis */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
@@ -367,7 +369,7 @@ export default function ControleFrota() {
                   <th className={`${th} text-center cursor-default`} title="Avarias apontadas no último check-in">Avarias</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('hodometro')}>Hodôm. {seta('hodometro')}</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('disp')}>Disponib. {seta('disp')}</th>
-                  <th className={`${th} text-right`} onClick={() => toggleSort('ocio')}>Ociosid. {seta('ocio')}</th>
+                  <th className={`${th} text-right !pr-5`} onClick={() => toggleSort('ocio')}>Ociosid. {seta('ocio')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -375,18 +377,18 @@ export default function ControleFrota() {
                   <tr key={l.v.id} onClick={() => setDetalhe({ v: l.v, a: l.aloc })}
                     className={`cursor-pointer border-t ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.04]'}`}>
                     <td className="px-2 py-2">
-                      <span className={`font-mono text-xs font-extrabold ${txtMain}`}>{l.codigo}</span>
-                      <span className={`block text-[10px] truncate max-w-[170px] ${txtMuted}`}>{l.v.marca} {l.v.modelo}</span>
+                      <span className={`font-mono text-sm font-extrabold ${txtMain}`}>{l.codigo}</span>
+                      <span className={`block text-[11px] truncate max-w-[190px] ${txtMuted}`}>{l.v.marca} {l.v.modelo}</span>
                     </td>
-                    <td className={`px-2 py-2 font-mono text-xs ${txtMuted}`}>{l.v.placa}</td>
-                    <td className={`px-2 py-2 text-[11px] ${txtMuted}`}>{l.categoriaLabel}</td>
+                    <td className={`px-2.5 py-2 font-mono text-[13px] ${txtMuted}`}>{l.v.placa}</td>
+                    <td className={`px-2.5 py-2 text-xs ${txtMuted}`}>{l.categoriaLabel}</td>
                     <td className="px-2 py-2">
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] ${txtMuted}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-xs ${txtMuted}`}>
                         <span className={`w-2 h-2 rounded-full ${STATUS_DOT[l.v.status] ?? 'bg-slate-400'}`} />
                         {STATUS_LABEL[l.v.status] ?? l.v.status}
                       </span>
                     </td>
-                    <td className={`px-2 py-2 text-[11px] max-w-[200px] truncate ${txtMuted}`}>
+                    <td className={`px-2.5 py-2 text-xs max-w-[230px] truncate ${txtMuted}`}>
                       {l.obra || l.local || '—'}
                     </td>
                     <td className="px-2 py-2 text-center">
@@ -398,14 +400,14 @@ export default function ControleFrota() {
                     <td className="px-2 py-2 text-center">
                       <AvariaIcone temAvaria={l.ck ? l.ck.tem_avaria : null} descricao={l.ck?.avarias_novas} />
                     </td>
-                    <td className={`px-2 py-2 text-right text-[11px] tabular-nums ${txtMuted}`}>
+                    <td className={`px-2.5 py-2 text-right text-xs tabular-nums ${txtMuted}`}>
                       {l.v.hodometro_atual != null ? l.v.hodometro_atual.toLocaleString('pt-BR') : '—'}
                     </td>
-                    <td className={`px-2 py-2 text-right text-xs font-bold tabular-nums ${corPct(l.disp)}`}
+                    <td className={`px-2.5 py-2 text-right text-sm font-bold tabular-nums ${corPct(l.disp)}`}
                       title={`${l.diasOS.toFixed(1)} dia(s) parado em OS no período`}>
                       {l.disp.toFixed(0)}%
                     </td>
-                    <td className={`px-2 py-2 text-right text-xs font-bold tabular-nums ${l.ocio == null ? txtMuted : corPct(l.ocio, true)}`}
+                    <td className={`pl-2.5 pr-5 py-2 text-right text-sm font-bold tabular-nums whitespace-nowrap ${l.ocio == null ? txtMuted : corPct(l.ocio, true)}`}
                       title={l.ocio == null ? 'Sem telemetria no período' : undefined}>
                       {l.ocio == null ? '—' : `${l.ocio.toFixed(0)}%`}
                     </td>
