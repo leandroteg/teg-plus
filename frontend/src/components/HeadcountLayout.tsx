@@ -35,7 +35,7 @@ export default function HeadcountLayout() {
             label: 'Desligamento',
             description: 'Iniciar o processo de desligamento de um colaborador.',
             tone: 'rose' as const,
-            action: () => navigate('/rh/headcount/desligamento'),
+            action: () => navigate('/rh/headcount/desligamento?nova=1'),
           },
         ],
       },
