@@ -17,7 +17,6 @@ import ControladoriaFlow, { type FlowStep } from '../../components/Controladoria
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
-  useSaldoEpi, useEpiVariantes, useSalvarEpiVariante, useRemoverEpiVariante, useItensEstoqueEpi,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
@@ -26,7 +25,7 @@ import {
   type SstDocumento, type MatrizRiscoCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
-  useEstoqueEpi,
+  useEstoqueEpi, useSaldoEpi,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -1098,12 +1097,6 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
   const [ativo, setAtivo] = useState(epi?.ativo ?? true)
   const [buscandoCa, setBuscandoCa] = useState(false)
   const [caMsg, setCaMsg] = useState<string | null>(null)
-  // Vínculo com o almoxarifado: o catálogo guarda o CA, o saldo vem do estoque.
-  const { data: variantes = [] } = useEpiVariantes(epi?.id)
-  const salvarVar = useSalvarEpiVariante()
-  const removerVar = useRemoverEpiVariante()
-  const [buscaItem, setBuscaItem] = useState('')
-  const { data: itensEstoque = [] } = useItensEstoqueEpi(buscaItem)
 
   // Busca na base oficial espelhada (qsma_caepi) e preenche tudo — padrão SOC
   async function buscarCA() {
@@ -1134,7 +1127,6 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
   const avisos: string[] = []
   if (!ca.trim()) avisos.push('EPI sem CA — verifique se é isento')
   if (validadeCa && validadeCa < new Date().toISOString().split('T')[0]) avisos.push('CA vencido')
-  if (epi && variantes.length === 0) avisos.push('sem item de estoque vinculado — a entrega não dará baixa no almoxarifado')
 
   return (
     <QsmaModal isDark={isDark} titulo={epi ? 'Editar EPI' : 'Novo EPI no catálogo'} subtitulo="Digite o nº do CA e busque — nome, fabricante e validade vêm da base oficial do MTE" onClose={onClose}>
@@ -1164,69 +1156,6 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
           </p>
         )}
       </div>
-
-      {/* Vínculo com o almoxarifado — sem isso a entrega não dá baixa no estoque.
-          Um EPI (com CA) aponta para N itens de estoque: as variantes de tamanho/cor. */}
-      {epi && (
-        <div className={`rounded-xl border p-3 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50/60'}`}>
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <label className={pickerLabelCls(isDark)}>Itens de estoque vinculados *</label>
-            <span className={`text-[10px] font-bold ${variantes.length ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : 'text-amber-500'}`}>
-              {variantes.length} variante(s)
-            </span>
-          </div>
-
-          {variantes.length > 0 && (
-            <div className="space-y-1 mb-2">
-              {variantes.map(v => (
-                <div key={v.id} className="flex items-center gap-1.5 text-[11px]">
-                  <span className={`flex-1 truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    <b className="font-mono">{v.item?.codigo}</b> · {v.item?.descricao}
-                  </span>
-                  {v.tamanho && <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-500 font-bold">{v.tamanho}</span>}
-                  {v.cor && <span className="px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-500">{v.cor}</span>}
-                  {v.padrao && <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 font-bold">padrão</span>}
-                  <button onClick={() => removerVar.mutate(v.id)} className="text-slate-400 hover:text-red-500 p-0.5" title="Desvincular">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <input
-            value={buscaItem} onChange={e => setBuscaItem(e.target.value)}
-            placeholder="Buscar item do estoque (categoria EPI/EPC)…"
-            className={pickerInputCls(isDark)}
-          />
-          {buscaItem.trim().length > 1 && (
-            <div className={`mt-1 max-h-40 overflow-y-auto rounded-lg border ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-              {itensEstoque.filter(i => !variantes.some(v => v.item_id === i.id)).slice(0, 30).map(i => (
-                <button
-                  key={i.id}
-                  onClick={() => {
-                    const m = i.descricao.match(/\b(EXG|XG|GG|G|M|P)\b\s*$/i) ?? i.descricao.match(/TAMANHO\s+(\S+)/i)
-                    salvarVar.mutate({
-                      epi_id: epi.id, item_id: i.id,
-                      tamanho: m ? m[1].toUpperCase() : null,
-                      padrao: variantes.length === 0,
-                    })
-                    setBuscaItem('')
-                  }}
-                  className={`w-full text-left px-2 py-1.5 text-[11px] ${isDark ? 'hover:bg-white/[0.06] text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}
-                >
-                  <b className="font-mono">{i.codigo}</b> · {i.descricao}
-                </button>
-              ))}
-            </div>
-          )}
-          {!variantes.length && (
-            <p className="mt-1.5 text-[10px] text-amber-500">
-              Sem vínculo a entrega não dá baixa no estoque. Vincule ao menos um item.
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -1296,14 +1225,12 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
   const criar = useCriarFichaEpi()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: bases = [] } = useBases()
-  const { data: variantes = [] } = useEpiVariantes()
   const { perfil } = useAuth()
   const [cargoSel, setCargoSel] = useState('')
   const hoje = new Date().toISOString().split('T')[0]
   const [colabId, setColabId] = useState('')
   const [colabNome, setColabNome] = useState('')
   const [baseId, setBaseId] = useState('')
-  const { data: saldoPorEpi } = useSaldoEpi(baseId || undefined)
   const [dataEntrega, setDataEntrega] = useState(hoje)
   const [motivo, setMotivo] = useState<MotivoEntregaEpi>('entrega')
   const [obs, setObs] = useState('')
@@ -1349,8 +1276,6 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
         })) as ItemFichaEpi[],
       }
       const r = await criar.mutateAsync(payload)
-      // A baixa no almoxarifado pode ficar negativa (por decisão): o aviso não pode sumir.
-      if (r.avisos?.length) alert(`Ficha ${r.codigo} criada.\n\nATENÇÃO — estoque:\n• ${r.avisos.join('\n• ')}`)
       if (gerarPdfAoSalvar) {
         await gerarFichaEpiPdf({
           codigo: r.codigo,
@@ -1439,43 +1364,18 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
               className={pickerInputCls(isDark)}
             >
               <option value="">Selecione o EPI…</option>
-              {epis.map(e => {
-                const sld = saldoPorEpi?.get(e.id)
-                const vinc = variantes.some(v => v.epi_id === e.id)
-                return (
-                  <option key={e.id} value={e.id}>
-                    {e.nome}{e.ca ? ` · CA ${e.ca}` : ''}
-                    {!vinc ? ' · SEM ESTOQUE VINCULADO' : ` · saldo ${sld ?? 0}`}
-                  </option>
-                )
-              })}
+              {epis.map(e => <option key={e.id} value={e.id}>{e.nome}{e.ca ? ` · CA ${e.ca}` : ''}</option>)}
             </select>
             <input
               type="number" min={1} value={it.quantidade} title="Quantidade"
               onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, quantidade: e.target.value } : x))}
               className={pickerInputCls(isDark)}
             />
-            {/* tamanho vem das variantes reais do estoque — texto livre não casava */}
-            {(() => {
-              const tams = variantes.filter(v => v.epi_id === it.epi_id && v.tamanho).map(v => v.tamanho as string)
-              const uniq = [...new Set(tams)]
-              return uniq.length ? (
-                <select
-                  value={it.tamanho} title="Tamanho"
-                  onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
-                  className={pickerInputCls(isDark)}
-                >
-                  <option value="">Tam.</option>
-                  {uniq.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              ) : (
-                <input
-                  value={it.tamanho} placeholder="Tam." title="Tamanho"
-                  onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
-                  className={pickerInputCls(isDark)}
-                />
-              )
-            })()}
+            <input
+              value={it.tamanho} placeholder="Tam." title="Tamanho"
+              onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
+              className={pickerInputCls(isDark)}
+            />
             <button
               onClick={() => setItens(prev => prev.filter((_, j) => j !== i))}
               className="text-slate-400 hover:text-red-500 p-1"
@@ -2843,13 +2743,13 @@ function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEdit
   onNovoEpi: () => void; onEditEpi: (e: QsmaEpi) => void
 }) {
   const { data: epis = [], isLoading } = useEpis()
-  const { data: estoque } = useEstoqueEpi()
+  const { data: saldoEpi } = useSaldoEpi()
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'ca_vencido' | 'inativos'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
 
   const hoje = new Date().toISOString().slice(0, 10)
-  const saldoDe = (id: string) => estoque?.saldo.get(id) ?? 0
+  const saldoDe = (id: string) => saldoEpi?.get(id) ?? 0
   const q = busca.trim().toLowerCase()
   const filt = epis.filter(e =>
     (!q || e.nome.toLowerCase().includes(q) || (e.ca ?? '').includes(q) || (e.fabricante ?? '').toLowerCase().includes(q))
