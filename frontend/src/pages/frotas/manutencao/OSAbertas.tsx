@@ -8,6 +8,7 @@ import {
 import { UpperTextarea } from '../../../components/UpperInput'
 import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
+import { useAuth } from '../../../contexts/AuthContext'
 import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
 import MultiSelectPopover from '../../../components/MultiSelectPopover'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
@@ -70,6 +71,7 @@ const STAGE_ACCENT_DARK: Record<StageKey, AccentSet> = {
 
 function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean }) {
   const criar = useCriarOS()
+  const { perfil } = useAuth()
   const { data: veiculos = [] } = useVeiculos()
   const [form, setForm] = useState({
     veiculo_id: '', tipo: 'corretiva' as TipoOS,
@@ -84,6 +86,8 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
       prioridade: form.prioridade,
       descricao_problema: form.descricao_problema,
       data_previsao: form.data_previsao || undefined,
+      // Quem abriu — faz a OS aparecer em "Minhas Solicitações" para esta pessoa.
+      solicitante_id: perfil?.id,
     })
     onClose()
   }
@@ -243,6 +247,18 @@ export default function OSAbertas() {
     setSearchParams(p, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [novaParam])
+
+  // "Consultar andamento" (Minhas Solicitações): ?os=<id> abre a OS na etapa dela.
+  const osParam = searchParams.get('os')
+  const abriuOsParam = useRef(false)
+  useEffect(() => {
+    if (!osParam || abriuOsParam.current || !ordens.length) return
+    const alvo = ordens.find(o => o.id === osParam)
+    if (!alvo) return
+    abriuOsParam.current = true
+    setActiveTab((alvo.status === 'aberta' ? 'pendente' : alvo.status) as StageKey)
+    setDetail(alvo)
+  }, [osParam, ordens])
   const { data: veiculosAll = [] } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ClipboardList, Eye, Zap, X, AlertTriangle,
   CheckCircle2, Package, ShoppingCart, Truck, DollarSign,
-  Clock, Filter, Pencil, Plus,
+  Clock, Filter, Pencil, Plus, Wrench, FileSignature, Monitor,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -11,7 +11,7 @@ import { BarraPrazo } from '../components/BarraPrazo'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
-type Modulo = 'compras' | 'logistica' | 'financeiro'
+type Modulo = 'compras' | 'logistica' | 'financeiro' | 'frotas' | 'contratos' | 'ti' | 'estoque'
 
 interface SolicitacaoItem {
   id: string
@@ -32,6 +32,10 @@ const STATUS_ENCERRADOS: Record<Modulo, string[]> = {
   compras:    ['cancelada', 'pago', 'entregue', 'rejeitada'],
   logistica:  ['concluido', 'cancelado', 'recusado', 'entregue', 'confirmado'],
   financeiro: ['pago', 'cancelado'],
+  frotas:     ['concluida', 'cancelada', 'rejeitada'],
+  contratos:  ['cancelado', 'concluido', 'assinado', 'rejeitado'],
+  ti:         ['fechado', 'resolvido', 'cancelado'],
+  estoque:    ['atendida', 'cancelada'],
 }
 
 function isEncerrada(item: SolicitacaoItem) {
@@ -71,6 +75,38 @@ const MODULO_CONFIG: Record<Modulo, {
     dot: 'bg-amber-500',
     detalhePath: (id) => `/financeiro/contas-a-pagar`,
   },
+  frotas: {
+    label: 'Frotas',
+    icon: Wrench,
+    bg: 'bg-rose-100',
+    text: 'text-rose-700',
+    dot: 'bg-rose-500',
+    detalhePath: (id) => `/frotas/manutencao?tab=os&os=${id}`,
+  },
+  contratos: {
+    label: 'Contratos',
+    icon: FileSignature,
+    bg: 'bg-indigo-100',
+    text: 'text-indigo-700',
+    dot: 'bg-indigo-500',
+    detalhePath: (id) => `/contratos/solicitacoes/${id}`,
+  },
+  ti: {
+    label: 'TI',
+    icon: Monitor,
+    bg: 'bg-cyan-100',
+    text: 'text-cyan-700',
+    dot: 'bg-cyan-500',
+    detalhePath: (id) => `/ti/c/${id}`,
+  },
+  estoque: {
+    label: 'Estoque',
+    icon: Package,
+    bg: 'bg-emerald-100',
+    text: 'text-emerald-700',
+    dot: 'bg-emerald-500',
+    detalhePath: () => `/estoque/solicitacoes`,
+  },
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
@@ -101,6 +137,24 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   em_transito:         { label: 'Em trânsito',        cls: 'bg-sky-100 text-sky-700' },
   em_esclarecimento:   { label: 'Em esclarecimento',  cls: 'bg-orange-100 text-orange-700' },
   devolvida_solicitante: { label: 'Devolvida — editar', cls: 'bg-rose-100 text-rose-700' },
+  // Frotas (OS)
+  em_execucao:         { label: 'Em execução',       cls: 'bg-violet-100 text-violet-700' },
+  aguardando:          { label: 'Aguardando',        cls: 'bg-orange-100 text-orange-700' },
+  concluida:           { label: 'Concluída',         cls: 'bg-green-100 text-green-700' },
+  // TI (chamados)
+  aberto:              { label: 'Aberto',            cls: 'bg-yellow-100 text-yellow-700' },
+  em_atendimento:      { label: 'Em atendimento',    cls: 'bg-blue-100 text-blue-700' },
+  aguardando_usuario:  { label: 'Aguarda você',      cls: 'bg-orange-100 text-orange-700' },
+  fechado:             { label: 'Fechado',           cls: 'bg-slate-100 text-slate-500' },
+  resolvido:           { label: 'Resolvido',         cls: 'bg-green-100 text-green-700' },
+  // Contratos
+  em_andamento:        { label: 'Em andamento',      cls: 'bg-blue-100 text-blue-700' },
+  // Estoque
+  aberta:              { label: 'Aberta',            cls: 'bg-yellow-100 text-yellow-700' },
+  em_separacao:        { label: 'Em separação',      cls: 'bg-blue-100 text-blue-700' },
+  atendida:            { label: 'Atendida',          cls: 'bg-green-100 text-green-700' },
+  parcial:             { label: 'Atendida parcial',  cls: 'bg-amber-100 text-amber-700' },
+  encaminhada_compras: { label: 'Foi p/ Compras',    cls: 'bg-violet-100 text-violet-700' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -364,7 +418,7 @@ function SolicitacaoCard({
             Consultar andamento
           </button>
         )}
-        {!encerrada && !precisaAcao && item.modulo !== 'financeiro' && (
+        {!encerrada && !precisaAcao && (item.modulo === 'compras' || item.modulo === 'logistica') && (
           <button
             onClick={() => onUrgencia(item)}
             disabled={jaUrgente}

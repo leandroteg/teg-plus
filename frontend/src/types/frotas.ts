@@ -119,6 +119,8 @@ export interface FroOrdemServico {
   status_detalhe?: string
   /** Etapa de origem ao ir para Aguardando — para onde retorna ao ser retomada. */
   status_anterior?: string
+  /** Perfil que abriu a OS (sys_perfis) — alimenta a tela Minhas Solicitações. */
+  solicitante_id?: string
   /** Parecer técnico da abertura — obrigatório na corretiva/sinistro (SUP-PRO-001). */
   parecer_tecnico?: string
   /** Envio a Suprimentos: inicia o SLA de 5 dias da categoria Manutenção de Frota. */
@@ -293,6 +295,7 @@ export interface FrotasKPIs {
 
 export interface CriarOSPayload {
   veiculo_id?: string
+  solicitante_id?: string
   ativo_livre?: string
   natureza?: NaturezaOS
   tipo?: TipoOS
