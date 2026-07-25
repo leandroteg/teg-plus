@@ -13,11 +13,12 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer } from 'lucide-react'
 import { imprimirQrAtivos } from '../../../components/frotas/QrAtivo'
-import { useVeiculos, useAlocacoes, useOrdensServico } from '../../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes, useOrdensServico, useUltimosCheckins } from '../../../hooks/useFrotas'
 import { useUtilizacaoVeiculos } from '../../../hooks/useTelemetria'
 import { useTheme } from '../../../contexts/ThemeContext'
 import MultiSelectPopover from '../../../components/MultiSelectPopover'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { NotaIcone, AvariaIcone, TrioCheckin } from '../../../components/frotas/CheckinIndicadores'
 import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import type { FroVeiculo, FroAlocacao, FroOrdemServico } from '../../../types/frotas'
@@ -84,9 +85,12 @@ export default function ControleFrota() {
   const { data: veiculos = [], isLoading } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const { data: ordens = [] } = useOrdensServico()
+  const { data: ultimosCheckin = [] } = useUltimosCheckins()
   const { data: utilizacao = [] } = useUtilizacaoVeiculos(inicio, fim)
 
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+  // Último check-in por ativo — alimenta Condição / Limpeza / Avarias.
+  const checkinByVeic = useMemo(() => new Map(ultimosCheckin.map(c => [c.veiculo_id, c])), [ultimosCheckin])
 
   // Abre a ficha assim que os dados chegam (uma vez só).
   useEffect(() => {
@@ -130,15 +134,16 @@ export default function ControleFrota() {
       }
 
       const { codigo, categoria } = formatCodigoCategoria(v)
+      const ck = checkinByVeic.get(v.id)
       return {
-        v, aloc, obs, diasOS, disp, ocio,
+        v, aloc, obs, diasOS, disp, ocio, ck,
         codigo, categoriaLabel: categoria || (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria),
         obra: aloc?.obra?.nome ?? '',
         local: obs.local ?? '',
         responsavel: aloc?.responsavel_nome ?? obs.responsavel ?? '',
       }
     })
-  }, [veiculos, alocByVeic, utilByVeic, osByVeic, inicio, fim])
+  }, [veiculos, alocByVeic, utilByVeic, osByVeic, checkinByVeic, inicio, fim])
 
   // ── Opções dos filtros ────────────────────────────────────────────────────
   const opts = useMemo(() => ({
@@ -321,6 +326,14 @@ export default function ControleFrota() {
 
                 {l.obra && <span className={`text-[11px] truncate max-w-[220px] ${txtMuted}`}>📍 {l.obra}</span>}
 
+                {/* Último check-in: condição · limpeza · avarias */}
+                <TrioCheckin
+                  funcional={l.ck?.aval_funcional}
+                  limpeza={l.ck?.aval_limpeza}
+                  temAvaria={l.ck ? l.ck.tem_avaria : null}
+                  avaria={l.ck?.avarias_novas}
+                />
+
                 <span className="ml-auto flex items-center gap-4 shrink-0">
                   <span className="text-right">
                     <span className={`block text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Disponib.</span>
@@ -348,6 +361,10 @@ export default function ControleFrota() {
                   <th className={`${th} text-left`} onClick={() => toggleSort('categoria')}>Categoria {seta('categoria')}</th>
                   <th className={`${th} text-left`} onClick={() => toggleSort('status')}>Situação {seta('status')}</th>
                   <th className={`${th} text-left`} onClick={() => toggleSort('obra')}>Obra / Base {seta('obra')}</th>
+                  {/* Último check-in diário — leitura visual, sem ordenação */}
+                  <th className={`${th} text-center cursor-default`} title="Condições funcionais no último check-in">Condição</th>
+                  <th className={`${th} text-center cursor-default`} title="Limpeza no último check-in">Limpeza</th>
+                  <th className={`${th} text-center cursor-default`} title="Avarias apontadas no último check-in">Avarias</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('hodometro')}>Hodôm. {seta('hodometro')}</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('disp')}>Disponib. {seta('disp')}</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('ocio')}>Ociosid. {seta('ocio')}</th>
@@ -371,6 +388,15 @@ export default function ControleFrota() {
                     </td>
                     <td className={`px-2 py-2 text-[11px] max-w-[200px] truncate ${txtMuted}`}>
                       {l.obra || l.local || '—'}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <NotaIcone nota={l.ck?.aval_funcional} titulo="Condição" />
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <NotaIcone nota={l.ck?.aval_limpeza} titulo="Limpeza" />
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <AvariaIcone temAvaria={l.ck ? l.ck.tem_avaria : null} descricao={l.ck?.avarias_novas} />
                     </td>
                     <td className={`px-2 py-2 text-right text-[11px] tabular-nums ${txtMuted}`}>
                       {l.v.hodometro_atual != null ? l.v.hodometro_atual.toLocaleString('pt-BR') : '—'}

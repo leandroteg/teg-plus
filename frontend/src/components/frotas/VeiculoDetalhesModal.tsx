@@ -10,6 +10,7 @@ import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, StatusOS, TipoOS } from '../../types/frotas'
 import { parseObsInfo } from './veiculoObs'
 import QrAtivoBloco from './QrAtivo'
+import CheckinsBloco from './CheckinsBloco'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../constants/categoriaVeiculo'
 
 // ── Shared helpers ──────────────────────────────────────────────────────────────
@@ -609,6 +610,9 @@ export default function VeiculoDetalhesModal({
 
           {/* QR para colar no ativo — leitura pelo Portal TEG */}
           <QrAtivoBloco veiculo={v} isLight={isLight} />
+
+          {/* Último check-in diário + atalho para a lista completa */}
+          <CheckinsBloco veiculoId={v.id} titulo={`${v.codigo_interno || v.placa || ''} ${v.marca ?? ''} ${v.modelo ?? ''}`.trim()} isLight={isLight} />
 
           {/* Histórico de serviços (OS) */}
           <HistoricoServicos veiculoId={v.id} isLight={isLight} />
