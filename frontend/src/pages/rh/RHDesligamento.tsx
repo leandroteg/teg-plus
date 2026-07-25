@@ -8,7 +8,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   UserMinus, ClipboardList, ShieldCheck, ClipboardCheck, FileCheck, DollarSign,
   CheckCircle2, ChevronLeft, ChevronRight, Plus, Construction, Receipt,
-  Search, PackageCheck, Loader2, Wallet, X, CheckCircle, XCircle, ArrowRight, AlertTriangle, Ban,
+  Search, PackageCheck, Loader2, Wallet, X, CheckCircle, XCircle, ArrowRight, AlertTriangle,
   LayoutList, LayoutGrid, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -392,6 +392,7 @@ function NadaConstaPanel({ isDark, fixo }: { isDark: boolean; fixo?: { id: strin
   const { data: linhas = [], isLoading } = useNadaConsta(sel?.id, sel?.nome)
   const definirValor = useDefinirValorCautela()
   const baixar = useBaixarNadaConsta()
+  const [selDev, setSelDev] = useState<Set<string>>(new Set())
 
   const card = isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'
   const txtMain = isDark ? 'text-slate-100' : 'text-slate-800'
@@ -413,13 +414,17 @@ function NadaConstaPanel({ isDark, fixo }: { isDark: boolean; fixo?: { id: strin
     try { await definirValor.mutateAsync({ item, valor: v, quem: perfil?.nome }) }
     catch (e: any) { alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
   }
-  async function darBaixa(item: string, tipo: 'devolucao' | 'perda', desc: string) {
-    const msg = tipo === 'devolucao' ? `Confirmar devolução de "${desc}"? Retorna ao estoque.`
-      : `Baixar "${desc}" como PERDA? Encerra a pendência sem retorno ao estoque.`
+  async function confirmarDevolucao(refs: string[]) {
+    if (!refs.length) return
+    const msg = refs.length === 1 ? 'Confirmar a devolução deste item? Ele volta ao estoque e sai da conta.'
+      : `Confirmar a devolução de ${refs.length} itens? Voltam ao estoque e saem da conta.`
     if (!window.confirm(msg)) return
-    try { await baixar.mutateAsync({ item, tipo, quemId: perfil?.id, quemNome: perfil?.nome }) }
-    catch (e: any) { alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
+    try {
+      for (const item of refs) await baixar.mutateAsync({ item, tipo: 'devolucao', quemId: perfil?.id, quemNome: perfil?.nome })
+      setSelDev(new Set())
+    } catch (e: any) { alert(`Erro: ${e?.message ?? 'desconhecido'}`) }
   }
+  const toggleSel = (ref: string) => setSelDev(p => { const n = new Set(p); n.has(ref) ? n.delete(ref) : n.add(ref); return n })
 
   return (
     <div className={`rounded-2xl border p-4 sm:p-5 ${card}`}>
@@ -452,10 +457,26 @@ function NadaConstaPanel({ isDark, fixo }: { isDark: boolean; fixo?: { id: strin
               <p className={`text-xs ${txtMut}`}>{pend.length} pendência(s) em aberto</p>
             </div>
             <div className={`text-right px-4 py-2 rounded-xl ${total > 0 ? (isDark ? 'bg-red-500/15' : 'bg-red-50') : (isDark ? 'bg-emerald-500/15' : 'bg-emerald-50')}`}>
-              <p className={`text-[10px] uppercase tracking-wide ${txtMut}`}>Total em aberto</p>
+              <p className={`text-[10px] uppercase tracking-wide ${txtMut}`}>A descontar na rescisão</p>
               <p className={`text-lg font-bold ${total > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{moeda(total)}</p>
             </div>
           </div>
+
+          {pend.some(l => l.origem === 'cautela') && (
+            <div className="flex items-center gap-2 mb-2">
+              <label className={`flex items-center gap-1.5 text-xs ${txtMut}`}>
+                <input type="checkbox"
+                  checked={selDev.size > 0 && selDev.size === pend.filter(l => l.origem === 'cautela').length}
+                  onChange={e => setSelDev(e.target.checked ? new Set(pend.filter(l => l.origem === 'cautela').map(l => l.ref_id)) : new Set())} />
+                Selecionar todos
+              </label>
+              <button onClick={() => confirmarDevolucao([...selDev])} disabled={!selDev.size || baixar.isPending}
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">
+                {baixar.isPending ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
+                Confirmar devolução{selDev.size ? ` (${selDev.size})` : ''}
+              </button>
+            </div>
+          )}
 
           {isLoading && <p className={`text-sm ${txtMut} flex items-center gap-2`}><Loader2 size={14} className="animate-spin" /> carregando…</p>}
 
@@ -468,56 +489,41 @@ function NadaConstaPanel({ isDark, fixo }: { isDark: boolean; fixo?: { id: strin
           )}
 
           {!isLoading && pend.length > 0 && (
-            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
-                    {['Origem', 'Item', 'Qtd', 'Local', 'Retirada → limite', 'Valor', ''].map((h, i) => (
-                      <th key={i} className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wide ${i === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className={isDark ? 'divide-y divide-white/5' : 'divide-y divide-slate-100'}>
-                  {pend.map(l => (
-                    <tr key={l.ref_id}>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${l.origem === 'repasse'
-                          ? (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700')
-                          : (isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-50 text-sky-700')}`}>
-                          {l.origem === 'repasse' ? 'Repasse' : 'Cautela'}
-                        </span>
-                      </td>
-                      <td className={`px-3 py-2.5 ${txtMain}`}>{l.descricao}</td>
-                      <td className={`px-3 py-2.5 ${txtMut}`}>{Number(l.quantidade)}</td>
-                      <td className={`px-3 py-2.5 ${txtMut}`}>{l.local}</td>
-                      <td className={`px-3 py-2.5 ${txtMut} whitespace-nowrap`}>{dataBR(l.data_ini)} → {dataBR(l.data_lim)}</td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        <button onClick={() => l.origem === 'cautela' && editarValor(l.ref_id, Number(l.valor))}
-                          className={`font-semibold ${l.origem === 'cautela' ? 'hover:underline cursor-pointer' : 'cursor-default'} ${Number(l.valor) > 0 ? txtMain : 'text-amber-500'}`}
-                          title={l.origem === 'cautela' ? 'Clique para definir o valor de reposição' : ''}>
-                          {Number(l.valor) > 0 ? moeda(Number(l.valor)) : 'definir'}
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        {l.origem === 'cautela' && (
-                          <span className="inline-flex gap-1">
-                            <button onClick={() => darBaixa(l.ref_id, 'devolucao', l.descricao)} disabled={baixar.isPending}
-                              className={`text-[11px] px-2 py-1 rounded-lg font-semibold ${isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>Devolver</button>
-                            <button onClick={() => darBaixa(l.ref_id, 'perda', l.descricao)} disabled={baixar.isPending}
-                              className={`text-[11px] px-2 py-1 rounded-lg font-semibold ${isDark ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>Perda</button>
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className={`rounded-xl border divide-y ${isDark ? 'border-white/10 divide-white/5' : 'border-slate-200 divide-slate-100'}`}>
+              {pend.map(l => (
+                <div key={l.ref_id} className="flex items-center gap-3 px-3 py-2.5">
+                  {l.origem === 'cautela'
+                    ? <input type="checkbox" className="shrink-0" checked={selDev.has(l.ref_id)} onChange={() => toggleSel(l.ref_id)} />
+                    : <span className="w-[13px] shrink-0" />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${l.origem === 'repasse'
+                        ? (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700')
+                        : (isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-50 text-sky-700')}`}>
+                        {l.origem === 'repasse' ? 'REPASSE' : 'CAUTELA'}
+                      </span>
+                      <span className={`text-sm font-semibold truncate ${txtMain}`}>{l.descricao}</span>
+                      {Number(l.quantidade) > 1 && <span className={`text-xs shrink-0 ${txtMut}`}>×{Number(l.quantidade)}</span>}
+                    </div>
+                    <p className={`text-[11px] truncate ${txtMut}`}>
+                      {l.local !== '—' ? `${l.local} · ` : ''}{dataBR(l.data_ini)} → vence {dataBR(l.data_lim)}
+                    </p>
+                  </div>
+
+                  <button onClick={() => l.origem === 'cautela' && editarValor(l.ref_id, Number(l.valor))}
+                    className={`text-sm font-bold shrink-0 w-[92px] text-right ${l.origem === 'cautela' ? 'hover:underline cursor-pointer' : 'cursor-default'} ${Number(l.valor) > 0 ? txtMain : 'text-amber-500'}`}
+                    title={l.origem === 'cautela' ? 'Definir valor de reposição' : ''}>
+                    {Number(l.valor) > 0 ? moeda(Number(l.valor)) : 'definir R$'}
+                  </button>
+
+                </div>
+              ))}
             </div>
           )}
 
           <p className={`text-[11px] mt-3 ${txtMut}`}>
             <Wallet size={11} className="inline mb-0.5 mr-1" />
-            EPI de consumo depreciado sai sozinho da lista; item devolvível fica até voltar. Repasse é casado pelo nome do favorecido.
+            Confirme a devolução do que voltar (sai da conta). O que ficar em aberto é descontado na rescisão. EPI de consumo depreciado já sai sozinho.
           </p>
         </>
       )}
@@ -709,7 +715,7 @@ function DesligamentoDetalhe({ d, isDark, onClose }: { d: Desligamento; isDark: 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+        className={`w-full max-w-3xl rounded-2xl border shadow-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
         <div className={`flex items-center justify-between px-5 py-3 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
           <div>
             <p className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{d.colaborador_nome}</p>
@@ -796,22 +802,17 @@ function DesligamentoDetalhe({ d, isDark, onClose }: { d: Desligamento; isDark: 
           )}
 
           {d.status === 'nada_consta' && (
-            totalAberto > 0 ? (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-red-500 inline-flex items-center gap-1"><AlertTriangle size={13} /> R$ {totalAberto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em aberto</span>
-                {podeAprovar && (
-                  <button onClick={() => avancar('rescisao')} disabled={atualizar.isPending}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                    <Ban size={14} /> Liberar mesmo assim
-                  </button>
-                )}
-              </div>
-            ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              {totalAberto > 0 && (
+                <span className="text-xs text-amber-500 inline-flex items-center gap-1">
+                  <AlertTriangle size={13} /> R$ {totalAberto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} serão descontados na rescisão
+                </span>
+              )}
               <button onClick={() => avancar('rescisao')} disabled={atualizar.isPending}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
                 <ArrowRight size={14} /> Ir para Rescisão
               </button>
-            )
+            </div>
           )}
 
           {d.status === 'rescisao' && (
