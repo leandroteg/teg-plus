@@ -207,7 +207,7 @@ export default function OSAbertas() {
   const [dataFim, setDataFim] = useState('')
 
   // Deep link do Portal (?veiculo=<id>): restringe o pipeline àquele ativo.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const veiculoLink = searchParams.get('veiculo')
   const abriuLink = useRef(false)
   const [sortField, setSortField] = useState<SortField>('data')
@@ -232,10 +232,17 @@ export default function OSAbertas() {
   }, [veiculoLink, ordens])
 
   // Deep link do flyout "Nova Demanda (OS)": /frotas/manutencao?tab=os&nova=<ts>
-  const abriuNova = useRef(false)
+  // Cada clique manda um ts novo. Abrimos e LIMPAMOS o param — assim, ao fechar
+  // e clicar de novo (ts diferente), o efeito dispara outra vez e reabre.
+  const novaParam = searchParams.get('nova')
   useEffect(() => {
-    if (searchParams.get('nova') && !abriuNova.current) { abriuNova.current = true; setNovaAberta(true) }
-  }, [searchParams])
+    if (!novaParam) return
+    setNovaAberta(true)
+    const p = new URLSearchParams(searchParams)
+    p.delete('nova')
+    setSearchParams(p, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novaParam])
   const { data: veiculosAll = [] } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])
