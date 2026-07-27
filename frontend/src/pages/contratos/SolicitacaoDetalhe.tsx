@@ -1370,7 +1370,12 @@ export default function SolicitacaoDetalhe() {
           )}
 
           {/* Documentos anexados (Fornecedor + Complementares) */}
-          <SolicitacaoDocsSection solicitacaoId={s.id} staged={[]} onStagedChange={() => {}} />
+          <SolicitacaoDocsSection
+            solicitacaoId={s.id}
+            staged={[]}
+            onStagedChange={() => {}}
+            tipoPessoa={s.contraparte_cnpj?.replace(/\D/g, '').length === 11 ? 'fisica' : 'juridica'}
+          />
 
           {/* Observacoes */}
           {s.observacoes && (
