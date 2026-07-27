@@ -14,19 +14,21 @@ interface Props {
   solicitacaoId?: string | null
   staged: StagedDoc[]
   onStagedChange: (next: StagedDoc[]) => void
+  /** Tipo de pessoa da contraparte — muda os documentos obrigatórios (PF não tem Cartão CNPJ). */
+  tipoPessoa?: 'juridica' | 'fisica'
 }
 
 const fmtSize = (b?: number | null) =>
   b == null ? '' : b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`
 
-export default function SolicitacaoDocsSection({ solicitacaoId, staged, onStagedChange }: Props) {
+export default function SolicitacaoDocsSection({ solicitacaoId, staged, onStagedChange, tipoPessoa = 'juridica' }: Props) {
   const isExisting = Boolean(solicitacaoId)
   const { data: anexos = [], isLoading } = useSolicitacaoAnexos(solicitacaoId)
   const upload = useUploadSolicitacaoAnexo()
   const remover = useRemoverSolicitacaoAnexo()
   const [erro, setErro] = useState<string | null>(null)
 
-  const pendencia = motivoBloqueioDocsObrigatorios(anexos, staged)
+  const pendencia = motivoBloqueioDocsObrigatorios(anexos, staged, tipoPessoa)
 
   async function abrir(path: string) {
     try {
@@ -45,8 +47,11 @@ export default function SolicitacaoDocsSection({ solicitacaoId, staged, onStaged
             <Paperclip size={10} /> Documentos
           </p>
           <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-            Obrigatórios para enviar: <strong>Cartão CNPJ</strong> + (<strong>CNH</strong> ou <strong>CPF</strong>) +
-            {' '}(<strong>Proposta Comercial</strong> ou <strong>Ordem de Compra</strong>). PDF ou imagem, até 15 MB.
+            Obrigatórios para enviar:{' '}
+            {tipoPessoa === 'fisica'
+              ? <>(<strong>CPF</strong> ou <strong>CNH</strong>)</>
+              : <><strong>Cartão CNPJ</strong> + (<strong>CNH</strong> ou <strong>CPF</strong>)</>}
+            {' '}+ (<strong>Proposta Comercial</strong> ou <strong>Ordem de Compra</strong>). PDF ou imagem, até 15 MB.
           </p>
         </div>
         <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 shrink-0 ${

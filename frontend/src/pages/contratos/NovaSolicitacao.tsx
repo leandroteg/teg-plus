@@ -500,7 +500,7 @@ export default function NovaSolicitacao() {
     if (!contraparteNome.trim()) return setErro('Informe o nome da contraparte')
     if (!objeto.trim()) return setErro('Informe o objeto do contrato')
     if (!justificativa.trim()) return setErro('Informe a justificativa')
-    const docErr = motivoBloqueioDocsObrigatorios([], stagedDocs)
+    const docErr = motivoBloqueioDocsObrigatorios([], stagedDocs, tipoPessoa)
     if (docErr) return setErro(docErr)
 
     try {
@@ -983,7 +983,7 @@ export default function NovaSolicitacao() {
           </div>
 
           {/* Documentos (anexos) — Fornecedor + Complementares */}
-          <SolicitacaoDocsSection staged={stagedDocs} onStagedChange={setStagedDocs} />
+          <SolicitacaoDocsSection staged={stagedDocs} onStagedChange={setStagedDocs} tipoPessoa={tipoPessoa} />
         </div>
       )}
 

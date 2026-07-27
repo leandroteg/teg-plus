@@ -61,21 +61,24 @@ export interface StagedDoc {
 }
 
 /**
- * Regra de obrigatoriedade para ENVIAR (não para rascunho):
- *   Cartão CNPJ + (CNH ou CPF) + (Proposta Comercial ou Ordem de Compra).
+ * Regra de obrigatoriedade para ENVIAR (não para rascunho), por tipo de pessoa:
+ *   • Jurídica: Cartão CNPJ + (CNH ou CPF) + (Proposta Comercial ou Ordem de Compra).
+ *   • Física:   (CPF ou CNH) + (Proposta Comercial ou Ordem de Compra) — PF não tem Cartão CNPJ.
  * Considera anexos já salvos (detalhe) + staged (nova solicitação).
  * Retorna a mensagem do primeiro bloqueio, ou null se tudo ok.
  */
 export function motivoBloqueioDocsObrigatorios(
   existentes: { tipo: SolicitacaoDocTipo }[],
   staged: { tipo: SolicitacaoDocTipo }[],
+  tipoPessoa: 'juridica' | 'fisica' = 'juridica',
 ): string | null {
   const tipos = new Set<SolicitacaoDocTipo>([
     ...existentes.map(a => a.tipo),
     ...staged.map(s => s.tipo),
   ])
-  if (!tipos.has('cartao_cnpj')) return 'Anexe o Cartão CNPJ (Documentos do Fornecedor).'
-  if (!tipos.has('cnh') && !tipos.has('cpf')) return 'Anexe a CNH ou o CPF (Documentos do Fornecedor).'
+  if (tipoPessoa === 'juridica' && !tipos.has('cartao_cnpj'))
+    return 'Anexe o Cartão CNPJ (Documentos do Fornecedor).'
+  if (!tipos.has('cnh') && !tipos.has('cpf')) return 'Anexe o CPF ou a CNH (Documentos do Fornecedor).'
   if (!tipos.has('proposta_comercial') && !tipos.has('ordem_compra'))
     return 'Anexe a Proposta Comercial ou a Ordem de Compra (Documentos Complementares).'
   return null
