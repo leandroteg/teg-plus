@@ -1031,7 +1031,14 @@ export function useRegistro() {
         .update({ matricula: i.matricula || null }).eq('id', i.colaboradorId)
       if (error) throw error
     },
-    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+    // Grava em rh_colaboradores, mas quem EXIBE o valor é useMatriculaColaborador.
+    // Sem invalidar essa query o campo volta a aparecer vazio e parece que nao salvou
+    // (e o botao Finalizar continua bloqueado por "sem matricula").
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-colab-matricula', v.colaboradorId] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
   })
   // Envia a ficha + documentos do candidato por e-mail (caixa do RH via n8n)
   const enviarEmail = useMutation({
@@ -1051,7 +1058,10 @@ export function useRegistro() {
         .update({ secullum_lotacao: i.lotacao || null }).eq('id', i.colaboradorId)
       if (error) throw error
     },
-    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-colab-matricula', v.colaboradorId] })
+    },
   })
   // Finaliza o registro: efetiva o colaborador (RPC passos 1-2: ativo/headcount) e
   // dispara OneDrive (pasta + anexos) + Secullum (cadastro) via SuperTEG (n8n, passos 3-4, assíncrono).

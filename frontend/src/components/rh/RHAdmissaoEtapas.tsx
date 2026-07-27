@@ -41,6 +41,11 @@ function CampoTexto({ valor, onSave, textarea, ...props }: {
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV(e.target.value),
     onFocus: () => setFocado(true),
     onBlur: () => { setFocado(false); if ((valor ?? '') !== v) onSave(v) },
+    // Enter também salva: digitar e teclar Enter é o reflexo natural em campo
+    // curto (matrícula), e antes o valor se perdia se a pessoa não clicasse fora.
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !textarea) { e.preventDefault(); (e.target as HTMLInputElement).blur() }
+    },
   }
   return textarea
     ? <textarea {...(shared as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} />
