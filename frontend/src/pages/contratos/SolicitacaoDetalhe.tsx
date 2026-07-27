@@ -27,6 +27,7 @@ import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } 
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
 import NumericInput from '../../components/NumericInput'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import SolicitacaoDocsSection from '../../components/SolicitacaoDocsSection'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -1367,6 +1368,9 @@ export default function SolicitacaoDetalhe() {
               </div>
             </div>
           )}
+
+          {/* Documentos anexados (Fornecedor + Complementares) */}
+          <SolicitacaoDocsSection solicitacaoId={s.id} staged={[]} onStagedChange={() => {}} />
 
           {/* Observacoes */}
           {s.observacoes && (
