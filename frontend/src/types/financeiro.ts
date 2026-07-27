@@ -37,6 +37,7 @@ export const CR_PIPELINE_STAGES: { status: StatusCR; label: string; color: strin
   { status: 'aguardando',   label: 'Aguardando',    color: 'orange',  borderColor: 'border-t-orange-500' },
   { status: 'recebido',     label: 'Recebidos',     color: 'teal',    borderColor: 'border-t-teal-500' },
   { status: 'conciliado',   label: 'Conciliados',   color: 'green',   borderColor: 'border-t-green-500' },
+  { status: 'cancelado',    label: 'Cancelados',    color: 'rose',    borderColor: 'border-t-rose-500' },
 ]
 
 export type TipoDocumento =
