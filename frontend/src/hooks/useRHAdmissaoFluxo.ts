@@ -546,6 +546,8 @@ export interface RHTreinamento {
   candidato_id: string
   nome: string
   norma: string | null
+  /** Curso do catálogo (célula onde o upload foi feito). Nulo só em registro legado. */
+  treinamento_id?: string | null
   status: 'pendente' | 'concluido'
 }
 
@@ -791,10 +793,11 @@ export function useAsoSetStatus() {
 export function useTreinamentos() {
   const qc = useQueryClient()
   const add = useMutation({
-    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; concluido?: boolean }) => {
+    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; treinamentoId?: string; concluido?: boolean }) => {
       const { error } = await supabase.from('rh_admissao_treinamentos')
         .insert({
           candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+          treinamento_id: i.treinamentoId ?? null,
           status: i.concluido ? 'concluido' : 'pendente',
           concluido_em: i.concluido ? new Date().toISOString() : null,
         })
@@ -820,18 +823,20 @@ export function useTreinamentos() {
   })
   // anexa o certificado (bucket rh-admissao-docs) e conclui aquele treinamento
   const anexarCert = useMutation({
-    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; file: File }) => {
+    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; treinamentoId?: string; file: File }) => {
       const safe = i.file.name.replace(/[^\w.\-]+/g, '_')
       const path = `treinamentos/${i.candidatoId}/${Date.now()}_${safe}`
       const { error: upErr } = await supabase.storage.from('rh-admissao-docs').upload(path, i.file, { upsert: true })
       if (upErr) throw upErr
-      const patch = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      const patch: Record<string, unknown> = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      if (i.treinamentoId) patch.treinamento_id = i.treinamentoId
       if (i.recId) {
         const { error } = await supabase.from('rh_admissao_treinamentos').update(patch).eq('id', i.recId)
         if (error) throw error
       } else {
         const { error } = await supabase.from('rh_admissao_treinamentos')
-          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null, ...patch })
+          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+                    treinamento_id: i.treinamentoId ?? null, ...patch })
         if (error) throw error
       }
     },
@@ -853,6 +858,8 @@ export async function certTreinamentoUrl(path?: string | null): Promise<string |
 export interface IntegracaoCand { id: string; nome: string; cargo: string | null; base: string | null; admissao_id: string; colaborador_id: string | null }
 export interface IntegracaoTreino {
   id: string; candidato_id: string; nome: string; norma: string | null
+  /** Curso do catálogo — identifica a célula sem depender de casar texto. */
+  treinamento_id?: string | null
   status: string; certificado_path: string | null; certificado_nome: string | null
 }
 
@@ -875,7 +882,7 @@ export function useIntegracaoTreinos() {
       if (ids.length) {
         const { data: tr } = await supabase
           .from('rh_admissao_treinamentos')
-          .select('id, candidato_id, nome, norma, status, certificado_path, certificado_nome')
+          .select('id, candidato_id, nome, norma, treinamento_id, status, certificado_path, certificado_nome')
           .in('candidato_id', ids)
         treinos = (tr ?? []) as IntegracaoTreino[]
       }

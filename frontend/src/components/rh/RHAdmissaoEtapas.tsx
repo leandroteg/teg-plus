@@ -442,7 +442,7 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
 // Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
 export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   cand: RHAdmissaoCandidato; cargo?: string | null
-  treinamentos: { id: string; nome: string; norma: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
+  treinamentos: { id: string; nome: string; norma: string | null; treinamento_id?: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
 }) {
   const trein = useTreinamentos()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
@@ -452,8 +452,12 @@ export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
   // ASO vem da etapa Exames — não aparece aqui
   const required = catalogo.filter(c => reqIds.has(c.id) && c.codigo !== 'ASO').sort((a, b) => a.ordem - b.ordem)
-  const recDe = (cat: { nome: string; norma: string | null }) =>
-    treinamentos.find(t => (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
+  // Casa pelo curso gravado no upload (treinamento_id). Casar por norma marcaria
+  // dois cursos com um certificado só quando a norma é compartilhada
+  // (NR-10 Básico x NR-10 SEP). Nome só para registro legado, sem id.
+  const recDe = (cat: { id: string; nome: string; norma: string | null }) =>
+    treinamentos.find(t => t.treinamento_id === cat.id)
+    ?? treinamentos.find(t => !t.treinamento_id && t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
   const usadosIds = new Set(required.map(c => recDe(c)?.id).filter(Boolean) as string[])
   const extras = treinamentos.filter(t => !usadosIds.has(t.id))
   const feitos = required.filter(c => recDe(c)?.status === 'concluido').length
@@ -487,7 +491,7 @@ export function TreinamentosBlock({ cand, cargo, treinamentos }: {
               <label className={`cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${temCert ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-teal-600 hover:bg-teal-700 text-white'} ${trein.anexarCert.isPending ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={11} /> {temCert ? 'Trocar' : 'Upload'}
                 <input type="file" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) trein.anexarCert.mutate({ candidatoId: cand.id, recId: rec?.id, nome: cat.nome, norma: cat.norma ?? undefined, file: f }); e.currentTarget.value = '' }} />
+                  onChange={e => { const f = e.target.files?.[0]; if (f) trein.anexarCert.mutate({ candidatoId: cand.id, recId: rec?.id, nome: cat.nome, norma: cat.norma ?? undefined, treinamentoId: cat.id, file: f }); e.currentTarget.value = '' }} />
               </label>
             </div>
           )
