@@ -13,7 +13,6 @@ import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
-import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -45,17 +44,6 @@ const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof Clipbo
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
 
-// Admin override: status em que um administrador pode cancelar a RC direto pela
-// modal (ex.: rascunho parado, RC duplicada). Exclui etapas pós-pedido para não
-// orfanar pedidos/financeiro, e 'cotacao_aprovada' (que já tem Cancelar próprio).
-const ADMIN_CANCELAVEL_STATUSES = [
-  'rascunho', 'aguardando_catalogo', 'devolvida_solicitante',
-  'em_triagem_cd', 'atendida_cd',
-  'pendente', 'em_aprovacao', 'em_esclarecimento',
-  'aprovada', 'em_cotacao', 'cotacao_enviada',
-  'cotacao_em_esclarecimento', 'cotacao_rejeitada', 'rejeitada',
-]
-
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
   pendente:     { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',    textActive: 'text-amber-800',    dot: 'bg-amber-400',    border: 'border-amber-400' },
   em_triagem:   { bg: 'hover:bg-sky-50',      bgActive: 'bg-sky-50',       text: 'text-sky-600',      textActive: 'text-sky-800',      dot: 'bg-sky-500',      border: 'border-sky-500' },
@@ -69,6 +57,13 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
   aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
+
+// Status que representam "em revisão" (Esclarecer / Rejeitado / Devolvido).
+// Usado APENAS pelo botão de filtro — NÃO altera o agrupamento das abas.
+const STATUS_EM_REVISAO = [
+  'em_esclarecimento', 'rejeitada', 'devolvida_solicitante',
+  'cotacao_em_esclarecimento', 'cotacao_rejeitada',
+]
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data',  label: 'Data' },
@@ -278,7 +273,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe, isLocked, blockedByName, canOverrideLock, onAssumeControl }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onDevolver, isDevolvendoEdicao, onAbrirDetalhe }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
@@ -289,8 +284,6 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
   onDevolver: (motivo: string) => void; isDevolvendoEdicao: boolean
   onAbrirDetalhe: () => void
-  isLocked?: boolean; blockedByName?: string | null
-  canOverrideLock?: boolean; onAssumeControl?: () => void
 }) {
   const { perfil, isAdmin } = useAuth()
   const [observacao, setObservacao] = useState('')
@@ -334,29 +327,6 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Bloqueio de edição (presença) — com override de Admin */}
-          {isLocked && (
-            <div className={`rounded-xl p-3.5 flex items-start gap-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-              <AlertTriangle size={16} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
-              <div>
-                <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-                  {blockedByName ?? 'Outro usuário'} está editando
-                </p>
-                <p className={`text-xs mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                  A RC fica bloqueada para evitar conflito até a finalização da edição.
-                </p>
-                {canOverrideLock && (
-                  <button
-                    type="button"
-                    onClick={onAssumeControl}
-                    className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition">
-                    Assumir edição (Admin)
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Resumo */}
           <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</p>
 
@@ -706,25 +676,6 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
-          {/* Admin: cancelar RC em qualquer etapa (RC duplicada/parada) */}
-          {isAdmin && ADMIN_CANCELAVEL_STATUSES.includes(r.status) && (
-            <div className={`pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <button
-                disabled={isCancelling}
-                onClick={onCancelar}
-                className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] disabled:opacity-50 ${
-                  isDark ? 'text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20'
-                    : 'text-red-500 bg-red-50 border-red-200 hover:bg-red-100'
-                }`}>
-                {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
-                Cancelar RC (Admin)
-              </button>
-              <p className={`mt-1.5 text-center text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Ação de administrador — encerra a requisição (ex.: duplicada ou parada).
-              </p>
-            </div>
-          )}
-
           {/* Botão ver detalhes completo */}
           <button onClick={onAbrirDetalhe}
             className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -743,8 +694,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
-  const { isAdmin, atLeast, perfil } = useAuth()
-  const { data: categorias = [] } = useCategorias()
+  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   // Suporta ?tab=em_triagem|em_validacao|aprovada|pendente via URL
   // (usado p/ links de outros módulos, ex: Estoque -> Janela Crítica)
@@ -758,21 +708,15 @@ export default function ListaRequisicoes() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [soRevisao, setSoRevisao] = useState(false)   // filtro "Em revisão" (off = tela atual)
   const [detail, setDetail] = useState<Requisicao | null>(null)
   const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
   const detailReqId = detail?.id
-  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName, canOverride: canOverrideDetailLock, assumeControl: assumeDetailControl } = useEditorLock({
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: detailReqId,
     enabled: Boolean(detailReqId),
   })
-
-  // Validação técnica é por CATEGORIA (mesma regra do AprovAi/podeVerAprovacao):
-  // só o validador técnico configurado na categoria da RC — ou admin — decide.
-  // Antes usava canTechnicalApprove('compras'), que liberava qualquer diretor/admin
-  // (ex.: um diretor aprovava hardware de TI sem ser o validador técnico da categoria).
-  const ehValidadorTecnicoDetail = !!detail && !!perfil?.id
-    && categorias.find(c => c.codigo === detail.categoria)?.validador_tecnico_id === perfil.id
 
   const obras = useLookupObras()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
@@ -829,6 +773,9 @@ export default function ListaRequisicoes() {
   const activeItems = useMemo(() => {
     let items = grouped.get(activeTab) ?? []
 
+    // Filtro "Em revisão" — restringe à etapa atual, sem mexer nas abas
+    if (soRevisao) items = items.filter(r => STATUS_EM_REVISAO.includes(r.status))
+
     // Search
     if (busca) {
       const t = busca.toLowerCase()
@@ -852,7 +799,13 @@ export default function ListaRequisicoes() {
     })
 
     return items
-  }, [grouped, activeTab, busca, sortField, sortDir])
+  }, [grouped, activeTab, busca, sortField, sortDir, soRevisao])
+
+  // quantos itens em revisão existem NESTA etapa (badge do botão)
+  const revisaoCount = useMemo(
+    () => (grouped.get(activeTab) ?? []).filter(r => STATUS_EM_REVISAO.includes(r.status)).length,
+    [grouped, activeTab],
+  )
 
   const totalCount = Array.from(grouped.values()).reduce((s, a) => s + a.length, 0)
   const urgentCount = activeItems.filter(r => r.urgencia !== 'normal').length
@@ -1034,6 +987,21 @@ export default function ListaRequisicoes() {
           </button>
         ))}
 
+        {/* Filtro "Em revisão" — mostra só esclarecer/rejeitado/devolvido DESTA etapa */}
+        <button onClick={() => setSoRevisao(v => !v)}
+          disabled={revisaoCount === 0 && !soRevisao}
+          title="Mostrar apenas o que está em revisão (Esclarecer / Rejeitado / Devolvido) nesta etapa"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all disabled:opacity-40 ${
+            soRevisao
+              ? isDark ? 'bg-rose-500/15 text-rose-300 border-rose-500/40' : 'bg-rose-50 text-rose-700 border-rose-300'
+              : isDark ? 'bg-transparent text-slate-500 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+          }`}>
+          <MessageSquare size={12} /> Em revisão
+          {revisaoCount > 0 && (
+            <span className={`px-1 rounded ${soRevisao ? (isDark ? 'bg-rose-500/25' : 'bg-rose-200/70') : (isDark ? 'bg-white/10' : 'bg-slate-100')}`}>{revisaoCount}</span>
+          )}
+        </button>
+
         {/* View toggle */}
         <div className={`flex border rounded-lg ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('list')}
@@ -1149,15 +1117,11 @@ export default function ListaRequisicoes() {
           apr={aprovacaoMap.get(detail.id)}
           isDark={isDark}
           onClose={() => setDetail(null)}
-          isLocked={isDetailLocked}
-          blockedByName={detailBlockedByName}
-          canOverrideLock={canOverrideDetailLock}
-          onAssumeControl={assumeDetailControl}
           canDecide={
             podeAprovarCompras(perfil?.email) && (
               (
                 ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
-                && (isAdmin || ehValidadorTecnicoDetail)
+                && canTechnicalApprove('compras')
               )
               || (detail.status === 'cotacao_enviada' && isAdmin)
             )
