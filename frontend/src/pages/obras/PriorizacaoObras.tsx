@@ -16,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
 import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
+import { ResumoTecnicoModal, useTecnicoPorOsc, ZERO } from './ResumoTecnicoObras'
 
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -78,6 +79,9 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
   const [q, setQ] = useState('')
   const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
   const f = useObrasFiltros({ tipoPadrao: true })
+  const { data: tecPorOsc } = useTecnicoPorOsc()
+  const tec = (id: string) => tecPorOsc?.get(id) ?? ZERO
+  const [tecObra, setTecObra] = useState<{ id: string; nome: string; oscs: EGPOscRow[] } | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
 
@@ -232,7 +236,11 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
               <GripVertical size={13} className="text-slate-300 cursor-grab" />
               {/* obra */}
               <span className="min-w-0">
-                <span className={`text-xs font-bold block truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
+                <button onClick={() => setTecObra({ id: o.id, nome: o.nome, oscs: oscByObra.get(o.id) ?? [] })}
+                  title="Ver resumo técnico da obra"
+                  className={`text-xs font-bold block truncate text-left w-full hover:underline ${isDark ? 'text-slate-200 hover:text-sky-300' : 'text-slate-700 hover:text-sky-700'}`}>
+                  {o.nome}
+                </button>
                 <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo_nome}</span>
               </span>
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFis)}`}>{o.pctFis != null ? `${o.pctFis}%` : '—'}</span>
@@ -293,6 +301,12 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
       <p className={`text-[10px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
         %Físico = EAP do EGP (executado ÷ contratado, ponderado) · %Financeiro = medição acumulada ÷ contratado · Prazo = OSC mais tardia da obra. A ordem e os campos alimentam o planejador automático e os painéis.
       </p>
+
+      {/* mesmo modal do Resumo Técnico (componente reaproveitado) */}
+      {tecObra && (
+        <ResumoTecnicoModal obraId={tecObra.id} nome={tecObra.nome} oscs={tecObra.oscs}
+          tec={tec} onClose={() => setTecObra(null)} isDark={isDark} />
+      )}
     </div>
   )
 }
