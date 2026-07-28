@@ -133,6 +133,10 @@ export function useSituacaoColaborador() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
       qc.invalidateQueries({ queryKey: ['rh-colaborador'] })
+      // o Ponto filtra por confiança/afastamento — sem isto a lista e o
+      // indicador do painel só reagiriam no próximo carregamento da tela
+      qc.invalidateQueries({ queryKey: ['ponto-colab-elegiveis'] })
+      qc.invalidateQueries({ queryKey: ['ponto-colab-ativos-7d'] })
     },
   })
 }
@@ -149,6 +153,8 @@ export function useCargoConfianca() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
       qc.invalidateQueries({ queryKey: ['rh-colaborador'] })
+      qc.invalidateQueries({ queryKey: ['ponto-colab-elegiveis'] })
+      qc.invalidateQueries({ queryKey: ['ponto-colab-ativos-7d'] })
     },
   })
 }
