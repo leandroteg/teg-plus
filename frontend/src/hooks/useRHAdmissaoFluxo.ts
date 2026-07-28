@@ -1174,21 +1174,25 @@ export function useEncerrarAdmissao() {
   })
 }
 
-// Sub-status GESET na etapa Liberação (aguardando liberação de campo × liberado).
-// Fica na MESMA aba; só troca o selo por candidato. p_status vazio/'liberado' volta ao padrão.
-export function useGesetLiberacao() {
+// Botão "Liberado" da tela de Liberação: é AQUI que o colaborador é liberado
+// para atividades (push + conclusão da requisição). Idempotente — quem já está
+// liberado não recebe notificação de novo.
+export function useLiberarGeset() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (i: { candidatoId: string; status: 'aguardando_liberacao' | 'liberado' }) => {
-      const { data, error } = await supabase.rpc('rh_admissao_geset_status', {
-        p_cand_id: i.candidatoId, p_status: i.status,
+    mutationFn: async (i: { candidatoId: string; autorId?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_liberar_geset', {
+        p_cand_id: i.candidatoId, p_autor_id: i.autorId ?? null, p_autor_nome: i.autorNome ?? null,
       })
       if (error) throw error
-      const r = data as { ok: boolean; erro?: string }
-      if (!r.ok) throw new Error(r.erro || 'Falha ao alterar status')
+      const r = data as { ok: boolean; erro?: string; faltam?: number }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao liberar')
       return r
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
   })
 }
 

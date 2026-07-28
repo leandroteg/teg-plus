@@ -16,7 +16,7 @@ import {
   useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
-  useExcluirAnexoAdmissao, useGesetLiberacao, useEncerrarAdmissao,
+  useExcluirAnexoAdmissao, useLiberarGeset, useEncerrarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -1084,7 +1084,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar Integração</p>
-            <p className="text-[10px] text-slate-400">Conclui a integração e avança o colaborador para Liberação (Pendente).</p>
+            <p className="text-[10px] text-slate-400">Conclui a integração e envia para Liberação, aguardando o GESET liberar a ida a campo.</p>
           </div>
           <button
             onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }) }}
@@ -1094,7 +1094,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
           </button>
         </div>
         {!todosCerts && (
-          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os certificados de treinamento estiverem anexados{requeridos.length > 0 ? ` (${requeridos.filter(temCert).length}/${requeridos.length})` : ''}.</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">Conclui quando todos os certificados de treinamento estiverem anexados{requeridos.length > 0 ? ` (${requeridos.filter(temCert).length}/${requeridos.length})` : ''}.</p>
         )}
         {liberar.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(liberar.error as Error)?.message}</p>}
       </div>
@@ -1113,15 +1113,15 @@ export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark
 
 function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark: boolean }) {
   const { data } = useEtapaCandidato(cand.id)
-  const geset = useGesetLiberacao()
+  const liberarGeset = useLiberarGeset()
   const encerrar = useEncerrarAdmissao()
   const { perfil } = useAuth()
   const aguardando = (cand.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao'
 
   const marcarLiberado = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (geset.isPending) return
-    geset.mutate({ candidatoId: cand.id, status: 'liberado' })
+    if (liberarGeset.isPending) return
+    liberarGeset.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome: perfil?.nome || perfil?.email || undefined })
   }
   const encerrarAdm = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1150,9 +1150,9 @@ function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark
       <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable={false} />
       <div className="flex justify-end">
         {aguardando ? (
-          <button type="button" onClick={marcarLiberado} disabled={geset.isPending}
+          <button type="button" onClick={marcarLiberado} disabled={liberarGeset.isPending}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            {geset.isPending ? <><Loader2 size={13} className="animate-spin" /> Liberando…</> : <><CheckCircle2 size={13} /> Liberado</>}
+            {liberarGeset.isPending ? <><Loader2 size={13} className="animate-spin" /> Liberando…</> : <><CheckCircle2 size={13} /> Liberado</>}
           </button>
         ) : (
           <button type="button" onClick={encerrarAdm} disabled={encerrar.isPending}
