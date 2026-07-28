@@ -1929,6 +1929,13 @@ function IntegracaoDetalhe({ cand, isDark, card, txtMain, txtMuted, onBack }: {
         <p className={`text-base font-black ${txtMain}`}>{cand.nome}</p>
         <p className={`text-xs mt-0.5 ${txtMuted}`}>{[cand.cargo, cand.base].filter(Boolean).join(' · ') || '—'}</p>
       </div>
+
+      {/* Cadastro do colaborador — mesmos blocos do Headcount. Só aparece depois
+          que o candidato já virou colaborador (colaborador_id preenchido). */}
+      {cand.colaborador_id && (
+        <RHColaboradorDetalhe id={cand.colaborador_id} onBack={onBack} soCadastro />
+      )}
+
       <div className={`${card} p-4`}>
         <TreinamentosBlock cand={cand as any} cargo={cand.cargo} treinamentos={data?.treinamentos ?? []} />
       </div>

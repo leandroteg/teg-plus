@@ -25,7 +25,12 @@ import { Lock } from 'lucide-react'
 import type { RHColaborador, RHDependente, RHMovimentacao } from '../../types/rh'
 import { TIPOS_CONTRATO, ESTADOS_CIVIS, GENEROS, UFS, PARENTESCOS, TIPOS_MOVIMENTACAO } from '../../types/rh'
 
-export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostrarEpi }: { id: string; onBack: () => void; soTreinamentos?: boolean; mostrarEpi?: boolean }) {
+export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostrarEpi, soCadastro }: {
+  id: string; onBack: () => void; soTreinamentos?: boolean; mostrarEpi?: boolean
+  /** Só os blocos cadastrais (Dados Pessoais + Contrato), para embutir em outra
+   *  tela que já tem cabeçalho e conteúdo próprios — ex.: QSMA › Integração. */
+  soCadastro?: boolean
+}) {
   const { isLightSidebar: isLight } = useTheme()
   const { data: colab, isLoading } = useRHColaborador(id)
   const { data: dependentes = [] } = useRHDependentes(id)
@@ -86,9 +91,9 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
   const headerCls = `flex items-center justify-between px-5 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      {/* Top bar */}
-      <div className="flex items-center justify-between">
+    <div className={soCadastro ? 'space-y-4' : 'p-4 sm:p-6 space-y-4'}>
+      {/* Top bar — a tela que embute já tem o seu Voltar */}
+      {!soCadastro && (<div className="flex items-center justify-between">
         <button onClick={onBack} className={`flex items-center gap-1.5 text-sm font-semibold ${isLight ? 'text-violet-600' : 'text-violet-400'}`}>
           <ArrowLeft size={16} /> Voltar
         </button>
@@ -111,10 +116,10 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
             <Edit3 size={12} /> Editar
           </button>
         ))}
-      </div>
+      </div>)}
 
-      {/* Header card */}
-      <div className={sectionCls}>
+      {/* Header card — idem: quem embute já mostra nome/cargo/base */}
+      {!soCadastro && (<div className={sectionCls}>
         <div className="p-5 flex items-start gap-4">
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0 ${
             isLight ? 'bg-violet-50 text-violet-600 border border-violet-100' : 'bg-violet-500/15 text-violet-400 border border-violet-500/20'
@@ -148,7 +153,7 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
             </div>
           </div>
         </div>
-      </div>
+      </div>)}
 
       {/* Dados Pessoais e Contrato & Trabalho aparecem também no QSMA (soTreinamentos):
           quem cuida de SST precisa saber quem é a pessoa, cargo, base e admissão.
@@ -272,7 +277,7 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
         )}
       </div>
 
-      {!soTreinamentos && (<>
+      {!soTreinamentos && !soCadastro && (<>
       {/* Documentação */}
       <div className={sectionCls}>
         <div className={headerCls} onClick={() => toggleSection('documentos')}>
@@ -442,14 +447,14 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
       </>)}
 
       {/* Treinamentos & Saúde (matriz QSMA + ASO) */}
-      <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />
+      {!soCadastro && <TreinamentosSaude colaboradorId={id} cargo={colab.cargo} sectionCls={sectionCls} isLight={isLight} />}
 
       {/* EPIs — ficha do colaborador + tamanhos (aberto pela tela QSMA › EPIs › Controle) */}
-      {mostrarEpi && (
+      {mostrarEpi && !soCadastro && (
         <EpisColaborador colaborador={colab} sectionCls={sectionCls} isLight={isLight} />
       )}
 
-      {!soTreinamentos && (<>
+      {!soTreinamentos && !soCadastro && (<>
       {/* Missões & Assinaturas (Portal TEG) */}
       <MissoesColaborador
         colaboradorId={id}
