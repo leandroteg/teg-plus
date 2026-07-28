@@ -150,7 +150,10 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
         </div>
       </div>
 
-      {!soTreinamentos && (<>
+      {/* Dados Pessoais e Contrato & Trabalho aparecem também no QSMA (soTreinamentos):
+          quem cuida de SST precisa saber quem é a pessoa, cargo, base e admissão.
+          O que fica só no RH vem depois: documentação, bancários, dependentes,
+          histórico e observações. */}
       {/* Dados Pessoais */}
       <div className={sectionCls}>
         <div className={headerCls} onClick={() => toggleSection('pessoal')}>
@@ -269,6 +272,7 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
         )}
       </div>
 
+      {!soTreinamentos && (<>
       {/* Documentação */}
       <div className={sectionCls}>
         <div className={headerCls} onClick={() => toggleSection('documentos')}>
