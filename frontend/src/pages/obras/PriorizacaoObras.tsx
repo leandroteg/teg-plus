@@ -15,7 +15,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
-import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
+import { useObrasFiltros, ObrasFiltrosBar, obraPassa, tipoObra, grupoTipo } from './obrasFiltros'
 import { ResumoTecnicoModal, useTecnicoPorOsc, ZERO } from './ResumoTecnicoObras'
 
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
@@ -129,7 +129,11 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
         prio: prioMap.get(o.id) ?? null,
       }
     })
+    // Construções primeiro, depois Manutenções, depois Depósitos; dentro do
+    // grupo vale a ordem salva (empate → prazo mais curto na frente).
     base.sort((a, b) => {
+      const ga = grupoTipo(tipoObra(oscByObra.get(a.id))), gb = grupoTipo(tipoObra(oscByObra.get(b.id)))
+      if (ga !== gb) return ga - gb
       const oa = a.prio?.ordem ?? 1e9, ob = b.prio?.ordem ?? 1e9
       if (oa !== ob) return oa - ob
       return (a.prazo ?? '9999') < (b.prazo ?? '9999') ? -1 : 1
@@ -148,10 +152,25 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
     onSuccess: () => qc.invalidateQueries({ queryKey: ['obr-priorizacao'] }),
   })
 
+  // Renumera a lista COMPLETA (não só a filtrada). As obras visíveis assumem a
+  // nova ordem entre si; as escondidas pelo filtro ficam onde estavam. Sem isso,
+  // reordenar com filtro ligado renumerava só um pedaço e gerava ordens repetidas.
   const salvarOrdem = async (ids: string[]) => {
     setSalvando(true)
     try {
-      const rows = ids.map((obra_id, i) => ({
+      const visivel = new Set(ids)
+      // universo ordenado hoje: grupo (constr > manut > DC) → ordem salva → nome
+      const todas = [...obras].sort((a, b) => {
+        const ga = grupoTipo(tipoObra(oscByObra.get(a.id))), gb = grupoTipo(tipoObra(oscByObra.get(b.id)))
+        if (ga !== gb) return ga - gb
+        const oa = prioMap.get(a.id)?.ordem ?? 1e9, ob = prioMap.get(b.id)?.ordem ?? 1e9
+        if (oa !== ob) return oa - ob
+        return a.nome.localeCompare(b.nome, 'pt-BR')
+      })
+      // percorre o universo; onde havia uma obra visível, entra a próxima da nova ordem
+      const fila = [...ids]
+      const final = todas.map(o => (visivel.has(o.id) ? (fila.shift() ?? o.id) : o.id))
+      const rows = final.map((obra_id, i) => ({
         // upsert só atualiza as colunas enviadas — os demais campos ficam intactos
         obra_id, ordem: i + 1,
         atualizado_por_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
