@@ -9,13 +9,15 @@ import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import RHTabRail, { corDaAba, type RHTab } from './RHTabRail'
 
-export default function DPFluxoPage({ titulo, subtitulo, icon: Icon, iconColor, tabs, renderPanel }: {
+export default function DPFluxoPage({ titulo, subtitulo, icon: Icon, iconColor, tabs, renderPanel, tabsUniform }: {
   titulo: string
   subtitulo: string
   icon: LucideIcon
   iconColor: string
   tabs: RHTab[]
   renderPanel?: (activeKey: string) => ReactNode
+  /** abas com largura igual (ver RHTabRail.uniform) */
+  tabsUniform?: boolean
 }) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
@@ -36,7 +38,7 @@ export default function DPFluxoPage({ titulo, subtitulo, icon: Icon, iconColor, 
       </div>
 
       {/* Rail */}
-      <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} />
+      <RHTabRail tabs={tabs} active={active} onChange={setActive} isDark={isDark} uniform={tabsUniform} />
 
       {/* Painel */}
       {conteudo ? (

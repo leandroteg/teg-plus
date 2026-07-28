@@ -50,13 +50,16 @@ export function corDaAba(cor: Cor, isDark: boolean): AccentSet {
   return (isDark ? ACCENT_DARK : ACCENT)[cor]
 }
 
-export default function RHTabRail({ tabs, active, onChange, isDark, fill = true }: {
+export default function RHTabRail({ tabs, active, onChange, isDark, fill = true, uniform = false }: {
   tabs: RHTab[]
   active: string
   onChange: (key: string) => void
   isDark: boolean
   /** true (padrão): abas esticam pra largura toda (md:flex-1). false: largura do conteúdo. */
   fill?: boolean
+  /** true: todas as abas com a MESMA largura (ignora o tamanho do rótulo). Só use
+   *  quando couber — poucas abas e rótulos curtos, senão o texto fica apertado. */
+  uniform?: boolean
 }) {
   const railRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number }>({ active: false, startX: 0, startScrollLeft: 0 })
@@ -142,7 +145,7 @@ export default function RHTabRail({ tabs, active, onChange, isDark, fill = true 
             const Icon = t.icon
             return (
               <button key={t.key} onClick={() => onChange(t.key)}
-                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 ${fill ? 'md:flex-1' : ''} ${
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 ${fill ? 'md:flex-1' : ''} ${fill && uniform ? 'md:min-w-0 md:basis-0' : ''} ${
                   isActive ? `${a.bgActive} ${a.textActive} border font-bold shadow-sm ${a.border}` : `${a.bg} ${a.text} font-medium`
                 }`}>
                 <Icon size={15} className="shrink-0" />
