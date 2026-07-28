@@ -634,8 +634,37 @@ export function useObrasKPIs() {
         prestacoes_pendentes: prestRes.count ?? 0,
       }
     },
-    // KPIs de acompanhamento — 3min é suficiente para contadores de home.
-    refetchInterval: 180_000,
+    refetchInterval: 60_000,
+  })
+}
+
+// ── Prioridade das obras definida em Obras › Gestão de Obras › Priorização ────
+// Devolve mapa nomeNormalizado → ordem. O nome é a chave porque o cronograma do
+// EGP trabalha com os nomes vindos da EAP (não tem obra_id).
+export const normNomeObra = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+export function useOrdemPriorizacao() {
+  return useQuery<Map<string, number>>({
+    queryKey: ['obr-priorizacao-ordem'],
+    queryFn: async () => {
+      const m = new Map<string, number>()
+      const { data, error } = await supabase
+        .from('obr_priorizacao')
+        .select('ordem, obra:sys_obras!obra_id(nome)')
+        .not('ordem', 'is', null)
+      if (error) return m
+      for (const r of (data ?? []) as unknown as { ordem: number | null; obra: { nome: string } | { nome: string }[] | null }[]) {
+        const o = Array.isArray(r.obra) ? r.obra[0] : r.obra
+        const nome = o?.nome
+        if (!nome || r.ordem == null) continue
+        const k = normNomeObra(nome)
+        // em caso de ordens repetidas, vale a menor (fica mais acima)
+        const atual = m.get(k)
+        if (atual == null || r.ordem < atual) m.set(k, r.ordem)
+      }
+      return m
+    },
     staleTime: 60_000,
   })
 }
