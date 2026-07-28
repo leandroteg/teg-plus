@@ -10,6 +10,8 @@ import { supabase } from '../services/supabase'
 import { useTheme } from '../contexts/ThemeContext'
 import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao, useDevolverParaEdicao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
+import { useObrasComProjeto } from '../hooks/useObras'
+import { MultiSelect } from './pmo/paineis/egpFiltros'
 import { useAprovacoesPendentes, useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
@@ -57,6 +59,11 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
   aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
+
+// Valores especiais dos filtros Projeto/Obra (não são ids reais)
+const SEM_PROJETO = '__sem_projeto__'
+const SEM_OBRA    = '__sem_obra__'
+const TODOS       = '__todos__'
 
 // Status que representam "em revisão" (Esclarecer / Rejeitado / Devolvido).
 // Usado APENAS pelo botão de filtro — NÃO altera o agrupamento das abas.
@@ -709,6 +716,8 @@ export default function ListaRequisicoes() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [soRevisao, setSoRevisao] = useState(false)   // filtro "Em revisão" (off = tela atual)
+  const [fProjeto, setFProjeto] = useState<Set<string>>(new Set())   // vazio = todos
+  const [fObra, setFObra] = useState<Set<string>>(new Set())         // vazio = todas
   const [detail, setDetail] = useState<Requisicao | null>(null)
   const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
   const detailReqId = detail?.id
@@ -719,6 +728,7 @@ export default function ListaRequisicoes() {
   })
 
   const obras = useLookupObras()
+  const { data: obrasComProjeto = [] } = useObrasComProjeto()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
   const { data: aprovacoes } = useAprovacoesPendentes()
   const decisaoMutation = useDecisaoRequisicao()
@@ -755,6 +765,55 @@ export default function ListaRequisicoes() {
     )
   }, [requisicoes, perfil])
 
+  // ── Filtros Projeto / Obra ────────────────────────────────────────────────
+  // obra_id → { chave do projeto, nome }. Obras sem projeto (CD/Sede) caem em SEM_PROJETO.
+  const projetoDaObra = useMemo(() => {
+    const m = new Map<string, { key: string; nome: string }>()
+    for (const o of obrasComProjeto) {
+      m.set(o.id, o.projeto_id
+        ? { key: o.projeto_id, nome: o.projeto_nome ?? '—' }
+        : { key: SEM_PROJETO, nome: 'Sem projeto' })
+    }
+    return m
+  }, [obrasComProjeto])
+
+  const projDaReq = (r: Requisicao) =>
+    (r.obra_id ? projetoDaObra.get(r.obra_id)?.key : undefined) ?? SEM_PROJETO
+
+  // opções montadas a partir das PRÓPRIAS requisições (só o que existe de fato)
+  const projetoOpts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const r of requisicoes) {
+      const info = r.obra_id ? projetoDaObra.get(r.obra_id) : undefined
+      m.set(info?.key ?? SEM_PROJETO, info?.nome ?? 'Sem projeto')
+    }
+    return [...m.entries()].map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.value === SEM_PROJETO ? 1 : b.value === SEM_PROJETO ? -1
+        : a.label.localeCompare(b.label, 'pt-BR'))
+  }, [requisicoes, projetoDaObra])
+
+  // Obra depende do Projeto selecionado (cascata)
+  const obraOpts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const r of requisicoes) {
+      if (fProjeto.size && !fProjeto.has(projDaReq(r))) continue
+      m.set(r.obra_id ?? SEM_OBRA, r.obra_nome || '— Sem obra —')
+    }
+    return [...m.entries()].map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [requisicoes, projetoDaObra, fProjeto])
+
+  // "Selecionar todos" é uma OPÇÃO injetada — o MultiSelect compartilhado não muda
+  const togProjeto = (v: string) => {
+    setFObra(new Set())   // trocar de projeto zera a obra (evita seleção órfã)
+    if (v === TODOS) { setFProjeto(new Set(projetoOpts.map(o => o.value))); return }
+    setFProjeto(s => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n })
+  }
+  const togObra = (v: string) => {
+    if (v === TODOS) { setFObra(new Set(obraOpts.map(o => o.value))); return }
+    setFObra(s => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n })
+  }
+
   // Group by pipeline tab
   const grouped = useMemo(() => {
     const map = new Map<PipelineTab, Requisicao[]>()
@@ -775,6 +834,10 @@ export default function ListaRequisicoes() {
 
     // Filtro "Em revisão" — restringe à etapa atual, sem mexer nas abas
     if (soRevisao) items = items.filter(r => STATUS_EM_REVISAO.includes(r.status))
+
+    // Filtros Projeto / Obra (vazios = tudo)
+    if (fProjeto.size) items = items.filter(r => fProjeto.has(projDaReq(r)))
+    if (fObra.size) items = items.filter(r => fObra.has(r.obra_id ?? SEM_OBRA))
 
     // Search
     if (busca) {
@@ -799,7 +862,7 @@ export default function ListaRequisicoes() {
     })
 
     return items
-  }, [grouped, activeTab, busca, sortField, sortDir, soRevisao])
+  }, [grouped, activeTab, busca, sortField, sortDir, soRevisao, fProjeto, fObra, projetoDaObra])
 
   // quantos itens em revisão existem NESTA etapa (badge do botão)
   const revisaoCount = useMemo(
@@ -973,6 +1036,15 @@ export default function ListaRequisicoes() {
             </button>
           )}
         </div>
+
+        {/* Filtros Projeto → Obra (cascata). "Selecionar todos" vai como opção. */}
+        <MultiSelect label="Projeto" isDark={isDark} compacto
+          options={[{ value: TODOS, label: 'Selecionar todos' }, ...projetoOpts]}
+          selected={fProjeto} onToggle={togProjeto}
+          onClear={() => { setFProjeto(new Set()); setFObra(new Set()) }} />
+        <MultiSelect label="Obra" isDark={isDark} compacto
+          options={[{ value: TODOS, label: 'Selecionar todos' }, ...obraOpts]}
+          selected={fObra} onToggle={togObra} onClear={() => setFObra(new Set())} />
 
         {/* Sort */}
         {SORT_OPTIONS.map(o => (
