@@ -69,6 +69,14 @@ export interface RHColaborador {
   motivo_demissao?: string
   status_admissao?: string
 
+  // Afastamento (Ativo / Afastado / Inativo). Afastado NÃO mexe em `ativo`:
+  // continua empregado, no headcount e nos benefícios — só não está trabalhando.
+  afastado?: boolean
+  afastamento_motivo?: 'licenca_medica' | 'suspensao' | 'maternidade' | null
+  afastamento_inicio?: string | null
+  afastamento_previsao_retorno?: string | null
+  afastamento_observacao?: string | null
+
   // Vínculos
   gestor_id?: string
   perfil_id?: string

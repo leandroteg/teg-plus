@@ -107,6 +107,52 @@ export function useSalvarRHColaborador() {
 
 // ── Dependentes ──────────────────────────────────────────────────────────────
 
+// Situação do colaborador no Headcount: Ativo / Afastado / Inativo.
+// Afastar NÃO desativa — o colaborador segue no headcount e nos benefícios.
+export function useSituacaoColaborador() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      id: string
+      afastado: boolean
+      motivo?: 'licenca_medica' | 'suspensao' | 'maternidade' | null
+      inicio?: string | null
+      previsaoRetorno?: string | null
+      observacao?: string | null
+    }) => {
+      const { error } = await supabase.from('rh_colaboradores').update({
+        afastado: p.afastado,
+        afastamento_motivo: p.afastado ? (p.motivo ?? null) : null,
+        afastamento_inicio: p.afastado ? (p.inicio ?? null) : null,
+        afastamento_previsao_retorno: p.afastado ? (p.previsaoRetorno ?? null) : null,
+        afastamento_observacao: p.afastado ? (p.observacao ?? null) : null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', p.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaborador'] })
+    },
+  })
+}
+
+// Cargo de confiança: isento de bater ponto (e de hora extra na folha).
+export function useCargoConfianca() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; valor: boolean }) => {
+      const { error } = await supabase.from('rh_colaboradores')
+        .update({ cargo_confianca: p.valor, updated_at: new Date().toISOString() }).eq('id', p.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaborador'] })
+    },
+  })
+}
+
 export function useRHDependentes(colaboradorId?: string) {
   return useQuery<RHDependente[]>({
     queryKey: ['rh-dependentes', colaboradorId],
