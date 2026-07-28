@@ -8,7 +8,7 @@
 // Vidas (titular+dependentes) sincronizam con_contratos.quantitativo (trigger).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react'
-import { HeartPulse, Search, Check, Loader2, FileText, Users, BarChart3, Receipt } from 'lucide-react'
+import { Search, Check, Loader2, FileText, Users, BarChart3 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
@@ -111,18 +111,6 @@ export default function DPPlanoSaudePanel() {
       .filter(c => !operadora || opDe(c.id) === operadora)
   }, [colaboradores, busca, soPlano, adesaoPorColab, operadora, porColab, opContrato])
 
-  const titulares = adesoes.length
-  const dependentes = adesoes.reduce((s, a) => s + (a.dependentes || 0), 0)
-  const vidas = titulares + dependentes
-  const somaPrecos = adesoes.reduce((s, a) => s + (a.valor_mensal || 0), 0)
-  const somaDescontos = adesoes.reduce((s, a) => s + (a.desconto_mensal || 0), 0)
-  const custoLiquido = somaPrecos - somaDescontos
-  const somaCopart = useMemo(() => {
-    let s = 0
-    for (const c of lista) s += porColab?.get(c.id)?.secundario ?? 0
-    return s
-  }, [lista, porColab])
-
   const toggle = async (colabId: string, nome: string) => {
     const ades = adesaoPorColab.get(colabId)
     if (ades) {
@@ -153,28 +141,36 @@ export default function DPPlanoSaudePanel() {
 
   return (
     <div className={`rounded-2xl border p-4 sm:p-5 space-y-4 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-      {/* Resumo + contrato + troca de sub-visão */}
+      {/* Cabeçalho: filtros + troca de sub-visão numa linha só.
+          Os totalizadores saíram daqui — quem soma é a sub-visão Consolidado. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
-          <HeartPulse size={13} /> {titulares} titulares · {dependentes} dependentes · <b>{vidas} vidas</b>
-        </span>
-        {somaPrecos > 0 && (
-          <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            preços: {fmtCur(somaPrecos)} · descontos: {fmtCur(somaDescontos)} · <b className={isDark ? 'text-amber-300' : 'text-amber-700'}>custo empresa: {fmtCur(custoLiquido)}/mês</b>
-          </span>
+        <select value={mes} onChange={e => setMes(e.target.value)} className={selCls} title="Competência">
+          {meses.map(m => (
+            <option key={m} value={m}>{fmtMes(m)}{comLote.includes(m) ? ' ·' : ''}</option>
+          ))}
+        </select>
+        {operadoras.length > 1 && (
+          <select value={operadora} onChange={e => setOperadora(e.target.value)} className={selCls}>
+            <option value="">Todas as operadoras</option>
+            {operadoras.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
         )}
-        {somaCopart > 0 && (
-          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-50 text-sky-700'}`}>
-            <Receipt size={12} /> coparticipação {mes ? fmtMes(mes) : ''}: <b>{fmtCur(somaCopart)}</b>
-          </span>
-        )}
+        <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[140px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={13} className={txtMuted} />
+          <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
+            className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+        </div>
+        <button onClick={() => setSoPlano(v => !v)}
+          className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${soPlano
+            ? isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+          <Users size={11} className="inline mr-1" />Só quem está no plano
+        </button>
         {contrato && (
-          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-            <FileText size={12} /> <b className={txt}>{contrato.numero}</b> · {(contrato.contraparte_nome ?? '').split('(')[0].trim()} · {(contrato.valor_mensal ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}/mês
-            {contrato.quantitativo != null && <> · q. <b className={txt}>{contrato.quantitativo}</b></>}
+          <span className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg whitespace-nowrap ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+            <FileText size={11} /> <b className={txt}>{contrato.numero}</b> · {(contrato.contraparte_nome ?? '').split('(')[0].trim()}
           </span>
         )}
-        <div className="flex-1" />
         <div className="flex items-center gap-1">
           {vistaBtn('adesoes', Users, 'Adesões')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado')}
@@ -183,32 +179,6 @@ export default function DPPlanoSaudePanel() {
 
       {vista === 'consolidado' ? <DPBeneficioConsolidado beneficio="plano_saude" /> : (
         <>
-          {/* Filtros */}
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={mes} onChange={e => setMes(e.target.value)} className={selCls} title="Competência">
-              {meses.map(m => (
-                <option key={m} value={m}>{fmtMes(m)}{comLote.includes(m) ? ' ·' : ''}</option>
-              ))}
-            </select>
-            {operadoras.length > 1 && (
-              <select value={operadora} onChange={e => setOperadora(e.target.value)} className={selCls}>
-                <option value="">Todas as operadoras</option>
-                {operadoras.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            )}
-            <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[140px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-              <Search size={13} className={txtMuted} />
-              <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
-                className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${inputCls.split(' ').filter(c => c.startsWith('text-') || c.startsWith('placeholder-')).join(' ')}`} />
-            </div>
-            <button onClick={() => setSoPlano(v => !v)}
-              className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${soPlano
-                ? isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
-              <Users size={11} className="inline mr-1" />Só quem está no plano
-            </button>
-          </div>
-
           {/* Matriz */}
           <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
@@ -290,13 +260,22 @@ export default function DPPlanoSaudePanel() {
                         </td>
                         <td className="text-center px-3 py-2">
                           {a ? (
-                            <span className="inline-flex items-center gap-1">
-                              <button onClick={() => atualizar.mutate({ id: a.id, dependentes: Math.max(0, a.dependentes - 1) })}
-                                className={`w-5 h-5 rounded border text-[10px] font-bold ${isDark ? 'border-white/15 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>−</button>
-                              <span className={`w-6 text-center font-bold ${txt}`}>{a.dependentes}</span>
-                              <button onClick={() => atualizar.mutate({ id: a.id, dependentes: a.dependentes + 1 })}
-                                className={`w-5 h-5 rounded border text-[10px] font-bold ${isDark ? 'border-white/15 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>+</button>
-                            </span>
+                            <>
+                              <span className="inline-flex items-center gap-1">
+                                <button onClick={() => atualizar.mutate({ id: a.id, dependentes: Math.max(0, a.dependentes - 1) })}
+                                  className={`w-5 h-5 rounded border text-[10px] font-bold ${isDark ? 'border-white/15 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>−</button>
+                                <span className={`w-6 text-center font-bold ${txt}`}>{a.dependentes}</span>
+                                <button onClick={() => atualizar.mutate({ id: a.id, dependentes: a.dependentes + 1 })}
+                                  className={`w-5 h-5 rounded border text-[10px] font-bold ${isDark ? 'border-white/15 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>+</button>
+                              </span>
+                              {mesC && mesC.dependentes !== a.dependentes && (
+                                <button onClick={() => atualizar.mutate({ id: a.id, dependentes: mesC.dependentes })}
+                                  title="A fatura do mês traz este número de dependentes — clique para usar"
+                                  className={`block mx-auto mt-0.5 text-[10px] underline decoration-dotted ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                                  relatório: {mesC.dependentes}
+                                </button>
+                              )}
+                            </>
                           ) : <span className={txtMuted}>—</span>}
                         </td>
                         <td className={`text-center px-3 py-2 font-bold ${a ? 'text-emerald-500' : txtMuted}`}>{a ? 1 + a.dependentes : '—'}</td>

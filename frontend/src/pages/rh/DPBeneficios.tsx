@@ -38,8 +38,8 @@ export default function DPBeneficios() {
       <DPFluxoPage titulo="Benefícios" subtitulo="Gestão dos benefícios dos colaboradores" icon={Gift} iconColor="text-amber-400" tabs={TABS} tabsUniform
         renderPanel={k =>
           k === 'plano_saude' ? <DPPlanoSaudePanel />
-          : k === 'alimentacao' ? <DPValePanel beneficio="vr" icon={UtensilsCrossed} accent="amber" />
-          : k === 'transporte' ? <DPValePanel beneficio="vt" icon={Bus} accent="sky" />
+          : k === 'alimentacao' ? <DPValePanel beneficio="vr" accent="amber" />
+          : k === 'transporte' ? <DPValePanel beneficio="vt" accent="sky" />
           : null} />
       {lancamento && <DPBeneficioUploadModal inicial={lancamento} onClose={() => setLancamento(null)} />}
     </>

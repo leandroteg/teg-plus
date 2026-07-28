@@ -205,6 +205,8 @@ export interface BeneficioMesColab {
   principal: number | null    // mensalidade (plano) / valor creditado (VR/VT)
   secundario: number | null   // coparticipação (só plano)
   linhas: number
+  /** dependentes contados NO TITULAR pelo relatório (sem cadastro nominal) */
+  dependentes: number
 }
 
 // ── O que o fornecedor cobrou de cada colaborador no mês (alimenta a matriz) ──
@@ -230,7 +232,7 @@ export function useBeneficioMesPorColaborador(beneficio: Beneficio, competenciaY
       const cobrados = rows.filter(l => l.cobranca !== false)
       const up = (cid: string, loteId: string) => {
         let cur = map.get(cid)
-        if (!cur) { cur = { fornecedor: forn.get(loteId) ?? null, principal: null, secundario: null, linhas: 0 }; map.set(cid, cur) }
+        if (!cur) { cur = { fornecedor: forn.get(loteId) ?? null, principal: null, secundario: null, linhas: 0, dependentes: 0 }; map.set(cid, cur) }
         if (!cur.fornecedor) cur.fornecedor = forn.get(loteId) ?? null
         return cur
       }
@@ -240,13 +242,14 @@ export function useBeneficioMesPorColaborador(beneficio: Beneficio, competenciaY
         const cop = cobrados.filter(l => l.tipo === 'coparticipacao').map(l => String(l.id))
         if (mens.length) {
           const { data, error: e } = await supabase.from('rh_plano_vidas')
-            .select('lote_id, colaborador_id, cobrado, mensalidade').in('lote_id', mens)
+            .select('lote_id, colaborador_id, cobrado, mensalidade, vinculo').in('lote_id', mens)
           if (e) throw e
           for (const v of data ?? []) {
             if (!v.colaborador_id) continue
             const cur = up(String(v.colaborador_id), String(v.lote_id))
             cur.principal = (cur.principal ?? 0) + Number(v.cobrado ?? v.mensalidade ?? 0)
             cur.linhas += 1
+            if (v.vinculo === 'dependente') cur.dependentes += 1
           }
         }
         if (cop.length) {

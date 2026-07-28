@@ -7,8 +7,7 @@
 // Sem relatório enviado, a coluna do mês fica "—" e nada mais muda.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Check, Loader2, Users, BarChart3, Wallet } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Search, Check, Loader2, Users, BarChart3 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
@@ -44,9 +43,8 @@ const mesesJanela = () => {
   return out
 }
 
-export default function DPValePanel({ beneficio, icon: Icon, accent }: {
+export default function DPValePanel({ beneficio, accent }: {
   beneficio: Exclude<Beneficio, 'plano_saude'>
-  icon: LucideIcon
   accent: 'amber' | 'sky'
 }) {
   const { isLightSidebar: isLight } = useTheme()
@@ -109,14 +107,6 @@ export default function DPValePanel({ beneficio, icon: Icon, accent }: {
       .filter(c => !fornecedor || fornDe(c.id) === fornecedor)
   }, [colaboradores, busca, soRecebe, adesaoPorColab, fornecedor, porColab])
 
-  const beneficiarios = adesoes.length
-  const somaDescontos = adesoes.reduce((s, a) => s + (a.desconto_mensal || 0), 0)
-  const somaMes = useMemo(() => {
-    let s = 0
-    for (const c of lista) s += porColab?.get(c.id)?.principal ?? 0
-    return s
-  }, [lista, porColab])
-
   const toggle = async (colabId: string, nome: string) => {
     const ades = adesaoPorColab.get(colabId)
     const rotulo = BENEFICIO_LABEL[beneficio]
@@ -148,21 +138,29 @@ export default function DPValePanel({ beneficio, icon: Icon, accent }: {
 
   return (
     <div className={`rounded-2xl border p-4 sm:p-5 space-y-4 ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+      {/* Cabeçalho: filtros + troca de sub-visão numa linha só.
+          Os totalizadores saíram daqui — quem soma é a sub-visão Consolidado. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${cor.pill}`}>
-          <Icon size={13} /> <b>{beneficiarios}</b> beneficiário(s)
-        </span>
-        {somaMes > 0 && (
-          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            <Wallet size={12} /> creditado em {fmtMes(mes)}: <b className={cor.valor}>{fmtCur(somaMes)}</b>
-          </span>
+        <select value={mes} onChange={e => setMes(e.target.value)} className={selCls} title="Competência">
+          {meses.map(m => <option key={m} value={m}>{fmtMes(m)}{comLote.includes(m) ? ' ·' : ''}</option>)}
+        </select>
+        {fornecedores.length > 1 && (
+          <select value={fornecedor} onChange={e => setFornecedor(e.target.value)} className={selCls}>
+            <option value="">Todos os fornecedores</option>
+            {fornecedores.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
         )}
-        {somaDescontos > 0 && (
-          <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            descontos: {fmtCur(somaDescontos)}
-          </span>
-        )}
-        <div className="flex-1" />
+        <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[140px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={13} className={txtMuted} />
+          <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
+            className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+        </div>
+        <button onClick={() => setSoRecebe(v => !v)}
+          className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${soRecebe
+            ? isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+          <Users size={11} className="inline mr-1" />Só quem recebe
+        </button>
         <div className="flex items-center gap-1">
           {vistaBtn('lancamentos', Users, 'Lançamentos')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado')}
@@ -171,29 +169,6 @@ export default function DPValePanel({ beneficio, icon: Icon, accent }: {
 
       {vista === 'consolidado' ? <DPBeneficioConsolidado beneficio={beneficio} /> : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={mes} onChange={e => setMes(e.target.value)} className={selCls} title="Competência">
-              {meses.map(m => <option key={m} value={m}>{fmtMes(m)}{comLote.includes(m) ? ' ·' : ''}</option>)}
-            </select>
-            {fornecedores.length > 1 && (
-              <select value={fornecedor} onChange={e => setFornecedor(e.target.value)} className={selCls}>
-                <option value="">Todos os fornecedores</option>
-                {fornecedores.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-            )}
-            <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[140px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-              <Search size={13} className={txtMuted} />
-              <input type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
-                className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
-            </div>
-            <button onClick={() => setSoRecebe(v => !v)}
-              className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${soRecebe
-                ? isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
-              <Users size={11} className="inline mr-1" />Só quem recebe
-            </button>
-          </div>
-
           <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               <table className="w-full text-xs">
