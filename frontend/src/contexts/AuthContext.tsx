@@ -162,6 +162,8 @@ export interface Perfil {
   comprador: boolean
   /** Pode aprovar/recusar solicitações de cancelamento de documentos financeiros (CP/CR). */
   aprova_cancelamento_fin: boolean
+  /** Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e cascateia os CP. */
+  pode_cancelar_pedido: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string

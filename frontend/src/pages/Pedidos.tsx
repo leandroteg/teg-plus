@@ -41,12 +41,13 @@ import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import PedidoImpostosSection from '../components/PedidoImpostosSection'
 import { AnexoReferencia } from '../components/AnexoReferencia'
+import CancelarPedidoControl from '../components/CancelarPedidoControl'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'encerrado'
+type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'encerrado' | 'cancelado'
 type SortField = 'data' | 'valor' | 'fornecedor'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -304,6 +305,12 @@ const PIPELINE_STAGES: {
     icon: ArchiveIcon,
     matchFn: p => !isPendingEmission(p) && ['liberado', 'pago'].includes((p as any).status_pagamento),
   },
+  {
+    key: 'cancelado',
+    label: 'Cancelados',
+    icon: X,
+    matchFn: p => p.status === 'cancelado',
+  },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
@@ -311,6 +318,7 @@ const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: s
   emitido:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    badge: 'bg-blue-100 text-blue-700',       border: 'border-blue-500' },
   entregue:  { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-500' },
   encerrado: { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',  text: 'text-slate-500',   textActive: 'text-slate-700',   badge: 'bg-slate-200 text-slate-600',     border: 'border-slate-400' },
+  cancelado: { bg: 'hover:bg-rose-50',    bgActive: 'bg-rose-50',    text: 'text-rose-600',    textActive: 'text-rose-800',    badge: 'bg-rose-100 text-rose-700',       border: 'border-rose-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
@@ -318,6 +326,7 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   emitido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    badge: 'bg-blue-500/20 text-blue-300',       border: 'border-blue-500/40' },
   entregue:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', badge: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/40' },
   encerrado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-white/[0.06]',   text: 'text-slate-400',   textActive: 'text-slate-300',   badge: 'bg-white/[0.08] text-slate-300',     border: 'border-white/[0.08]' },
+  cancelado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-rose-500/10',    text: 'text-rose-400',    textActive: 'text-rose-300',    badge: 'bg-rose-500/20 text-rose-300',       border: 'border-rose-500/40' },
 }
 
 const statusConfig: Record<string, { bg: string; text: string; label: string; bgDark: string; textDark: string }> = {
@@ -2317,6 +2326,9 @@ function DetailModal({
             {isPago && (
               <div className="flex items-center gap-2 text-emerald-500 text-xs font-semibold"><CheckCircle size={14} /> Pagamento confirmado {pagoEm ? `em ${fmtData(pagoEm)}` : ''}</div>
             )}
+            {!pending && (
+              <CancelarPedidoControl pedidoId={pedido.id} status={pedido.status} dark={dark} onDone={() => onClose()} />
+            )}
           </div>
         </div>
 
@@ -2510,15 +2522,18 @@ export default function Pedidos() {
 
     return [...pendingEmission, ...contratoFormalizado]
   }, [cotacoes, pedidosByReq])
+  // Cancelados ficam de fora de allPedidos (p/ não sujar pedidosByReq), mas entram
+  // no allPedidoItems para aparecerem na aba "Cancelados".
+  const canceladosPedidos = useMemo(() => (pedidos ?? []).filter(p => p.status === 'cancelado'), [pedidos])
   const allPedidoItems = useMemo<PedidoListItem[]>(
-    () => [...pendingApprovalPedidos, ...allPedidos],
-    [pendingApprovalPedidos, allPedidos],
+    () => [...pendingApprovalPedidos, ...allPedidos, ...canceladosPedidos],
+    [pendingApprovalPedidos, allPedidos, canceladosPedidos],
   )
   const isLoading = isLoadingPedidos || isLoadingCotacoes
 
   // Count per tab
   const counts = useMemo(() => {
-    const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, encerrado: 0 }
+    const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, encerrado: 0, cancelado: 0 }
     for (const p of allPedidoItems) {
       for (const stage of PIPELINE_STAGES) {
         if (stage.matchFn(p)) { c[stage.key]++; break }
