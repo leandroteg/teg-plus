@@ -118,13 +118,21 @@ export function RegistrosPontoTab(props: PontoTabProps) {
   return props.vista === 'dia' ? <RegistrosDia {...props} /> : <RegistrosMes {...props} />
 }
 
-// Situação = Ativos / Inativos / Todos. Enquanto o set não carregou, não filtra (mostra tudo).
-// "Ativos" mostra só quem DEVE bater ponto: cargo de confiança e afastado ficam de
-// fora (aparecem em "Todos"), senão entram todo mês com o mês inteiro de falta.
+// Situação é múltipla escolha. Cada pessoa cai em UMA categoria; nada marcado
+// (ou set ainda não carregado) = sem filtro. Cargo de confiança e afastado ficam
+// fora de "Ativo" — senão entram todo mês com o mês inteiro de falta.
+export const SITUACOES_PONTO = ['Ativo', 'Afastado', 'Cargo de confiança', 'Inativo']
+
+function situacaoDoColab(id: string, eleg: PontoElegiveis): string {
+  if (!eleg.ativos.has(id)) return 'Inativo'
+  if (eleg.afastados.has(id)) return 'Afastado'
+  if (eleg.confianca.has(id)) return 'Cargo de confiança'
+  return 'Ativo'
+}
+
 function matchSituacao(colaboradorId: string | null | undefined, situacao: PontoTabProps['situacao'], eleg?: PontoElegiveis): boolean {
-  if (situacao === 'todos' || !eleg) return true
-  const id = colaboradorId ?? ''
-  return situacao === 'ativos' ? eleg.batem.has(id) : !eleg.ativos.has(id)
+  if (!eleg || !situacao || situacao.size === 0) return true
+  return situacao.has(situacaoDoColab(colaboradorId ?? '', eleg))
 }
 
 function RegistrosMes({ anoMes, baseId, pessoa, quickReg, dispositivo, situacao }: PontoTabProps) {

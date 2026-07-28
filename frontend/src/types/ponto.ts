@@ -112,7 +112,8 @@ export interface PontoTabProps {
   vista: string
   diaData: string
   dispositivo: string
-  situacao: 'ativos' | 'inativos' | 'todos'
+  /** situações marcadas (múltipla escolha). Vazio = sem filtro. */
+  situacao: Set<string>
   bases: { id: string; nome: string; codigo: string }[]
 }
 
