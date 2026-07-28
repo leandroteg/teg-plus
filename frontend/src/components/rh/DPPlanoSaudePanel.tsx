@@ -23,8 +23,27 @@ import DPPlanoUploadModal from './DPPlanoUploadModal'
 
 const fmtCur = (v?: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
-const fmtMes = (ym: string) =>
-  new Date(ym + '-01T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })
+const fmtMes = (ym: string) => {
+  const d = new Date(ym + '-01T00:00:00')
+  return `${d.toLocaleDateString('pt-BR', { month: 'long' })}/${d.getFullYear()}`
+}
+// mês anterior — é o que a operadora fatura
+const mesPadrao = () => {
+  const d = new Date()
+  d.setDate(1); d.setMonth(d.getMonth() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+// últimos 18 meses + 1 à frente, para o seletor nunca ficar vazio
+const mesesJanela = () => {
+  const out: string[] = []
+  const d = new Date()
+  d.setDate(1); d.setMonth(d.getMonth() + 1)
+  for (let i = 0; i < 20; i++) {
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+    d.setMonth(d.getMonth() - 1)
+  }
+  return out
+}
 
 export default function DPPlanoSaudePanel() {
   const { isLightSidebar: isLight } = useTheme()
@@ -42,18 +61,25 @@ export default function DPPlanoSaudePanel() {
   const [busca, setBusca] = useState('')
   const [soPlano, setSoPlano] = useState(false)
   const [pendenteId, setPendenteId] = useState<string | null>(null)
-  const [mes, setMes] = useState<string>('')
+  const [mes, setMes] = useState<string>(mesPadrao())
   const [operadora, setOperadora] = useState<string>('')
   const [upload, setUpload] = useState(false)
 
-  // meses com relatório enviado (o mais recente entra selecionado)
-  const meses = useMemo(
-    () => [...new Set(lotes.map(l => compYm(l.competencia)))].sort().reverse(),
+  // meses com relatório enviado — o seletor sempre existe (janela fixa),
+  // mas garante que todo mês já lançado apareça na lista
+  const comLote = useMemo(
+    () => [...new Set(lotes.map(l => compYm(l.competencia)))],
     [lotes],
   )
+  const meses = useMemo(
+    () => [...new Set([...mesesJanela(), ...comLote, mes])].filter(Boolean).sort().reverse(),
+    [comLote, mes],
+  )
+  // ao chegar o 1º relatório, cai no mês dele
   useEffect(() => {
-    if (!mes && meses.length) setMes(meses[0])
-  }, [meses, mes])
+    if (comLote.length && !comLote.includes(mes)) setMes([...comLote].sort().reverse()[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comLote.join(',')])
 
   const { data: porColab } = usePlanoMesPorColaborador(mes || null)
 
@@ -167,11 +193,11 @@ export default function DPPlanoSaudePanel() {
         <>
           {/* Filtros */}
           <div className="flex flex-wrap items-center gap-2">
-            {meses.length > 0 && (
-              <select value={mes} onChange={e => setMes(e.target.value)} className={selCls}>
-                {meses.map(m => <option key={m} value={m}>{fmtMes(m)}</option>)}
-              </select>
-            )}
+            <select value={mes} onChange={e => setMes(e.target.value)} className={selCls} title="Competência">
+              {meses.map(m => (
+                <option key={m} value={m}>{fmtMes(m)}{comLote.includes(m) ? ' ·' : ''}</option>
+              ))}
+            </select>
             {operadoras.length > 1 && (
               <select value={operadora} onChange={e => setOperadora(e.target.value)} className={selCls}>
                 <option value="">Todas as operadoras</option>
@@ -294,7 +320,9 @@ export default function DPPlanoSaudePanel() {
           </div>
           <p className={`text-[11px] ${txtMuted}`}>
             {lista.length} colaborador(es) · adesões marcam a <b>data de entrada</b> de hoje (editável). As vidas alimentam o quantitativo do contrato automaticamente.
-            {meses.length > 0 && ' Mensalidade da fatura e coparticipação vêm do relatório da operadora do mês selecionado.'}
+            {comLote.includes(mes)
+              ? ' Mensalidade da fatura e coparticipação vêm do relatório da operadora de ' + fmtMes(mes) + '.'
+              : ' Nenhum relatório da operadora em ' + fmtMes(mes) + ' — suba em “Novo relatório” para preencher fatura e coparticipação.'}
           </p>
         </>
       )}
