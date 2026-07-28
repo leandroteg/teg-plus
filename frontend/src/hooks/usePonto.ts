@@ -7,14 +7,36 @@ import type {
 } from '../types/ponto'
 
 // Conjunto de ids de colaboradores ATIVOS (para filtrar a lista de ponto por situação)
+// Quem o Ponto deve cobrar. Nem todo colaborador ativo bate ponto:
+//   cargo de confianca -> isento por definicao;
+//   afastado           -> licenca medica / suspensao / maternidade.
+// Os dois continuam ativos e no headcount, mas fora da lista de ponto - senao
+// aparecem todo mes com o mes inteiro de "falta".
+export interface PontoElegiveis {
+  /** ativos que DEVEM bater ponto */
+  batem: Set<string>
+  /** ativos dispensados (confianca ou afastado) */
+  dispensados: Set<string>
+  /** todos os ativos (batem + dispensados) */
+  ativos: Set<string>
+}
+
 export function useColabAtivosIds() {
-  return useQuery<Set<string>>({
-    queryKey: ['ponto-colab-ativos-ids'],
+  return useQuery<PontoElegiveis>({
+    queryKey: ['ponto-colab-elegiveis'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('rh_colaboradores').select('id').eq('ativo', true)
-      if (error) { console.error('useColabAtivosIds:', error); return new Set<string>() }
-      return new Set((data ?? []).map(r => (r as { id: string }).id))
+      const vazio: PontoElegiveis = { batem: new Set(), dispensados: new Set(), ativos: new Set() }
+      const { data, error } = await supabase.from('rh_colaboradores')
+        .select('id, cargo_confianca, afastado').eq('ativo', true)
+      if (error) { console.error('useColabAtivosIds:', error); return vazio }
+      const r: PontoElegiveis = { batem: new Set(), dispensados: new Set(), ativos: new Set() }
+      for (const c of (data ?? []) as { id: string; cargo_confianca?: boolean; afastado?: boolean }[]) {
+        r.ativos.add(c.id)
+        if (c.cargo_confianca || c.afastado) r.dispensados.add(c.id)
+        else r.batem.add(c.id)
+      }
+      return r
     },
   })
 }
