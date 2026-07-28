@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ClipboardList, Eye, Zap, X, AlertTriangle,
@@ -336,6 +336,10 @@ function SolicitacaoCard({
   const isDevolvida = item.status === 'devolvida_solicitante'
   const isEsclarecimento = item.status === 'em_esclarecimento'
   const precisaAcao = isDevolvida || isEsclarecimento
+  // Contratos self-service: quem não tem o módulo acompanha pelo card (status +
+  // prazo), mas o detalhe completo é restrito — não oferecemos o deep-link gated.
+  const { hasModule } = useAuth()
+  const podeVerDetalhe = item.modulo !== 'contratos' || hasModule('contratos')
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-shadow p-4 ${
@@ -400,41 +404,92 @@ function SolicitacaoCard({
       )}
 
       {/* Action buttons */}
-      <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
-        {precisaAcao && item.modulo === 'compras' ? (
-          <button
-            onClick={() => navigate(`/requisicoes/${item.id}/editar`)}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors"
-          >
-            <Pencil size={13} />
-            Editar e Reenviar
-          </button>
-        ) : (
-          <button
-            onClick={() => navigate(mod.detalhePath(item.id))}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
-          >
-            <Eye size={13} className="text-slate-400" />
-            Consultar andamento
-          </button>
-        )}
-        {!encerrada && !precisaAcao && (item.modulo === 'compras' || item.modulo === 'logistica') && (
-          <button
-            onClick={() => onUrgencia(item)}
-            disabled={jaUrgente}
-            title={jaUrgente ? 'Já marcada como urgente' : 'Pedir urgência'}
-            className={[
-              'flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-colors',
-              jaUrgente
-                ? 'text-orange-400 bg-orange-50 cursor-default opacity-60'
-                : 'text-orange-600 bg-orange-50 hover:bg-orange-100',
-            ].join(' ')}
-          >
-            <Zap size={13} />
-            Pedir urgência
-          </button>
-        )}
-      </div>
+      {(() => {
+        const showEditar = precisaAcao && item.modulo === 'compras'
+        const showConsultar = !showEditar && podeVerDetalhe
+        const showUrgencia = !encerrada && !precisaAcao && (item.modulo === 'compras' || item.modulo === 'logistica')
+        if (!showEditar && !showConsultar && !showUrgencia) return null
+        return (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
+            {showEditar ? (
+              <button
+                onClick={() => navigate(`/requisicoes/${item.id}/editar`)}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors"
+              >
+                <Pencil size={13} />
+                Editar e Reenviar
+              </button>
+            ) : showConsultar ? (
+              <button
+                onClick={() => navigate(mod.detalhePath(item.id))}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <Eye size={13} className="text-slate-400" />
+                Consultar andamento
+              </button>
+            ) : null}
+            {showUrgencia && (
+              <button
+                onClick={() => onUrgencia(item)}
+                disabled={jaUrgente}
+                title={jaUrgente ? 'Já marcada como urgente' : 'Pedir urgência'}
+                className={[
+                  'flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-colors',
+                  jaUrgente
+                    ? 'text-orange-400 bg-orange-50 cursor-default opacity-60'
+                    : 'text-orange-600 bg-orange-50 hover:bg-orange-100',
+                ].join(' ')}
+              >
+                <Zap size={13} />
+                Pedir urgência
+              </button>
+            )}
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ── Botão "Nova" com seletor (Compra / Contrato) ────────────────────────────────
+// A criação de solicitação de contrato é self-service (rota /solicitar-contrato,
+// aberta a todos), então não exige o módulo Contratos.
+function NovaSolicitacaoBtn() {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+  const opcoes = [
+    { label: 'Requisição de Compra',   icon: ShoppingCart,  to: '/requisicoes/nova',    tone: 'text-violet-600' },
+    { label: 'Solicitação de Contrato', icon: FileSignature, to: '/solicitar-contrato',  tone: 'text-indigo-600' },
+  ]
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
+      >
+        <Plus size={14} />
+        Nova
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1.5 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden">
+          {opcoes.map(o => (
+            <button
+              key={o.to}
+              onClick={() => { setOpen(false); navigate(o.to) }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <o.icon size={15} className={o.tone} />
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -491,13 +546,7 @@ export default function MinhasSolicitacoes({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/requisicoes/nova')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
-          >
-            <Plus size={14} />
-            Nova
-          </button>
+          <NovaSolicitacaoBtn />
         </div>
 
         {/* Tabs — só no header standalone */}
@@ -541,13 +590,7 @@ export default function MinhasSolicitacoes({
                 {isLoading ? 'Carregando…' : `${abertas.length} em aberto · ${encerradas.length} encerrada${encerradas.length !== 1 ? 's' : ''}`}
               </p>
             </div>
-            <button
-              onClick={() => navigate('/requisicoes/nova')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-white bg-teal-500 hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-500/20"
-            >
-              <Plus size={14} />
-              Nova
-            </button>
+            <NovaSolicitacaoBtn />
           </div>
         )}
 

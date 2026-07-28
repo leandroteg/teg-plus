@@ -226,8 +226,12 @@ function FilterSelect({ label, value, onChange, options, placeholder, labelClass
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function NovaSolicitacao() {
+export default function NovaSolicitacao({ selfService = false }: { selfService?: boolean } = {}) {
   const nav = useNavigate()
+  // Self-service (rota /solicitar-contrato, aberta a todos, sem o módulo Contratos):
+  // navega para o hub global Minhas Solicitações em vez das rotas gated de Contratos.
+  const voltarPara = selfService ? '/minhas-solicitacoes' : '/contratos/solicitacoes'
+  const aposCriar = (id: string) => selfService ? '/minhas-solicitacoes' : `/contratos/solicitacoes/${id}`
   const { perfil } = useAuth()
   // obras removido — usar centro de custos
   const centrosCusto = useLookupCentrosCusto()
@@ -487,7 +491,7 @@ export default function NovaSolicitacao() {
       } catch (upErr) {
         console.warn('Falha ao enviar anexos da solicitacao:', upErr)
       }
-      nav(`/contratos/solicitacoes/${result.id}`)
+      nav(aposCriar(result.id))
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao salvar rascunho')
     }
@@ -514,7 +518,7 @@ export default function NovaSolicitacao() {
       } catch (upErr) {
         console.warn('Falha ao enviar anexos da solicitacao:', upErr)
       }
-      nav(`/contratos/solicitacoes/${result.id}`)
+      nav(aposCriar(result.id))
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao enviar solicitacao')
     }
@@ -533,7 +537,7 @@ export default function NovaSolicitacao() {
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => nav('/contratos/solicitacoes')}
+          onClick={() => nav(voltarPara)}
           className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center
             text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-all"
         >
@@ -1099,7 +1103,7 @@ export default function NovaSolicitacao() {
           </button>
         ) : (
           <button
-            onClick={() => nav('/contratos/solicitacoes')}
+            onClick={() => nav(voltarPara)}
             className="flex items-center gap-1.5 px-5 py-3 rounded-xl border-2 border-slate-200
               text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all"
           >
