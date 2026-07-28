@@ -53,6 +53,10 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   em_aprovacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
 
+// Status da REQUISIÇÃO que indicam cotação "em revisão" (Esclarecer / Rejeitado).
+// Usado APENAS pelo botão de filtro — NÃO altera shouldShowInCotacoes nem as abas.
+const REQ_EM_REVISAO = ['cotacao_em_esclarecimento', 'cotacao_rejeitada']
+
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data',  label: 'Data' },
   { field: 'valor', label: 'Valor' },
@@ -445,6 +449,7 @@ export default function FilaCotacoes() {
   const { isAdmin, atLeast, perfil } = useAuth()
 
   const [activeTab, setActiveTab] = useState<PipelineTab>('pendente')
+  const [soRevisao, setSoRevisao] = useState(false)   // filtro "Em revisão" (off = tela atual)
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -486,6 +491,9 @@ export default function FilaCotacoes() {
   const activeItems = useMemo(() => {
     let items = grouped.get(activeTab) ?? []
 
+    // Filtro "Em revisão" — restringe à etapa atual, sem mexer nas abas
+    if (soRevisao) items = items.filter(c => REQ_EM_REVISAO.includes(c.requisicao?.status ?? ''))
+
     if (busca) {
       const t = busca.toLowerCase()
       items = items.filter(c =>
@@ -506,7 +514,13 @@ export default function FilaCotacoes() {
     })
 
     return items
-  }, [grouped, activeTab, busca, sortField, sortDir])
+  }, [grouped, activeTab, busca, sortField, sortDir, soRevisao])
+
+  // quantas cotações em revisão existem NESTA etapa (badge do botão)
+  const revisaoCount = useMemo(
+    () => (grouped.get(activeTab) ?? []).filter(c => REQ_EM_REVISAO.includes(c.requisicao?.status ?? '')).length,
+    [grouped, activeTab],
+  )
 
   const totalCount = Array.from(grouped.values()).reduce((s, a) => s + a.length, 0)
 
@@ -593,6 +607,21 @@ export default function FilaCotacoes() {
             {o.label} {sortField === o.field && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
           </button>
         ))}
+
+        {/* Filtro "Em revisão" — mostra só esclarecer/rejeitado DESTA etapa */}
+        <button onClick={() => setSoRevisao(v => !v)}
+          disabled={revisaoCount === 0 && !soRevisao}
+          title="Mostrar apenas cotações em revisão (Esclarecer / Rejeitado) nesta etapa"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all disabled:opacity-40 ${
+            soRevisao
+              ? isDark ? 'bg-rose-500/15 text-rose-300 border-rose-500/40' : 'bg-rose-50 text-rose-700 border-rose-300'
+              : isDark ? 'bg-transparent text-slate-500 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+          }`}>
+          <MessageSquare size={12} /> Em revisão
+          {revisaoCount > 0 && (
+            <span className={`px-1 rounded ${soRevisao ? (isDark ? 'bg-rose-500/25' : 'bg-rose-200/70') : (isDark ? 'bg-white/10' : 'bg-slate-100')}`}>{revisaoCount}</span>
+          )}
+        </button>
 
         <div className={`flex border rounded-lg ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('list')} className={`p-1.5 transition-all ${viewMode === 'list' ? isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
