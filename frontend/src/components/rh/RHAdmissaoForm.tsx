@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // components/rh/RHAdmissaoForm.tsx — Nova Solicitação de Admissão (multi-candidato)
 // Campos compartilhados da requisição + N candidatos (como itens de um pedido).
-// Anexar vários documentos → IA (n8n) pré-preenche um candidato por arquivo.
+// Anexar vários documentos → IA (n8n) preenche; docs da mesma pessoa se fundem.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef } from 'react'
 import {
@@ -29,6 +29,16 @@ interface CandForm {
   arquivos: ArqForm[]
   lendo?: boolean
   confianca?: number
+}
+
+// Identidade do candidato para não duplicar: CPF quando houver, senão o nome
+// normalizado. Vários documentos da MESMA pessoa têm que virar UM candidato.
+export function chaveCandidato(c: { cpf?: string; nome?: string }): string {
+  const cpf = (c.cpf || '').replace(/\D/g, '')
+  if (cpf.length === 11) return 'cpf:' + cpf
+  const nome = (c.nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  return nome ? 'nome:' + nome : ''
 }
 
 function guessTipo(name: string): string {
@@ -69,7 +79,8 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
 
   function novoUid() { return uidRef.current++ }
 
-  // Anexa vários arquivos → cria 1 candidato por arquivo + IA preenche
+  // Anexa vários arquivos → 1 bloco por arquivo; depois da leitura da IA os
+  // blocos da mesma pessoa (mesmo CPF/nome) se fundem num candidato só.
   function addArquivosComoCandidatos(files: FileList | null) {
     if (!files) return
     const lista = Array.from(files)
@@ -84,16 +95,36 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
     novos.forEach(c => {
       const arq = c.arquivos[0]
       parseDocumentoAdmissao(arq.file, arq.tipo).then(ext => {
-        setCandidatos(prev => prev.map(x => x.uid === c.uid ? {
-          ...x,
-          lendo: false,
-          nome: x.nome || String(ext?.nome || ''),
-          cpf: x.cpf || String(ext?.cpf || ''),
-          dataNascimento: x.dataNascimento || String(ext?.data_nascimento || ''),
-          cargo: x.cargo || String(ext?.cargo_pretendido || ''),
-          dados_extras: (ext && typeof ext === 'object') ? (ext as Record<string, unknown>) : undefined,
-          confianca: typeof ext?.confianca === 'number' ? ext.confianca : undefined,
-        } : x))
+        setCandidatos(prev => {
+          const atual = prev.map(x => x.uid === c.uid ? {
+            ...x,
+            lendo: false,
+            nome: x.nome || String(ext?.nome || ''),
+            cpf: x.cpf || String(ext?.cpf || ''),
+            dataNascimento: x.dataNascimento || String(ext?.data_nascimento || ''),
+            cargo: x.cargo || String(ext?.cargo_pretendido || ''),
+            dados_extras: (ext && typeof ext === 'object') ? (ext as Record<string, unknown>) : undefined,
+            confianca: typeof ext?.confianca === 'number' ? ext.confianca : undefined,
+          } : x)
+          // CTPS + proposta + CNH da mesma pessoa chegam como blocos separados
+          // (1 por arquivo). Agora que a IA leu, funde no bloco que já existia:
+          // fica um candidato só, com todos os documentos.
+          const eu = atual.find(x => x.uid === c.uid)
+          const chave = eu ? chaveCandidato(eu) : ''
+          if (!eu || !chave) return atual
+          const irmao = atual.find(x => x.uid !== eu.uid && chaveCandidato(x) === chave)
+          if (!irmao) return atual
+          return atual
+            .map(x => x.uid === irmao.uid ? {
+              ...x,
+              arquivos: [...x.arquivos, ...eu.arquivos],
+              cargo: x.cargo || eu.cargo,
+              dataNascimento: x.dataNascimento || eu.dataNascimento,
+              dados_extras: x.dados_extras ?? eu.dados_extras,
+              confianca: x.confianca ?? eu.confianca,
+            } : x)
+            .filter(x => x.uid !== eu.uid)
+        })
       }).catch(() => {
         setCandidatos(prev => prev.map(x => x.uid === c.uid ? { ...x, lendo: false } : x))
       })
@@ -133,6 +164,16 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
     if (!motivo.trim()) e.push('Informe o motivo da admissão')
     if (candidatos.length === 0) e.push('Adicione pelo menos um candidato')
     if (candidatos.some(c => !c.nome.trim())) e.push('Todos os candidatos precisam ter nome')
+    const vistos = new Set<string>(); const avisados = new Set<string>()
+    for (const c of candidatos) {
+      const k = chaveCandidato(c)
+      if (!k) continue
+      if (vistos.has(k) && !avisados.has(k)) {
+        avisados.add(k)
+        e.push(`${c.nome.trim() || 'Candidato'} aparece duas vezes — junte os documentos num único candidato`)
+      }
+      vistos.add(k)
+    }
     return e
   }
 
@@ -295,8 +336,8 @@ export default function RHAdmissaoForm({ onBack, onCreated }: { onBack: () => vo
                 <Sparkles size={18} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700">Anexar documentos — a IA cria um candidato por arquivo</p>
-                <p className="text-[11px] text-slate-400">Solte vários CTPS/CV/CNH de uma vez · nome, CPF e cargo são preenchidos automaticamente.</p>
+                <p className="text-sm font-semibold text-slate-700">Anexar documentos — a IA lê e preenche o candidato</p>
+                <p className="text-[11px] text-slate-400">Solte vários CTPS/CV/CNH de uma vez · documentos da mesma pessoa ficam num candidato só.</p>
               </div>
             </div>
           </div>

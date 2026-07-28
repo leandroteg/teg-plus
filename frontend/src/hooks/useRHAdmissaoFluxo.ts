@@ -181,7 +181,26 @@ export function useCriarAdmissao() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ dados, candidatos, autorId, autorNome }: NovaAdmissaoInput) => {
-      // 0) trava de duplicidade: CPF (ou nome) com requisição ainda aberta
+      // 0a) trava de duplicidade DENTRO do próprio envio: vários documentos da
+      //     mesma pessoa não podem virar candidatos diferentes (o form já funde,
+      //     isto é a rede de segurança para não gravar duplicado no banco).
+      const vistos = new Set<string>()
+      for (const c of candidatos) {
+        const cpf = (c.cpf || '').replace(/\D/g, '')
+        const chave = cpf.length === 11
+          ? 'cpf:' + cpf
+          : 'nome:' + (c.nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+              .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+        if (chave === 'nome:') continue
+        if (vistos.has(chave)) {
+          throw new Error(
+            `${c.nome} aparece duas vezes nesta requisição. Junte os documentos num único candidato antes de enviar.`,
+          )
+        }
+        vistos.add(chave)
+      }
+
+      // 0b) trava de duplicidade: CPF (ou nome) com requisição ainda aberta
       for (const c of candidatos) {
         const { data: dup } = await supabase.rpc('rh_admissao_existe_aberta', {
           p_cpf: c.cpf || null,
