@@ -14,6 +14,7 @@ import {
   buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 import { planejarComReforco, type PlanParams, type PlanObraIn, type PlanResult } from './planejadorAuto'
+import { useOrdemPriorizacao, normNomeObra } from '../../../hooks/useObras'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const PROD_BANDS: [string, string, (p: number) => boolean][] = [
@@ -466,6 +467,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const [planExc, setPlanExc] = useState<Set<string>>(new Set()) // obras embargadas / fora do plano
   const [planOrdem, setPlanOrdem] = useState<string[]>([]) // prioridade manual (ordem das obras)
   const [planRes, setPlanRes] = useState<PlanResult | null>(null)
+  // ordem oficial definida em Obras › Gestão de Obras › Priorização
+  const { data: ordemPrio } = useOrdemPriorizacao()
   // torres por obra = Σ qtd_torres das OSCs de CONSTRUÇÃO ativas (lançadas na Iniciação) — busca só com o modal aberto
   const { data: torresObra } = useQuery<Record<string, number>>({
     queryKey: ['plan-torres', portfolioId],
@@ -503,6 +506,15 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
       .map(o => ({ nome: o.nome, pz: o.fim ? ymNum(o.fim.slice(0, 7)) - ymNum(st) : 9999, sr: o.saldoR }))
       .sort((a, b) => a.pz !== b.pz ? a.pz - b.pz : b.sr - a.sr).map(o => o.nome)
     try { const salvo: string[] = JSON.parse(localStorage.getItem(`crono-plan-ordem-${portfolioId}`) ?? '[]'); if (salvo.length) { const set = new Set(salvo); ordem.sort((a, b) => (set.has(a) ? salvo.indexOf(a) : 1e9) - (set.has(b) ? salvo.indexOf(b) : 1e9)) } } catch { /* ignora ordem salva corrompida */ }
+    // Obras › Priorização manda: é a ordem combinada com a operação. Quem não
+    // estiver lá mantém a posição anterior (padrão do planejador / ajuste local).
+    if (ordemPrio?.size) {
+      ordem.sort((a, b) => {
+        const oa = ordemPrio.get(normNomeObra(a)) ?? 1e9
+        const ob = ordemPrio.get(normNomeObra(b)) ?? 1e9
+        return oa !== ob ? oa - ob : 0
+      })
+    }
     setPlanOrdem(ordem)
   }
   const togglePlanExc = (nome: string) => {
@@ -1050,7 +1062,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                   const incl = lista.filter(n => !planExc.has(n)).length
                   return (
                     <div>
-                      <p className={`${plbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— {incl} no plano · setas ordenam · desmarque pra tirar</span></p>
+                      <p className={`${plbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— {incl} no plano · {ordemPrio?.size ? 'ordem vem de Obras › Priorização · ' : ''}setas ordenam · desmarque pra tirar</span></p>
                       <div className={`max-h-52 overflow-auto rounded-lg border p-1 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                         {lista.map((n, i) => { const o = obraMap.get(n)!; const on = !planExc.has(n); return (
                           <div key={n} className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] ${on ? '' : 'opacity-40'} ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
