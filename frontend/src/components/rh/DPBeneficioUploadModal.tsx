@@ -1,29 +1,39 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// components/rh/DPPlanoUploadModal.tsx — sobe os relatórios da operadora.
-// Não perguntamos operadora nem tipo: o SuperTEG identifica lendo o arquivo.
-// A competência vem sugerida (mês passado) e é editável — quem confere decide.
+// components/rh/DPBeneficioUploadModal.tsx — "Lançamento Benefícios".
+// Escolhe o benefício e a competência e sobe os arquivos do fornecedor.
+// Fornecedor, tipo de relatório e as linhas quem identifica é o SuperTEG —
+// que ainda confere se o arquivo bate com o benefício escolhido.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useRef, useState } from 'react'
-import { X, Upload, FileText, Loader2, Sparkles, Trash2 } from 'lucide-react'
+import { X, Upload, FileText, Loader2, Sparkles, Trash2, HeartPulse, UtensilsCrossed, Bus } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useEnviarRelatorioPlano } from '../../hooks/usePlanoSaude'
+import { useEnviarRelatorioBeneficio, type Beneficio } from '../../hooks/useBeneficioRelatorios'
 
-// mês anterior — é o que a operadora fatura
+const OPCOES: { key: Beneficio; label: string; icon: typeof HeartPulse; exemplo: string }[] = [
+  { key: 'plano_saude', label: 'Plano de Saúde', icon: HeartPulse,      exemplo: 'mensalidade ou coparticipação' },
+  { key: 'vr',          label: 'Alimentação',    icon: UtensilsCrossed, exemplo: 'pedido de crédito VR/VA' },
+  { key: 'vt',          label: 'Transporte',     icon: Bus,             exemplo: 'requisição de crédito ou saldo' },
+]
+
+// mês anterior — é o que o fornecedor costuma faturar
 const mesSugerido = () => {
   const d = new Date()
-  d.setDate(1)
-  d.setMonth(d.getMonth() - 1)
+  d.setDate(1); d.setMonth(d.getMonth() - 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export default function DPPlanoUploadModal({ onClose }: { onClose: () => void }) {
+export default function DPBeneficioUploadModal({ inicial, onClose }: {
+  inicial?: Beneficio
+  onClose: () => void
+}) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
-  const enviar = useEnviarRelatorioPlano()
+  const enviar = useEnviarRelatorioBeneficio()
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const [beneficio, setBeneficio] = useState<Beneficio>(inicial ?? 'plano_saude')
   const [arquivos, setArquivos] = useState<File[]>([])
   const [competencia, setCompetencia] = useState(mesSugerido())
   const [erro, setErro] = useState<string | null>(null)
@@ -34,18 +44,12 @@ export default function DPPlanoUploadModal({ onClose }: { onClose: () => void })
     ? 'bg-white/[0.05] border-white/10 text-white'
     : 'bg-white border-slate-200 text-slate-800'
 
-  const add = (fl: FileList | null) => {
-    if (!fl?.length) return
-    setArquivos(a => [...a, ...Array.from(fl)])
-    setErro(null)
-  }
-
   const submeter = async () => {
     if (!arquivos.length) { setErro('Selecione ao menos um arquivo.'); return }
     if (!/^\d{4}-\d{2}$/.test(competencia)) { setErro('Informe a competência.'); return }
     setErro(null)
     try {
-      await enviar.mutateAsync({ arquivos, competenciaYm: competencia, criadoPor: perfil?.nome ?? null })
+      await enviar.mutateAsync({ beneficio, arquivos, competenciaYm: competencia, criadoPor: perfil?.nome ?? null })
       onClose()
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e))
@@ -59,17 +63,32 @@ export default function DPPlanoUploadModal({ onClose }: { onClose: () => void })
         <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-100'}`}>
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-emerald-500" />
-            <h3 className={`text-sm font-bold ${txt}`}>Relatórios do plano de saúde</h3>
+            <h3 className={`text-sm font-bold ${txt}`}>Lançamento Benefícios</h3>
           </div>
-          <button onClick={onClose} className={`p-1 rounded-lg ${txtMuted} hover:${isDark ? 'bg-white/10' : 'bg-slate-100'}`}><X size={16} /></button>
+          <button onClick={onClose} className={`p-1 rounded-lg ${txtMuted}`}><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          <p className={`text-xs leading-relaxed ${txtMuted}`}>
-            Suba a <b className={txt}>mensalidade</b> e/ou a <b className={txt}>coparticipação</b> de qualquer operadora.
-            O SuperTEG identifica sozinho a operadora, o tipo do relatório e cada linha — e só aceita a leitura
-            quando a soma bate com o total impresso no documento.
-          </p>
+          <div>
+            <label className={`block text-[11px] font-semibold mb-1.5 ${txtMuted}`}>BENEFÍCIO</label>
+            <div className="grid grid-cols-3 gap-2">
+              {OPCOES.map(o => {
+                const on = beneficio === o.key
+                return (
+                  <button key={o.key} onClick={() => setBeneficio(o.key)}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-[11px] font-semibold transition-colors ${on
+                      ? isDark ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                      : isDark ? 'border-white/10 text-slate-400 hover:border-white/25' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                    <o.icon size={16} />
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className={`mt-1.5 text-[11px] ${txtMuted}`}>
+              {OPCOES.find(o => o.key === beneficio)?.exemplo}
+            </p>
+          </div>
 
           <div>
             <label className={`block text-[11px] font-semibold mb-1 ${txtMuted}`}>COMPETÊNCIA</label>
@@ -80,7 +99,7 @@ export default function DPPlanoUploadModal({ onClose }: { onClose: () => void })
 
           <div>
             <input ref={inputRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt"
-              className="hidden" onChange={e => { add(e.target.files); e.target.value = '' }} />
+              className="hidden" onChange={e => { if (e.target.files?.length) { setArquivos(a => [...a, ...Array.from(e.target.files!)]); setErro(null) } ; e.target.value = '' }} />
             <button onClick={() => inputRef.current?.click()}
               className={`w-full flex items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed text-xs font-semibold transition-colors ${isDark
                 ? 'border-white/15 text-slate-400 hover:border-emerald-400 hover:text-emerald-300'
@@ -103,6 +122,11 @@ export default function DPPlanoUploadModal({ onClose }: { onClose: () => void })
               ))}
             </div>
           )}
+
+          <p className={`text-[11px] leading-relaxed ${txtMuted}`}>
+            O SuperTEG identifica o fornecedor, o tipo do relatório e cada linha — e só aceita a leitura
+            quando a soma bate com o total impresso no documento.
+          </p>
 
           {erro && <p className="text-xs text-rose-500">{erro}</p>}
         </div>

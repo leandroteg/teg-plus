@@ -77,14 +77,16 @@ function useInvalidarBeneficios() {
 export function useAderirBeneficio() {
   const invalidar = useInvalidarBeneficios()
   return useMutation({
-    mutationFn: async (p: { colaboradorId: string; tipo?: string; contratoId?: string | null; dependentes?: number; criadoPor?: string | null }) => {
+    mutationFn: async (p: { colaboradorId: string; tipo?: string; contratoId?: string | null; dependentes?: number; descontoMensal?: number | null; criadoPor?: string | null }) => {
+      const tipo = p.tipo ?? 'plano_saude'
       const { error } = await supabase.from('rh_beneficio_adesoes').insert({
         colaborador_id: p.colaboradorId,
-        tipo: p.tipo ?? 'plano_saude',
+        tipo,
         contrato_id: p.contratoId ?? null,
         dependentes: p.dependentes ?? 0,
         valor_mensal: (p as { valorMensal?: number }).valorMensal ?? null,
-        desconto_mensal: 60,  // padrão da rubrica 8111 (editável na matriz)
+        // plano de saúde tem desconto fixo (rubrica 8111); VR/VT começam sem desconto
+        desconto_mensal: p.descontoMensal !== undefined ? p.descontoMensal : (tipo === 'plano_saude' ? 60 : null),
         criado_por_nome: p.criadoPor ?? null,
       })
       if (error) throw error

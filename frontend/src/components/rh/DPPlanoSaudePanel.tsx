@@ -8,7 +8,7 @@
 // Vidas (titular+dependentes) sincronizam con_contratos.quantitativo (trigger).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react'
-import { HeartPulse, Search, Check, Loader2, FileText, Users, BarChart3, Upload, Receipt } from 'lucide-react'
+import { HeartPulse, Search, Check, Loader2, FileText, Users, BarChart3, Receipt } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColaboradoresAtivos } from '../../hooks/useObras'
@@ -17,9 +17,8 @@ import {
   useAderirBeneficio, useAtualizarAdesao, useEncerrarAdesao,
   type BeneficioAdesao,
 } from '../../hooks/useBeneficios'
-import { usePlanoLotes, usePlanoMesPorColaborador, compYm } from '../../hooks/usePlanoSaude'
-import DPPlanoConsolidado from './DPPlanoConsolidado'
-import DPPlanoUploadModal from './DPPlanoUploadModal'
+import { useBeneficioLotes, useBeneficioMesPorColaborador, compYm } from '../../hooks/useBeneficioRelatorios'
+import DPBeneficioConsolidado from './DPBeneficioConsolidado'
 
 const fmtCur = (v?: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
@@ -52,7 +51,7 @@ export default function DPPlanoSaudePanel() {
   const { data: colaboradores = [], isLoading: loadCol } = useColaboradoresAtivos()
   const { data: adesoes = [], isLoading: loadAd } = useAdesoesBeneficio('plano_saude')
   const { data: contrato } = useContratoPlanoSaude()
-  const { data: lotes = [] } = usePlanoLotes()
+  const { data: lotes = [] } = useBeneficioLotes('plano_saude')
   const aderir = useAderirBeneficio()
   const atualizar = useAtualizarAdesao()
   const encerrar = useEncerrarAdesao()
@@ -63,7 +62,6 @@ export default function DPPlanoSaudePanel() {
   const [pendenteId, setPendenteId] = useState<string | null>(null)
   const [mes, setMes] = useState<string>(mesPadrao())
   const [operadora, setOperadora] = useState<string>('')
-  const [upload, setUpload] = useState(false)
 
   // meses com relatório enviado — o seletor sempre existe (janela fixa),
   // mas garante que todo mês já lançado apareça na lista
@@ -81,10 +79,10 @@ export default function DPPlanoSaudePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comLote.join(',')])
 
-  const { data: porColab } = usePlanoMesPorColaborador(mes || null)
+  const { data: porColab } = useBeneficioMesPorColaborador('plano_saude', mes || null)
 
   const operadoras = useMemo(
-    () => [...new Set(lotes.filter(l => !mes || compYm(l.competencia) === mes).map(l => l.operadora).filter(Boolean))] as string[],
+    () => [...new Set(lotes.filter(l => !mes || compYm(l.competencia) === mes).map(l => l.fornecedor).filter(Boolean))] as string[],
     [lotes, mes],
   )
 
@@ -103,7 +101,7 @@ export default function DPPlanoSaudePanel() {
 
   // operadora do colaborador: a que cobrou no mês; sem relatório, a do contrato
   const opContrato = (contrato?.contraparte_nome ?? '').split('(')[0].trim().toUpperCase() || null
-  const opDe = (colabId: string) => porColab?.get(colabId)?.operadora ?? opContrato
+  const opDe = (colabId: string) => porColab?.get(colabId)?.fornecedor ?? opContrato
 
   const lista = useMemo(() => {
     const q = busca.toLowerCase()
@@ -121,7 +119,7 @@ export default function DPPlanoSaudePanel() {
   const custoLiquido = somaPrecos - somaDescontos
   const somaCopart = useMemo(() => {
     let s = 0
-    for (const c of lista) s += porColab?.get(c.id)?.coparticipacao ?? 0
+    for (const c of lista) s += porColab?.get(c.id)?.secundario ?? 0
     return s
   }, [lista, porColab])
 
@@ -177,19 +175,13 @@ export default function DPPlanoSaudePanel() {
           </span>
         )}
         <div className="flex-1" />
-        <button onClick={() => setUpload(true)}
-          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${isDark
-            ? 'border-white/10 text-slate-300 hover:border-emerald-400 hover:text-emerald-300'
-            : 'border-slate-200 text-slate-600 hover:border-emerald-500 hover:text-emerald-700'}`}>
-          <Upload size={12} /> Novo relatório
-        </button>
         <div className="flex items-center gap-1">
           {vistaBtn('adesoes', Users, 'Adesões')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado')}
         </div>
       </div>
 
-      {vista === 'consolidado' ? <DPPlanoConsolidado /> : (
+      {vista === 'consolidado' ? <DPBeneficioConsolidado beneficio="plano_saude" /> : (
         <>
           {/* Filtros */}
           <div className="flex flex-wrap items-center gap-2">
@@ -240,8 +232,8 @@ export default function DPPlanoSaudePanel() {
                     const a = adesaoPorColab.get(c.id)
                     const busy = pendenteId === c.id
                     const mesC = porColab?.get(c.id)
-                    const divergiu = a?.valor_mensal != null && mesC?.mensalidade != null
-                      && Math.abs(Number(mesC.mensalidade) - Number(a.valor_mensal)) > 0.01
+                    const divergiu = a?.valor_mensal != null && mesC?.principal != null
+                      && Math.abs(Number(mesC.principal) - Number(a.valor_mensal)) > 0.01
                     return (
                       <tr key={c.id} className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'} ${a ? (isDark ? 'bg-emerald-500/[0.04]' : 'bg-emerald-50/40') : ''}`}>
                         <td className="px-3 py-2">
@@ -249,7 +241,7 @@ export default function DPPlanoSaudePanel() {
                           <p className={txtMuted}>{c.cargo || '—'}{c.base_nome ? ` · ${c.base_nome}` : ''}</p>
                         </td>
                         <td className="px-3 py-2">
-                          {a ? <span className={mesC?.operadora ? txt : txtMuted}>{opDe(c.id) ?? '—'}</span> : <span className={txtMuted}>—</span>}
+                          {a ? <span className={mesC?.fornecedor ? txt : txtMuted}>{opDe(c.id) ?? '—'}</span> : <span className={txtMuted}>—</span>}
                         </td>
                         <td className="text-center px-3 py-2">
                           <button onClick={() => toggle(c.id, c.nome)} disabled={busy} title={a ? 'Remover do plano' : 'Adicionar ao plano'}
@@ -266,17 +258,17 @@ export default function DPPlanoSaudePanel() {
                                 key={`${a.id}-preco-${a.valor_mensal ?? ''}`}
                                 onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (a.valor_mensal ?? null)) atualizar.mutate({ id: a.id, valor_mensal: v }) }}
                                 className={`w-[85px] text-right text-xs rounded-lg px-2 py-1 border outline-none ${inputCls}`} />
-                              {mesC?.mensalidade != null && (
+                              {mesC?.principal != null && (
                                 <p className={`mt-0.5 text-[10px] ${divergiu ? (isDark ? 'text-amber-300' : 'text-amber-700') : txtMuted}`}
                                   title={divergiu ? 'Valor da fatura diferente do preço cadastrado' : 'Valor da fatura do mês'}>
-                                  fatura: {fmtCur(mesC.mensalidade)}
+                                  fatura: {fmtCur(mesC.principal)}
                                 </p>
                               )}
                             </>
                           ) : <span className={txtMuted}>—</span>}
                         </td>
-                        <td className={`text-right px-3 py-2 ${mesC?.coparticipacao ? (isDark ? 'text-sky-300' : 'text-sky-700') : txtMuted}`}>
-                          {mesC?.coparticipacao != null ? fmtCur(mesC.coparticipacao) : '—'}
+                        <td className={`text-right px-3 py-2 ${mesC?.secundario ? (isDark ? 'text-sky-300' : 'text-sky-700') : txtMuted}`}>
+                          {mesC?.secundario != null ? fmtCur(mesC.secundario) : '—'}
                         </td>
                         <td className="text-right px-3 py-2">
                           {a ? (
@@ -322,12 +314,11 @@ export default function DPPlanoSaudePanel() {
             {lista.length} colaborador(es) · adesões marcam a <b>data de entrada</b> de hoje (editável). As vidas alimentam o quantitativo do contrato automaticamente.
             {comLote.includes(mes)
               ? ' Mensalidade da fatura e coparticipação vêm do relatório da operadora de ' + fmtMes(mes) + '.'
-              : ' Nenhum relatório da operadora em ' + fmtMes(mes) + ' — suba em “Novo relatório” para preencher fatura e coparticipação.'}
+              : ' Nenhum relatório da operadora em ' + fmtMes(mes) + ' — suba em Novo Registro › Lançamento Benefícios para preencher fatura e coparticipação.'}
           </p>
         </>
       )}
 
-      {upload && <DPPlanoUploadModal onClose={() => setUpload(false)} />}
     </div>
   )
 }
