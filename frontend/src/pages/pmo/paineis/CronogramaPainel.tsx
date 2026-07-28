@@ -167,6 +167,32 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
   const totPessoasAll = useMemo(() => applied ? allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, allObras])
 
+  // NOTA: este hook precisa ficar ANTES dos returns antecipados abaixo — se
+  // vier depois, o render de loading executa menos hooks que o seguinte e o
+  // React quebra com "Rendered more hooks than during the previous render" (#310).
+  const publicar = useMutation({
+    mutationFn: async () => {
+      const obrasAll = view.frentesF.flatMap(fr => fr.obras)
+      const tot = totMensal(obrasAll)
+      await supabase.from('pmo_cronograma_previsao').delete().eq('portfolio_id', portfolioId)
+      const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
+        .filter(r => r.valor > 0.5)
+      if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
+      // replica no HISTOGRAMA: grava a config aplicada como versão com o MESMO nome do cronograma
+      let nomeV = ''
+      if (applied) {
+        nomeV = appliedNome.trim() || 'Cronograma publicado'
+        const ex = versoes.find(v => v.nome.toLowerCase() === nomeV.toLowerCase())
+        if (ex) { const { error } = await supabase.from('pmo_cronograma_versao').update({ config: applied, updated_at: new Date().toISOString() }).eq('id', ex.id); if (error) throw error }
+        else { const { error } = await supabase.from('pmo_cronograma_versao').insert({ portfolio_id: portfolioId, nome: nomeV, config: applied }); if (error) throw error }
+        qc.invalidateQueries({ queryKey: ['crono-versoes', portfolioId] })
+      }
+      return { n: rows.length, nomeV }
+    },
+    onSuccess: r => alert(`Cronograma publicado: ${r.n} competência(s) — Fluxo de Caixa atualizado${r.nomeV ? ` e replicado no Histograma (versão "${r.nomeV}")` : ''}.`),
+    onError: () => alert('Erro ao publicar o cronograma.'),
+  })
+
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
 
@@ -200,29 +226,6 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       </div>
     )
   }
-
-  const publicar = useMutation({
-    mutationFn: async () => {
-      const obrasAll = view.frentesF.flatMap(fr => fr.obras)
-      const tot = totMensal(obrasAll)
-      await supabase.from('pmo_cronograma_previsao').delete().eq('portfolio_id', portfolioId)
-      const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
-        .filter(r => r.valor > 0.5)
-      if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
-      // replica no HISTOGRAMA: grava a config aplicada como versão com o MESMO nome do cronograma
-      let nomeV = ''
-      if (applied) {
-        nomeV = appliedNome.trim() || 'Cronograma publicado'
-        const ex = versoes.find(v => v.nome.toLowerCase() === nomeV.toLowerCase())
-        if (ex) { const { error } = await supabase.from('pmo_cronograma_versao').update({ config: applied, updated_at: new Date().toISOString() }).eq('id', ex.id); if (error) throw error }
-        else { const { error } = await supabase.from('pmo_cronograma_versao').insert({ portfolio_id: portfolioId, nome: nomeV, config: applied }); if (error) throw error }
-        qc.invalidateQueries({ queryKey: ['crono-versoes', portfolioId] })
-      }
-      return { n: rows.length, nomeV }
-    },
-    onSuccess: r => alert(`Cronograma publicado: ${r.n} competência(s) — Fluxo de Caixa atualizado${r.nomeV ? ` e replicado no Histograma (versão "${r.nomeV}")` : ''}.`),
-    onError: () => alert('Erro ao publicar o cronograma.'),
-  })
 
   const subBtn = (k: 'proj' | 'cfg', label: string, icon: ReactNode) => (
     <button key={k} onClick={() => setSub(k)} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${sub === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}>{icon}{label}</button>
