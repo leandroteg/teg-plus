@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // useNotificacoes.ts — Fila in-app de notificacoes (sys_notif_queue, mig 129).
 //
-// Hoje a unica origem que popula a fila e 'cartao_lancamento' (trigger
-// fn_notif_item_fatura_cartao). Outras origens podem ser plugadas sem mudar
-// este hook — a fila e generica.
+// Origens: cartao_lancamento (mig 129) + notificacoes de etapa de todos os
+// modulos (triggers/sweep das migs 20260729000001+ — aprovacoes, cotacoes,
+// esclarecimentos, locacao, cautelas, adiantamentos, SGI, contratos).
+// Novas origens podem ser plugadas sem mudar este hook — a fila e generica.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo } from 'react'
@@ -44,6 +45,8 @@ export function useNotificacoes() {
       return (data ?? []) as NotifItem[]
     },
     staleTime: 30_000,
+    // Fallback caso o realtime nao dispare (mesmo padrao do sino do TI)
+    refetchInterval: 60_000,
   })
 
   // Realtime: dispara browser notification + invalida query ao chegar nova
@@ -62,7 +65,7 @@ export function useNotificacoes() {
             try {
               new Notification(n.titulo, {
                 body: n.corpo ?? undefined,
-                icon: '/icon-192.png',
+                icon: '/icons/icon-192.png',
                 tag: `${n.origem}:${n.origem_id ?? n.id}`,
               })
             } catch { /* ignore */ }

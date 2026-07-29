@@ -15,7 +15,7 @@ import { normalizeUnidade } from '../constants/unidades'
 
 export default function NotificationBell({ isDark = false }: { isDark?: boolean }) {
   const navigate = useNavigate()
-  const { pendentes, count: countPre, isAdminOrDirector, marcarAprovado, rejeitar } = usePreCadastros()
+  const { pendentes, count: countPre, marcarAprovado, rejeitar } = usePreCadastros()
   const { isAdmin, perfil } = useAuth()
   const { data: bases = [] } = useBases()
   const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
@@ -93,10 +93,10 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
     prevCountRef.current = count
   }, [count, play])
 
-  // Mostra o sino se o usuario tem algum tipo de notificacao:
-  // - pre-cadastros (admin/director/aprovador)
-  // - RC em triagem CD (triador)
-  if (!isAdminOrDirector && !isTriador) return null
+  // Sino visivel para todo usuario autenticado: a fila sys_notif_queue traz as
+  // notificacoes de etapa de qualquer modulo (aprovacoes, cotacoes, locacao...).
+  // As secoes restritas continuam gated pelos proprios hooks: pre-cadastros so
+  // busca se isAdminOrDirector (usePreCadastros) e triagem so exibe se isTriador.
 
   return (
     <>
@@ -175,10 +175,11 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
                 <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
                   isDark ? 'text-violet-400 bg-violet-500/5' : 'text-violet-600 bg-violet-50/60'
                 }`}>
-                  Cartões e avisos ({notifQueue.length})
+                  Avisos ({notifQueue.length})
                 </div>
                 {notifQueue.map(n => {
                   const horas = Math.max(1, Math.floor((Date.now() - new Date(n.criada_em).getTime()) / 3600000))
+                  const NotifIcon = n.origem === 'cartao_lancamento' ? CreditCard : Bell
                   return (
                     <button
                       key={n.id}
@@ -192,7 +193,7 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
                       }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
-                        <CreditCard className="w-4 h-4 text-violet-500" strokeWidth={2} />
+                        <NotifIcon className="w-4 h-4 text-violet-500" strokeWidth={2} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>

@@ -21,12 +21,17 @@ export function usePushNotifications() {
   const { perfil } = useAuth()
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
+  const [missingKey, setMissingKey] = useState(false)
   const [loading, setLoading] = useState(false)
 
   // Check support and existing subscription
   useEffect(() => {
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window && !!VAPID_PUBLIC_KEY
+    const browserSupports = 'serviceWorker' in navigator && 'PushManager' in window
+    const supported = browserSupports && !!VAPID_PUBLIC_KEY
     setIsSupported(supported)
+    // Browser suporta mas VITE_VAPID_PUBLIC_KEY nao esta configurada no build
+    // (Vercel) — expor o motivo em vez de sumir com o toggle silenciosamente.
+    setMissingKey(browserSupports && !VAPID_PUBLIC_KEY)
 
     if (!supported) return
 
@@ -91,5 +96,5 @@ export function usePushNotifications() {
     setLoading(false)
   }, [perfil?.auth_id])
 
-  return { isSupported, isSubscribed, subscribe, unsubscribe, loading }
+  return { isSupported, isSubscribed, subscribe, unsubscribe, loading, missingKey }
 }

@@ -565,7 +565,23 @@ function SoundToggle() {
 
 // ── Push notifications toggle ───────────────────────────────────────────────────
 function PushToggle() {
-  const { isSupported, isSubscribed, subscribe, unsubscribe, loading } = usePushNotifications()
+  const { isSupported, isSubscribed, subscribe, unsubscribe, loading, missingKey } = usePushNotifications()
+
+  // Browser suporta push mas o build veio sem VITE_VAPID_PUBLIC_KEY:
+  // mostra o motivo em vez de esconder o toggle silenciosamente.
+  if (missingKey) {
+    return (
+      <div className="w-full flex items-center gap-3 px-4 py-3 text-left opacity-60">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
+          <BellRing size={15} className="text-slate-400" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-navy">Notificacoes push</p>
+          <p className="text-xs text-slate-400">Indisponiveis neste ambiente (chave de push nao configurada)</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!isSupported) return null
 
