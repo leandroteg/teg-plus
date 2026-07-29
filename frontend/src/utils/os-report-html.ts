@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../services/supabase'
 import { EMPRESA_FALLBACK, getEmpresa } from '../services/empresa'
+import { CATEGORIA_LABEL } from '../constants/categoriaVeiculo'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -212,10 +213,12 @@ footer{padding:10px 24px;display:flex;justify-content:space-between;font-size:10
   <div class="campo"><span>Placa</span><b>${esc(v.placa ?? '—')}</b></div>
   <div class="campo"><span>Veículo</span><b>${esc(`${v.marca ?? ''} ${v.modelo ?? ''}`.trim() || '—')}</b></div>
   <div class="campo"><span>Base</span><b>${esc(baseNome ?? '—')}</b></div>
-  <div class="campo"><span>Categoria</span><b>${esc(v.categoria ?? '—')}</b></div>
+  <div class="campo"><span>Categoria</span><b>${esc((CATEGORIA_LABEL as Record<string, string>)[v.categoria] ?? v.categoria ?? '—')}</b></div>
   <div class="campo"><span>Hodômetro</span><b>${num(os.hodometro_entrada ?? v.hodometro_atual)}</b></div>
   <div class="campo"><span>Tipo de OS</span><b>${esc(TIPO_OS[os.tipo] ?? os.tipo ?? '—')}</b></div>
   <div class="campo"><span>Abertura</span><b>${fmtD(os.data_abertura)}</b></div>
+  <div class="campo"><span>Previsão de término</span><b>${fmtD(os.data_previsao)}</b></div>
+  <div class="campo"><span>Prioridade</span><b>${esc(os.prioridade ?? '—')}</b></div>
 </div></section>
 
 <section><h2>${isParecer ? 'Problema relatado' : 'Problema que originou a OS'}</h2>
