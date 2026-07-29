@@ -3,7 +3,7 @@
 // Espelha components/frotas/os/OSCards para que a mesma solicitação tenha a
 // mesma aparência no pipeline, no histórico e no quadro.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Wrench, FileText, Handshake, RefreshCw, Clock, Paperclip, Sparkles } from 'lucide-react'
+import { Wrench, FileText, Handshake, RefreshCw, Clock, Paperclip, Sparkles, ShieldAlert } from 'lucide-react'
 import type { LocSolicitacao, TipoSolicitacao, UrgenciaSolicitacao } from '../../../types/locacao'
 
 export const BRL = (v?: number | null) =>
@@ -20,6 +20,7 @@ export const TIPO_CFG: Record<TipoSolicitacao, { label: string; icon: React.Elem
   manutencao: { label: 'Manutenção', icon: Wrench,    cls: 'text-orange-600 bg-orange-50' },
   servico:    { label: 'Serviço',    icon: FileText,  cls: 'text-sky-600 bg-sky-50' },
   limpeza:    { label: 'Limpeza',    icon: Sparkles,  cls: 'text-cyan-600 bg-cyan-50' },
+  nc_seguranca: { label: 'NC de Segurança', icon: ShieldAlert, cls: 'text-rose-600 bg-rose-50' },
   acordo:     { label: 'Acordo',     icon: Handshake, cls: 'text-emerald-600 bg-emerald-50' },
   renovacao:  { label: 'Renovação',  icon: RefreshCw, cls: 'text-violet-600 bg-violet-50' },
 }

@@ -7,11 +7,11 @@
 import { useState, useEffect } from 'react'
 import {
   X, Loader2, CheckCircle2, Ban, ImageIcon, MapPin, User, Clock, ExternalLink,
-  ArrowRight, RotateCcw, CalendarClock, AlertTriangle,
+  ArrowRight, RotateCcw, CalendarClock, AlertTriangle, PauseCircle, Play,
 } from 'lucide-react'
 import { supabase } from '../../../services/supabase'
 import { useAtualizarSolicitacaoLocacao } from '../../../hooks/useLocacao'
-import { STAGES, stageDe, proximaEtapa, type StageKey } from './solicitacaoStages'
+import { STAGES, stageDe, proximaEtapa, STAGE_RETOMA_LABEL, type StageKey } from './solicitacaoStages'
 import { TIPO_CFG, URGENCIA, BRL, diasEmAberto } from './SolicitacaoCards'
 import type { LocSolicitacao } from '../../../types/locacao'
 
@@ -24,6 +24,8 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
   const atualizar = useAtualizarSolicitacaoLocacao()
   const [anexo, setAnexo] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [motivoPausa, setMotivoPausa] = useState('')
+  const [pausando, setPausando] = useState(false)
 
   const etapa = stageDe(sol.status)
   const prox = proximaEtapa(etapa)
@@ -77,6 +79,10 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
     isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
   }`
   const encerrada = sol.status === 'concluida' || sol.status === 'cancelada' || sol.status === 'rejeitada'
+  const pausada = etapa === 'aguardando'
+  // Para onde o Retomar devolve: de onde ela saiu; sem registro, volta pra Cotação.
+  const destinoRetomada = (sol.status_anterior && STAGE_RETOMA_LABEL[sol.status_anterior])
+    ? sol.status_anterior : 'em_cotacao'
   const u = URGENCIA[sol.urgencia] ?? URGENCIA.normal
   const t = TIPO_CFG[sol.tipo] ?? TIPO_CFG.manutencao
 
@@ -277,12 +283,55 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
             </button>
           )}
 
+          {pausada && (
+            <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-amber-400/25 bg-amber-500/[0.07]' : 'border-amber-200 bg-amber-50/70'}`}>
+              <p className={`text-[11px] font-bold flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                <PauseCircle size={13} /> Parada — não foi cancelada nem executada
+              </p>
+              {sol.status_detalhe && (
+                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.status_detalhe}</p>
+              )}
+              <button onClick={() => salvar({ status: destinoRetomada as LocSolicitacao['status'], status_anterior: null })}
+                disabled={salvando}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50">
+                <Play size={13} /> Retomar para {STAGE_RETOMA_LABEL[destinoRetomada] ?? 'Cotação'}
+              </button>
+            </div>
+          )}
+
           {bloqueio && (
             <p className="flex items-start gap-1.5 text-[11px] text-amber-600 font-semibold">
               <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {bloqueio}
             </p>
           )}
         </div>
+
+        {/* Pausar — sai do fluxo sem cancelar nem concluir */}
+        {!encerrada && !pausada && (
+          <div className={`px-5 py-2.5 border-t shrink-0 ${border}`}>
+            {pausando ? (
+              <div className="flex items-center gap-2">
+                <input value={motivoPausa} onChange={e => setMotivoPausa(e.target.value)} autoFocus
+                  placeholder="Por que está parando? (ex.: aguardando peça)"
+                  className={`flex-1 rounded-lg border px-2.5 py-1.5 text-[11px] outline-none ${
+                    isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`} />
+                <button onClick={() => salvar({ status: 'aguardando', status_anterior: sol.status, status_detalhe: motivoPausa || null })}
+                  disabled={salvando}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50">
+                  {salvando ? <Loader2 size={12} className="animate-spin" /> : <PauseCircle size={12} />} Confirmar
+                </button>
+                <button onClick={() => { setPausando(false); setMotivoPausa('') }}
+                  className={`px-2 py-1.5 rounded-lg text-[11px] ${txtMuted}`}>Cancelar</button>
+              </div>
+            ) : (
+              <button onClick={() => setPausando(true)}
+                className={`flex items-center gap-1.5 text-[11px] font-semibold ${
+                  isDark ? 'text-amber-400 hover:text-amber-300' : 'text-amber-600 hover:text-amber-700'}`}>
+                <PauseCircle size={13} /> Colocar em Aguardando
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Ações */}
         <div className={`px-5 py-4 border-t shrink-0 ${border}`}>

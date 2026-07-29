@@ -36,7 +36,7 @@ export type TipoFatura =
 
 export type StatusFatura = 'previsto' | 'lancado' | 'enviado_pagamento' | 'pago'
 
-export type TipoSolicitacao = 'servico' | 'manutencao' | 'limpeza' | 'acordo' | 'renovacao'
+export type TipoSolicitacao = 'servico' | 'manutencao' | 'limpeza' | 'nc_seguranca' | 'acordo' | 'renovacao'
 
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'urgente'
 
@@ -45,6 +45,7 @@ export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'urgente'
 export type StatusSolicitacao =
   | 'pendente' | 'aberta'
   | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'em_andamento'
+  | 'aguardando'
   | 'concluida' | 'cancelada' | 'rejeitada'
 
 export type TipoAcordo = 'benfeitoria' | 'abatimento' | 'multa' | 'negociacao' | 'outro'
@@ -332,6 +333,10 @@ export interface LocSolicitacao {
   responsavel_id?: string
   urgencia: UrgenciaSolicitacao
   status: StatusSolicitacao
+  /** de onde saiu ao ir para "aguardando" (para o botão Retomar) */
+  status_anterior?: string | null
+  /** motivo livre — hoje usado para explicar a pausa */
+  status_detalhe?: string | null
   cmp_requisicao_id?: string
   con_contrato_id?: string
   data_limite?: string
@@ -434,6 +439,7 @@ export const TIPO_SOLICITACAO_LABEL: Record<TipoSolicitacao, string> = {
   servico: 'Servico',
   manutencao: 'Manutencao',
   limpeza: 'Limpeza',
+  nc_seguranca: 'NC de Seguranca',
   acordo: 'Acordo',
   renovacao: 'Renovacao',
 }
@@ -460,6 +466,7 @@ export const STATUS_SOLICITACAO_LABEL: Record<StatusSolicitacao, { label: string
   aprovada:    { label: 'Programacao',  dot: 'bg-teal-500',  bg: 'bg-teal-50',   text: 'text-teal-700' },
   em_execucao: { label: 'Execucao',     dot: 'bg-violet-500',bg: 'bg-violet-50', text: 'text-violet-700' },
   em_andamento:{ label: 'Em Andamento', dot: 'bg-amber-400', bg: 'bg-amber-50',  text: 'text-amber-700' },
+  aguardando:  { label: 'Aguardando',   dot: 'bg-orange-500',bg: 'bg-orange-50', text: 'text-orange-700' },
   concluida:   { label: 'Liberado',     dot: 'bg-green-500', bg: 'bg-green-50',  text: 'text-green-700' },
   cancelada:   { label: 'Cancelada',    dot: 'bg-slate-400', bg: 'bg-slate-100', text: 'text-slate-500' },
   rejeitada:   { label: 'Rejeitada',    dot: 'bg-red-500',   bg: 'bg-red-50',    text: 'text-red-700' },
