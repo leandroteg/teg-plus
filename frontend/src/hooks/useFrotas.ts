@@ -447,6 +447,78 @@ export function useLiberarOS() {
 }
 
 /** Upload de foto da OS (antes/depois). Reusa o bucket de fotos de frotas, prefixo os/. */
+// ── Anexos da OS ─────────────────────────────────────────────────────────────
+// 1 OS -> N arquivos, marcados pela etapa em que entraram. A foto obrigatória da
+// abertura continua em foto_antes_url; aqui entram as DEMAIS (fotos e documentos).
+export interface FroOSAnexo {
+  id: string
+  os_id: string
+  etapa: string
+  rotulo: string | null
+  arquivo_nome: string
+  arquivo_url: string
+  arquivo_path: string | null
+  mime_type: string | null
+  tamanho_bytes: number | null
+  is_imagem: boolean
+  enviado_por_nome: string | null
+  created_at: string
+}
+
+export function useAnexosOS(osId?: string) {
+  return useQuery({
+    queryKey: ['fro_os_anexos', osId],
+    enabled: !!osId,
+    queryFn: async (): Promise<FroOSAnexo[]> => {
+      const { data, error } = await supabase
+        .from('fro_os_anexos').select('*')
+        .eq('os_id', osId!).order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as FroOSAnexo[]
+    },
+  })
+}
+
+export function useEnviarAnexoOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      osId: string; file: File; etapa: string; rotulo?: string | null
+      autorId?: string | null; autorNome?: string | null
+    }) => {
+      const ext = p.file.name.split('.').pop() || 'bin'
+      const path = `os/${p.osId}/${p.etapa}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('fro-checklist-fotos')
+        .upload(path, p.file, { upsert: false, contentType: p.file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('fro-checklist-fotos').getPublicUrl(path)
+      const { error } = await supabase.from('fro_os_anexos').insert({
+        os_id: p.osId, etapa: p.etapa, rotulo: p.rotulo ?? null,
+        arquivo_nome: p.file.name, arquivo_url: publicUrl, arquivo_path: path,
+        mime_type: p.file.type || null, tamanho_bytes: p.file.size ?? null,
+        is_imagem: (p.file.type || '').startsWith('image/'),
+        enviado_por_id: p.autorId ?? null, enviado_por_nome: p.autorNome ?? null,
+      })
+      if (error) throw error
+      return publicUrl
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_anexos', v.osId] }),
+  })
+}
+
+export function useRemoverAnexoOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; osId: string; path?: string | null }) => {
+      if (p.path) await supabase.storage.from('fro-checklist-fotos').remove([p.path])
+      const { error } = await supabase.from('fro_os_anexos').delete().eq('id', p.id)
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_anexos', v.osId] }),
+  })
+}
+
 export function useUploadFotoOS() {
   const qc = useQueryClient()
   return useMutation({
