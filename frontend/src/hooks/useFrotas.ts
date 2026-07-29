@@ -1085,7 +1085,8 @@ export function useFrotasKPIs() {
       const disponiveis = vs.filter(v => v.status === 'disponivel').length
       const em_uso      = vs.filter(v => v.status === 'em_uso').length
       const em_manu     = vs.filter(v => v.status === 'em_manutencao').length
-      const parados     = vs.filter(v => v.status === 'parado').length
+      const parados     = vs.filter(v => v.status === 'parada_manutencao').length
+      const nec_parada  = vs.filter(v => v.status === 'necessario_parada').length
       const bloqueados  = vs.filter(v => v.status === 'bloqueado').length
 
       const prevs = prevRes.data ?? []
@@ -1104,6 +1105,7 @@ export function useFrotasKPIs() {
         disponiveis,
         em_manutencao: em_manu,
         parados,
+        necessario_parada: nec_parada,
         em_uso,
         bloqueados,
         taxa_disponibilidade: total ? Math.round((disponiveis / total) * 100) : 0,
