@@ -10,8 +10,9 @@ export type CombustivelVeiculo = 'flex' | 'gasolina' | 'diesel' | 'etanol' | 'el
 export type PropriedadeVeiculo = 'propria' | 'locada' | 'cedida'
 export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'parada_manutencao' | 'necessario_parada' | 'bloqueado' | 'baixado' | 'em_entrada' | 'aguardando_saida'
 export type TipoOS             = 'preventiva' | 'corretiva' | 'sinistro' | 'revisao'
+export type NaturezaOS         = 'manutencao' | 'material' | 'servico'
 export type PrioridadeOS       = 'critica' | 'alta' | 'media' | 'baixa'
-export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'concluida' | 'rejeitada' | 'cancelada'
+export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'aguardando' | 'concluida' | 'rejeitada' | 'cancelada'
 export type TipoItemOS         = 'peca' | 'mao_obra' | 'outros'
 export type TipoPagamento      = 'cartao_frota' | 'dinheiro' | 'pix' | 'boleto'
 export type TipoChecklist      = 'pre_viagem' | 'pos_viagem' | 'pos_manutencao'
@@ -83,8 +84,14 @@ export interface FroFornecedor {
 export interface FroOrdemServico {
   id: string
   numero_os?: string
-  veiculo_id: string
-  tipo: TipoOS
+  /** Nulo quando a demanda não é de um veículo cadastrado (compra, ativo sem placa). */
+  veiculo_id?: string
+  /** Rótulo do ativo quando não há veículo (ex.: "GERADOR BASE"). */
+  ativo_livre?: string
+  /** manutencao = reparo de veículo | material = compra | servico = serviço de terceiro. */
+  natureza?: NaturezaOS
+  /** Só nas demandas de manutenção de veículo. */
+  tipo?: TipoOS
   prioridade: PrioridadeOS
   status: StatusOS
   hodometro_entrada?: number
@@ -110,6 +117,10 @@ export interface FroOrdemServico {
   observacoes?: string
   /** Sub-status livre durante a execução (ex: "Aguardando peça"). Lido pelo Painel de Disponibilidade. */
   status_detalhe?: string
+  /** Etapa de origem ao ir para Aguardando — para onde retorna ao ser retomada. */
+  status_anterior?: string
+  /** Perfil que abriu a OS (sys_perfis) — alimenta a tela Minhas Solicitações. */
+  solicitante_id?: string
   /** Parecer técnico da abertura — obrigatório na corretiva/sinistro (SUP-PRO-001). */
   parecer_tecnico?: string
   /** Envio a Suprimentos: inicia o SLA de 5 dias da categoria Manutenção de Frota. */
@@ -292,8 +303,11 @@ export interface FrotasKPIs {
 // ── Payloads ──────────────────────────────────────────────────────────────────
 
 export interface CriarOSPayload {
-  veiculo_id: string
-  tipo: TipoOS
+  veiculo_id?: string
+  solicitante_id?: string
+  ativo_livre?: string
+  natureza?: NaturezaOS
+  tipo?: TipoOS
   prioridade: PrioridadeOS
   descricao_problema: string
   hodometro_entrada?: number
@@ -568,4 +582,48 @@ export interface FroTelSyncLog {
   erro: string | null
   detalhe: unknown | null
   created_at: string
+}
+
+// ── Check-in diário (lançado no Portal TEG) ───────────────────────────────────
+
+/** Avaliações são 1..5 — a mesma escala que o motorista vê no Portal. */
+export interface FroCheckinDiario {
+  id: string
+  veiculo_id: string
+  colaborador_id: string
+  colaborador_nome: string | null
+  created_at: string
+  obra_id?: string | null
+  obra_nome: string | null
+  km_informado: number | null
+  nivel_combustivel: string | null
+  foto_painel_url: string | null
+  aval_funcional: number | null
+  aval_limpeza: number | null
+  tem_avaria: boolean
+  avarias_novas: string | null
+  foto_avaria_url: string | null
+  responsavel_nome?: string | null
+  data_retorno_prev?: string | null
+  obs_alocacao?: string | null
+  qtd_passageiros: number
+  passageiros?: unknown
+}
+
+/** Uma linha por veículo: o check-in mais recente (view vw_fro_checkin_ultimo). */
+export interface FroCheckinUltimo {
+  veiculo_id: string
+  checkin_id: string
+  created_at: string
+  colaborador_nome: string | null
+  obra_nome: string | null
+  aval_funcional: number | null
+  aval_limpeza: number | null
+  tem_avaria: boolean
+  avarias_novas: string | null
+  foto_avaria_url: string | null
+  km_informado: number | null
+  nivel_combustivel: string | null
+  foto_painel_url: string | null
+  qtd_passageiros: number
 }
