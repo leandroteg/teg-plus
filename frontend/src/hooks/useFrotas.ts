@@ -1752,6 +1752,60 @@ export function useItensManutencaoTodos() {
   })
 }
 
+// ── Comentários da OS ────────────────────────────────────────────────────────
+// Registro livre em qualquer etapa do fluxo: guarda autor e data/hora.
+export interface FroOSComentario {
+  id: string
+  os_id: string
+  mensagem: string
+  autor_id: string | null
+  criado_por_nome: string | null
+  created_at: string
+}
+
+export function useComentariosOS(osId?: string) {
+  return useQuery({
+    queryKey: ['fro_os_comentarios', osId],
+    enabled: !!osId,
+    queryFn: async (): Promise<FroOSComentario[]> => {
+      const { data, error } = await supabase
+        .from('fro_os_comentarios')
+        .select('*')
+        .eq('os_id', osId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as FroOSComentario[]
+    },
+  })
+}
+
+export function useAdicionarComentarioOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { osId: string; mensagem: string; autorId?: string | null; autorNome?: string | null }) => {
+      const msg = p.mensagem.trim()
+      if (!msg) throw new Error('Comentário vazio')
+      const { error } = await supabase.from('fro_os_comentarios').insert({
+        os_id: p.osId, mensagem: msg,
+        autor_id: p.autorId ?? null, criado_por_nome: p.autorNome ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_comentarios', v.osId] }),
+  })
+}
+
+export function useRemoverComentarioOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; osId: string }) => {
+      const { error } = await supabase.from('fro_os_comentarios').delete().eq('id', p.id)
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_comentarios', v.osId] }),
+  })
+}
+
 export function useItensManutencao(veiculoId?: string) {
   return useQuery<FroItemManutencao[]>({
     queryKey: ['fro_itens_manutencao', veiculoId],
