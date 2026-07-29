@@ -10,7 +10,7 @@ import QRCode from 'qrcode'
 import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
   LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
-  LayoutList, LayoutGrid, Map as MapIcon, Users,
+  LayoutList, LayoutGrid, Map as MapIcon, Users, Camera,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
@@ -785,6 +785,12 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                           </button>
                           {oc ? (
                             <>
+                              {oc.checkin_foto_url && (
+                                <FotoCheckinBtn
+                                  url={oc.checkin_foto_url} isDark={isDark}
+                                  titulo={`Leito ${leitoLbl(l.codigo_leito)} · check-in de ${oc.colaborador_nome}`}
+                                />
+                              )}
                               <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
                                 className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
                                 <ArrowRightLeft size={14} />
@@ -862,6 +868,37 @@ function QrLeitoModal({ leito, ocup, alojamento, isDark, onClose }: {
 }
 
 // ── Botão liberar (check-out) ────────────────────────────────────────────────
+// A foto tirada no check-in é a prova de como o leito estava na entrada —
+// aparece aqui em lightbox, sem sair da tela.
+function FotoCheckinBtn({ url, titulo, isDark }: { url: string; titulo: string; isDark: boolean }) {
+  const [aberta, setAberta] = useState(false)
+  return (
+    <>
+      <button
+        onClick={e => { e.stopPropagation(); setAberta(true) }}
+        title="Foto do check-in"
+        className={`p-1.5 rounded-lg ${isDark ? 'text-violet-300/70 hover:text-violet-300 hover:bg-white/[0.06]' : 'text-violet-400 hover:text-violet-600 hover:bg-violet-50'}`}
+      >
+        <Camera size={14} />
+      </button>
+      {aberta && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={() => setAberta(false)}>
+          <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <p className="text-white text-sm font-bold truncate">{titulo}</p>
+              <button onClick={() => setAberta(false)} className="p-1.5 rounded-lg text-white hover:bg-white/15 shrink-0"><X size={16} /></button>
+            </div>
+            <img src={url} alt="" className="w-full rounded-2xl shadow-2xl" />
+            <a href={url} target="_blank" rel="noreferrer" className="block text-center mt-2 text-xs font-semibold text-white/60 hover:text-white">
+              abrir em tamanho original
+            </a>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function LiberarBtn({ ocupacaoId, isDark }: { ocupacaoId: string; isDark: boolean }) {
   const liberar = useLiberarLeito()
   return (
@@ -1127,7 +1164,7 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Colaborador', 'Alojamento', 'Leito', 'Início', 'Fim', 'Origem'].map(h => (
+                  {['Colaborador', 'Alojamento', 'Leito', 'Início', 'Fim', 'Origem', 'Foto'].map(h => (
                     <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>{h}</th>
                   ))}
                 </tr>
@@ -1148,6 +1185,14 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${h.origem === 'portal_qr' ? 'bg-violet-100 text-violet-700' : (isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
                         {h.origem === 'portal_qr' ? 'QR Portal' : 'Manual'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {h.checkin_foto_url
+                        ? <FotoCheckinBtn
+                            url={h.checkin_foto_url} isDark={isDark}
+                            titulo={`${h.leito ? `Leito ${leitoLbl(h.leito.codigo_leito)} · ` : ''}check-in de ${h.colaborador_nome}`}
+                          />
+                        : <span className={`text-xs ${txtMuted}`}>—</span>}
                     </td>
                   </tr>
                 ))}

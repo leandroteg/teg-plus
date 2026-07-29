@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import {
   ClipboardCheck, Siren, ShieldCheck, GraduationCap, FileBadge,
-  AlertTriangle, ClipboardList, ArrowRight,
+  AlertTriangle, ClipboardList, ArrowRight, BedDouble,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -13,6 +13,12 @@ const OPCOES = [
     titulo: 'Programar Inspeção',
     desc: 'Agendar checklist de equipe, veículo ou área para execução em campo',
     tone: 'sky',
+  },
+  {
+    icon: BedDouble, to: '/qsma/inspecoes?novo=alojamento',
+    titulo: 'Inspeção de Alojamento',
+    desc: 'Executar o checklist de alojamentos num imóvel da Locação, com PDF ao concluir',
+    tone: 'cyan',
   },
   {
     icon: ClipboardList, to: '/qsma/inspecoes?novo=modelo',
@@ -54,6 +60,7 @@ const OPCOES = [
 
 const TONE: Record<string, { light: string; dark: string; icon: string }> = {
   sky:     { light: 'hover:border-sky-300 hover:bg-sky-50/50',       dark: 'hover:border-sky-500/40 hover:bg-sky-500/[0.06]',     icon: 'text-sky-500' },
+  cyan:    { light: 'hover:border-cyan-300 hover:bg-cyan-50/50',     dark: 'hover:border-cyan-500/40 hover:bg-cyan-500/[0.06]',   icon: 'text-cyan-500' },
   indigo:  { light: 'hover:border-indigo-300 hover:bg-indigo-50/50', dark: 'hover:border-indigo-500/40 hover:bg-indigo-500/[0.06]', icon: 'text-indigo-500' },
   red:     { light: 'hover:border-red-300 hover:bg-red-50/50',       dark: 'hover:border-red-500/40 hover:bg-red-500/[0.06]',     icon: 'text-red-500' },
   violet:  { light: 'hover:border-violet-300 hover:bg-violet-50/50', dark: 'hover:border-violet-500/40 hover:bg-violet-500/[0.06]', icon: 'text-violet-500' },

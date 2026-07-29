@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, CalendarRange, CheckCircle2, Plus, ChevronUp, ChevronDown,
-  Trash2, Ban, ShieldCheck, Play, Loader2, FileDown, User, Clock,
+  Trash2, Ban, ShieldCheck, Play, Loader2, FileDown, User, Clock, BedDouble,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,7 +16,9 @@ import {
   useObrasComProjeto, useColaboradoresAtivos, usePlanejamentoEquipe,
   useCriarPlanEquipe, useAtualizarPlanEquipe, useExcluirPlanEquipe, papelSugerido,
 } from '../../hooks/useObras'
+import { useAlojamentos } from '../../hooks/useLeitos'
 import type { ObraPlanejamentoEquipe } from '../../types/obras'
+import type { LocImovel } from '../../types/locacao'
 import type { QsmaModeloChecklist, QsmaInspecao, ItemChecklist, RespostaItem, TipoModelo, EscopoModelo, TipoResposta } from '../../types/qsma'
 import { TIPO_MODELO_LABEL, ESCOPO_MODELO_LABEL, STATUS_INSPECAO_LABEL } from '../../types/qsma'
 
@@ -51,6 +53,8 @@ export default function QsmaInspecoes() {
   const [modalProg, setModalProg] = useState<null | { aloc?: ObraPlanejamentoEquipe; obraId?: string; data?: string; tstId?: string }>(null)
   const [executar, setExecutar] = useState<QsmaInspecao | null>(null)
   const [pickerExec, setPickerExec] = useState(false)
+  // inspeção cujo alvo é um alojamento (Locação), não uma obra
+  const [modalAloj, setModalAloj] = useState(false)
 
   // deep-link do Novo Registro (reage à mudança do parâmetro, mesmo já na tela)
   const novoParam = params.get('novo')
@@ -59,6 +63,7 @@ export default function QsmaInspecoes() {
     if (novoParam === 'programar') { setAba('programacao'); setModalProg({}) }
     if (novoParam === 'executar') { setAba('programacao'); setPickerExec(true) }
     if (novoParam === 'modelo') { setAba('modelos'); setModalModelo('novo') }
+    if (novoParam === 'alojamento') { setAba('programacao'); setModalAloj(true) }
     setParams({}, { replace: true })
   }, [novoParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -67,6 +72,16 @@ export default function QsmaInspecoes() {
   const { data: obras = [] } = useObrasComProjeto()
   const { data: equipeObras = [] } = usePlanejamentoEquipe()
   const obraNome = (id?: string) => obras.find(o => o.id === id)?.nome ?? '—'
+  // Alojamentos entram como alvo alternativo à obra (modelo DI020 e afins).
+  const { data: alojamentos = [] } = useAlojamentos()
+  const alojNome = (id?: string | null) => {
+    const a = alojamentos.find(x => x.id === id)
+    if (!a) return '—'
+    const nome = a.titulo || a.nome || a.descricao || 'Alojamento'
+    return a.cidade ? `${nome} · ${a.cidade}` : nome
+  }
+  /** Onde a inspeção acontece: alojamento quando houver, senão a obra. */
+  const alvoNome = (i: QsmaInspecao) => (i.imovel_id ? alojNome(i.imovel_id) : obraNome(i.obra_id))
 
   // supervisor/admin podem alterar a alocação clicando no nome
   const { isAdmin, atLeast } = useAuth()
@@ -496,7 +511,7 @@ export default function QsmaInspecoes() {
                       <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{i.codigo}</span>
                       {i.modelo?.nome ?? 'Checklist'}
                     </p>
-                    <p className={`text-[11px] ${txtMuted}`}>{obraNome(i.obra_id)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
+                    <p className={`text-[11px] ${txtMuted}`}>{alvoNome(i)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
                   </div>
                   <button
                     onClick={() => setExecutar(i)}
@@ -537,7 +552,7 @@ export default function QsmaInspecoes() {
                     {i.modelo?.nome ?? 'Checklist'}
                   </p>
                   <p className={`text-[11px] ${txtMuted}`}>
-                    {obraNome(i.obra_id)} · {fmtData(i.data_execucao)} · {i.executor_nome ?? '—'}
+                    {alvoNome(i)} · {fmtData(i.data_execucao)} · {i.executor_nome ?? '—'}
                     {nc > 0 && <span className="text-red-500 font-semibold"> · {nc} NC</span>}
                   </p>
                 </div>
@@ -552,7 +567,7 @@ export default function QsmaInspecoes() {
                   </span>
                 )}
                 <button
-                  onClick={() => exportarInspecaoPdf(i, obraNome(i.obra_id)).catch(e => alert(`Erro no PDF: ${e?.message ?? 'desconhecido'}`))}
+                  onClick={() => exportarInspecaoPdf(i, alvoNome(i)).catch(e => alert(`Erro no PDF: ${e?.message ?? 'desconhecido'}`))}
                   className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                   title="Gerar relatório em PDF (papel timbrado)"
                 >
@@ -592,13 +607,22 @@ export default function QsmaInspecoes() {
           programadas={programadas}
           modelos={modelos.filter(m => m.ativo)}
           obras={obras}
-          obraNome={obraNome}
+          alvoNome={alvoNome}
           onPick={(i) => { setPickerExec(false); setExecutar(i) }}
           onClose={() => setPickerExec(false)}
         />
       )}
+      {modalAloj && (
+        <InspecaoAlojamentoModal
+          isDark={isDark}
+          modelos={modelos.filter(m => m.ativo)}
+          alojamentos={alojamentos}
+          onPick={(i) => { setModalAloj(false); setExecutar(i) }}
+          onClose={() => setModalAloj(false)}
+        />
+      )}
       {executar && (
-        <ExecutarInspecaoModal isDark={isDark} inspecao={executar} obraNomeStr={obraNome(executar.obra_id)} onClose={() => setExecutar(null)} />
+        <ExecutarInspecaoModal isDark={isDark} inspecao={executar} obraNomeStr={alvoNome(executar)} onClose={() => setExecutar(null)} />
       )}
     </ControladoriaFlow>
   )
@@ -629,12 +653,12 @@ async function exportarInspecaoPdf(inspecao: QsmaInspecao, obraNomeStr: string) 
 }
 
 // ── Modal: executar (avulsa preenchendo os dados OU escolher uma programada) ──
-function ExecutarPickerModal({ isDark, programadas, modelos, obras, obraNome, onPick, onClose }: {
+function ExecutarPickerModal({ isDark, programadas, modelos, obras, alvoNome, onPick, onClose }: {
   isDark: boolean
   programadas: QsmaInspecao[]
   modelos: QsmaModeloChecklist[]
   obras: { id: string; nome: string; projeto_id?: string; projeto_nome?: string }[]
-  obraNome: (id?: string) => string
+  alvoNome: (i: QsmaInspecao) => string
   onPick: (i: QsmaInspecao) => void
   onClose: () => void
 }) {
@@ -654,7 +678,7 @@ function ExecutarPickerModal({ isDark, programadas, modelos, obras, obraNome, on
 
   const filtradas = programadas.filter(i => {
     const s = q.trim().toLowerCase()
-    return !s || (i.codigo ?? '').toLowerCase().includes(s) || (i.modelo?.nome ?? '').toLowerCase().includes(s) || obraNome(i.obra_id).toLowerCase().includes(s)
+    return !s || (i.codigo ?? '').toLowerCase().includes(s) || (i.modelo?.nome ?? '').toLowerCase().includes(s) || alvoNome(i).toLowerCase().includes(s)
   })
 
   function iniciarAvulsa() {
@@ -733,7 +757,7 @@ function ExecutarPickerModal({ isDark, programadas, modelos, obras, obraNome, on
                     <span className={`font-mono text-[10px] mr-2 ${txtMuted}`}>{i.codigo}</span>
                     {i.modelo?.nome ?? 'Checklist'}
                   </p>
-                  <p className={`text-[11px] truncate ${txtMuted}`}>{obraNome(i.obra_id)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
+                  <p className={`text-[11px] truncate ${txtMuted}`}>{alvoNome(i)}{i.frente ? ` · ${i.frente}` : ''} · prevista {fmtData(i.data_prevista)}</p>
                 </div>
                 <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-600 text-white">
                   <Play size={11} /> Executar
@@ -743,6 +767,121 @@ function ExecutarPickerModal({ isDark, programadas, modelos, obras, obraNome, on
           </div>
         )}
       </div>
+    </QsmaModal>
+  )
+}
+
+// ── Modal: inspeção de alojamento ────────────────────────────────────────────
+// Atalho da Locação. O alvo aqui é o imóvel, não a obra — por isso a inspeção
+// nasce com imovel_id e obra_id vazio. O checklist padrão é o DI020 (Inspeção
+// de Alojamentos), mas qualquer modelo de escopo "área" serve.
+function InspecaoAlojamentoModal({ isDark, modelos, alojamentos, onPick, onClose }: {
+  isDark: boolean
+  modelos: QsmaModeloChecklist[]
+  alojamentos: LocImovel[]
+  onPick: (i: QsmaInspecao) => void
+  onClose: () => void
+}) {
+  const daArea = useMemo(
+    () => modelos.filter(m => m.escopo === 'area' && m.tipo === 'inspecao'),
+    [modelos],
+  )
+  const padrao = useMemo(() => daArea.find(m => m.codigo === 'DI020'), [daArea])
+  const [modeloId, setModeloId] = useState(padrao?.id ?? '')
+  const [imovelId, setImovelId] = useState('')
+  const [q, setQ] = useState('')
+
+  useEffect(() => { if (!modeloId && padrao) setModeloId(padrao.id) }, [padrao, modeloId])
+
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const lista = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    return alojamentos.filter(a => !s
+      || (a.titulo ?? '').toLowerCase().includes(s)
+      || (a.nome ?? '').toLowerCase().includes(s)
+      || (a.descricao ?? '').toLowerCase().includes(s)
+      || (a.cidade ?? '').toLowerCase().includes(s))
+  }, [alojamentos, q])
+
+  function iniciar() {
+    const mod = modelos.find(m => m.id === modeloId)
+    if (!mod || !imovelId) return
+    // inspeção avulsa sem id → salva ao concluir a execução
+    onPick({
+      id: undefined as unknown as string,
+      modelo_id: modeloId, modelo: mod, imovel_id: imovelId,
+      respostas: [], fotos: [], status: 'programada',
+      data_prevista: new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    } as QsmaInspecao)
+  }
+
+  return (
+    <QsmaModal
+      isDark={isDark} wide
+      titulo="Inspeção de alojamento"
+      subtitulo="Checklist de área aplicado a um imóvel da Locação — as NCs saem no PDF ao concluir"
+      onClose={onClose}
+    >
+      <div>
+        <label className={pickerLabelCls(isDark)}>Checklist *</label>
+        <select value={modeloId} onChange={e => setModeloId(e.target.value)} className={pickerInputCls(isDark)}>
+          <option value="">Selecione…</option>
+          {daArea.map(m => (
+            <option key={m.id} value={m.id}>{m.nome} · {m.itens.length} item(ns)</option>
+          ))}
+        </select>
+        {daArea.length === 0 && (
+          <p className={`text-[11px] mt-1 ${txtMuted}`}>Nenhum modelo de escopo "área" ativo.</p>
+        )}
+      </div>
+
+      <div>
+        <label className={pickerLabelCls(isDark)}>Alojamento *</label>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por código, nome ou cidade…" className={pickerInputCls(isDark)} />
+        {lista.length === 0 ? (
+          <p className={`text-[11px] italic text-center py-4 ${txtMuted}`}>
+            {alojamentos.length === 0 ? 'Nenhum alojamento cadastrado.' : 'Nada encontrado na busca.'}
+          </p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto space-y-1.5 mt-2">
+            {lista.map(a => {
+              const sel = a.id === imovelId
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setImovelId(a.id)}
+                  className={`w-full text-left rounded-xl border p-2.5 flex items-center gap-2.5 transition-all ${
+                    sel
+                      ? isDark ? 'border-emerald-500/50 bg-emerald-500/[0.08]' : 'border-emerald-400 bg-emerald-50'
+                      : isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'
+                  }`}
+                >
+                  <BedDouble size={15} className={sel ? 'text-emerald-500 shrink-0' : `${txtMuted} shrink-0`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-bold truncate ${txtMain}`}>{a.titulo || a.nome || a.descricao || 'Alojamento'}</p>
+                    <p className={`text-[11px] truncate ${txtMuted}`}>
+                      {[a.cidade, a.uf].filter(Boolean).join('/') || 'sem cidade'}
+                      {a.tipo === 'HTL' ? ' · hotel' : ''}
+                    </p>
+                  </div>
+                  {sel && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={iniciar}
+        disabled={!modeloId || !imovelId}
+        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+      >
+        <Play size={13} /> Iniciar inspeção
+      </button>
     </QsmaModal>
   )
 }
@@ -1268,9 +1407,11 @@ function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }: { isD
           try {
             await salvar.mutateAsync({
               id: inspecao.id,
-              // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo/obra
+              // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo e
+              // do alvo — obra ou alojamento, conforme o caso
               ...(inspecao.id ? {} : {
                 modelo_id: inspecao.modelo_id, obra_id: inspecao.obra_id,
+                imovel_id: inspecao.imovel_id ?? null,
                 frente: inspecao.frente, equipe_lider_id: inspecao.equipe_lider_id,
               }),
               respostas,
