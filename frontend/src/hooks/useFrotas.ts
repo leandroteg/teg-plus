@@ -1919,6 +1919,47 @@ export function useUltimosCheckins() {
   })
 }
 
+/** Check-in lançado na mão pela ficha do ativo (escritório), quando o motorista
+ *  não registrou no Portal. Todo campo é opcional: grava só o que se sabe — e
+ *  sempre a data/hora do lançamento (created_at). */
+export function useCriarCheckinManual() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: {
+      veiculoId: string
+      avalFuncional?: number | null
+      avalLimpeza?: number | null
+      kmInformado?: number | null
+      nivelCombustivel?: string | null
+      temAvaria?: boolean
+      avariasNovas?: string | null
+      observacao?: string | null
+      colaboradorId?: string | null
+      registradoPorNome?: string | null
+    }) => {
+      const { error } = await supabase.from('fro_checkin_diario').insert({
+        veiculo_id: p.veiculoId,
+        origem: 'manual',
+        colaborador_id: p.colaboradorId ?? null,
+        colaborador_nome: p.registradoPorNome ?? null,
+        registrado_por_nome: p.registradoPorNome ?? null,
+        aval_funcional: p.avalFuncional ?? null,
+        aval_limpeza: p.avalLimpeza ?? null,
+        km_informado: p.kmInformado ?? null,
+        nivel_combustivel: p.nivelCombustivel ?? null,
+        tem_avaria: p.temAvaria ?? false,
+        avarias_novas: p.avariasNovas ?? null,
+        observacao: p.observacao ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['fro_checkins_veiculo', v.veiculoId] })
+      qc.invalidateQueries({ queryKey: ['fro_checkin_ultimo'] })
+    },
+  })
+}
+
 /** Histórico de check-ins de um ativo — usado no submodal "Ver check-ins". */
 export function useCheckinsVeiculo(veiculoId?: string, limit = 60) {
   return useQuery({
