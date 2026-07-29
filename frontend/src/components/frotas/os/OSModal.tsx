@@ -359,6 +359,7 @@ function TrocarFase({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
   const mudar = useAtualizarStatusOS()
   const { data: hist = [] } = useHistoricoStatusOS(os.id)
   const [aberto, setAberto] = useState(false)
+  const [rel, setRel] = useState<'parecer' | 'conclusao' | null>(null)
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const label = (v?: string | null) => FASES.find(f => f.v === v)?.label ?? v ?? '—'
@@ -386,12 +387,34 @@ function TrocarFase({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
           {!FASES.some(f => f.v === os.status) && <option value={os.status}>{os.status}</option>}
         </select>
         {mudar.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
-        {hist.length > 0 && (
-          <button onClick={() => setAberto(v => !v)} className={`ml-auto text-[10px] font-bold ${txtMuted} hover:underline`}>
-            {aberto ? 'ocultar' : `histórico (${hist.length})`}
+        <span className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setRel('parecer')}
+            title="Parecer Técnico — o que será feito, fotos e histórico do veículo"
+            className={`text-[10px] font-bold px-2 py-1.5 rounded-lg inline-flex items-center gap-1 ${
+              isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}>
+            <FileText size={11} /> Parecer
           </button>
-        )}
+          <button
+            onClick={() => setRel('conclusao')}
+            title="Relatório de Conclusão — serviço executado, fotos e termo de garantia"
+            className={`text-[10px] font-bold px-2 py-1.5 rounded-lg inline-flex items-center gap-1 ${
+              isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}>
+            <FileText size={11} /> Conclusão
+          </button>
+          {hist.length > 0 && (
+            <button onClick={() => setAberto(v => !v)} className={`text-[10px] font-bold ${txtMuted} hover:underline`}>
+              {aberto ? 'ocultar' : `histórico (${hist.length})`}
+            </button>
+          )}
+        </span>
       </div>
+      {rel && (
+        <OSRelatorioModal osId={os.id} numeroOS={os.numero_os} tipo={rel} isDark={isDark}
+          onClose={() => setRel(null)} />
+      )}
       {aberto && (
         <div className="mt-2 space-y-1">
           {hist.map(h => (
@@ -599,7 +622,6 @@ function CorpoCotacao({ os, isDark, onClose }: {
   const mudarStatus = useAtualizarStatusOS()
 
   const [itens, setItens] = useState<ItemEdit[]>([])
-  const [verParecer, setVerParecer] = useState(false)
   const [justificativa, setJustificativa] = useState(os.justificativa_excecao ?? '')
   const [fornecedorId, setFornecedorId] = useState(os.fornecedor_id ?? '')
   const [dataEntrada, setDataEntrada] = useState(os.data_programada_entrada ?? '')
@@ -748,18 +770,6 @@ function CorpoCotacao({ os, isDark, onClose }: {
 
       <OSAnexos osId={os.id} etapa="cotacao" isDark={isDark} titulo="Orçamentos, laudos e fotos da avaliação" />
 
-      <button
-        onClick={() => setVerParecer(true)}
-        className={`w-full py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 ${
-          isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-        }`}
-      >
-        <FileText size={13} /> Gerar Parecer Técnico
-      </button>
-      {verParecer && (
-        <OSRelatorioModal osId={os.id} numeroOS={os.numero_os} tipo="parecer" isDark={isDark}
-          onClose={() => setVerParecer(false)} />
-      )}
     </div>
   )
 }
@@ -1168,7 +1178,6 @@ function CorpoExecucao({ os, isDark, onClose }: {
   const { data: precoHist } = useHistoricoPrecoItens()
   const atualizar = useAtualizarOS()
   const [liberando, setLiberando] = useState(false)
-  const [verConclusao, setVerConclusao] = useState(false)
 
   const diasOficina = diasDesde(os.data_entrada_oficina)
   const atrasado = os.data_previsao ? new Date(os.data_previsao) < new Date() : false
@@ -1241,19 +1250,6 @@ function CorpoExecucao({ os, isDark, onClose }: {
       </Secao>
 
       <OSAnexos osId={os.id} etapa="execucao" isDark={isDark} titulo="Fotos do serviço executado e NF" />
-
-      <button
-        onClick={() => setVerConclusao(true)}
-        className={`w-full py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 ${
-          isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-        }`}
-      >
-        <FileText size={13} /> Gerar Relatório de Conclusão
-      </button>
-      {verConclusao && (
-        <OSRelatorioModal osId={os.id} numeroOS={os.numero_os} tipo="conclusao" isDark={isDark}
-          onClose={() => setVerConclusao(false)} />
-      )}
 
       <button
         onClick={() => setLiberando(true)}
