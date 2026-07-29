@@ -20,6 +20,7 @@ import {
   useCotacoesOS, useSalvarCotacao, useFornecedoresOS,
   useProgramarEntradaOS, useLiberarOS, useAlocacoes, useVeiculos, useChecklists,
   useComentariosOS, useAdicionarComentarioOS, useRemoverComentarioOS,
+  useHistoricoStatusOS,
 } from '../../../hooks/useFrotas'
 import { useAuth } from '../../../contexts/AuthContext'
 import FornecedorPicker from './FornecedorPicker'
@@ -218,6 +219,9 @@ export default function OSModal({
           </div>
         )}
 
+        {/* Trocar de fase — o histórico fica registrado pela trigger do banco */}
+        <TrocarFase os={os} isDark={isDark} />
+
         {/* Corpo por etapa */}
         <div className="p-5">
           {os.status === 'pendente' || os.status === 'aberta' ? (
@@ -335,6 +339,70 @@ function ComentariosOS({ osId, isDark }: { osId: string; isDark: boolean }) {
         </button>
       </div>
     </Secao>
+  )
+}
+
+// ── Trocar de fase ───────────────────────────────────────────────────────────
+// Move a OS para qualquer etapa sem perder nada: anexos, comentários, itens e
+// cotações são ligados por os_id. Cada troca vira uma linha no histórico.
+const FASES: { v: StatusOS; label: string }[] = [
+  { v: 'pendente', label: 'Pendente' },
+  { v: 'em_cotacao', label: 'Cotação' },
+  { v: 'aguardando_aprovacao', label: 'Aprovação' },
+  { v: 'aprovada', label: 'Programação' },
+  { v: 'em_execucao', label: 'Execução' },
+  { v: 'aguardando', label: 'Aguardando' },
+  { v: 'concluida', label: 'Liberado' },
+]
+
+function TrocarFase({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
+  const mudar = useAtualizarStatusOS()
+  const { data: hist = [] } = useHistoricoStatusOS(os.id)
+  const [aberto, setAberto] = useState(false)
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const label = (v?: string | null) => FASES.find(f => f.v === v)?.label ?? v ?? '—'
+
+  async function ir(v: StatusOS) {
+    if (v === os.status) return
+    if (!window.confirm(`Mover esta OS para "${label(v)}"? Os anexos, comentários e itens são mantidos.`)) return
+    try { await mudar.mutateAsync({ id: os.id, status: v }) }
+    catch (e: any) { alert(`Erro ao mover: ${e?.message ?? 'desconhecido'}`) }
+  }
+
+  return (
+    <div className={`px-5 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Fase</span>
+        <select
+          value={os.status}
+          disabled={mudar.isPending}
+          onChange={e => ir(e.target.value as StatusOS)}
+          className={`text-xs font-semibold rounded-lg px-2 py-1.5 border ${
+            isDark ? 'bg-white/[0.05] border-white/10 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
+          }`}
+        >
+          {FASES.map(f => <option key={f.v} value={f.v}>{f.label}</option>)}
+          {!FASES.some(f => f.v === os.status) && <option value={os.status}>{os.status}</option>}
+        </select>
+        {mudar.isPending && <Loader2 size={12} className="animate-spin text-slate-400" />}
+        {hist.length > 0 && (
+          <button onClick={() => setAberto(v => !v)} className={`ml-auto text-[10px] font-bold ${txtMuted} hover:underline`}>
+            {aberto ? 'ocultar' : `histórico (${hist.length})`}
+          </button>
+        )}
+      </div>
+      {aberto && (
+        <div className="mt-2 space-y-1">
+          {hist.map(h => (
+            <p key={h.id} className={`text-[10px] ${txtMuted}`}>
+              {new Date(h.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {' · '}{label(h.de)} → <b>{label(h.para)}</b>{h.motivo ? ` · ${h.motivo}` : ''}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
