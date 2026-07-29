@@ -13,14 +13,16 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock,
+  FileSearch, Send, Building2, Clock, CalendarClock, MessageSquare, Trash2,
 } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
   useCotacoesOS, useSalvarCotacao, useFornecedoresOS,
   useProgramarEntradaOS, useLiberarOS, useAlocacoes, useVeiculos, useChecklists,
+  useComentariosOS, useAdicionarComentarioOS, useRemoverComentarioOS,
 } from '../../../hooks/useFrotas'
+import { useAuth } from '../../../contexts/AuthContext'
 import FornecedorPicker from './FornecedorPicker'
 import ItensOSEditor, { type ItemEdit } from './ItensOSEditor'
 import type { FroOrdemServico, FroVeiculo, StatusOS, TipoOS, PrioridadeOS } from '../../../types/frotas'
@@ -182,9 +184,108 @@ export default function OSModal({
           ) : (
             <CorpoResumo os={os} isDark={isDark} />
           )}
+
+          {/* Comentários — disponíveis em qualquer etapa do fluxo */}
+          <div className="mt-4">
+            <ComentariosOS osId={os.id} isDark={isDark} />
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Comentários da OS ────────────────────────────────────────────────────────
+function ComentariosOS({ osId, isDark }: { osId: string; isDark: boolean }) {
+  const { perfil } = useAuth()
+  const { data: comentarios = [], isLoading } = useComentariosOS(osId)
+  const adicionar = useAdicionarComentarioOS()
+  const remover = useRemoverComentarioOS()
+  const [texto, setTexto] = useState('')
+
+  const txt = isDark ? 'text-slate-200' : 'text-slate-700'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const quando = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+  const iniciais = (nome?: string | null) =>
+    (nome ?? '?').trim().split(/\s+/).slice(0, 2).map(p => p[0] ?? '').join('').toUpperCase() || '?'
+
+  async function enviar() {
+    if (!texto.trim() || adicionar.isPending) return
+    try {
+      await adicionar.mutateAsync({
+        osId, mensagem: texto, autorId: perfil?.id ?? null, autorNome: perfil?.nome ?? null,
+      })
+      setTexto('')
+    } catch (e: any) { alert(`Erro ao comentar: ${e?.message ?? 'desconhecido'}`) }
+  }
+
+  return (
+    <Secao titulo={`Comentários${comentarios.length ? ` (${comentarios.length})` : ''}`} isDark={isDark}>
+      {isLoading ? (
+        <p className={`text-[11px] flex items-center gap-1.5 ${txtMuted}`}>
+          <Loader2 size={11} className="animate-spin" /> carregando…
+        </p>
+      ) : comentarios.length === 0 ? (
+        <p className={`text-[11px] flex items-center gap-1.5 ${txtMuted}`}>
+          <MessageSquare size={11} /> Nenhum comentário ainda.
+        </p>
+      ) : (
+        <div className="space-y-2.5 mb-3">
+          {comentarios.map(c => (
+            <div key={c.id} className="flex gap-2">
+              <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold ${
+                isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-100 text-rose-700'
+              }`}>
+                {iniciais(c.criado_por_nome)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className={`text-[11px] font-bold ${txt}`}>{c.criado_por_nome ?? 'Sem autor'}</span>
+                  <span className={`text-[10px] ${txtMuted}`}>{quando(c.created_at)}</span>
+                  {perfil?.id && c.autor_id === perfil.id && (
+                    <button
+                      onClick={() => { if (window.confirm('Apagar este comentário?')) remover.mutate({ id: c.id, osId }) }}
+                      className={`ml-auto p-0.5 rounded ${txtMuted} hover:text-red-500`}
+                      title="Apagar meu comentário"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  )}
+                </div>
+                <p className={`text-[12px] whitespace-pre-wrap break-words ${txt}`}>{c.mensagem}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-end gap-2">
+        <textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); enviar() } }}
+          rows={2}
+          placeholder="Escreva um comentário… (Ctrl+Enter envia)"
+          className={`flex-1 text-[12px] rounded-lg border px-2.5 py-2 outline-none resize-none ${
+            isDark
+              ? 'bg-white/[0.04] border-white/10 text-slate-100 placeholder-slate-500'
+              : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+          }`}
+        />
+        <button
+          onClick={enviar}
+          disabled={!texto.trim() || adicionar.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-40"
+        >
+          {adicionar.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+          Enviar
+        </button>
+      </div>
+    </Secao>
   )
 }
 

@@ -25,7 +25,7 @@ import {
   type SstDocumento, type MatrizRiscoCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
-  useEstoqueEpi,
+  useEstoqueEpi, useSaldoEpi,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
@@ -1715,9 +1715,17 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
 
   const treinosPorCand = new Map<string, IntegracaoTreino[]>()
   treinos.forEach(t => { treinosPorCand.set(t.candidato_id, [...(treinosPorCand.get(t.candidato_id) ?? []), t]) })
-  const recDe = (candId: string, cat: { nome: string; norma: string | null }) =>
-    (treinosPorCand.get(candId) ?? []).find(t =>
-      (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
+  // O upload é feito na célula exata, então o registro guarda QUAL curso é
+  // (treinamento_id). Casar por id acaba com a adivinhação: antes, normas
+  // compartilhadas (NR-10 Básico x NR-10 SEP) faziam um certificado marcar dois
+  // cursos. O casamento por nome fica só para registros legados, sem id.
+  const recDe = (candId: string, cat: { id: string; nome: string; norma: string | null }) => {
+    const lista = treinosPorCand.get(candId) ?? []
+    const porId = lista.find(t => t.treinamento_id === cat.id)
+    if (porId) return porId
+    const alvo = cat.nome.trim().toUpperCase()
+    return lista.find(t => !t.treinamento_id && t.nome.trim().toUpperCase() === alvo)
+  }
 
   type Cel = { s: 'na' | 'ok' | 'faltando'; rec?: IntegracaoTreino }
   const statusCel = (candId: string, cargoKey: string, cat: { id: string; nome: string; norma: string | null }): Cel => {
@@ -1753,9 +1761,9 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
     .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
 
   const cols = catalogo
-  const upload = (candId: string, recId: string | undefined, cat: { nome: string; norma: string | null }, file: File) => {
+  const upload = (candId: string, recId: string | undefined, cat: { id: string; nome: string; norma: string | null }, file: File) => {
     admTrein.anexarCert.mutate(
-      { candidatoId: candId, recId, nome: cat.nome, norma: cat.norma ?? undefined, file },
+      { candidatoId: candId, recId, nome: cat.nome, norma: cat.norma ?? undefined, treinamentoId: cat.id, file },
       { onSuccess: () => qc.invalidateQueries({ queryKey: ['integracao-treinos'] }), onError: (e: any) => alert(`Erro ao anexar: ${e?.message ?? 'desconhecido'}`) },
     )
   }
@@ -1921,6 +1929,13 @@ function IntegracaoDetalhe({ cand, isDark, card, txtMain, txtMuted, onBack }: {
         <p className={`text-base font-black ${txtMain}`}>{cand.nome}</p>
         <p className={`text-xs mt-0.5 ${txtMuted}`}>{[cand.cargo, cand.base].filter(Boolean).join(' · ') || '—'}</p>
       </div>
+
+      {/* Cadastro do colaborador — mesmos blocos do Headcount. Só aparece depois
+          que o candidato já virou colaborador (colaborador_id preenchido). */}
+      {cand.colaborador_id && (
+        <RHColaboradorDetalhe id={cand.colaborador_id} onBack={onBack} soCadastro />
+      )}
+
       <div className={`${card} p-4`}>
         <TreinamentosBlock cand={cand as any} cargo={cand.cargo} treinamentos={data?.treinamentos ?? []} />
       </div>
@@ -2743,13 +2758,13 @@ function ListaEpis({ subTabs, isDark, card, txtMain, txtMuted, onNovoEpi, onEdit
   onNovoEpi: () => void; onEditEpi: (e: QsmaEpi) => void
 }) {
   const { data: epis = [], isLoading } = useEpis()
-  const { data: estoque } = useEstoqueEpi()
+  const { data: saldoEpi } = useSaldoEpi()
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'ca_vencido' | 'inativos'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
 
   const hoje = new Date().toISOString().slice(0, 10)
-  const saldoDe = (id: string) => estoque?.saldo.get(id) ?? 0
+  const saldoDe = (id: string) => saldoEpi?.get(id) ?? 0
   const q = busca.trim().toLowerCase()
   const filt = epis.filter(e =>
     (!q || e.nome.toLowerCase().includes(q) || (e.ca ?? '').includes(q) || (e.fabricante ?? '').toLowerCase().includes(q))

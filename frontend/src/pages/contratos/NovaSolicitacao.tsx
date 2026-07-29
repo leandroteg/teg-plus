@@ -18,6 +18,8 @@ import type {
 } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
+import SolicitacaoDocsSection from '../../components/SolicitacaoDocsSection'
+import { persistStagedDocs, motivoBloqueioDocsObrigatorios, type StagedDoc } from '../../hooks/useSolicitacaoDocs'
 
 // ── CNPJ helpers ──────────────────────────────────────────────────────────────
 
@@ -45,6 +47,30 @@ function maskCNPJ(value: string): string {
   if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
 }
+
+// ── CPF helpers ───────────────────────────────────────────────────────────────
+
+function validarCPF(digits: string): boolean {
+  if (digits.length !== 11) return false
+  if (/^(\d)\1{10}$/.test(digits)) return false // all same digit
+  const calc = (len: number) => {
+    let sum = 0
+    for (let i = 0; i < len; i++) sum += parseInt(digits[i]) * (len + 1 - i)
+    const rem = (sum * 10) % 11
+    return rem === 10 ? 0 : rem
+  }
+  return calc(9) === parseInt(digits[9]) && calc(10) === parseInt(digits[10])
+}
+
+function maskCPF(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
+type TipoPessoa = 'juridica' | 'fisica'
 
 interface CnpjResult {
   cnpj: string
@@ -200,8 +226,12 @@ function FilterSelect({ label, value, onChange, options, placeholder, labelClass
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function NovaSolicitacao() {
+export default function NovaSolicitacao({ selfService = false }: { selfService?: boolean } = {}) {
   const nav = useNavigate()
+  // Self-service (rota /solicitar-contrato, aberta a todos, sem o módulo Contratos):
+  // navega para o hub global Minhas Solicitações em vez das rotas gated de Contratos.
+  const voltarPara = selfService ? '/minhas-solicitacoes' : '/contratos/solicitacoes'
+  const aposCriar = (id: string) => selfService ? '/minhas-solicitacoes' : `/contratos/solicitacoes/${id}`
   const { perfil } = useAuth()
   // obras removido — usar centro de custos
   const centrosCusto = useLookupCentrosCusto()
@@ -223,6 +253,7 @@ export default function NovaSolicitacao() {
   // Step 2 — Dados da Solicitação
   const [tipoSolicitacao, setTipoSolicitacao] = useState<TipoSolicitacao>('novo_contrato')
   const [tipoContraparte, setTipoContraparte] = useState<TipoContraparte>('fornecedor')
+  const [tipoPessoa, setTipoPessoa] = useState<TipoPessoa>('juridica')
   const [contraparteNome, setContraparteNome] = useState('')
   const [contraparteCnpj, setContraparteCnpj] = useState('')
   const [contraparteTelefone, setContraparteTelefone] = useState('')
@@ -243,6 +274,7 @@ export default function NovaSolicitacao() {
 
   const isRecorrente = /\b(mensal|bimestral|trimestral|semestral|anual)\b/i.test(formaPagamento)
   const [descricaoEscopo, setDescricaoEscopo] = useState('')
+  const [stagedDocs, setStagedDocs] = useState<StagedDoc[]>([])
 
   // Step 3 — Vigencia e Classificacao
   const [dataInicioPrevista, setDataInicioPrevista] = useState('')
@@ -330,17 +362,41 @@ export default function NovaSolicitacao() {
     }
   }, [contraparteNome, contraparteTelefone, contraparteEmail, contraparteEndereco, contraparteRepNome])
 
-  const handleCnpjChange = useCallback((raw: string) => {
-    const masked = maskCNPJ(raw)
-    setContraparteCnpj(masked)
+  const handleDocChange = useCallback((raw: string) => {
     const digits = raw.replace(/\D/g, '')
+    if (tipoPessoa === 'fisica') {
+      setContraparteCnpj(maskCPF(raw))
+      cnpjLastRef.current = ''
+      if (digits.length === 11) {
+        setCnpjStatus(validarCPF(digits) ? { ok: true, msg: 'CPF válido' } : { ok: false, msg: 'CPF inválido' })
+      } else {
+        setCnpjStatus(null)
+      }
+      return
+    }
+    setContraparteCnpj(maskCNPJ(raw))
     if (digits.length === 14) {
       handleCnpjLookup(raw)
     } else {
       setCnpjStatus(null)
       cnpjLastRef.current = ''
     }
-  }, [handleCnpjLookup])
+  }, [tipoPessoa, handleCnpjLookup])
+
+  const handleTipoPessoaChange = useCallback((tp: TipoPessoa) => {
+    if (tp === tipoPessoa) return
+    setTipoPessoa(tp)
+    // Reset document + lookup state when switching type (mask/validation differ)
+    setContraparteCnpj('')
+    setCnpjStatus(null)
+    cnpjLastRef.current = ''
+    // Clear CNPJ-only representante fields so hidden values aren't submitted for PF
+    if (tp === 'fisica') {
+      setContraparteRepNome('')
+      setContraparteRepCpf('')
+      setContraparteRepCargo('')
+    }
+  }, [tipoPessoa])
 
   // ── Validation ───────────────────────────────────────────────────────────
 
@@ -351,9 +407,10 @@ export default function NovaSolicitacao() {
     if (s === 2) {
       if (!contraparteNome.trim()) return 'Informe o nome da contraparte'
       if (!objeto.trim()) return 'Informe o objeto do contrato'
+      if (!justificativa.trim()) return 'Informe a justificativa'
     }
     return null
-  }, [solicitanteNome, contraparteNome, objeto])
+  }, [solicitanteNome, contraparteNome, objeto, justificativa])
 
   const handleNext = () => {
     setTouched(true)
@@ -421,6 +478,7 @@ export default function NovaSolicitacao() {
     if (!solicitanteNome.trim()) return setErro('Informe o nome do solicitante')
     if (!contraparteNome.trim()) return setErro('Informe o nome da contraparte')
     if (!objeto.trim()) return setErro('Informe o objeto do contrato')
+    if (!justificativa.trim()) return setErro('Informe a justificativa')
 
     try {
       const result = await criarSolicitacao.mutateAsync({
@@ -428,7 +486,12 @@ export default function NovaSolicitacao() {
         status: 'rascunho',
         etapa_atual: 'solicitacao',
       })
-      nav(`/contratos/solicitacoes/${result.id}`)
+      try {
+        await persistStagedDocs(result.id, stagedDocs)
+      } catch (upErr) {
+        console.warn('Falha ao enviar anexos da solicitacao:', upErr)
+      }
+      nav(aposCriar(result.id))
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao salvar rascunho')
     }
@@ -440,6 +503,9 @@ export default function NovaSolicitacao() {
     if (!solicitanteNome.trim()) return setErro('Informe o nome do solicitante')
     if (!contraparteNome.trim()) return setErro('Informe o nome da contraparte')
     if (!objeto.trim()) return setErro('Informe o objeto do contrato')
+    if (!justificativa.trim()) return setErro('Informe a justificativa')
+    const docErr = motivoBloqueioDocsObrigatorios([], stagedDocs, tipoPessoa)
+    if (docErr) return setErro(docErr)
 
     try {
       const result = await criarSolicitacao.mutateAsync({
@@ -447,7 +513,12 @@ export default function NovaSolicitacao() {
         status: 'em_andamento',
         etapa_atual: 'preparar_minuta',
       })
-      nav(`/contratos/solicitacoes/${result.id}`)
+      try {
+        await persistStagedDocs(result.id, stagedDocs)
+      } catch (upErr) {
+        console.warn('Falha ao enviar anexos da solicitacao:', upErr)
+      }
+      nav(aposCriar(result.id))
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao enviar solicitacao')
     }
@@ -466,7 +537,7 @@ export default function NovaSolicitacao() {
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => nav('/contratos/solicitacoes')}
+          onClick={() => nav(voltarPara)}
           className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center
             text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-all"
         >
@@ -540,27 +611,6 @@ export default function NovaSolicitacao() {
               )}
             </div>
             <div>
-              <label className={labelClass}>Centro de Custos</label>
-              <select
-                value={departamento}
-                onChange={e => setDepartamento(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Selecione o centro de custos</option>
-                {centrosCusto.map(cc => (
-                  <option key={cc.id} value={cc.descricao}>{cc.codigo} — {cc.descricao}</option>
-                ))}
-              </select>
-              {perfil?.departamento && (
-                <p className="text-[9px] text-emerald-500 mt-0.5 flex items-center gap-1">
-                  <ShieldCheck size={9} /> Preenchido automaticamente
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
               <label className={labelClass}>E-mail Corporativo</label>
               <div className="relative">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -574,7 +624,6 @@ export default function NovaSolicitacao() {
                 <ShieldCheck size={9} /> Vinculado ao seu perfil
               </p>
             </div>
-            <div></div>
           </div>
         </div>
       )}
@@ -679,23 +728,53 @@ export default function NovaSolicitacao() {
             </div>
           </div>
 
-          {/* ── CNPJ + Auto-fill block ──────────────────────── */}
+          {/* ── Documento + Auto-fill block ──────────────────── */}
           <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-4">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <SearchIcon size={10} />
-              Dados da Contraparte — CNPJ auto-preenche
+              Dados da Contraparte{tipoPessoa === 'juridica' ? ' — CNPJ auto-preenche' : ''}
             </p>
 
+            {/* Pessoa Física / Jurídica toggle */}
+            <div>
+              <label className={labelClass}>Tipo de Pessoa *</label>
+              <div className="grid grid-cols-2 gap-2 max-w-sm">
+                {([
+                  { value: 'juridica', label: 'Pessoa Jurídica', icon: Building2 },
+                  { value: 'fisica', label: 'Pessoa Física', icon: User },
+                ] as const).map(opt => {
+                  const Icon = opt.icon
+                  const active = tipoPessoa === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handleTipoPessoaChange(opt.value)}
+                      className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold border-2 transition-all
+                        ${active
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                    >
+                      <Icon size={14} /> {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* CNPJ field with auto-fill */}
+              {/* CPF/CNPJ field with auto-fill (CNPJ only) */}
               <div>
-                <label className={labelClass}>CPF / CNPJ *</label>
+                <label className={labelClass}>{tipoPessoa === 'fisica' ? 'CPF *' : 'CNPJ *'}</label>
                 <div className="relative">
-                  <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  {tipoPessoa === 'fisica'
+                    ? <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    : <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />}
                   <input
                     value={contraparteCnpj}
-                    onChange={e => handleCnpjChange(e.target.value)}
-                    placeholder="00.000.000/0000-00"
+                    onChange={e => handleDocChange(e.target.value)}
+                    placeholder={tipoPessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                    inputMode="numeric"
                     className={`${inputClass} pl-9 pr-10`}
                   />
                   {cnpjLoading && (
@@ -715,7 +794,7 @@ export default function NovaSolicitacao() {
                 )}
                 {cnpjStatus?.ok && (
                   <p className="text-[9px] text-emerald-600 mt-1 flex items-center gap-1">
-                    <CheckCircle2 size={9} /> Situacao: {cnpjStatus.msg}
+                    <CheckCircle2 size={9} /> {tipoPessoa === 'juridica' ? `Situacao: ${cnpjStatus.msg}` : cnpjStatus.msg}
                   </p>
                 )}
                 {cnpjStatus && !cnpjStatus.ok && (
@@ -723,16 +802,16 @@ export default function NovaSolicitacao() {
                 )}
               </div>
 
-              {/* Nome (auto-filled) */}
+              {/* Nome (auto-filled for CNPJ) */}
               <div>
-                <label className={labelClass}>Nome / Razao Social *</label>
+                <label className={labelClass}>{tipoPessoa === 'fisica' ? 'Nome Completo *' : 'Nome / Razao Social *'}</label>
                 <input
                   value={contraparteNome}
                   onChange={e => setContraparteNome(e.target.value)}
-                  placeholder="Razao social ou nome fantasia"
+                  placeholder={tipoPessoa === 'fisica' ? 'Nome completo da pessoa' : 'Razao social ou nome fantasia'}
                   className={`${inputClass} ${errorBorder(contraparteNome)}`}
                 />
-                {cnpjStatus?.ok && contraparteNome && (
+                {tipoPessoa === 'juridica' && cnpjStatus?.ok && contraparteNome && (
                   <p className="text-[9px] text-emerald-500 mt-0.5 flex items-center gap-1">
                     <ShieldCheck size={9} /> Preenchido via CNPJ
                   </p>
@@ -753,7 +832,7 @@ export default function NovaSolicitacao() {
                     className={`${inputClass} pl-9`}
                   />
                 </div>
-                {cnpjStatus?.ok && contraparteTelefone && (
+                {tipoPessoa === 'juridica' && cnpjStatus?.ok && contraparteTelefone && (
                   <p className="text-[9px] text-emerald-500 mt-0.5 flex items-center gap-1">
                     <ShieldCheck size={9} /> Preenchido via CNPJ
                   </p>
@@ -772,7 +851,7 @@ export default function NovaSolicitacao() {
                     className={`${inputClass} pl-9`}
                   />
                 </div>
-                {cnpjStatus?.ok && contraparteEmail && (
+                {tipoPessoa === 'juridica' && cnpjStatus?.ok && contraparteEmail && (
                   <p className="text-[9px] text-emerald-500 mt-0.5 flex items-center gap-1">
                     <ShieldCheck size={9} /> Preenchido via CNPJ
                   </p>
@@ -786,23 +865,25 @@ export default function NovaSolicitacao() {
               <UpperInput value={contraparteEndereco} onChange={e => setContraparteEndereco(e.target.value)}
                 placeholder="Rua, número, bairro, cidade/UF, CEP" className={inputClass} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Representante Legal</label>
-                <UpperInput value={contraparteRepNome} onChange={e => setContraparteRepNome(e.target.value)}
-                  placeholder="Nome completo" className={inputClass} />
+            {tipoPessoa === 'juridica' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className={labelClass}>Representante Legal</label>
+                  <UpperInput value={contraparteRepNome} onChange={e => setContraparteRepNome(e.target.value)}
+                    placeholder="Nome completo" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>CPF do Representante</label>
+                  <input value={contraparteRepCpf} onChange={e => setContraparteRepCpf(e.target.value)}
+                    placeholder="000.000.000-00" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Cargo</label>
+                  <UpperInput value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
+                    placeholder="Ex: Diretor, Sócio" className={inputClass} />
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>CPF do Representante</label>
-                <input value={contraparteRepCpf} onChange={e => setContraparteRepCpf(e.target.value)}
-                  placeholder="000.000.000-00" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Cargo</label>
-                <UpperInput value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
-                  placeholder="Ex: Diretor, Sócio" className={inputClass} />
-              </div>
-            </div>
+            )}
 
             {/* Cadastro checks */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -849,13 +930,13 @@ export default function NovaSolicitacao() {
           </div>
 
           <div>
-            <label className={labelClass}>Justificativa (responsavel, obra, setor, municipio e motivo)</label>
+            <label className={labelClass}>Justificativa (responsavel, obra, setor, municipio e motivo) *</label>
             <UpperTextarea
               value={justificativa}
               onChange={e => setJustificativa(e.target.value)}
               placeholder="Informe quem e o responsavel, obra, setor, municipio e o motivo da solicitacao..."
               rows={3}
-              className={`${inputClass} resize-none`}
+              className={`${inputClass} resize-none ${errorBorder(justificativa)}`}
             />
           </div>
 
@@ -904,6 +985,9 @@ export default function NovaSolicitacao() {
               />
             </div>
           </div>
+
+          {/* Documentos (anexos) — Fornecedor + Complementares */}
+          <SolicitacaoDocsSection staged={stagedDocs} onStagedChange={setStagedDocs} tipoPessoa={tipoPessoa} />
         </div>
       )}
 
@@ -1019,7 +1103,7 @@ export default function NovaSolicitacao() {
           </button>
         ) : (
           <button
-            onClick={() => nav('/contratos/solicitacoes')}
+            onClick={() => nav(voltarPara)}
             className="flex items-center gap-1.5 px-5 py-3 rounded-xl border-2 border-slate-200
               text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all"
           >

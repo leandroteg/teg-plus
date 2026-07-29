@@ -188,6 +188,7 @@ export default function FrotasHome({ initialPainel }: { initialPainel?: 'painel'
       { key: 'disponivel',       label: 'Disponíveis',       value: counts.disponivel ?? 0,       barClass: 'bg-emerald-500' },
       { key: 'em_uso',           label: 'Em Uso',            value: counts.em_uso ?? 0,           barClass: 'bg-sky-500' },
       { key: 'em_manutencao',    label: 'Em Manutenção',     value: counts.em_manutencao ?? 0,    barClass: 'bg-amber-500' },
+      { key: 'parado',           label: 'Parados',           value: counts.parado ?? 0,           barClass: 'bg-rose-600' },
       { key: 'bloqueado',        label: 'Bloqueados',        value: counts.bloqueado ?? 0,        barClass: 'bg-red-500' },
       { key: 'em_entrada',       label: 'Em Entrada',        value: counts.em_entrada ?? 0,       barClass: 'bg-violet-500' },
       { key: 'aguardando_saida', label: 'Aguardando Saída',  value: counts.aguardando_saida ?? 0, barClass: 'bg-rose-500' },

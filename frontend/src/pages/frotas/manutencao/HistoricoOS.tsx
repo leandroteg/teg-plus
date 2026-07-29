@@ -3,7 +3,8 @@
 // Usa os mesmos cartão/linha da tela de OS (OSCards) para que a mesma OS não
 // tenha duas aparências no sistema.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, X, LayoutList, LayoutGrid, CheckCircle2, XCircle, Ban } from 'lucide-react'
 import { useOrdensServico, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -29,6 +30,12 @@ export default function HistoricoOS() {
 
   const [mes, setMes] = useState(mesAtual())
   const [semFiltroMes, setSemFiltroMes] = useState(false)
+
+  // Deep link do Portal (?veiculo=<id>): já abre filtrado naquele ativo,
+  // sem recorte de mês — o analista quer o histórico inteiro dele.
+  const [searchParams] = useSearchParams()
+  const veiculoLink = searchParams.get('veiculo')
+  useEffect(() => { if (veiculoLink) setSemFiltroMes(true) }, [veiculoLink])
   const [filtroTipo, setFiltroTipo] = useState<TipoOS | ''>('')
   const [filtroStatus, setFiltroStatus] = useState<StatusOS | ''>('')
   const [busca, setBusca] = useState('')
@@ -44,7 +51,8 @@ export default function HistoricoOS() {
   const veicMap = useMemo(() => new Map(veiculos.map(v => [v.id, v])), [veiculos])
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
   const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
-  const openVeicDetalhe = (veiculo_id: string) => {
+  const openVeicDetalhe = (veiculo_id?: string) => {
+    if (!veiculo_id) return
     const v = veicMap.get(veiculo_id)
     if (v) setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
   }
@@ -53,6 +61,7 @@ export default function HistoricoOS() {
   const filtrado = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return historico.filter(os => {
+      if (veiculoLink && os.veiculo_id !== veiculoLink) return false
       if (!semFiltroMes) {
         const ref = os.data_conclusao ?? os.data_abertura
         if (ref < mes + '-01' || ref > mes + '-31') return false
@@ -60,7 +69,7 @@ export default function HistoricoOS() {
       if (filtroTipo && os.tipo !== filtroTipo) return false
       if (filtroStatus && os.status !== filtroStatus) return false
       if (q) {
-        const v = veicMap.get(os.veiculo_id)
+        const v = os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined
         const codigo = v ? formatCodigoCategoria(v).codigo : ''
         const alvo = [
           os.veiculo?.placa, codigo, os.numero_os, os.veiculo?.modelo,
@@ -70,7 +79,7 @@ export default function HistoricoOS() {
       }
       return true
     })
-  }, [historico, mes, semFiltroMes, filtroTipo, filtroStatus, busca, veicMap])
+  }, [historico, mes, semFiltroMes, filtroTipo, filtroStatus, busca, veicMap, veiculoLink])
 
   const concluidas = filtrado.filter(os => os.status === 'concluida')
   const valorTotal = concluidas.reduce((s, os) => s + (os.valor_final ?? 0), 0)
@@ -177,8 +186,8 @@ export default function HistoricoOS() {
         ) : viewMode === 'cards' ? (
           <div className="space-y-2 p-4">
             {filtrado.map(os => (
-              <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
-                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+              <OSCard key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />
             ))}
           </div>
         ) : (
@@ -191,17 +200,17 @@ export default function HistoricoOS() {
               <span className="w-[50px] text-right">Dias</span><span className="w-[70px] text-right">Valor</span>
             </div>
             {filtrado.map(os => (
-              <OSRow key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark}
-                onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />
+              <OSRow key={os.id} os={os} veicFull={os.veiculo_id ? veicMap.get(os.veiculo_id) : undefined} isDark={isDark}
+                onClick={() => setDetail(os)} onVeicClick={os.veiculo_id ? () => openVeicDetalhe(os.veiculo_id) : undefined} />
             ))}
           </div>
         )}
       </div>
 
       {detail && (
-        <OSModal os={detail} veiculo={veicMap.get(detail.veiculo_id)} isDark={isDark}
+        <OSModal os={detail} veiculo={detail.veiculo_id ? veicMap.get(detail.veiculo_id) : undefined} isDark={isDark}
           onClose={() => setDetail(null)}
-          onVeiculoClick={() => { setDetail(null); openVeicDetalhe(detail.veiculo_id) }} />
+          onVeiculoClick={detail.veiculo_id ? () => { setDetail(null); openVeicDetalhe(detail.veiculo_id) } : undefined} />
       )}
       {detalheVeic && (
         <VeiculoDetalhesModal

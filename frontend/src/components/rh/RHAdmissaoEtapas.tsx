@@ -16,7 +16,7 @@ import {
   useEtapaCandidato, useAsoAgendar, useTreinamentos, useTransicaoAdmissao,
   useMobilizacao, useIntegracao, useProposta, useUploadAnexoCandidato, useMobApoio,
   useRegistro, useMatriculaColaborador, anexoSignedUrl, certTreinamentoUrl, useLiberarAdmissao,
-  useExcluirAnexoAdmissao, useGesetLiberacao, useEncerrarAdmissao,
+  useExcluirAnexoAdmissao, useLiberarGeset, useEncerrarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
@@ -41,6 +41,11 @@ function CampoTexto({ valor, onSave, textarea, ...props }: {
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV(e.target.value),
     onFocus: () => setFocado(true),
     onBlur: () => { setFocado(false); if ((valor ?? '') !== v) onSave(v) },
+    // Enter também salva: digitar e teclar Enter é o reflexo natural em campo
+    // curto (matrícula), e antes o valor se perdia se a pessoa não clicasse fora.
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !textarea) { e.preventDefault(); (e.target as HTMLInputElement).blur() }
+    },
   }
   return textarea
     ? <textarea {...(shared as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} />
@@ -442,7 +447,7 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
 // Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
 export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   cand: RHAdmissaoCandidato; cargo?: string | null
-  treinamentos: { id: string; nome: string; norma: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
+  treinamentos: { id: string; nome: string; norma: string | null; treinamento_id?: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
 }) {
   const trein = useTreinamentos()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
@@ -452,8 +457,12 @@ export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   const reqIds = new Set(matriz.filter(m => cargoBase(m.cargo) === cargoNorm && m.exigencia === 'obrigatorio').map(m => m.treinamento_id))
   // ASO vem da etapa Exames — não aparece aqui
   const required = catalogo.filter(c => reqIds.has(c.id) && c.codigo !== 'ASO').sort((a, b) => a.ordem - b.ordem)
-  const recDe = (cat: { nome: string; norma: string | null }) =>
-    treinamentos.find(t => (cat.norma && (t.norma ?? '').toUpperCase() === cat.norma.toUpperCase()) || t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
+  // Casa pelo curso gravado no upload (treinamento_id). Casar por norma marcaria
+  // dois cursos com um certificado só quando a norma é compartilhada
+  // (NR-10 Básico x NR-10 SEP). Nome só para registro legado, sem id.
+  const recDe = (cat: { id: string; nome: string; norma: string | null }) =>
+    treinamentos.find(t => t.treinamento_id === cat.id)
+    ?? treinamentos.find(t => !t.treinamento_id && t.nome.trim().toUpperCase() === cat.nome.trim().toUpperCase())
   const usadosIds = new Set(required.map(c => recDe(c)?.id).filter(Boolean) as string[])
   const extras = treinamentos.filter(t => !usadosIds.has(t.id))
   const feitos = required.filter(c => recDe(c)?.status === 'concluido').length
@@ -487,7 +496,7 @@ export function TreinamentosBlock({ cand, cargo, treinamentos }: {
               <label className={`cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${temCert ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-teal-600 hover:bg-teal-700 text-white'} ${trein.anexarCert.isPending ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={11} /> {temCert ? 'Trocar' : 'Upload'}
                 <input type="file" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) trein.anexarCert.mutate({ candidatoId: cand.id, recId: rec?.id, nome: cat.nome, norma: cat.norma ?? undefined, file: f }); e.currentTarget.value = '' }} />
+                  onChange={e => { const f = e.target.files?.[0]; if (f) trein.anexarCert.mutate({ candidatoId: cand.id, recId: rec?.id, nome: cat.nome, norma: cat.norma ?? undefined, treinamentoId: cat.id, file: f }); e.currentTarget.value = '' }} />
               </label>
             </div>
           )
@@ -1075,7 +1084,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[12px] font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Finalizar Integração</p>
-            <p className="text-[10px] text-slate-400">Conclui a integração e avança o colaborador para Liberação (Pendente).</p>
+            <p className="text-[10px] text-slate-400">Conclui a integração e envia para Liberação, aguardando o GESET liberar a ida a campo.</p>
           </div>
           <button
             onClick={async () => { await liberar.mutateAsync({ admissaoId: adm.id, autorId: perfil?.id, autorNome }) }}
@@ -1085,7 +1094,7 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
           </button>
         </div>
         {!todosCerts && (
-          <p className="text-[10px] text-slate-400 mt-1.5">Libera quando todos os certificados de treinamento estiverem anexados{requeridos.length > 0 ? ` (${requeridos.filter(temCert).length}/${requeridos.length})` : ''}.</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">Conclui quando todos os certificados de treinamento estiverem anexados{requeridos.length > 0 ? ` (${requeridos.filter(temCert).length}/${requeridos.length})` : ''}.</p>
         )}
         {liberar.isError && <p className="text-[10px] text-red-600 font-semibold mt-1.5">{(liberar.error as Error)?.message}</p>}
       </div>
@@ -1104,15 +1113,15 @@ export function LiberadoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark
 
 function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark: boolean }) {
   const { data } = useEtapaCandidato(cand.id)
-  const geset = useGesetLiberacao()
+  const liberarGeset = useLiberarGeset()
   const encerrar = useEncerrarAdmissao()
   const { perfil } = useAuth()
   const aguardando = (cand.dados_extras as Record<string, unknown> | undefined)?.geset_status === 'aguardando_liberacao'
 
   const marcarLiberado = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (geset.isPending) return
-    geset.mutate({ candidatoId: cand.id, status: 'liberado' })
+    if (liberarGeset.isPending) return
+    liberarGeset.mutate({ candidatoId: cand.id, autorId: perfil?.id, autorNome: perfil?.nome || perfil?.email || undefined })
   }
   const encerrarAdm = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1141,9 +1150,9 @@ function LiberadoCandidato({ cand, isDark }: { cand: RHAdmissaoCandidato; isDark
       <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable={false} />
       <div className="flex justify-end">
         {aguardando ? (
-          <button type="button" onClick={marcarLiberado} disabled={geset.isPending}
+          <button type="button" onClick={marcarLiberado} disabled={liberarGeset.isPending}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            {geset.isPending ? <><Loader2 size={13} className="animate-spin" /> Liberando…</> : <><CheckCircle2 size={13} /> Liberado</>}
+            {liberarGeset.isPending ? <><Loader2 size={13} className="animate-spin" /> Liberando…</> : <><CheckCircle2 size={13} /> Liberado</>}
           </button>
         ) : (
           <button type="button" onClick={encerrarAdm} disabled={encerrar.isPending}

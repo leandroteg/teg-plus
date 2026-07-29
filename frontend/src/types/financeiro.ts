@@ -37,6 +37,7 @@ export const CR_PIPELINE_STAGES: { status: StatusCR; label: string; color: strin
   { status: 'aguardando',   label: 'Aguardando',    color: 'orange',  borderColor: 'border-t-orange-500' },
   { status: 'recebido',     label: 'Recebidos',     color: 'teal',    borderColor: 'border-t-teal-500' },
   { status: 'conciliado',   label: 'Conciliados',   color: 'green',   borderColor: 'border-t-green-500' },
+  { status: 'cancelado',    label: 'Cancelados',    color: 'rose',    borderColor: 'border-t-rose-500' },
 ]
 
 export type TipoDocumento =
@@ -90,6 +91,8 @@ export interface ContaPagar {
   loc_fatura_id?: string
   numero_documento?: string
   status: StatusCP
+  /** Há uma solicitação de cancelamento pendente de aprovação para este documento. */
+  cancelamento_pendente?: boolean
   aprovado_por?: string
   aprovado_em?: string
   omie_cp_id?: number
@@ -159,6 +162,8 @@ export interface ContaReceber {
   projeto_id?: string
   natureza?: string
   status: StatusCR
+  /** Há uma solicitação de cancelamento pendente de aprovação para este documento. */
+  cancelamento_pendente?: boolean
   autorizado_por?: string
   autorizado_em?: string
   danfe_url?: string

@@ -641,12 +641,140 @@ export function useCriarFichaEpi() {
       }))
       const { error: e2 } = await supabase.from('qsma_epi_entregas').insert(rows)
       if (e2) throw e2
-      return data as { id: string; codigo: string }
+
+      // Baixa no almoxarifado + cautela do colaborador (validade = vida útil do EPI).
+      // A RPC resolve a variante de estoque pelo tamanho do colaborador e nunca bloqueia
+      // a entrega: falta de saldo volta em `avisos` (e o saldo pode ficar negativo).
+      let avisos: string[] = []
+      const { data: baixa, error: e3 } = await supabase.rpc('qsma_epi_entregar', { p_ficha_id: fichaId })
+      if (e3) {
+        console.error('qsma_epi_entregar:', e3)
+        avisos = [`Ficha criada, mas a baixa no estoque falhou: ${e3.message}`]
+      } else {
+        const r = baixa as { ok: boolean; erro?: string; avisos?: { epi: string; aviso: string }[] } | null
+        if (r && !r.ok) avisos = [r.erro ?? 'baixa no estoque não efetuada']
+        else avisos = (r?.avisos ?? []).map(a => `${a.epi}: ${a.aviso}`)
+      }
+      return { ...(data as { id: string; codigo: string }), avisos }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] })
       qc.invalidateQueries({ queryKey: ['qsma_epi_entregas'] })
       qc.invalidateQueries({ queryKey: ['qsma_kpis'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_saldo'] })
+    },
+  })
+}
+
+// ── EPI × Estoque ────────────────────────────────────────────────────────────
+// O catálogo QSMA (com CA) aponta para N itens do almoxarifado (variantes de
+// tamanho/cor) via qsma_epi_itens. O saldo exibido vem do estoque, não daqui.
+export interface QsmaEpiVariante {
+  id: string; epi_id: string; item_id: string
+  tamanho: string | null; cor: string | null; padrao: boolean
+  item?: { codigo: string; descricao: string; unidade: string | null } | null
+}
+
+export function useEpiVariantes(epiId?: string) {
+  return useQuery({
+    queryKey: ['qsma_epi_itens', epiId ?? 'todos'],
+    queryFn: async () => {
+      let q = supabase.from('qsma_epi_itens')
+        .select('*, item:est_itens(codigo, descricao, unidade)')
+      if (epiId) q = q.eq('epi_id', epiId)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as QsmaEpiVariante[]
+    },
+  })
+}
+
+export function useSalvarEpiVariante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id?: string; epi_id: string; item_id: string; tamanho?: string | null; cor?: string | null; padrao?: boolean }) => {
+      const { id, ...rest } = p
+      if (id) {
+        const { error } = await supabase.from('qsma_epi_itens').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qsma_epi_itens').insert(rest)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['qsma_epi_itens'] })
+      qc.invalidateQueries({ queryKey: ['qsma_epi_saldo'] })
+    },
+  })
+}
+
+export function useRemoverEpiVariante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('qsma_epi_itens').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_epi_itens'] }),
+  })
+}
+
+// Saldo por EPI (soma das variantes). Se baseId vier, filtra a base do canteiro.
+export function useSaldoEpi(baseId?: string) {
+  return useQuery({
+    queryKey: ['qsma_epi_saldo', baseId ?? 'todas'],
+    queryFn: async () => {
+      let q = supabase.from('vw_qsma_epi_saldo').select('epi_id, base_id, saldo')
+      if (baseId) q = q.eq('base_id', baseId)
+      const { data, error } = await q
+      if (error) throw error
+      const por = new Map<string, number>()
+      for (const r of (data ?? []) as { epi_id: string; saldo: number }[]) {
+        por.set(r.epi_id, (por.get(r.epi_id) ?? 0) + Number(r.saldo ?? 0))
+      }
+      return por
+    },
+  })
+}
+
+// Itens de estoque da categoria EPI/EPC ainda não vinculados a nenhum EPI —
+// alimenta o picker "Adicionar do estoque" (evita poluir o catálogo).
+export function useItensEstoqueEpi(busca?: string) {
+  return useQuery({
+    queryKey: ['est_itens_epi', busca ?? ''],
+    queryFn: async () => {
+      let q = supabase.from('est_itens')
+        .select('id, codigo, descricao, unidade')
+        .eq('categoria', 'EPI/EPC').eq('ativo', true)
+        .order('descricao').limit(200)
+      if (busca && busca.trim()) q = q.ilike('descricao', `%${busca.trim()}%`)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as { id: string; codigo: string; descricao: string; unidade: string | null }[]
+    },
+  })
+}
+
+// Cautelas de EPI/equipamento em aberto do colaborador — usado no Nada Consta
+// do desligamento. 'depreciado' (passou da vida útil) não é pendência.
+export interface QsmaCautelaPendencia {
+  cautela_item_id: string; cautela_id: string; numero: string | null
+  colaborador_id: string; item_desc: string; epi_nome: string | null
+  quantidade: number; quantidade_devolvida: number | null
+  data_retirada: string; vence_em: string | null; status: 'em_uso' | 'depreciado' | 'devolvido'
+}
+
+export function useCautelasColaborador(colaboradorId?: string) {
+  return useQuery({
+    queryKey: ['qsma_cautela_status', colaboradorId],
+    enabled: !!colaboradorId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_qsma_epi_cautela_status')
+        .select('*').eq('colaborador_id', colaboradorId!)
+        .order('data_retirada', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as QsmaCautelaPendencia[]
     },
   })
 }
@@ -838,6 +966,131 @@ export interface ColabTreino {
   id: string; nome: string; cargo: string | null; setor: string | null
   departamento: string | null; data_admissao: string | null; base: string | null
 }
+// ── Desligamento — fluxo de 6 etapas sobre rh_desligamentos ───────────────────
+export type EtapaDeslig = 'requisicao' | 'aprovacao' | 'preparo' | 'nada_consta' | 'rescisao' | 'encerrados'
+export const ORDEM_ETAPAS: EtapaDeslig[] = ['requisicao', 'aprovacao', 'preparo', 'nada_consta', 'rescisao', 'encerrados']
+
+export interface Desligamento {
+  id: string
+  colaborador_id: string
+  colaborador_nome: string | null
+  cargo: string | null
+  base_nome: string | null
+  data_admissao: string | null
+  colaborador_ativo: boolean | null
+  tipo: string | null
+  motivo: string | null
+  data_aviso: string | null
+  data_desligamento: string | null
+  cumpriu_aviso: boolean | null
+  observacoes: string | null
+  checklist: { label: string; done: boolean }[] | null
+  status: EtapaDeslig
+  created_by_nome: string | null
+  created_at: string
+}
+
+export function useDesligamentos() {
+  return useQuery({
+    queryKey: ['rh_desligamentos'],
+    queryFn: async (): Promise<Desligamento[]> => {
+      const { data, error } = await supabase.from('vw_rh_desligamentos').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Desligamento[]
+    },
+  })
+}
+
+export function useCriarDesligamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { colaborador_id: string; tipo: string; motivo?: string; data_aviso?: string; data_desligamento?: string; cumpriu_aviso?: boolean; observacoes?: string; criadoPor?: string }) => {
+      const { error } = await supabase.from('rh_desligamentos').insert({
+        colaborador_id: p.colaborador_id, tipo: p.tipo, motivo: p.motivo ?? null,
+        data_aviso: p.data_aviso || null, data_desligamento: p.data_desligamento || null,
+        cumpriu_aviso: p.cumpriu_aviso ?? null, observacoes: p.observacoes ?? null,
+        status: 'requisicao', created_by_nome: p.criadoPor ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh_desligamentos'] }),
+  })
+}
+
+export function useAtualizarDesligamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; patch: Partial<Desligamento> }) => {
+      const { id, patch } = p
+      const { colaborador_nome, cargo, base_nome, data_admissao, colaborador_ativo, created_at, ...limpo } = patch as any
+      const { error } = await supabase.from('rh_desligamentos').update({ ...limpo, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh_desligamentos'] }),
+  })
+}
+
+// ── Nada Consta (desligamento): conta a pagar do colaborador ─────────────────
+// Consolida cautelas em aberto (todas, não só EPI) + repasses não prestados.
+export interface NadaConstaLinha {
+  origem: 'cautela' | 'repasse'
+  colaborador_id: string | null
+  colaborador_norm: string
+  solicitante_nome: string | null
+  ref_id: string
+  descricao: string
+  quantidade: number
+  local: string
+  data_ini: string | null
+  data_lim: string | null
+  valor: number
+  valor_manual: boolean
+  status: string
+}
+
+// Passe colaboradorId (cautela casa por id) e o nome normalizado (repasse casa por nome).
+export function useNadaConsta(colaboradorId?: string, colaboradorNome?: string) {
+  return useQuery({
+    queryKey: ['qsma_nada_consta', colaboradorId, colaboradorNome],
+    enabled: !!colaboradorId,
+    queryFn: async (): Promise<NadaConstaLinha[]> => {
+      const norm = (colaboradorNome ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+      const { data, error } = await supabase.from('vw_qsma_nada_consta').select('*')
+        .or(`colaborador_id.eq.${colaboradorId}${norm ? `,colaborador_norm.eq.${norm}` : ''}`)
+      if (error) throw error
+      return (data ?? []) as NadaConstaLinha[]
+    },
+  })
+}
+
+export function useDefinirValorCautela() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { item: string; valor: number; obs?: string; quem?: string }) => {
+      const { error } = await supabase.rpc('qsma_cautela_definir_valor', {
+        p_item: p.item, p_valor: p.valor, p_obs: p.obs ?? null, p_quem: p.quem ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_nada_consta'] }),
+  })
+}
+
+export function useBaixarNadaConsta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { item: string; tipo: 'devolucao' | 'perda'; quemId?: string; quemNome?: string }) => {
+      const { data, error } = await supabase.rpc('qsma_nada_consta_baixar', {
+        p_item: p.item, p_tipo: p.tipo, p_quem_id: p.quemId ?? null, p_quem_nome: p.quemNome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (r && !r.ok) throw new Error(r.erro || 'falha na baixa')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_nada_consta'] }),
+  })
+}
+
 export function useColaboradoresTreino() {
   return useQuery({
     queryKey: ['qsma_colab_treino'],

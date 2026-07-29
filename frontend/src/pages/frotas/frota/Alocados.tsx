@@ -440,6 +440,7 @@ export default function Alocados() {
   // map veiculo_id → OS count
   const osCountMap: Record<string, number> = {}
   for (const os of ordens) {
+    if (!os.veiculo_id) continue
     osCountMap[os.veiculo_id] = (osCountMap[os.veiculo_id] ?? 0) + 1
   }
 

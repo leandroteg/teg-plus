@@ -7,6 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras, useColabAtivosIds,
   usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia, usePontoDispositivos,
+  type PontoElegiveis,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
@@ -117,23 +118,33 @@ export function RegistrosPontoTab(props: PontoTabProps) {
   return props.vista === 'dia' ? <RegistrosDia {...props} /> : <RegistrosMes {...props} />
 }
 
-// Situação = Ativos / Inativos / Todos. Enquanto o set não carregou, não filtra (mostra tudo).
-function matchSituacao(colaboradorId: string | null | undefined, situacao: PontoTabProps['situacao'], ativos?: Set<string>): boolean {
-  if (situacao === 'todos' || !ativos) return true
-  const ativo = !!colaboradorId && ativos.has(colaboradorId)
-  return situacao === 'ativos' ? ativo : !ativo
+// Situação é múltipla escolha. Cada pessoa cai em UMA categoria; nada marcado
+// (ou set ainda não carregado) = sem filtro. Cargo de confiança e afastado ficam
+// fora de "Ativo" — senão entram todo mês com o mês inteiro de falta.
+export const SITUACOES_PONTO = ['Ativo', 'Afastado', 'Cargo de confiança', 'Inativo']
+
+function situacaoDoColab(id: string, eleg: PontoElegiveis): string {
+  if (!eleg.ativos.has(id)) return 'Inativo'
+  if (eleg.afastados.has(id)) return 'Afastado'
+  if (eleg.confianca.has(id)) return 'Cargo de confiança'
+  return 'Ativo'
+}
+
+function matchSituacao(colaboradorId: string | null | undefined, situacao: PontoTabProps['situacao'], eleg?: PontoElegiveis): boolean {
+  if (!eleg || !situacao || situacao.size === 0) return true
+  return situacao.has(situacaoDoColab(colaboradorId ?? '', eleg))
 }
 
 function RegistrosMes({ anoMes, baseId, pessoa, quickReg, dispositivo, situacao }: PontoTabProps) {
   const { data = [], isLoading } = usePontoResumoMes(anoMes, baseId || undefined)
   const { data: atestados = [] } = usePontoAtestados(anoMes)
-  const { data: ativosSet } = useColabAtivosIds()
+  const { data: elegiveis } = useColabAtivosIds()
   const c = useThemeCls()
   const [sel, setSel] = useState<PontoResumoMes | null>(null)
   const afastados = new Set(atestados.map(a => a.colaborador_id).filter(Boolean))
   const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa)
     && (!dispositivo || r.dispositivo === dispositivo)
-    && matchSituacao(r.colaborador_id, situacao, ativosSet)
+    && matchSituacao(r.colaborador_id, situacao, elegiveis)
     && (
     quickReg === 'aberto' ? r.dias_em_aberto > 0
       : quickReg === 'fora_horario' ? r.dias_fora_horario > 0
@@ -241,7 +252,7 @@ function CartaoDiario({ colab, anoMes, onClose }: { colab: PontoResumoMes; anoMe
 function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo, situacao }: PontoTabProps) {
   const { data = [], isLoading } = usePontoDia(diaData, baseId || undefined)
   const { data: dispositivos = [] } = usePontoDispositivos()
-  const { data: ativosSet } = useColabAtivosIds()
+  const { data: elegiveis } = useColabAtivosIds()
   const c = useThemeCls()
   const horaCls = (fora: boolean) => fora ? 'text-rose-500 font-bold' : c.txt
   // resolve o Ponto Virtual do dia: primeiro equip id não-vazio das batidas → cadastro linkdisp
@@ -251,7 +262,7 @@ function RegistrosDia({ baseId, pessoa, diaData, quickReg, dispositivo, situacao
     return eq ? dispById.get(Number(eq)) ?? null : null
   }
   const rows = data
-    .filter(r => matchPessoa(r.colaborador?.nome, pessoa) && matchSituacao(r.colaborador_id, situacao, ativosSet))
+    .filter(r => matchPessoa(r.colaborador?.nome, pessoa) && matchSituacao(r.colaborador_id, situacao, elegiveis))
     .map(r => {
       const disp = dispDoDia(r)
       // compara com a base de CADASTRO do colaborador (a base do dia é derivada do próprio dispositivo)

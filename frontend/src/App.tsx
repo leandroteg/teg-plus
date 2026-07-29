@@ -312,6 +312,9 @@ export default function App() {
           <Route path="/perfil"      element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-tarefas" element={<Lazy><MinhasTarefas /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
+          {/* Self-service: qualquer usuário autenticado pode abrir uma solicitação de
+              contrato, sem precisar do módulo Contratos (só criação, sem o menu completo). */}
+          <Route path="/solicitar-contrato" element={<Lazy><NovaSolicitacao selfService /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 

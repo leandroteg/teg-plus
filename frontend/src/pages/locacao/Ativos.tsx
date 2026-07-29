@@ -2,14 +2,14 @@ import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
-  Pencil, Save, Loader2, Plus,
+  Pencil, Save, Loader2, Plus, Sparkles, Wrench,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useAditivos, useVistorias, useAtualizarImovel } from '../../hooks/useLocacao'
+import { useImoveis, useAditivos, useVistorias, useAtualizarImovel, useSolicitacoesLocacao } from '../../hooks/useLocacao'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import NovoImovelModal from '../../components/locacao/NovoImovelModal'
 import { UpperInput } from '../../components/UpperInput'
-import { fmtEndereco } from '../../types/locacao'
+import { fmtEndereco, STATUS_SOLICITACAO_LABEL, TIPO_SOLICITACAO_LABEL } from '../../types/locacao'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
@@ -49,6 +49,10 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
   const stCfg = STATUS_CFG[imovel.status] || STATUS_CFG.ativo
   const imovelAditivos = aditivos.filter(a => a.imovel_id === imovel.id)
   const imovelVistorias = vistorias.filter(v => v.imovel_id === imovel.id)
+  // Histórico do imóvel: TODAS as solicitações dele (manutenção, serviço e
+  // limpeza), buscadas só quando a ficha abre. É aqui que mora o histórico —
+  // a aba Manutenções e Serviços mostra apenas o quadro do que está em curso.
+  const { data: solicitacoes = [] } = useSolicitacoesLocacao({ imovel_id: imovel.id })
 
   const setF = (k: keyof LocImovel, v: any) => setForm(f => ({ ...f, [k]: v }))
   const txt = (label: string, k: keyof LocImovel, opts: { full?: boolean; type?: string } = {}) => (
@@ -225,6 +229,56 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Histórico de solicitações (manutenção, serviço e limpeza) */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Wrench size={11} /> Manutenções, Serviços e Limpeza
+            </p>
+            {solicitacoes.length === 0 ? (
+              <p className={`text-xs ${txtMuted}`}>Nenhuma solicitação registrada para este imóvel.</p>
+            ) : (
+              <div className="space-y-2">
+                {solicitacoes.map(sol => {
+                  const pend = (sol.checklist ?? []).filter(a => a.estado === 'pendente')
+                  const viva = !['concluida', 'cancelada', 'rejeitada'].includes(sol.status)
+                  const valor = sol.valor_final ?? sol.valor_estimado
+                  const st = STATUS_SOLICITACAO_LABEL[sol.status]
+                  return (
+                    <div key={sol.id} className={`rounded-lg p-3 border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className={`text-xs font-bold ${txtMain}`}>{sol.titulo}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.bg} ${st.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                        </span>
+                      </div>
+                      <p className={`text-[10px] mt-1 ${txtMuted}`}>
+                        {TIPO_SOLICITACAO_LABEL[sol.tipo]}
+                        {' · '}{fmtDate((sol.data_conclusao ?? sol.created_at).split('T')[0])}
+                        {sol.criado_por_nome ? ` · ${sol.criado_por_nome}` : ''}
+                        {valor != null && !viva ? ` · ${fmtCur(valor)}` : ''}
+                      </p>
+                      {pend.length > 0 && (
+                        <p className="text-[10px] mt-1 font-semibold text-amber-600">
+                          Pendente: {pend.map(a => a.area).join(', ')}
+                        </p>
+                      )}
+                      {sol.descricao && <p className={`text-[11px] mt-1.5 ${txtMain}`}>{sol.descricao}</p>}
+                      {(sol.fotos ?? []).length > 0 && (
+                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                          {sol.fotos!.map(url => (
+                            <a key={url} href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                              <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-slate-200" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

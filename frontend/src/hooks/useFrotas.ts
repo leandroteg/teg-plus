@@ -1085,6 +1085,7 @@ export function useFrotasKPIs() {
       const disponiveis = vs.filter(v => v.status === 'disponivel').length
       const em_uso      = vs.filter(v => v.status === 'em_uso').length
       const em_manu     = vs.filter(v => v.status === 'em_manutencao').length
+      const parados     = vs.filter(v => v.status === 'parado').length
       const bloqueados  = vs.filter(v => v.status === 'bloqueado').length
 
       const prevs = prevRes.data ?? []
@@ -1102,6 +1103,7 @@ export function useFrotasKPIs() {
         total_veiculos: total,
         disponiveis,
         em_manutencao: em_manu,
+        parados,
         em_uso,
         bloqueados,
         taxa_disponibilidade: total ? Math.round((disponiveis / total) * 100) : 0,
@@ -1747,6 +1749,60 @@ export function useItensManutencaoTodos() {
       }) as (FroItemManutencao & { placa?: string; marca?: string; modelo?: string; hodometro_atual?: number })[]
     },
     staleTime: 60_000,
+  })
+}
+
+// ── Comentários da OS ────────────────────────────────────────────────────────
+// Registro livre em qualquer etapa do fluxo: guarda autor e data/hora.
+export interface FroOSComentario {
+  id: string
+  os_id: string
+  mensagem: string
+  autor_id: string | null
+  criado_por_nome: string | null
+  created_at: string
+}
+
+export function useComentariosOS(osId?: string) {
+  return useQuery({
+    queryKey: ['fro_os_comentarios', osId],
+    enabled: !!osId,
+    queryFn: async (): Promise<FroOSComentario[]> => {
+      const { data, error } = await supabase
+        .from('fro_os_comentarios')
+        .select('*')
+        .eq('os_id', osId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as FroOSComentario[]
+    },
+  })
+}
+
+export function useAdicionarComentarioOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { osId: string; mensagem: string; autorId?: string | null; autorNome?: string | null }) => {
+      const msg = p.mensagem.trim()
+      if (!msg) throw new Error('Comentário vazio')
+      const { error } = await supabase.from('fro_os_comentarios').insert({
+        os_id: p.osId, mensagem: msg,
+        autor_id: p.autorId ?? null, criado_por_nome: p.autorNome ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_comentarios', v.osId] }),
+  })
+}
+
+export function useRemoverComentarioOS() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { id: string; osId: string }) => {
+      const { error } = await supabase.from('fro_os_comentarios').delete().eq('id', p.id)
+      if (error) throw error
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['fro_os_comentarios', v.osId] }),
   })
 }
 

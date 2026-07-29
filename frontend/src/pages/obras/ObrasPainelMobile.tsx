@@ -9,6 +9,13 @@ import {
 } from '../../components/paineis-mobile/kit'
 
 const STATUS_ATIVO = ['planejado', 'mobilizado', 'ativo']
+
+// mesma paleta/ordem do desktop (ObrasPainel)
+const GRUPOS_FROTA = ['leve', 'onibus_van', 'pesados', 'guindauto', 'maquinas'] as const
+const GRUPO_HEX: Record<string, string> = {
+  leve: '#0ea5e9', onibus_van: '#8b5cf6', pesados: '#f97316', guindauto: '#14b8a6', maquinas: '#eab308',
+}
+const canteiroNm = (n?: string) => (n ?? '—').replace(/^LD\s+/i, '').replace(/,\s*\d+\s*KV.*$/i, '').trim()
 const poloNm = (s?: string) => (s ?? '').replace(/^F[\d.\/]+\s*-\s*/, '') || (s ?? '—')
 
 // Versão mobile do Painel Obras — mesmos dados do desktop (equipe + frota), ajustado para telas pequenas.
@@ -82,7 +89,22 @@ export default function ObrasPainelMobile() {
     const porFrotaObra  = [...frotaPorObra.entries()].map(([id, n]) => ({ label: obraById.get(id)?.nome ?? '—', value: n })).sort((a, b) => b.value - a.value)
     const porFrotaGrupo = [...frotaPorGrupo.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
 
-    return { kpi, maquinas, porObra, porPolo, porPapel, porFrente, porFrotaObra, porFrotaGrupo }
+    // frota por canteiro × grupo (bloco que o desktop ganhou em 02/07)
+    const canteiroMap = new Map<string, { id: string; nome: string; total: number; porGrupo: Record<string, number> }>()
+    const grupoTotais: Record<string, number> = {}
+    frotaAtiva.forEach(a => {
+      const veic = veicById.get(a.veiculo_id)!
+      const grp = (CATEGORIA_GRUPO[veic.categoria] ?? 'maquinas') as string
+      const oid = a.obra_id!
+      let c = canteiroMap.get(oid)
+      if (!c) { c = { id: oid, nome: canteiroNm(obraById.get(oid)?.nome), total: 0, porGrupo: {} }; canteiroMap.set(oid, c) }
+      c.total++; c.porGrupo[grp] = (c.porGrupo[grp] ?? 0) + 1
+      grupoTotais[grp] = (grupoTotais[grp] ?? 0) + 1
+    })
+    const canteiros = [...canteiroMap.values()].sort((a, b) => b.total - a.total)
+    const gruposFrota = GRUPOS_FROTA.filter(g => (grupoTotais[g] ?? 0) > 0)
+
+    return { kpi, maquinas, porObra, porPolo, porPapel, porFrente, porFrotaObra, porFrotaGrupo, canteiros, gruposFrota, grupoTotais }
   }, [equipe, obras, alocFrota, veiculos])
 
   if (isLoading) return <MobileLoading tone="amber" />
@@ -170,6 +192,74 @@ export default function ObrasPainelMobile() {
             ? <Empty>Nenhuma máquina alocada</Empty>
             : d.porFrotaGrupo.map(x => <BarStat key={x.label} label={x.label} value={`${x.value}`} pct={(x.value / maxFGrupo) * 100} tone="emerald" />)
           }
+        </SectionBody>
+      </Section>
+
+      {/* Frota por canteiro (empilhado por grupo) — mesmo bloco do desktop, adaptado */}
+      <Section title="Frota por Canteiro" icon={Truck} tone="emerald">
+        <SectionBody className="space-y-2.5">
+          {d.canteiros.length === 0 ? (
+            <Empty>Nenhuma máquina alocada</Empty>
+          ) : (<>
+            {/* legenda dos grupos */}
+            <div className="flex items-center gap-2.5 flex-wrap pb-0.5">
+              {d.gruposFrota.map(g => (
+                <span key={g} className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GRUPO_HEX[g] }} />
+                  {CATEGORIA_GRUPO_LABEL[g]} <b>{d.grupoTotais[g]}</b>
+                </span>
+              ))}
+            </div>
+            {d.canteiros.map(c => (
+              <div key={c.id} className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold truncate min-w-0">{c.nome}</span>
+                  <span className="text-[11px] font-bold tabular-nums shrink-0">{c.total}</span>
+                </div>
+                <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-200/60 dark:bg-white/[0.08]">
+                  {d.gruposFrota.map(g => {
+                    const v = c.porGrupo[g] ?? 0
+                    if (!v) return null
+                    return <div key={g} className="h-full" style={{ width: `${(v / c.total) * 100}%`, background: GRUPO_HEX[g] }}
+                      title={`${CATEGORIA_GRUPO_LABEL[g]}: ${v}`} />
+                  })}
+                </div>
+              </div>
+            ))}
+          </>)}
+        </SectionBody>
+      </Section>
+
+      {/* Composição da frota por canteiro — equivalente ao bloco do desktop, em barra empilhada */}
+      <Section title="Frota por Canteiro" icon={Truck} tone="emerald">
+        <SectionBody className="space-y-2.5">
+          {d.canteiros.length === 0 ? <Empty>Nenhuma máquina alocada</Empty> : (<>
+            {/* legenda dos grupos presentes */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {d.gruposFrota.map(g => (
+                <span key={g} className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GRUPO_HEX[g] }} />
+                  {CATEGORIA_GRUPO_LABEL[g]} <b className="text-slate-500">{d.grupoTotais[g] ?? 0}</b>
+                </span>
+              ))}
+            </div>
+            {d.canteiros.map(c => (
+              <div key={c.id} className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold truncate text-slate-400">{c.nome}</span>
+                  <span className="text-[11px] font-bold tabular-nums text-slate-500 shrink-0">{c.total}</span>
+                </div>
+                <div className="flex h-3 rounded-full overflow-hidden bg-slate-200/50 dark:bg-white/[0.06]">
+                  {d.gruposFrota.map(g => {
+                    const v = c.porGrupo[g] ?? 0
+                    if (!v) return null
+                    return <div key={g} className="h-full" style={{ width: `${(v / c.total) * 100}%`, background: GRUPO_HEX[g] }}
+                      title={`${CATEGORIA_GRUPO_LABEL[g]}: ${v}`} />
+                  })}
+                </div>
+              </div>
+            ))}
+          </>)}
         </SectionBody>
       </Section>
     </MobilePanel>

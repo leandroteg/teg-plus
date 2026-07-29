@@ -7,14 +7,39 @@ import type {
 } from '../types/ponto'
 
 // Conjunto de ids de colaboradores ATIVOS (para filtrar a lista de ponto por situação)
+// Quem o Ponto deve cobrar. Nem todo colaborador ativo bate ponto:
+//   cargo de confianca -> isento por definicao;
+//   afastado           -> licenca medica / suspensao / maternidade.
+// Os dois continuam ativos e no headcount, mas fora da lista de ponto - senao
+// aparecem todo mes com o mes inteiro de "falta".
+export interface PontoElegiveis {
+  /** ativos que DEVEM bater ponto */
+  batem: Set<string>
+  /** ativos afastados (licenca medica / suspensao / maternidade) */
+  afastados: Set<string>
+  /** ativos em cargo de confianca (isentos por definicao) */
+  confianca: Set<string>
+  /** todos os ativos */
+  ativos: Set<string>
+}
+
 export function useColabAtivosIds() {
-  return useQuery<Set<string>>({
-    queryKey: ['ponto-colab-ativos-ids'],
+  return useQuery<PontoElegiveis>({
+    queryKey: ['ponto-colab-elegiveis'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('rh_colaboradores').select('id').eq('ativo', true)
-      if (error) { console.error('useColabAtivosIds:', error); return new Set<string>() }
-      return new Set((data ?? []).map(r => (r as { id: string }).id))
+      const vazio: PontoElegiveis = { batem: new Set(), afastados: new Set(), confianca: new Set(), ativos: new Set() }
+      const { data, error } = await supabase.from('rh_colaboradores')
+        .select('id, cargo_confianca, afastado').eq('ativo', true)
+      if (error) { console.error('useColabAtivosIds:', error); return vazio }
+      const r: PontoElegiveis = { batem: new Set(), afastados: new Set(), confianca: new Set(), ativos: new Set() }
+      for (const c of (data ?? []) as { id: string; cargo_confianca?: boolean; afastado?: boolean }[]) {
+        r.ativos.add(c.id)
+        if (c.afastado) r.afastados.add(c.id)
+        else if (c.cargo_confianca) r.confianca.add(c.id)
+        else r.batem.add(c.id)
+      }
+      return r
     },
   })
 }
@@ -47,8 +72,16 @@ export function usePontoColabAtivos() {
         // só batida real: Origem <> 2 (exclui inclusão manual/import)
         supabase.from('rh_ponto_dia').select('colaborador_id, data').gte('data', desde).not('entrada1', 'is', null)
           .neq('raw->FonteDadosEntrada1->>Origem', '2').limit(5000),
-        // denominador = ATIVOS no Secullum (de-para), que é quem bate ponto (CLT não-confiança), não todo o cadastro
-        supabase.from('rh_ponto_linkcolab').select('secullum_func_id', { count: 'exact', head: true }).eq('status', 'ativo'),
+        // Denominador = quem REALMENTE deve bater ponto: ativo no de-para do Secullum
+        // E ativo no TEG+ E fora de cargo de confiança / afastamento. O !inner também
+        // derruba link sem colaborador vinculado — esse nunca poderia entrar no
+        // numerador (o pico conta colaborador_id), então inflava o denominador à toa.
+        supabase.from('rh_ponto_linkcolab')
+          .select('secullum_func_id, colaborador:rh_colaboradores!inner(id)', { count: 'exact', head: true })
+          .eq('status', 'ativo')
+          .eq('colaborador.ativo', true)
+          .eq('colaborador.cargo_confianca', false)
+          .eq('colaborador.afastado', false),
       ])
       if (pontos.error) console.error('usePontoColabAtivos:', pontos.error)
       const porDia = new Map<string, Set<string>>()

@@ -1,5 +1,6 @@
 // pages/rh/DPPonto.tsx — DP > Ponto
 import { useState, useMemo } from 'react'
+import MultiSelectPopover from '../../components/MultiSelectPopover'
 import { Clock, FileEdit, Timer, FileText, ShieldCheck, CheckCircle2, Fingerprint, CalendarRange, CalendarDays } from 'lucide-react'
 import DPFluxoPage from '../../components/rh/DPFluxoPage'
 import type { RHTab } from '../../components/rh/RHTabRail'
@@ -9,7 +10,7 @@ import { usePontoRetificacoes, usePontoDispositivos } from '../../hooks/usePonto
 import { ultimosMeses, labelMes, mesAtual, hojeISO, ontemISO } from '../../lib/ponto'
 import {
   RegistrosPontoTab, RetificacoesTab, HorasExtrasTab, AtestadosTab, AprovacaoTab, ConsolidacaoTab,
-  MultiSelectJustif, RUIDO_MIGRACAO, REG_CHIPS,
+  MultiSelectJustif, RUIDO_MIGRACAO, REG_CHIPS, SITUACOES_PONTO,
 } from '../../components/rh/ponto/PontoTabs'
 import type { PontoTabProps } from '../../types/ponto'
 
@@ -33,7 +34,7 @@ export default function DPPonto() {
   const [vista, setVista] = useState('mes')
   const [diaData, setDiaData] = useState(hojeISO())
   const [dispositivo, setDispositivo] = useState('')
-  const [situacao, setSituacao] = useState<'ativos' | 'inativos' | 'todos'>('ativos')
+  const [situacao, setSituacao] = useState<Set<string>>(new Set(['Ativo']))
   const { data: basesRaw = [] } = useBases()
   const { data: dispositivos = [] } = usePontoDispositivos()
   const bases = basesRaw.map(b => ({ id: b.id, nome: b.nome, codigo: b.codigo }))
@@ -88,11 +89,8 @@ export default function DPPonto() {
             </select>
           )}
           {key === 'registros' && (
-            <div className={`inline-flex rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-slate-700'}`}>
-              <button onClick={() => setSituacao('ativos')} className={segCls(situacao === 'ativos')}>Ativos</button>
-              <button onClick={() => setSituacao('inativos')} className={segCls(situacao === 'inativos')}>Inativos</button>
-              <button onClick={() => setSituacao('todos')} className={segCls(situacao === 'todos')}>Todos</button>
-            </div>
+            <MultiSelectPopover label="Situação" options={SITUACOES_PONTO}
+              selected={situacao} onChange={setSituacao} isLight={isLight} minWidth={190} />
           )}
           {!semFiltroBase(key) && (
             <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"

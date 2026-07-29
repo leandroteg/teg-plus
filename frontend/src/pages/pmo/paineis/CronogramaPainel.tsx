@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Filter, ChevronDown, ChevronRight, ChevronUp, Check, Flag, Settings2, Save, Trash2, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock, Scale } from 'lucide-react'
+import { CalendarDays, Filter, ChevronDown, ChevronRight, ChevronUp, Check, Flag, Settings2, Save, Trash2, Plus, X, Sparkles, Gauge, Eye, EyeOff, ChevronsDownUp, ChevronsUpDown, Users, HardHat, RefreshCw, Clock, Scale } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useEAPFinal } from '../../../hooks/usePMO'
@@ -14,6 +14,7 @@ import {
   buildTree, makeDefaultConfig, projObra, projTodas, equipeFromEfetivo, type Obra, type Frente, type Config, type Versao,
 } from './cronogramaEngine'
 import { planejarComReforco, type PlanParams, type PlanObraIn, type PlanResult } from './planejadorAuto'
+import { useOrdemPriorizacao, normNomeObra } from '../../../hooks/useObras'
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 const PROD_BANDS: [string, string, (p: number) => boolean][] = [
@@ -166,6 +167,32 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
   // total geral (todas as obras, ignorando o filtro de % físico/obra) — o KPI mostra o todo; o filtro só muda a lista
   const totPessoasAll = useMemo(() => applied ? allObras.reduce((s, o) => s + DRV.reduce((a, d) => a + (applied.equipe?.[o.nome]?.[d.label] || 0), 0), 0) : 0, [applied, allObras])
 
+  // NOTA: este hook precisa ficar ANTES dos returns antecipados abaixo — se
+  // vier depois, o render de loading executa menos hooks que o seguinte e o
+  // React quebra com "Rendered more hooks than during the previous render" (#310).
+  const publicar = useMutation({
+    mutationFn: async () => {
+      const obrasAll = view.frentesF.flatMap(fr => fr.obras)
+      const tot = totMensal(obrasAll)
+      await supabase.from('pmo_cronograma_previsao').delete().eq('portfolio_id', portfolioId)
+      const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
+        .filter(r => r.valor > 0.5)
+      if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
+      // replica no HISTOGRAMA: grava a config aplicada como versão com o MESMO nome do cronograma
+      let nomeV = ''
+      if (applied) {
+        nomeV = appliedNome.trim() || 'Cronograma publicado'
+        const ex = versoes.find(v => v.nome.toLowerCase() === nomeV.toLowerCase())
+        if (ex) { const { error } = await supabase.from('pmo_cronograma_versao').update({ config: applied, updated_at: new Date().toISOString() }).eq('id', ex.id); if (error) throw error }
+        else { const { error } = await supabase.from('pmo_cronograma_versao').insert({ portfolio_id: portfolioId, nome: nomeV, config: applied }); if (error) throw error }
+        qc.invalidateQueries({ queryKey: ['crono-versoes', portfolioId] })
+      }
+      return { n: rows.length, nomeV }
+    },
+    onSuccess: r => alert(`Cronograma publicado: ${r.n} competência(s) — Fluxo de Caixa atualizado${r.nomeV ? ` e replicado no Histograma (versão "${r.nomeV}")` : ''}.`),
+    onError: () => alert('Erro ao publicar o cronograma.'),
+  })
+
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!tree.length) return <p className={`text-center py-16 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem dados da EAP.</p>
 
@@ -199,29 +226,6 @@ export default function CronogramaPainel({ portfolioId = CONTRATO_CEMIG }: { por
       </div>
     )
   }
-
-  const publicar = useMutation({
-    mutationFn: async () => {
-      const obrasAll = view.frentesF.flatMap(fr => fr.obras)
-      const tot = totMensal(obrasAll)
-      await supabase.from('pmo_cronograma_previsao').delete().eq('portfolio_id', portfolioId)
-      const rows = mesesArr.map((ym, i) => ({ portfolio_id: portfolioId, competencia: ym, valor: tot[i] || 0 }))
-        .filter(r => r.valor > 0.5)
-      if (rows.length) { const { error } = await supabase.from('pmo_cronograma_previsao').insert(rows); if (error) throw error }
-      // replica no HISTOGRAMA: grava a config aplicada como versão com o MESMO nome do cronograma
-      let nomeV = ''
-      if (applied) {
-        nomeV = appliedNome.trim() || 'Cronograma publicado'
-        const ex = versoes.find(v => v.nome.toLowerCase() === nomeV.toLowerCase())
-        if (ex) { const { error } = await supabase.from('pmo_cronograma_versao').update({ config: applied, updated_at: new Date().toISOString() }).eq('id', ex.id); if (error) throw error }
-        else { const { error } = await supabase.from('pmo_cronograma_versao').insert({ portfolio_id: portfolioId, nome: nomeV, config: applied }); if (error) throw error }
-        qc.invalidateQueries({ queryKey: ['crono-versoes', portfolioId] })
-      }
-      return { n: rows.length, nomeV }
-    },
-    onSuccess: r => alert(`Cronograma publicado: ${r.n} competência(s) — Fluxo de Caixa atualizado${r.nomeV ? ` e replicado no Histograma (versão "${r.nomeV}")` : ''}.`),
-    onError: () => alert('Erro ao publicar o cronograma.'),
-  })
 
   const subBtn = (k: 'proj' | 'cfg', label: string, icon: ReactNode) => (
     <button key={k} onClick={() => setSub(k)} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[10px] text-[12px] font-bold transition ${sub === k ? 'bg-teal-600 text-white shadow-sm' : (isDark ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}>{icon}{label}</button>
@@ -466,6 +470,8 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
   const [planExc, setPlanExc] = useState<Set<string>>(new Set()) // obras embargadas / fora do plano
   const [planOrdem, setPlanOrdem] = useState<string[]>([]) // prioridade manual (ordem das obras)
   const [planRes, setPlanRes] = useState<PlanResult | null>(null)
+  // ordem oficial definida em Obras › Gestão de Obras › Priorização
+  const { data: ordemPrio } = useOrdemPriorizacao()
   // torres por obra = Σ qtd_torres das OSCs de CONSTRUÇÃO ativas (lançadas na Iniciação) — busca só com o modal aberto
   const { data: torresObra } = useQuery<Record<string, number>>({
     queryKey: ['plan-torres', portfolioId],
@@ -503,6 +509,15 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
       .map(o => ({ nome: o.nome, pz: o.fim ? ymNum(o.fim.slice(0, 7)) - ymNum(st) : 9999, sr: o.saldoR }))
       .sort((a, b) => a.pz !== b.pz ? a.pz - b.pz : b.sr - a.sr).map(o => o.nome)
     try { const salvo: string[] = JSON.parse(localStorage.getItem(`crono-plan-ordem-${portfolioId}`) ?? '[]'); if (salvo.length) { const set = new Set(salvo); ordem.sort((a, b) => (set.has(a) ? salvo.indexOf(a) : 1e9) - (set.has(b) ? salvo.indexOf(b) : 1e9)) } } catch { /* ignora ordem salva corrompida */ }
+    // Obras › Priorização manda: é a ordem combinada com a operação. Quem não
+    // estiver lá mantém a posição anterior (padrão do planejador / ajuste local).
+    if (ordemPrio?.size) {
+      ordem.sort((a, b) => {
+        const oa = ordemPrio.get(normNomeObra(a)) ?? 1e9
+        const ob = ordemPrio.get(normNomeObra(b)) ?? 1e9
+        return oa !== ob ? oa - ob : 0
+      })
+    }
     setPlanOrdem(ordem)
   }
   const togglePlanExc = (nome: string) => {
@@ -641,10 +656,23 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
       if (fFrente.size > 0 && !fFrente.has(o.frente)) continue
       if (fObra.size > 0 && !fObra.has(o.nome)) continue
       if (fPct.size > 0 && !PROD_BANDS.some(b => fPct.has(b[0]) && b[2](o.pctFis))) continue
+      if (planExc.has(o.nome)) continue   // fora do plano (desmarcada no Planejamento Automático / lixeira)
       const arr = map.get(o.frente) ?? []; arr.push(o); map.set(o.frente, arr)
     }
     return [...map.entries()]
-  }, [allObras, hide100, qObra, fFrente, fObra, fPct])
+  }, [allObras, hide100, qObra, fFrente, fObra, fPct, planExc])
+
+  // obras da frente que estão FORA do plano — alimentam o "+" de cada frente
+  const foraPorFrente = useMemo(() => {
+    const m = new Map<string, Obra[]>()
+    for (const o of allObras) {
+      if (!o.drivers.some(d => d.contr > 0)) continue
+      if (!planExc.has(o.nome)) continue
+      const a = m.get(o.frente) ?? []; a.push(o); m.set(o.frente, a)
+    }
+    return m
+  }, [allObras, planExc])
+  const [addFrente, setAddFrente] = useState<string | null>(null)
   const predOpts = useMemo(() => allObras.filter(o => o.drivers.some(d => d.contr > 0)).map(o => o.nome).sort(), [allObras])
   // Gantt integrado à DIREITA das colunas (estilo MS Project) — linha do tempo mensal + barras por serviço
   const [ganttWide, setGanttWide] = useState(false) // true = encobre as colunas de dados (Gantt toma o lugar)
@@ -761,7 +789,29 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <span className={`text-[11px] font-bold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>{frente}</span>
                         <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{obras.length} obra(s)</span>
                         <span className={`text-[11px] font-bold tabular-nums ml-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{totFr > 0 ? `· ${totFr} pessoas` : ''}</span>
+                        {(foraPorFrente.get(frente)?.length ?? 0) > 0 && (
+                          <span role="button" tabIndex={0}
+                            onClick={e => { e.stopPropagation(); setAddFrente(f => f === frente ? null : frente) }}
+                            onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setAddFrente(f => f === frente ? null : frente) } }}
+                            title={`Adicionar obra desta frente ao cronograma (${foraPorFrente.get(frente)!.length} fora do plano)`}
+                            className={`ml-auto mr-1 shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold cursor-pointer ${isDark ? 'text-slate-500 hover:text-teal-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-teal-700 hover:bg-slate-100'}`}>
+                            <Plus size={11} /> {foraPorFrente.get(frente)!.length}
+                          </span>
+                        )}
                       </button>
+                      {addFrente === frente && (
+                        <div className={`px-2.5 py-1.5 border-b space-y-0.5 ${isDark ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
+                          <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Fora do plano — clique pra incluir</p>
+                          {foraPorFrente.get(frente)!.map(fo => (
+                            <button key={fo.nome} type="button" onClick={() => { togglePlanExc(fo.nome); setAddFrente(null) }}
+                              className={`w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] text-left ${isDark ? 'hover:bg-white/[0.06] text-slate-300' : 'hover:bg-white text-slate-600'}`}>
+                              <Plus size={11} className="shrink-0 opacity-60" />
+                              <span className="truncate">{fo.nome}</span>
+                              <span className="opacity-50 shrink-0">· {fo.pctFis}%</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {!fechado && obras.map(o => { const eq = cfg.equipe[o.nome] ?? {}; const tot = DRV.reduce((s, d) => s + (eq[d.label] || 0), 0); const aberto = openSrv.has(o.nome)
                         // barra-resumo da obra (janela total: menor início → maior término); serviços têm barra própria quando expandidos
                         const gIni = (obraIniVal(o) || '').slice(0, 7), gFim = (obraFimVal(o) || '').slice(0, 7)
@@ -770,6 +820,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                         <div key={o.nome}>
                         <div className={`flex items-center gap-2 px-2.5 py-1.5 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
                           <span className={`shrink-0 sticky left-0 z-10 min-w-0 flex items-center text-[11px] relative after:content-[''] after:absolute after:left-full after:inset-y-0 after:w-2 after:bg-inherit ${isDark ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600'}`} style={{ width: NAMEW }}>
+                            <button type="button" onClick={() => togglePlanExc(o.nome)} title="Tirar esta obra do cronograma (some daqui e do Planejamento Automático — dá pra reincluir no + da frente)" className={`shrink-0 p-0.5 mr-0.5 opacity-25 hover:opacity-100 ${isDark ? 'hover:text-rose-400' : 'hover:text-rose-600'}`}><Trash2 size={11} /></button>
                             <button type="button" onClick={() => setOpenSrv(s => { const n = new Set(s); n.has(o.nome) ? n.delete(o.nome) : n.add(o.nome); return n })} title={aberto ? 'Recolher serviços' : 'Abrir serviços (Prelim./Fundação/Montagem/Lançamento/Outros)'} className="shrink-0 p-0.5 mr-0.5 opacity-60 hover:opacity-100">{aberto ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
                             <span className="truncate flex-1 min-w-0" title={`${o.nome} · físico ${o.pctFis}%`}>{o.nome} <span className="opacity-50">· {o.pctFis}%</span></span>
                             <button type="button" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setRecalcMenu(m => m?.obra === o.nome ? null : { obra: o.nome, x: r.left, y: r.bottom + 4 }) }} title="Recalcular esta obra — prazo pela equipe ou equipe pelo prazo" className={`shrink-0 ml-1 mr-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md border transition ${recalcMenu?.obra === o.nome ? 'bg-teal-600 border-teal-600 text-white' : (isDark ? 'border-teal-500/40 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20' : 'border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100')}`}><RefreshCw size={11} /></button>
@@ -1050,7 +1101,7 @@ function ConfigView({ isDark, portfolioId, allObras, saldoGlobal, tree, efetivoF
                   const incl = lista.filter(n => !planExc.has(n)).length
                   return (
                     <div>
-                      <p className={`${plbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— {incl} no plano · setas ordenam · desmarque pra tirar</span></p>
+                      <p className={`${plbl} mb-1`}>Prioridade das obras <span className="normal-case font-normal opacity-70">— {incl} no plano · {ordemPrio?.size ? 'ordem vem de Obras › Priorização · ' : ''}setas ordenam · desmarque pra tirar</span></p>
                       <div className={`max-h-52 overflow-auto rounded-lg border p-1 space-y-0.5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                         {lista.map((n, i) => { const o = obraMap.get(n)!; const on = !planExc.has(n); return (
                           <div key={n} className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] ${on ? '' : 'opacity-40'} ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>

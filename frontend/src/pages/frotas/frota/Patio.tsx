@@ -451,6 +451,7 @@ export default function Patio() {
   const osCountMap = useMemo(() => {
     const m: Record<string, number> = {}
     for (const os of ordens) {
+      if (!os.veiculo_id) continue
       m[os.veiculo_id] = (m[os.veiculo_id] ?? 0) + 1
     }
     return m

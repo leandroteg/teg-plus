@@ -1,4 +1,4 @@
-import { LayoutDashboard, Gift, Fingerprint, Receipt, Plus } from 'lucide-react'
+import { LayoutDashboard, Gift, Fingerprint, Receipt, Plus, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
 
@@ -22,6 +22,13 @@ export default function DPLayout() {
             description: 'Criar a apuração de uma nova competência de folha.',
             tone: 'blue' as const,
             action: () => navigate('/rh/dp/folha?nova=1'),
+          },
+          {
+            icon: Sparkles,
+            label: 'Lançamento Benefícios',
+            description: 'Subir os relatórios do fornecedor (plano de saúde, VR, VT) para o SuperTEG ler.',
+            tone: 'emerald' as const,
+            action: () => navigate('/rh/dp/beneficios?lancamento=1'),
           },
         ],
       },

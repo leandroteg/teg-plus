@@ -737,6 +737,8 @@ function UserDetailPanel({
   const [podeReceber, setPodeReceber] = useState<boolean>(user.pode_receber ?? true)
   const [almoxarife, setAlmoxarife] = useState<boolean>(user.almoxarife ?? false)
   const [comprador, setComprador] = useState<boolean>(user.comprador ?? false)
+  const [aprovaCancelamentoFin, setAprovaCancelamentoFin] = useState<boolean>(user.aprova_cancelamento_fin ?? false)
+  const [podeCancelarPedidoFlag, setPodeCancelarPedidoFlag] = useState<boolean>(user.pode_cancelar_pedido ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
@@ -791,6 +793,8 @@ function UserDetailPanel({
       pode_receber: podeReceber,
       almoxarife,
       comprador,
+      aprova_cancelamento_fin: aprovaCancelamentoFin,
+      pode_cancelar_pedido: podeCancelarPedidoFlag,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
@@ -804,6 +808,8 @@ function UserDetailPanel({
     setPodeReceber(user.pode_receber ?? true)
     setAlmoxarife(user.almoxarife ?? false)
     setComprador(user.comprador ?? false)
+    setAprovaCancelamentoFin(user.aprova_cancelamento_fin ?? false)
+    setPodeCancelarPedidoFlag(user.pode_cancelar_pedido ?? false)
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
@@ -999,6 +1005,32 @@ function UserDetailPanel({
               />
               <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Comprador — pode registrar devolução de cautela na Sede
+              </span>
+            </label>
+
+            {/* Aprovador de cancelamento de documentos financeiros (CP/CR) */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={aprovaCancelamentoFin}
+                onChange={e => setAprovaCancelamentoFin(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Aprova cancelamento financeiro — pode aprovar/recusar cancelamento de Contas a Pagar/Receber
+              </span>
+            </label>
+
+            {/* Supervisor de Compras — pode cancelar pedido (cancela o pedido e cascateia os CP) */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={podeCancelarPedidoFlag}
+                onChange={e => setPodeCancelarPedidoFlag(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e os CP ligados
               </span>
             </label>
           </div>

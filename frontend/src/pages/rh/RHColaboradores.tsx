@@ -6,14 +6,146 @@ import {
   Users, Search, SlidersHorizontal, X, Phone, Mail, Briefcase,
   ChevronRight, ChevronDown, Calendar, MapPin, Building2, HardHat, BadgeCheck,
   Filter, Download, UserCircle, DollarSign, Clock, Heart,
-  LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle, Hourglass,
+  LayoutList, LayoutGrid, GraduationCap, Gavel, AlertTriangle, Hourglass, PauseCircle, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useRHColaboradores } from '../../hooks/useRH'
+import { useRHColaboradores, useSituacaoColaborador } from '../../hooks/useRH'
 import { useBases } from '../../hooks/useEstoque'
 import type { RHColaborador, FiltrosColaboradores } from '../../types/rh'
 import { TIPOS_CONTRATO, UFS, ESTADOS_CIVIS, GENEROS } from '../../types/rh'
 import RHColaboradorDetalhe from './RHColaboradorDetalhe'
+
+type Situacao = 'ativo' | 'afastado' | 'inativo'
+
+// Afastado é ativo=true COM a marca de afastamento: continua empregado, no
+// headcount e nos benefícios — só não está trabalhando.
+const situacaoDe = (c: RHColaborador): Situacao =>
+  !c.ativo ? 'inativo' : c.afastado ? 'afastado' : 'ativo'
+
+const SITUACAO_LABEL: Record<Situacao, string> = { ativo: 'Ativo', afastado: 'Afastado', inativo: 'Inativo' }
+const SITUACAO_DOT: Record<Situacao, string> = { ativo: 'bg-emerald-500', afastado: 'bg-amber-500', inativo: 'bg-slate-400' }
+const SITUACAO_TXT: Record<Situacao, (l: boolean) => string> = {
+  ativo:    l => (l ? 'text-emerald-600' : 'text-emerald-400'),
+  afastado: l => (l ? 'text-amber-600' : 'text-amber-400'),
+  inativo:  l => (l ? 'text-slate-400' : 'text-slate-500'),
+}
+const MOTIVOS = [
+  { v: 'licenca_medica', l: 'Licença médica' },
+  { v: 'suspensao',      l: 'Suspensão' },
+  { v: 'maternidade',    l: 'Maternidade' },
+] as const
+const MOTIVO_LABEL: Record<string, string> = Object.fromEntries(MOTIVOS.map(m => [m.v, m.l]))
+
+function AfastamentoModal({ colab, isLight, onClose }: {
+  colab: RHColaborador; isLight: boolean; onClose: () => void
+}) {
+  const salvar = useSituacaoColaborador()
+  const [afastado, setAfastado] = useState(!!colab.afastado)
+  const [motivo, setMotivo] = useState<string>(colab.afastamento_motivo ?? '')
+  const [inicio, setInicio] = useState(colab.afastamento_inicio ?? '')
+  const [retorno, setRetorno] = useState(colab.afastamento_previsao_retorno ?? '')
+  const [obs, setObs] = useState(colab.afastamento_observacao ?? '')
+  const [erro, setErro] = useState<string | null>(null)
+
+  const input = isLight
+    ? 'bg-white border-slate-200 text-slate-800'
+    : 'bg-white/[0.05] border-white/10 text-white'
+
+  const confirmar = async () => {
+    if (afastado && !motivo) { setErro('Escolha o motivo do afastamento.'); return }
+    setErro(null)
+    try {
+      await salvar.mutateAsync({
+        id: colab.id, afastado,
+        motivo: (motivo || null) as 'licenca_medica' | 'suspensao' | 'maternidade' | null,
+        inicio: inicio || null, previsaoRetorno: retorno || null, observacao: obs.trim() || null,
+      })
+      onClose()
+    } catch (e) { setErro(e instanceof Error ? e.message : String(e)) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className={`w-full max-w-md rounded-2xl border shadow-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#0d1420] border-white/10'}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.08]'}`}>
+          <div className="min-w-0">
+            <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Situação do colaborador</h3>
+            <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{colab.nome}</p>
+          </div>
+          <button onClick={onClose} className={isLight ? 'text-slate-400' : 'text-slate-500'}><X size={16} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {[{ v: false, l: 'Ativo', c: 'emerald' }, { v: true, l: 'Afastado', c: 'amber' }].map(o => {
+              const on = afastado === o.v
+              return (
+                <button key={o.l} onClick={() => setAfastado(o.v)}
+                  className={`py-2.5 rounded-xl border text-xs font-bold transition-colors ${on
+                    ? o.c === 'emerald'
+                      ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300')
+                      : (isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/20 border-amber-500/40 text-amber-300')
+                    : isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'}`}>
+                  {o.l}
+                </button>
+              )
+            })}
+          </div>
+
+          {afastado && (
+            <>
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>MOTIVO</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {MOTIVOS.map(m => (
+                    <button key={m.v} onClick={() => setMotivo(m.v)}
+                      className={`py-2 rounded-lg border text-[11px] font-semibold transition-colors ${motivo === m.v
+                        ? isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'}`}>
+                      {m.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>INÍCIO</label>
+                  <input type="date" value={inicio} onChange={e => setInicio(e.target.value)}
+                    className={`w-full text-sm rounded-lg px-2.5 py-2 border outline-none ${input}`} />
+                </div>
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>PREVISÃO DE RETORNO</label>
+                  <input type="date" value={retorno} onChange={e => setRetorno(e.target.value)}
+                    className={`w-full text-sm rounded-lg px-2.5 py-2 border outline-none ${input}`} />
+                </div>
+              </div>
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>OBSERVAÇÃO</label>
+                <input value={obs} onChange={e => setObs(e.target.value)} placeholder="opcional"
+                  className={`w-full text-sm rounded-lg px-2.5 py-2 border outline-none ${input}`} />
+              </div>
+            </>
+          )}
+
+          <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            Afastar não desliga: o colaborador continua no headcount e nos benefícios.
+            Para desligar, use Desligamento.
+          </p>
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+        </div>
+
+        <div className={`flex justify-end gap-2 px-5 py-4 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.08]'}`}>
+          <button onClick={onClose} className={`text-xs font-semibold px-3 py-2 rounded-lg ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Cancelar</button>
+          <button onClick={confirmar} disabled={salvar.isPending}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+            {salvar.isPending ? <><Loader2 size={13} className="animate-spin" /> Salvando…</> : <><PauseCircle size={13} /> Salvar</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function calcTempoEmpresa(dataAdmissao: string | undefined) {
   if (!dataAdmissao) return null
@@ -85,7 +217,11 @@ export default function RHColaboradores() {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [showFiltros, setShowFiltros] = useState(false)
-  const [filtros, setFiltros] = useState<FiltrosColaboradores>({ ativo: true })
+  const [filtros, setFiltros] = useState<FiltrosColaboradores>({})
+  // Situação do colaborador: Ativo / Afastado / Inativo. "Afastado" é ativo=true
+  // com a marca de afastamento — não some do headcount nem dos benefícios.
+  const [situacao, setSituacao] = useState<Situacao>('ativo')
+  const [afastando, setAfastando] = useState<RHColaborador | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [comProcesso, setComProcesso] = useState(false)
@@ -102,8 +238,8 @@ export default function RHColaboradores() {
   // Filtragem local completa
   const filtered = useMemo(() => {
     return todos.filter(c => {
-      // Status ativo/inativo
-      if (filtros.ativo !== undefined && c.ativo !== filtros.ativo) return false
+      // Situação: ativo / afastado / inativo
+      if (situacaoDe(c) !== situacao) return false
       // Processo trabalhista
       if (comProcesso && !c.tem_processo_trabalhista) return false
       // Sem CPF ou Data de Nascimento
@@ -226,25 +362,26 @@ export default function RHColaboradores() {
 
       {/* Busca + status + filtros + exportar + view (tudo em 1 linha) */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Status: Ativos / Inativos */}
-        {[
-          { label: 'Ativos', value: true, count: todos.filter(c => c.ativo).length },
-          { label: 'Inativos', value: false, count: todos.filter(c => !c.ativo).length },
-        ].map(t => (
-          <button key={String(t.value)} onClick={() => setFiltros(f => ({ ...f, ativo: t.value }))}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
-              filtros.ativo === t.value
-                ? isLight ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
-            }`}>
-            {t.label}
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              filtros.ativo === t.value
-                ? isLight ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-200'
-                : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
-            }`}>{t.count}</span>
-          </button>
-        ))}
+        {/* Situação: Ativos / Afastados / Inativos */}
+        {(['ativo', 'afastado', 'inativo'] as Situacao[]).map(v => {
+          const on = situacao === v
+          const count = todos.filter(c => situacaoDe(c) === v).length
+          return (
+            <button key={v} onClick={() => setSituacao(v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                on
+                  ? isLight ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                  : isLight ? 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200' : 'bg-white/[0.03] text-slate-400 hover:bg-white/[0.05] border border-white/10'
+              }`}>
+              {SITUACAO_LABEL[v]}s
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                on
+                  ? isLight ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-200'
+                  : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
+              }`}>{count}</span>
+            </button>
+          )
+        })}
 
         {/* Processo trabalhista */}
         <button onClick={() => setComProcesso(v => !v)}
@@ -275,7 +412,7 @@ export default function RHColaboradores() {
             semDados
               ? isLight ? 'bg-rose-200 text-rose-700' : 'bg-rose-500/30 text-rose-200'
               : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
-          }`}>{todos.filter(c => (filtros.ativo === undefined ? true : c.ativo === filtros.ativo) && (!c.cpf || !c.data_nascimento)).length}</span>
+          }`}>{todos.filter(c => situacaoDe(c) === situacao && (!c.cpf || !c.data_nascimento)).length}</span>
         </button>
 
         {/* Experiência vencendo (35–45 ou 80–90 dias de admissão) */}
@@ -291,7 +428,7 @@ export default function RHColaboradores() {
             expVencendo
               ? isLight ? 'bg-sky-200 text-sky-700' : 'bg-sky-500/30 text-sky-200'
               : isLight ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-500'
-          }`}>{todos.filter(c => (filtros.ativo === undefined ? true : c.ativo === filtros.ativo) && experienciaVencendo(c.data_admissao)).length}</span>
+          }`}>{todos.filter(c => situacaoDe(c) === situacao && experienciaVencendo(c.data_admissao)).length}</span>
         </button>
 
         {/* Busca (encolhe pra caber) */}
@@ -524,16 +661,22 @@ export default function RHColaboradores() {
                         <td className={`px-4 py-3 hidden xl:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                           {tempoEmpresa || '—'}
                         </td>
-                        {/* Status */}
+                        {/* Situação — clicar abre a edição de afastamento */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <div className={`w-2 h-2 rounded-full ${c.ativo ? 'bg-emerald-500' : isLight ? 'bg-slate-300' : 'bg-slate-600'}`} />
-                            <span className={`text-xs font-semibold ${
-                              c.ativo
-                                ? isLight ? 'text-emerald-600' : 'text-emerald-400'
-                                : isLight ? 'text-slate-400' : 'text-slate-500'
-                            }`}>{c.ativo ? 'Ativo' : 'Inativo'}</span>
-                          </div>
+                          <button type="button"
+                            onClick={e => { e.stopPropagation(); setAfastando(c) }}
+                            title="Alterar situação (afastamento)"
+                            className="flex items-center gap-1.5 hover:opacity-70 transition-opacity">
+                            <div className={`w-2 h-2 rounded-full ${SITUACAO_DOT[situacaoDe(c)]}`} />
+                            <span className={`text-xs font-semibold ${SITUACAO_TXT[situacaoDe(c)](isLight)}`}>
+                              {SITUACAO_LABEL[situacaoDe(c)]}
+                            </span>
+                            {c.afastado && c.afastamento_motivo && (
+                              <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                                · {MOTIVO_LABEL[c.afastamento_motivo]}
+                              </span>
+                            )}
+                          </button>
                         </td>
                       </tr>
                     )
@@ -626,6 +769,10 @@ export default function RHColaboradores() {
             </div>
           )}
         </>
+      )}
+
+      {afastando && (
+        <AfastamentoModal colab={afastando} isLight={isLight} onClose={() => setAfastando(null)} />
       )}
     </div>
   )

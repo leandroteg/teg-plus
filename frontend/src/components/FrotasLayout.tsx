@@ -26,10 +26,10 @@ export default function FrotasLayout() {
           },
           {
             icon: Wrench,
-            label: 'Solicitação de Manutenção',
-            description: 'Reportar um problema ou agendar revisão de um ativo.',
+            label: 'Nova OS',
+            description: 'Abrir uma ordem de serviço de manutenção direto no quadro.',
             tone: 'rose' as const,
-            action: () => navigate(`/frotas/solicitacoes?nova=${Date.now()}&tipo=manutencao`),
+            action: () => navigate(`/frotas/manutencao?tab=os&nova=${Date.now()}`),
           },
           {
             icon: CalendarPlus,

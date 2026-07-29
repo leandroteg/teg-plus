@@ -64,6 +64,23 @@ export function agruparOscsPorObra(oscs: EGPOscRow[]) {
   return m
 }
 
+// ── Tipo da OBRA (um só) ─────────────────────────────────────────────────────
+// A obra não tem 2 tipos: se tiver QUALQUER OSC de construção, ela é Construção.
+// Senão manutenção; senão depósito. Ordem também define o agrupamento na tela.
+export const TIPO_ORDEM = ['construcao', 'manutencao', 'deposito'] as const
+export type TipoObra = typeof TIPO_ORDEM[number] | 'outro'
+
+export function tipoObra(oscs: EGPOscRow[] | undefined): TipoObra {
+  if (!oscs?.length) return 'outro'
+  for (const t of TIPO_ORDEM) if (oscs.some(o => o.tipo === t)) return t
+  return 'outro'
+}
+/** posição do grupo na ordenação (menor = mais acima) */
+export const grupoTipo = (t: TipoObra) => {
+  const i = (TIPO_ORDEM as readonly string[]).indexOf(t)
+  return i < 0 ? TIPO_ORDEM.length : i
+}
+
 /** true se a obra passa nos 4 filtros */
 export function obraPassa(
   obra: { id: string; pmo_projeto_id: string | null; status?: string | null },
@@ -73,7 +90,7 @@ export function obraPassa(
   if (f.fStatus.size && !f.fStatus.has(statusObra(obra.status))) return false
   if (f.fProjeto.size && !(obra.pmo_projeto_id && f.fProjeto.has(obra.pmo_projeto_id))) return false
   const arr = oscsPorObra.get(obra.id) ?? []
-  if (f.fTipo.size && !arr.some(x => x.tipo && f.fTipo.has(x.tipo))) return false
+  if (f.fTipo.size && !f.fTipo.has(tipoObra(arr))) return false   // tipo único da obra
   if (f.fAno.size && !arr.some(x => f.fAno.has((x.data_osc ?? '').slice(0, 4)))) return false
   if (f.fValor.size && !arr.some(x => {
     const v = x.valor ?? 0

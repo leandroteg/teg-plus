@@ -13,6 +13,7 @@ export default function ObrasLayout() {
       to: 'obras-novo-registro',
       icon: Plus,
       label: 'Novo Registro',
+      mobileLabel: 'Registro',
       end: false,
       accent: true,
       actionMenu: {
@@ -35,9 +36,9 @@ export default function ObrasLayout() {
         ],
       },
     },
-    { to: '/obras/gestao', icon: ClipboardList, label: 'Gestão de Obras' },
-    { to: '/obras/equipe', icon: Users2, label: 'Alocação de Equipes' },
-    { to: '/obras/alocacao-recursos', icon: Truck, label: 'Alocação de Recursos' },
+    { to: '/obras/gestao', icon: ClipboardList, label: 'Gestão de Obras', mobileLabel: 'Gestão' },
+    { to: '/obras/equipe', icon: Users2, label: 'Alocação de Equipes', mobileLabel: 'Equipe' },
+    { to: '/obras/alocacao-recursos', icon: Truck, label: 'Alocação de Recursos', mobileLabel: 'Recursos' },
   ]
 
   return (

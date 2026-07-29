@@ -582,7 +582,7 @@ export function useLocFaturaResumo(locFaturaId?: string) {
 
 // ── Solicitacoes ──────────────────────────────────────────────────────────────
 
-export function useSolicitacoesLocacao(filtros?: { status?: string; tipo?: string }) {
+export function useSolicitacoesLocacao(filtros?: { status?: string; tipo?: string; imovel_id?: string }) {
   return useQuery({
     queryKey: QK.solicitacoes(filtros),
     queryFn: async () => {
@@ -593,6 +593,7 @@ export function useSolicitacoesLocacao(filtros?: { status?: string; tipo?: strin
 
       if (filtros?.status) q = q.eq('status', filtros.status)
       if (filtros?.tipo) q = q.eq('tipo', filtros.tipo)
+      if (filtros?.imovel_id) q = q.eq('imovel_id', filtros.imovel_id)
 
       const { data, error } = await q
       if (error) throw error
@@ -608,6 +609,23 @@ export function useCriarSolicitacaoLocacao() {
       const { data, error } = await supabase
         .from('loc_solicitacoes')
         .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LocSolicitacao
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_solicitacoes'] }),
+  })
+}
+
+export function useAtualizarSolicitacaoLocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string } & Partial<LocSolicitacao>) => {
+      const { data, error } = await supabase
+        .from('loc_solicitacoes')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
         .select()
         .single()
       if (error) throw error

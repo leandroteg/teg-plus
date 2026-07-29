@@ -15,7 +15,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProjetos, useObrasDoPortfolio, useOSCsDoPortfolio, useEAPFinal, type EGPOscRow } from '../../hooks/usePMO'
 import { buildTree } from '../pmo/paineis/cronogramaEngine'
-import { useObrasFiltros, ObrasFiltrosBar, obraPassa } from './obrasFiltros'
+import { useObrasFiltros, ObrasFiltrosBar, obraPassa, tipoObra, grupoTipo } from './obrasFiltros'
+import { ResumoTecnicoModal, useTecnicoPorOsc, ZERO } from './ResumoTecnicoObras'
 
 const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -78,6 +79,9 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
   const [q, setQ] = useState('')
   const [fStatus, setFStatus] = useState<'ativas' | 'canceladas' | 'todas'>('ativas')
   const f = useObrasFiltros({ tipoPadrao: true })
+  const { data: tecPorOsc } = useTecnicoPorOsc()
+  const tec = (id: string) => tecPorOsc?.get(id) ?? ZERO
+  const [tecObra, setTecObra] = useState<{ id: string; nome: string; oscs: EGPOscRow[] } | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
 
@@ -125,7 +129,11 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
         prio: prioMap.get(o.id) ?? null,
       }
     })
+    // Construções primeiro, depois Manutenções, depois Depósitos; dentro do
+    // grupo vale a ordem salva (empate → prazo mais curto na frente).
     base.sort((a, b) => {
+      const ga = grupoTipo(tipoObra(oscByObra.get(a.id))), gb = grupoTipo(tipoObra(oscByObra.get(b.id)))
+      if (ga !== gb) return ga - gb
       const oa = a.prio?.ordem ?? 1e9, ob = b.prio?.ordem ?? 1e9
       if (oa !== ob) return oa - ob
       return (a.prazo ?? '9999') < (b.prazo ?? '9999') ? -1 : 1
@@ -144,10 +152,25 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
     onSuccess: () => qc.invalidateQueries({ queryKey: ['obr-priorizacao'] }),
   })
 
+  // Renumera a lista COMPLETA (não só a filtrada). As obras visíveis assumem a
+  // nova ordem entre si; as escondidas pelo filtro ficam onde estavam. Sem isso,
+  // reordenar com filtro ligado renumerava só um pedaço e gerava ordens repetidas.
   const salvarOrdem = async (ids: string[]) => {
     setSalvando(true)
     try {
-      const rows = ids.map((obra_id, i) => ({
+      const visivel = new Set(ids)
+      // universo ordenado hoje: grupo (constr > manut > DC) → ordem salva → nome
+      const todas = [...obras].sort((a, b) => {
+        const ga = grupoTipo(tipoObra(oscByObra.get(a.id))), gb = grupoTipo(tipoObra(oscByObra.get(b.id)))
+        if (ga !== gb) return ga - gb
+        const oa = prioMap.get(a.id)?.ordem ?? 1e9, ob = prioMap.get(b.id)?.ordem ?? 1e9
+        if (oa !== ob) return oa - ob
+        return a.nome.localeCompare(b.nome, 'pt-BR')
+      })
+      // percorre o universo; onde havia uma obra visível, entra a próxima da nova ordem
+      const fila = [...ids]
+      const final = todas.map(o => (visivel.has(o.id) ? (fila.shift() ?? o.id) : o.id))
+      const rows = final.map((obra_id, i) => ({
         // upsert só atualiza as colunas enviadas — os demais campos ficam intactos
         obra_id, ordem: i + 1,
         atualizado_por_nome: perfil?.nome ?? null, updated_at: new Date().toISOString(),
@@ -232,7 +255,11 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
               <GripVertical size={13} className="text-slate-300 cursor-grab" />
               {/* obra */}
               <span className="min-w-0">
-                <span className={`text-xs font-bold block truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{o.nome}</span>
+                <button onClick={() => setTecObra({ id: o.id, nome: o.nome, oscs: oscByObra.get(o.id) ?? [] })}
+                  title="Ver resumo técnico da obra"
+                  className={`text-xs font-bold block truncate text-left w-full hover:underline ${isDark ? 'text-slate-200 hover:text-sky-300' : 'text-slate-700 hover:text-sky-700'}`}>
+                  {o.nome}
+                </button>
                 <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.polo_nome}</span>
               </span>
               <span className={`text-right text-xs tabular-nums ${pctCls(o.pctFis)}`}>{o.pctFis != null ? `${o.pctFis}%` : '—'}</span>
@@ -293,6 +320,12 @@ export default function PriorizacaoObras({ portfolioId }: { portfolioId?: string
       <p className={`text-[10px] px-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
         %Físico = EAP do EGP (executado ÷ contratado, ponderado) · %Financeiro = medição acumulada ÷ contratado · Prazo = OSC mais tardia da obra. A ordem e os campos alimentam o planejador automático e os painéis.
       </p>
+
+      {/* mesmo modal do Resumo Técnico (componente reaproveitado) */}
+      {tecObra && (
+        <ResumoTecnicoModal obraId={tecObra.id} nome={tecObra.nome} oscs={tecObra.oscs}
+          tec={tec} onClose={() => setTecObra(null)} isDark={isDark} />
+      )}
     </div>
   )
 }

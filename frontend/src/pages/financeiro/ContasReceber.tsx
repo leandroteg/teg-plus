@@ -19,6 +19,7 @@ import {
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
@@ -745,6 +746,16 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
               )}
             </div>
           )}
+
+          <CancelamentoDocControl
+            tipo="cr"
+            docId={cr.id}
+            status={cr.status}
+            cancelamentoPendente={cr.cancelamento_pendente}
+            dark={isDark}
+            onChanged={onClose}
+            className="mb-2"
+          />
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>

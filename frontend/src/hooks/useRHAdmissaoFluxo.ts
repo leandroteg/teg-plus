@@ -181,7 +181,26 @@ export function useCriarAdmissao() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ dados, candidatos, autorId, autorNome }: NovaAdmissaoInput) => {
-      // 0) trava de duplicidade: CPF (ou nome) com requisição ainda aberta
+      // 0a) trava de duplicidade DENTRO do próprio envio: vários documentos da
+      //     mesma pessoa não podem virar candidatos diferentes (o form já funde,
+      //     isto é a rede de segurança para não gravar duplicado no banco).
+      const vistos = new Set<string>()
+      for (const c of candidatos) {
+        const cpf = (c.cpf || '').replace(/\D/g, '')
+        const chave = cpf.length === 11
+          ? 'cpf:' + cpf
+          : 'nome:' + (c.nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+              .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+        if (chave === 'nome:') continue
+        if (vistos.has(chave)) {
+          throw new Error(
+            `${c.nome} aparece duas vezes nesta requisição. Junte os documentos num único candidato antes de enviar.`,
+          )
+        }
+        vistos.add(chave)
+      }
+
+      // 0b) trava de duplicidade: CPF (ou nome) com requisição ainda aberta
       for (const c of candidatos) {
         const { data: dup } = await supabase.rpc('rh_admissao_existe_aberta', {
           p_cpf: c.cpf || null,
@@ -546,6 +565,8 @@ export interface RHTreinamento {
   candidato_id: string
   nome: string
   norma: string | null
+  /** Curso do catálogo (célula onde o upload foi feito). Nulo só em registro legado. */
+  treinamento_id?: string | null
   status: 'pendente' | 'concluido'
 }
 
@@ -791,10 +812,11 @@ export function useAsoSetStatus() {
 export function useTreinamentos() {
   const qc = useQueryClient()
   const add = useMutation({
-    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; concluido?: boolean }) => {
+    mutationFn: async (i: { candidatoId: string; nome: string; norma?: string; treinamentoId?: string; concluido?: boolean }) => {
       const { error } = await supabase.from('rh_admissao_treinamentos')
         .insert({
           candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+          treinamento_id: i.treinamentoId ?? null,
           status: i.concluido ? 'concluido' : 'pendente',
           concluido_em: i.concluido ? new Date().toISOString() : null,
         })
@@ -820,18 +842,20 @@ export function useTreinamentos() {
   })
   // anexa o certificado (bucket rh-admissao-docs) e conclui aquele treinamento
   const anexarCert = useMutation({
-    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; file: File }) => {
+    mutationFn: async (i: { candidatoId: string; recId?: string; nome: string; norma?: string; treinamentoId?: string; file: File }) => {
       const safe = i.file.name.replace(/[^\w.\-]+/g, '_')
       const path = `treinamentos/${i.candidatoId}/${Date.now()}_${safe}`
       const { error: upErr } = await supabase.storage.from('rh-admissao-docs').upload(path, i.file, { upsert: true })
       if (upErr) throw upErr
-      const patch = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      const patch: Record<string, unknown> = { certificado_path: path, certificado_nome: i.file.name, status: 'concluido', concluido_em: new Date().toISOString() }
+      if (i.treinamentoId) patch.treinamento_id = i.treinamentoId
       if (i.recId) {
         const { error } = await supabase.from('rh_admissao_treinamentos').update(patch).eq('id', i.recId)
         if (error) throw error
       } else {
         const { error } = await supabase.from('rh_admissao_treinamentos')
-          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null, ...patch })
+          .insert({ candidato_id: i.candidatoId, nome: i.nome, norma: i.norma ?? null,
+                    treinamento_id: i.treinamentoId ?? null, ...patch })
         if (error) throw error
       }
     },
@@ -853,6 +877,8 @@ export async function certTreinamentoUrl(path?: string | null): Promise<string |
 export interface IntegracaoCand { id: string; nome: string; cargo: string | null; base: string | null; admissao_id: string; colaborador_id: string | null }
 export interface IntegracaoTreino {
   id: string; candidato_id: string; nome: string; norma: string | null
+  /** Curso do catálogo — identifica a célula sem depender de casar texto. */
+  treinamento_id?: string | null
   status: string; certificado_path: string | null; certificado_nome: string | null
 }
 
@@ -875,7 +901,7 @@ export function useIntegracaoTreinos() {
       if (ids.length) {
         const { data: tr } = await supabase
           .from('rh_admissao_treinamentos')
-          .select('id, candidato_id, nome, norma, status, certificado_path, certificado_nome')
+          .select('id, candidato_id, nome, norma, treinamento_id, status, certificado_path, certificado_nome')
           .in('candidato_id', ids)
         treinos = (tr ?? []) as IntegracaoTreino[]
       }
@@ -1024,7 +1050,14 @@ export function useRegistro() {
         .update({ matricula: i.matricula || null }).eq('id', i.colaboradorId)
       if (error) throw error
     },
-    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+    // Grava em rh_colaboradores, mas quem EXIBE o valor é useMatriculaColaborador.
+    // Sem invalidar essa query o campo volta a aparecer vazio e parece que nao salvou
+    // (e o botao Finalizar continua bloqueado por "sem matricula").
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-colab-matricula', v.colaboradorId] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
   })
   // Envia a ficha + documentos do candidato por e-mail (caixa do RH via n8n)
   const enviarEmail = useMutation({
@@ -1044,7 +1077,10 @@ export function useRegistro() {
         .update({ secullum_lotacao: i.lotacao || null }).eq('id', i.colaboradorId)
       if (error) throw error
     },
-    onSuccess: (_, v) => invalidateEtapa(qc, v.candidatoId),
+    onSuccess: (_, v) => {
+      invalidateEtapa(qc, v.candidatoId)
+      qc.invalidateQueries({ queryKey: ['rh-colab-matricula', v.colaboradorId] })
+    },
   })
   // Finaliza o registro: efetiva o colaborador (RPC passos 1-2: ativo/headcount) e
   // dispara OneDrive (pasta + anexos) + Secullum (cadastro) via SuperTEG (n8n, passos 3-4, assíncrono).
@@ -1138,21 +1174,25 @@ export function useEncerrarAdmissao() {
   })
 }
 
-// Sub-status GESET na etapa Liberação (aguardando liberação de campo × liberado).
-// Fica na MESMA aba; só troca o selo por candidato. p_status vazio/'liberado' volta ao padrão.
-export function useGesetLiberacao() {
+// Botão "Liberado" da tela de Liberação: é AQUI que o colaborador é liberado
+// para atividades (push + conclusão da requisição). Idempotente — quem já está
+// liberado não recebe notificação de novo.
+export function useLiberarGeset() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (i: { candidatoId: string; status: 'aguardando_liberacao' | 'liberado' }) => {
-      const { data, error } = await supabase.rpc('rh_admissao_geset_status', {
-        p_cand_id: i.candidatoId, p_status: i.status,
+    mutationFn: async (i: { candidatoId: string; autorId?: string; autorNome?: string }) => {
+      const { data, error } = await supabase.rpc('rh_admissao_liberar_geset', {
+        p_cand_id: i.candidatoId, p_autor_id: i.autorId ?? null, p_autor_nome: i.autorNome ?? null,
       })
       if (error) throw error
-      const r = data as { ok: boolean; erro?: string }
-      if (!r.ok) throw new Error(r.erro || 'Falha ao alterar status')
+      const r = data as { ok: boolean; erro?: string; faltam?: number }
+      if (!r.ok) throw new Error(r.erro || 'Falha ao liberar')
       return r
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rh-admissoes-fluxo'] })
+      qc.invalidateQueries({ queryKey: ['rh-colaboradores'] })
+    },
   })
 }
 

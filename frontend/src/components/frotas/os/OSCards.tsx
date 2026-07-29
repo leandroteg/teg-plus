@@ -3,7 +3,7 @@
 // Vive fora das telas porque OS Abertas e Histórico mostram a MESMA OS: se cada
 // tela desenhasse a sua, elas divergiriam na primeira manutenção.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Clock, Building2 } from 'lucide-react'
+import { Clock, Building2, CalendarClock } from 'lucide-react'
 import { formatCodigoCategoria } from '../veiculoObs'
 import type { FroOrdemServico, FroVeiculo, PrioridadeOS, TipoOS, StatusOS } from '../../../types/frotas'
 
@@ -12,6 +12,23 @@ export const BRL = (v: number) =>
 
 export function diasEmAberto(dataAbertura: string): number {
   return Math.floor((Date.now() - new Date(dataAbertura).getTime()) / 86_400_000)
+}
+
+/** Prazo da OS (data_previsao): rótulo curto + se está vencido.
+ *  OS encerrada não fica vermelha — o prazo já não corre. */
+export function prazoOS(dataPrevisao?: string | null, status?: StatusOS) {
+  if (!dataPrevisao) return null
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const d = new Date(String(dataPrevisao).slice(0, 10) + 'T12:00:00')
+  if (isNaN(d.getTime())) return null
+  const dias = Math.round((d.getTime() - hoje.getTime()) / 86_400_000)
+  const encerrada = status === 'concluida' || status === 'cancelada' || status === 'rejeitada'
+  return {
+    label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    dias,
+    atrasado: !encerrada && dias < 0,
+    hojeOuAmanha: !encerrada && dias >= 0 && dias <= 1,
+  }
 }
 
 export const PRIOR: Record<PrioridadeOS, { label: string; badge: string; bar: string }> = {
@@ -49,6 +66,7 @@ export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemPro
   const p = PRIOR[os.prioridade]
   const t = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
+  const prazo = prazoOS(os.data_previsao, os.status)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
   const { codigo, categoria } = veicFull
     ? formatCodigoCategoria(veicFull)
@@ -99,6 +117,20 @@ export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemPro
       <div className={`flex items-center gap-2 flex-wrap text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         <span className={`px-1.5 py-0.5 rounded-md font-bold ${t.cls}`}>{t.label}</span>
         <span className="flex items-center gap-0.5"><Clock size={9} /> {dias}d</span>
+        {prazo && (
+          <span
+            title={prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`}
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-bold ${
+              prazo.atrasado
+                ? 'bg-red-500/15 text-red-500'
+                : prazo.hojeOuAmanha
+                  ? 'bg-amber-500/15 text-amber-600'
+                  : isDark ? 'text-slate-400' : 'text-slate-500'
+            }`}>
+            <CalendarClock size={9} />
+            {prazo.label}{prazo.atrasado && ` (${Math.abs(prazo.dias)}d)`}
+          </span>
+        )}
         {os.fornecedor && (
           <span className="flex items-center gap-0.5 truncate max-w-[120px]">
             <Building2 size={9} /> {os.fornecedor.nome_fantasia ?? os.fornecedor.razao_social}
@@ -116,6 +148,7 @@ export function OSRow({ os, veicFull, isDark, onClick, onVeicClick, dot }: OSIte
   const p = PRIOR[os.prioridade]
   const t = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
+  const prazo = prazoOS(os.data_previsao, os.status)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
   const corDot = dot ?? STATUS_DOT[os.status]
   const { codigo, categoria } = veicFull
@@ -150,6 +183,15 @@ export function OSRow({ os, veicFull, isDark, onClick, onVeicClick, dot }: OSIte
       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${p.badge}`}>{p.label}</span>
       <span className={`w-[50px] text-[10px] text-right shrink-0 ${dias > 14 ? 'text-red-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {dias}d
+      </span>
+      <span
+        title={prazo ? (prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`) : 'Sem prazo definido'}
+        className={`w-[62px] text-[10px] text-right shrink-0 ${
+          prazo?.atrasado ? 'text-red-500 font-bold'
+            : prazo?.hojeOuAmanha ? 'text-amber-600 font-bold'
+            : isDark ? 'text-slate-500' : 'text-slate-400'
+        }`}>
+        {prazo ? prazo.label : '—'}
       </span>
       <span className={`w-[70px] text-xs text-right font-semibold shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
         {valor ? BRL(valor) : '—'}

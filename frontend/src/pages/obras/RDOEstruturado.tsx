@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Loader2, Users, Truck, ClipboardList, Check, Save, ChevronDown, ChevronRight, Plus, AlertTriangle, Camera } from 'lucide-react'
+import { X, Loader2, Users, Truck, ClipboardList, Check, Save, ChevronDown, ChevronUp, ChevronRight, Plus, AlertTriangle, Camera } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useCatalogoAtividades, coresDoCatalogo } from './catalogoAtividades'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -174,6 +174,8 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   const [abertas, setAbertas] = useState<Set<string>>(new Set())
   const togSecao = (k: string) => setAbertas(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const [aba, setAba] = useState<'avanco' | 'equipe' | 'recursos'>('avanco')
+  // no MOBILE o cabeçalho do dia começa recolhido (no desktop aparece sempre)
+  const [detDia, setDetDia] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -390,24 +392,33 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   })
 
   // botão de câmera reutilizado nos eventos e nas atividades
+  // MOBILE: botão-câmera com alvo de toque maior e só o CONTADOR (sem os nomes
+  // de arquivo, que amassavam a linha). Miniaturas ficam abaixo, tocáveis p/ remover.
   const BotaoFoto = ({ arquivos, onAdd, onDel, titulo }: {
     arquivos: File[]; onAdd: (fs: File[]) => void; onDel: (i: number) => void; titulo: string
   }) => (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 align-middle">
       <label title={titulo}
-        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-lg cursor-pointer text-[10px] font-bold ${arquivos.length
-          ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-50 text-sky-700')
-          : (isDark ? 'text-slate-500 hover:bg-white/[0.06]' : 'text-slate-400 hover:bg-slate-100')}`}>
-        <Camera size={13} />{arquivos.length > 0 && arquivos.length}
+        className={`inline-flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-1.5 lg:py-1 rounded-lg cursor-pointer text-[10px] font-bold shrink-0 ${arquivos.length
+          ? (isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700')
+          : (isDark ? 'text-slate-400 bg-white/[0.06] lg:bg-transparent' : 'text-slate-500 bg-slate-100 lg:bg-transparent hover:bg-slate-100')}`}>
+        <Camera size={15} className="lg:hidden" /><Camera size={13} className="hidden lg:block" />
+        {arquivos.length > 0 && <span className="lg:inline">{arquivos.length}</span>}
         <input type="file" accept="image/*" multiple capture="environment" className="hidden"
           onChange={e => { onAdd([...(e.target.files ?? [])]); e.currentTarget.value = '' }} />
       </label>
+      {/* nomes dos arquivos: só no desktop */}
       {arquivos.map((f, i) => (
-        <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] max-w-[110px] ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+        <span key={i} className={`hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] max-w-[110px] ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
           <span className="truncate">{f.name}</span>
           <button onClick={() => onDel(i)} className="hover:text-rose-500 shrink-0"><X size={9} /></button>
         </span>
       ))}
+      {/* mobile: toque no contador remove a última */}
+      {arquivos.length > 0 && (
+        <button onClick={() => onDel(arquivos.length - 1)} title="remover última foto"
+          className="lg:hidden text-slate-400 active:text-rose-500 shrink-0"><X size={12} /></button>
+      )}
     </span>
   )
 
@@ -425,9 +436,9 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full max-w-5xl max-h-[92vh] lg:max-h-[92vh] flex flex-col rounded-t-2xl lg:rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+        className={`w-full max-w-5xl h-[92dvh] lg:h-auto lg:max-h-[92vh] overflow-y-auto lg:overflow-hidden overscroll-contain flex flex-col rounded-t-2xl lg:rounded-2xl border shadow-2xl ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
         {/* header */}
-        <div className={`flex items-start justify-between gap-3 p-4 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <div className={`sticky lg:static top-0 z-30 shrink-0 flex items-start justify-between gap-3 p-3 lg:p-4 border-b ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
           <div className="min-w-0">
             <div className="flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-2 min-w-0">
               <h3 className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>Diário de Obra</h3>
@@ -455,13 +466,19 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
         </div>
 
         {/* cabeçalho do dia */}
-        <div className={`px-4 py-3 flex items-end gap-2 flex-wrap border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className={`shrink-0 px-3 lg:px-4 py-2.5 lg:py-3 flex items-end gap-2 flex-wrap border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">DATA
             <input type="date" value={data} onChange={e => setData(e.target.value)} className={inp} /></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">CLIMA
             <select value={clima} onChange={e => setClima(e.target.value as never)} className={inp}>
               {CLIMAS.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
             </select></label>
+          {/* MOBILE: recolhe os campos secundários pra sobrar tela pro conteúdo */}
+          <button onClick={() => setDetDia(v => !v)}
+            className={`lg:hidden inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold border ${isDark ? 'border-white/[0.1] text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+            {detDia ? <ChevronUp size={13} /> : <ChevronDown size={13} />} Detalhes
+          </button>
+          <div className={`${detDia ? 'contents' : 'hidden'} lg:contents`}>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1">HS IMPRODUTIVAS
             <input value={horasImp} onChange={e => setHorasImp(e.target.value)} className={`${inp} w-24`} /></label>
           <label className="text-[10px] font-bold text-slate-400 flex flex-col gap-1 flex-1 min-w-[180px]">MOTIVO
@@ -494,14 +511,22 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          </div>
+          <div className="hidden lg:flex items-center gap-1.5 ml-auto">
             {tab('avanco', 'Avanço', <ClipboardList size={13} />, nAv)}
             {tab('equipe', 'Equipe', <Users size={13} />, nEquipe)}
             {tab('recursos', 'Recursos', <Truck size={13} />, nRec)}
           </div>
         </div>
 
-        <div className="p-4 overflow-y-auto flex-1 space-y-3">
+        {/* MOBILE: abas em barra própria, sempre alcançáveis */}
+        <div className={`lg:hidden sticky top-[52px] z-20 shrink-0 flex items-center gap-1.5 px-3 py-2 border-b ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-100'}`}>
+          {tab('avanco', 'Avanço', <ClipboardList size={13} />, nAv)}
+          {tab('equipe', 'Equipe', <Users size={13} />, nEquipe)}
+          {tab('recursos', 'Recursos', <Truck size={13} />, nRec)}
+        </div>
+
+        <div className="p-3 lg:p-4 lg:overflow-y-auto lg:flex-1 space-y-3">
           {/* ── AVANÇO: matriz estrutura × atividade ── */}
           {aba === 'avanco' && (
             estruturas.length === 0 ? (
@@ -509,7 +534,7 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                 Esta obra ainda não tem estruturas cadastradas — cadastre em <b>Planejamento</b> para lançar avanço por torre.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overscroll-x-contain">
                 <table className="border-collapse text-xs min-w-full">
                   <thead>
                     <tr>
@@ -540,8 +565,8 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
                       ...(abertas.has(g.secao) ? g.atividades : []).map(atv => (
                       <tr key={g.secao + atv} className={isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}>
                         <td className={`sticky left-0 z-10 px-2 py-1 pl-6 text-[11px] whitespace-nowrap ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-white text-slate-600'}`}>
-                          <span className="inline-flex items-center gap-1.5">
-                            {atv}
+                          <span className="inline-flex items-center gap-1.5 whitespace-normal lg:whitespace-nowrap">
+                            <span className="min-w-0">{atv}</span>
                             <BotaoFoto arquivos={fotosAtiv[atv] ?? []} titulo={`fotos de ${atv}`}
                               onAdd={fs => setFotosAtiv(p => ({ ...p, [atv]: [...(p[atv] ?? []), ...fs] }))}
                               onDel={k => setFotosAtiv(p => ({ ...p, [atv]: (p[atv] ?? []).filter((_, z) => z !== k) }))} />
@@ -657,13 +682,13 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
             ) : (
               <div className="space-y-1.5">
                 {eventos.map((ev, i) => (
-                  <div key={i} className="flex items-center gap-1.5 flex-wrap">
+                  <div key={i} className={`flex items-center gap-1.5 flex-wrap rounded-lg p-1.5 lg:p-0 ${isDark ? "bg-white/[0.03] lg:bg-transparent" : "bg-slate-50 lg:bg-transparent"}`}>
                     <select value={ev.natureza} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, natureza: e.target.value } : x))}
-                      className={`${inp} w-[130px]`}>
+                      className={`${inp} flex-1 min-w-[120px] lg:flex-none lg:w-[130px]`}>
                       {NATUREZAS.map(n => <option key={n.v} value={n.v}>{n.l}</option>)}
                     </select>
                     <select value={ev.tipo} onChange={e => setEventos(l => l.map((x, j) => j === i ? { ...x, tipo: e.target.value } : x))}
-                      className={`${inp} w-[200px]`}>
+                      className={`${inp} flex-1 min-w-[140px] lg:flex-none lg:w-[200px]`}>
                       {EVENTO_TIPOS.map(g => (
                         <optgroup key={g.grupo} label={g.grupo}>
                           {g.itens.map(it => <option key={it.v} value={it.v}>{it.l}</option>)}
@@ -687,15 +712,15 @@ export default function RDOEstruturado({ obraId, obraNome, onClose, obras, onObr
         </div>
 
         {/* footer */}
-        <div className={`p-4 border-t flex items-center justify-between gap-2 ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        <div className={`sticky lg:static bottom-0 z-30 shrink-0 mt-auto p-3 lg:p-4 border-t flex items-center justify-between gap-2 flex-wrap ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
           <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {nAv} avanço(s) · {nEquipe} pessoa(s) · {nRec} recurso(s)
           </span>
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className={`px-4 py-2 rounded-xl text-sm font-medium border ${isDark ? 'border-white/[0.1] text-slate-300' : 'border-slate-300 text-slate-600'}`}>Cancelar</button>
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <button onClick={onClose} className={`px-4 py-2.5 lg:py-2 rounded-xl text-sm font-medium border ${isDark ? 'border-white/[0.1] text-slate-300' : 'border-slate-300 text-slate-600'}`}>Cancelar</button>
             <button onClick={() => { setErro(null); setSalvando(true); salvar.mutate(undefined, { onError: e => setErro(String((e as Error).message)), onSettled: () => setSalvando(false) }) }}
               disabled={salvando}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 lg:py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
               {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} {rdoIdProp ? 'Salvar alterações' : 'Salvar RDO'}
             </button>
           </div>

@@ -10,6 +10,7 @@ import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, StatusOS, TipoOS } from '../../types/frotas'
 import { parseObsInfo } from './veiculoObs'
 import QrAtivoBloco from './QrAtivo'
+import CheckinsBloco from './CheckinsBloco'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../constants/categoriaVeiculo'
 
 // ── Shared helpers ──────────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ const PROP_MAP = {
 const STATUS_OS_LABEL: Record<StatusOS, string> = {
   pendente: 'Pendente', aberta: 'Pendente', em_cotacao: 'Cotação',
   aguardando_aprovacao: 'Aprovação', aprovada: 'Aprovada', em_execucao: 'Em Execução',
+  aguardando: 'Aguardando',
   concluida: 'Concluída', rejeitada: 'Rejeitada', cancelada: 'Cancelada',
 }
 const STATUS_OS_STYLE: Record<StatusOS, { light: string; dark: string }> = {
@@ -74,6 +76,7 @@ const STATUS_OS_STYLE: Record<StatusOS, { light: string; dark: string }> = {
   aguardando_aprovacao: { light: 'bg-violet-50 text-violet-700',  dark: 'bg-violet-500/10 text-violet-300' },
   aprovada:             { light: 'bg-indigo-50 text-indigo-700',  dark: 'bg-indigo-500/10 text-indigo-300' },
   em_execucao:          { light: 'bg-blue-50 text-blue-700',      dark: 'bg-blue-500/10 text-blue-300' },
+  aguardando:           { light: 'bg-orange-50 text-orange-700',  dark: 'bg-orange-500/10 text-orange-300' },
   concluida:            { light: 'bg-emerald-50 text-emerald-700', dark: 'bg-emerald-500/10 text-emerald-300' },
   rejeitada:            { light: 'bg-red-50 text-red-700',        dark: 'bg-red-500/10 text-red-300' },
   cancelada:            { light: 'bg-slate-100 text-slate-500',   dark: 'bg-slate-500/10 text-slate-400' },
@@ -131,7 +134,7 @@ function HistoricoServicos({ veiculoId, isLight }: { veiculoId: string; isLight:
                     {o.numero_os || 'OS s/ nº'}
                   </span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'}`}>
-                    {TIPO_OS_LABEL[o.tipo]}
+                    {o.tipo ? TIPO_OS_LABEL[o.tipo] : '—'}
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-auto ${isLight ? st.light : st.dark}`}>
                     {STATUS_OS_LABEL[o.status]}
@@ -607,6 +610,9 @@ export default function VeiculoDetalhesModal({
 
           {/* QR para colar no ativo — leitura pelo Portal TEG */}
           <QrAtivoBloco veiculo={v} isLight={isLight} />
+
+          {/* Último check-in diário + atalho para a lista completa */}
+          <CheckinsBloco veiculoId={v.id} titulo={`${v.codigo_interno || v.placa || ''} ${v.marca ?? ''} ${v.modelo ?? ''}`.trim()} isLight={isLight} />
 
           {/* Histórico de serviços (OS) */}
           <HistoricoServicos veiculoId={v.id} isLight={isLight} />

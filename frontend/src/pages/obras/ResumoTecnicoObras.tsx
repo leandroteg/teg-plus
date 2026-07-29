@@ -25,9 +25,9 @@ const fmtData = (d?: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDat
 //  · aço (t)   = unidade ton na seção "Montagem"   (Descarga de materiais, fora)
 //  · fundação  = unidade m³ na seção "Fundações"   (Grout em Serv. Complementares, fora)
 export interface TecOsc { km: number; aco: number; fund: number }
-const ZERO: TecOsc = { km: 0, aco: 0, fund: 0 }
+export const ZERO: TecOsc = { km: 0, aco: 0, fund: 0 }
 
-function useTecnicoPorOsc() {
+export function useTecnicoPorOsc() {
   return useQuery<Map<string, TecOsc>>({
     queryKey: ['obr-tecnico-por-osc'],
     queryFn: async () => {
@@ -263,7 +263,7 @@ export default function ResumoTecnicoObras({ portfolioId }: { portfolioId?: stri
 }
 
 // ── Modal: resumo técnico consolidado da obra ────────────────────────────────
-function ResumoTecnicoModal({ obraId, nome, oscs, tec, onClose, isDark }: {
+export function ResumoTecnicoModal({ obraId, nome, oscs, tec, onClose, isDark }: {
   obraId: string; nome: string; oscs: EGPOscRow[]; tec: (id: string) => TecOsc; onClose: () => void; isDark: boolean
 }) {
   const t = oscs.reduce((acc, o) => {

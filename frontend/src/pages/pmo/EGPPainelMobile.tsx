@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity, AlertTriangle, TrendingUp, MapPin,
@@ -7,8 +7,29 @@ import {
 import { useMedicaoMensal, useEAPFinal, aggregatePolos } from '../../hooks/usePMO'
 import {
   MobilePanel, MobileHeader, KpiCard, KpiGrid, StatTile, Section,
-  SectionBody, BarStat, Pill, Empty, MobileLoading,
+  SectionBody, BarStat, Pill, Empty, MobileLoading, MobileSelect,
 } from '../../components/paineis-mobile/kit'
+
+// MESMOS painéis do desktop (EGPPainel) — sem duplicar lógica
+const ProducaoPainel    = lazy(() => import('./paineis/ProducaoPainel'))
+const FaturamentoPainel = lazy(() => import('./paineis/FaturamentoPainel'))
+const MedicaoPainel     = lazy(() => import('./paineis/MedicaoPainel'))
+const CronogramaPainel  = lazy(() => import('./paineis/CronogramaPainel'))
+const CustosPainel      = lazy(() => import('./paineis/CustosPainel'))
+
+type EGPPainelKey = 'geral' | 'producao' | 'faturamento' | 'medicao' | 'cronograma' | 'custos'
+const EGP_PAINEIS: { value: EGPPainelKey; label: string }[] = [
+  { value: 'geral', label: 'Visão Geral' },
+  { value: 'producao', label: 'Produção' },
+  { value: 'faturamento', label: 'Faturamento' },
+  { value: 'medicao', label: 'Medição' },
+  { value: 'cronograma', label: 'Cronograma' },
+  { value: 'custos', label: 'Custos' },
+]
+// período padrão: mesmo do desktop (ano corrente)
+const hoje = new Date()
+const DE_PADRAO = `${hoje.getFullYear()}-01`
+const ATE_PADRAO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
 
 const CONTRATO_CEMIG = '2cd4557b-846e-4d25-bbd5-6df71406a4ed'
 
@@ -30,6 +51,7 @@ const ritTone = (pctFis: number, pctPrazo: number | null): 'emerald' | 'amber' |
 // Versão mobile do Painel EGP — mesma Visão Geral do desktop (derivada da EAP + medições do contrato CEMIG).
 export default function EGPPainelMobile() {
   const nav = useNavigate()
+  const [painel, setPainel] = useState<EGPPainelKey>('geral')
   const { data: rows, isLoading: loadingMed, refetch: refetchM } = useMedicaoMensal()
   const { data: raw, isLoading: loadingEap, refetch: refetchE } = useEAPFinal(CONTRATO_CEMIG)
 
@@ -118,7 +140,7 @@ export default function EGPPainelMobile() {
     }
   }, [raw, rows])
 
-  if (loadingEap || loadingMed) return <MobileLoading tone="emerald" />
+  const carregandoGeral = loadingEap || loadingMed
 
   const maxTop = Math.max(...g.topObras.map(o => o.valor), 1)
 
@@ -135,6 +157,27 @@ export default function EGPPainelMobile() {
           </button>
         }
       />
+
+      {/* Seletor de painel — os MESMOS 6 do desktop */}
+      <div className="px-3 -mt-1">
+        <MobileSelect<EGPPainelKey> value={painel} onChange={setPainel} options={EGP_PAINEIS} tone="emerald" icon={BarChart3} />
+      </div>
+
+      {/* Painéis do desktop, reaproveitados (rolagem horizontal onde não couber) */}
+      {painel !== 'geral' && (
+        <Suspense fallback={<MobileLoading tone="emerald" />}>
+          <div className="px-2 [&_table]:text-[11px] overflow-x-auto">
+            {painel === 'producao' && <ProducaoPainel de={DE_PADRAO} ate={ATE_PADRAO} />}
+            {painel === 'faturamento' && <FaturamentoPainel de={DE_PADRAO} ate={ATE_PADRAO} visao="faturamento" />}
+            {painel === 'medicao' && <MedicaoPainel de={DE_PADRAO} ate={ATE_PADRAO} />}
+            {painel === 'cronograma' && <CronogramaPainel />}
+            {painel === 'custos' && <CustosPainel />}
+          </div>
+        </Suspense>
+      )}
+
+      {painel === 'geral' && carregandoGeral && <MobileLoading tone="emerald" />}
+      {painel === 'geral' && !carregandoGeral && (<>
 
       {/* KPIs consolidados — mesma Visão Geral do desktop */}
       <KpiGrid cols={3}>
@@ -234,6 +277,7 @@ export default function EGPPainelMobile() {
           ))}
         </SectionBody>
       </Section>
+      </>)}
     </MobilePanel>
   )
 }

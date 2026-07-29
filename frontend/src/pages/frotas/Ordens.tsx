@@ -32,7 +32,7 @@ const TIPO_LABEL: Record<TipoOS, string> = {
 const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_cotacao: 'Em Cotacao',
   aguardando_aprovacao: 'Ag. Aprovacao', aprovada: 'Aprovada',
-  em_execucao: 'Em Execucao', concluida: 'Concluida',
+  em_execucao: 'Em Execucao', aguardando: 'Aguardando', concluida: 'Concluida',
   rejeitada: 'Rejeitada', cancelada: 'Cancelada',
 }
 
@@ -264,7 +264,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
   async function handleConcluir() {
     await concluir.mutateAsync({
       id: os.id,
-      veiculo_id: os.veiculo_id,
+      veiculo_id: os.veiculo_id ?? '',
       hodometro_saida: hodSaida ? +hodSaida : undefined,
       valor_final: valorFinal ? +valorFinal : os.valor_aprovado,
     })
@@ -289,7 +289,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
             </p>
             <p className="text-[11px] text-slate-400 truncate">{os.descricao_problema}</p>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] text-slate-500">{TIPO_LABEL[os.tipo]}</span>
+              <span className="text-[10px] text-slate-500">{os.tipo ? TIPO_LABEL[os.tipo] : '—'}</span>
               {os.fornecedor && <span className="text-[10px] text-slate-500">· {os.fornecedor.razao_social}</span>}
             </div>
           </div>

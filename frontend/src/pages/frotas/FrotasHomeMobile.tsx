@@ -29,12 +29,13 @@ const STATUS_SEG: { key: string; label: string; tone: Tone }[] = [
   { key: 'disponivel',       label: 'Disponíveis',      tone: 'emerald' },
   { key: 'em_uso',           label: 'Em Uso',           tone: 'sky' },
   { key: 'em_manutencao',    label: 'Em Manutenção',    tone: 'amber' },
+  { key: 'parado',           label: 'Parados',          tone: 'rose' },
   { key: 'bloqueado',        label: 'Bloqueados',       tone: 'red' },
   { key: 'em_entrada',       label: 'Em Entrada',       tone: 'violet' },
   { key: 'aguardando_saida', label: 'Aguardando Saída', tone: 'rose' },
 ]
 const STATUS_BAR: Record<string, string> = {
-  disponivel: 'bg-emerald-500', em_uso: 'bg-sky-500', em_manutencao: 'bg-amber-500',
+  disponivel: 'bg-emerald-500', em_uso: 'bg-sky-500', em_manutencao: 'bg-amber-500', parado: 'bg-rose-600',
   bloqueado: 'bg-red-500', em_entrada: 'bg-violet-500', aguardando_saida: 'bg-rose-500',
 }
 const PRIORIDADE_TONE: Record<string, Tone> = {

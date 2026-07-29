@@ -8,6 +8,8 @@ import {
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../services/supabase'
 import { useCotacoes } from '../hooks/useCotacoes'
+import { useObrasComProjeto } from '../hooks/useObras'
+import { MultiSelect } from './pmo/paineis/egpFiltros'
 import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useReenviarEsclarecimento } from '../hooks/useRequisicoes'
@@ -52,6 +54,18 @@ const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; te
   em_cotacao:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300' },
   em_aprovacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
+
+// Valores especiais dos filtros Projeto/Obra (não são ids reais)
+const SEM_PROJETO = '__sem_projeto__'
+const TODOS       = '__todos__'
+// Cotações só carregam obra_nome (não o id). O nome está denormalizado e alguns
+// registros trazem sufixo "(OSC xx)" — normalizamos só p/ agrupar, sem tocar no dado.
+const chaveObra = (n?: string | null) =>
+  (n ?? '').replace(/\s*\(OSC[^)]*\)\s*$/i, '').trim().toUpperCase()
+
+// Status da REQUISIÇÃO que indicam cotação "em revisão" (Esclarecer / Rejeitado).
+// Usado APENAS pelo botão de filtro — NÃO altera shouldShowInCotacoes nem as abas.
+const REQ_EM_REVISAO = ['cotacao_em_esclarecimento', 'cotacao_rejeitada']
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data',  label: 'Data' },
@@ -445,6 +459,10 @@ export default function FilaCotacoes() {
   const { isAdmin, atLeast, perfil } = useAuth()
 
   const [activeTab, setActiveTab] = useState<PipelineTab>('pendente')
+  const [soRevisao, setSoRevisao] = useState(false)   // filtro "Em revisão" (off = tela atual)
+  const [fProjeto, setFProjeto] = useState<Set<string>>(new Set())   // vazio = todos
+  const [fObra, setFObra] = useState<Set<string>>(new Set())         // vazio = todas
+  const { data: obrasComProjeto = [] } = useObrasComProjeto()
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -464,6 +482,56 @@ export default function FilaCotacoes() {
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  // ── Filtros Projeto / Obra ────────────────────────────────────────────────
+  // chave do nome da obra → projeto (cotações não trazem obra_id)
+  const projetoPorObra = useMemo(() => {
+    const m = new Map<string, { key: string; nome: string }>()
+    for (const o of obrasComProjeto) {
+      m.set(chaveObra(o.nome), o.projeto_id
+        ? { key: o.projeto_id, nome: o.projeto_nome ?? '—' }
+        : { key: SEM_PROJETO, nome: 'Sem projeto' })
+    }
+    return m
+  }, [obrasComProjeto])
+
+  const projDaCot = (c: Cotacao) =>
+    projetoPorObra.get(chaveObra(c.requisicao?.obra_nome))?.key ?? SEM_PROJETO
+
+  const projetoOpts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of cotacoes) {
+      const info = projetoPorObra.get(chaveObra(c.requisicao?.obra_nome))
+      m.set(info?.key ?? SEM_PROJETO, info?.nome ?? 'Sem projeto')
+    }
+    return [...m.entries()].map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.value === SEM_PROJETO ? 1 : b.value === SEM_PROJETO ? -1
+        : a.label.localeCompare(b.label, 'pt-BR'))
+  }, [cotacoes, projetoPorObra])
+
+  // Obra depende do Projeto (cascata)
+  const obraOpts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of cotacoes) {
+      if (fProjeto.size && !fProjeto.has(projDaCot(c))) continue
+      const k = chaveObra(c.requisicao?.obra_nome)
+      if (!k) continue
+      if (!m.has(k)) m.set(k, c.requisicao?.obra_nome ?? '—')
+    }
+    return [...m.entries()].map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [cotacoes, projetoPorObra, fProjeto])
+
+  // "Selecionar todos" é uma OPÇÃO injetada — o MultiSelect compartilhado não muda
+  const togProjeto = (v: string) => {
+    setFObra(new Set())
+    if (v === TODOS) { setFProjeto(new Set(projetoOpts.map(o => o.value))); return }
+    setFProjeto(s => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n })
+  }
+  const togObra = (v: string) => {
+    if (v === TODOS) { setFObra(new Set(obraOpts.map(o => o.value))); return }
+    setFObra(s => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n })
+  }
 
   // Group by pipeline tab
   const grouped = useMemo(() => {
@@ -486,6 +554,13 @@ export default function FilaCotacoes() {
   const activeItems = useMemo(() => {
     let items = grouped.get(activeTab) ?? []
 
+    // Filtro "Em revisão" — restringe à etapa atual, sem mexer nas abas
+    if (soRevisao) items = items.filter(c => REQ_EM_REVISAO.includes(c.requisicao?.status ?? ''))
+
+    // Filtros Projeto / Obra (vazios = tudo)
+    if (fProjeto.size) items = items.filter(c => fProjeto.has(projDaCot(c)))
+    if (fObra.size) items = items.filter(c => fObra.has(chaveObra(c.requisicao?.obra_nome)))
+
     if (busca) {
       const t = busca.toLowerCase()
       items = items.filter(c =>
@@ -506,7 +581,13 @@ export default function FilaCotacoes() {
     })
 
     return items
-  }, [grouped, activeTab, busca, sortField, sortDir])
+  }, [grouped, activeTab, busca, sortField, sortDir, soRevisao, fProjeto, fObra, projetoPorObra])
+
+  // quantas cotações em revisão existem NESTA etapa (badge do botão)
+  const revisaoCount = useMemo(
+    () => (grouped.get(activeTab) ?? []).filter(c => REQ_EM_REVISAO.includes(c.requisicao?.status ?? '')).length,
+    [grouped, activeTab],
+  )
 
   const totalCount = Array.from(grouped.values()).reduce((s, a) => s + a.length, 0)
 
@@ -584,6 +665,15 @@ export default function FilaCotacoes() {
           {busca && <button onClick={() => setBusca('')} className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}><X size={12} /></button>}
         </div>
 
+        {/* Filtros Projeto → Obra (cascata). "Selecionar todos" vai como opção. */}
+        <MultiSelect label="Projeto" isDark={isDark} compacto
+          options={[{ value: TODOS, label: 'Selecionar todos' }, ...projetoOpts]}
+          selected={fProjeto} onToggle={togProjeto}
+          onClear={() => { setFProjeto(new Set()); setFObra(new Set()) }} />
+        <MultiSelect label="Obra" isDark={isDark} compacto
+          options={[{ value: TODOS, label: 'Selecionar todos' }, ...obraOpts]}
+          selected={fObra} onToggle={togObra} onClear={() => setFObra(new Set())} />
+
         {SORT_OPTIONS.map(o => (
           <button key={o.field} onClick={() => { if (sortField === o.field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(o.field); setSortDir('desc') } }}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
@@ -593,6 +683,21 @@ export default function FilaCotacoes() {
             {o.label} {sortField === o.field && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
           </button>
         ))}
+
+        {/* Filtro "Em revisão" — mostra só esclarecer/rejeitado DESTA etapa */}
+        <button onClick={() => setSoRevisao(v => !v)}
+          disabled={revisaoCount === 0 && !soRevisao}
+          title="Mostrar apenas cotações em revisão (Esclarecer / Rejeitado) nesta etapa"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all disabled:opacity-40 ${
+            soRevisao
+              ? isDark ? 'bg-rose-500/15 text-rose-300 border-rose-500/40' : 'bg-rose-50 text-rose-700 border-rose-300'
+              : isDark ? 'bg-transparent text-slate-500 border-white/[0.06] hover:bg-white/5' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+          }`}>
+          <MessageSquare size={12} /> Em revisão
+          {revisaoCount > 0 && (
+            <span className={`px-1 rounded ${soRevisao ? (isDark ? 'bg-rose-500/25' : 'bg-rose-200/70') : (isDark ? 'bg-white/10' : 'bg-slate-100')}`}>{revisaoCount}</span>
+          )}
+        </button>
 
         <div className={`flex border rounded-lg ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
           <button onClick={() => setViewMode('list')} className={`p-1.5 transition-all ${viewMode === 'list' ? isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
