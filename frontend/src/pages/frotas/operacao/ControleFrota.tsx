@@ -20,15 +20,16 @@ import MultiSelectPopover from '../../../components/MultiSelectPopover'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
+import { humanizarStatus } from '../../../types/frotas'
 import type { FroVeiculo, FroAlocacao, FroOrdemServico } from '../../../types/frotas'
 
 const STATUS_LABEL: Record<string, string> = {
-  disponivel: 'Disponível', em_uso: 'Em Uso', em_manutencao: 'Em Manutenção', parado: 'Parado',
+  disponivel: 'Disponível', em_uso: 'Em Uso', em_manutencao: 'Em Manutenção', parada_manutencao: 'Parada para Manutenção', necessario_parada: 'Necessário Parada',
   bloqueado: 'Bloqueado', em_entrada: 'Em Entrada', aguardando_saida: 'Aguardando Saída',
   baixado: 'Baixado',
 }
 const STATUS_DOT: Record<string, string> = {
-  disponivel: 'bg-emerald-500', em_uso: 'bg-sky-500', em_manutencao: 'bg-amber-500', parado: 'bg-rose-600',
+  disponivel: 'bg-emerald-500', em_uso: 'bg-sky-500', em_manutencao: 'bg-amber-500', parada_manutencao: 'bg-rose-600', necessario_parada: 'bg-orange-500',
   bloqueado: 'bg-red-500', em_entrada: 'bg-violet-500', aguardando_saida: 'bg-rose-500',
   baixado: 'bg-slate-400',
 }
@@ -142,7 +143,7 @@ export default function ControleFrota() {
   // ── Opções dos filtros ────────────────────────────────────────────────────
   const opts = useMemo(() => ({
     categoria: [...new Set(linhas.map(l => l.categoriaLabel).filter(Boolean))].sort(),
-    status: [...new Set(linhas.map(l => STATUS_LABEL[l.v.status] ?? l.v.status))].sort(),
+    status: [...new Set(linhas.map(l => STATUS_LABEL[l.v.status] ?? humanizarStatus(l.v.status)))].sort(),
     propriedade: [...new Set(linhas.map(l => PROP_LABEL[l.v.propriedade] ?? l.v.propriedade))].sort(),
     obra: [...new Set(linhas.map(l => l.obra).filter(Boolean))].sort(),
     local: [...new Set(linhas.map(l => l.local).filter(Boolean))].sort(),
@@ -152,7 +153,7 @@ export default function ControleFrota() {
     const q = busca.trim().toLowerCase()
     return linhas.filter(l => {
       if (fCategoria.size && !fCategoria.has(l.categoriaLabel)) return false
-      if (fStatus.size && !fStatus.has(STATUS_LABEL[l.v.status] ?? l.v.status)) return false
+      if (fStatus.size && !fStatus.has(STATUS_LABEL[l.v.status] ?? humanizarStatus(l.v.status))) return false
       if (fPropriedade.size && !fPropriedade.has(PROP_LABEL[l.v.propriedade] ?? l.v.propriedade)) return false
       if (fObra.size && !fObra.has(l.obra)) return false
       if (fLocal.size && !fLocal.has(l.local)) return false
@@ -315,7 +316,7 @@ export default function ControleFrota() {
 
                 <span className={`flex items-center gap-1.5 text-[11px] ${txtMuted}`}>
                   <span className={`w-2 h-2 rounded-full ${STATUS_DOT[l.v.status] ?? 'bg-slate-400'}`} />
-                  {STATUS_LABEL[l.v.status] ?? l.v.status}
+                  {STATUS_LABEL[l.v.status] ?? humanizarStatus(l.v.status)}
                 </span>
 
                 {l.obra && <span className={`text-[11px] truncate max-w-[220px] ${txtMuted}`}>📍 {l.obra}</span>}
@@ -365,7 +366,7 @@ export default function ControleFrota() {
                     <td className="px-2 py-2">
                       <span className={`inline-flex items-center gap-1.5 text-[11px] ${txtMuted}`}>
                         <span className={`w-2 h-2 rounded-full ${STATUS_DOT[l.v.status] ?? 'bg-slate-400'}`} />
-                        {STATUS_LABEL[l.v.status] ?? l.v.status}
+                        {STATUS_LABEL[l.v.status] ?? humanizarStatus(l.v.status)}
                       </span>
                     </td>
                     <td className={`px-2 py-2 text-[11px] max-w-[200px] truncate ${txtMuted}`}>
