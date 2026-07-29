@@ -11,7 +11,6 @@ import type {
   StatusVeiculo, CategoriaVeiculo,
   StatusOS, PrioridadeOS, StatusOcorrenciaTel, TipoChecklist,
   CriarOSPayload, CriarChecklistPayload, RegistrarAbastecimentoPayload,
-  FroCheckinDiario, FroCheckinUltimo,
   FroAlocacao, FroMulta, FroChecklistTemplate, FroChecklistExecucao, FroAcessorio,
   FroChecklistFoto,
   StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
@@ -329,7 +328,7 @@ export function useProgramarEntradaOS() {
   return useMutation({
     mutationFn: async (p: {
       osId: string
-      veiculoId?: string
+      veiculoId: string
       dataEntrada: string
       hodometroEntrada?: number
       /** Alocação ativa a encerrar (o veículo sai da obra para a oficina). */
@@ -372,12 +371,9 @@ export function useProgramarEntradaOS() {
       }
 
       // Só depois de mexer nas alocações: o veículo da OS fica em manutenção.
-      // Demanda de suprimento (sem veículo) não tem ativo a marcar.
-      if (p.veiculoId) {
-        const { error: eV } = await supabase.from('fro_veiculos')
-          .update({ status: 'em_manutencao' }).eq('id', p.veiculoId)
-        if (eV) throw eV
-      }
+      const { error: eV } = await supabase.from('fro_veiculos')
+        .update({ status: 'em_manutencao' }).eq('id', p.veiculoId)
+      if (eV) throw eV
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_os'] })
@@ -398,7 +394,7 @@ export function useLiberarOS() {
   return useMutation({
     mutationFn: async (p: {
       osId: string
-      veiculoId?: string
+      veiculoId: string
       valorFinal: number
       hodometroSaida?: number
       descricaoServico?: string
@@ -416,7 +412,7 @@ export function useLiberarOS() {
       }).eq('id', p.osId)
       if (error) throw error
 
-      if (p.realocar?.obraId && p.veiculoId) {
+      if (p.realocar?.obraId) {
         const { error: eA } = await supabase.from('fro_alocacoes').insert({
           veiculo_id: p.veiculoId,
           obra_id: p.realocar.obraId,
@@ -430,12 +426,10 @@ export function useLiberarOS() {
         if (eA) throw eA
       }
 
-      if (p.veiculoId) {
-        await supabase.from('fro_veiculos').update({
-          status: p.realocar?.obraId ? 'em_uso' : 'disponivel',
-          ...(p.hodometroSaida != null ? { hodometro_atual: p.hodometroSaida } : {}),
-        }).eq('id', p.veiculoId)
-      }
+      await supabase.from('fro_veiculos').update({
+        status: p.realocar?.obraId ? 'em_uso' : 'disponivel',
+        ...(p.hodometroSaida != null ? { hodometro_atual: p.hodometroSaida } : {}),
+      }).eq('id', p.veiculoId)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_os'] })
@@ -509,12 +503,16 @@ export function useCriarOS() {
         if (eItem) throw eItem
       }
 
-      // Reflete no ativo — só quando a demanda é de um veículo cadastrado.
-      // Demandas de suprimento (compra, ativo sem placa) não têm veículo a bloquear.
-      if (osData.veiculo_id) {
+      // Bloqueio imediato para OS crítica
+      if (osData.prioridade === 'critica') {
         await supabase
           .from('fro_veiculos')
-          .update({ status: osData.prioridade === 'critica' ? 'bloqueado' : 'em_manutencao' })
+          .update({ status: 'bloqueado' })
+          .eq('id', osData.veiculo_id)
+      } else {
+        await supabase
+          .from('fro_veiculos')
+          .update({ status: 'em_manutencao' })
           .eq('id', osData.veiculo_id)
       }
 
@@ -1087,6 +1085,7 @@ export function useFrotasKPIs() {
       const disponiveis = vs.filter(v => v.status === 'disponivel').length
       const em_uso      = vs.filter(v => v.status === 'em_uso').length
       const em_manu     = vs.filter(v => v.status === 'em_manutencao').length
+      const parados     = vs.filter(v => v.status === 'parado').length
       const bloqueados  = vs.filter(v => v.status === 'bloqueado').length
 
       const prevs = prevRes.data ?? []
@@ -1104,6 +1103,7 @@ export function useFrotasKPIs() {
         total_veiculos: total,
         disponiveis,
         em_manutencao: em_manu,
+        parados,
         em_uso,
         bloqueados,
         taxa_disponibilidade: total ? Math.round((disponiveis / total) * 100) : 0,
@@ -1841,40 +1841,5 @@ export function useTelSyncLog(limit = 20) {
     },
     refetchInterval: 300_000,  // os ciclos de sync rodam a cada 5/15 min — poll de 60s era desperdício
     staleTime: 60_000,
-  })
-}
-
-// ── Check-in diário (Portal TEG) ──────────────────────────────────────────────
-
-/** Último check-in de CADA ativo — alimenta as colunas Condição/Limpeza/Avarias. */
-export function useUltimosCheckins() {
-  return useQuery({
-    queryKey: ['fro_checkin_ultimo'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_fro_checkin_ultimo')
-        .select('*')
-      if (error) throw error
-      return (data ?? []) as FroCheckinUltimo[]
-    },
-    staleTime: 60_000,
-  })
-}
-
-/** Histórico de check-ins de um ativo — usado no submodal "Ver check-ins". */
-export function useCheckinsVeiculo(veiculoId?: string, limit = 60) {
-  return useQuery({
-    queryKey: ['fro_checkins_veiculo', veiculoId, limit],
-    enabled: !!veiculoId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fro_checkin_diario')
-        .select('*')
-        .eq('veiculo_id', veiculoId!)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-      if (error) throw error
-      return (data ?? []) as FroCheckinDiario[]
-    },
   })
 }
