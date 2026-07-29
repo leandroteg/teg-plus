@@ -17,7 +17,7 @@ export default function RegistrarEntradaModal({ onClose }: Props) {
 
   const veiculosRetorno = useMemo(
     () => todosVeiculos.filter(v =>
-      v.status === 'em_uso' || v.status === 'em_manutencao' || v.status === 'parado' || v.status === 'bloqueado' || v.status === 'aguardando_saida'
+      v.status === 'em_uso' || v.status === 'em_manutencao' || v.status === 'parada_manutencao' || v.status === 'necessario_parada' || v.status === 'bloqueado' || v.status === 'aguardando_saida'
     ),
     [todosVeiculos],
   )
@@ -47,7 +47,8 @@ export default function RegistrarEntradaModal({ onClose }: Props) {
   const STATUS_LABEL: Record<string, string> = {
     em_uso: 'Em Uso',
     em_manutencao: 'Em Manutenção',
-    parado: 'Parado',
+    parada_manutencao: 'Parada para Manutenção',
+    necessario_parada: 'Necessário Parada',
     bloqueado: 'Bloqueado',
     aguardando_saida: 'Aguardando Saída',
   }
@@ -55,7 +56,8 @@ export default function RegistrarEntradaModal({ onClose }: Props) {
   const STATUS_COLOR: Record<string, string> = {
     em_uso: isDark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-100 text-sky-700',
     em_manutencao: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700',
-    parado: isDark ? 'bg-rose-500/15 text-rose-400' : 'bg-rose-100 text-rose-700',
+    parada_manutencao: isDark ? 'bg-rose-500/15 text-rose-400' : 'bg-rose-100 text-rose-700',
+    necessario_parada: isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700',
     bloqueado: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700',
     aguardando_saida: isDark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-100 text-violet-700',
   }

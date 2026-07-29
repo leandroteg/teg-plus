@@ -45,10 +45,36 @@ export const TIPO_LABEL: Record<TipoOS, { label: string; cls: string }> = {
   revisao:    { label: 'Revisão',    cls: 'bg-violet-500/10 text-violet-500' },
 }
 
+// Demandas que não são reparo de veículo (compra de material, serviço de terceiro).
+// Entram no mesmo quadro; no lugar do tipo de manutenção mostram a natureza.
+export const NATUREZA_LABEL: Record<string, { label: string; cls: string }> = {
+  material: { label: 'Material/Compra', cls: 'bg-amber-500/10 text-amber-600' },
+  servico:  { label: 'Serviço',         cls: 'bg-sky-500/10 text-sky-500' },
+}
+
+/** Badge de classificação do cartão: tipo de manutenção, ou natureza se for demanda de suprimento. */
+function badgeTipo(os: FroOrdemServico) {
+  if (os.tipo) return TIPO_LABEL[os.tipo]
+  if (os.natureza && NATUREZA_LABEL[os.natureza]) return NATUREZA_LABEL[os.natureza]
+  return null
+}
+
+/** Cabeçalho do cartão: veículo (código+categoria) ou, sem veículo, o ativo livre + selo da natureza. */
+function tituloOS(os: FroOrdemServico, veicFull?: FroVeiculo): { codigo: string; categoria: string } {
+  if (veicFull) return formatCodigoCategoria(veicFull)
+  if (os.veiculo?.placa) return { codigo: os.veiculo.placa, categoria: '' }
+  // Demanda de suprimentos: sem placa.
+  return {
+    codigo: os.ativo_livre || 'Demanda',
+    categoria: os.natureza === 'material' ? 'SUPRIMENTOS' : os.natureza === 'servico' ? 'SERVIÇO' : '',
+  }
+}
+
 /** Cor do ponto de status — usada na linha para situar a OS no fluxo. */
 export const STATUS_DOT: Record<StatusOS, string> = {
   pendente: 'bg-slate-400', aberta: 'bg-slate-400', em_cotacao: 'bg-sky-500',
   aguardando_aprovacao: 'bg-amber-500', aprovada: 'bg-teal-500', em_execucao: 'bg-violet-500',
+  aguardando: 'bg-orange-500',
   concluida: 'bg-emerald-500', rejeitada: 'bg-red-500', cancelada: 'bg-slate-400',
 }
 
@@ -64,13 +90,11 @@ interface OSItemProps {
 
 export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemProps) {
   const p = PRIOR[os.prioridade]
-  const t = TIPO_LABEL[os.tipo]
+  const t = badgeTipo(os)
   const dias = diasEmAberto(os.data_abertura)
   const prazo = prazoOS(os.data_previsao, os.status)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
-  const { codigo, categoria } = veicFull
-    ? formatCodigoCategoria(veicFull)
-    : { codigo: os.veiculo?.placa ?? '—', categoria: '' }
+  const { codigo, categoria } = tituloOS(os, veicFull)
 
   return (
     <button type="button" onClick={onClick} className={`w-full text-left rounded-xl border p-3 transition-all ${
@@ -115,22 +139,24 @@ export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemPro
         </p>
       )}
       <div className={`flex items-center gap-2 flex-wrap text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        <span className={`px-1.5 py-0.5 rounded-md font-bold ${t.cls}`}>{t.label}</span>
+        {t && <span className={`px-1.5 py-0.5 rounded-md font-bold ${t.cls}`}>{t.label}</span>}
         <span className="flex items-center gap-0.5"><Clock size={9} /> {dias}d</span>
-        {prazo && (
-          <span
-            title={prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-bold ${
-              prazo.atrasado
+        <span
+          title={prazo
+            ? (prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`)
+            : 'Sem prazo definido — informe a previsão na OS'}
+          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-bold ${
+            !prazo
+              ? isDark ? 'text-slate-600' : 'text-slate-400'
+              : prazo.atrasado
                 ? 'bg-red-500/15 text-red-500'
                 : prazo.hojeOuAmanha
                   ? 'bg-amber-500/15 text-amber-600'
                   : isDark ? 'text-slate-400' : 'text-slate-500'
-            }`}>
-            <CalendarClock size={9} />
-            {prazo.label}{prazo.atrasado && ` (${Math.abs(prazo.dias)}d)`}
-          </span>
-        )}
+          }`}>
+          <CalendarClock size={9} />
+          {prazo ? `${prazo.label}${prazo.atrasado ? ` (${Math.abs(prazo.dias)}d)` : ''}` : 'sem prazo'}
+        </span>
         {os.fornecedor && (
           <span className="flex items-center gap-0.5 truncate max-w-[120px]">
             <Building2 size={9} /> {os.fornecedor.nome_fantasia ?? os.fornecedor.razao_social}
@@ -146,14 +172,12 @@ export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemPro
 
 export function OSRow({ os, veicFull, isDark, onClick, onVeicClick, dot }: OSItemProps) {
   const p = PRIOR[os.prioridade]
-  const t = TIPO_LABEL[os.tipo]
+  const t = badgeTipo(os)
   const dias = diasEmAberto(os.data_abertura)
   const prazo = prazoOS(os.data_previsao, os.status)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
   const corDot = dot ?? STATUS_DOT[os.status]
-  const { codigo, categoria } = veicFull
-    ? formatCodigoCategoria(veicFull)
-    : { codigo: os.veiculo?.placa ?? '—', categoria: '' }
+  const { codigo, categoria } = tituloOS(os, veicFull)
 
   return (
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2.5 text-left border-b transition-all ${
@@ -179,7 +203,9 @@ export function OSRow({ os, veicFull, isDark, onClick, onVeicClick, dot }: OSIte
           </span>
         </div>
       </div>
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0 ${t.cls}`}>{t.label}</span>
+      {t
+        ? <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0 ${t.cls}`}>{t.label}</span>
+        : <span className="w-[76px] shrink-0" />}
       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${p.badge}`}>{p.label}</span>
       <span className={`w-[50px] text-[10px] text-right shrink-0 ${dias > 14 ? 'text-red-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {dias}d
