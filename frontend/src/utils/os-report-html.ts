@@ -31,6 +31,9 @@ const num = (v?: number | null) => (v == null ? '—' : v.toLocaleString('pt-BR'
 const TIPO_OS: Record<string, string> = {
   preventiva: 'Preventiva', corretiva: 'Corretiva', sinistro: 'Sinistro', revisao: 'Revisão',
 }
+const PRIOR_OS: Record<string, string> = {
+  critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa',
+}
 const STATUS_OS: Record<string, string> = {
   pendente: 'Pendente', aberta: 'Aberta', em_cotacao: 'Em cotação',
   aguardando_aprovacao: 'Aguardando aprovação', aprovada: 'Aprovada', em_execucao: 'Em execução',
@@ -167,7 +170,7 @@ export async function buildOSReportHtml(osId: string, tipo: TipoRelatorioOS): Pr
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;background:#f1f5f9;font-size:13px;line-height:1.5}
 .wrap{max-width:820px;margin:0 auto;background:#fff}
-header{background:${isParecer ? '#0f172a' : '#065f46'};color:#fff;padding:18px 24px;display:flex;align-items:center;gap:16px}
+header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:16px}
 header img{height:34px}
 header .t{flex:1}
 header h1{font-size:19px;font-weight:700;letter-spacing:.3px}
@@ -180,7 +183,7 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748b;marg
 .campo{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
 .campo span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:700}
 .campo b{font-size:13px;font-weight:600}
-.texto{background:#f8fafc;border-left:3px solid ${isParecer ? '#0f172a' : '#059669'};border-radius:0 8px 8px 0;padding:10px 12px;white-space:pre-wrap}
+.texto{background:#f8fafc;border-left:3px solid #0f172a;border-radius:0 8px 8px 0;padding:10px 12px;white-space:pre-wrap}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase;letter-spacing:.6px;text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0}
 td{padding:6px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}
@@ -218,7 +221,7 @@ footer{padding:10px 24px;display:flex;justify-content:space-between;font-size:10
   <div class="campo"><span>Tipo de OS</span><b>${esc(TIPO_OS[os.tipo] ?? os.tipo ?? '—')}</b></div>
   <div class="campo"><span>Abertura</span><b>${fmtD(os.data_abertura)}</b></div>
   <div class="campo"><span>Previsão de término</span><b>${fmtD(os.data_previsao)}</b></div>
-  <div class="campo"><span>Prioridade</span><b>${esc(os.prioridade ?? '—')}</b></div>
+  <div class="campo"><span>Prioridade</span><b>${esc(PRIOR_OS[os.prioridade] ?? os.prioridade ?? '—')}</b></div>
 </div></section>
 
 <section><h2>${isParecer ? 'Problema relatado' : 'Problema que originou a OS'}</h2>
