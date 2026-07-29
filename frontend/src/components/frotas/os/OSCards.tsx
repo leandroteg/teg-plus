@@ -117,20 +117,22 @@ export function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: OSItemPro
       <div className={`flex items-center gap-2 flex-wrap text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         <span className={`px-1.5 py-0.5 rounded-md font-bold ${t.cls}`}>{t.label}</span>
         <span className="flex items-center gap-0.5"><Clock size={9} /> {dias}d</span>
-        {prazo && (
-          <span
-            title={prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-bold ${
-              prazo.atrasado
+        <span
+          title={prazo
+            ? (prazo.atrasado ? `Prazo vencido há ${Math.abs(prazo.dias)}d` : `Prazo: ${prazo.label}`)
+            : 'Sem prazo definido — informe a previsão na OS'}
+          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-bold ${
+            !prazo
+              ? isDark ? 'text-slate-600' : 'text-slate-400'
+              : prazo.atrasado
                 ? 'bg-red-500/15 text-red-500'
                 : prazo.hojeOuAmanha
                   ? 'bg-amber-500/15 text-amber-600'
                   : isDark ? 'text-slate-400' : 'text-slate-500'
-            }`}>
-            <CalendarClock size={9} />
-            {prazo.label}{prazo.atrasado && ` (${Math.abs(prazo.dias)}d)`}
-          </span>
-        )}
+          }`}>
+          <CalendarClock size={9} />
+          {prazo ? `${prazo.label}${prazo.atrasado ? ` (${Math.abs(prazo.dias)}d)` : ''}` : 'sem prazo'}
+        </span>
         {os.fornecedor && (
           <span className="flex items-center gap-0.5 truncate max-w-[120px]">
             <Building2 size={9} /> {os.fornecedor.nome_fantasia ?? os.fornecedor.razao_social}
