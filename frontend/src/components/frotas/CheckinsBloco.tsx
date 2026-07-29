@@ -4,8 +4,9 @@
 // inteiro pertence ao submodal.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
-import { ClipboardCheck, X, Loader, Gauge, Fuel, Users } from 'lucide-react'
-import { useCheckinsVeiculo } from '../../hooks/useFrotas'
+import { ClipboardCheck, X, Loader, Gauge, Fuel, Users, Plus, Check } from 'lucide-react'
+import { useCheckinsVeiculo, useCriarCheckinManual } from '../../hooks/useFrotas'
+import { useAuth } from '../../contexts/AuthContext'
 import { NotaIcone, AvariaIcone, ESCALA } from './CheckinIndicadores'
 
 const fmtDataHora = (iso: string) =>
@@ -135,6 +136,7 @@ export default function CheckinsBloco({ veiculoId, titulo, isLight }: {
 }) {
   const { data: lista = [], isLoading } = useCheckinsVeiculo(veiculoId, 1)
   const [verTodos, setVerTodos] = useState(false)
+  const [novo, setNovo] = useState(false)
   const ultimo = lista[0]
 
   const isDark = !isLight
@@ -156,15 +158,36 @@ export default function CheckinsBloco({ veiculoId, titulo, isLight }: {
         <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${txtMuted}`}>
           <ClipboardCheck size={11} /> Check-in diário
         </p>
-        <button
-          onClick={() => setVerTodos(true)}
-          className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-colors ${
-            isDark ? 'text-blue-400 hover:bg-blue-500/10' : 'text-blue-600 hover:bg-blue-50'
-          }`}
-        >
-          Ver check-ins
-        </button>
+        <span className="flex items-center gap-1">
+          <button
+            onClick={() => setNovo(v => !v)}
+            title="Lançar check-in manual"
+            className={`text-[10px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1 transition-colors ${
+              novo
+                ? isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-50 text-rose-700'
+                : isDark ? 'text-rose-400 hover:bg-rose-500/10' : 'text-rose-600 hover:bg-rose-50'
+            }`}
+          >
+            <Plus size={11} /> Check-in
+          </button>
+          <button
+            onClick={() => setVerTodos(true)}
+            className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-colors ${
+              isDark ? 'text-blue-400 hover:bg-blue-500/10' : 'text-blue-600 hover:bg-blue-50'
+            }`}
+          >
+            Ver check-ins
+          </button>
+        </span>
       </div>
+
+      {novo && (
+        <CheckinManualForm
+          veiculoId={veiculoId}
+          isDark={isDark}
+          onPronto={() => setNovo(false)}
+        />
+      )}
 
       {isLoading ? (
         <div className={`flex items-center justify-center gap-2 py-3 text-xs ${txtMuted}`}>
@@ -198,6 +221,102 @@ export default function CheckinsBloco({ veiculoId, titulo, isLight }: {
           onClose={() => setVerTodos(false)}
         />
       )}
+    </div>
+  )
+}
+
+// ── Check-in manual (escritório) ─────────────────────────────────────────────
+// Todos os campos são opcionais: preenche só o que se sabe. A data/hora do
+// lançamento é sempre gravada (created_at).
+function CheckinManualForm({ veiculoId, isDark, onPronto }: {
+  veiculoId: string; isDark: boolean; onPronto: () => void
+}) {
+  const { perfil } = useAuth()
+  const criar = useCriarCheckinManual()
+  const [cond, setCond] = useState<number | null>(null)
+  const [limp, setLimp] = useState<number | null>(null)
+  const [km, setKm] = useState('')
+  const [avaria, setAvaria] = useState('')
+  const [obs, setObs] = useState('')
+
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const inp = `w-full text-[11px] rounded-lg border px-2 py-1.5 outline-none ${
+    isDark ? 'bg-white/[0.04] border-white/10 text-slate-100 placeholder-slate-500'
+           : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'}`
+
+  const nada = cond == null && limp == null && !km.trim() && !avaria.trim() && !obs.trim()
+
+  const Escala = ({ valor, onSel, label }: { valor: number | null; onSel: (n: number | null) => void; label: string }) => (
+    <div>
+      <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>{label}</p>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(n => {
+          const e = ESCALA[n]
+          const Ic = e.icon
+          const on = valor === n
+          return (
+            <button
+              key={n}
+              type="button"
+              title={e.label}
+              onClick={() => onSel(on ? null : n)}
+              className={`p-1 rounded-lg transition-all ${on ? `${e.bg} ${e.cor} ring-1 ring-current` : `${txtMuted} hover:opacity-100 opacity-50`}`}
+            >
+              <Ic size={16} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  async function salvar() {
+    if (nada) return
+    try {
+      await criar.mutateAsync({
+        veiculoId,
+        avalFuncional: cond,
+        avalLimpeza: limp,
+        kmInformado: km.trim() ? Number(km.replace(/\D/g, '')) : null,
+        avariasNovas: avaria.trim() || null,
+        temAvaria: !!avaria.trim(),
+        observacao: obs.trim() || null,
+        colaboradorId: perfil?.colaborador_id ?? null,
+        registradoPorNome: perfil?.nome ?? null,
+      })
+      onPronto()
+    } catch (e: any) {
+      alert(`Erro ao lançar check-in: ${e?.message ?? 'desconhecido'}`)
+    }
+  }
+
+  return (
+    <div className={`rounded-lg border p-3 mb-3 ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+      <div className="flex flex-wrap gap-4 mb-2">
+        <Escala valor={cond} onSel={setCond} label="Condição" />
+        <Escala valor={limp} onSel={setLimp} label="Limpeza" />
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <input value={km} onChange={e => setKm(e.target.value)} inputMode="numeric" placeholder="Hodômetro (opcional)" className={inp} />
+        <input value={avaria} onChange={e => setAvaria(e.target.value)} placeholder="Avaria observada (opcional)" className={inp} />
+      </div>
+      <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Observação (opcional)" className={`${inp} mb-2`} />
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[10px] ${txtMuted}`}>
+          {nada ? 'Preencha ao menos um campo' : 'Só o preenchido será gravado'}
+        </span>
+        <span className="flex items-center gap-1">
+          <button onClick={onPronto} className={`text-[10px] font-bold px-2 py-1.5 rounded-lg ${txtMuted}`}>Cancelar</button>
+          <button
+            onClick={salvar}
+            disabled={nada || criar.isPending}
+            className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            {criar.isPending ? <Loader size={11} className="animate-spin" /> : <Check size={11} />}
+            Salvar
+          </button>
+        </span>
+      </div>
     </div>
   )
 }
