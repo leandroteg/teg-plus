@@ -6,7 +6,7 @@ import {
   ClipboardCheck, ShieldCheck, Cog, FileSearch, CalendarClock, PauseCircle,
 } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
-import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
+import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes, useEnviarAnexoOS } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
@@ -78,17 +78,31 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
     prioridade: 'media' as PrioridadeOS,
     descricao_problema: '', data_previsao: '',
   })
+  const enviarAnexo = useEnviarAnexoOS()
+  const [fotos, setFotos] = useState<File[]>([])
+  const [parado, setParado] = useState(true)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await criar.mutateAsync({
+    const os = await criar.mutateAsync({
       veiculo_id: form.veiculo_id, tipo: form.tipo,
       prioridade: form.prioridade,
       descricao_problema: form.descricao_problema,
       data_previsao: form.data_previsao || undefined,
+      veiculo_parado: parado,
       // Quem abriu — faz a OS aparecer em "Minhas Solicitações" para esta pessoa.
       solicitante_id: perfil?.id,
-    })
+    } as Parameters<typeof criar.mutateAsync>[0])
+    // Fotos do problema: a 1ª também vira a foto oficial da abertura
+    const osId = (os as { id?: string } | undefined)?.id
+    if (osId && fotos.length) {
+      for (const file of fotos) {
+        await enviarAnexo.mutateAsync({
+          osId, file, etapa: 'requisicao', rotulo: 'Foto do problema',
+          autorId: perfil?.id ?? null, autorNome: perfil?.nome ?? null,
+        }).catch(() => {})
+      }
+    }
     onClose()
   }
 
@@ -162,6 +176,31 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
             <input type="date" className={inp} value={form.data_previsao}
               onChange={e => setForm(f => ({ ...f, data_previsao: e.target.value }))} />
           </div>
+
+          <div>
+            <label className={lbl}>O veiculo ficou parado?</label>
+            <div className="flex gap-2">
+              {([['Sim, esta parado', true], ['Nao, segue rodando', false]] as const).map(([txt, v]) => (
+                <button key={String(v)} type="button" onClick={() => setParado(v)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                    parado === v
+                      ? 'bg-rose-500/15 border-rose-400/40 text-rose-500'
+                      : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'
+                  }`}>{txt}</button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className={lbl}>Fotos do problema</label>
+            <input type="file" accept="image/*" multiple className={inp}
+              onChange={e => setFotos(Array.from(e.target.files ?? []))} />
+            {fotos.length > 0 && (
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {fotos.length} foto(s) selecionada(s) — enviadas ao criar a OS
+              </p>
+            )}
+          </div>
         </div>
         <div className={`px-5 py-4 border-t flex gap-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <button type="button" onClick={onClose}
@@ -170,7 +209,7 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
           </button>
           <button type="submit" disabled={criar.isPending}
             className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-sm text-white font-bold transition-colors disabled:opacity-50">
-            {criar.isPending ? 'Criando...' : 'Criar OS'}
+            {criar.isPending || enviarAnexo.isPending ? 'Criando...' : 'Criar OS'}
           </button>
         </div>
       </form>
