@@ -583,10 +583,17 @@ export function useCriarOS() {
 
       // Reflete no ativo — só quando a demanda é de um veículo cadastrado.
       // Demandas de suprimento (compra, ativo sem placa) não têm veículo a bloquear.
+      // Só imobiliza o ativo se a OS disser que ele PAROU. Uma OS aberta não
+      // significa veículo fora de operação (ver fro_ordens_servico.veiculo_parado).
       if (osData.veiculo_id) {
+        const parado = (osData as { veiculo_parado?: boolean }).veiculo_parado !== false
         await supabase
           .from('fro_veiculos')
-          .update({ status: osData.prioridade === 'critica' ? 'bloqueado' : 'em_manutencao' })
+          .update({
+            status: !parado
+              ? 'necessario_parada'
+              : osData.prioridade === 'critica' ? 'bloqueado' : 'parada_manutencao',
+          })
           .eq('id', osData.veiculo_id)
       }
 
@@ -595,6 +602,21 @@ export function useCriarOS() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_os'] })
       qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+    },
+  })
+}
+
+/** Histórico de mudanças de fase da OS — a trigger do banco registra sozinha. */
+export function useHistoricoStatusOS(osId?: string) {
+  return useQuery({
+    queryKey: ['fro_os_status_hist', osId],
+    enabled: !!osId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_os_status_hist').select('*')
+        .eq('os_id', osId!).order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as { id: string; de: string | null; para: string; motivo: string | null; created_at: string }[]
     },
   })
 }
