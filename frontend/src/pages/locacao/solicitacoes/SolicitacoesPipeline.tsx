@@ -5,18 +5,19 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown,
+  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, ShieldAlert,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useSolicitacoesLocacao } from '../../../hooks/useLocacao'
 import SolicitacaoModal from './SolicitacaoModal'
+import RelatorioNCs from './RelatorioNCs'
 import { SolicitacaoCard, SolicitacaoRow, URGENCIA_ORDER, imovelLabel } from './SolicitacaoCards'
 import {
   STAGES, STAGE_ACCENT, STAGE_ACCENT_DARK, stageDe, ENCERRADOS, type StageKey,
 } from './solicitacaoStages'
 import type { LocSolicitacao } from '../../../types/locacao'
 
-type ViewMode = 'cards' | 'list' | 'quadro'
+type ViewMode = 'cards' | 'list' | 'quadro' | 'ncs'
 type SortField = 'data' | 'imovel' | 'urgencia'
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -130,7 +131,7 @@ export default function SolicitacoesPipeline() {
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Etapas — escondidas no quadro, onde as colunas já são as etapas. */}
-      {viewMode !== 'quadro' && (
+      {viewMode !== 'quadro' && viewMode !== 'ncs' && (
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${
         isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
       }`}>
@@ -192,6 +193,8 @@ export default function SolicitacoesPipeline() {
             className={`p-1.5 ${viewMode === 'cards' ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><LayoutGrid size={14} /></button>
           <button onClick={() => setViewMode('quadro')} title="Quadro"
             className={`p-1.5 ${viewMode === 'quadro' ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><Columns3 size={14} /></button>
+          <button onClick={() => setViewMode('ncs')} title="NCs de Segurança"
+            className={`p-1.5 ${viewMode === 'ncs' ? (isDark ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-50 text-rose-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><ShieldAlert size={14} /></button>
         </div>
         <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           {viewMode === 'quadro'
@@ -202,7 +205,9 @@ export default function SolicitacoesPipeline() {
 
       {/* Conteúdo */}
       <div className="min-h-[200px]">
-        {viewMode === 'quadro' ? (
+        {viewMode === 'ncs' ? (
+          <RelatorioNCs solicitacoes={solicitacoes} isDark={isDark} onAbrir={setDetail} />
+        ) : viewMode === 'quadro' ? (
           <div ref={boardRef} style={boardH ? { height: boardH } : undefined}
             className="flex gap-3 p-4 overflow-x-auto min-h-[360px]">
             {STAGES.map(stage => {

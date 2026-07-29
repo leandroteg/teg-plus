@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Wrench, FileText, Handshake, RefreshCw, Loader2, Paperclip } from 'lucide-react'
+import { X, Wrench, FileText, Handshake, RefreshCw, Loader2, Paperclip, ShieldAlert } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
@@ -8,6 +8,7 @@ import type { TipoSolicitacao, UrgenciaSolicitacao } from '../../types/locacao'
 const TIPOS: { key: TipoSolicitacao; label: string; desc: string; icon: typeof Wrench; iconColor: string }[] = [
   { key: 'manutencao', label: 'Manutencao',           desc: 'Reparos e manutencoes no imovel',        icon: Wrench,     iconColor: 'text-orange-500' },
   { key: 'servico',    label: 'Contrato de Servico',  desc: 'Servicos terceirizados (limpeza, etc)',   icon: FileText,   iconColor: 'text-blue-500' },
+  { key: 'nc_seguranca', label: 'NC de Seguranca',    desc: 'Nao-conformidade de seguranca no imovel', icon: ShieldAlert, iconColor: 'text-rose-500' },
   { key: 'acordo',     label: 'Acordo / Benfeitoria', desc: 'Benfeitorias, abatimentos ou multas',     icon: Handshake,  iconColor: 'text-green-500' },
   { key: 'renovacao',  label: 'Aditivo / Renovacao',  desc: 'Renovar ou aditivar contrato de locacao', icon: RefreshCw,  iconColor: 'text-violet-500' },
 ]
@@ -61,7 +62,7 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
         tipo, titulo, descricao,
         urgencia: (urgente ? 'urgente' : 'normal') as UrgenciaSolicitacao,
         imovel_id: imovelId || undefined,
-        data_limite: dataLimite || undefined,
+        data_limite: dataLimite,
         anexo_url: anexoUrl, anexo_nome: anexoNome,
       } as any)
       onClose()
@@ -164,8 +165,11 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
             {/* Data limite + Urgente */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data limite</label>
-                <input type="date" value={dataLimite} onChange={e => setDataLimite(e.target.value)}
+                <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>
+                  Prazo previsto <span className="text-rose-500">*</span>
+                </label>
+                <input type="date" required value={dataLimite} onChange={e => setDataLimite(e.target.value)}
+                  min={new Date().toISOString().slice(0, 10)}
                   className={`w-full text-sm rounded-xl px-3 py-2 border outline-none transition-colors ${inputCls}`} />
               </div>
               <div>
@@ -204,7 +208,7 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={criar.isPending || enviando || !titulo}
+                disabled={criar.isPending || enviando || !titulo || !dataLimite}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {(criar.isPending || enviando) && <Loader2 size={14} className="animate-spin" />}
