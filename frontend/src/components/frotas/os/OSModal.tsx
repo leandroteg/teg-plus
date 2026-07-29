@@ -13,7 +13,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2 } from 'lucide-react'
+  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext'
 import FornecedorPicker from './FornecedorPicker'
 import ItensOSEditor, { type ItemEdit } from './ItensOSEditor'
+import { OSAnexos, OSRelatorioModal } from './OSAnexos'
 import type { FroOrdemServico, FroVeiculo, StatusOS, TipoOS, PrioridadeOS } from '../../../types/frotas'
 
 // ── Fluxo ────────────────────────────────────────────────────────────────────
@@ -509,6 +510,9 @@ function CorpoAbertura({ os, veiculo, isDark, onClose }: {
       <p className={`text-[10px] text-center ${txtMuted}`}>
         Suprimentos recebe a OS e cota com as oficinas credenciadas · SLA {SLA_COTACAO_DIAS} dias
       </p>
+
+      {/* Além da foto obrigatória acima: quantas fotos/documentos quiser */}
+      <OSAnexos osId={os.id} etapa="requisicao" isDark={isDark} titulo="Outras fotos e documentos" />
     </div>
   )
 }
@@ -527,6 +531,7 @@ function CorpoCotacao({ os, isDark, onClose }: {
   const mudarStatus = useAtualizarStatusOS()
 
   const [itens, setItens] = useState<ItemEdit[]>([])
+  const [verParecer, setVerParecer] = useState(false)
   const [justificativa, setJustificativa] = useState(os.justificativa_excecao ?? '')
   const [fornecedorId, setFornecedorId] = useState(os.fornecedor_id ?? '')
   const [dataEntrada, setDataEntrada] = useState(os.data_programada_entrada ?? '')
@@ -672,6 +677,21 @@ function CorpoCotacao({ os, isDark, onClose }: {
       <p className={`text-[10px] text-center ${txtMuted}`}>
         Alçada: {alcadaDe(total).aprovador} ({alcadaDe(total).faixa})
       </p>
+
+      <OSAnexos osId={os.id} etapa="cotacao" isDark={isDark} titulo="Orçamentos, laudos e fotos da avaliação" />
+
+      <button
+        onClick={() => setVerParecer(true)}
+        className={`w-full py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 ${
+          isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+        }`}
+      >
+        <FileText size={13} /> Gerar Parecer Técnico
+      </button>
+      {verParecer && (
+        <OSRelatorioModal osId={os.id} numeroOS={os.numero_os} tipo="parecer" isDark={isDark}
+          onClose={() => setVerParecer(false)} />
+      )}
     </div>
   )
 }
@@ -1080,6 +1100,7 @@ function CorpoExecucao({ os, isDark, onClose }: {
   const { data: precoHist } = useHistoricoPrecoItens()
   const atualizar = useAtualizarOS()
   const [liberando, setLiberando] = useState(false)
+  const [verConclusao, setVerConclusao] = useState(false)
 
   const diasOficina = diasDesde(os.data_entrada_oficina)
   const atrasado = os.data_previsao ? new Date(os.data_previsao) < new Date() : false
@@ -1150,6 +1171,21 @@ function CorpoExecucao({ os, isDark, onClose }: {
       <Secao titulo="Problema" isDark={isDark}>
         <p className={`text-xs whitespace-pre-wrap ${txt}`}>{os.descricao_problema}</p>
       </Secao>
+
+      <OSAnexos osId={os.id} etapa="execucao" isDark={isDark} titulo="Fotos do serviço executado e NF" />
+
+      <button
+        onClick={() => setVerConclusao(true)}
+        className={`w-full py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 ${
+          isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+        }`}
+      >
+        <FileText size={13} /> Gerar Relatório de Conclusão
+      </button>
+      {verConclusao && (
+        <OSRelatorioModal osId={os.id} numeroOS={os.numero_os} tipo="conclusao" isDark={isDark}
+          onClose={() => setVerConclusao(false)} />
+      )}
 
       <button
         onClick={() => setLiberando(true)}
