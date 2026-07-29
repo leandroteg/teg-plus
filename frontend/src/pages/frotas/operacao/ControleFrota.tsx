@@ -11,13 +11,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer } from 'lucide-react'
+import { LayoutList, LayoutGrid, ArrowUp, ArrowDown, Search, X, Car, Cog, Printer, Camera } from 'lucide-react'
 import { imprimirQrAtivos } from '../../../components/frotas/QrAtivo'
-import { useVeiculos, useAlocacoes, useOrdensServico } from '../../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes, useOrdensServico, useUltimosCheckins } from '../../../hooks/useFrotas'
 import { useUtilizacaoVeiculos } from '../../../hooks/useTelemetria'
 import { useTheme } from '../../../contexts/ThemeContext'
 import MultiSelectPopover from '../../../components/MultiSelectPopover'
 import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { NotaIcone, AvariaIcone, TrioCheckin } from '../../../components/frotas/CheckinIndicadores'
 import { formatCodigoCategoria, parseObsInfo } from '../../../components/frotas/veiculoObs'
 import { CATEGORIA_LABEL, type CategoriaVeiculo } from '../../../constants/categoriaVeiculo'
 import { humanizarStatus } from '../../../types/frotas'
@@ -85,9 +86,12 @@ export default function ControleFrota() {
   const { data: veiculos = [], isLoading } = useVeiculos()
   const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const { data: ordens = [] } = useOrdensServico()
+  const { data: ultimosCheckin = [] } = useUltimosCheckins()
   const { data: utilizacao = [] } = useUtilizacaoVeiculos(inicio, fim)
 
   const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+  // Último check-in por ativo — alimenta Condição / Limpeza / Avarias.
+  const checkinByVeic = useMemo(() => new Map(ultimosCheckin.map(c => [c.veiculo_id, c])), [ultimosCheckin])
 
   // Abre a ficha assim que os dados chegam (uma vez só).
   useEffect(() => {
@@ -101,6 +105,7 @@ export default function ControleFrota() {
   const osByVeic = useMemo(() => {
     const m = new Map<string, FroOrdemServico[]>()
     ordens.forEach(o => {
+      if (!o.veiculo_id) return
       const l = m.get(o.veiculo_id) ?? []
       l.push(o)
       m.set(o.veiculo_id, l)
@@ -130,15 +135,25 @@ export default function ControleFrota() {
       }
 
       const { codigo, categoria } = formatCodigoCategoria(v)
+      const ck = checkinByVeic.get(v.id)
+
+      // Hodômetro: o do cadastro manda. Sem ele (nulo ou zerado), cai para o
+      // km do último check-in — mas SÓ se veio com foto do painel, que é a
+      // prova de que o número foi lido do veículo e não digitado de memória.
+      const hodoAtivo = v.hodometro_atual != null && v.hodometro_atual > 0 ? v.hodometro_atual : null
+      const kmCheckin = ck?.km_informado != null && ck.foto_painel_url ? Number(ck.km_informado) : null
+      const hodometro = hodoAtivo ?? (kmCheckin && kmCheckin > 0 ? kmCheckin : null)
+      const hodoDeCheckin = hodoAtivo == null && hodometro != null
+
       return {
-        v, aloc, obs, diasOS, disp, ocio,
+        v, aloc, obs, diasOS, disp, ocio, ck, hodometro, hodoDeCheckin,
         codigo, categoriaLabel: categoria || (CATEGORIA_LABEL[v.categoria as CategoriaVeiculo] ?? v.categoria),
         obra: aloc?.obra?.nome ?? '',
         local: obs.local ?? '',
         responsavel: aloc?.responsavel_nome ?? obs.responsavel ?? '',
       }
     })
-  }, [veiculos, alocByVeic, utilByVeic, osByVeic, inicio, fim])
+  }, [veiculos, alocByVeic, utilByVeic, osByVeic, checkinByVeic, inicio, fim])
 
   // ── Opções dos filtros ────────────────────────────────────────────────────
   const opts = useMemo(() => ({
@@ -175,7 +190,7 @@ export default function ControleFrota() {
         case 'categoria': return dir * a.categoriaLabel.localeCompare(b.categoriaLabel)
         case 'status':    return dir * (STATUS_LABEL[a.v.status] ?? '').localeCompare(STATUS_LABEL[b.v.status] ?? '')
         case 'obra':      return dir * a.obra.localeCompare(b.obra)
-        case 'hodometro': return dir * ((a.v.hodometro_atual ?? 0) - (b.v.hodometro_atual ?? 0))
+        case 'hodometro': return dir * ((a.hodometro ?? 0) - (b.hodometro ?? 0))
         case 'disp':      return dir * (a.disp - b.disp)
         case 'ocio':      return dir * ((a.ocio ?? -1) - (b.ocio ?? -1))
         default:          return dir * a.codigo.localeCompare(b.codigo)
@@ -206,7 +221,7 @@ export default function ControleFrota() {
   const inp = `px-2.5 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
     isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-white/[0.04] border-white/[0.1] text-slate-200'
   }`
-  const th = `px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none ${txtMuted}`
+  const th = `px-2.5 py-2 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none ${txtMuted}`
 
   const corPct = (p: number, invertido = false) => {
     const bom = invertido ? p < 30 : p > 85
@@ -217,7 +232,9 @@ export default function ControleFrota() {
   }
 
   return (
-    <div className="pb-4 space-y-3">
+    // pb generoso: o botão flutuante do assistente cobre o canto inferior direito
+    // e escondia a última linha da tabela.
+    <div className="pb-20 space-y-3">
       {/* Filtros — tudo em uma linha, caixas selecionáveis */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
@@ -321,6 +338,14 @@ export default function ControleFrota() {
 
                 {l.obra && <span className={`text-[11px] truncate max-w-[220px] ${txtMuted}`}>📍 {l.obra}</span>}
 
+                {/* Último check-in: condição · limpeza · avarias */}
+                <TrioCheckin
+                  funcional={l.ck?.aval_funcional}
+                  limpeza={l.ck?.aval_limpeza}
+                  temAvaria={l.ck ? l.ck.tem_avaria : null}
+                  avaria={l.ck?.avarias_novas}
+                />
+
                 <span className="ml-auto flex items-center gap-4 shrink-0">
                   <span className="text-right">
                     <span className={`block text-[9px] font-bold uppercase tracking-wider ${txtMuted}`}>Disponib.</span>
@@ -348,9 +373,13 @@ export default function ControleFrota() {
                   <th className={`${th} text-left`} onClick={() => toggleSort('categoria')}>Categoria {seta('categoria')}</th>
                   <th className={`${th} text-left`} onClick={() => toggleSort('status')}>Situação {seta('status')}</th>
                   <th className={`${th} text-left`} onClick={() => toggleSort('obra')}>Obra / Base {seta('obra')}</th>
+                  {/* Último check-in diário — leitura visual, sem ordenação */}
+                  <th className={`${th} text-center cursor-default`} title="Condições funcionais no último check-in">Condição</th>
+                  <th className={`${th} text-center cursor-default`} title="Limpeza no último check-in">Limpeza</th>
+                  <th className={`${th} text-center cursor-default`} title="Avarias apontadas no último check-in">Avarias</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('hodometro')}>Hodôm. {seta('hodometro')}</th>
                   <th className={`${th} text-right`} onClick={() => toggleSort('disp')}>Disponib. {seta('disp')}</th>
-                  <th className={`${th} text-right`} onClick={() => toggleSort('ocio')}>Ociosid. {seta('ocio')}</th>
+                  <th className={`${th} text-right !pr-5`} onClick={() => toggleSort('ocio')}>Ociosid. {seta('ocio')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -358,28 +387,45 @@ export default function ControleFrota() {
                   <tr key={l.v.id} onClick={() => setDetalhe({ v: l.v, a: l.aloc })}
                     className={`cursor-pointer border-t ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.04]'}`}>
                     <td className="px-2 py-2">
-                      <span className={`font-mono text-xs font-extrabold ${txtMain}`}>{l.codigo}</span>
-                      <span className={`block text-[10px] truncate max-w-[170px] ${txtMuted}`}>{l.v.marca} {l.v.modelo}</span>
+                      <span className={`font-mono text-sm font-extrabold ${txtMain}`}>{l.codigo}</span>
+                      <span className={`block text-[11px] truncate max-w-[190px] ${txtMuted}`}>{l.v.marca} {l.v.modelo}</span>
                     </td>
-                    <td className={`px-2 py-2 font-mono text-xs ${txtMuted}`}>{l.v.placa}</td>
-                    <td className={`px-2 py-2 text-[11px] ${txtMuted}`}>{l.categoriaLabel}</td>
+                    <td className={`px-2.5 py-2 font-mono text-[13px] ${txtMuted}`}>{l.v.placa}</td>
+                    <td className={`px-2.5 py-2 text-xs ${txtMuted}`}>{l.categoriaLabel}</td>
                     <td className="px-2 py-2">
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] ${txtMuted}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-xs ${txtMuted}`}>
                         <span className={`w-2 h-2 rounded-full ${STATUS_DOT[l.v.status] ?? 'bg-slate-400'}`} />
                         {STATUS_LABEL[l.v.status] ?? humanizarStatus(l.v.status)}
                       </span>
                     </td>
-                    <td className={`px-2 py-2 text-[11px] max-w-[200px] truncate ${txtMuted}`}>
+                    <td className={`px-2.5 py-2 text-xs max-w-[230px] truncate ${txtMuted}`}>
                       {l.obra || l.local || '—'}
                     </td>
-                    <td className={`px-2 py-2 text-right text-[11px] tabular-nums ${txtMuted}`}>
-                      {l.v.hodometro_atual != null ? l.v.hodometro_atual.toLocaleString('pt-BR') : '—'}
+                    <td className="px-2 py-2 text-center">
+                      <NotaIcone nota={l.ck?.aval_funcional} titulo="Condição" />
                     </td>
-                    <td className={`px-2 py-2 text-right text-xs font-bold tabular-nums ${corPct(l.disp)}`}
+                    <td className="px-2 py-2 text-center">
+                      <NotaIcone nota={l.ck?.aval_limpeza} titulo="Limpeza" />
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <AvariaIcone temAvaria={l.ck ? l.ck.tem_avaria : null} descricao={l.ck?.avarias_novas} />
+                    </td>
+                    <td className={`px-2.5 py-2 text-right text-xs tabular-nums ${txtMuted}`}>
+                      {l.hodometro == null ? '—' : (
+                        <span className="inline-flex items-center justify-end gap-1"
+                          title={l.hodoDeCheckin
+                            ? `Do check-in de ${new Date(l.ck!.created_at).toLocaleDateString('pt-BR')} — foto do painel confirmada`
+                            : undefined}>
+                          {l.hodoDeCheckin && <Camera size={11} className="text-blue-500 shrink-0" />}
+                          {l.hodometro.toLocaleString('pt-BR')}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`px-2.5 py-2 text-right text-sm font-bold tabular-nums ${corPct(l.disp)}`}
                       title={`${l.diasOS.toFixed(1)} dia(s) parado em OS no período`}>
                       {l.disp.toFixed(0)}%
                     </td>
-                    <td className={`px-2 py-2 text-right text-xs font-bold tabular-nums ${l.ocio == null ? txtMuted : corPct(l.ocio, true)}`}
+                    <td className={`pl-2.5 pr-5 py-2 text-right text-sm font-bold tabular-nums whitespace-nowrap ${l.ocio == null ? txtMuted : corPct(l.ocio, true)}`}
                       title={l.ocio == null ? 'Sem telemetria no período' : undefined}>
                       {l.ocio == null ? '—' : `${l.ocio.toFixed(0)}%`}
                     </td>
