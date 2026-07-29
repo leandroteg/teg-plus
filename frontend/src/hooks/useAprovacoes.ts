@@ -21,6 +21,7 @@ const APROVADORES_COMPRAS = new Set([
   'elton.costa',
   'leandro.mallet',
   'jackeline.freire',
+  'gabriel.freitas',
 ])
 
 // Helper reutilizavel: usuario esta na allowlist de aprovadores de compras?
