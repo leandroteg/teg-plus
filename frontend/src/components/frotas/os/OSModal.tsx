@@ -13,7 +13,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText } from 'lucide-react'
+  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText, XCircle, CheckCircle } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
@@ -844,8 +844,6 @@ function CorpoAprovacao({ os, isDark, onClose }: {
   const aprovar = useAprovarOS()
 
   const salvarItens = useSalvarItensOS()
-  const [modo, setModo] = useState<'ver' | 'ajustar' | 'rejeitar'>('ver')
-  const [valorAjuste, setValorAjuste] = useState(os.valor_orcado?.toString() ?? '')
   const [motivo, setMotivo] = useState('')
   const [erro, setErro] = useState<string>()
   const [detalhando, setDetalhando] = useState(false)
@@ -867,13 +865,25 @@ function CorpoAprovacao({ os, isDark, onClose }: {
     isDark ? 'bg-white/[0.04] border-white/[0.1] text-white' : 'bg-white border-slate-200 text-slate-800'
   }`
 
+  // Esclarecer: devolve à Cotação com a dúvida registrada (não é rejeição).
+  async function pedirEsclarecimento() {
+    if (!motivo.trim()) { setErro('Escreva o que precisa ser esclarecido.'); return }
+    try {
+      await mudarStatus.mutateAsync({
+        id: os.id, status: 'em_cotacao',
+        extra: { status_detalhe: `Esclarecimento pedido na aprovação: ${motivo.trim()}` },
+      })
+      onClose()
+    } catch (e: any) { setErro(e?.message ?? 'Falha ao pedir esclarecimento') }
+  }
+
   async function decidir(ok: boolean) {
     setErro(undefined)
     if (!ok && !motivo.trim()) return setErro('Motivo da rejeição é obrigatório.')
     await aprovar.mutateAsync({
       id: os.id,
       aprovado: ok,
-      valor: ok ? (modo === 'ajustar' ? +valorAjuste : total) : undefined,
+      valor: ok ? total : undefined,
       motivo: ok ? undefined : motivo.trim(),
     })
     onClose()
@@ -986,52 +996,37 @@ function CorpoAprovacao({ os, isDark, onClose }: {
         </p>
       </div>
 
-      {modo === 'ajustar' && (
-        <div>
-          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Valor aprovado</label>
-          <input type="number" value={valorAjuste} onChange={e => setValorAjuste(e.target.value)} className={inp} />
-        </div>
-      )}
-      {modo === 'rejeitar' && (
-        <div>
-          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${txtMuted}`}>Motivo da rejeição *</label>
-          <textarea rows={2} value={motivo} onChange={e => setMotivo(e.target.value)} className={`${inp} resize-none`} />
-        </div>
-      )}
 
       <Erro msg={erro} />
 
-      <div className="flex flex-col gap-2">
-        {modo === 'rejeitar' ? (
-          <div className="flex gap-2">
-            <button onClick={() => { setModo('ver'); setErro(undefined) }}
-              className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
-              Voltar
-            </button>
-            <button onClick={() => decidir(false)} disabled={aprovar.isPending}
-              className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-50">
-              Confirmar rejeição
-            </button>
-          </div>
-        ) : (
-          <>
-            <button onClick={() => decidir(true)} disabled={aprovar.isPending}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition-colors">
-              {aprovar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Aprovar {BRL(modo === 'ajustar' ? +valorAjuste || 0 : total)}
-            </button>
-            <div className="flex gap-2">
-              <button onClick={() => setModo(modo === 'ajustar' ? 'ver' : 'ajustar')}
-                className={`flex-1 py-2 rounded-xl border text-xs font-semibold ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
-                {modo === 'ajustar' ? 'Cancelar ajuste' : 'Aprovar com ajuste'}
-              </button>
-              <button onClick={() => setModo('rejeitar')}
-                className="flex-1 py-2 rounded-xl border border-red-500/30 text-red-500 text-xs font-semibold">
-                Rejeitar
-              </button>
-            </div>
-          </>
-        )}
+      {/* Decisão no padrão dos demais módulos: 1 observação + 3 saídas */}
+      <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+        <textarea
+          rows={2}
+          className={`w-full border rounded-xl px-3 py-2 text-sm outline-none resize-none ${
+            isDark
+              ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30'
+              : 'border-slate-200 focus:ring-2 focus:ring-teal-400/30'
+          }`}
+          placeholder="Observação / motivo..."
+          value={motivo}
+          onChange={e => setMotivo(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <button disabled={aprovar.isPending} onClick={() => decidir(false)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98] transition-all disabled:opacity-50">
+            <XCircle size={14} /> Rejeitar
+          </button>
+          <button disabled={aprovar.isPending} onClick={pedirEsclarecimento}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98] transition-all disabled:opacity-50">
+            <MessageSquare size={14} /> Esclarecer
+          </button>
+          <button disabled={aprovar.isPending} onClick={() => decidir(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98] transition-all disabled:opacity-50">
+            {aprovar.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+            Aprovar
+          </button>
+        </div>
       </div>
     </div>
   )
