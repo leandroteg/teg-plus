@@ -13,14 +13,16 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,
+  FileSearch, Send, Building2, Clock, CalendarClock, MessageSquare, Trash2,
 } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
   useCotacoesOS, useSalvarCotacao, useFornecedoresOS,
   useProgramarEntradaOS, useLiberarOS, useAlocacoes, useVeiculos, useChecklists,
+  useComentariosOS, useAdicionarComentarioOS, useRemoverComentarioOS,
 } from '../../../hooks/useFrotas'
+import { useAuth } from '../../../contexts/AuthContext'
 import FornecedorPicker from './FornecedorPicker'
 import ItensOSEditor, { type ItemEdit } from './ItensOSEditor'
 import type { FroOrdemServico, FroVeiculo, StatusOS, TipoOS, PrioridadeOS } from '../../../types/frotas'
@@ -62,12 +64,6 @@ const diasDesde = (d?: string) =>
 const TIPO_LABEL: Record<TipoOS, string> = {
   preventiva: 'Preventiva', corretiva: 'Corretiva', sinistro: 'Sinistro', revisao: 'Revisão',
 }
-const NATUREZA_LABEL: Record<string, string> = {
-  material: 'Material/Compra', servico: 'Serviço', manutencao: 'Manutenção',
-}
-/** Rótulo de classificação: tipo de manutenção, ou natureza quando é demanda de suprimento. */
-const classifOS = (os: FroOrdemServico) =>
-  os.tipo ? TIPO_LABEL[os.tipo] : (os.natureza ? NATUREZA_LABEL[os.natureza] : 'Demanda')
 const PRIOR_LABEL: Record<PrioridadeOS, string> = {
   critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa',
 }
@@ -84,19 +80,6 @@ export default function OSModal({
 }) {
   const etapaAtual = etapaDe(os.status)
   const encerrada = os.status === 'rejeitada' || os.status === 'cancelada'
-  const emEspera = os.status === 'aguardando'
-
-  // Pausar: leva a OS para "Aguardando" (para mas não cancela nem conclui),
-  // guardando a etapa de origem para retomar depois. Motivo vai em status_detalhe.
-  const mudarStatus = useAtualizarStatusOS()
-  const [pausando, setPausando] = useState(false)
-  const [motivoPausa, setMotivoPausa] = useState('')
-  const pausar = () => {
-    mudarStatus.mutate(
-      { id: os.id, status: 'aguardando', extra: { status_anterior: os.status, status_detalhe: motivoPausa || null } },
-      { onSuccess: onClose },
-    )
-  }
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'
@@ -125,7 +108,7 @@ export default function OSModal({
           </div>
 
           {/* Stepper — cada etapa com a data em que a OS entrou nela */}
-          {!encerrada && !emEspera && (
+          {!encerrada && (
             <div className="flex items-center gap-1 mt-2.5 overflow-x-auto pb-0.5">
               {FLUXO.map((e, i) => {
                 const passou = i < etapaAtual
@@ -159,12 +142,6 @@ export default function OSModal({
               {os.motivo_rejeicao && ` · ${os.motivo_rejeicao}`}
             </span>
           )}
-          {emEspera && (
-            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-orange-500/15 text-orange-500">
-              <PauseCircle size={11} /> Aguardando
-              {os.status_detalhe && ` · ${os.status_detalhe}`}
-            </span>
-          )}
         </div>
 
         {/* Veículo */}
@@ -178,43 +155,17 @@ export default function OSModal({
             <Car size={15} className={txtMuted} />
             <div className="min-w-0">
               <p className={`text-sm font-bold ${txt} ${onVeiculoClick ? 'hover:underline decoration-dotted' : ''}`}>
-                {veiculo?.codigo_interno || os.veiculo?.placa || os.ativo_livre || 'Demanda de suprimentos'}
+                {veiculo?.codigo_interno || os.veiculo?.placa || '—'}
                 <span className={`ml-2 text-xs font-normal ${txtMuted}`}>
                   {os.veiculo?.marca} {os.veiculo?.modelo}
                 </span>
               </p>
               <p className={`text-[11px] ${txtMuted}`}>
-                {classifOS(os)} · Prioridade {PRIOR_LABEL[os.prioridade]} · Aberta {fmtData(os.data_abertura)}
+                {TIPO_LABEL[os.tipo]} · Prioridade {PRIOR_LABEL[os.prioridade]} · Aberta {fmtData(os.data_abertura)}
               </p>
             </div>
           </button>
         </div>
-
-        {/* Pausar → Aguardando (disponível em qualquer etapa ativa) */}
-        {!encerrada && !emEspera && os.status !== 'concluida' && (
-          <div className={`px-5 py-2 border-b ${border}`}>
-            {pausando ? (
-              <div className="flex items-center gap-2">
-                <input autoFocus value={motivoPausa} onChange={e => setMotivoPausa(e.target.value)}
-                  placeholder="Motivo (opcional): peça em falta, aguardando terceiro…"
-                  className={`flex-1 px-2.5 py-1.5 rounded-lg border text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
-                    isDark ? 'bg-white/[0.04] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
-                  }`} />
-                <button onClick={pausar} disabled={mudarStatus.isPending}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50">
-                  {mudarStatus.isPending ? <Loader2 size={12} className="animate-spin" /> : <PauseCircle size={12} />} Confirmar
-                </button>
-                <button onClick={() => { setPausando(false); setMotivoPausa('') }}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Cancelar</button>
-              </div>
-            ) : (
-              <button onClick={() => setPausando(true)}
-                className={`flex items-center gap-1.5 text-[11px] font-semibold ${isDark ? 'text-orange-400 hover:text-orange-300' : 'text-orange-600 hover:text-orange-700'}`}>
-                <PauseCircle size={13} /> Colocar em Aguardando
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Corpo por etapa */}
         <div className="p-5">
@@ -228,16 +179,113 @@ export default function OSModal({
             <CorpoProgramacao os={os} veiculo={veiculo} isDark={isDark} onClose={onClose} />
           ) : os.status === 'em_execucao' ? (
             <CorpoExecucao os={os} isDark={isDark} onClose={onClose} />
-          ) : os.status === 'aguardando' ? (
-            <CorpoAguardando os={os} isDark={isDark} onClose={onClose} />
           ) : os.status === 'concluida' ? (
             <CorpoLiberado os={os} isDark={isDark} />
           ) : (
             <CorpoResumo os={os} isDark={isDark} />
           )}
+
+          {/* Comentários — disponíveis em qualquer etapa do fluxo */}
+          <div className="mt-4">
+            <ComentariosOS osId={os.id} isDark={isDark} />
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Comentários da OS ────────────────────────────────────────────────────────
+function ComentariosOS({ osId, isDark }: { osId: string; isDark: boolean }) {
+  const { perfil } = useAuth()
+  const { data: comentarios = [], isLoading } = useComentariosOS(osId)
+  const adicionar = useAdicionarComentarioOS()
+  const remover = useRemoverComentarioOS()
+  const [texto, setTexto] = useState('')
+
+  const txt = isDark ? 'text-slate-200' : 'text-slate-700'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const quando = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+  const iniciais = (nome?: string | null) =>
+    (nome ?? '?').trim().split(/\s+/).slice(0, 2).map(p => p[0] ?? '').join('').toUpperCase() || '?'
+
+  async function enviar() {
+    if (!texto.trim() || adicionar.isPending) return
+    try {
+      await adicionar.mutateAsync({
+        osId, mensagem: texto, autorId: perfil?.id ?? null, autorNome: perfil?.nome ?? null,
+      })
+      setTexto('')
+    } catch (e: any) { alert(`Erro ao comentar: ${e?.message ?? 'desconhecido'}`) }
+  }
+
+  return (
+    <Secao titulo={`Comentários${comentarios.length ? ` (${comentarios.length})` : ''}`} isDark={isDark}>
+      {isLoading ? (
+        <p className={`text-[11px] flex items-center gap-1.5 ${txtMuted}`}>
+          <Loader2 size={11} className="animate-spin" /> carregando…
+        </p>
+      ) : comentarios.length === 0 ? (
+        <p className={`text-[11px] flex items-center gap-1.5 ${txtMuted}`}>
+          <MessageSquare size={11} /> Nenhum comentário ainda.
+        </p>
+      ) : (
+        <div className="space-y-2.5 mb-3">
+          {comentarios.map(c => (
+            <div key={c.id} className="flex gap-2">
+              <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold ${
+                isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-100 text-rose-700'
+              }`}>
+                {iniciais(c.criado_por_nome)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className={`text-[11px] font-bold ${txt}`}>{c.criado_por_nome ?? 'Sem autor'}</span>
+                  <span className={`text-[10px] ${txtMuted}`}>{quando(c.created_at)}</span>
+                  {perfil?.id && c.autor_id === perfil.id && (
+                    <button
+                      onClick={() => { if (window.confirm('Apagar este comentário?')) remover.mutate({ id: c.id, osId }) }}
+                      className={`ml-auto p-0.5 rounded ${txtMuted} hover:text-red-500`}
+                      title="Apagar meu comentário"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  )}
+                </div>
+                <p className={`text-[12px] whitespace-pre-wrap break-words ${txt}`}>{c.mensagem}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-end gap-2">
+        <textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); enviar() } }}
+          rows={2}
+          placeholder="Escreva um comentário… (Ctrl+Enter envia)"
+          className={`flex-1 text-[12px] rounded-lg border px-2.5 py-2 outline-none resize-none ${
+            isDark
+              ? 'bg-white/[0.04] border-white/10 text-slate-100 placeholder-slate-500'
+              : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+          }`}
+        />
+        <button
+          onClick={enviar}
+          disabled={!texto.trim() || adicionar.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-40"
+        >
+          {adicionar.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+          Enviar
+        </button>
+      </div>
+    </Secao>
   )
 }
 
@@ -695,7 +743,7 @@ function CorpoAprovacao({ os, isDark, onClose }: {
           Veículo parado há {diasParado ?? '—'} dias
         </p>
         <p className={`text-[11px] ${isDark ? 'text-red-300/80' : 'text-red-700'}`}>
-          {classifOS(os)} · prioridade {PRIOR_LABEL[os.prioridade]}
+          {TIPO_LABEL[os.tipo]} · prioridade {PRIOR_LABEL[os.prioridade]}
         </p>
       </div>
 
@@ -1390,66 +1438,6 @@ function CorpoResumo({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
           <p className={`text-xs font-semibold ${txt}`}>{os.status_detalhe}</p>
         </Secao>
       )}
-    </div>
-  )
-}
-
-// ── AGUARDANDO (em espera) ────────────────────────────────────────────────────
-// A OS parou mas não foi cancelada nem concluída. Daqui ela RETOMA para a etapa
-// de onde saiu (status_anterior), ou pode ser cancelada.
-const STAGE_RETOMA_LABEL: Record<string, string> = {
-  pendente: 'Pendente', aberta: 'Pendente', em_cotacao: 'Cotação',
-  aguardando_aprovacao: 'Aprovação', aprovada: 'Programação', em_execucao: 'Execução',
-}
-function CorpoAguardando({ os, isDark, onClose }: {
-  os: FroOrdemServico; isDark: boolean; onClose: () => void
-}) {
-  const mudarStatus = useAtualizarStatusOS()
-  const txt = isDark ? 'text-white' : 'text-slate-800'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-
-  // Para onde volta: a etapa de origem; sem registro, cai em Cotação.
-  const destino = (os.status_anterior && STAGE_RETOMA_LABEL[os.status_anterior]) ? os.status_anterior : 'em_cotacao'
-  const destinoLabel = STAGE_RETOMA_LABEL[destino] ?? 'Cotação'
-  const desde = os.updated_at ? Math.floor((Date.now() - new Date(os.updated_at).getTime()) / 86_400_000) : null
-
-  const retomar = () =>
-    mudarStatus.mutate({ id: os.id, status: destino as StatusOS, extra: { status_anterior: null } }, { onSuccess: onClose })
-  const cancelar = () =>
-    mudarStatus.mutate({ id: os.id, status: 'cancelada' }, { onSuccess: onClose })
-
-  return (
-    <div className="space-y-4">
-      <Secao titulo="Em espera" isDark={isDark} acento="alerta">
-        <p className={`text-xs ${txt}`}>
-          {os.status_detalhe || 'Sem motivo registrado.'}
-        </p>
-        {desde != null && (
-          <p className={`text-[11px] mt-1 flex items-center gap-1 ${txtMuted}`}>
-            <Clock size={11} /> parada há {desde} {desde === 1 ? 'dia' : 'dias'}
-          </p>
-        )}
-      </Secao>
-
-      <Secao titulo="Problema" isDark={isDark}>
-        <p className={`text-xs whitespace-pre-wrap ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-          {os.descricao_problema}
-        </p>
-      </Secao>
-
-      <div className="flex items-center gap-2">
-        <button onClick={retomar} disabled={mudarStatus.isPending}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50">
-          {mudarStatus.isPending ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
-          Retomar para {destinoLabel}
-        </button>
-        <button onClick={cancelar} disabled={mudarStatus.isPending}
-          className={`px-3 py-2.5 rounded-xl text-xs font-bold border ${
-            isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-          } disabled:opacity-50`}>
-          Cancelar OS
-        </button>
-      </div>
     </div>
   )
 }
