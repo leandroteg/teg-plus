@@ -10,7 +10,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useUsoModulos, useUsoModuloDetalhe, useUsoMetas, useSalvarMeta,
-  useUltimaAnalise, useGerarAnalise, type PeriodoDias,
+  useUltimaAnalise, useGerarAnalise, useUsoPorUsuario, type PeriodoDias,
 } from '../../hooks/useUsoModulos'
 import { moduleLabel, TRACKED_MODULES } from '../../config/moduleTracking'
 import type { UsoPorUsuario } from '../../types/usoModulos'
@@ -19,6 +19,9 @@ const PERIODOS: PeriodoDias[] = [7, 30, 90]
 const COLORS = ['#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b']
 
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+const toIsoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const fmtNum = (n: number) => n.toLocaleString('pt-BR')
 const fmtDataHora = (iso: string | null) =>
   iso
@@ -523,6 +526,8 @@ export default function UsoModulos() {
   const [mostrarSemUso, setMostrarSemUso] = useState(false)
   const [buscaUsuario, setBuscaUsuario] = useState('')
   const [moduloDetalhe, setModuloDetalhe] = useState<string | null>(null)
+  // Período próprio da tabela "Uso por usuário": 'd:<n>' (últimos n dias) ou 'm:AAAA-MM' (mês)
+  const [periodoUsuarios, setPeriodoUsuarios] = useState('d:30')
 
   const { data, isLoading, isError, error } = useUsoModulos(dias)
   const { data: metas = {} } = useUsoMetas()
@@ -568,20 +573,61 @@ export default function UsoModulos() {
     [data],
   )
 
+  // Opções de mês (mês atual + 5 anteriores) para o filtro da tabela de usuários
+  const opcoesMes = useMemo(() => {
+    const hoje = new Date()
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
+      return {
+        value: `m:${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: capitalizar(d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })),
+      }
+    })
+  }, [])
+
+  // Converte a seleção em intervalo de datas + rótulo exibido nas colunas
+  const periodoUso = useMemo(() => {
+    const hoje = new Date()
+    if (periodoUsuarios.startsWith('m:')) {
+      const [ano, mes] = periodoUsuarios.slice(2).split('-').map(Number)
+      const inicio = new Date(ano, mes - 1, 1)
+      const fimMes = new Date(ano, mes, 0)
+      const nome = inicio.toLocaleDateString('pt-BR', { month: 'long' })
+      return {
+        inicio: toIsoDate(inicio),
+        fim: toIsoDate(fimMes > hoje ? hoje : fimMes),
+        rotulo: `no mês de ${nome}`,
+      }
+    }
+    const n = Number(periodoUsuarios.slice(2))
+    const inicio = new Date(hoje)
+    inicio.setDate(inicio.getDate() - (n - 1))
+    return { inicio: toIsoDate(inicio), fim: toIsoDate(hoje), rotulo: `nos últimos ${n} dias` }
+  }, [periodoUsuarios])
+
+  const { data: usoUsuarios, isLoading: carregandoUsuarios } = useUsoPorUsuario(periodoUso.inicio, periodoUso.fim)
+
   const usuariosVisiveis = useMemo(() => {
-    let lista = data?.por_usuario ?? []
+    let lista = usoUsuarios?.usuarios ?? []
     if (!mostrarSemUso) lista = lista.filter((u) => u.total_acessos + u.total_acoes > 0)
     const termo = normalizar(buscaUsuario.trim())
     if (termo) lista = lista.filter((u) => normalizar(u.nome).includes(termo))
     return lista
-  }, [data, mostrarSemUso, buscaUsuario])
+  }, [usoUsuarios, mostrarSemUso, buscaUsuario])
 
   const semUsoCount = useMemo(
-    () => (data?.por_usuario ?? []).filter((u) => u.total_acessos + u.total_acoes === 0).length,
-    [data],
+    () => (usoUsuarios?.usuarios ?? []).filter((u) => u.total_acessos + u.total_acoes === 0).length,
+    [usoUsuarios],
   )
 
-  const nuncaUsados = (u: UsoPorUsuario) => modulosComUso.filter((m) => !u.modulos_usados.includes(m))
+  // módulos usados por alguém no período da tabela de usuários (base do "nunca usou")
+  const modulosComUsoTabela = useMemo(() => {
+    const s = new Set<string>()
+    for (const u of usoUsuarios?.usuarios ?? []) for (const m of u.modulos_usados) s.add(m)
+    return [...s]
+  }, [usoUsuarios])
+
+  const nuncaUsados = (u: UsoPorUsuario) => modulosComUsoTabela.filter((m) => !u.modulos_usados.includes(m))
 
   const panel = isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
   const label = isLight ? 'text-slate-500' : 'text-slate-400'
@@ -888,6 +934,19 @@ export default function UsoModulos() {
             <div className={`rounded-2xl border p-4 mb-4 overflow-x-auto ${panel}`}>
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <h2 className={`text-sm font-semibold mr-auto ${heading}`}>Uso por usuário</h2>
+                <select
+                  value={periodoUsuarios}
+                  onChange={(e) => setPeriodoUsuarios(e.target.value)}
+                  className={selectCls}
+                  title="Período dos acessos, ações e dias ativos desta tabela"
+                >
+                  {[7, 15, 30, 90].map((n) => (
+                    <option key={n} value={`d:${n}`} className={optionCls}>Últimos {n} dias</option>
+                  ))}
+                  {opcoesMes.map((m) => (
+                    <option key={m.value} value={m.value} className={optionCls}>{m.label}</option>
+                  ))}
+                </select>
                 <div className="relative">
                   <Search size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${label}`} />
                   <input
@@ -910,18 +969,33 @@ export default function UsoModulos() {
                   {mostrarSemUso ? 'Ocultar sem uso' : `Mostrar sem uso (${semUsoCount})`}
                 </button>
               </div>
-              {usuariosVisiveis.length === 0 ? (
+              {carregandoUsuarios ? (
+                <div className="animate-pulse space-y-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className={`h-9 rounded-lg ${isLight ? 'bg-slate-100' : 'bg-white/[0.04]'}`} />
+                  ))}
+                </div>
+              ) : usuariosVisiveis.length === 0 ? (
                 <p className={`text-[13px] ${label}`}>
-                  {buscaUsuario.trim() ? 'Nenhum usuário encontrado com esse nome.' : 'Nenhum usuário com uso no período.'}
+                  {buscaUsuario.trim() ? 'Nenhum usuário encontrado com esse nome.' : `Nenhum usuário com uso ${periodoUso.rotulo}.`}
                 </p>
               ) : (
                 <table className="w-full text-[13px]">
                   <thead>
                     <tr className={`text-left text-[11px] uppercase tracking-wide ${label}`}>
                       <th className="py-2 pr-3 font-medium">Usuário</th>
-                      <th className="py-2 pr-3 font-medium text-right">Acessos</th>
-                      <th className="py-2 pr-3 font-medium text-right">Ações</th>
-                      <th className="py-2 pr-3 font-medium text-right">Dias ativos</th>
+                      <th className="py-2 pr-3 font-medium text-right">
+                        Acessos
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                      </th>
+                      <th className="py-2 pr-3 font-medium text-right">
+                        Ações
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                      </th>
+                      <th className="py-2 pr-3 font-medium text-right">
+                        Dias ativos
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                      </th>
                       <th className="py-2 pr-3 font-medium">Último uso</th>
                       <th className="py-2 pr-3 font-medium">Módulos usados</th>
                       <th className="py-2 font-medium">Nunca usou</th>
@@ -934,9 +1008,19 @@ export default function UsoModulos() {
                           <div className={`font-medium ${heading}`}>{u.nome}</div>
                           <div className={`text-[11px] capitalize ${label}`}>{u.role}</div>
                         </td>
-                        <td className={`py-2 pr-3 text-right tabular-nums ${label}`}>{fmtNum(u.total_acessos)}</td>
+                        <td
+                          className={`py-2 pr-3 text-right tabular-nums ${label}`}
+                          title={`${fmtNum(u.total_acessos)} acessos ${periodoUso.rotulo}`}
+                        >
+                          {fmtNum(u.total_acessos)}
+                        </td>
                         <td className={`py-2 pr-3 text-right tabular-nums ${label}`}>{fmtNum(u.total_acoes)}</td>
-                        <td className={`py-2 pr-3 text-right tabular-nums ${label}`}>{u.dias_ativos}/{dias}</td>
+                        <td
+                          className={`py-2 pr-3 text-right tabular-nums ${label}`}
+                          title={`Ativo em ${u.dias_ativos} de ${usoUsuarios?.dias_periodo} dias ${periodoUso.rotulo}`}
+                        >
+                          {u.dias_ativos}/{usoUsuarios?.dias_periodo}
+                        </td>
                         <td className={`py-2 pr-3 whitespace-nowrap ${label}`}>{fmtDataHora(u.ultimo_uso)}</td>
                         <td className="py-2 pr-3"><ModuloChips modulos={u.modulos_usados} isLight={isLight} /></td>
                         <td className="py-2"><ModuloChips modulos={nuncaUsados(u)} dim isLight={isLight} /></td>

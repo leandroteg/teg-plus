@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import type { ModuloDetalhePayload, UsoInsights, UsoModulosPayload } from '../types/usoModulos'
+import type { ModuloDetalhePayload, UsoInsights, UsoModulosPayload, UsoPorUsuarioPeriodoPayload } from '../types/usoModulos'
 
 export type PeriodoDias = 7 | 30 | 90
 
@@ -11,6 +11,23 @@ export function useUsoModulos(dias: PeriodoDias) {
       const { data, error } = await supabase.rpc('get_admin_uso_modulos', { p_dias: dias })
       if (error) throw error
       return data as UsoModulosPayload
+    },
+    staleTime: 60_000,
+  })
+}
+
+// Tabela "Uso por usuário" com período independente do filtro geral da página
+// (inicio/fim em 'YYYY-MM-DD', interpretados no fuso America/Sao_Paulo)
+export function useUsoPorUsuario(inicio: string, fim: string) {
+  return useQuery({
+    queryKey: ['uso-por-usuario', inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_admin_uso_por_usuario', {
+        p_inicio: inicio,
+        p_fim: fim,
+      })
+      if (error) throw error
+      return data as UsoPorUsuarioPeriodoPayload
     },
     staleTime: 60_000,
   })

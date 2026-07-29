@@ -50,6 +50,13 @@ export interface UsoPorUsuario {
   modulos_usados: string[]
 }
 
+// Payload da RPC get_admin_uso_por_usuario (tabela "Uso por usuário" com
+// período próprio: últimos N dias ou mês-calendário)
+export interface UsoPorUsuarioPeriodoPayload {
+  dias_periodo: number
+  usuarios: UsoPorUsuario[]
+}
+
 export interface RankingTela {
   modulo: string
   tela: string
