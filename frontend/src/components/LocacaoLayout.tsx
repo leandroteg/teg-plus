@@ -1,13 +1,14 @@
 import {
   LayoutDashboard, Building2, FolderOpen, ArrowRightFromLine, Plus,
   Loader2, WifiOff, CloudUpload, CheckCircle2, AlertTriangle, X,
-  Home, Wrench, FileText, Handshake, RefreshCw,
+  Home, Wrench, FileText, Handshake, RefreshCw, ShieldAlert, ClipboardCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
 import NovaSolicitacaoModal from './locacao/NovaSolicitacaoModal'
 import NovoImovelModal from './locacao/NovoImovelModal'
+import { InspecaoAlojamentoFluxo } from './qsma/InspecaoAlojamento'
 import type { TipoSolicitacao } from '../types/locacao'
 import { useVistoriaSync } from '../hooks/useVistoriaSync'
 import { useTheme } from '../contexts/ThemeContext'
@@ -120,6 +121,9 @@ export default function LocacaoLayout() {
   const [solicTipo, setSolicTipo] = useState<TipoSolicitacao | null>(null)
   const [showSolic, setShowSolic] = useState(false)
   const [showNovoImovel, setShowNovoImovel] = useState(false)
+  // A inspeção usa o checklist do QSMA, mas roda aqui dentro — sem trocar de módulo.
+  const [showInspecao, setShowInspecao] = useState(false)
+  const { isDark } = useTheme()
 
   const abrirSolic = (t: TipoSolicitacao) => { setSolicTipo(t); setShowSolic(true) }
 
@@ -148,6 +152,16 @@ export default function LocacaoLayout() {
             icon: FileText, label: 'Contrato de Serviço', tone: 'sky',
             description: 'Serviços terceirizados (limpeza, dedetização, etc).',
             action: () => abrirSolic('servico'),
+          },
+          {
+            icon: ShieldAlert, label: 'NC de Segurança', tone: 'rose',
+            description: 'Não-conformidade de segurança no imóvel, com prazo de correção.',
+            action: () => abrirSolic('nc_seguranca'),
+          },
+          {
+            icon: ClipboardCheck, label: 'Executar Inspeção', tone: 'cyan',
+            description: 'Checklist de alojamento (DI020) com foto por item e PDF ao concluir.',
+            action: () => setShowInspecao(true),
           },
           {
             icon: Handshake, label: 'Acordo / Benfeitoria', tone: 'emerald',
@@ -181,6 +195,7 @@ export default function LocacaoLayout() {
       />
       {showSolic && <NovaSolicitacaoModal tipoInicial={solicTipo ?? undefined} onClose={() => { setShowSolic(false); setSolicTipo(null) }} />}
       {showNovoImovel && <NovoImovelModal onClose={() => setShowNovoImovel(false)} />}
+      {showInspecao && <InspecaoAlojamentoFluxo isDark={isDark} onClose={() => setShowInspecao(false)} />}
     </>
   )
 }

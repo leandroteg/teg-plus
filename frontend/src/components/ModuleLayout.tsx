@@ -21,7 +21,7 @@ export interface NavActionMenuItem {
   icon: LucideIcon
   label: string
   description?: string
-  tone?: 'amber' | 'emerald' | 'sky' | 'violet' | 'rose' | 'blue'
+  tone?: 'amber' | 'emerald' | 'sky' | 'violet' | 'rose' | 'blue' | 'cyan'
   action: () => void
 }
 
@@ -502,6 +502,7 @@ export default function ModuleLayout({
       case 'violet': return ls ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/15 text-violet-300'
       case 'rose':   return ls ? 'bg-rose-50 text-rose-600'     : 'bg-rose-500/15 text-rose-300'
       case 'blue':   return ls ? 'bg-blue-50 text-blue-600'     : 'bg-blue-500/15 text-blue-300'
+      case 'cyan':   return ls ? 'bg-cyan-50 text-cyan-600'     : 'bg-cyan-500/15 text-cyan-300'
       default:       return ls ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-500/15 text-emerald-300'
     }
   }

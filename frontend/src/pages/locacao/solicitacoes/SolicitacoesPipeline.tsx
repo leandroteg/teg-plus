@@ -3,10 +3,9 @@
 // OS de Frotas: seis etapas, visão lista/cards/quadro (quadro é a padrão).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, ShieldAlert,
-  ClipboardCheck,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useSolicitacoesLocacao } from '../../../hooks/useLocacao'
@@ -29,7 +28,6 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 export default function SolicitacoesPipeline() {
   const { isDark } = useTheme()
-  const nav = useNavigate()
   const { data: solicitacoes = [], isLoading } = useSolicitacoesLocacao()
 
   const [activeTab, setActiveTab] = useState<StageKey>('pendente')
@@ -198,18 +196,6 @@ export default function SolicitacoesPipeline() {
           <button onClick={() => setViewMode('ncs')} title="NCs de Segurança"
             className={`p-1.5 ${viewMode === 'ncs' ? (isDark ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-50 text-rose-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><ShieldAlert size={14} /></button>
         </div>
-        {/* A inspeção de alojamento é executada no QSMA (checklist DI020) — aqui é só a porta */}
-        <button
-          onClick={() => nav('/qsma/inspecoes?novo=alojamento')}
-          title="Executar o checklist de alojamento no QSMA"
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
-            isDark
-              ? 'border-white/[0.06] text-slate-400 hover:text-cyan-300 hover:border-cyan-500/30'
-              : 'border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'
-          }`}
-        >
-          <ClipboardCheck size={13} /> Inspecionar alojamento
-        </button>
         <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           {viewMode === 'quadro'
             ? [...quadroGrouped.values()].reduce((s, l) => s + l.length, 0)
