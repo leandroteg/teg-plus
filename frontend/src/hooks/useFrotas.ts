@@ -11,6 +11,7 @@ import type {
   StatusVeiculo, CategoriaVeiculo,
   StatusOS, PrioridadeOS, StatusOcorrenciaTel, TipoChecklist,
   CriarOSPayload, CriarChecklistPayload, RegistrarAbastecimentoPayload,
+  FroCheckinDiario,
   FroAlocacao, FroMulta, FroChecklistTemplate, FroChecklistExecucao, FroAcessorio,
   FroChecklistFoto,
   StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
@@ -1895,5 +1896,25 @@ export function useTelSyncLog(limit = 20) {
     },
     refetchInterval: 300_000,  // os ciclos de sync rodam a cada 5/15 min — poll de 60s era desperdício
     staleTime: 60_000,
+  })
+}
+
+// ── Check-in diário (Portal TEG) ──────────────────────────────────────────────
+
+/** Histórico de check-ins de um ativo — usado no submodal "Ver check-ins". */
+export function useCheckinsVeiculo(veiculoId?: string, limit = 60) {
+  return useQuery({
+    queryKey: ['fro_checkins_veiculo', veiculoId, limit],
+    enabled: !!veiculoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_checkin_diario')
+        .select('*')
+        .eq('veiculo_id', veiculoId!)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return (data ?? []) as FroCheckinDiario[]
+    },
   })
 }

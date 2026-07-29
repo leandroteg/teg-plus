@@ -547,6 +547,32 @@ export interface FroItemManutencao {
   updated_at: string
 }
 
+// ── Check-in diário (lançado no Portal TEG) ───────────────────────────────────
+
+/** Avaliações são 1..5 — a mesma escala que o motorista vê no Portal. */
+export interface FroCheckinDiario {
+  id: string
+  veiculo_id: string
+  colaborador_id: string
+  colaborador_nome: string | null
+  created_at: string
+  obra_id?: string | null
+  obra_nome: string | null
+  km_informado: number | null
+  nivel_combustivel: string | null
+  foto_painel_url: string | null
+  aval_funcional: number | null
+  aval_limpeza: number | null
+  tem_avaria: boolean
+  avarias_novas: string | null
+  foto_avaria_url: string | null
+  responsavel_nome?: string | null
+  data_retorno_prev?: string | null
+  obs_alocacao?: string | null
+  qtd_passageiros: number
+  passageiros?: unknown
+}
+
 // ── Log de Sincronização de Telemetria ──────────────────────────────────────
 // Resumo por execução dos syncs (Mobi7, Cobli, ...), gravado pelos workflows n8n.
 export interface FroTelSyncLog {
