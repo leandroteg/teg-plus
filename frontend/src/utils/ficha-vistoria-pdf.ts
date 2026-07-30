@@ -51,6 +51,24 @@ async function loadLogoBase64(url: string): Promise<string | null> {
 }
 
 /**
+ * As fontes padrao do jsPDF sao WinAnsi (cp1252): emoji e simbolos fora dessa
+ * tabela saem como lixo ("&þ") e ainda bagunçam o espaçamento da linha.
+ * Como o texto vem de campo livre digitado por gente, sanear e obrigatorio.
+ */
+function winAnsi(txt: string): string {
+  return txt
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u2022/g, '-')
+    // emoji e pictogramas: fora com eles, inclusive os seletores de variacao
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{2190}-\u{21FF}]/gu, '')
+    .replace(/[^\u0000-\u00FF]/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trimEnd()
+}
+/**
  * Encaixa a logo na caixa sem deformar. A caixa fixa antiga (18x28) esmagava
  * qualquer logo que nao fosse retrato — a da TEG e quase quadrada.
  */
@@ -120,9 +138,10 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
     if (l2) doc.text(l2.toUpperCase(), M + half, y)
     y += 4
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...DARK)
-    if (v1) doc.text(v1, M, y); else linhaParaEscrever(M, larg)
-    if (l2) { if (v2) doc.text(v2, M + half, y); else linhaParaEscrever(M + half, larg) }
-    y += 6
+    if (v1) doc.text(winAnsi(v1), M, y); else linhaParaEscrever(M, larg)
+    if (l2) { if (v2) doc.text(winAnsi(v2), M + half, y); else linhaParaEscrever(M + half, larg) }
+    // campo em branco precisa de altura de escrita a mao, nao de leitura
+    y += (!v1 || (l2 && !v2)) ? 9 : 6
   }
 
   // ── HEADER ────────────────────────────────────────────────────────────────
@@ -180,7 +199,7 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   if (entrada.observacoes) {
     sectionTitle('ATENÇÃO - JÁ REGISTRADO NESTA ENTRADA')
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-    for (const linha of doc.splitTextToSize(entrada.observacoes, CW) as string[]) {
+    for (const linha of doc.splitTextToSize(winAnsi(entrada.observacoes), CW) as string[]) {
       checkPage(6)
       doc.text(linha, M, y)
       y += 4
@@ -191,7 +210,7 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   // ── GRADE 8 × 8 ───────────────────────────────────────────────────────────
   sectionTitle(`AVALIAÇÃO POR AMBIENTE (${AMBIENTES_PADRAO.length * ITENS_POR_AMBIENTE.length} pontos)`)
   doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(...MID)
-  doc.text('Preencher no aplicativo. Esta folha é apoio para quando faltar sinal no local.', M, y)
+  doc.text('Marque o estado de cada item e use as duas linhas para anotar o que encontrar.', M, y)
   y += 6
 
   const colObs = 58                       // largura da coluna do item
@@ -200,7 +219,7 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   const xEstado = (i: number) => M + colObs + i * boxW
 
   for (const ambiente of AMBIENTES_PADRAO) {
-    checkPage(12 + ITENS_POR_AMBIENTE.length * 5.5 + 8)
+    checkPage(12 + ITENS_POR_AMBIENTE.length * 11 + 8)
 
     // faixa do ambiente
     doc.setFillColor(...DARK)
@@ -221,13 +240,17 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
     doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2)
     for (const item of ITENS_POR_AMBIENTE) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK)
-      doc.text(item, M + 2, y + 3.8)
+      doc.text(item, M + 2, y + 4.2)
       // quadradinhos para riscar
-      ESTADOS_COL.forEach((_, i) => doc.rect(xEstado(i) + boxW / 2 - 1.6, y + 1.6, 3.2, 3.2))
-      // linha para escrever a observação
-      doc.line(xEstado(ESTADOS_COL.length) + 2, y + 4.4, M + CW - 2, y + 4.4)
-      y += 5.5
+      ESTADOS_COL.forEach((_, i) => doc.rect(xEstado(i) + boxW / 2 - 1.75, y + 2.2, 3.5, 3.5))
+      // DUAS linhas de observação por item — uma so nao cabe caneta
+      const xObs = xEstado(ESTADOS_COL.length) + 2
+      doc.line(xObs, y + 4.6, M + CW - 2, y + 4.6)
+      doc.line(xObs, y + 9.4, M + CW - 2, y + 9.4)
+      y += 11
+      doc.setDrawColor(...MID); doc.setLineWidth(0.25)
       doc.line(M, y, M + CW, y)
+      doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2)
     }
     y += 4
   }
