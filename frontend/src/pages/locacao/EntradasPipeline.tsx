@@ -15,7 +15,7 @@ import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
 import VistoriaModal from '../../components/locacao/VistoriaModal'
 import { UpperInput } from '../../components/UpperInput'
 import { downloadVistoriaPdf, compartilharVistoriaWhatsApp, type VistoriaPdfData } from '../../utils/vistoria-pdf'
-import { downloadFichaVistoriaPdf } from '../../utils/ficha-vistoria-pdf'
+import FichaVistoriaModal from '../../components/locacao/FichaVistoriaModal'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -579,6 +579,7 @@ export default function EntradasPipeline() {
   const [assinar, setAssinar] = useState<LocEntrada | null>(null)
   // Solicitar vistoria virou atribuicao: precisa dizer a quem.
   const [solicitar, setSolicitar] = useState<LocEntrada | null>(null)
+  const [ficha, setFicha] = useState<LocEntrada | null>(null)
   const qc = useQueryClient()
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
@@ -620,10 +621,7 @@ export default function EntradasPipeline() {
     if (action === 'solicitar_vistoria') { setSolicitar(e); return }
     const map: Record<string, StatusEntrada> = { vistoria_concluida: 'aguardando_assinatura' }
     if (map[action]) atualizarStatus.mutate({ id: e.id, status: map[action] })
-    if (action === 'gerar_pdf') {
-      downloadFichaVistoriaPdf({ entrada: e, imovel: e.imovel, tipo: 'entrada' })
-        .catch(err => alert(`Erro ao gerar a ficha: ${err?.message ?? 'desconhecido'}`))
-    }
+    if (action === 'gerar_pdf') setFicha(e)
   }, [atualizarStatus])
 
   if (isLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -694,6 +692,12 @@ export default function EntradasPipeline() {
       {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark}
         onOpenVistoria={(e) => { setDetail(null); setVistoriaEntrada(e) }} />}
       {vistoriaEntrada && <VistoriaModal entrada={vistoriaEntrada} onClose={() => setVistoriaEntrada(null)} />}
+      {ficha && (
+        <FichaVistoriaModal
+          dados={{ entrada: ficha, imovel: ficha.imovel, tipo: 'entrada' }}
+          onClose={() => setFicha(null)}
+        />
+      )}
       {solicitar && (
         <SolicitarVistoriaModal
           entrada={solicitar} isDark={isDark}
