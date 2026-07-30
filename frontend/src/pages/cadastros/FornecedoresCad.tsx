@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   Building2, Plus, Search, ChevronRight, CheckCircle2, AlertCircle,
-  Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2,
-} from 'lucide-react'
+  Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, ChevronDown } from 'lucide-react'
 import { UpperInput } from '../../components/UpperInput'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
 import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
@@ -42,9 +41,17 @@ const formatStatus = (value?: string | null) => {
   return normalized.charAt(0) + normalized.slice(1).toLowerCase()
 }
 
+const SEGMENTOS_BASE = [
+  'Manutenção de Frota', 'Pneus', 'Peças', 'Combustível', 'EPI',
+  'Materiais de Obra', 'Serviços', 'TI', 'Outros',
+]
+
 export default function FornecedoresCad() {
   const [busca, setBusca] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  // Segmento é texto livre no banco: as opções vêm do que já existe + a lista base.
+  const [fSegmentos, setFSegmentos] = useState<Set<string> | null>(null)
+  const [segAberto, setSegAberto] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<Fornecedor> | null>(null)
   const [confidence, setConfidence] = useState<Record<string, number>>({})
@@ -84,8 +91,15 @@ export default function FornecedoresCad() {
     } : prev)
   }, []))
 
+  const segmentosDisponiveis = useMemo(() => {
+    const usados = new Set<string>()
+    for (const f of fornecedores) if ((f as any).segmento) usados.add((f as any).segmento)
+    return [...new Set([...SEGMENTOS_BASE, ...usados])].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [fornecedores])
+
   const filtered = useMemo(() => {
-    let list = fornecedores.filter(f => showInactive || f.ativo)
+    let list = fornecedores.filter((f: any) => !fSegmentos || fSegmentos.size === 0 || (f.segmento && fSegmentos.has(f.segmento)))
+    .filter(f => showInactive || f.ativo)
     if (busca.trim()) {
       const q = busca.toLowerCase()
       list = list.filter(f =>
@@ -325,6 +339,49 @@ export default function FornecedoresCad() {
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
         </div>
+        <div className="relative">
+          <button onClick={() => setSegAberto(v => !v)}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border inline-flex items-center gap-1.5 ${
+              fSegmentos && fSegmentos.size > 0 ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200'
+            }`}>
+            Segmento{fSegmentos && fSegmentos.size > 0 ? `: ${fSegmentos.size}` : ''}
+            <ChevronDown size={13} />
+          </button>
+          {segAberto && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setSegAberto(false)} />
+              <div className="absolute z-30 mt-1 w-64 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg p-2">
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-700">
+                  <input type="checkbox"
+                    checked={!!fSegmentos && fSegmentos.size === segmentosDisponiveis.length}
+                    onChange={e => setFSegmentos(e.target.checked ? new Set(segmentosDisponiveis) : new Set())}
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  Selecionar todos
+                </label>
+                <div className="h-px bg-slate-100 my-1" />
+                {segmentosDisponiveis.map(sg => (
+                  <label key={sg} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-600">
+                    <input type="checkbox"
+                      checked={!!fSegmentos && fSegmentos.has(sg)}
+                      onChange={() => setFSegmentos(prev => {
+                        const n = new Set(prev ?? [])
+                        n.has(sg) ? n.delete(sg) : n.add(sg)
+                        return n
+                      })}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    {sg}
+                  </label>
+                ))}
+                {fSegmentos && fSegmentos.size > 0 && (
+                  <button onClick={() => setFSegmentos(new Set())}
+                    className="w-full mt-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:bg-slate-50">
+                    Limpar
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
         <button onClick={() => setShowInactive(!showInactive)}
           className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
             showInactive ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200'
@@ -365,7 +422,7 @@ export default function FornecedoresCad() {
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:table-cell cursor-pointer select-none" onClick={() => toggleSort('numero_cadastro')}>
                   <span className="flex items-center gap-1">Codigo <SortIcon col="numero_cadastro" /></span>
                 </th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('razao_social')}>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none max-w-[280px] w-[280px]" onClick={() => toggleSort('razao_social')}>
                   <span className="flex items-center gap-1">Razao Social <SortIcon col="razao_social" /></span>
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('nome_fantasia')}>
@@ -373,6 +430,9 @@ export default function FornecedoresCad() {
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort('cnpj')}>
                   <span className="flex items-center gap-1">CNPJ <SortIcon col="cnpj" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden lg:table-cell w-[150px]">
+                  Segmento
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('telefone')}>
                   <span className="flex items-center gap-1">Telefone <SortIcon col="telefone" /></span>
@@ -384,17 +444,17 @@ export default function FornecedoresCad() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.map(f => (
-                <tr key={f.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => openEdit(f)}>
+                <tr key={f.id} className="hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap" onClick={() => openEdit(f)}>
                   <td className="px-4 py-2.5" onClick={ev => ev.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelect(f.id)}
                       className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                   </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden sm:table-cell">{f.numero_cadastro || '---'}</td>
-                  <td className="px-4 py-2.5 font-semibold text-slate-800">
-                    <span className="flex items-center gap-1.5">
-                      {f.razao_social}
+                  <td className="px-4 py-2.5 font-semibold text-slate-800 max-w-[280px]">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate" title={f.razao_social}>{f.razao_social}</span>
                       {docPendente(f) && (
-                        <span title="Cartão CNPJ pendente" className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                        <span title="Cartão CNPJ pendente" className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                           <AlertCircle size={9} /> DOC
                         </span>
                       )}
@@ -403,6 +463,11 @@ export default function FornecedoresCad() {
                   <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{f.nome_fantasia || '—'}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden lg:table-cell">
                     {f.cnpj ? f.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs hidden lg:table-cell">
+                    {(f as any).segmento
+                      ? <span className="inline-block max-w-[140px] truncate align-middle bg-violet-50 text-violet-700 text-[10px] font-semibold px-2 py-0.5 rounded-full" title={(f as any).segmento}>{(f as any).segmento}</span>
+                      : <span className="text-slate-400">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{f.telefone || '—'}</td>
                   <td className="px-4 py-2.5 text-center">
@@ -573,6 +638,20 @@ export default function FornecedoresCad() {
                 confidence={confidence.cidade} placeholder="Cidade" disabled={sensitiveLocked} />
               <ConfidenceField label="UF" value={(editItem as any).uf ?? ''} onChange={v => set('uf', v)}
                 confidence={confidence.uf} placeholder="MG" disabled={sensitiveLocked} />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Segmento</label>
+              <input
+                list="lista-segmentos-fornecedor"
+                value={(editItem as any).segmento ?? ''}
+                onChange={e => set('segmento' as any, e.target.value)}
+                placeholder="Ex.: Manutenção de Frota"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm
+                  focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+              <datalist id="lista-segmentos-fornecedor">
+                {segmentosDisponiveis.map(sg => <option key={sg} value={sg} />)}
+              </datalist>
             </div>
 
             <div className="pt-3 border-t border-slate-100">
