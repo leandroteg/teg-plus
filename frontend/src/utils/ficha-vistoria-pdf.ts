@@ -128,9 +128,19 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   const linha2 = [bairro, [cidade, uf].filter(Boolean).join('/')].filter(Boolean).join(' - ')
     + (cep ? ` · CEP ${cep}` : '')
   par('Endereço', linha1 || '-', 'Cidade / Bairro', linha2 || '-')
-  par('Área', imv?.area_m2 != null ? `${imv.area_m2} m²` : '-',
+  par('Área total', imv?.area_m2 != null ? `${imv.area_m2} m²` : '-',
+      'Área construída', imv?.area_construida_m2 != null ? `${imv.area_construida_m2} m²` : '-')
+  par('Matrícula', imv?.matricula || '-',
       'Aluguel', entrada.valor_aluguel != null
         ? entrada.valor_aluguel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : '-')
+
+  // Vem preenchido do que ja se sabe; em branco, o vistoriador conta e anota.
+  const cont = (v?: number | null) => (v != null ? String(v) : '____')
+  par('Contagens (banheiros / portas / janelas)',
+      `${cont(imv?.qtd_banheiros)}  /  ${cont(imv?.qtd_portas)}  /  ${cont(imv?.qtd_janelas)}`,
+      'IPTU', imv?.iptu_numero
+        ? `${imv.iptu_numero}${imv.iptu_quitado == null ? '' : imv.iptu_quitado ? ' (quitado)' : ' (em aberto)'}`
         : '-')
 
   // ── COMO ENTRAR ───────────────────────────────────────────────────────────
@@ -139,6 +149,8 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
       'Contato', entrada.locador_contato || imv?.locador_contato || '-')
   par('Início previsto', fmtDate(entrada.data_prevista_inicio),
       'Vistoria até', limiteVistoria(entrada.data_prevista_inicio))
+  par('Locado até', fmtDate(entrada.prazo_fim),
+      'Pretende renovar', entrada.renovacao === 'sim' ? 'Sim' : entrada.renovacao === 'nao' ? 'Não' : '-')
 
   // ── O QUE JÁ SE SABE ──────────────────────────────────────────────────────
   // O texto de observações é onde ficam as pendências conhecidas (obra a fazer,

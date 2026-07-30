@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   ArrowLeft, Camera, Check, CheckCircle2, ChevronRight, ChevronLeft,
   Loader2, MessageSquare, Pencil, Plus, Save, Trash2,
-  WifiOff, Wifi, X, AlertTriangle, Sparkles, Eye,
+  WifiOff, Wifi, X, AlertTriangle, Sparkles, Eye, ClipboardList,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { UpperInput, UpperTextarea } from '../UpperInput'
@@ -18,6 +18,7 @@ import {
   ITENS_POR_AMBIENTE, buildDefaultItens,
   type ChecklistItem,
 } from './VistoriaChecklist'
+import VistoriaCaracteristicas, { useCaracteristicasState, salvarCaracteristicas } from './VistoriaCaracteristicas'
 import type { LocEntrada, EstadoItem } from '../../types/locacao'
 import { supabase } from '../../services/supabase'
 
@@ -82,6 +83,8 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
       ? offline.data.itens
       : buildDefaultItens()
   )
+  const carac = useCaracteristicasState(entrada)
+  const [showCarac, setShowCarac] = useState(false)
   const [obsGerais, setObsGeraisState] = useState(
     offline.hasSavedData ? offline.data.obsGerais : ''
   )
@@ -256,6 +259,7 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
     setSaving(true)
     try {
       if (isOnline) {
+        await salvarCaracteristicas(entrada, carac.valores)
         await onSave(itens, obsGerais)
         if (vistoriaId) await uploadFotos(vistoriaId, offlineFotos)
         offline.markSynced()
@@ -273,6 +277,7 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
       if (isOnline) {
         // Upload photos FIRST using local state (not offline.data which may be stale)
         if (vistoriaId) await uploadFotos(vistoriaId, offlineFotos)
+        await salvarCaracteristicas(entrada, carac.valores)
         await onConcluir(itens, obsGerais)
         offline.markSynced()
         offline.clear()
@@ -442,6 +447,32 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
               </>
             )}
           </div>
+
+          {/* Dados do imovel — o vistoriador e quem tem esses numeros na mao */}
+          {activeTab === 0 && (
+            <button onClick={() => setShowCarac(!showCarac)}
+              className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl border transition-colors ${
+                isDark
+                  ? 'border-white/[0.06] bg-white/[0.02] active:bg-white/[0.04]'
+                  : 'border-slate-100 bg-white active:bg-slate-50'
+              }`}>
+              <div className="flex items-center gap-2">
+                <ClipboardList size={14} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
+                <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Dados do imovel, prazo e melhorias
+                </span>
+              </div>
+              <ChevronRight size={14} className={`transition-transform ${showCarac ? 'rotate-90' : ''} ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+            </button>
+          )}
+          {activeTab === 0 && showCarac && (
+            <div className="animate-fadeIn">
+              <VistoriaCaracteristicas
+                valores={carac.valores} onChange={carac.setValores}
+                isDark={isDark} dataEntrada={entrada.data_prevista_inicio}
+              />
+            </div>
+          )}
 
           {/* Obs gerais — first tab only */}
           {activeTab === 0 && (

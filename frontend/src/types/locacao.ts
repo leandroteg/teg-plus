@@ -184,8 +184,20 @@ export interface LocImovel {
   valor_aluguel_mensal?: number
   dia_vencimento?: number
   locador_nome?: string
+  /** CPF, CNPJ ou CIN — o RG novo ja e o CPF. */
   locador_cpf_cnpj?: string
+  /** @deprecated campo unico antigo; use locador_telefone/locador_email */
   locador_contato?: string
+  locador_telefone?: string
+  locador_email?: string
+  /** Preenchidos na vistoria — valem para o imovel, nao so para aquela visita. */
+  matricula?: string
+  area_construida_m2?: number
+  qtd_banheiros?: number
+  qtd_portas?: number
+  qtd_janelas?: number
+  iptu_numero?: string
+  iptu_quitado?: boolean | null
   prefeito_nome?: string
   prefeito_telefone?: string
   latitude?: number | null
@@ -231,6 +243,10 @@ export interface LocEntrada {
   locador_cpf_cnpj?: string
   locador_contato?: string
   data_prevista_inicio?: string
+  /** Prazo negociado na vistoria; pre-preenche o fim do contrato na assinatura. */
+  prazo_fim?: string | null
+  renovacao?: 'sim' | 'nao' | null
+  melhorias_mobilizacao?: string | null
   observacoes?: string
   contrato_id?: string
   created_at: string

@@ -9,6 +9,7 @@ import { X, Save, CheckCircle2, Loader2, AlertTriangle, Wifi, WifiOff } from 'lu
 import { useTheme } from '../../contexts/ThemeContext'
 import VistoriaChecklist, { buildDefaultItens, type ChecklistItem } from './VistoriaChecklist'
 import VistoriaMobile from './VistoriaMobile'
+import VistoriaCaracteristicas, { useCaracteristicasState, salvarCaracteristicas } from './VistoriaCaracteristicas'
 import {
   useCriarVistoria, useAtualizarVistoria, useSalvarVistoriaItens,
   useUploadVistoriaFoto, useVistoriaFotos, useVistorias, useAtualizarStatusEntrada,
@@ -60,6 +61,7 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
   const [vistoriaId, setVistoriaId] = useState<string | null>(existingVistoria?.id || null)
   const [itens, setItens] = useState<ChecklistItem[]>([])
   const [obsGerais, setObsGerais] = useState(existingVistoria?.observacoes_gerais || '')
+  const carac = useCaracteristicasState(entrada)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [initialized, setInitialized] = useState(false)
@@ -181,11 +183,12 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
         observacao: it.observacao || undefined, ordem: i,
       })),
     })
+    await salvarCaracteristicas(entrada, carac.valores)
     await atualizarVistoria.mutateAsync({
       id: vistoriaId, status: 'em_andamento', observacoes_gerais: saveObs || undefined,
       data_vistoria: new Date().toISOString().split('T')[0],
     })
-  }, [vistoriaId, salvarItens, atualizarVistoria])
+  }, [vistoriaId, salvarItens, atualizarVistoria, entrada, carac.valores])
 
   const doConclude = useCallback(async (concItens: ChecklistItem[], concObs: string) => {
     if (!vistoriaId) return
@@ -198,13 +201,14 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
         observacao: it.observacao || undefined, ordem: i,
       })),
     })
+    await salvarCaracteristicas(entrada, carac.valores)
     await atualizarVistoria.mutateAsync({
       id: vistoriaId, status: 'concluida', observacoes_gerais: concObs || undefined,
       tem_pendencias: temPendencias,
       data_vistoria: new Date().toISOString().split('T')[0],
     })
     await atualizarEntrada.mutateAsync({ id: entrada.id, status: 'aguardando_assinatura' as StatusEntrada })
-  }, [vistoriaId, salvarItens, atualizarVistoria, atualizarEntrada, entrada.id])
+  }, [vistoriaId, salvarItens, atualizarVistoria, atualizarEntrada, entrada, carac.valores])
 
   const handleSalvarRascunho = async () => {
     setSaving(true)
@@ -339,6 +343,11 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
               className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${inputCls}`}
             />
           </div>
+
+          <VistoriaCaracteristicas
+            valores={carac.valores} onChange={carac.setValores}
+            isDark={isDark} dataEntrada={entrada.data_prevista_inicio}
+          />
 
           <VistoriaChecklist
             tipo="entrada"

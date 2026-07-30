@@ -457,7 +457,8 @@ function AssinaturaContratoModal({ entrada, isDark, onClose, onDone }: {
   const isHtl = entrada.imovel?.tipo === 'HTL'
   const [numero, setNumero] = useState('')
   const [inicio, setInicio] = useState(entrada.data_prevista_inicio ?? '')
-  const [fim, setFim] = useState('')
+  // O prazo já foi negociado e anotado na vistoria — aqui é só conferir.
+  const [fim, setFim] = useState(entrada.prazo_fim ?? '')
   const [pdf, setPdf] = useState<File | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')

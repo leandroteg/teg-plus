@@ -294,10 +294,29 @@ async function buildVistoriaDoc(
     'CEP', cep || '—',
   )
 
-  if (imv?.area_m2 || entrada?.area_m2) {
+  if (imv?.area_m2 || entrada?.area_m2 || imv?.area_construida_m2) {
     addFieldPair(
-      'Área (m²)', `${imv?.area_m2 || entrada?.area_m2 || '—'} m²`,
-      'Código', imv?.codigo || '—',
+      'Área total (m²)', imv?.area_m2 || entrada?.area_m2 ? `${imv?.area_m2 ?? entrada?.area_m2} m²` : '-',
+      'Área construída (m²)', imv?.area_construida_m2 != null ? `${imv.area_construida_m2} m²` : '-',
+    )
+  }
+
+  // Levantados na vistoria — sao eles que destravam contrato e mobilizacao.
+  if (imv?.matricula || imv?.codigo) {
+    addFieldPair('Matrícula', imv?.matricula || '-', 'Código', imv?.codigo || '-')
+  }
+
+  const contagens = [
+    imv?.qtd_banheiros != null ? `${imv.qtd_banheiros} banheiro(s)` : null,
+    imv?.qtd_portas != null ? `${imv.qtd_portas} porta(s)` : null,
+    imv?.qtd_janelas != null ? `${imv.qtd_janelas} janela(s)` : null,
+  ].filter(Boolean).join('  ·  ')
+  if (contagens) addField('Contagens', contagens)
+
+  if (imv?.iptu_numero || imv?.iptu_quitado != null) {
+    addFieldPair(
+      'IPTU', imv?.iptu_numero || '-',
+      'Situação do IPTU', imv?.iptu_quitado == null ? '-' : imv.iptu_quitado ? 'Quitado' : 'Em aberto',
     )
   }
 
@@ -313,13 +332,15 @@ async function buildVistoriaDoc(
 
   const locadorNome = imv?.locador_nome || entrada?.locador_nome
   const locadorDoc  = imv?.locador_cpf_cnpj || entrada?.locador_cpf_cnpj
-  const locadorTel  = imv?.locador_contato || entrada?.locador_contato
+  const locadorTel  = imv?.locador_telefone || imv?.locador_contato || entrada?.locador_contato
+  const locadorMail = imv?.locador_email
 
   if (locadorNome || locadorDoc) {
     sectionTitle('LOCADOR / PROPRIETÁRIO')
     addField('Nome', locadorNome || '—', true)
-    if (locadorDoc) addField('CPF/CNPJ', locadorDoc)
-    if (locadorTel) addField('Contato', locadorTel)
+    if (locadorDoc) addField('CPF / CNPJ / CIN', locadorDoc)
+    if (locadorTel) addField('Telefone (WhatsApp)', locadorTel)
+    if (locadorMail) addField('E-mail', locadorMail)
     y += 2
   }
 
@@ -336,8 +357,33 @@ async function buildVistoriaDoc(
       'Aluguel Mensal', valor,
       'Dia Vencimento', entrada.dia_vencimento ? `Dia ${entrada.dia_vencimento}` : '—',
     )
-    if (entrada.data_prevista_inicio) {
-      addField('Início Previsto', fmtDateFull(entrada.data_prevista_inicio))
+    if (entrada.data_prevista_inicio || entrada.prazo_fim) {
+      addFieldPair(
+        'Início Previsto', entrada.data_prevista_inicio ? fmtDateFull(entrada.data_prevista_inicio) : '-',
+        'Locado até', entrada.prazo_fim ? fmtDateFull(entrada.prazo_fim) : '-',
+      )
+    }
+    if (entrada.renovacao) {
+      addField('Pretende renovar', entrada.renovacao === 'sim' ? 'Sim' : 'Não')
+    }
+
+    // O que precisa ser feito antes da equipe entrar — motivo pelo qual a
+    // mobilizacao costumava travar depois da vistoria.
+    if (entrada.melhorias_mobilizacao) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...MID)
+      doc.text('Melhorias necessárias para mobilização', M, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...DARK)
+      doc.setFontSize(9)
+      for (const linha of doc.splitTextToSize(entrada.melhorias_mobilizacao, CW) as string[]) {
+        checkPage(6)
+        doc.text(linha, M, y)
+        y += 4
+      }
+      y += 2
     }
     if (entrada.observacoes) {
       doc.setFont('helvetica', 'normal')
