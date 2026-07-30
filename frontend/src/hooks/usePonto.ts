@@ -294,3 +294,47 @@ export function usePontoDispositivos() {
     staleTime: 10 * 60 * 1000,
   })
 }
+
+// ── Fechamento mensal do ponto ───────────────────────────────────────────────
+// Não trava o rh_ponto_dia: o sync só cobre o mês corrente, então mês passado
+// já congela sozinho. O fechamento guarda o snapshot dos totais e o estado.
+export interface PontoFechamento {
+  ano_mes: string
+  status: 'fechado' | 'liberado'
+  fechado_por: string | null; fechado_em: string | null
+  liberado_por: string | null; liberado_em: string | null; liberado_motivo: string | null
+  colaboradores: number | null; hh_min: number | null; extras_min: number | null; faltas_min: number | null
+}
+
+export function usePontoFechamentos() {
+  return useQuery<PontoFechamento[]>({
+    queryKey: ['ponto-fechamentos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_ponto_fechamento').select('*').order('ano_mes', { ascending: false })
+      if (error) { console.error('usePontoFechamentos:', error); return [] }
+      return (data ?? []) as PontoFechamento[]
+    },
+  })
+}
+
+export function useFecharMes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { anoMes: string; por: string }) => {
+      const { error } = await supabase.rpc('rh_ponto_fechar_mes', { p_ano_mes: v.anoMes, p_por: v.por })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-fechamentos'] }),
+  })
+}
+
+export function useLiberarMes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { anoMes: string; por: string; motivo?: string }) => {
+      const { error } = await supabase.rpc('rh_ponto_liberar_mes', { p_ano_mes: v.anoMes, p_por: v.por, p_motivo: v.motivo ?? null })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-fechamentos'] }),
+  })
+}

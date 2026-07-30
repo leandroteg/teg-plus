@@ -10,9 +10,10 @@
 // Não há etapa de aprovação: retificação já chega aprovada do Secullum.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react'
-import { Search, Users, BarChart3, FileText, Package, Loader2, Lock } from 'lucide-react'
+import { Search, Users, BarChart3, FileText, Package, Loader2, Lock, LockOpen, ArrowUpDown, Check } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { usePontoResumoMes, usePontoResumoPeriodo } from '../../../hooks/usePonto'
+import { useAuth } from '../../../contexts/AuthContext'
+import { usePontoResumoMes, usePontoResumoPeriodo, usePontoFechamentos, useFecharMes, useLiberarMes } from '../../../hooks/usePonto'
 import { intervalToMin, minToHoras, labelMes, ultimosMeses } from '../../../lib/ponto'
 import PontoReportModal, { type PontoReportAlvo } from './PontoReportModal'
 
@@ -23,6 +24,14 @@ interface Pessoa {
 }
 interface MesLinha {
   anoMes: string; pessoas: number; hh: number; ex: number; falta: number; assinados: number
+}
+type OrdemPessoa = 'nome' | 'base' | 'dias' | 'hh' | 'ex' | 'falta'
+type OrdemMes = 'anoMes' | 'pessoas' | 'hh' | 'ex' | 'falta'
+
+/** clique no cabeçalho: mesma coluna inverte, coluna nova começa em asc (texto) ou desc (número) */
+function proxOrdem<K extends string>(atual: { k: K; dir: 1 | -1 }, k: K, numerica: boolean): { k: K; dir: 1 | -1 } {
+  if (atual.k === k) return { k, dir: atual.dir === 1 ? -1 : 1 }
+  return { k, dir: numerica ? -1 : 1 }
 }
 
 export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
@@ -38,6 +47,17 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
+  const [ordP, setOrdP] = useState<{ k: OrdemPessoa; dir: 1 | -1 }>({ k: 'nome', dir: 1 })
+  const [ordM, setOrdM] = useState<{ k: OrdemMes; dir: 1 | -1 }>({ k: 'anoMes', dir: -1 })
+
+  const { user } = useAuth()
+  const quem = (user as { nome?: string; email?: string } | null)?.nome
+    || (user as { email?: string } | null)?.email || 'RH'
+  const fechamentos = usePontoFechamentos()
+  const fechar = useFecharMes()
+  const liberar = useLiberarMes()
+  const fechPorMes = useMemo(() =>
+    new Map((fechamentos.data ?? []).map(f => [String(f.ano_mes).slice(0, 10), f])), [fechamentos.data])
 
   const resumo = usePontoResumoMes(anoMes)
   // janela dos últimos 12 meses só quando a visão mensal está aberta
@@ -68,7 +88,16 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   }, [resumo.data])
 
   const q = busca.trim().toLowerCase()
-  const lista = pessoas.filter(p => (!baseFil || p.baseId === baseFil) && (!q || p.nome.toLowerCase().includes(q)))
+  const lista = pessoas
+    .filter(p => (!baseFil || p.baseId === baseFil) && (!q || p.nome.toLowerCase().includes(q)))
+    .sort((a, b) => {
+      const k = ordP.k
+      const cmp = k === 'nome' ? a.nome.localeCompare(b.nome, 'pt-BR')
+        : k === 'base' ? (a.base ?? '').localeCompare(b.base ?? '', 'pt-BR')
+          : k === 'dias' ? a.batidos - b.batidos
+            : (a[k] as number) - (b[k] as number)
+      return (cmp !== 0 ? cmp : a.nome.localeCompare(b.nome, 'pt-BR')) * ordP.dir
+    })
   // seleção vazia = todos do filtro (é o comportamento esperado ao só filtrar)
   const escolhidos = sel.size ? lista.filter(p => sel.has(p.id)) : lista
   const nomeBase = bases?.find(b => b.id === baseFil)?.nome
@@ -87,8 +116,15 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
       a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras); a.falta += intervalToMin(r.faltas)
       m.set(k, a)
     }
-    return [...m.values()].map(x => ({ ...x, pessoas: x.ids.size })).sort((a, b) => b.anoMes.localeCompare(a.anoMes))
-  }, [periodo.data])
+    return [...m.values()].map(x => ({ ...x, pessoas: x.ids.size })).sort((a, b) => {
+      const k = ordM.k
+      const cmp = k === 'anoMes' ? a.anoMes.localeCompare(b.anoMes) : (a[k] as number) - (b[k] as number)
+      return (cmp !== 0 ? cmp : a.anoMes.localeCompare(b.anoMes)) * ordM.dir
+    })
+  }, [periodo.data, ordM])
+
+  const hoje = new Date()
+  const mesCorrente = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
 
   const abrirConsolidado = (mes: string, quem: { id: string; nome: string }[], recorte?: string) =>
     setEspelho({ tipo: 'consolidado', spec: { ano_mes: mes, recorte, colaboradores: quem } })
@@ -100,6 +136,22 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
         : isDark ? 'border-white/10 text-slate-500 hover:text-white' : 'border-slate-200 text-slate-400 hover:text-slate-700'}`}>
       <Icon size={14} />
     </button>
+  )
+
+  // cabecalho clicavel: seta indica a coluna ativa e o sentido
+  const ThP = ({ label, k, num, cls = '' }: { label: string; k: OrdemPessoa; num?: boolean; cls?: string }) => (
+    <th className={`${TH} ${cls} cursor-pointer select-none`} onClick={() => setOrdP(o => proxOrdem(o, k, !!num))} title={`Ordenar por ${label.toLowerCase()}`}>
+      <span className={`inline-flex items-center gap-1 ${ordP.k === k ? 'text-violet-500' : ''}`}>
+        {label}{ordP.k === k ? <span className="text-[8px] leading-none">{ordP.dir === 1 ? '▲' : '▼'}</span> : <ArrowUpDown size={10} className="opacity-30" />}
+      </span>
+    </th>
+  )
+  const ThM = ({ label, k, num, cls = '' }: { label: string; k: OrdemMes; num?: boolean; cls?: string }) => (
+    <th className={`${TH} ${cls} cursor-pointer select-none`} onClick={() => setOrdM(o => proxOrdem(o, k, !!num))} title={`Ordenar por ${label.toLowerCase()}`}>
+      <span className={`inline-flex items-center gap-1 ${ordM.k === k ? 'text-violet-500' : ''}`}>
+        {label}{ordM.k === k ? <span className="text-[8px] leading-none">{ordM.dir === 1 ? '▲' : '▼'}</span> : <ArrowUpDown size={10} className="opacity-30" />}
+      </span>
+    </th>
   )
 
   const painel = `rounded-2xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`
@@ -142,9 +194,9 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
               <table className="w-full">
                 <thead><tr className={head}>
                   <th className={`${TH} w-px`}><input type="checkbox" checked={todosMarcados} onChange={marcarTodos} className="accent-violet-500" title="Selecionar todos" /></th>
-                  <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Área</th>
-                  <th className={TH}>Dias</th><th className={`${TH} hidden sm:table-cell`}>HH</th>
-                  <th className={TH}>Extras</th><th className={`${TH} hidden sm:table-cell`}>Faltas</th>
+                  <ThP label="Colaborador" k="nome" /><ThP label="Área" k="base" cls="hidden md:table-cell" />
+                  <ThP label="Dias" k="dias" num /><ThP label="HH" k="hh" num cls="hidden sm:table-cell" />
+                  <ThP label="Extras" k="ex" num /><ThP label="Faltas" k="falta" num cls="hidden sm:table-cell" />
                   <th className={TH}>Assinatura</th><th className={TH}></th>
                 </tr></thead>
                 <tbody>{lista.map(p => (
@@ -176,13 +228,17 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className={head}>
-                  <th className={TH}>Mês</th><th className={TH}>Colaboradores</th>
-                  <th className={`${TH} hidden sm:table-cell`}>HH</th><th className={TH}>Extras</th>
-                  <th className={`${TH} hidden sm:table-cell`}>Faltas</th>
+                  <ThM label="Mês" k="anoMes" /><ThM label="Colaboradores" k="pessoas" num />
+                  <ThM label="HH" k="hh" num cls="hidden sm:table-cell" /><ThM label="Extras" k="ex" num />
+                  <ThM label="Faltas" k="falta" num cls="hidden sm:table-cell" />
                   <th className={TH}>Fechamento</th><th className={TH}>Assinados</th><th className={TH}></th>
                 </tr></thead>
                 <tbody>{linhasMes.map(l => {
                   const doMes = l.anoMes === anoMes
+                  const fech = fechPorMes.get(l.anoMes)
+                  // só depois do mês terminar (regra também aplicada na RPC)
+                  const encerrado = l.anoMes < mesCorrente
+                  const trabalhando = (fechar.isPending || liberar.isPending)
                   return (
                     <tr key={l.anoMes} className={`border-t ${row}`}>
                       <td className={`${TD} font-semibold ${txt}`}>{labelMes(l.anoMes)}{doMes && <span className={`ml-1.5 text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-500 font-bold uppercase`}>atual</span>}</td>
@@ -191,9 +247,17 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                       <td className={`${TD} font-semibold ${l.ex > 0 ? 'text-orange-500' : sub}`}>{l.ex > 0 ? minToHoras(l.ex) : '—'}</td>
                       <td className={`${TD} hidden sm:table-cell ${l.falta > 0 ? 'text-rose-500' : sub}`}>{l.falta > 0 ? minToHoras(l.falta) : '—'}</td>
                       <td className={TD}>
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
-                          <Lock size={9} /> em aberto
-                        </span>
+                        {fech?.status === 'fechado' ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-emerald-500/15 text-emerald-500"
+                            title={`Fechado por ${fech.fechado_por ?? '—'} em ${fech.fechado_em ? new Date(fech.fechado_em).toLocaleString('pt-BR') : '—'}`}>
+                            <Lock size={9} /> fechado
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}
+                            title={fech?.status === 'liberado' ? `Liberado por ${fech.liberado_por ?? '—'}` : encerrado ? 'Mês encerrado — pode fechar' : 'Mês em andamento'}>
+                            <LockOpen size={9} /> {fech?.status === 'liberado' ? 'liberado' : 'em aberto'}
+                          </span>
+                        )}
                       </td>
                       <td className={`${TD} ${sub}`}>0/{l.pessoas}</td>
                       <td className={`${TD} w-px`}>
@@ -209,6 +273,19 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-500/10 text-slate-400 disabled:opacity-60 whitespace-nowrap cursor-not-allowed">
                             <Package size={12} /> ZIP
                           </button>
+                          {fech?.status === 'fechado' ? (
+                            <button onClick={() => liberar.mutate({ anoMes: l.anoMes, por: quem })} disabled={trabalhando}
+                              title="Reabrir o mês para ajustes"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 disabled:opacity-40 whitespace-nowrap">
+                              <LockOpen size={12} /> Liberar
+                            </button>
+                          ) : (
+                            <button onClick={() => fechar.mutate({ anoMes: l.anoMes, por: quem })} disabled={!encerrado || trabalhando}
+                              title={encerrado ? 'Fechar o ponto do mês e congelar os totais' : 'Só depois que o mês terminar'}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 disabled:opacity-30 whitespace-nowrap">
+                              <Check size={12} /> Fechar
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
