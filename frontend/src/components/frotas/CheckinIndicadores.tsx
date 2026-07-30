@@ -1,20 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CheckinIndicadores — leitura visual do último check-in diário.
 //
-// A escala (ícone + cor) é a MESMA que o motorista vê no Portal TEG ao lançar o
-// check-in: Crítico › Ruim › Moderado › Bom › Excelente. Se divergirem, o campo
-// e o escritório passam a falar línguas diferentes sobre o mesmo ativo.
+// A nota é a MESMA que o motorista lança no Portal TEG:
+// 1 Crítico › 2 Ruim › 3 Moderado › 4 Bom › 5 Excelente.
+// Ao ESCOLHER (Portal e check-in manual) ela aparece como carinhas; ao LER
+// (tabelas e cards) aparece como estrelas. O que não pode divergir é o
+// significado da nota — senão campo e escritório falam línguas diferentes.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Angry, Frown, Meh, Smile, Laugh, TriangleAlert, Minus } from 'lucide-react'
+import { Angry, Frown, Meh, Smile, Laugh, Star, TriangleAlert, Minus } from 'lucide-react'
 
-export const ESCALA: Record<number, {
-  label: string; icon: React.ElementType; cor: string; bg: string; solido: string
-}> = {
-  1: { label: 'Crítico',   icon: Angry, cor: 'text-red-600',     bg: 'bg-red-50',     solido: 'bg-red-500' },
-  2: { label: 'Ruim',      icon: Frown, cor: 'text-orange-600',  bg: 'bg-orange-50',  solido: 'bg-orange-500' },
-  3: { label: 'Moderado',  icon: Meh,   cor: 'text-amber-600',   bg: 'bg-amber-50',   solido: 'bg-amber-500' },
-  4: { label: 'Bom',       icon: Smile, cor: 'text-lime-600',    bg: 'bg-lime-50',    solido: 'bg-lime-600' },
-  5: { label: 'Excelente', icon: Laugh, cor: 'text-emerald-600', bg: 'bg-emerald-50', solido: 'bg-emerald-500' },
+export const ESCALA: Record<number, { label: string; icon: React.ElementType; cor: string; bg: string }> = {
+  1: { label: 'Crítico',   icon: Angry, cor: 'text-red-600',     bg: 'bg-red-50' },
+  2: { label: 'Ruim',      icon: Frown, cor: 'text-orange-600',  bg: 'bg-orange-50' },
+  3: { label: 'Moderado',  icon: Meh,   cor: 'text-amber-600',   bg: 'bg-amber-50' },
+  4: { label: 'Bom',       icon: Smile, cor: 'text-lime-600',    bg: 'bg-lime-50' },
+  5: { label: 'Excelente', icon: Laugh, cor: 'text-emerald-600', bg: 'bg-emerald-50' },
 }
 
 const VAZIO = 'text-slate-300'
@@ -29,28 +29,35 @@ function SemDado({ size, titulo = 'Sem check-in' }: { size: number; titulo?: str
   )
 }
 
-/** Nota 1..5 como ícone. Sem check-in ainda → traço discreto, nunca um zero falso. */
+/** Nota 1..5 como barra de 5 estrelas: as N primeiras cheias, o resto apagado.
+ *  Sem check-in ainda → traço, nunca uma barra zerada (que se leria como
+ *  "avaliado com nota mínima"). */
 export function NotaIcone({ nota, size = 17, titulo }: {
   nota: number | null | undefined
   size?: number
   /** Prefixo do tooltip, ex.: "Condição". */
   titulo?: string
 }) {
-  if (nota == null) {
+  if (nota == null || !ESCALA[nota]) {
     return <SemDado size={size} />
   }
-  const e = ESCALA[nota]
-  if (!e) return <SemDado size={size} />
-  const Icon = e.icon
-  // Ficha preenchida: o disco carrega a cor e o rosto vem em branco. Fica
-  // legível de longe numa coluna de tabela, que é onde ela mais é lida.
+  // `size` é a altura do espaço; a estrela é menor porque são cinco lado a lado.
+  const estrela = Math.max(8, Math.round(size * 0.6))
   return (
     <span
-      title={`${titulo ? titulo + ': ' : ''}${e.label}`}
-      className={`inline-flex items-center justify-center rounded-full ${e.solido}`}
-      style={{ width: size + 7, height: size + 7 }}
+      title={`${titulo ? titulo + ': ' : ''}${nota} de 5 — ${ESCALA[nota].label}`}
+      className="inline-flex items-center gap-[1px]"
+      aria-label={`${nota} de 5`}
     >
-      <Icon size={size - 1} className="text-white" strokeWidth={2.4} aria-label={e.label} />
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          size={estrela}
+          className={i <= nota ? 'text-amber-400' : 'text-slate-200'}
+          fill="currentColor"
+          strokeWidth={0}
+        />
+      ))}
     </span>
   )
 }
@@ -68,12 +75,8 @@ export function AvariaIcone({ temAvaria, descricao, size = 17 }: {
     return <SemDado size={size} titulo={temAvaria === false ? 'Sem avarias' : 'Sem check-in'} />
   }
   return (
-    <span
-      title={descricao ? `Avaria: ${descricao}` : 'Avaria registrada'}
-      className="inline-flex items-center justify-center rounded-full bg-amber-500"
-      style={{ width: size + 7, height: size + 7 }}
-    >
-      <TriangleAlert size={size - 1} className="text-white" strokeWidth={2.4} aria-label="com avaria" />
+    <span title={descricao ? `Avaria: ${descricao}` : 'Avaria registrada'} className="inline-flex">
+      <TriangleAlert size={size} className="text-amber-500" fill="currentColor" strokeWidth={0} aria-label="com avaria" />
     </span>
   )
 }
