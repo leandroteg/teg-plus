@@ -123,10 +123,12 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
 
   // Esta ficha e preenchida a mao quando a vistoria e manual: campo sem valor
   // ganha uma linha para escrever, nunca um traco (traco parece 'nao tem').
-  const linhaParaEscrever = (x: number, largura: number) => {
+  // A linha vai no PE da celula: e sobre ela que se escreve, entao o texto
+  // manuscrito precisa do espaco acima dela, nao abaixo.
+  const linhaParaEscrever = (x: number, largura: number, base: number) => {
     doc.setDrawColor(...MID)
     doc.setLineWidth(0.35)
-    doc.line(x, y + 1, x + largura, y + 1)
+    doc.line(x, base, x + largura, base)
   }
 
   const par = (l1: string, v1: string, l2?: string, v2?: string) => {
@@ -138,10 +140,12 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
     if (l2) doc.text(l2.toUpperCase(), M + half, y)
     y += 4
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...DARK)
-    if (v1) doc.text(winAnsi(v1), M, y); else linhaParaEscrever(M, larg)
-    if (l2) { if (v2) doc.text(winAnsi(v2), M + half, y); else linhaParaEscrever(M + half, larg) }
     // campo em branco precisa de altura de escrita a mao, nao de leitura
-    y += (!v1 || (l2 && !v2)) ? 9 : 6
+    const alturaValor = (!v1 || (l2 && !v2)) ? 9 : 6
+    const base = y + alturaValor - 2
+    if (v1) doc.text(winAnsi(v1), M, y); else linhaParaEscrever(M, larg, base)
+    if (l2) { if (v2) doc.text(winAnsi(v2), M + half, y); else linhaParaEscrever(M + half, larg, base) }
+    y += alturaValor
   }
 
   // ── HEADER ────────────────────────────────────────────────────────────────
@@ -197,7 +201,7 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   // O texto de observações é onde ficam as pendências conhecidas (obra a fazer,
   // dados que faltam). Levar isso a campo é metade do valor da ficha.
   if (entrada.observacoes) {
-    sectionTitle('ATENÇÃO - JÁ REGISTRADO NESTA ENTRADA')
+    sectionTitle('OBSERVAÇÕES')
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
     for (const linha of doc.splitTextToSize(winAnsi(entrada.observacoes), CW) as string[]) {
       checkPage(6)
