@@ -1093,6 +1093,13 @@ export default function CotacaoForm() {
   // Seleção manual por item: Map<descricaoNormalizada, fornecedorIndex>
   const [selecaoPorItem, setSelecaoPorItem] = useState<Map<string, number>>(new Map())
   const [selecaoTocada, setSelecaoTocada] = useState(false)
+  // Saldo de quantidade: itens cuja qtd cotada (na proposta escolhida) é menor
+  // que a qtd da RC — ao concluir, o comprador decide o destino do restante
+  // (desconsiderar ou gerar RC complementar via RPC cmp_ajustar_qtd_cotacao).
+  const [saldoPrompt, setSaldoPrompt] = useState<
+    { item_id: string; descricao: string; unidade: string; qtd_rc: number; qtd_nova: number }[] | null
+  >(null)
+  const [saldoBusy, setSaldoBusy] = useState(false)
 
   // ── CNPJ auto-lookup state per fornecedor ─────────────────────────────────
   const [cnpjLoading, setCnpjLoading] = useState<Record<number, boolean>>({})
@@ -1637,6 +1644,39 @@ export default function CotacaoForm() {
     .map(it => String(it.descricao ?? '').trim())
     .filter(desc => desc && !itensParaEscolher.has(desc.toLowerCase()))
 
+  // Itens da RC cuja quantidade na proposta ESCOLHIDA (seleção por item ou menor
+  // preço entregue) veio menor que a da RC — fornecedor sem a quantidade cheia.
+  // A qtd da linha de outros fornecedores não importa: só o que será comprado.
+  const computeReducoes = () => {
+    const rcItens = (((cotacao?.requisicao as any)?.itens ?? []) as any[])
+      .filter(it => !it.atendido_em_pedido_id)
+    const menorPreco = validos.reduce<FornecedorForm | undefined>(
+      (best, f) => (!best || calcTotalEntregue(f) < calcTotalEntregue(best) ? f : best),
+      undefined,
+    )
+    const reducoes: { item_id: string; descricao: string; unidade: string; qtd_rc: number; qtd_nova: number }[] = []
+    for (const it of rcItens) {
+      const key = String(it.descricao ?? '').toLowerCase().trim()
+      if (!key) continue
+      const idxSel = selecaoPorItem.get(key)
+      const escolhido = idxSel !== undefined ? fornecedores[idxSel] : menorPreco
+      const linha = escolhido?.itens_precos.find(ip => ip.descricao.toLowerCase().trim() === key)
+      if (!linha || !(linha.valor_total > 0)) continue // item não cotado → aviso próprio já cobre
+      const qtdRc = Number(it.quantidade ?? 0)
+      const qtdCotada = Number(linha.qtd ?? 0)
+      if (qtdCotada > 0 && qtdCotada < qtdRc) {
+        reducoes.push({
+          item_id: it.id,
+          descricao: String(it.descricao ?? ''),
+          unidade: String(it.unidade ?? 'un'),
+          qtd_rc: qtdRc,
+          qtd_nova: qtdCotada,
+        })
+      }
+    }
+    return reducoes
+  }
+
   const fornecedoresComCondicaoInvalida = validos
     .map((f, i) => ({ idx: i + 1, nome: f.fornecedor_nome, cond: f.condicao_pagamento }))
     .filter(f => f.cond.trim() && !condicaoPagamentoInterpretavel(f.cond))
@@ -1705,6 +1745,20 @@ export default function CotacaoForm() {
       return
     }
 
+    // Fornecedor escolhido sem a quantidade cheia de algum item → o comprador
+    // decide o destino do saldo antes do envio (modal). O envio continua em
+    // confirmarSaldo, depois do RPC de ajuste.
+    const reducoes = computeReducoes()
+    if (reducoes.length > 0) {
+      setSaldoPrompt(reducoes)
+      return
+    }
+
+    await doEnviar()
+  }
+
+  const doEnviar = async (msgExtra?: string) => {
+    if (!id || !cotacao) return
     try {
       // Mapeia índice em 'fornecedores' (original) → índice em 'validos'
       const validosIdxMap = new Map<number, number>()
@@ -1753,12 +1807,39 @@ export default function CotacaoForm() {
         justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
         fornecedores_removidos_ids: fornecedoresRemovidosIds,
       })
-      setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
-      setTimeout(() => nav('/cotacoes'), 800)
+      setToast({ type: 'success', msg: `Cotação enviada para aprovação!${msgExtra ? ` ${msgExtra}` : ''}` })
+      setTimeout(() => nav('/cotacoes'), msgExtra ? 1600 : 800)
     } catch (err) {
       console.error('[CotacaoForm] Erro ao enviar:', err)
       const msg = err instanceof Error ? err.message : 'Erro desconhecido'
       setToast({ type: 'error', msg: `Erro ao enviar cotação: ${msg}` })
+    }
+  }
+
+  // Resposta do modal de saldo: ajusta as quantidades da RC (RPC) e segue o envio.
+  // gerarComplementar=true também cria a RC-filha (numero-B) com o restante.
+  const confirmarSaldo = async (gerarComplementar: boolean) => {
+    if (!id || !saldoPrompt || saldoPrompt.length === 0) return
+    setSaldoBusy(true)
+    try {
+      const { data, error } = await supabase.rpc('cmp_ajustar_qtd_cotacao', {
+        p_cotacao_id: id,
+        p_ajustes: saldoPrompt.map(r => ({ item_id: r.item_id, qtd_nova: r.qtd_nova })),
+        p_gerar_complementar: gerarComplementar,
+      })
+      if (error) throw new Error(error.message)
+      const childNumero = (data as any)?.child_numero as string | undefined
+      setSaldoPrompt(null)
+      await doEnviar(
+        gerarComplementar && childNumero
+          ? `RC complementar ${childNumero} criada com o saldo — já está na fila de cotação.`
+          : undefined,
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setToast({ type: 'error', msg: `Erro ao ajustar quantidades: ${msg}` })
+    } finally {
+      setSaldoBusy(false)
     }
   }
 
@@ -2551,6 +2632,78 @@ export default function CotacaoForm() {
             setToast({ type: 'success', msg: 'Fornecedor cadastrado com sucesso.' })
           }}
         />
+      )}
+
+      {/* Modal: destino do saldo de quantidade (fornecedor sem a qtd cheia) */}
+      {saldoPrompt && saldoPrompt.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          onClick={() => !saldoBusy && setSaldoPrompt(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-4 flex items-center gap-3">
+              <PackagePlus size={20} className="text-white" />
+              <div>
+                <p className="text-sm font-bold text-white">Quantidade menor que a pedida</p>
+                <p className="text-[11px] text-white/80">
+                  O fornecedor escolhido não cobre a quantidade total da RC.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <ul className="space-y-1.5">
+                {saldoPrompt.map(r => (
+                  <li key={r.item_id} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700">
+                    <span className="font-bold">{r.descricao}</span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5">
+                      Cotado {r.qtd_nova} de {r.qtd_rc} {r.unidade} — saldo de {r.qtd_rc - r.qtd_nova} {r.unidade}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                O que deseja fazer com o restante? A RC seguirá para aprovação apenas com a
+                quantidade cotada. A RC complementar entra na fila de cotação com o saldo,
+                numerada como {(cotacao?.requisicao as any)?.numero ?? 'RC'}-B.
+              </p>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={saldoBusy}
+                  onClick={() => confirmarSaldo(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition disabled:opacity-50"
+                >
+                  {saldoBusy
+                    ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <PackagePlus size={14} />}
+                  Gerar RC complementar com o saldo
+                </button>
+                <button
+                  type="button"
+                  disabled={saldoBusy}
+                  onClick={() => confirmarSaldo(false)}
+                  className="w-full py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-xs font-bold text-amber-700 hover:bg-amber-100 transition disabled:opacity-50"
+                >
+                  Desconsiderar o restante
+                </button>
+                <button
+                  type="button"
+                  disabled={saldoBusy}
+                  onClick={() => setSaldoPrompt(null)}
+                  className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                >
+                  Voltar e revisar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </form>
   )
