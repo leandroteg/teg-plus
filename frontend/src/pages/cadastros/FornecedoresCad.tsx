@@ -63,9 +63,9 @@ const SEGMENTOS_BASE = [
 /** Recorte opcional por segmento — a tela passa a mostrar so esses fornecedores
  *  e o filtro de segmento sai de cena (ja esta fixo). Usado pela aba Cadastros
  *  do modulo Frotas. */
-type FornecedoresCadProps = { segmentos?: string[]; titulo?: string }
+type FornecedoresCadProps = { segmentos?: string[]; titulo?: string; extra?: React.ReactNode }
 
-export default function FornecedoresCad({ segmentos, titulo }: FornecedoresCadProps = {}) {
+export default function FornecedoresCad({ segmentos, titulo, extra }: FornecedoresCadProps = {}) {
   const [busca, setBusca] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   // Segmento é texto livre no banco: as opções vêm do que já existe + a lista base.
@@ -341,20 +341,13 @@ export default function FornecedoresCad({ segmentos, titulo }: FornecedoresCadPr
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">{titulo ?? 'Fornecedores'}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} item(s)</p>
-        </div>
-        <button onClick={openNew}
-          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Novo Fornecedor
-        </button>
-      </div>
-
+      {/* Titulo, busca, filtros e acoes na mesma linha (quebra so no mobile) */}
       <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <h1 className="text-lg font-extrabold text-slate-800 whitespace-nowrap">{titulo ?? 'Fornecedores'}</h1>
+          <span className="text-xs text-slate-400 whitespace-nowrap">{filtered.length} item(s)</span>
+        </div>
+        <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por codigo, nome, CNPJ..."
@@ -426,6 +419,12 @@ export default function FornecedoresCad({ segmentos, titulo }: FornecedoresCadPr
             <LayoutGrid size={16} />
           </button>
         </div>
+        {extra}
+        <button onClick={openNew}
+          className="shrink-0 flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
+            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
+          <Plus size={15} /> Novo Fornecedor
+        </button>
       </div>
 
       {isLoading ? (
