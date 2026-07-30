@@ -1,17 +1,17 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2, MapPinOff, ArrowUpDown } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, X, FileText, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2, MapPinOff, ArrowUpDown, ShieldCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoCartao, usePontoRetificacoes, usePontoHorasExtras, useColabAtivosIds,
-  usePontoAtestados, useAprovarItem, useEnviarItens, usePontoDia, usePontoDispositivos,
+  usePontoAtestados, useEnviarItens, usePontoDia, usePontoDispositivos,
   type PontoElegiveis,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
-import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao, HoraExtraItem } from '../../../types/ponto'
-import PontoReportModal, { type PontoReportAlvo } from './PontoReportModal'
+import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, PontoRetificacao, HoraExtraItem } from '../../../types/ponto'
+import PontoConsolidacao from './PontoConsolidacao'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -46,8 +46,6 @@ function useAprovador() {
   return (user as { nome?: string; email?: string } | null)?.nome || (user as { email?: string } | null)?.email || 'RH'
 }
 export const RUIDO_MIGRACAO = /aplicativo|sistema|teste/i
-const tipoLabel: Record<AprovTipo, string> = { retificacao: 'Retificação', hora_extra: 'Hora extra', atestado: 'Atestado' }
-const tipoCor: Record<AprovTipo, string> = { retificacao: 'text-amber-500', hora_extra: 'text-orange-500', atestado: 'text-rose-500' }
 function matchPessoa(nome: string | null | undefined, q: string) {
   return !q.trim() || (nome ?? '').toLowerCase().includes(q.trim().toLowerCase())
 }
@@ -580,265 +578,32 @@ export function AtestadosTab({ anoMes, baseId, pessoa, status }: PontoTabProps) 
   )
 }
 
-// ── fila de aprovação ────────────────────────────────────────────────────────
-interface FilaItem { tipo: AprovTipo; key: AprovKey; nome: string; baseId: string; baseNome: string; quando: string; desc: string }
-
 // ════════════════════════════════════════════════════════════════════════════
 // 5) APROVAÇÃO — itens "em aprovação", agrupados por base + modal c/ filtros
 // ════════════════════════════════════════════════════════════════════════════
 export function AprovacaoTab({ anoMes }: PontoTabProps) {
-  const ret = usePontoRetificacoes(anoMes)
-  const he = usePontoHorasExtras(anoMes)
-  const at = usePontoAtestados(anoMes)
   const c = useThemeCls()
-  const [aberta, setAberta] = useState<string | null>(null)
-  const [modal, setModal] = useState<{ base: string; itens: FilaItem[] } | null>(null)
-
-  const itens: FilaItem[] = useMemo(() => {
-    const out: FilaItem[] = []
-    for (const r of (ret.data ?? [])) if (r.aprov_status === 'em_aprovacao' && (!r.motivo || !RUIDO_MIGRACAO.test(r.motivo)))
-      out.push({ tipo: 'retificacao', key: { tipo: 'retificacao', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: r.motivo ?? `${r.n_ret} batida(s) à mão${r.dia_todo ? ' · jornada inteira' : ''}` })
-    for (const r of (he.data ?? [])) if (r.aprov_status === 'em_aprovacao')
-      out.push({ tipo: 'hora_extra', key: { tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: fmtHoras(r.extras_total) })
-    for (const a of (at.data ?? [])) if (a.aprov_status === 'em_aprovacao')
-      out.push({ tipo: 'atestado', key: { tipo: 'atestado', id: a.id }, nome: a.colaborador?.nome ?? '—', baseId: a.colaborador?.base_id ?? '', baseNome: a.colaborador?.base?.nome ?? '(sem base)', quando: a.inicio, desc: a.justificativa ?? a.motivo ?? '' })
-    return out
-  }, [ret.data, he.data, at.data])
-
-  const grupos = useMemo(() => {
-    const m = new Map<string, FilaItem[]>()
-    for (const it of itens) { if (!m.has(it.baseNome)) m.set(it.baseNome, []); m.get(it.baseNome)!.push(it) }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length)
-  }, [itens])
-
-  if (ret.isLoading || he.isLoading || at.isLoading) return <Painel><Loading /></Painel>
-  if (!itens.length) return <Painel><div className="text-center py-16"><Check className="mx-auto mb-3 text-emerald-500" size={26} /><p className={`text-sm ${c.sub}`}>Nada em aprovação em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>Itens enviados nas abas Retificações/Horas Extras/Atestados aparecem aqui.</p></div></Painel>
-
-  const cont = (its: FilaItem[]) => {
-    const r = its.filter(i => i.tipo === 'retificacao').length, h = its.filter(i => i.tipo === 'hora_extra').length, a = its.filter(i => i.tipo === 'atestado').length
-    return [r && `${r} retif.`, h && `${h} extra`, a && `${a} atest.`].filter(Boolean).join(' · ')
-  }
-
+  // Sem etapa de aprovacao por ora: a retificacao ja chega aprovada do Secullum,
+  // entao tudo que vem de la segue direto para a Consolidacao. A fila fica aqui
+  // desativada — nada mais do comportamento antigo foi alterado.
   return (
-    <div className="space-y-2">
-      <div className={`text-xs ${c.sub}`}><b className={c.txt}>{itens.length}</b> em aprovação em {labelMes(anoMes)}, em {grupos.length} área(s).</div>
-      {grupos.map(([base, its]) => {
-        const open = aberta === base
-        return (
-          <Painel key={base}>
-            <div className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${c.row}`} onClick={() => setAberta(open ? null : base)}>
-              <ChevronRight size={15} className={`${c.sub} transition-transform ${open ? 'rotate-90' : ''}`} />
-              <div className="flex-1 min-w-0"><p className={`text-sm font-bold ${c.txt}`}>{base}</p><p className={`text-[10px] ${c.sub}`}>{its.length} itens · {cont(its)}</p></div>
-              <button onClick={e => { e.stopPropagation(); setModal({ base, itens: its }) }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500/15 text-violet-500 hover:bg-violet-500/25"><Filter size={12} /> Filtrar / aprovar</button>
-            </div>
-            {open && <ListaFila itens={its.slice(0, 30)} />}
-            {open && its.length > 30 && <div className={`px-4 py-2 text-[11px] ${c.sub}`}>+{its.length - 30} itens — use “Filtrar / aprovar”.</div>}
-          </Painel>
-        )
-      })}
-      {modal && <FilaModal base={modal.base} itens={modal.itens} onClose={() => setModal(null)} />}
-    </div>
-  )
-}
-
-function ListaFila({ itens }: { itens: FilaItem[] }) {
-  const c = useThemeCls()
-  return (
-    <table className="w-full border-t border-dashed">
-      <tbody>{itens.map((it, i) => (
-        <tr key={i} className={`border-t ${c.row}`}>
-          <td className={`${TD} font-semibold ${c.txt}`}>{it.nome}</td>
-          <td className={`${TD} ${tipoCor[it.tipo]} hidden sm:table-cell`}>{tipoLabel[it.tipo]}</td>
-          <td className={`${TD} ${c.sub}`}>{new Date(it.quando).toLocaleDateString('pt-BR')}</td>
-          <td className={`${TD} ${c.txt}`}>{it.desc}</td>
-        </tr>
-      ))}</tbody>
-    </table>
-  )
-}
-
-function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; onClose: () => void }) {
-  const c = useThemeCls()
-  const aprovar = useAprovarItem()
-  const aprovador = useAprovador()
-  const [de, setDe] = useState(''); const [ate, setAte] = useState(''); const [pessoa, setPessoa] = useState('')
-  const pessoas = useMemo(() => [...new Set(itens.map(i => i.nome))].sort(), [itens])
-  const filtrados = itens.filter(it => {
-    const d = it.quando.slice(0, 10)
-    if (de && d < de) return false
-    if (ate && d > ate) return false
-    if (pessoa && it.nome !== pessoa) return false
-    return true
-  })
-  const act = (key: AprovKey, st: AprovStatus) => aprovar.mutate({ key, status: st, aprovador })
-  const aprovarTodos = () => filtrados.forEach(it => aprovar.mutate({ key: it.key, status: 'aprovado', aprovador }))
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className={`w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border shadow-2xl ${c.isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'}`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-4 py-3 border-b ${c.isLight ? 'border-slate-200' : 'border-white/10'}`}>
-          <div><p className={`text-sm font-bold ${c.txt}`}>Aprovação · {base}</p><p className={`text-[10px] ${c.sub}`}>{filtrados.length} de {itens.length} itens</p></div>
-          <button onClick={onClose} className={`p-1.5 rounded-lg ${c.isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}><X size={16} className={c.sub} /></button>
-        </div>
-        <div className={`flex items-center gap-2 flex-wrap px-4 py-3 border-b ${c.isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-          <label className={`text-[10px] ${c.sub}`}>De</label>
-          <input type="date" value={de} onChange={e => setDe(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`} />
-          <label className={`text-[10px] ${c.sub}`}>Até</label>
-          <input type="date" value={ate} onChange={e => setAte(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`} />
-          <select value={pessoa} onChange={e => setPessoa(e.target.value)} className={`px-2 py-1.5 rounded-lg border text-xs ${c.input}`}>
-            <option value="">Todas as pessoas</option>
-            {pessoas.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <div className="flex-1" />
-          <button disabled={aprovar.isPending || !filtrados.length} onClick={aprovarTodos}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 disabled:opacity-40"><Check size={12} /> Aprovar filtrados ({filtrados.length})</button>
-        </div>
-        <div className="overflow-y-auto">
-          <table className="w-full">
-            <thead><tr className={c.head}><th className={TH}>Colaborador</th><th className={`${TH} hidden sm:table-cell`}>Tipo</th><th className={TH}>Data</th><th className={TH}>Detalhe</th><th className={TH}></th></tr></thead>
-            <tbody>{filtrados.map((it, i) => (
-              <tr key={i} className={`border-t ${c.row}`}>
-                <td className={`${TD} font-semibold ${c.txt}`}>{it.nome}</td>
-                <td className={`${TD} ${tipoCor[it.tipo]} hidden sm:table-cell`}>{tipoLabel[it.tipo]}</td>
-                <td className={`${TD} ${c.sub}`}>{new Date(it.quando).toLocaleDateString('pt-BR')}</td>
-                <td className={`${TD} ${c.txt}`}>{it.desc}</td>
-                <td className={`${TD} w-px`}><div className="flex gap-1.5 justify-end">
-                  <button disabled={aprovar.isPending} onClick={() => act(it.key, 'aprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"><Check size={12} /></button>
-                  <button disabled={aprovar.isPending} onClick={() => act(it.key, 'reprovado')} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500/25"><X size={12} /></button>
-                </div></td>
-              </tr>
-            ))}</tbody>
-          </table>
-          {!filtrados.length && <Vazio msg="Nenhum item no filtro." />}
-        </div>
+    <Painel>
+      <div className="text-center py-16 px-6">
+        <ShieldCheck className="mx-auto mb-3 text-violet-500" size={26} />
+        <p className={`text-sm font-semibold ${c.txt}`}>Aprovações serão implementadas via TEG+ em breve.</p>
+        <p className={`text-xs mt-1.5 max-w-md mx-auto ${c.sub}`}>
+          Por enquanto a retificação já chega aprovada do Secullum, então tudo que vem de lá
+          segue direto para a Consolidação — sem etapa de aprovação aqui.
+        </p>
+        <p className={`text-[11px] mt-3 ${c.sub}`}>Competência: {labelMes(anoMes)}</p>
       </div>
-    </div>
+    </Painel>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 6) CONSOLIDAÇÃO — só aprovados
+// 6) CONSOLIDAÇÃO — por pessoa (espelho) e por mês (pacote p/ CEMIG)
 // ════════════════════════════════════════════════════════════════════════════
 export function ConsolidacaoTab({ anoMes, bases }: PontoTabProps) {
-  const he = usePontoHorasExtras(anoMes)
-  const ret = usePontoRetificacoes(anoMes)
-  const at = usePontoAtestados(anoMes)
-  const resumo = usePontoResumoMes(anoMes)
-  const c = useThemeCls()
-  const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
-  const [busca, setBusca] = useState('')
-  const [baseFil, setBaseFil] = useState('')
-  const heAprov = (he.data ?? []).filter(r => r.aprov_status === 'aprovado')
-  const retAprov = (ret.data ?? []).filter(r => r.aprov_status === 'aprovado')
-  const atAprov = (at.data ?? []).filter(a => a.aprov_status === 'aprovado')
-
-  const porBase = useMemo(() => {
-    const m = new Map<string, { base: string; extras: number; lanc: number }>()
-    for (const r of heAprov) {
-      const k = r.base_nome ?? '—'
-      if (!m.has(k)) m.set(k, { base: k, extras: 0, lanc: 0 })
-      const a = m.get(k)!; a.extras += intervalToMin(r.extras_total); a.lanc++
-    }
-    return [...m.values()].sort((a, b) => b.extras - a.extras)
-  }, [he.data])
-
-  // espelho de ponto: 1 linha por colaborador do mês (independe de aprovação —
-  // o espelho é o cartão do mês, não a fila de itens aprovados)
-  const pessoas = useMemo(() => {
-    const m = new Map<string, { id: string; nome: string; cargo: string | null; baseId: string | null; base: string | null; hh: number; ex: number; falta: number; dias: number; batidos: number }>()
-    for (const r of (resumo.data ?? [])) {
-      if (!r.colaborador_id) continue
-      const a = m.get(r.colaborador_id) ?? { id: r.colaborador_id, nome: r.colaborador_nome ?? '—', cargo: r.cargo, baseId: r.base_id, base: r.base_nome, hh: 0, ex: 0, falta: 0, dias: 0, batidos: 0 }
-      a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras)
-      a.falta += intervalToMin(r.faltas)
-      a.dias += r.dias || 0; a.batidos += r.dias_batidos || 0
-      m.set(r.colaborador_id, a)
-    }
-    return [...m.values()].sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
-  }, [resumo.data])
-  const pessoasFil = pessoas.filter(p => matchPessoa(p.nome, busca) && (!baseFil || p.baseId === baseFil))
-  const nomeBase = bases?.find(b => b.id === baseFil)?.nome
-
-  const semAprovado = !heAprov.length && !retAprov.length && !atAprov.length
-  if (he.isLoading || ret.isLoading || at.isLoading) return <Painel><Loading /></Painel>
-
-  return (
-    <div className="space-y-3">
-      {semAprovado ? (
-        <Painel><div className="text-center py-10"><Lock className="mx-auto mb-3 text-slate-400" size={26} /><p className={`text-sm ${c.sub}`}>Nada aprovado em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>A consolidação mostra só o que foi aprovado — o espelho de ponto abaixo independe disso.</p></div></Painel>
-      ) : (<>
-      <div className="flex items-center gap-2 text-xs text-emerald-500"><Lock size={14} /> Ponto fechado de {labelMes(anoMes)} — só itens aprovados.</div>
-      <div className="grid grid-cols-3 gap-3">
-        <div className={`rounded-2xl border p-3 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`}><p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras</p><p className={`text-lg font-extrabold ${c.txt}`}>{minToHoras(heAprov.reduce((s, r) => s + intervalToMin(r.extras_total), 0))}</p></div>
-        <div className={`rounded-2xl border p-3 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`}><p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Retificações</p><p className={`text-lg font-extrabold ${c.txt}`}>{retAprov.length}</p></div>
-        <div className={`rounded-2xl border p-3 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`}><p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Atestados</p><p className={`text-lg font-extrabold ${c.txt}`}>{atAprov.length}</p></div>
-      </div>
-      {porBase.length > 0 && (
-        <Painel>
-          <table className="w-full">
-            <thead><tr className={c.head}><th className={TH}>Base</th><th className={TH}>Lançamentos</th><th className={TH}>Horas extras aprovadas</th></tr></thead>
-            <tbody>{porBase.map((l, i) => (
-              <tr key={i} className={`border-t ${c.row}`}>
-                <td className={`${TD} font-semibold ${c.txt}`}>{l.base}</td>
-                <td className={`${TD} ${c.sub}`}>{l.lanc}</td>
-                <td className={`${TD} font-bold text-orange-500`}>{minToHoras(l.extras)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </Painel>
-      )}
-      </>)}
-
-      {/* ── Espelho de ponto do mês, por colaborador ───────────────────────── */}
-      <Painel>
-        <div className={`flex items-center justify-between gap-2 px-3 py-2.5 border-b flex-wrap ${c.isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
-          <div>
-            <p className={`text-sm font-bold ${c.txt}`}>Espelho de ponto · {labelMes(anoMes)}</p>
-            <p className={`text-[10px] ${c.sub}`}>Cartão do mês por colaborador, com a origem de cada marcação — abre em HTML e baixa em PDF.</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select value={baseFil} onChange={e => setBaseFil(e.target.value)} className={`px-3 py-1.5 rounded-xl border text-xs ${c.input}`}>
-              <option value="">Todas as bases</option>
-              {(bases ?? []).map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
-            </select>
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar por pessoa…"
-              className={`px-3 py-1.5 rounded-xl border text-xs w-[170px] ${c.input}`} />
-            <button
-              disabled={!pessoasFil.length}
-              onClick={() => setEspelho({ tipo: 'consolidado', spec: { ano_mes: anoMes, recorte: nomeBase, colaboradores: pessoasFil.map(p => ({ id: p.id, nome: p.nome })) } })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
-              <FileText size={13} /> Consolidado ({pessoasFil.length})
-            </button>
-          </div>
-        </div>
-        {resumo.isLoading ? <Loading /> : !pessoasFil.length ? <Vazio msg="Nenhum colaborador com ponto no mês." /> : (
-          <table className="w-full">
-            <thead><tr className={c.head}>
-              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th>
-              <th className={TH}>Dias</th><th className={`${TH} hidden sm:table-cell`}>HH</th><th className={TH}>Extras</th><th className={TH}></th>
-            </tr></thead>
-            <tbody>{pessoasFil.map(p => (
-              <tr key={p.id} className={`border-t cursor-pointer ${c.row}`}
-                onClick={() => setEspelho({ tipo: 'colaborador', row: { colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes } })}>
-                <td className={`${TD} font-semibold ${c.txt} max-w-[260px]`}>
-                  <span className="block truncate" title={p.nome}>{p.nome}</span>
-                  <span className={`text-[10px] ${c.sub}`}>{p.cargo ?? '—'}</span>
-                </td>
-                <td className={`${TD} hidden md:table-cell ${c.sub}`}>{p.base ?? '—'}</td>
-                <td className={`${TD} ${c.txt}`}>{p.batidos}/{p.dias}</td>
-                <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{p.hh > 0 ? minToHoras(p.hh) : '—'}</td>
-                <td className={`${TD} font-semibold ${p.ex > 0 ? 'text-orange-500' : c.sub}`}>{p.ex > 0 ? minToHoras(p.ex) : '—'}</td>
-                <td className={`${TD} w-px`}>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-500 whitespace-nowrap"><FileText size={13} /> Espelho</span>
-                </td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </Painel>
-
-      {espelho && <PontoReportModal alvo={espelho} onClose={() => setEspelho(null)} />}
-    </div>
-  )
+  return <PontoConsolidacao anoMes={anoMes} bases={bases} />
 }

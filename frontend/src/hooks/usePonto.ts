@@ -115,10 +115,14 @@ export function usePontoResumoPeriodo(de: string, ate: string) {
   return useQuery<PontoResumoMes[]>({
     queryKey: ['ponto-resumo-periodo', de, ate],
     queryFn: async () => {
-      const { data, error } = await supabase.from('vw_rh_ponto_resumo_mes').select('*')
-        .gte('ano_mes', `${de}-01`).lte('ano_mes', `${ate}-01`).order('colaborador_nome')
-      if (error) { console.error('usePontoResumoPeriodo:', error); return [] }
-      return (data ?? []) as PontoResumoMes[]
+      // sem paginar, 12 meses (~4 mil linhas) voltariam cortados em 1000
+      try {
+        return await paginar<PontoResumoMes>((from, to) => supabase
+          .from('vw_rh_ponto_resumo_mes').select('*')
+          .gte('ano_mes', `${de}-01`).lte('ano_mes', `${ate}-01`)
+          .order('ano_mes').order('colaborador_nome').order('colaborador_id')
+          .range(from, to))
+      } catch (e) { console.error('usePontoResumoPeriodo:', e); return [] }
     },
   })
 }

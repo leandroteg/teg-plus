@@ -1,0 +1,236 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// components/rh/ponto/PontoConsolidacao.tsx — DP › Ponto › Consolidação.
+// Duas sub-visões na MESMA aba (padrão dos ícones do Benefícios):
+//   Por pessoa  — 1 linha por colaborador do mês, com o espelho individual;
+//   Consolidado — 1 linha por mês, com o relatório do mês e o pacote p/ CEMIG.
+//
+// A seleção (com filtro por base e por pessoa) define quem entra no relatório
+// consolidado e no ZIP — é a mesma lista nas duas visões.
+//
+// Não há etapa de aprovação: retificação já chega aprovada do Secullum.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useMemo, useState } from 'react'
+import { Search, Users, BarChart3, FileText, Package, Loader2, Lock } from 'lucide-react'
+import { useTheme } from '../../../contexts/ThemeContext'
+import { usePontoResumoMes, usePontoResumoPeriodo } from '../../../hooks/usePonto'
+import { intervalToMin, minToHoras, labelMes, ultimosMeses } from '../../../lib/ponto'
+import PontoReportModal, { type PontoReportAlvo } from './PontoReportModal'
+
+interface Pessoa {
+  id: string; nome: string; cargo: string | null
+  baseId: string | null; base: string | null
+  hh: number; ex: number; falta: number; dias: number; batidos: number
+}
+interface MesLinha {
+  anoMes: string; pessoas: number; hh: number; ex: number; falta: number; assinados: number
+}
+
+export default function PontoConsolidacao({ anoMes, bases }: {
+  anoMes: string
+  bases?: { id: string; nome: string; codigo?: string | null }[]
+}) {
+  const { isLightSidebar: isLight } = useTheme()
+  const isDark = !isLight
+  const [vista, setVista] = useState<'pessoa' | 'consolidado'>('pessoa')
+  const [baseFil, setBaseFil] = useState('')
+  const [busca, setBusca] = useState('')
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
+
+  const resumo = usePontoResumoMes(anoMes)
+  // janela dos últimos 12 meses só quando a visão mensal está aberta
+  const meses = useMemo(() => ultimosMeses(12), [])
+  const de = (meses[meses.length - 1] ?? anoMes).slice(0, 7)
+  const ate = (meses[0] ?? anoMes).slice(0, 7)
+  const periodo = usePontoResumoPeriodo(vista === 'consolidado' ? de : ate, ate)
+
+  const txt = isDark ? 'text-slate-200' : 'text-slate-700'
+  const sub = isDark ? 'text-slate-500' : 'text-slate-400'
+  const head = isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'
+  const row = isDark ? 'border-white/[0.05] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50/70'
+  const selCls = `px-3 py-1.5 rounded-xl border text-xs ${isDark ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700'}`
+  const TH = 'text-left text-[10px] uppercase tracking-widest font-bold px-3 py-2.5'
+  const TD = 'px-3 py-2 text-xs'
+
+  // ── pessoas do mês (mesma agregação nas duas visões) ───────────────────────
+  const pessoas: Pessoa[] = useMemo(() => {
+    const m = new Map<string, Pessoa>()
+    for (const r of (resumo.data ?? [])) {
+      if (!r.colaborador_id) continue
+      const a = m.get(r.colaborador_id) ?? { id: r.colaborador_id, nome: r.colaborador_nome ?? '—', cargo: r.cargo, baseId: r.base_id, base: r.base_nome, hh: 0, ex: 0, falta: 0, dias: 0, batidos: 0 }
+      a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras); a.falta += intervalToMin(r.faltas)
+      a.dias += r.dias || 0; a.batidos += r.dias_batidos || 0
+      m.set(r.colaborador_id, a)
+    }
+    return [...m.values()].sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
+  }, [resumo.data])
+
+  const q = busca.trim().toLowerCase()
+  const lista = pessoas.filter(p => (!baseFil || p.baseId === baseFil) && (!q || p.nome.toLowerCase().includes(q)))
+  // seleção vazia = todos do filtro (é o comportamento esperado ao só filtrar)
+  const escolhidos = sel.size ? lista.filter(p => sel.has(p.id)) : lista
+  const nomeBase = bases?.find(b => b.id === baseFil)?.nome
+  const todosMarcados = lista.length > 0 && lista.every(p => sel.has(p.id))
+
+  const marcarTodos = () => setSel(todosMarcados ? new Set() : new Set(lista.map(p => p.id)))
+  const alternar = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // ── linhas mensais ─────────────────────────────────────────────────────────
+  const linhasMes: MesLinha[] = useMemo(() => {
+    const m = new Map<string, MesLinha & { ids: Set<string> }>()
+    for (const r of (periodo.data ?? [])) {
+      const k = String(r.ano_mes).slice(0, 10)
+      const a = m.get(k) ?? { anoMes: k, pessoas: 0, hh: 0, ex: 0, falta: 0, assinados: 0, ids: new Set<string>() }
+      if (r.colaborador_id) a.ids.add(r.colaborador_id)
+      a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras); a.falta += intervalToMin(r.faltas)
+      m.set(k, a)
+    }
+    return [...m.values()].map(x => ({ ...x, pessoas: x.ids.size })).sort((a, b) => b.anoMes.localeCompare(a.anoMes))
+  }, [periodo.data])
+
+  const abrirConsolidado = (mes: string, quem: { id: string; nome: string }[], recorte?: string) =>
+    setEspelho({ tipo: 'consolidado', spec: { ano_mes: mes, recorte, colaboradores: quem } })
+
+  const vistaBtn = (v: typeof vista, Icon: typeof Users, titulo: string) => (
+    <button key={v} onClick={() => setVista(v)} title={titulo}
+      className={`w-8 h-8 inline-flex items-center justify-center rounded-lg border transition-colors ${vista === v
+        ? isDark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-50 border-violet-200 text-violet-700'
+        : isDark ? 'border-white/10 text-slate-500 hover:text-white' : 'border-slate-200 text-slate-400 hover:text-slate-700'}`}>
+      <Icon size={14} />
+    </button>
+  )
+
+  const painel = `rounded-2xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'}`
+
+  return (
+    <div className="space-y-3">
+      {/* filtros + troca de sub-visão numa linha só, como no Benefícios */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={baseFil} onChange={e => { setBaseFil(e.target.value); setSel(new Set()) }} className={selCls}>
+          <option value="">Todas as áreas</option>
+          {(bases ?? []).map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+        </select>
+        <div className={`flex flex-1 items-center gap-2 rounded-xl border px-3 py-1.5 min-w-[150px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+          <Search size={13} className={sub} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar colaborador…"
+            className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+        </div>
+        <span className={`text-[11px] whitespace-nowrap ${sub}`}>
+          <b className={txt}>{escolhidos.length}</b> {sel.size ? 'selecionado(s)' : 'no filtro'}
+        </span>
+        <div className="flex items-center gap-1">
+          {vistaBtn('pessoa', Users, 'Por pessoa')}
+          {vistaBtn('consolidado', BarChart3, 'Consolidado por mês')}
+        </div>
+      </div>
+
+      {vista === 'pessoa' ? (
+        <div className={painel}>
+          <div className={`flex items-center justify-between gap-2 px-3 py-2.5 border-b flex-wrap ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <div>
+              <p className={`text-sm font-bold ${txt}`}>Espelho de ponto · {labelMes(anoMes)}</p>
+              <p className={`text-[10px] ${sub}`}>Clique na linha para abrir o espelho do colaborador.</p>
+            </div>
+            <button disabled={!escolhidos.length}
+              onClick={() => abrirConsolidado(anoMes, escolhidos.map(p => ({ id: p.id, nome: p.nome })), nomeBase)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
+              <FileText size={13} /> Consolidado ({escolhidos.length})
+            </button>
+          </div>
+          {resumo.isLoading ? <Carregando /> : !lista.length ? <Vazio msg="Nenhum colaborador com ponto no mês." /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className={head}>
+                  <th className={`${TH} w-px`}><input type="checkbox" checked={todosMarcados} onChange={marcarTodos} className="accent-violet-500" title="Selecionar todos" /></th>
+                  <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Área</th>
+                  <th className={TH}>Dias</th><th className={`${TH} hidden sm:table-cell`}>HH</th>
+                  <th className={TH}>Extras</th><th className={`${TH} hidden sm:table-cell`}>Faltas</th>
+                  <th className={TH}>Assinatura</th><th className={TH}></th>
+                </tr></thead>
+                <tbody>{lista.map(p => (
+                  <tr key={p.id} className={`border-t cursor-pointer ${row}`}
+                    onClick={() => setEspelho({ tipo: 'colaborador', row: { colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes } })}>
+                    <td className={`${TD} w-px`} onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={sel.has(p.id)} onChange={() => alternar(p.id)} className="accent-violet-500" />
+                    </td>
+                    <td className={`${TD} font-semibold ${txt} max-w-[250px]`}>
+                      <span className="block truncate" title={p.nome}>{p.nome}</span>
+                      <span className={`text-[10px] ${sub}`}>{p.cargo ?? '—'}</span>
+                    </td>
+                    <td className={`${TD} hidden md:table-cell ${sub}`}>{p.base ?? '—'}</td>
+                    <td className={`${TD} ${txt}`}>{p.batidos}/{p.dias}</td>
+                    <td className={`${TD} hidden sm:table-cell ${sub}`}>{p.hh > 0 ? minToHoras(p.hh) : '—'}</td>
+                    <td className={`${TD} font-semibold ${p.ex > 0 ? 'text-orange-500' : sub}`}>{p.ex > 0 ? minToHoras(p.ex) : '—'}</td>
+                    <td className={`${TD} hidden sm:table-cell ${p.falta > 0 ? 'text-rose-500 font-semibold' : sub}`}>{p.falta > 0 ? minToHoras(p.falta) : '—'}</td>
+                    <td className={TD}><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>não enviado</span></td>
+                    <td className={`${TD} w-px`}><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-500 whitespace-nowrap"><FileText size={13} /> Espelho</span></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={painel}>
+          <div className={`px-3 py-2.5 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <p className={`text-sm font-bold ${txt}`}>Consolidado por mês</p>
+            <p className={`text-[10px] ${sub}`}>
+              Últimos 12 meses. O relatório e o pacote seguem o filtro de área e a seleção acima
+              {nomeBase ? ` — hoje: ${nomeBase}` : ''}{sel.size ? ` · ${sel.size} pessoa(s) marcada(s)` : ''}.
+            </p>
+          </div>
+          {periodo.isLoading ? <Carregando /> : !linhasMes.length ? <Vazio msg="Sem ponto apurado no período." /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className={head}>
+                  <th className={TH}>Mês</th><th className={TH}>Colaboradores</th>
+                  <th className={`${TH} hidden sm:table-cell`}>HH</th><th className={TH}>Extras</th>
+                  <th className={`${TH} hidden sm:table-cell`}>Faltas</th>
+                  <th className={TH}>Fechamento</th><th className={TH}>Assinados</th><th className={TH}></th>
+                </tr></thead>
+                <tbody>{linhasMes.map(l => {
+                  const doMes = l.anoMes === anoMes
+                  return (
+                    <tr key={l.anoMes} className={`border-t ${row}`}>
+                      <td className={`${TD} font-semibold ${txt}`}>{labelMes(l.anoMes)}{doMes && <span className={`ml-1.5 text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-500 font-bold uppercase`}>atual</span>}</td>
+                      <td className={`${TD} ${txt}`}>{l.pessoas}</td>
+                      <td className={`${TD} hidden sm:table-cell ${sub}`}>{l.hh > 0 ? minToHoras(l.hh) : '—'}</td>
+                      <td className={`${TD} font-semibold ${l.ex > 0 ? 'text-orange-500' : sub}`}>{l.ex > 0 ? minToHoras(l.ex) : '—'}</td>
+                      <td className={`${TD} hidden sm:table-cell ${l.falta > 0 ? 'text-rose-500' : sub}`}>{l.falta > 0 ? minToHoras(l.falta) : '—'}</td>
+                      <td className={TD}>
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                          <Lock size={9} /> em aberto
+                        </span>
+                      </td>
+                      <td className={`${TD} ${sub}`}>0/{l.pessoas}</td>
+                      <td className={`${TD} w-px`}>
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <button
+                            onClick={() => abrirConsolidado(l.anoMes, (doMes ? escolhidos : []).map(p => ({ id: p.id, nome: p.nome })), nomeBase)}
+                            disabled={!doMes || !escolhidos.length}
+                            title={doMes ? 'Relatório consolidado do mês' : 'Troque a competência no filtro do topo para gerar outro mês'}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-violet-500/15 text-violet-500 hover:bg-violet-500/25 disabled:opacity-30 whitespace-nowrap">
+                            <FileText size={12} /> Relatório
+                          </button>
+                          <button disabled title="Disponível quando a assinatura do espelho estiver ligada — hoje não há PDF assinado para empacotar"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-500/10 text-slate-400 disabled:opacity-60 whitespace-nowrap cursor-not-allowed">
+                            <Package size={12} /> ZIP
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {espelho && <PontoReportModal alvo={espelho} onClose={() => setEspelho(null)} />}
+    </div>
+  )
+
+  function Carregando() { return <div className="flex justify-center py-14"><Loader2 className="animate-spin text-violet-500" size={24} /></div> }
+  function Vazio({ msg }: { msg: string }) { return <div className={`text-center py-14 text-sm ${sub}`}>{msg}</div> }
+}
