@@ -151,7 +151,7 @@ export async function buildRdoReportHtml(r: RdoReportRow): Promise<string> {
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;background:#f1f5f9;font-size:13px;line-height:1.5}
   .page{max-width:820px;margin:0 auto;background:#fff}
-  header{background:linear-gradient(135deg,#1e293b,#0f766e);color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  header{background:#0f172a;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
   header img{height:34px}
   header .r{text-align:right}
   header h1{font-size:20px;font-weight:700;letter-spacing:.3px}
