@@ -60,6 +60,7 @@ export interface Fornecedor {
   boleto?: boolean
   pix_chave?: string
   pix_tipo?: string
+  segmento?: string | null
   omie_id?: number
   ativo: boolean
   created_at: string
