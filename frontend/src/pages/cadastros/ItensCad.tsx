@@ -36,9 +36,9 @@ const EMPTY: Partial<EstItem> = {
 /** Recorte opcional: quando vem preenchido, a tela mostra so aquelas
  *  subcategorias (grupo de compra) e ja nasce com ela no item novo.
  *  Usado pela aba Cadastros do modulo Frotas. */
-type ItensCadProps = { subcategorias?: string[]; titulo?: string }
+type ItensCadProps = { subcategorias?: string[]; titulo?: string; extra?: React.ReactNode }
 
-export default function ItensCad({ subcategorias, titulo }: ItensCadProps = {}) {
+export default function ItensCad({ subcategorias, titulo, extra }: ItensCadProps = {}) {
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
@@ -270,21 +270,13 @@ export default function ItensCad({ subcategorias, titulo }: ItensCadProps = {}) 
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">{titulo ?? 'Catalogo de Itens'}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} item(s)</p>
-        </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-        >
-          <Plus size={15} /> Novo Item
-        </button>
-      </div>
-
+      {/* Titulo, busca, filtros e acoes na mesma linha (quebra so no mobile) */}
       <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <h1 className="text-lg font-extrabold text-slate-800 whitespace-nowrap">{titulo ?? 'Catalogo de Itens'}</h1>
+          <span className="text-xs text-slate-400 whitespace-nowrap">{filtrados.length} item(s)</span>
+        </div>
+        <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={busca}
@@ -303,7 +295,7 @@ export default function ItensCad({ subcategorias, titulo }: ItensCadProps = {}) 
                 : 'bg-white text-slate-500 border-slate-200'
             }`}
           >
-            {curva === '' ? 'Todos' : `Curva ${curva}`}
+            {curva === '' ? 'Todos' : curva}
           </button>
         ))}
         <div className="flex rounded-xl border border-slate-200 overflow-hidden">
@@ -316,6 +308,13 @@ export default function ItensCad({ subcategorias, titulo }: ItensCadProps = {}) 
             <LayoutGrid size={16} />
           </button>
         </div>
+        {extra}
+        <button
+          onClick={openNew}
+          className="shrink-0 flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+        >
+          <Plus size={15} /> Novo Item
+        </button>
       </div>
 
       {isLoading ? (
