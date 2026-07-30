@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CalendarDays, ClipboardList, Wrench, History } from 'lucide-react'
+import { CalendarDays, ClipboardList, Wrench, History, Boxes } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useOrdensServico, useChecklists } from '../../../hooks/useFrotas'
 import Planejamento         from './Planejamento'
 import ChecklistsManutencao from './ChecklistsManutencao'
 import OSAbertas            from './OSAbertas'
 import HistoricoOS          from './HistoricoOS'
+import CadastrosFrotas     from './CadastrosFrotas'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'planejamento' | 'checklists' | 'os' | 'historico'
+type TabKey = 'planejamento' | 'checklists' | 'os' | 'historico' | 'cadastros'
 
 // Ordem pelo uso do dia a dia: a OS é a tela de trabalho, o plano é consulta.
 const TABS: Array<{ key: TabKey; label: string }> = [
@@ -18,6 +19,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'historico',    label: 'Histórico'         },
   { key: 'checklists',   label: 'Checklists'        },
   { key: 'planejamento', label: 'Plano Manutenção'  },
+  { key: 'cadastros',    label: 'Cadastros'         },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
@@ -25,6 +27,7 @@ const TAB_ICONS: Record<TabKey, React.ElementType> = {
   checklists:   ClipboardList,
   os:           Wrench,
   historico:    History,
+  cadastros:    Boxes,
 }
 
 const TAB_ACCENT: Record<TabKey, {
@@ -49,6 +52,11 @@ const TAB_ACCENT: Record<TabKey, {
     bg: 'hover:bg-emerald-50',   bgActive: 'bg-emerald-50',
     text: 'text-emerald-600',    textActive: 'text-emerald-800',
     border: 'border-emerald-500',
+  },
+  cadastros: {
+    bg: 'hover:bg-slate-100',    bgActive: 'bg-slate-100',
+    text: 'text-slate-600',      textActive: 'text-slate-800',
+    border: 'border-slate-400',
   },
 }
 
@@ -75,6 +83,11 @@ const TAB_ACCENT_DARK: Record<TabKey, {
     text: 'text-emerald-400',      textActive: 'text-emerald-200',
     border: 'border-emerald-500/40',
   },
+  cadastros: {
+    bg: 'hover:bg-white/[0.06]',   bgActive: 'bg-white/[0.10]',
+    text: 'text-slate-400',        textActive: 'text-slate-100',
+    border: 'border-white/20',
+  },
 }
 
 const COMPS: Record<TabKey, React.ComponentType> = {
@@ -82,6 +95,7 @@ const COMPS: Record<TabKey, React.ComponentType> = {
   checklists:   ChecklistsManutencao,
   os:           OSAbertas,
   historico:    HistoricoOS,
+  cadastros:    CadastrosFrotas,
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -94,7 +108,7 @@ export default function ManutencaoHub() {
   const [searchParams] = useSearchParams()
   useEffect(() => {
     const t = searchParams.get('tab')
-    if (t && ['os', 'historico', 'checklists', 'planejamento'].includes(t)) setActive(t as TabKey)
+    if (t && ['os', 'historico', 'checklists', 'planejamento', 'cadastros'].includes(t)) setActive(t as TabKey)
   }, [searchParams])
   const { isDark } = useTheme()
   const { data: ordens = [] } = useOrdensServico()
@@ -104,6 +118,7 @@ export default function ManutencaoHub() {
     checklists: 0,
     os: ordens.filter(o => !['concluida', 'cancelada', 'rejeitada'].includes(o.status)).length,
     historico: ordens.filter(o => o.status === 'concluida').length,
+    cadastros: 0,
   }
   const Comp = COMPS[active] ?? OSAbertas
 
