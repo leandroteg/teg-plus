@@ -1,14 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ponto-report-html.ts — Espelho de ponto do colaborador no mês, em HTML
-// (mesmo padrão estético do RDO / relatório QSMA). Abre no visualizador (iframe)
-// e vira PDF pelo "Baixar" (print A4).
+// ponto-report-html.ts — Espelho de ponto em HTML (padrão estético do RDO/QSMA).
+// Dois formatos, mesma seção de colaborador:
+//   • buildPontoReportHtml       → 1 colaborador
+//   • buildPontoConsolidadoHtml  → capa + N colaboradores, 1 por página
+// Abre no visualizador (iframe) e vira PDF pelo "Baixar" (print A4).
 //
 // Marca a ORIGEM de cada batida: relógio (REP), intervalo pré-assinalado e
 // lançamento manual (retificação). Isso é o que dá valor de conferência ao
 // espelho — sem isso, 12:00/13:00 parece batida e não é.
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../services/supabase'
-import { EMPRESA_FALLBACK, getEmpresa } from '../services/empresa'
+import { EMPRESA_FALLBACK, getEmpresa, type EmpresaData } from '../services/empresa'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, proximoMes } from '../lib/ponto'
 
 const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -24,8 +26,15 @@ export interface PontoReportRow {
   colaborador_nome: string
   ano_mes: string            // 'YYYY-MM'
 }
+export interface PontoConsolidadoSpec {
+  ano_mes: string
+  colaboradores: { id: string; nome: string }[]
+  /** rótulo do recorte na capa (ex.: nome da base) */
+  recorte?: string
+}
 
-interface DiaRaw {
+interface DiaRow {
+  colaborador_id: string | null
   data: string
   entrada1: string | null; saida1: string | null
   entrada2: string | null; saida2: string | null
@@ -33,62 +42,83 @@ interface DiaRaw {
   ex50: string | null; ex70: string | null; ex100: string | null
   hh_trabalhada: string | null; atrasos: string | null
   folga: boolean | null; compensado: boolean | null
-  raw: Record<string, { Origem?: number | string } | null> | null
+  // só a origem, não o raw inteiro — são ~10 mil linhas no consolidado
+  o_e1: string | null; o_s1: string | null; o_e2: string | null; o_s2: string | null
+}
+type ResumoRow = Record<string, unknown> & { colaborador_id: string | null }
+
+const SEL_DIA = 'colaborador_id, data, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, hh_trabalhada, atrasos, folga, compensado,'
+  + 'o_e1:raw->FonteDadosEntrada1->>Origem, o_s1:raw->FonteDadosSaida1->>Origem,'
+  + 'o_e2:raw->FonteDadosEntrada2->>Origem, o_s2:raw->FonteDadosSaida2->>Origem'
+const SEL_RESUMO = 'colaborador_id, colaborador_nome, cargo, matricula, base_nome, cc_codigo, cc_nome, departamento,'
+  + 'dias, dias_batidos, hh_trabalhada, normais, extras, faltas, atrasos, banco_saldo, dias_em_aberto'
+
+// o PostgREST capa em 1000 linhas por request mesmo com .limit() maior
+const PAGE = 1000
+async function paginar<T>(lote: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>, max = 40_000): Promise<T[]> {
+  const all: T[] = []
+  for (let from = 0; from < max; from += PAGE) {
+    const { data, error } = await lote(from, from + PAGE - 1)
+    if (error) throw error
+    const pag = (data ?? []) as T[]
+    all.push(...pag)
+    if (pag.length < PAGE) break
+  }
+  return all
 }
 
-const origemDe = (raw: DiaRaw['raw'], slot: string): string => {
-  const o = raw?.[`FonteDados${slot}`]?.Origem
-  return o == null ? '' : String(o)
-}
-
-export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
-  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
-  const ini = `${r.ano_mes}-01`
+async function carregar(anoMes: string, ids?: string[]) {
+  const ini = `${anoMes}-01`
   const fim = proximoMes(ini)
-
-  const [resRes, diasRes] = await Promise.all([
-    supabase.from('vw_rh_ponto_resumo_mes')
-      .select('colaborador_nome, cargo, matricula, base_nome, cc_codigo, cc_nome, departamento, dias, dias_batidos, hh_trabalhada, normais, extras, faltas, atrasos, banco_saldo, dias_em_aberto')
-      .eq('colaborador_id', r.colaborador_id).eq('ano_mes', ini),
-    supabase.from('rh_ponto_dia')
-      .select('data, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, hh_trabalhada, atrasos, folga, compensado, raw')
-      .eq('colaborador_id', r.colaborador_id).gte('data', ini).lt('data', fim).order('data'),
+  const umSo = ids?.length === 1 ? ids[0] : null
+  const [resumo, dias] = await Promise.all([
+    paginar<ResumoRow>((from, to) => {
+      let q = supabase.from('vw_rh_ponto_resumo_mes').select(SEL_RESUMO).eq('ano_mes', ini)
+      if (umSo) q = q.eq('colaborador_id', umSo)
+      return q.order('colaborador_id').range(from, to)
+    }),
+    paginar<DiaRow>((from, to) => {
+      let q = supabase.from('rh_ponto_dia').select(SEL_DIA).gte('data', ini).lt('data', fim)
+      if (umSo) q = q.eq('colaborador_id', umSo)
+      return q.order('colaborador_id').order('data').range(from, to)
+    }),
   ])
+  // com muitos colaboradores sai mais barato trazer o mês e filtrar aqui do que
+  // montar um .in() com centenas de uuids na URL
+  const set = ids && ids.length > 1 ? new Set(ids) : null
+  return {
+    ini,
+    resumo: set ? resumo.filter(r => r.colaborador_id && set.has(r.colaborador_id)) : resumo,
+    dias: set ? dias.filter(d => d.colaborador_id && set.has(d.colaborador_id)) : dias,
+  }
+}
 
-  const resumos = (resRes.data ?? []) as Record<string, unknown>[]
-  const dias = (diasRes.data ?? []) as unknown as DiaRaw[]
-  // o colaborador pode ter 2+ linhas no resumo (troca de base no mês) — soma
+const origens = (d: DiaRow) => [d.o_e1, d.o_s1, d.o_e2, d.o_s2]
+
+// ── seção de UM colaborador (usada nos dois formatos) ────────────────────────
+function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], ini: string, comQuebra: boolean): string {
   const cab = resumos[0] ?? {}
   const somaInt = (k: string) => resumos.reduce((s, x) => s + intervalToMin(x[k] as string), 0)
   const somaNum = (k: string) => resumos.reduce((s, x) => s + Number(x[k] ?? 0), 0)
+  const hhMin = somaInt('hh_trabalhada'), normMin = somaInt('normais')
+  const faltaMin = somaInt('faltas'), atrasoMin = somaInt('atrasos'), exMin = somaInt('extras')
+  const nDias = somaNum('dias'), nBatidos = somaNum('dias_batidos'), emAberto = somaNum('dias_em_aberto')
 
-  const hhMin = somaInt('hh_trabalhada')
-  const normMin = somaInt('normais')
-  const faltaMin = somaInt('faltas')
-  const atrasoMin = somaInt('atrasos')
-  const exMin = somaInt('extras')
-  const nDias = somaNum('dias')
-  const nBatidos = somaNum('dias_batidos')
-  const emAberto = somaNum('dias_em_aberto')
-
-  // quantas batidas do mês vieram de cada origem — é o rodapé de conferência
   let nRep = 0, nPre = 0, nManual = 0, diasComManual = 0
   for (const d of dias) {
-    let temManual = false
-    for (const slot of ['Entrada1', 'Saida1', 'Entrada2', 'Saida2']) {
-      const o = origemDe(d.raw, slot)
+    let tem = false
+    for (const o of origens(d)) {
       if (o === ORIGEM_REP) nRep++
       else if (o === ORIGEM_PRE) nPre++
-      else if (o === ORIGEM_MANUAL) { nManual++; temManual = true }
+      else if (o === ORIGEM_MANUAL) { nManual++; tem = true }
     }
-    if (temManual) diasComManual++
+    if (tem) diasComManual++
   }
 
   const kpi = (label: string, valor: string, cor = '#0d9488') =>
     `<div class="kpi"><div class="kpi-v" style="color:${cor}">${valor}</div><div class="kpi-l">${esc(label)}</div></div>`
 
-  // célula de batida com a marca da origem
-  const cel = (h: string | null, o: string) => {
+  const cel = (h: string | null, o: string | null) => {
     if (!h) return '<td class="h">—</td>'
     const cls = o === ORIGEM_MANUAL ? 'h man' : o === ORIGEM_PRE ? 'h pre' : 'h'
     const tag = o === ORIGEM_MANUAL ? '<sup>M</sup>' : o === ORIGEM_PRE ? '<sup>P</sup>' : ''
@@ -105,10 +135,7 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
       : d.compensado ? '<span class="tag comp">comp.</span>' : ''
     return `<tr class="${fds ? 'fds' : ''}">
       <td class="d">${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')} <span class="dow">${DIAS[dow]}</span></td>
-      ${cel(d.entrada1, origemDe(d.raw, 'Entrada1'))}
-      ${cel(d.saida1, origemDe(d.raw, 'Saida1'))}
-      ${cel(d.entrada2, origemDe(d.raw, 'Entrada2'))}
-      ${cel(d.saida2, origemDe(d.raw, 'Saida2'))}
+      ${cel(d.entrada1, d.o_e1)}${cel(d.saida1, d.o_s1)}${cel(d.entrada2, d.o_e2)}${cel(d.saida2, d.o_s2)}
       <td class="n">${fmtHoras(d.normais)}</td>
       <td class="n ${ex > 0 ? 'ex' : ''}">${ex > 0 ? minToHoras(ex) : '—'}</td>
       <td class="n ${falta ? 'fal' : ''}">${fmtHoras(d.faltas)}</td>
@@ -117,21 +144,53 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
   }).join('')
 
   const totalRow = `<tr class="tot">
-    <td>Total · ${nBatidos}/${nDias} dias</td>
-    <td colspan="4"></td>
+    <td>Total · ${nBatidos}/${nDias} dias</td><td colspan="4"></td>
     <td>${normMin > 0 ? minToHoras(normMin) : '—'}</td>
     <td class="ex">${exMin > 0 ? minToHoras(exMin) : '—'}</td>
-    <td class="fal">${faltaMin > 0 ? minToHoras(faltaMin) : '—'}</td>
-    <td></td>
+    <td class="fal">${faltaMin > 0 ? minToHoras(faltaMin) : '—'}</td><td></td>
   </tr>`
 
-  const logoUrl = `${location.origin}/logo-teg-transicao-branca.png`
-  const hoje = new Date().toLocaleDateString('pt-BR')
+  return `<section class="colab${comQuebra ? ' quebra' : ''}">
+    <h2>${esc(cab.colaborador_nome ?? nome)}</h2>
+    <div class="grid">
+      <div class="f"><label>Matrícula</label><div>${esc(cab.matricula ?? '—')}</div></div>
+      <div class="f"><label>Cargo</label><div>${esc(cab.cargo ?? '—')}</div></div>
+      <div class="f"><label>Base</label><div>${esc(cab.base_nome ?? '—')}</div></div>
+      <div class="f"><label>Centro de custo</label><div>${esc(cab.cc_codigo ?? cab.cc_nome ?? '—')}</div></div>
+      <div class="f"><label>Departamento</label><div>${esc(cab.departamento ?? '—')}</div></div>
+      <div class="f"><label>Competência</label><div>${esc(labelMes(ini))}</div></div>
+    </div>
+    <div class="kpis">
+      ${kpi('HH trabalhada', hhMin > 0 ? minToHoras(hhMin) : '—', '#7c3aed')}
+      ${kpi('Horas normais', normMin > 0 ? minToHoras(normMin) : '—')}
+      ${kpi('Horas extras', exMin > 0 ? minToHoras(exMin) : '—', '#ea580c')}
+      ${kpi('Faltas', faltaMin > 0 ? minToHoras(faltaMin) : '—', '#e11d48')}
+    </div>
+    <div class="leg">
+      <span><b>Dias apurados:</b> ${nBatidos} de ${nDias}</span>
+      <span><b>Atrasos:</b> ${atrasoMin > 0 ? minToHoras(atrasoMin) : '—'}</span>
+      <span><b>Saldo banco:</b> ${fmtHoras(cab.banco_saldo as string)}</span>
+      ${emAberto > 0 ? `<span style="color:#b45309"><b>Dias em aberto:</b> ${emAberto}</span>` : ''}
+    </div>
+    <table>
+      <thead><tr>
+        <th>Dia</th><th>Entrada</th><th>Saída interv.</th><th>Volta interv.</th><th>Saída</th>
+        <th>Normais</th><th>Extras</th><th>Faltas</th><th></th>
+      </tr></thead>
+      <tbody>${linhas || '<tr><td colspan="9" class="vazio">Sem marcações no período.</td></tr>'}${dias.length ? totalRow : ''}</tbody>
+    </table>
+    <div class="leg">
+      <span><b>Origem:</b></span>
+      <span><b style="color:#334155">${nRep}</b> no relógio</span>
+      <span><b style="color:#94a3b8">${nPre}</b> pré-assinaladas <sup>P</sup></span>
+      <span><b style="color:#b45309">${nManual}</b> lançadas à mão <sup>M</sup></span>
+    </div>
+    ${nManual > 0 ? `<div class="aviso"><b>${nManual} marcaç${nManual > 1 ? 'ões' : 'ão'} em ${diasComManual} dia${diasComManual > 1 ? 's' : ''} ${nManual > 1 ? 'foram lançadas' : 'foi lançada'} manualmente no sistema de ponto</b> — destacadas em âmbar com <sup>M</sup>. Não passaram pelo relógio, por isso não têm NSR. As marcadas com <sup>P</sup> são o intervalo pré-assinalado, gerado a partir do horário cadastrado.</div>` : ''}
+    <div class="assin"><div>Assinatura do colaborador</div><div>Assinatura do responsável</div></div>
+  </section>`
+}
 
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Espelho de ponto — ${esc(r.colaborador_nome)} — ${esc(labelMes(ini))}</title>
-<style>
+const CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;background:#f1f5f9;font-size:13px;line-height:1.5}
   .page{max-width:820px;margin:0 auto;background:#fff}
@@ -141,12 +200,13 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
   header h1{font-size:20px;font-weight:700;letter-spacing:.3px}
   header .sub{font-size:12px;opacity:.85;margin-top:2px}
   .body{padding:22px 28px}
-  h2{font-size:13px;font-weight:800;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #0d9488;padding-bottom:5px;margin:22px 0 12px}
-  h2:first-child{margin-top:0}
+  h2{font-size:13px;font-weight:800;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #0d9488;padding-bottom:5px;margin:0 0 12px}
+  .colab{margin-bottom:26px}
+  .colab.quebra{break-before:page;padding-top:6px}
   .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 24px}
   .f label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:700}
   .f div{font-size:13px;color:#1e293b;font-weight:600;margin-top:1px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 6px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 6px}
   .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center}
   .kpi-v{font-size:22px;font-weight:800}
   .kpi-l{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:700;margin-top:2px}
@@ -163,6 +223,7 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
   td.n{font-variant-numeric:tabular-nums;color:#64748b}
   td.n.ex{color:#ea580c;font-weight:700}
   td.n.fal{color:#e11d48;font-weight:700}
+  td.vazio{padding:18px;color:#94a3b8;font-style:italic}
   tr.fds td{background:#fafafa;color:#94a3b8}
   tr.fds td.d{color:#94a3b8}
   tr.tot td{background:#f1f5f9;font-weight:800;color:#1e293b;border-top:2px solid #cbd5e1;border-bottom:0}
@@ -170,11 +231,14 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
   .tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px}
   .tag.folga{background:#e0f2fe;color:#0369a1}
   .tag.comp{background:#f1f5f9;color:#64748b}
-  .leg{margin-top:10px;font-size:10.5px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap}
+  .leg{margin-top:8px;font-size:10.5px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap}
   .leg b{color:#334155}
   .aviso{margin-top:8px;font-size:10.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px}
-  .assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}
+  .assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px}
   .assin div{border-top:1px solid #94a3b8;padding-top:5px;font-size:11px;color:#64748b;text-align:center}
+  .capa table{margin-top:10px}
+  .capa td{text-align:left}
+  .capa td.num{text-align:right;font-variant-numeric:tabular-nums}
   footer{padding:14px 28px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between}
   @media print{
     body{background:#fff}
@@ -184,66 +248,101 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
     tr{break-inside:avoid}
     h2{break-after:avoid}
     .assin{break-inside:avoid}
-  }
-</style></head>
+  }`
+
+function shell(empresa: EmpresaData, titulo: string, sub: string, corpo: string) {
+  const logoUrl = `${location.origin}/logo-teg-transicao-branca.png`
+  const hoje = new Date().toLocaleDateString('pt-BR')
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>${esc(titulo)} — ${esc(sub)}</title>
+<style>${CSS}</style></head>
 <body>
 <div class="page">
   <header>
     <div><img src="${logoUrl}" onerror="this.style.display='none'"/>
       <div class="sub" style="margin-top:8px">${esc(empresa.razao)} · CNPJ ${esc(empresa.cnpj)}</div></div>
-    <div class="r"><h1>Espelho de Ponto</h1>
-      <div class="sub">${esc(r.colaborador_nome)} · ${esc(labelMes(ini))}</div></div>
+    <div class="r"><h1>${esc(titulo)}</h1><div class="sub">${esc(sub)}</div></div>
   </header>
-  <div class="body">
-    <h2>Colaborador</h2>
-    <div class="grid">
-      <div class="f"><label>Nome</label><div>${esc(cab.colaborador_nome ?? r.colaborador_nome)}</div></div>
-      <div class="f"><label>Matrícula</label><div>${esc(cab.matricula ?? '—')}</div></div>
-      <div class="f"><label>Cargo</label><div>${esc(cab.cargo ?? '—')}</div></div>
-      <div class="f"><label>Base</label><div>${esc(cab.base_nome ?? '—')}</div></div>
-      <div class="f"><label>Centro de custo</label><div>${esc(cab.cc_codigo ?? cab.cc_nome ?? '—')}</div></div>
-      <div class="f"><label>Competência</label><div>${esc(labelMes(ini))}</div></div>
-    </div>
-
-    <h2>Totais do mês</h2>
-    <div class="kpis">
-      ${kpi('HH trabalhada', hhMin > 0 ? minToHoras(hhMin) : '—', '#7c3aed')}
-      ${kpi('Horas normais', normMin > 0 ? minToHoras(normMin) : '—')}
-      ${kpi('Horas extras', exMin > 0 ? minToHoras(exMin) : '—', '#ea580c')}
-      ${kpi('Faltas', faltaMin > 0 ? minToHoras(faltaMin) : '—', '#e11d48')}
-    </div>
-    <div class="leg">
-      <span><b>Dias apurados:</b> ${nBatidos} de ${nDias}</span>
-      <span><b>Atrasos:</b> ${atrasoMin > 0 ? minToHoras(atrasoMin) : '—'}</span>
-      <span><b>Saldo banco:</b> ${fmtHoras(cab.banco_saldo as string)}</span>
-      ${emAberto > 0 ? `<span style="color:#b45309"><b>Dias em aberto:</b> ${emAberto}</span>` : ''}
-    </div>
-
-    <h2>Marcações do mês</h2>
-    <table>
-      <thead><tr>
-        <th>Dia</th><th>Entrada</th><th>Saída interv.</th><th>Volta interv.</th><th>Saída</th>
-        <th>Normais</th><th>Extras</th><th>Faltas</th><th></th>
-      </tr></thead>
-      <tbody>${linhas || '<tr><td colspan="9" style="padding:18px;color:#94a3b8;font-style:italic">Sem marcações no período.</td></tr>'}${dias.length ? totalRow : ''}</tbody>
-    </table>
-
-    <div class="leg">
-      <span><b>Origem das marcações:</b></span>
-      <span><b style="color:#334155">${nRep}</b> no relógio</span>
-      <span><b style="color:#94a3b8">${nPre}</b> pré-assinaladas <sup>P</sup></span>
-      <span><b style="color:#b45309">${nManual}</b> lançadas à mão <sup>M</sup></span>
-    </div>
-    ${nManual > 0 ? `<div class="aviso"><b>${nManual} marcaç${nManual > 1 ? 'ões' : 'ão'} em ${diasComManual} dia${diasComManual > 1 ? 's' : ''} ${nManual > 1 ? 'foram lançadas' : 'foi lançada'} manualmente no sistema de ponto</b> (destacadas em âmbar com <sup>M</sup>) — não passaram pelo relógio e por isso não têm NSR. As marcadas com <sup>P</sup> são o intervalo pré-assinalado, gerado a partir do horário cadastrado.</div>` : ''}
-
-    <div class="assin">
-      <div>Assinatura do colaborador</div>
-      <div>Assinatura do responsável</div>
-    </div>
-  </div>
-  <footer><span>${esc(empresa.razao)} — Espelho de ponto</span><span>Gerado pelo TEG+ · ${hoje}</span></footer>
+  <div class="body">${corpo}</div>
+  <footer><span>${esc(empresa.razao)} — ${esc(titulo)}</span><span>Gerado pelo TEG+ · ${hoje}</span></footer>
 </div>
 </body></html>`
+}
+
+// ── 1 colaborador ────────────────────────────────────────────────────────────
+export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
+  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+  const { ini, resumo, dias } = await carregar(r.ano_mes, [r.colaborador_id])
+  const corpo = secaoColaborador(r.colaborador_nome, resumo, dias, ini, false)
+  return shell(empresa, 'Espelho de Ponto', `${r.colaborador_nome} · ${labelMes(ini)}`, corpo)
+}
+
+// ── consolidado: capa + 1 colaborador por página ─────────────────────────────
+export async function buildPontoConsolidadoHtml(spec: PontoConsolidadoSpec): Promise<string> {
+  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+  const ids = spec.colaboradores.map(p => p.id)
+  const { ini, resumo, dias } = await carregar(spec.ano_mes, ids)
+
+  const resPorId = new Map<string, ResumoRow[]>()
+  for (const r of resumo) { if (!r.colaborador_id) continue; const a = resPorId.get(r.colaborador_id) ?? []; a.push(r); resPorId.set(r.colaborador_id, a) }
+  const diaPorId = new Map<string, DiaRow[]>()
+  for (const d of dias) { if (!d.colaborador_id) continue; const a = diaPorId.get(d.colaborador_id) ?? []; a.push(d); diaPorId.set(d.colaborador_id, a) }
+
+  // capa: totais do recorte + índice com o resumo de cada um
+  let tHH = 0, tNorm = 0, tEx = 0, tFalta = 0, tManual = 0
+  const linhasCapa = spec.colaboradores.map((p, i) => {
+    const rs = resPorId.get(p.id) ?? []
+    const ds = diaPorId.get(p.id) ?? []
+    const hh = rs.reduce((s, x) => s + intervalToMin(x.hh_trabalhada as string), 0)
+    const nm = rs.reduce((s, x) => s + intervalToMin(x.normais as string), 0)
+    const ex = rs.reduce((s, x) => s + intervalToMin(x.extras as string), 0)
+    const fa = rs.reduce((s, x) => s + intervalToMin(x.faltas as string), 0)
+    const man = ds.reduce((s, d) => s + origens(d).filter(o => o === ORIGEM_MANUAL).length, 0)
+    tHH += hh; tNorm += nm; tEx += ex; tFalta += fa; tManual += man
+    return `<tr>
+      <td style="color:#94a3b8;width:26px">${i + 1}</td>
+      <td style="font-weight:600">${esc(p.nome)}</td>
+      <td style="color:#64748b">${esc((rs[0]?.base_nome as string) ?? '—')}</td>
+      <td class="num">${rs.reduce((s, x) => s + Number(x.dias_batidos ?? 0), 0)}</td>
+      <td class="num">${hh > 0 ? minToHoras(hh) : '—'}</td>
+      <td class="num" style="color:#ea580c;font-weight:600">${ex > 0 ? minToHoras(ex) : '—'}</td>
+      <td class="num" style="color:#e11d48">${fa > 0 ? minToHoras(fa) : '—'}</td>
+      <td class="num" style="color:#b45309">${man || '—'}</td>
+    </tr>`
+  }).join('')
+
+  const kpi = (label: string, valor: string, cor = '#0d9488') =>
+    `<div class="kpi"><div class="kpi-v" style="color:${cor}">${valor}</div><div class="kpi-l">${esc(label)}</div></div>`
+
+  const capa = `<section class="capa">
+    <h2>Consolidado ${esc(labelMes(ini))}${spec.recorte ? ` · ${esc(spec.recorte)}` : ''}</h2>
+    <div class="kpis">
+      ${kpi('Colaboradores', String(spec.colaboradores.length), '#0ea5e9')}
+      ${kpi('HH trabalhada', tHH > 0 ? minToHoras(tHH) : '—', '#7c3aed')}
+      ${kpi('Horas extras', tEx > 0 ? minToHoras(tEx) : '—', '#ea580c')}
+      ${kpi('Faltas', tFalta > 0 ? minToHoras(tFalta) : '—', '#e11d48')}
+    </div>
+    <div class="leg">
+      <span><b>Horas normais:</b> ${tNorm > 0 ? minToHoras(tNorm) : '—'}</span>
+      <span><b style="color:#b45309">${tManual}</b> marcações lançadas à mão no recorte</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="text-align:left" colspan="2">Colaborador</th><th style="text-align:left">Base</th>
+        <th>Dias</th><th>HH</th><th>Extras</th><th>Faltas</th><th>Manuais</th>
+      </tr></thead>
+      <tbody>${linhasCapa || '<tr><td colspan="8" class="vazio">Nenhum colaborador no recorte.</td></tr>'}</tbody>
+    </table>
+    <p style="margin-top:10px;font-size:10.5px;color:#94a3b8">Cada colaborador tem o espelho completo nas páginas seguintes, um por página.</p>
+  </section>`
+
+  const secoes = spec.colaboradores
+    .map(p => secaoColaborador(p.nome, resPorId.get(p.id) ?? [], diaPorId.get(p.id) ?? [], ini, true))
+    .join('')
+
+  const sub = `${labelMes(ini)}${spec.recorte ? ` · ${spec.recorte}` : ''} · ${spec.colaboradores.length} colaborador${spec.colaboradores.length > 1 ? 'es' : ''}`
+  return shell(empresa, 'Espelho de Ponto — Consolidado', sub, capa + secoes)
 }
 
 export function nomeArquivoPontoReport(r: PontoReportRow) {

@@ -2,25 +2,40 @@
 // components/rh/ponto/PontoReportModal.tsx — visualizador do espelho de ponto.
 // Monta o relatório HTML (utils/ponto-report-html), mostra num iframe
 // (bottom-sheet no mobile) e o "Baixar" imprime o próprio iframe → PDF.
+// Serve o espelho de 1 colaborador e o consolidado do mês.
 // Mesmo padrão do RdoPdfModal (módulo Obras).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
 import { X, Download, Loader2, Fingerprint } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { buildPontoReportHtml, type PontoReportRow } from '../../../utils/ponto-report-html'
+import {
+  buildPontoReportHtml, buildPontoConsolidadoHtml,
+  type PontoReportRow, type PontoConsolidadoSpec,
+} from '../../../utils/ponto-report-html'
 
-export default function PontoReportModal({ alvo, onClose }: { alvo: PontoReportRow; onClose: () => void }) {
+export type PontoReportAlvo =
+  | { tipo: 'colaborador'; row: PontoReportRow }
+  | { tipo: 'consolidado'; spec: PontoConsolidadoSpec }
+
+export default function PontoReportModal({ alvo, onClose }: { alvo: PontoReportAlvo; onClose: () => void }) {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const [html, setHtml] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
+  const titulo = alvo.tipo === 'colaborador'
+    ? `Espelho de ponto — ${alvo.row.colaborador_nome}`
+    : `Consolidado — ${alvo.spec.colaboradores.length} colaboradores`
+
   useEffect(() => {
     let cancel = false
+    setHtml(null); setErro(null)
     ;(async () => {
       try {
-        const h = await buildPontoReportHtml(alvo)
+        const h = alvo.tipo === 'colaborador'
+          ? await buildPontoReportHtml(alvo.row)
+          : await buildPontoConsolidadoHtml(alvo.spec)
         if (!cancel) setHtml(h)
       } catch (e) { if (!cancel) setErro(String((e as Error).message)) }
     })()
@@ -33,6 +48,8 @@ export default function PontoReportModal({ alvo, onClose }: { alvo: PontoReportR
     if (win) { win.focus(); win.print() }
   }
 
+  const pesado = alvo.tipo === 'consolidado' && alvo.spec.colaboradores.length > 60
+
   return (
     <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
@@ -40,7 +57,7 @@ export default function PontoReportModal({ alvo, onClose }: { alvo: PontoReportR
         <div className={`flex items-center justify-between gap-2 p-3 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
           <span className={`flex items-center gap-2 font-bold text-sm min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Fingerprint size={16} className="text-teal-500 shrink-0" />
-            <span className="truncate">Espelho de ponto — {alvo.colaborador_nome}</span>
+            <span className="truncate">{titulo}</span>
           </span>
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={baixar} disabled={!html}
@@ -54,7 +71,10 @@ export default function PontoReportModal({ alvo, onClose }: { alvo: PontoReportR
           {erro ? (
             <div className="h-full flex items-center justify-center text-sm text-rose-500 p-4 text-center">Falha ao gerar o espelho: {erro}</div>
           ) : !html ? (
-            <div className="h-full flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> montando espelho…</div>
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-slate-400">
+              <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> montando espelho…</span>
+              {pesado && <span className="text-xs">{alvo.tipo === 'consolidado' ? alvo.spec.colaboradores.length : 0} colaboradores — pode levar alguns segundos.</span>}
+            </div>
           ) : (
             <iframe ref={iframeRef} title="Espelho de ponto" srcDoc={html} className="w-full h-full border-0 bg-white" />
           )}

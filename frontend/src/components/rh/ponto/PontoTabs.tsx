@@ -11,8 +11,7 @@ import {
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao, HoraExtraItem } from '../../../types/ponto'
-import PontoReportModal from './PontoReportModal'
-import type { PontoReportRow } from '../../../utils/ponto-report-html'
+import PontoReportModal, { type PontoReportAlvo } from './PontoReportModal'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -721,14 +720,15 @@ function FilaModal({ base, itens, onClose }: { base: string; itens: FilaItem[]; 
 // ════════════════════════════════════════════════════════════════════════════
 // 6) CONSOLIDAÇÃO — só aprovados
 // ════════════════════════════════════════════════════════════════════════════
-export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
+export function ConsolidacaoTab({ anoMes, bases }: PontoTabProps) {
   const he = usePontoHorasExtras(anoMes)
   const ret = usePontoRetificacoes(anoMes)
   const at = usePontoAtestados(anoMes)
   const resumo = usePontoResumoMes(anoMes)
   const c = useThemeCls()
-  const [espelho, setEspelho] = useState<PontoReportRow | null>(null)
+  const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
   const [busca, setBusca] = useState('')
+  const [baseFil, setBaseFil] = useState('')
   const heAprov = (he.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const retAprov = (ret.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const atAprov = (at.data ?? []).filter(a => a.aprov_status === 'aprovado')
@@ -746,17 +746,19 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
   // espelho de ponto: 1 linha por colaborador do mês (independe de aprovação —
   // o espelho é o cartão do mês, não a fila de itens aprovados)
   const pessoas = useMemo(() => {
-    const m = new Map<string, { id: string; nome: string; cargo: string | null; base: string | null; hh: number; ex: number; dias: number; batidos: number }>()
+    const m = new Map<string, { id: string; nome: string; cargo: string | null; baseId: string | null; base: string | null; hh: number; ex: number; falta: number; dias: number; batidos: number }>()
     for (const r of (resumo.data ?? [])) {
       if (!r.colaborador_id) continue
-      const a = m.get(r.colaborador_id) ?? { id: r.colaborador_id, nome: r.colaborador_nome ?? '—', cargo: r.cargo, base: r.base_nome, hh: 0, ex: 0, dias: 0, batidos: 0 }
+      const a = m.get(r.colaborador_id) ?? { id: r.colaborador_id, nome: r.colaborador_nome ?? '—', cargo: r.cargo, baseId: r.base_id, base: r.base_nome, hh: 0, ex: 0, falta: 0, dias: 0, batidos: 0 }
       a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras)
+      a.falta += intervalToMin(r.faltas)
       a.dias += r.dias || 0; a.batidos += r.dias_batidos || 0
       m.set(r.colaborador_id, a)
     }
     return [...m.values()].sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
   }, [resumo.data])
-  const pessoasFil = pessoas.filter(p => matchPessoa(p.nome, busca))
+  const pessoasFil = pessoas.filter(p => matchPessoa(p.nome, busca) && (!baseFil || p.baseId === baseFil))
+  const nomeBase = bases?.find(b => b.id === baseFil)?.nome
 
   const semAprovado = !heAprov.length && !retAprov.length && !atAprov.length
   if (he.isLoading || ret.isLoading || at.isLoading) return <Painel><Loading /></Painel>
@@ -795,8 +797,20 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
             <p className={`text-sm font-bold ${c.txt}`}>Espelho de ponto · {labelMes(anoMes)}</p>
             <p className={`text-[10px] ${c.sub}`}>Cartão do mês por colaborador, com a origem de cada marcação — abre em HTML e baixa em PDF.</p>
           </div>
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar por pessoa…"
-            className={`px-3 py-1.5 rounded-xl border text-xs w-[190px] ${c.input}`} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={baseFil} onChange={e => setBaseFil(e.target.value)} className={`px-3 py-1.5 rounded-xl border text-xs ${c.input}`}>
+              <option value="">Todas as bases</option>
+              {(bases ?? []).map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+            </select>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar por pessoa…"
+              className={`px-3 py-1.5 rounded-xl border text-xs w-[170px] ${c.input}`} />
+            <button
+              disabled={!pessoasFil.length}
+              onClick={() => setEspelho({ tipo: 'consolidado', spec: { ano_mes: anoMes, recorte: nomeBase, colaboradores: pessoasFil.map(p => ({ id: p.id, nome: p.nome })) } })}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40 whitespace-nowrap">
+              <FileText size={13} /> Consolidado ({pessoasFil.length})
+            </button>
+          </div>
         </div>
         {resumo.isLoading ? <Loading /> : !pessoasFil.length ? <Vazio msg="Nenhum colaborador com ponto no mês." /> : (
           <table className="w-full">
@@ -806,7 +820,7 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
             </tr></thead>
             <tbody>{pessoasFil.map(p => (
               <tr key={p.id} className={`border-t cursor-pointer ${c.row}`}
-                onClick={() => setEspelho({ colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes })}>
+                onClick={() => setEspelho({ tipo: 'colaborador', row: { colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes } })}>
                 <td className={`${TD} font-semibold ${c.txt} max-w-[260px]`}>
                   <span className="block truncate" title={p.nome}>{p.nome}</span>
                   <span className={`text-[10px] ${c.sub}`}>{p.cargo ?? '—'}</span>
