@@ -71,14 +71,21 @@ export default function DPPainel() {
     const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
-      const hh = intervalToMin(r.hh_real)            // só batida real (exclui import/manual)
-      const exV = intervalToMin(r.extras_validos_real) // real, sem dias em aberto
+      // HH e extras TOTAIS. Os campos _real descartavam o dia inteiro quando a
+      // Entrada1 era lançada à mão (Origem 2) — critério que errava nos dois
+      // sentidos: jogava fora ~11,6 mil h de dias cujas outras batidas eram do
+      // relógio, e ainda assim deixava passar metade das extras vindas de dias
+      // com lançamento manual em OUTRA batida (a Saída2, justamente a que mais
+      // se retifica e a que define a hora extra). A hora é paga de todo jeito.
+      const hh = intervalToMin(r.hh_trabalhada)
+      const exV = intervalToMin(r.extras_validos)   // sem dias em aberto
       const banco = ehBanco(r.base_nome)            // banco de horas não paga extra
       hhMin += hh
       if (!banco) { exMin += exV; hhPagavel += hh } // hora extra A PAGAR + base do %
       emAberto += r.dias_em_aberto_real || 0
       foraHorario += r.dias_fora_horario_real || 0
-      if (r.colaborador_id && (r.dias_batidos_real || 0) > 0) comBatida.add(r.colaborador_id)
+      // anota os cards de HH/extras, então acompanha o mesmo critério deles
+      if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
       if (r.colaborador_id && hh > 0) comApur.add(r.colaborador_id)
       const ck = r.cc_codigo || r.cc_nome || '—'
       const cc = ccMap.get(ck) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
@@ -120,7 +127,7 @@ export default function DPPainel() {
           <div>
             <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel DP</h1>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {view === 'ponto' ? <>Ponto · <span className="font-semibold">batida real</span> (sem inclusão manual/import)</> : 'Folha · custo de pessoal, conferência e pagamento'}
+              {view === 'ponto' ? <>Ponto · <span className="font-semibold">apuração do Secullum</span> (inclui retificação)</> : 'Folha · custo de pessoal, conferência e pagamento'}
             </p>
           </div>
           <select value={view} onChange={e => setView(e.target.value as 'ponto' | 'folha')}
