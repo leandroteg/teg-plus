@@ -33,7 +33,12 @@ const EMPTY: Partial<EstItem> = {
   destino_operacional: 'estoque',
 }
 
-export default function ItensCad() {
+/** Recorte opcional: quando vem preenchido, a tela mostra so aquelas
+ *  subcategorias (grupo de compra) e ja nasce com ela no item novo.
+ *  Usado pela aba Cadastros do modulo Frotas. */
+type ItensCadProps = { subcategorias?: string[]; titulo?: string }
+
+export default function ItensCad({ subcategorias, titulo }: ItensCadProps = {}) {
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
@@ -106,6 +111,10 @@ export default function ItensCad() {
 
   const filtrados = useMemo(() => {
     let list = itens
+    if (subcategorias?.length) {
+      const permitidas = new Set(subcategorias)
+      list = list.filter(item => item.subcategoria && permitidas.has(item.subcategoria))
+    }
     if (busca.trim()) {
       const q = busca.toLowerCase()
       list = list.filter((item) =>
@@ -122,7 +131,7 @@ export default function ItensCad() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
-  }, [itens, busca, sortCol, sortDir])
+  }, [itens, busca, sortCol, sortDir, subcategorias])
 
   const toggleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -164,7 +173,11 @@ export default function ItensCad() {
   }
 
   function openNew() {
-    setEditItem({ ...EMPTY })
+    setEditItem({
+      ...EMPTY,
+      // Recorte de um unico grupo: o item novo ja nasce nele
+      ...(subcategorias?.length === 1 ? { subcategoria: subcategorias[0] } : {}),
+    })
     setClasseBusca('')
     setClasseDropdownOpen(false)
     setShowForm(true)
@@ -259,7 +272,7 @@ export default function ItensCad() {
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Catalogo de Itens</h1>
+          <h1 className="text-xl font-extrabold text-slate-800">{titulo ?? 'Catalogo de Itens'}</h1>
           <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} item(s)</p>
         </div>
         <button
