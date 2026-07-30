@@ -60,7 +60,12 @@ const SEGMENTOS_BASE = [
   'Taxas e Órgãos Públicos',
 ]
 
-export default function FornecedoresCad() {
+/** Recorte opcional por segmento — a tela passa a mostrar so esses fornecedores
+ *  e o filtro de segmento sai de cena (ja esta fixo). Usado pela aba Cadastros
+ *  do modulo Frotas. */
+type FornecedoresCadProps = { segmentos?: string[]; titulo?: string }
+
+export default function FornecedoresCad({ segmentos, titulo }: FornecedoresCadProps = {}) {
   const [busca, setBusca] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   // Segmento é texto livre no banco: as opções vêm do que já existe + a lista base.
@@ -112,7 +117,10 @@ export default function FornecedoresCad() {
   }, [fornecedores])
 
   const filtered = useMemo(() => {
-    let list = fornecedores.filter((f: any) => !fSegmentos || fSegmentos.size === 0 || (f.segmento && fSegmentos.has(f.segmento)))
+    const fixos = segmentos?.length ? new Set(segmentos) : null
+    let list = fornecedores
+    .filter((f: any) => !fixos || (f.segmento && fixos.has(f.segmento)))
+    .filter((f: any) => !fSegmentos || fSegmentos.size === 0 || (f.segmento && fSegmentos.has(f.segmento)))
     .filter(f => showInactive || f.ativo)
     if (busca.trim()) {
       const q = busca.toLowerCase()
@@ -130,7 +138,7 @@ export default function FornecedoresCad() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
-  }, [fornecedores, busca, showInactive, sortCol, sortDir])
+  }, [fornecedores, busca, showInactive, sortCol, sortDir, fSegmentos, segmentos])
 
   const toggleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -335,7 +343,7 @@ export default function FornecedoresCad() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Fornecedores</h1>
+          <h1 className="text-xl font-extrabold text-slate-800">{titulo ?? 'Fornecedores'}</h1>
           <p className="text-xs text-slate-400 mt-0.5">{filtered.length} item(s)</p>
         </div>
         <button onClick={openNew}
@@ -353,6 +361,11 @@ export default function FornecedoresCad() {
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
         </div>
+        {segmentos?.length ? (
+          <span className="px-3 py-2 rounded-xl text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+            {segmentos.join(' · ')}
+          </span>
+        ) : (
         <div className="relative">
           <button onClick={() => setSegAberto(v => !v)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border inline-flex items-center gap-1.5 ${
@@ -396,6 +409,7 @@ export default function FornecedoresCad() {
             </>
           )}
         </div>
+        )}
         <button onClick={() => setShowInactive(!showInactive)}
           className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
             showInactive ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200'
