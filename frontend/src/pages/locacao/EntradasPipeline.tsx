@@ -6,7 +6,7 @@ import {
   Download, Share2, Loader2,
 } from 'lucide-react'
 import { useEntradas, useAtualizarStatusEntrada, useVistorias, useVistoriaFotos } from '../../hooks/useLocacao'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -66,6 +66,7 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
   const diasParaLimite = dataLimiteVistoria ? Math.ceil((dataLimiteVistoria.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null
 
   // Vistoria info
+  const responsavelNome = useResponsavelNome(entrada.responsavel_id)
   const { data: vistorias = [] } = useVistorias({ imovel_id: entrada.imovel_id })
   const vistoria = vistorias.find(v => v.entrada_id === entrada.id && v.tipo === 'entrada')
   const itensPreenchidos = vistoria?.itens?.filter(it => it.estado_entrada).length || 0
@@ -135,7 +136,7 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
               {entrada.data_prevista_inicio && <div><p className={txtMuted}>Início Previsto</p><p className={`font-semibold ${txtMain}`}>{fmtDate(entrada.data_prevista_inicio)}</p></div>}
               {entrada.dia_vencimento != null && <div><p className={txtMuted}>Dia Vencimento</p><p className={`font-semibold ${txtMain}`}>Dia {entrada.dia_vencimento}</p></div>}
               {(entrada as any).centro_custo?.descricao && <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{(entrada as any).centro_custo.codigo} — {(entrada as any).centro_custo.descricao}</p></div>}
-              {entrada.responsavel_id && <div><p className={txtMuted}>Responsável</p><p className={`font-semibold ${txtMain}`}>Atribuído</p></div>}
+              {entrada.responsavel_id && <div><p className={txtMuted}>Responsável</p><p className={`font-semibold ${txtMain}`}>{responsavelNome ?? 'Atribuído'}</p></div>}
             </div>
           </div>
 
@@ -217,25 +218,25 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
 
           {/* Ações */}
           <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
+            <button onClick={onClose} className={`shrink-0 px-5 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
             {entrada.status === 'pendente' && (
               <>
-                <button onClick={() => onAction('gerar_pdf', entrada)} className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-indigo-400 hover:bg-indigo-500/10' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'}`}>
+                <button onClick={() => onAction('gerar_pdf', entrada)} className={`flex-1 py-3 px-3 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap ${isDark ? 'border-white/[0.06] text-indigo-400 hover:bg-indigo-500/10' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'}`}>
                   <FileText size={14} /> Ficha de Vistoria
                 </button>
-                <button onClick={() => onAction('solicitar_vistoria', entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
+                <button onClick={() => onAction('solicitar_vistoria', entrada)} className="flex-1 py-3 px-3 rounded-xl bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 whitespace-nowrap">
                   <ClipboardCheck size={15} /> Solicitar Vistoria
                 </button>
               </>
             )}
             {entrada.status === 'aguardando_vistoria' && (
-              <button onClick={() => onOpenVistoria(entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
+              <button onClick={() => onOpenVistoria(entrada)} className="flex-1 py-3 px-3 rounded-xl bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 whitespace-nowrap">
                 <ClipboardCheck size={15} />
                 {itensPreenchidos > 0 ? `Continuar Vistoria (${itensPreenchidos}/64)` : 'Iniciar Vistoria'}
               </button>
             )}
             {entrada.status === 'aguardando_assinatura' && (
-              <button onClick={() => onAction('confirmar_assinatura', entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
+              <button onClick={() => onAction('confirmar_assinatura', entrada)} className="flex-1 py-3 px-3 rounded-xl bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 whitespace-nowrap">
                 <CheckCircle2 size={15} /> Confirmar Assinatura
               </button>
             )}
@@ -287,6 +288,168 @@ function EntradaRow({ entrada, onClick, isDark }: { entrada: LocEntrada; onClick
 // no modal "Novo Imóvel" ele nem é pedido. A RPC cria o ALG, amarra em imóvel
 // e entrada e libera, tudo junto: liberar sem contrato deixaria o imóvel ativo
 // fora do módulo Contratos e sem parcela (logo, fora do Provisionado).
+/** Nome de quem esta com a entrada — responsavel_id guarda o auth_id. */
+function useResponsavelNome(authId?: string | null) {
+  const { data } = useQuery({
+    queryKey: ['sys_perfil_nome', authId],
+    enabled: !!authId,
+    queryFn: async () => {
+      const { data } = await supabase.from('sys_perfis').select('nome').eq('auth_id', authId!).maybeSingle()
+      return (data?.nome as string | undefined) ?? null
+    },
+  })
+  return data ?? null
+}
+
+// ── Modal: solicitar vistoria ───────────────────────────────────────────────
+// Antes este botão só trocava o status. "Solicitar" sem dizer a quem não
+// solicita nada: loc_entradas.responsavel_id é o campo que faz a entrada
+// aparecer em "Minhas Tarefas" (useMinhasTarefas casa contra o auth.uid), e ele
+// nunca era preenchido. Agora escolhe-se o responsável, o prazo, e ele recebe
+// a notificação in-app.
+function SolicitarVistoriaModal({ entrada, isDark, onClose, onDone }: {
+  entrada: LocEntrada; isDark: boolean; onClose: () => void; onDone: () => void
+}) {
+  const { perfil } = useAuth()
+  const [responsavel, setResponsavel] = useState('')
+  const [previsto, setPrevisto] = useState(entrada.data_prevista_inicio ?? '')
+  const [obs, setObs] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  // Só quem tem login no TEG+ pode ser responsável — a tarefa é casada pelo auth_id.
+  const { data: usuarios = [] } = useQuery({
+    queryKey: ['loc-vistoriadores'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sys_perfis')
+        .select('auth_id, nome, cargo')
+        .eq('ativo', true)
+        .not('auth_id', 'is', null)
+        .order('nome')
+      if (error) throw error
+      return (data ?? []) as { auth_id: string; nome: string; cargo: string | null }[]
+    },
+  })
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const labelCls = `block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
+  const inputCls = isDark
+    ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500 [&>option]:bg-slate-900'
+    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+  const fieldCls = `w-full px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500/25 ${inputCls}`
+
+  // Mesma regra da tela: a vistoria é cobrada 7 dias antes do início previsto.
+  const limite = previsto
+    ? new Date(new Date(previsto + 'T12:00:00').getTime() - 7 * 86_400_000).toLocaleDateString('pt-BR')
+    : null
+
+  async function confirmar() {
+    setErro('')
+    if (!responsavel) { setErro('Escolha quem vai fazer a vistoria.'); return }
+    setEnviando(true)
+    try {
+      const texto = obs.trim()
+      const patch: Record<string, unknown> = {
+        responsavel_id: responsavel,
+        status: 'aguardando_vistoria',
+        atualizado_por_nome: perfil?.nome ?? null,
+        updated_at: new Date().toISOString(),
+      }
+      if (previsto) patch.data_prevista_inicio = previsto
+      if (texto) {
+        patch.observacoes = `${entrada.observacoes ? entrada.observacoes + '\n\n' : ''}[Solicitação de vistoria] ${texto}`
+      }
+      const { error } = await supabase.from('loc_entradas').update(patch).eq('id', entrada.id)
+      if (error) throw error
+
+      if (entrada.imovel_id) {
+        await supabase.from('loc_imoveis').update({ status: 'em_entrada' }).eq('id', entrada.imovel_id)
+      }
+
+      // Notificação in-app; se a fila falhar, a atribuição já valeu — não desfaz.
+      const local = [entrada.endereco, entrada.numero].filter(Boolean).join(', ')
+      await supabase.from('sys_notif_queue').insert({
+        user_id: responsavel,
+        titulo: 'Vistoria de entrada solicitada',
+        corpo: `${local || 'Imóvel'}${entrada.cidade ? ` — ${entrada.cidade}` : ''}`
+          + (limite ? ` · vistoriar até ${limite}` : ''),
+        url: '/locacoes/entradas',
+        origem: 'loc_entrada',
+        origem_id: entrada.id,
+        dedupe_key: `loc_entrada_vistoria:${entrada.id}`,
+      }).then(({ error: e }) => { if (e) console.warn('notificação não enfileirada:', e.message) })
+
+      onDone()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao solicitar a vistoria.')
+    } finally { setEnviando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="min-w-0">
+            <h3 className={`text-base font-bold ${txtMain}`}>Solicitar vistoria</h3>
+            <p className={`text-xs truncate ${txtMuted}`}>{entrada.endereco || entrada.imovel?.descricao || 'Entrada'}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div>
+            <label className={labelCls}>Quem vai vistoriar *</label>
+            <select value={responsavel} onChange={e => setResponsavel(e.target.value)} className={fieldCls}>
+              <option value="">Selecionar...</option>
+              {usuarios.map(u => (
+                <option key={u.auth_id} value={u.auth_id}>
+                  {u.nome}{u.cargo ? ` — ${u.cargo}` : ''}
+                </option>
+              ))}
+            </select>
+            <p className={`text-[11px] mt-1 ${txtMuted}`}>
+              A entrada passa a aparecer em <b>Minhas Tarefas</b> dessa pessoa.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Início previsto da locação</label>
+            <input type="date" value={previsto} onChange={e => setPrevisto(e.target.value)} className={fieldCls} />
+            <p className={`text-[11px] mt-1 ${limite ? txtMuted : (isDark ? 'text-amber-300' : 'text-amber-600')}`}>
+              {limite
+                ? `Prazo da vistoria: até ${limite} (7 dias antes).`
+                : 'Sem esta data o sistema não consegue cobrar prazo da vistoria.'}
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Recado para quem vai vistoriar</label>
+            <textarea rows={2} value={obs} onChange={e => setObs(e.target.value)}
+              placeholder="Ex.: combinar a chave com o locador antes de ir" className={fieldCls} />
+          </div>
+
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              Cancelar
+            </button>
+            <button onClick={confirmar} disabled={enviando || !responsavel}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {enviando && <Loader2 size={14} className="animate-spin" />}
+              Solicitar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AssinaturaContratoModal({ entrada, isDark, onClose, onDone }: {
   entrada: LocEntrada; isDark: boolean; onClose: () => void; onDone: () => void
 }) {
@@ -413,6 +576,8 @@ export default function EntradasPipeline() {
   const [vistoriaEntrada, setVistoriaEntrada] = useState<LocEntrada | null>(null)
   // A assinatura nao e so trocar o status: e onde o contrato passa a existir.
   const [assinar, setAssinar] = useState<LocEntrada | null>(null)
+  // Solicitar vistoria virou atribuicao: precisa dizer a quem.
+  const [solicitar, setSolicitar] = useState<LocEntrada | null>(null)
   const qc = useQueryClient()
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
@@ -451,7 +616,8 @@ export default function EntradasPipeline() {
   const handleAction = useCallback((action: string, e: LocEntrada) => {
     setDetail(null)
     if (action === 'confirmar_assinatura') { setAssinar(e); return }
-    const map: Record<string, StatusEntrada> = { solicitar_vistoria: 'aguardando_vistoria', vistoria_concluida: 'aguardando_assinatura' }
+    if (action === 'solicitar_vistoria') { setSolicitar(e); return }
+    const map: Record<string, StatusEntrada> = { vistoria_concluida: 'aguardando_assinatura' }
     if (map[action]) atualizarStatus.mutate({ id: e.id, status: map[action] })
     if (action === 'gerar_pdf') {
       downloadFichaVistoriaPdf({ entrada: e, imovel: e.imovel, tipo: 'entrada' })
@@ -527,6 +693,17 @@ export default function EntradasPipeline() {
       {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark}
         onOpenVistoria={(e) => { setDetail(null); setVistoriaEntrada(e) }} />}
       {vistoriaEntrada && <VistoriaModal entrada={vistoriaEntrada} onClose={() => setVistoriaEntrada(null)} />}
+      {solicitar && (
+        <SolicitarVistoriaModal
+          entrada={solicitar} isDark={isDark}
+          onClose={() => setSolicitar(null)}
+          onDone={() => {
+            setSolicitar(null)
+            ;['loc_entradas', 'loc_imoveis', 'minhas-tarefas'].forEach(k =>
+              qc.invalidateQueries({ queryKey: [k] }))
+          }}
+        />
+      )}
       {assinar && (
         <AssinaturaContratoModal
           entrada={assinar} isDark={isDark}

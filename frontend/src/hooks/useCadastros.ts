@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
+import { clearEmpresaCache } from '../services/empresa'
 import type { Fornecedor } from '../types/financeiro'
 import type {
   Empresa, ClasseFinanceira, CentroCusto, Obra, Colaborador,
@@ -32,7 +33,12 @@ export function useSalvarEmpresa() {
         if (error) throw error
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cad-empresas'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cad-empresas'] })
+      // getEmpresa() guarda a empresa em memoria: sem limpar, os PDFs
+      // continuam com a logo/dados antigos ate o proximo reload.
+      clearEmpresaCache()
+    },
   })
 }
 
