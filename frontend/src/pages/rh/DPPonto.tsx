@@ -51,13 +51,15 @@ export default function DPPonto() {
   const selCls = `px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-700 bg-slate-800 text-white'}`
 
   function renderPanel(key: string) {
-    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, dispositivo, situacao, bases }
+    const props: PontoTabProps = { anoMes, baseId, pessoa, status, ocultosJustif, quickReg, vista, diaData, dispositivo, situacao, bases, onAnoMes: setAnoMes }
     const temStatus = key === 'retificacoes' || key === 'horas_extras' || key === 'atestados'
     const chipCls = (on: boolean) => `inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${on ? (isLight ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-violet-500/20 text-violet-300 border-violet-500/30') : (isLight ? 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] text-slate-400 border-white/10 hover:bg-white/[0.06]')}`
     const segCls = (on: boolean) => `px-2.5 py-2 text-xs font-semibold inline-flex items-center gap-1 ${on ? (isLight ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-300') : (isLight ? 'bg-white text-slate-500 hover:bg-slate-50' : 'bg-transparent text-slate-400 hover:bg-white/[0.05]')}`
     return (
       <div className="space-y-4">
-        {/* Filtros (primeira linha): mês + base + status + justificativa + pessoa */}
+        {/* Filtros (primeira linha): mês + base + status + justificativa + pessoa.
+            A Consolidação monta a própria linha (o mês vai junto lá), senão viram duas. */}
+        {key !== 'consolidacao' && (
         <div className="flex items-center gap-2 flex-wrap">
           {!(key === 'registros' && vista === 'dia') && (
             <select value={anoMes} onChange={e => setAnoMes(e.target.value)} className={selCls}>
@@ -125,6 +127,7 @@ export default function DPPonto() {
             </div>
           )}
         </div>
+        )}
 
         {key === 'registros' && <RegistrosPontoTab {...props} />}
         {key === 'retificacoes' && <RetificacoesTab {...props} />}

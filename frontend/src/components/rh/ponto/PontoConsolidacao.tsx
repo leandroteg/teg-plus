@@ -25,8 +25,10 @@ interface MesLinha {
   anoMes: string; pessoas: number; hh: number; ex: number; falta: number; assinados: number
 }
 
-export default function PontoConsolidacao({ anoMes, bases }: {
+export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   anoMes: string
+  /** a competência entra NESTA barra — a aba esconde a do DPPonto p/ não virar 2 linhas */
+  onAnoMes?: (v: string) => void
   bases?: { id: string; nome: string; codigo?: string | null }[]
 }) {
   const { isLightSidebar: isLight } = useTheme()
@@ -104,8 +106,11 @@ export default function PontoConsolidacao({ anoMes, bases }: {
 
   return (
     <div className="space-y-3">
-      {/* filtros + troca de sub-visão numa linha só, como no Benefícios */}
+      {/* TUDO numa linha só: competência · área · busca · contador · ação · visões */}
       <div className="flex flex-wrap items-center gap-2">
+        <select value={anoMes} onChange={e => onAnoMes?.(e.target.value)} className={selCls} title="Competência">
+          {ultimosMeses(12).map(m => <option key={m} value={m}>{labelMes(m)}</option>)}
+        </select>
         <select value={baseFil} onChange={e => { setBaseFil(e.target.value); setSel(new Set()) }} className={selCls}>
           <option value="">Todas as áreas</option>
           {(bases ?? []).map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
@@ -116,8 +121,14 @@ export default function PontoConsolidacao({ anoMes, bases }: {
             className={`flex-1 min-w-0 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
         </div>
         <span className={`text-[11px] whitespace-nowrap ${sub}`}>
-          <b className={txt}>{escolhidos.length}</b> {sel.size ? 'selecionado(s)' : 'no filtro'}
+          <b className={txt}>{escolhidos.length}</b> {sel.size ? 'selec.' : 'no filtro'}
         </span>
+        <button disabled={!escolhidos.length}
+          onClick={() => abrirConsolidado(anoMes, escolhidos.map(p => ({ id: p.id, nome: p.nome })), nomeBase)}
+          title={`Relatório consolidado de ${labelMes(anoMes)}${nomeBase ? ` — ${nomeBase}` : ''}`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
+          <FileText size={13} /> Consolidado ({escolhidos.length})
+        </button>
         <div className="flex items-center gap-1">
           {vistaBtn('pessoa', Users, 'Por pessoa')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado por mês')}
@@ -126,17 +137,6 @@ export default function PontoConsolidacao({ anoMes, bases }: {
 
       {vista === 'pessoa' ? (
         <div className={painel}>
-          <div className={`flex items-center justify-between gap-2 px-3 py-2.5 border-b flex-wrap ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
-            <div>
-              <p className={`text-sm font-bold ${txt}`}>Espelho de ponto · {labelMes(anoMes)}</p>
-              <p className={`text-[10px] ${sub}`}>Clique na linha para abrir o espelho do colaborador.</p>
-            </div>
-            <button disabled={!escolhidos.length}
-              onClick={() => abrirConsolidado(anoMes, escolhidos.map(p => ({ id: p.id, nome: p.nome })), nomeBase)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
-              <FileText size={13} /> Consolidado ({escolhidos.length})
-            </button>
-          </div>
           {resumo.isLoading ? <Carregando /> : !lista.length ? <Vazio msg="Nenhum colaborador com ponto no mês." /> : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -172,13 +172,6 @@ export default function PontoConsolidacao({ anoMes, bases }: {
         </div>
       ) : (
         <div className={painel}>
-          <div className={`px-3 py-2.5 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
-            <p className={`text-sm font-bold ${txt}`}>Consolidado por mês</p>
-            <p className={`text-[10px] ${sub}`}>
-              Últimos 12 meses. O relatório e o pacote seguem o filtro de área e a seleção acima
-              {nomeBase ? ` — hoje: ${nomeBase}` : ''}{sel.size ? ` · ${sel.size} pessoa(s) marcada(s)` : ''}.
-            </p>
-          </div>
           {periodo.isLoading ? <Carregando /> : !linhasMes.length ? <Vazio msg="Sem ponto apurado no período." /> : (
             <div className="overflow-x-auto">
               <table className="w-full">

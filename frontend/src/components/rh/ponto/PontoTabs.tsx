@@ -604,6 +604,6 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
 // ════════════════════════════════════════════════════════════════════════════
 // 6) CONSOLIDAÇÃO — por pessoa (espelho) e por mês (pacote p/ CEMIG)
 // ════════════════════════════════════════════════════════════════════════════
-export function ConsolidacaoTab({ anoMes, bases }: PontoTabProps) {
-  return <PontoConsolidacao anoMes={anoMes} bases={bases} />
+export function ConsolidacaoTab({ anoMes, onAnoMes, bases }: PontoTabProps) {
+  return <PontoConsolidacao anoMes={anoMes} onAnoMes={onAnoMes} bases={bases} />
 }

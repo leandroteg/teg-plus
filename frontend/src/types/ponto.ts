@@ -122,6 +122,8 @@ export interface PontoRetificacao {
 
 export interface PontoTabProps {
   anoMes: string
+  /** troca a competência — usado onde a aba monta a própria barra de filtros */
+  onAnoMes?: (v: string) => void
   baseId: string
   pessoa: string
   status: string
