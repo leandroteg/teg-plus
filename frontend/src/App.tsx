@@ -29,6 +29,10 @@ import FinanceiroLayout from './components/FinanceiroLayout'
 import FiscalLayout from './components/FiscalLayout'
 import EstoqueLayout from './components/EstoqueLayout'
 import LogisticaLayout from './components/LogisticaLayout'
+import TiLayout from './pages/ti/TiLayout'
+import { TiStaffRoute, TiAdminRoute } from './pages/ti/components/TiGuards'
+import MonLayout from './pages/monitoramento/MonLayout'
+import { MonAdminRoute } from './pages/monitoramento/MonGuards'
 import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
@@ -243,13 +247,30 @@ const AdminLogs = lazy(() => import('./pages/admin/Logs'))
 const AdminUsoModulos = lazy(() => import('./pages/admin/UsoModulos'))
 const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 
-// TI / Help Desk
-const TIHome = lazy(() => import('./pages/ti/TIHome'))
-const NovoChamado = lazy(() => import('./pages/ti/NovoChamado'))
-const MeusChamados = lazy(() => import('./pages/ti/MeusChamados'))
-const FilaChamados = lazy(() => import('./pages/ti/FilaChamados'))
-const ChamadoDetalhe = lazy(() => import('./pages/ti/ChamadoDetalhe'))
-const AdminAtendentes = lazy(() => import('./pages/ti/AdminAtendentes'))
+// TI — Help Desk (Supabase-nativo). Telas legadas preservadas na branch backup/ti-chamados.
+// ⚠️ NÃO recolocar as rotas antigas (TIHome/FilaChamados/AdminAtendentes): o módulo novo
+// vive sob ModuleRoute('ti') mais abaixo. Se este bloco sumir num merge, o TI volta ao antigo.
+const TiHome = lazy(() => import('./pages/ti/Home'))
+const TiChamados = lazy(() => import('./pages/ti/Chamados'))
+const TiNovoChamado = lazy(() => import('./pages/ti/NovoChamado'))
+const TiChamadoDetalhe = lazy(() => import('./pages/ti/ChamadoDetalhe'))
+const TiQuadro = lazy(() => import('./pages/ti/Quadro'))
+const TiAtivos = lazy(() => import('./pages/ti/Ativos'))
+const TiAtivoDetalhe = lazy(() => import('./pages/ti/AtivoDetalhe'))
+const TiTermos = lazy(() => import('./pages/ti/Termos'))
+const TiRelatorios = lazy(() => import('./pages/ti/Relatorios'))
+const TiConfiguracoes = lazy(() => import('./pages/ti/Configuracoes'))
+const TiBase = lazy(() => import('./pages/ti/Base'))
+const TiArtigo = lazy(() => import('./pages/ti/Artigo'))
+const TiArtigoEditor = lazy(() => import('./pages/ti/ArtigoEditor'))
+const TiRespostas = lazy(() => import('./pages/ti/Respostas'))
+const TiUsuarios = lazy(() => import('./pages/ti/Usuarios'))
+const MeusChamadosPessoal = lazy(() => import('./pages/ti/MeusChamadosPessoal'))
+
+// Monitoramento (CFTV Hikvision) — gated pelo módulo 'monitoramento'
+const MonCameras = lazy(() => import('./pages/monitoramento/Cameras'))
+const MonEventos = lazy(() => import('./pages/monitoramento/Eventos'))
+const MonConfig = lazy(() => import('./pages/monitoramento/Config'))
 
 // Orçamentação (Expansão)
 const OrcamentacaoHome = lazy(() => import('./pages/orcamentacao/OrcamentacaoHome'))
@@ -302,6 +323,50 @@ export default function App() {
         <Route path="/assinar/:id"   element={<Lazy><AssinarDocumento /></Lazy>} />
         <Route path="/verificar/:id" element={<Lazy><VerificarAssinatura /></Lazy>} />
 
+        {/* ── TI / Help Desk: exige o módulo 'ti' liberado ao usuário (admin sempre
+             entra). Papéis internos: colaborador abre/acompanha chamados e lê a base;
+             TiStaffRoute = equipe (atendentes/admin); TiAdminRoute = só admin. ── */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<ModuleRoute moduleKey="ti" />}>
+            <Route element={<TiLayout />}>
+              <Route path="/ti" element={<Lazy><TiHome /></Lazy>} />
+              <Route path="/ti/chamados" element={<Lazy><TiChamados /></Lazy>} />
+              <Route path="/ti/chamados/novo" element={<Lazy><TiNovoChamado /></Lazy>} />
+              <Route path="/ti/chamados/:id" element={<Lazy><TiChamadoDetalhe /></Lazy>} />
+              <Route path="/ti/base" element={<Lazy><TiBase /></Lazy>} />
+              <Route path="/ti/base/:id" element={<Lazy><TiArtigo /></Lazy>} />
+              <Route element={<TiStaffRoute />}>
+                <Route path="/ti/quadro" element={<Lazy><TiQuadro /></Lazy>} />
+                <Route path="/ti/respostas" element={<Lazy><TiRespostas /></Lazy>} />
+                <Route path="/ti/ativos" element={<Lazy><TiAtivos /></Lazy>} />
+                <Route path="/ti/ativos/:id" element={<Lazy><TiAtivoDetalhe /></Lazy>} />
+                <Route path="/ti/termos" element={<Lazy><TiTermos /></Lazy>} />
+                <Route path="/ti/relatorios" element={<Lazy><TiRelatorios /></Lazy>} />
+                <Route path="/ti/base/novo" element={<Lazy><TiArtigoEditor /></Lazy>} />
+                <Route path="/ti/base/:id/editar" element={<Lazy><TiArtigoEditor /></Lazy>} />
+              </Route>
+              <Route element={<TiAdminRoute />}>
+                <Route path="/ti/usuarios" element={<Lazy><TiUsuarios /></Lazy>} />
+                <Route path="/ti/configuracoes" element={<Lazy><TiConfiguracoes /></Lazy>} />
+              </Route>
+            </Route>
+          </Route>
+        </Route>
+
+        {/* ── Monitoramento (CFTV Hikvision): exige o módulo 'monitoramento'
+             liberado (admin sempre entra). Config só admin. ── */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<ModuleRoute moduleKey="monitoramento" />}>
+            <Route element={<MonLayout />}>
+              <Route path="/monitoramento" element={<Lazy><MonCameras /></Lazy>} />
+              <Route path="/monitoramento/eventos" element={<Lazy><MonEventos /></Lazy>} />
+              <Route element={<MonAdminRoute />}>
+                <Route path="/monitoramento/config" element={<Lazy><MonConfig /></Lazy>} />
+              </Route>
+            </Route>
+          </Route>
+        </Route>
+
         {/* ── Privadas ──────────────────────────────────────── */}
         <Route element={<PrivateRoute />}>
 
@@ -312,19 +377,14 @@ export default function App() {
           <Route path="/perfil"      element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-tarefas" element={<Lazy><MinhasTarefas /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
+          <Route path="/meus-chamados" element={<Lazy><MeusChamadosPessoal /></Lazy>} />
           {/* Self-service: qualquer usuário autenticado pode abrir uma solicitação de
               contrato, sem precisar do módulo Contratos (só criação, sem o menu completo). */}
           <Route path="/solicitar-contrato" element={<Lazy><NovaSolicitacao selfService /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
           <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 
-          {/* TI / Help Desk — aberto a qualquer autenticado */}
-          <Route path="/ti"              element={<Lazy><TIHome /></Lazy>} />
-          <Route path="/ti/novo"         element={<Lazy><NovoChamado /></Lazy>} />
-          <Route path="/ti/meus"         element={<Lazy><MeusChamados /></Lazy>} />
-          <Route path="/ti/fila"         element={<Lazy><FilaChamados /></Lazy>} />
-          <Route path="/ti/c/:id"        element={<Lazy><ChamadoDetalhe /></Lazy>} />
-          <Route path="/ti/admin"        element={<Lazy><AdminAtendentes /></Lazy>} />
+          {/* TI / Help Desk → bloco com ModuleRoute('ti') acima (NÃO recolocar rotas antigas aqui) */}
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
