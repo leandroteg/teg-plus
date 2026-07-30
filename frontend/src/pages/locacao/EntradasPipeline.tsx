@@ -6,6 +6,9 @@ import {
   Download, Share2, Loader2,
 } from 'lucide-react'
 import { useEntradas, useAtualizarStatusEntrada, useVistorias, useVistoriaFotos } from '../../hooks/useLocacao'
+import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { LocEntrada, StatusEntrada } from '../../types/locacao'
 import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
@@ -278,6 +281,125 @@ function EntradaRow({ entrada, onClick, isDark }: { entrada: LocEntrada; onClick
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+// ── Modal: assinatura do contrato (etapa "Aguardando Assinatura") ───────────
+// É aqui que o contrato de locação nasce quando o imóvel entrou pelo fluxo —
+// no modal "Novo Imóvel" ele nem é pedido. A RPC cria o ALG, amarra em imóvel
+// e entrada e libera, tudo junto: liberar sem contrato deixaria o imóvel ativo
+// fora do módulo Contratos e sem parcela (logo, fora do Provisionado).
+function AssinaturaContratoModal({ entrada, isDark, onClose, onDone }: {
+  entrada: LocEntrada; isDark: boolean; onClose: () => void; onDone: () => void
+}) {
+  const { perfil } = useAuth()
+  const isHtl = entrada.imovel?.tipo === 'HTL'
+  const [numero, setNumero] = useState('')
+  const [inicio, setInicio] = useState(entrada.data_prevista_inicio ?? '')
+  const [fim, setFim] = useState('')
+  const [pdf, setPdf] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const labelCls = `block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
+  const inputCls = isDark
+    ? 'bg-white/[0.04] border-white/10 text-white placeholder-slate-500'
+    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+  const fieldCls = `w-full px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500/25 ${inputCls}`
+
+  async function confirmar() {
+    setErro('')
+    if (!isHtl && (!inicio || !fim)) { setErro('Informe o início e o fim do contrato.'); return }
+    setEnviando(true)
+    try {
+      let arquivoUrl: string | null = null
+      if (pdf) {
+        const path = `contratos/${Date.now()}_${pdf.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
+        const { error: upErr } = await supabase.storage.from('contratos-anexos').upload(path, pdf)
+        if (!upErr) arquivoUrl = path
+      }
+      const { data, error } = await supabase.rpc('loc_entrada_assinar', {
+        p_entrada_id: entrada.id,
+        p_contrato_numero: numero || null,
+        p_contrato_inicio: isHtl ? null : inicio,
+        p_contrato_fim: isHtl ? null : fim,
+        p_arquivo_url: arquivoUrl,
+        p_usuario: perfil?.nome ?? null,
+      })
+      if (error) throw error
+      const r = data as { ok: boolean; erro?: string }
+      if (!r.ok) { setErro(r.erro || 'Não foi possível concluir a assinatura.'); return }
+      onDone()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao concluir a assinatura.')
+    } finally { setEnviando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="min-w-0">
+            <h3 className={`text-base font-bold ${txtMain}`}>Assinatura do contrato</h3>
+            <p className={`text-xs truncate ${txtMuted}`}>{entrada.endereco || entrada.imovel?.descricao || 'Entrada'}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {isHtl ? (
+            <p className={`text-xs ${txtMuted}`}>
+              Hotel é hospedagem temporária: não gera contrato. Confirmar aqui apenas libera o imóvel.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className={labelCls}>Nº do contrato</label>
+                  <input type="text" value={numero} onChange={e => setNumero(e.target.value)} placeholder="Auto (ALG-…)" className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Início *</label>
+                  <input type="date" value={inicio} onChange={e => setInicio(e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Fim *</label>
+                  <input type="date" value={fim} onChange={e => setFim(e.target.value)} className={fieldCls} />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Contrato assinado (PDF)</label>
+                <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm ${inputCls}`}>
+                  <FileText size={14} className="shrink-0 opacity-60" />
+                  <span className={pdf ? '' : 'opacity-50'}>{pdf ? pdf.name : 'Anexar contrato...'}</span>
+                  <input type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setPdf(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+              <p className={`text-[11px] leading-snug ${txtMuted}`}>
+                Ao confirmar, o contrato entra no módulo Contratos e o imóvel passa a ativo.
+              </p>
+            </>
+          )}
+
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              Cancelar
+            </button>
+            <button onClick={confirmar} disabled={enviando}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {enviando && <Loader2 size={14} className="animate-spin" />}
+              {isHtl ? 'Liberar imóvel' : 'Confirmar e liberar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function EntradasPipeline() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -288,6 +410,9 @@ export default function EntradasPipeline() {
   const [activeTab, setActiveTab] = useState<StatusEntrada>(() => (searchParams.get('tab') as StatusEntrada) || 'pendente')
   const [detail, setDetail] = useState<LocEntrada | null>(null)
   const [vistoriaEntrada, setVistoriaEntrada] = useState<LocEntrada | null>(null)
+  // A assinatura nao e so trocar o status: e onde o contrato passa a existir.
+  const [assinar, setAssinar] = useState<LocEntrada | null>(null)
+  const qc = useQueryClient()
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -324,7 +449,8 @@ export default function EntradasPipeline() {
 
   const handleAction = useCallback((action: string, e: LocEntrada) => {
     setDetail(null)
-    const map: Record<string, StatusEntrada> = { solicitar_vistoria: 'aguardando_vistoria', vistoria_concluida: 'aguardando_assinatura', confirmar_assinatura: 'liberado' }
+    if (action === 'confirmar_assinatura') { setAssinar(e); return }
+    const map: Record<string, StatusEntrada> = { solicitar_vistoria: 'aguardando_vistoria', vistoria_concluida: 'aguardando_assinatura' }
     if (map[action]) atualizarStatus.mutate({ id: e.id, status: map[action] })
     if (action === 'gerar_pdf') alert('PDF de orientações será gerado em breve')
   }, [atualizarStatus])
@@ -397,6 +523,17 @@ export default function EntradasPipeline() {
       {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark}
         onOpenVistoria={(e) => { setDetail(null); setVistoriaEntrada(e) }} />}
       {vistoriaEntrada && <VistoriaModal entrada={vistoriaEntrada} onClose={() => setVistoriaEntrada(null)} />}
+      {assinar && (
+        <AssinaturaContratoModal
+          entrada={assinar} isDark={isDark}
+          onClose={() => setAssinar(null)}
+          onDone={() => {
+            setAssinar(null)
+            ;['loc_entradas', 'loc_imoveis', 'loc_alojamentos', 'con_contratos'].forEach(k =>
+              qc.invalidateQueries({ queryKey: [k] }))
+          }}
+        />
+      )}
     </div>
   )
 }

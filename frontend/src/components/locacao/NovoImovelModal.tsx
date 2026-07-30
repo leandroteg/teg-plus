@@ -65,6 +65,9 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
   const [contratoInicio, setContratoInicio] = useState('')
   const [contratoFim, setContratoFim] = useState('')
   const [contratoPdf, setContratoPdf] = useState<File | null>(null)
+  // No fluxo o contrato é assinado na etapa própria do pipeline; aqui só a data
+  // prevista de início, que é o que define o prazo da vistoria (início − 7 dias).
+  const [previstoInicio, setPrevistoInicio] = useState('')
 
   const isHtl = tipo === 'HTL'
 
@@ -83,8 +86,8 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErro('')
-    // validações mínimas
-    if (!isHtl && (!contratoInicio || !contratoFim)) {
+    // validações mínimas — no fluxo o contrato só existe na etapa de assinatura
+    if (!viaFluxo && !isHtl && (!contratoInicio || !contratoFim)) {
       setErro('Informe o início e o fim do contrato.')
       return
     }
@@ -96,7 +99,7 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
     try {
       // Sobe o PDF do contrato (só p/ tipos com contrato)
       let arquivoUrl: string | null = null
-      if (!isHtl && contratoPdf) {
+      if (!viaFluxo && !isHtl && contratoPdf) {
         const path = `contratos/${Date.now()}_${contratoPdf.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
         const { error: upErr } = await supabase.storage.from('contratos-anexos').upload(path, contratoPdf)
         if (!upErr) arquivoUrl = path
@@ -123,9 +126,10 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
         p_empresa_id: empresaId || null,
         p_centro_custo_id: centroCustoId || null,
         p_qtd_leitos: qtdLeitos.trim() === '' ? 0 : Number(qtdLeitos),
-        p_contrato_numero: isHtl ? null : (contratoNumero || null),
-        p_contrato_inicio: isHtl ? null : contratoInicio,
-        p_contrato_fim: isHtl ? null : contratoFim,
+        p_contrato_numero: viaFluxo || isHtl ? null : (contratoNumero || null),
+        p_contrato_inicio: viaFluxo || isHtl ? null : contratoInicio,
+        p_contrato_fim: viaFluxo || isHtl ? null : contratoFim,
+        p_data_prevista_inicio: viaFluxo ? (previstoInicio || null) : null,
         p_arquivo_url: arquivoUrl,
         p_criado_por: perfil?.nome ?? null,
         p_via_fluxo: viaFluxo,
@@ -295,7 +299,21 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
                   </div>
                 </div>
 
-                {/* Contrato */}
+                {/* No fluxo o contrato é assinado na etapa "Aguardando Assinatura"
+                    do pipeline — aqui só o que define o prazo da vistoria. */}
+                {viaFluxo ? (
+                  <div className={`rounded-xl p-4 space-y-3 ${isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'}`}>
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Entrada</p>
+                    <div>
+                      <label className={labelCls}>Início previsto</label>
+                      <input type="date" value={previstoInicio} onChange={e => setPrevistoInicio(e.target.value)} className={fieldCls} />
+                    </div>
+                    <p className={`text-[11px] leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      A vistoria é cobrada a partir de 7 dias antes desta data. O contrato
+                      é lançado depois, na etapa <b>Aguardando Assinatura</b> do pipeline.
+                    </p>
+                  </div>
+                ) : (
                 <div className={`rounded-xl p-4 space-y-3 ${isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'}`}>
                   <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Contrato (vai para o módulo Contratos)</p>
                   <div className="grid grid-cols-3 gap-2">
@@ -321,6 +339,7 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
                     </label>
                   </div>
                 </div>
+                )}
               </>
             )}
 
