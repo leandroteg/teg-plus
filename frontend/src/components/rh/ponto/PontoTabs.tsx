@@ -11,6 +11,8 @@ import {
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
 import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao, HoraExtraItem } from '../../../types/ponto'
+import PontoReportModal from './PontoReportModal'
+import type { PontoReportRow } from '../../../utils/ponto-report-html'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -723,7 +725,10 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
   const he = usePontoHorasExtras(anoMes)
   const ret = usePontoRetificacoes(anoMes)
   const at = usePontoAtestados(anoMes)
+  const resumo = usePontoResumoMes(anoMes)
   const c = useThemeCls()
+  const [espelho, setEspelho] = useState<PontoReportRow | null>(null)
+  const [busca, setBusca] = useState('')
   const heAprov = (he.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const retAprov = (ret.data ?? []).filter(r => r.aprov_status === 'aprovado')
   const atAprov = (at.data ?? []).filter(a => a.aprov_status === 'aprovado')
@@ -738,12 +743,29 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
     return [...m.values()].sort((a, b) => b.extras - a.extras)
   }, [he.data])
 
+  // espelho de ponto: 1 linha por colaborador do mês (independe de aprovação —
+  // o espelho é o cartão do mês, não a fila de itens aprovados)
+  const pessoas = useMemo(() => {
+    const m = new Map<string, { id: string; nome: string; cargo: string | null; base: string | null; hh: number; ex: number; dias: number; batidos: number }>()
+    for (const r of (resumo.data ?? [])) {
+      if (!r.colaborador_id) continue
+      const a = m.get(r.colaborador_id) ?? { id: r.colaborador_id, nome: r.colaborador_nome ?? '—', cargo: r.cargo, base: r.base_nome, hh: 0, ex: 0, dias: 0, batidos: 0 }
+      a.hh += intervalToMin(r.hh_trabalhada); a.ex += intervalToMin(r.extras)
+      a.dias += r.dias || 0; a.batidos += r.dias_batidos || 0
+      m.set(r.colaborador_id, a)
+    }
+    return [...m.values()].sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
+  }, [resumo.data])
+  const pessoasFil = pessoas.filter(p => matchPessoa(p.nome, busca))
+
+  const semAprovado = !heAprov.length && !retAprov.length && !atAprov.length
   if (he.isLoading || ret.isLoading || at.isLoading) return <Painel><Loading /></Painel>
-  if (!heAprov.length && !retAprov.length && !atAprov.length)
-    return <Painel><div className="text-center py-16"><Lock className="mx-auto mb-3 text-slate-400" size={26} /><p className={`text-sm ${c.sub}`}>Nada aprovado em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>A consolidação mostra só o que foi aprovado.</p></div></Painel>
 
   return (
     <div className="space-y-3">
+      {semAprovado ? (
+        <Painel><div className="text-center py-10"><Lock className="mx-auto mb-3 text-slate-400" size={26} /><p className={`text-sm ${c.sub}`}>Nada aprovado em {labelMes(anoMes)}.</p><p className={`text-xs ${c.sub}`}>A consolidação mostra só o que foi aprovado — o espelho de ponto abaixo independe disso.</p></div></Painel>
+      ) : (<>
       <div className="flex items-center gap-2 text-xs text-emerald-500"><Lock size={14} /> Ponto fechado de {labelMes(anoMes)} — só itens aprovados.</div>
       <div className="grid grid-cols-3 gap-3">
         <div className={`rounded-2xl border p-3 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`}><p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras</p><p className={`text-lg font-extrabold ${c.txt}`}>{minToHoras(heAprov.reduce((s, r) => s + intervalToMin(r.extras_total), 0))}</p></div>
@@ -764,6 +786,45 @@ export function ConsolidacaoTab({ anoMes }: PontoTabProps) {
           </table>
         </Painel>
       )}
+      </>)}
+
+      {/* ── Espelho de ponto do mês, por colaborador ───────────────────────── */}
+      <Painel>
+        <div className={`flex items-center justify-between gap-2 px-3 py-2.5 border-b flex-wrap ${c.isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
+          <div>
+            <p className={`text-sm font-bold ${c.txt}`}>Espelho de ponto · {labelMes(anoMes)}</p>
+            <p className={`text-[10px] ${c.sub}`}>Cartão do mês por colaborador, com a origem de cada marcação — abre em HTML e baixa em PDF.</p>
+          </div>
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar por pessoa…"
+            className={`px-3 py-1.5 rounded-xl border text-xs w-[190px] ${c.input}`} />
+        </div>
+        {resumo.isLoading ? <Loading /> : !pessoasFil.length ? <Vazio msg="Nenhum colaborador com ponto no mês." /> : (
+          <table className="w-full">
+            <thead><tr className={c.head}>
+              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th>
+              <th className={TH}>Dias</th><th className={`${TH} hidden sm:table-cell`}>HH</th><th className={TH}>Extras</th><th className={TH}></th>
+            </tr></thead>
+            <tbody>{pessoasFil.map(p => (
+              <tr key={p.id} className={`border-t cursor-pointer ${c.row}`}
+                onClick={() => setEspelho({ colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes })}>
+                <td className={`${TD} font-semibold ${c.txt} max-w-[260px]`}>
+                  <span className="block truncate" title={p.nome}>{p.nome}</span>
+                  <span className={`text-[10px] ${c.sub}`}>{p.cargo ?? '—'}</span>
+                </td>
+                <td className={`${TD} hidden md:table-cell ${c.sub}`}>{p.base ?? '—'}</td>
+                <td className={`${TD} ${c.txt}`}>{p.batidos}/{p.dias}</td>
+                <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{p.hh > 0 ? minToHoras(p.hh) : '—'}</td>
+                <td className={`${TD} font-semibold ${p.ex > 0 ? 'text-orange-500' : c.sub}`}>{p.ex > 0 ? minToHoras(p.ex) : '—'}</td>
+                <td className={`${TD} w-px`}>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-500 whitespace-nowrap"><FileText size={13} /> Espelho</span>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </Painel>
+
+      {espelho && <PontoReportModal alvo={espelho} onClose={() => setEspelho(null)} />}
     </div>
   )
 }
