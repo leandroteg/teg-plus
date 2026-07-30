@@ -12,12 +12,14 @@ import {
   useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo,
   useSolicitarMovimentoObras, useRascunhosPlanejamento,
   usePublicarPlano, useDescartarPlano,
+  useUltimosCheckins,
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
 import { humanizarStatus } from '../../types/frotas'
 import { CATEGORIA_LABEL, CATEGORIA_LABEL_ATIVAS, CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
+import { NotaIcone } from '../../components/frotas/CheckinIndicadores'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 
@@ -409,7 +411,10 @@ function ListaView({
   onAlocar: (veiculoId: string) => void
 }) {
   const [busca, setBusca] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState<StatusVeiculo | 'todos'>('todos')
+  // 'parados' agrupa em_manutencao + parada_manutencao + bloqueado
+  const [filtroStatus, setFiltroStatus] = useState<StatusVeiculo | 'todos' | 'parados'>('todos')
+  // Condicao vem do ultimo check-in: 'todas' | '1'..'5' | 'ruins' (1-2) | 'sem'
+  const [filtroCondicao, setFiltroCondicao] = useState<string>('todas')
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaVeiculo | 'todos'>('todos')
   const [filtroObra, setFiltroObra] = useState<'todas' | string>('todas')
 
@@ -420,13 +425,26 @@ function ListaView({
     isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200'
   }`
 
+  // Condicao do ativo vem do ultimo check-in — mesma fonte do modulo Frotas.
+  const { data: ultimosCheckin = [] } = useUltimosCheckins()
+  const checkinByVeic = useMemo(
+    () => new Map(ultimosCheckin.map(c => [c.veiculo_id, c])),
+    [ultimosCheckin],
+  )
+
   // KPIs
   const kpis = useMemo(() => {
-    const total        = veiculos.length
-    const emUso        = veiculos.filter(v => v.status === 'em_uso').length
-    const disponivel   = veiculos.filter(v => v.status === 'disponivel').length
-    const manutencao   = veiculos.filter(v => v.status === 'em_manutencao').length
-    return { total, emUso, disponivel, manutencao }
+    const conta = (...st: StatusVeiculo[]) => veiculos.filter(v => st.includes(v.status)).length
+    return {
+      total:      veiculos.length,
+      emUso:      conta('em_uso'),
+      disponivel: conta('disponivel'),
+      // Parado de verdade — inclui os status novos, que antes nao eram contados
+      // em lugar nenhum e faziam o cartao de manutencao marcar zero.
+      parados:    conta('em_manutencao', 'parada_manutencao', 'bloqueado'),
+      // Rodando, mas ja marcado para parar: o alerta que interessa a obra.
+      aParar:     conta('necessario_parada'),
+    }
   }, [veiculos])
 
   // Filter
@@ -441,13 +459,25 @@ function ListaView({
         v.numero_serie?.toLowerCase().includes(q)
       )
     }
-    if (filtroStatus !== 'todos')    list = list.filter(v => v.status === filtroStatus)
+    if (filtroStatus === 'parados') {
+      list = list.filter(v => ['em_manutencao', 'parada_manutencao', 'bloqueado'].includes(v.status))
+    } else if (filtroStatus !== 'todos') {
+      list = list.filter(v => v.status === filtroStatus)
+    }
     if (filtroCategoria !== 'todos') list = list.filter(v => v.categoria === filtroCategoria)
     if (filtroObra !== 'todas') {
       list = list.filter(v => alocAtivaByVeic.get(v.id)?.obra_id === filtroObra)
     }
+    if (filtroCondicao !== 'todas') {
+      list = list.filter(v => {
+        const nota = checkinByVeic.get(v.id)?.aval_funcional ?? null
+        if (filtroCondicao === 'sem')   return nota == null
+        if (filtroCondicao === 'ruins') return nota != null && nota <= 2
+        return String(nota) === filtroCondicao
+      })
+    }
     return list
-  }, [veiculos, busca, filtroStatus, filtroCategoria, filtroObra, alocAtivaByVeic])
+  }, [veiculos, busca, filtroStatus, filtroCategoria, filtroObra, filtroCondicao, alocAtivaByVeic, checkinByVeic])
 
   // Group by obra for the "por canteiro" view
   const porObra = useMemo(() => {
@@ -472,11 +502,12 @@ function ListaView({
   return (
     <div className="space-y-4">
       {/* KPI summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KpiCard isDark={isDark} icon={Truck}         label="Total"       value={kpis.total}      color="slate"  onClick={() => setFiltroStatus('todos')}        active={filtroStatus === 'todos'} />
-        <KpiCard isDark={isDark} icon={CheckCircle2}  label="Em uso"      value={kpis.emUso}      color="blue"   onClick={() => setFiltroStatus('em_uso')}       active={filtroStatus === 'em_uso'} />
-        <KpiCard isDark={isDark} icon={PauseCircle}   label="Disponivel"  value={kpis.disponivel} color="emerald" onClick={() => setFiltroStatus('disponivel')} active={filtroStatus === 'disponivel'} />
-        <KpiCard isDark={isDark} icon={Wrench}        label="Manutencao"  value={kpis.manutencao} color="amber"  onClick={() => setFiltroStatus('em_manutencao')} active={filtroStatus === 'em_manutencao'} />
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <KpiCard isDark={isDark} icon={Truck}         label="Total"      value={kpis.total}      color="slate"   onClick={() => setFiltroStatus('todos')}      active={filtroStatus === 'todos'} />
+        <KpiCard isDark={isDark} icon={CheckCircle2}  label="Em uso"     value={kpis.emUso}      color="blue"    onClick={() => setFiltroStatus('em_uso')}     active={filtroStatus === 'em_uso'} />
+        <KpiCard isDark={isDark} icon={PauseCircle}   label="Disponivel" value={kpis.disponivel} color="emerald" onClick={() => setFiltroStatus('disponivel')} active={filtroStatus === 'disponivel'} />
+        <KpiCard isDark={isDark} icon={Wrench}        label="Parados"    value={kpis.parados}    color="rose"    onClick={() => setFiltroStatus('parados')}    active={filtroStatus === 'parados'} />
+        <KpiCard isDark={isDark} icon={AlertTriangle} label="A parar"    value={kpis.aParar}     color="amber"   onClick={() => setFiltroStatus('necessario_parada')} active={filtroStatus === 'necessario_parada'} />
       </div>
 
       {/* Filters row */}
@@ -505,6 +536,16 @@ function ListaView({
           <option value="todas">Todas as obras</option>
           {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
+        <select value={filtroCondicao} onChange={e => setFiltroCondicao(e.target.value)} className={`${inputCls} max-w-[160px]`}>
+          <option value="todas">Toda condicao</option>
+          <option value="ruins">Ruim ou critica (1-2)</option>
+          <option value="5">5 — Excelente</option>
+          <option value="4">4 — Bom</option>
+          <option value="3">3 — Moderado</option>
+          <option value="2">2 — Ruim</option>
+          <option value="1">1 — Critico</option>
+          <option value="sem">Sem check-in</option>
+        </select>
         <span className={`ml-auto text-[11px] ${txtMuted}`}>{filtered.length} resultado(s)</span>
       </div>
 
@@ -519,7 +560,8 @@ function ListaView({
                 <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">MARCA / MODELO</th>
                 <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">ANO</th>
                 <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">COR</th>
-                <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">STATUS</th>
+                <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">CONDICAO</th>
+                <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">STATUS</th>
                 <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">OBRA ATUAL</th>
                 <th className="text-right px-3 py-2 font-semibold whitespace-nowrap">ACAO</th>
               </tr>
@@ -538,12 +580,11 @@ function ListaView({
                     <td className={`px-3 py-2.5 ${txtMuted}`}>{v.ano_fab || '—'}</td>
                     <td className={`px-3 py-2.5 ${txtMuted}`}>{v.cor || '—'}</td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        isDark ? `${stCfg.bgDark} ${stCfg.color}` : `${stCfg.bg} ${stCfg.color}`
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${stCfg.color.replace('text-', 'bg-')}`} />
-                        {stCfg.label}
-                      </span>
+                      <NotaIcone nota={checkinByVeic.get(v.id)?.aval_funcional} titulo="Condicao" size={14} />
+                    </td>
+                    {/* Status escrito: a pilula era pequena e obrigava a decorar cor */}
+                    <td className={`px-3 py-2.5 font-semibold whitespace-nowrap ${stCfg.color}`}>
+                      {stCfg.label}
                     </td>
                     <td className={`px-3 py-2.5 ${txtMuted}`}>{aloc?.obra?.nome || '—'}</td>
                     <td className="px-3 py-2.5 text-right">
@@ -607,7 +648,7 @@ function KpiCard({ isDark, icon: Icon, label, value, color, onClick, active }: {
   icon: typeof Truck
   label: string
   value: number
-  color: 'slate' | 'blue' | 'emerald' | 'amber'
+  color: 'slate' | 'blue' | 'emerald' | 'amber' | 'rose'
   onClick: () => void
   active?: boolean
 }) {
@@ -616,6 +657,7 @@ function KpiCard({ isDark, icon: Icon, label, value, color, onClick, active }: {
     blue:    { text: 'text-blue-600',    textDark: 'text-blue-300',    bg: 'bg-blue-50',    bgDark: 'bg-blue-500/10' },
     emerald: { text: 'text-emerald-600', textDark: 'text-emerald-300', bg: 'bg-emerald-50', bgDark: 'bg-emerald-500/10' },
     amber:   { text: 'text-amber-600',   textDark: 'text-amber-300',   bg: 'bg-amber-50',   bgDark: 'bg-amber-500/10' },
+    rose:    { text: 'text-rose-600',    textDark: 'text-rose-300',    bg: 'bg-rose-50',    bgDark: 'bg-rose-500/10' },
   }
   const clr = colorMap[color]
   return (
