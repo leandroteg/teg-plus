@@ -5,13 +5,17 @@
 //   • buildPontoConsolidadoHtml  → capa + N colaboradores, 1 por página
 // Abre no visualizador (iframe) e vira PDF pelo "Baixar" (print A4).
 //
-// Marca a ORIGEM de cada batida: relógio (REP), intervalo pré-assinalado e
-// lançamento manual (retificação). Isso é o que dá valor de conferência ao
-// espelho — sem isso, 12:00/13:00 parece batida e não é.
+// As batidas saem do rh_ponto_dia.raw, não das colunas tipadas, para o espelho
+// mostrar EXATAMENTE o que está no Secullum: em dia abonado o Secullum põe a
+// sigla da justificativa no campo da batida ("Atest", "INSS", "FaltDIA") e o
+// rh_ponto_totime() do sync transforma isso em null.
+//
+// Marca também a ORIGEM de cada batida: relógio (REP), intervalo pré-assinalado
+// e lançamento manual (retificação) — sem isso 12:00/13:00 parece batida e não é.
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../services/supabase'
 import { EMPRESA_FALLBACK, getEmpresa, type EmpresaData } from '../services/empresa'
-import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, proximoMes } from '../lib/ponto'
+import { fmtHoras, intervalToMin, minToHoras, labelMes, proximoMes } from '../lib/ponto'
 
 const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
@@ -40,20 +44,29 @@ export interface PontoConsolidadoSpec {
 interface DiaRow {
   colaborador_id: string | null
   data: string
-  entrada1: string | null; saida1: string | null
-  entrada2: string | null; saida2: string | null
   normais: string | null; faltas: string | null
   ex50: string | null; ex70: string | null; ex100: string | null
   hh_trabalhada: string | null; atrasos: string | null
-  folga: boolean | null; compensado: boolean | null
+  carga: string | null; dsr: string | null
+  folga: boolean | null
+  // as batidas vêm do raw, NÃO das colunas tipadas: quando o dia é abonado o
+  // Secullum põe a sigla da justificativa no lugar da hora ("Atest", "INSS",
+  // "FaltDIA"), e o rh_ponto_totime() do sync converte isso em null. Lendo o
+  // raw o espelho mostra exatamente o que o Secullum mostra. O valor já vem
+  // formatado ("06:48"), não precisa de fmtHora.
+  b_e1: string | null; b_s1: string | null; b_e2: string | null; b_s2: string | null
+  b_e3: string | null; b_s3: string | null
   // só a origem, não o raw inteiro — são ~10 mil linhas no consolidado
   o_e1: string | null; o_s1: string | null; o_e2: string | null; o_s2: string | null
+  o_e3: string | null; o_s3: string | null
 }
 type ResumoRow = Record<string, unknown> & { colaborador_id: string | null }
 
-const SEL_DIA = 'colaborador_id, data, entrada1, saida1, entrada2, saida2, normais, faltas, ex50, ex70, ex100, hh_trabalhada, atrasos, folga, compensado,'
+const SEL_DIA = 'colaborador_id, data, normais, faltas, ex50, ex70, ex100, hh_trabalhada, atrasos, carga, dsr, folga,'
+  + 'b_e1:raw->>Entrada1, b_s1:raw->>Saida1, b_e2:raw->>Entrada2, b_s2:raw->>Saida2, b_e3:raw->>Entrada3, b_s3:raw->>Saida3,'
   + 'o_e1:raw->FonteDadosEntrada1->>Origem, o_s1:raw->FonteDadosSaida1->>Origem,'
-  + 'o_e2:raw->FonteDadosEntrada2->>Origem, o_s2:raw->FonteDadosSaida2->>Origem'
+  + 'o_e2:raw->FonteDadosEntrada2->>Origem, o_s2:raw->FonteDadosSaida2->>Origem,'
+  + 'o_e3:raw->FonteDadosEntrada3->>Origem, o_s3:raw->FonteDadosSaida3->>Origem'
 const SEL_RESUMO = 'colaborador_id, colaborador_nome, cargo, matricula, base_nome, cc_codigo, cc_nome, departamento,'
   + 'dias, dias_batidos, hh_trabalhada, normais, extras, faltas, atrasos, banco_saldo, dias_em_aberto'
 
@@ -97,7 +110,12 @@ async function carregar(anoMes: string, ids?: string[]) {
   }
 }
 
-const origens = (d: DiaRow) => [d.o_e1, d.o_s1, d.o_e2, d.o_s2]
+const origens = (d: DiaRow) => [d.o_e1, d.o_s1, d.o_e2, d.o_s2, d.o_e3, d.o_s3]
+/** "06:48" é batida; "Atest"/"INSS"/"FaltDIA" é sigla de justificativa */
+const ehHora = (v: string | null) => !!v && /^\d{1,2}:\d{2}/.test(v)
+// só liga as colunas do 3º par se houver HORA de verdade nelas: em dia abonado
+// o Secullum repete a sigla da justificativa em todos os slots, inclusive no 3º
+const temTerceira = (ds: DiaRow[]) => ds.some(d => ehHora(d.b_e3) || ehHora(d.b_s3))
 
 // ── seção de UM colaborador (usada nos dois formatos) ────────────────────────
 function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], ini: string, comQuebra: boolean): string {
@@ -108,7 +126,7 @@ function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], in
   const faltaMin = somaInt('faltas'), atrasoMin = somaInt('atrasos'), exMin = somaInt('extras')
   const nDias = somaNum('dias'), nBatidos = somaNum('dias_batidos'), emAberto = somaNum('dias_em_aberto')
 
-  let nRep = 0, nPre = 0, nManual = 0, diasComManual = 0
+  let nRep = 0, nPre = 0, nManual = 0, diasComManual = 0, diasJustif = 0
   for (const d of dias) {
     let tem = false
     for (const o of origens(d)) {
@@ -117,41 +135,53 @@ function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], in
       else if (o === ORIGEM_MANUAL) { nManual++; tem = true }
     }
     if (tem) diasComManual++
+    if (d.b_e1 && !ehHora(d.b_e1)) diasJustif++
   }
 
   const kpi = (label: string, valor: string, cor = '#334155') =>
     `<div class="kpi"><div class="kpi-v" style="color:${cor}">${valor}</div><div class="kpi-l">${esc(label)}</div></div>`
 
-  const cel = (h: string | null, o: string | null) => {
-    if (!h) return '<td class="h">—</td>'
+  // 3º par de batidas só entra se alguém do recorte tiver — senão são 2 colunas
+  // vazias em todo mundo (em julho: 2 dias no mês inteiro)
+  const t3 = temTerceira(dias)
+  const cel = (v: string | null, o: string | null) => {
+    if (!v) return '<td class="h">—</td>'
+    // sigla de justificativa ocupando o campo da batida, como no Secullum
+    if (!ehHora(v)) return `<td class="h just">${esc(v)}</td>`
     const cls = o === ORIGEM_MANUAL ? 'h man' : o === ORIGEM_PRE ? 'h pre' : 'h'
     const tag = o === ORIGEM_MANUAL ? '<sup>M</sup>' : o === ORIGEM_PRE ? '<sup>P</sup>' : ''
-    return `<td class="${cls}">${fmtHora(h)}${tag}</td>`
+    return `<td class="${cls}">${esc(v)}${tag}</td>`
   }
 
+  let cargaMin = 0, dsrMin = 0
   const linhas = dias.map(d => {
     const ex = intervalToMin(d.ex50) + intervalToMin(d.ex70) + intervalToMin(d.ex100)
     const falta = intervalToMin(d.faltas) > 0
+    cargaMin += intervalToMin(d.carga); dsrMin += intervalToMin(d.dsr)
     const dt = new Date(d.data + 'T12:00:00')
     const dow = dt.getDay()
     const fds = dow === 0 || dow === 6
-    const marca = d.folga ? '<span class="tag folga">folga</span>'
-      : d.compensado ? '<span class="tag comp">comp.</span>' : ''
+    const marca = d.folga ? '<span class="tag folga">folga</span>' : ''
     return `<tr class="${fds ? 'fds' : ''}">
       <td class="d">${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')} <span class="dow">${DIAS[dow]}</span></td>
-      ${cel(d.entrada1, d.o_e1)}${cel(d.saida1, d.o_s1)}${cel(d.entrada2, d.o_e2)}${cel(d.saida2, d.o_s2)}
+      ${cel(d.b_e1, d.o_e1)}${cel(d.b_s1, d.o_s1)}${cel(d.b_e2, d.o_e2)}${cel(d.b_s2, d.o_s2)}
+      ${t3 ? cel(d.b_e3, d.o_e3) + cel(d.b_s3, d.o_s3) : ''}
+      <td class="n">${fmtHoras(d.carga)}</td>
       <td class="n">${fmtHoras(d.normais)}</td>
       <td class="n ${ex > 0 ? 'ex' : ''}">${ex > 0 ? minToHoras(ex) : '—'}</td>
       <td class="n ${falta ? 'fal' : ''}">${fmtHoras(d.faltas)}</td>
+      <td class="n">${fmtHoras(d.dsr)}</td>
       <td class="mk">${marca}</td>
     </tr>`
   }).join('')
 
   const totalRow = `<tr class="tot">
-    <td>Total · ${nBatidos}/${nDias} dias</td><td colspan="4"></td>
+    <td>Total · ${nBatidos}/${nDias} dias</td><td colspan="${t3 ? 6 : 4}"></td>
+    <td>${cargaMin > 0 ? minToHoras(cargaMin) : '—'}</td>
     <td>${normMin > 0 ? minToHoras(normMin) : '—'}</td>
     <td class="ex">${exMin > 0 ? minToHoras(exMin) : '—'}</td>
-    <td class="fal">${faltaMin > 0 ? minToHoras(faltaMin) : '—'}</td><td></td>
+    <td class="fal">${faltaMin > 0 ? minToHoras(faltaMin) : '—'}</td>
+    <td>${dsrMin > 0 ? minToHoras(dsrMin) : '—'}</td><td></td>
   </tr>`
 
   return `<section class="colab${comQuebra ? ' quebra' : ''}">
@@ -179,15 +209,17 @@ function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], in
     <table>
       <thead><tr>
         <th>Dia</th><th>Entrada</th><th>Saída interv.</th><th>Volta interv.</th><th>Saída</th>
-        <th>Normais</th><th>Extras</th><th>Faltas</th><th></th>
+        ${t3 ? '<th>3ª entrada</th><th>3ª saída</th>' : ''}
+        <th>Carga</th><th>Normais</th><th>Extras</th><th>Faltas</th><th>DSR</th><th></th>
       </tr></thead>
-      <tbody>${linhas || '<tr><td colspan="9" class="vazio">Sem marcações no período.</td></tr>'}${dias.length ? totalRow : ''}</tbody>
+      <tbody>${linhas || `<tr><td colspan="${t3 ? 13 : 11}" class="vazio">Sem marcações no período.</td></tr>`}${dias.length ? totalRow : ''}</tbody>
     </table>
     <div class="leg">
       <span><b>Origem:</b></span>
       <span><b style="color:#334155">${nRep}</b> no relógio</span>
       <span><b style="color:#94a3b8">${nPre}</b> pré-assinaladas <sup>P</sup></span>
       <span><b style="color:#b45309">${nManual}</b> lançadas à mão <sup>M</sup></span>
+      ${diasJustif > 0 ? `<span><b style="color:#0369a1">${diasJustif}</b> dia${diasJustif > 1 ? 's' : ''} com justificativa no lugar da batida</span>` : ''}
     </div>
     ${nManual > 0 ? `<div class="aviso"><b>${nManual} marcaç${nManual > 1 ? 'ões' : 'ão'} em ${diasComManual} dia${diasComManual > 1 ? 's' : ''} ${nManual > 1 ? 'foram lançadas' : 'foi lançada'} manualmente no sistema de ponto</b> — destacadas em âmbar com <sup>M</sup>. Não passaram pelo relógio, por isso não têm NSR. As marcadas com <sup>P</sup> são o intervalo pré-assinalado, gerado a partir do horário cadastrado.</div>` : ''}
     <div class="assin"><div>Assinatura do colaborador</div><div>Assinatura do responsável</div></div>
@@ -223,6 +255,7 @@ const CSS = `
   td.h{font-variant-numeric:tabular-nums;color:#334155}
   td.h.man{color:#b45309;font-weight:700;background:#fffbeb}
   td.h.pre{color:#94a3b8}
+  td.h.just{color:#0369a1;font-weight:700;background:#f0f9ff;font-size:11px}
   td.h sup{font-size:8px;margin-left:1px}
   td.n{font-variant-numeric:tabular-nums;color:#64748b}
   td.n.ex{color:#ea580c;font-weight:700}
@@ -234,7 +267,6 @@ const CSS = `
   tr.tot td:first-child{text-align:left}
   .tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px}
   .tag.folga{background:#e0f2fe;color:#0369a1}
-  .tag.comp{background:#f1f5f9;color:#64748b}
   .leg{margin-top:8px;font-size:10.5px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap}
   .leg b{color:#334155}
   .aviso{margin-top:8px;font-size:10.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px}
