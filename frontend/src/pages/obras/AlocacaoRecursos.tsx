@@ -15,19 +15,34 @@ import {
 } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
+import { humanizarStatus } from '../../types/frotas'
 import { CATEGORIA_LABEL, CATEGORIA_LABEL_ATIVAS, CATEGORIA_VEICULO, CATEGORIA_VEICULO_ATIVAS, CATEGORIA_GRUPO, CATEGORIA_GRUPO_LABEL } from '../../constants/categoriaVeiculo'
 import EditarMaquinarioModal from '../../components/obras/EditarMaquinarioModal'
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<StatusVeiculo, { label: string; color: string; bg: string; bgDark: string }> = {
+type CfgStatus = { label: string; color: string; bg: string; bgDark: string }
+
+const STATUS_LABEL: Record<StatusVeiculo, CfgStatus> = {
   disponivel:        { label: 'Disponivel',     color: 'text-emerald-600', bg: 'bg-emerald-50', bgDark: 'bg-emerald-500/10' },
   em_uso:            { label: 'Em uso',         color: 'text-blue-600',    bg: 'bg-blue-50',    bgDark: 'bg-blue-500/10' },
   em_manutencao:     { label: 'Manutencao',     color: 'text-amber-600',   bg: 'bg-amber-50',   bgDark: 'bg-amber-500/10' },
+  parada_manutencao: { label: 'Parada p/ Manut.', color: 'text-rose-600',   bg: 'bg-rose-50',    bgDark: 'bg-rose-500/10' },
+  necessario_parada: { label: 'Necessario Parada', color: 'text-orange-600', bg: 'bg-orange-50', bgDark: 'bg-orange-500/10' },
   bloqueado:         { label: 'Bloqueado',      color: 'text-rose-600',    bg: 'bg-rose-50',    bgDark: 'bg-rose-500/10' },
   baixado:           { label: 'Baixado',        color: 'text-slate-500',   bg: 'bg-slate-100',  bgDark: 'bg-slate-500/10' },
   em_entrada:        { label: 'Em entrada',     color: 'text-indigo-600',  bg: 'bg-indigo-50',  bgDark: 'bg-indigo-500/10' },
   aguardando_saida:  { label: 'Aguarda saida',  color: 'text-violet-600',  bg: 'bg-violet-50',  bgDark: 'bg-violet-500/10' },
+}
+
+/** Um status fora do mapa nao pode derrubar a tela: vira selo neutro com o
+ *  proprio valor humanizado. Ja aconteceu quando a frota ganhou status novos. */
+const STATUS_NEUTRO: CfgStatus = {
+  label: '—', color: 'text-slate-500', bg: 'bg-slate-100', bgDark: 'bg-slate-500/10',
+}
+function cfgStatus(status?: StatusVeiculo | null): CfgStatus {
+  if (!status) return STATUS_NEUTRO
+  return STATUS_LABEL[status] ?? { ...STATUS_NEUTRO, label: humanizarStatus(status) }
 }
 
 type TabKey = 'lista' | 'gantt' | 'kanban'
@@ -514,7 +529,7 @@ function ListaView({
                 <tr><td colSpan={8} className={`text-center py-8 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Nenhum equipamento encontrado</td></tr>
               ) : filtered.map(v => {
                 const aloc = alocAtivaByVeic.get(v.id)
-                const stCfg = STATUS_LABEL[v.status]
+                const stCfg = cfgStatus(v.status)
                 return (
                   <tr key={v.id} className={isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}>
                     <td className={`px-3 py-2.5 font-semibold ${txtMain}`}>{CATEGORIA_LABEL[v.categoria]}</td>
@@ -1433,7 +1448,7 @@ function VeiculoKanbanCard({
   onDragEnd: () => void
   onClick?: () => void
 }) {
-  const stCfg = STATUS_LABEL[v.status]
+  const stCfg = cfgStatus(v.status)
   const cardCls = isDark
     ? 'bg-[#111827] border-white/[0.08] hover:border-white/[0.14]'
     : 'bg-white border-slate-200 hover:shadow-md'
