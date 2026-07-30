@@ -124,9 +124,9 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   // Esta ficha e preenchida a mao quando a vistoria e manual: campo sem valor
   // ganha uma linha para escrever, nunca um traco (traco parece 'nao tem').
   const linhaParaEscrever = (x: number, largura: number) => {
-    doc.setDrawColor(...LIGHT)
-    doc.setLineWidth(0.3)
-    doc.line(x, y + 0.8, x + largura, y + 0.8)
+    doc.setDrawColor(...MID)
+    doc.setLineWidth(0.35)
+    doc.line(x, y + 1, x + largura, y + 1)
   }
 
   const par = (l1: string, v1: string, l2?: string, v2?: string) => {
@@ -237,20 +237,24 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
     doc.text('OBSERVAÇÃO', xEstado(ESTADOS_COL.length) + 2, y + 3.4)
     y += 5
 
-    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2)
     for (const item of ITENS_POR_AMBIENTE) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK)
       doc.text(item, M + 2, y + 4.2)
-      // quadradinhos para riscar
-      ESTADOS_COL.forEach((_, i) => doc.rect(xEstado(i) + boxW / 2 - 1.75, y + 2.2, 3.5, 3.5))
+
+      // quadradinho: e onde a caneta vai bater, entao precisa ser visivel
+      doc.setDrawColor(...MID); doc.setLineWidth(0.4)
+      ESTADOS_COL.forEach((_, i) => doc.rect(xEstado(i) + boxW / 2 - 1.9, y + 2.1, 3.8, 3.8))
+
       // DUAS linhas de observação por item — uma so nao cabe caneta
       const xObs = xEstado(ESTADOS_COL.length) + 2
+      doc.setDrawColor(...MID); doc.setLineWidth(0.35)
       doc.line(xObs, y + 4.6, M + CW - 2, y + 4.6)
       doc.line(xObs, y + 9.4, M + CW - 2, y + 9.4)
+
+      // separador entre itens: so organiza a leitura, fica no fundo
       y += 11
-      doc.setDrawColor(...MID); doc.setLineWidth(0.25)
+      doc.setDrawColor(...LIGHT); doc.setLineWidth(0.15)
       doc.line(M, y, M + CW, y)
-      doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2)
     }
     y += 4
   }
