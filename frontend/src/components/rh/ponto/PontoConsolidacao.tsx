@@ -10,7 +10,7 @@
 // Não há etapa de aprovação: retificação já chega aprovada do Secullum.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react'
-import { Search, Users, BarChart3, FileText, Package, Loader2, Lock, LockOpen, ArrowUpDown, Check } from 'lucide-react'
+import { Search, Users, BarChart3, FileText, Package, Loader2, Lock, LockOpen, ArrowUpDown, Check, X } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import { usePontoResumoMes, usePontoResumoPeriodo, usePontoFechamentos, useFecharMes, useLiberarMes } from '../../../hooks/usePonto'
@@ -25,6 +25,9 @@ interface Pessoa {
 interface MesLinha {
   anoMes: string; pessoas: number; hh: number; ex: number; falta: number; assinados: number
 }
+/** labelMes vem minúsculo (serve em frases); em coluna de tabela fica capitalizado */
+const capMes = (m: string) => { const t = labelMes(m); return t.charAt(0).toUpperCase() + t.slice(1) }
+
 type OrdemPessoa = 'nome' | 'base' | 'dias' | 'hh' | 'ex' | 'falta'
 type OrdemMes = 'anoMes' | 'pessoas' | 'hh' | 'ex' | 'falta'
 
@@ -47,6 +50,7 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
+  const [resumoMes, setResumoMes] = useState<string | null>(null)
   const [ordP, setOrdP] = useState<{ k: OrdemPessoa; dir: 1 | -1 }>({ k: 'nome', dir: 1 })
   const [ordM, setOrdM] = useState<{ k: OrdemMes; dir: 1 | -1 }>({ k: 'anoMes', dir: -1 })
 
@@ -259,8 +263,8 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                   const encerrado = l.anoMes < mesCorrente
                   const trabalhando = (fechar.isPending || liberar.isPending)
                   return (
-                    <tr key={l.anoMes} className={`border-t ${row}`}>
-                      <td className={`${TD} font-semibold ${txt}`}>{labelMes(l.anoMes)}{doMes && <span className={`ml-1.5 text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-500 font-bold uppercase`}>atual</span>}</td>
+                    <tr key={l.anoMes} className={`border-t cursor-pointer ${row}`} onClick={() => setResumoMes(l.anoMes)}>
+                      <td className={`${TD} font-semibold ${txt}`}>{capMes(l.anoMes)}{doMes && <span className={`ml-1.5 text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-500 font-bold uppercase`}>atual</span>}</td>
                       <td className={`${TD} ${txt}`}>{l.pessoas}</td>
                       <td className={`${TD} hidden sm:table-cell ${sub}`}>{l.hh > 0 ? minToHoras(l.hh) : '—'}</td>
                       <td className={`${TD} font-semibold ${l.ex > 0 ? 'text-orange-500' : sub}`}>{l.ex > 0 ? minToHoras(l.ex) : '—'}</td>
@@ -279,7 +283,7 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                         )}
                       </td>
                       <td className={`${TD} ${sub}`}>0/{l.pessoas}</td>
-                      <td className={`${TD} w-px`}>
+                      <td className={`${TD} w-px`} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 justify-end">
                           <button
                             onClick={() => abrirConsolidado(l.anoMes, (doMes ? escolhidos : []).map(p => ({ id: p.id, nome: p.nome })), nomeBase)}
@@ -317,8 +321,115 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
       )}
 
       {espelho && <PontoReportModal alvo={espelho} onClose={() => setEspelho(null)} />}
+      {resumoMes && <ModalResumoMes mes={resumoMes} onClose={() => setResumoMes(null)} />}
     </div>
   )
+
+  // ── resumo do mês (clique na linha da visão mensal) ───────────────────────
+  function ModalResumoMes({ mes, onClose }: { mes: string; onClose: () => void }) {
+    const doMes = (periodo.data ?? []).filter(r => String(r.ano_mes).slice(0, 10) === mes)
+    const fech = fechPorMes.get(mes)
+    const encerrado = mes < mesCorrente
+
+    const ids = new Set<string>()
+    let hh = 0, ex = 0, falta = 0, atraso = 0, aberto = 0
+    const porArea = new Map<string, { area: string; n: Set<string>; hh: number; ex: number; falta: number }>()
+    for (const r of doMes) {
+      if (r.colaborador_id) ids.add(r.colaborador_id)
+      const h = intervalToMin(r.hh_trabalhada), e = intervalToMin(r.extras), f = intervalToMin(r.faltas)
+      hh += h; ex += e; falta += f
+      atraso += intervalToMin(r.atrasos); aberto += r.dias_em_aberto || 0
+      const k = r.base_nome ?? '— sem área'
+      const a = porArea.get(k) ?? { area: k, n: new Set<string>(), hh: 0, ex: 0, falta: 0 }
+      if (r.colaborador_id) a.n.add(r.colaborador_id)
+      a.hh += h; a.ex += e; a.falta += f
+      porArea.set(k, a)
+    }
+    const areas = [...porArea.values()].sort((a, b) => b.hh - a.hh)
+    const pctEx = hh > 0 ? (ex / hh) * 100 : 0
+
+    const card = `rounded-2xl border px-3 py-2.5 ${isDark ? 'bg-white/[0.03] border-white/[0.08]' : 'bg-slate-50 border-slate-200'}`
+    const kpi = (rot: string, val: string, cor?: string) => (
+      <div className={card}>
+        <p className={`text-[9px] font-bold uppercase tracking-widest ${sub}`}>{rot}</p>
+        <p className={`text-lg font-extrabold ${cor ?? txt}`}>{val}</p>
+      </div>
+    )
+
+    return (
+      <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/50" onClick={onClose}>
+        <div onClick={e => e.stopPropagation()}
+          className={`w-full max-w-2xl max-h-[92vh] lg:max-h-[85vh] flex flex-col rounded-t-2xl lg:rounded-2xl border shadow-2xl overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+          <div className={`flex items-center justify-between gap-2 px-4 py-3 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <div className="min-w-0">
+              <p className={`text-sm font-bold ${txt}`}>{capMes(mes)}</p>
+              <p className={`text-[10px] ${sub}`}>
+                {fech?.status === 'fechado'
+                  ? `Fechado por ${fech.fechado_por ?? '—'} em ${fech.fechado_em ? new Date(fech.fechado_em).toLocaleDateString('pt-BR') : '—'}`
+                  : encerrado ? 'Mês encerrado — pronto para fechar' : 'Mês em andamento'}
+              </p>
+            </div>
+            <button onClick={onClose} className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={18} /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {kpi('Colaboradores', String(ids.size))}
+              {kpi('HH trabalhada', hh > 0 ? minToHoras(hh) : '—')}
+              {kpi('Horas extras', ex > 0 ? minToHoras(ex) : '—', 'text-orange-500')}
+              {kpi('Faltas', falta > 0 ? minToHoras(falta) : '—', 'text-rose-500')}
+            </div>
+            <div className={`flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${sub}`}>
+              <span>Extras sobre HH: <b className={txt}>{pctEx.toFixed(1)}%</b></span>
+              <span>Atrasos: <b className={txt}>{atraso > 0 ? minToHoras(atraso) : '—'}</b></span>
+              {aberto > 0 && <span className="text-amber-600">Dias em aberto: <b>{aberto}</b></span>}
+              <span>Espelhos assinados: <b className={txt}>0 de {ids.size}</b></span>
+            </div>
+
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              <table className="w-full">
+                <thead><tr className={head}>
+                  <th className={TH}>Área</th><th className={TH}>Pessoas</th>
+                  <th className={`${TH} hidden sm:table-cell`}>HH</th><th className={TH}>Extras</th><th className={TH}>Faltas</th>
+                </tr></thead>
+                <tbody>{areas.map(a => (
+                  <tr key={a.area} className={`border-t ${row}`}>
+                    <td className={`${TD} font-semibold ${txt}`}>{a.area}</td>
+                    <td className={`${TD} ${txt}`}>{a.n.size}</td>
+                    <td className={`${TD} hidden sm:table-cell ${sub}`}>{a.hh > 0 ? minToHoras(a.hh) : '—'}</td>
+                    <td className={`${TD} font-semibold ${a.ex > 0 ? 'text-orange-500' : sub}`}>{a.ex > 0 ? minToHoras(a.ex) : '—'}</td>
+                    <td className={`${TD} ${a.falta > 0 ? 'text-rose-500' : sub}`}>{a.falta > 0 ? minToHoras(a.falta) : '—'}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={`flex items-center justify-end gap-2 px-4 py-3 border-t flex-wrap ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <button
+              onClick={() => { onClose(); abrirConsolidado(mes, (mes === anoMes ? escolhidos : []).map(p => ({ id: p.id, nome: p.nome })), nomeBase) }}
+              disabled={mes !== anoMes || !escolhidos.length}
+              title={mes === anoMes ? 'Relatório consolidado do mês' : 'Selecione esta competência no topo para gerar o relatório'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-500/15 text-violet-500 hover:bg-violet-500/25 disabled:opacity-30">
+              <FileText size={13} /> Relatório
+            </button>
+            {fech?.status === 'fechado' ? (
+              <button onClick={() => liberar.mutate({ anoMes: mes, por: quem })} disabled={liberar.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 disabled:opacity-40">
+                <LockOpen size={13} /> Liberar ponto
+              </button>
+            ) : (
+              <button onClick={() => fechar.mutate({ anoMes: mes, por: quem })} disabled={!encerrado || fechar.isPending}
+                title={encerrado ? 'Fechar e congelar os totais' : 'Só depois que o mês terminar'}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-30">
+                <Lock size={13} /> Fechar ponto
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   function Carregando() { return <div className="flex justify-center py-14"><Loader2 className="animate-spin text-violet-500" size={24} /></div> }
   function Vazio({ msg }: { msg: string }) { return <div className={`text-center py-14 text-sm ${sub}`}>{msg}</div> }

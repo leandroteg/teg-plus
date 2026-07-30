@@ -34,7 +34,8 @@ export function intervalToMin(s?: string | null): number {
 export function minToHoras(min: number): string {
   const neg = min < 0
   const a = Math.abs(min)
-  const out = `${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`
+  // separador de milhar: agregados de mês passam de 60 mil horas e viram ilegíveis
+  const out = `${Math.floor(a / 60).toLocaleString('pt-BR')}h${String(a % 60).padStart(2, '0')}`
   return neg ? `-${out}` : out
 }
 
