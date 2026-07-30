@@ -91,15 +91,33 @@ export interface PontoAfastamento {
   colaborador?: { nome: string | null; base_id: string | null; base?: { nome: string | null } | null } | null
 }
 
+// Retificação = dia/colaborador com ao menos 1 batida de Origem 2 (inclusão
+// manual no Secullum). Vem da view vw_rh_ponto_retificacao, que lê o que já
+// está gravado em rh_ponto_dia.raw — não depende do /FonteDados.
 export interface PontoRetificacao {
-  nsr: number | null
-  data_hora: string
-  origem: string | null
+  data: string
+  secullum_func_id: number
+  colaborador_id: string | null
+  colaborador_nome: string | null
+  cargo: string | null
+  base_id: string | null
+  base_nome: string | null
+  cc_codigo: string | null
+  entrada1: string | null; saida1: string | null
+  entrada2: string | null; saida2: string | null
+  /** quais batidas do dia foram lançadas à mão */
+  ret_e1: boolean; ret_s1: boolean; ret_e2: boolean; ret_s2: boolean
+  n_ret: number
+  /** 3+ batidas manuais = jornada montada à mão, não correção pontual */
+  dia_todo: boolean
+  /** quando a retificação foi lançada (DataInclusao da batida manual) */
+  incluido_em: string | null
+  atraso_dias: number | null
+  /** só existe onde o /FonteDados rodou (10/06 a 29/06); null daí em diante */
   motivo: string | null
   aprov_status: AprovStatus
   aprov_por: string | null
   aprov_em: string | null
-  colaborador?: { nome: string | null; base_id: string | null; base?: { nome: string | null } | null } | null
 }
 
 export interface PontoTabProps {

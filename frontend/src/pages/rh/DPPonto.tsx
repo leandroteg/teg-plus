@@ -42,7 +42,7 @@ export default function DPPonto() {
   // motivos de retificação (p/ o dropdown na barra), do mesmo cache do hook
   const { data: retData = [] } = usePontoRetificacoes(anoMes)
   const motivosRetif = useMemo(() => [...new Set(
-    retData.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId)).map(r => r.motivo!)
+    retData.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.base_id === baseId)).map(r => r.motivo!)
   )].sort(), [retData, baseId])
   const toggleJustif = (m: string) => setOcultosJustif(s => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
 

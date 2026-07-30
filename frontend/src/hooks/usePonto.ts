@@ -154,20 +154,20 @@ export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
   })
 }
 
-// Retificações = marcações (FonteDados) com motivo
+// Retificações = dias com batida de Origem 2 (inclusão manual no Secullum).
+// Lê a view, que desempacota o rh_ponto_dia.raw já gravado — o endpoint
+// /FonteDados (que trazia o texto do motivo) saiu do sync em 29/06, então
+// `motivo` só vem preenchido até essa data.
 export function usePontoRetificacoes(anoMes: string) {
   return useQuery<PontoRetificacao[]>({
     queryKey: ['ponto-retificacoes', anoMes],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('rh_ponto_marcacao')
-        .select('nsr, data_hora, origem, motivo, aprov_status, aprov_por, aprov_em, colaborador:rh_colaboradores!colaborador_id(nome, base_id, base:est_bases!base_id(nome))')
-        .eq('origem', '2')   // Origem 2 = inclusão/edição MANUAL no cartão (= retificação); 3=REP físico, 16=app
-        .not('motivo', 'is', null)
+        .from('vw_rh_ponto_retificacao').select('*')
         .gte('data', anoMes).lt('data', proximoMes(anoMes))
-        .order('data_hora', { ascending: false }).limit(2000)
+        .order('data', { ascending: false }).limit(4000)
       if (error) { console.error('usePontoRetificacoes:', error); return [] }
-      return (data ?? []) as unknown as PontoRetificacao[]
+      return (data ?? []) as PontoRetificacao[]
     },
   })
 }
@@ -210,10 +210,17 @@ export function useEnviarItens() {
   return useMutation({
     mutationFn: async (v: { keys: AprovKey[]; por: string }) => {
       const patch = { aprov_status: 'em_aprovacao', aprov_por: v.por, aprov_em: new Date().toISOString() }
-      const nsrs = v.keys.filter(k => k.tipo === 'retificacao').map(k => k.nsr).filter((x): x is number => x != null)
+      // retificação tem tabela de aprovação PRÓPRIA: 75% dos dias com retificação
+      // também têm hora extra, e rh_ponto_dia.aprov_status é uma coluna só —
+      // aprovar um marcaria o outro.
+      const rets = v.keys.filter(k => k.tipo === 'retificacao' && k.data && k.secullum_func_id != null)
       const ids = v.keys.filter(k => k.tipo === 'atestado').map(k => k.id).filter((x): x is string => !!x)
       const hes = v.keys.filter(k => k.tipo === 'hora_extra')
-      if (nsrs.length) { const { error } = await supabase.from('rh_ponto_marcacao').update(patch).in('nsr', nsrs); if (error) throw error }
+      if (rets.length) {
+        const rows = rets.map(k => ({ data: k.data!, secullum_func_id: k.secullum_func_id!, ...patch }))
+        const { error } = await supabase.from('rh_ponto_ret_aprov').upsert(rows, { onConflict: 'data,secullum_func_id' })
+        if (error) throw error
+      }
       if (ids.length) { const { error } = await supabase.from('rh_ponto_afastamento').update(patch).in('id', ids); if (error) throw error }
       for (const k of hes) { const { error } = await supabase.from('rh_ponto_dia').update(patch).eq('data', k.data!).eq('secullum_func_id', k.secullum_func_id!); if (error) throw error }
     },
@@ -233,7 +240,8 @@ export function useAprovarItem() {
       const patch = { aprov_status: v.status, aprov_por: v.aprovador, aprov_em: new Date().toISOString() }
       const k = v.key
       let res
-      if (k.tipo === 'retificacao') res = await supabase.from('rh_ponto_marcacao').update(patch).eq('nsr', k.nsr!)
+      if (k.tipo === 'retificacao') res = await supabase.from('rh_ponto_ret_aprov')
+        .upsert({ data: k.data!, secullum_func_id: k.secullum_func_id!, ...patch }, { onConflict: 'data,secullum_func_id' })
       else if (k.tipo === 'hora_extra') res = await supabase.from('rh_ponto_dia').update(patch).eq('data', k.data!).eq('secullum_func_id', k.secullum_func_id!)
       else res = await supabase.from('rh_ponto_afastamento').update(patch).eq('id', k.id!)
       if (res.error) throw res.error

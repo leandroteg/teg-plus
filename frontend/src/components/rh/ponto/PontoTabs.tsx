@@ -342,36 +342,89 @@ export function RetificacoesTab({ anoMes, baseId, pessoa, status, ocultosJustif 
   const aprovador = useAprovador()
   const enviar = useEnviarItens()
   const { sel, toggle, setAll, clear } = useSelecao()
-  const semNoise = data.filter(r => r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && (!baseId || r.colaborador?.base_id === baseId))
-  const lista = semNoise.filter(r => !ocultosJustif.has(r.motivo!) && matchPessoa(r.colaborador?.nome, pessoa) && (!status || r.aprov_status === status))
-  const idOf = (r: PontoRetificacao) => String(r.nsr)
+  // o motivo só existe até 29/06 (quando o /FonteDados saiu do sync). Onde ele
+  // existe vale o filtro de justificativa + o ruído da migração; onde não existe
+  // a linha passa — senão julho em diante sumiria da tela.
+  const lista = data.filter(r => (!baseId || r.base_id === baseId)
+    && matchPessoa(r.colaborador_nome, pessoa)
+    && (!status || r.aprov_status === status)
+    && (!r.motivo || (!RUIDO_MIGRACAO.test(r.motivo) && !ocultosJustif.has(r.motivo))))
+  const idOf = (r: PontoRetificacao) => `${r.data}|${r.secullum_func_id}`
   const pend = lista.filter(r => r.aprov_status === 'pendente')
   const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
-  const onEnviar = () => enviar.mutate({ keys: lista.filter(r => sel.has(idOf(r))).map(r => ({ tipo: 'retificacao', nsr: r.nsr } as AprovKey)), por: aprovador }, { onSuccess: clear })
+  const onEnviar = () => enviar.mutate({ keys: lista.filter(r => sel.has(idOf(r))).map(r => ({ tipo: 'retificacao', data: r.data, secullum_func_id: r.secullum_func_id } as AprovKey)), por: aprovador }, { onSuccess: clear })
+
+  const nBatidas = lista.reduce((s, r) => s + r.n_ret, 0)
+  const nDiaTodo = lista.filter(r => r.dia_todo).length
+  const comAtraso = lista.filter(r => r.atraso_dias != null)
+  const atrasoMed = comAtraso.length ? Math.round(comAtraso.reduce((s, r) => s + (r.atraso_dias ?? 0), 0) / comAtraso.length) : null
+
+  // batida lançada à mão fica em âmbar; as demais seguem o cinza do cartão
+  const Cel = ({ h, ret, mob }: { h: string | null; ret: boolean; mob?: boolean }) => (
+    <td className={`${TD} ${mob ? 'hidden sm:table-cell' : ''} ${ret ? 'text-amber-500 font-bold' : c.sub}`}>{fmtHora(h)}</td>
+  )
+  const box = `rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`
 
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-amber-50 border-amber-100' : 'bg-amber-500/10 border-amber-500/20'}`}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Retificações · {labelMes(anoMes)}</span>
+            <p className={`text-lg font-extrabold ${c.txt}`}>{lista.length} <span className={`text-xs font-normal ${c.sub}`}>dias · {nBatidas} batidas</span></p>
+          </div>
+          <div className={box}>
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${c.sub}`}>Jornada montada à mão</span>
+            <p className={`text-lg font-extrabold ${nDiaTodo > 0 ? 'text-rose-500' : c.txt}`}>{nDiaTodo} <span className={`text-xs font-normal ${c.sub}`}>dias</span></p>
+          </div>
+          <div className={box}>
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${c.sub}`}>Lançada depois do fato</span>
+            <p className={`text-lg font-extrabold ${c.txt}`}>{atrasoMed == null ? '—' : `${atrasoMed}d`} <span className={`text-xs font-normal ${c.sub}`}>em média</span></p>
+          </div>
+        </div>
+        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
+      </div>
       <Painel>
-        {!lista.length ? <Vazio msg="Nenhuma retificação no filtro." /> : (
+        {!lista.length ? <Vazio msg="Nenhuma retificação no filtro." /> : (<>
           <table className="w-full">
             <thead><tr className={c.head}>
               <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(idOf))} />
-              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data/Hora</th><th className={TH}>Tipo (motivo)</th><th className={TH}>Status</th>
+              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Dia</th>
+              <th className={TH}>E1</th><th className={TH}>S1</th><th className={`${TH} hidden sm:table-cell`}>E2</th><th className={TH}>S2</th>
+              <th className={`${TH} hidden md:table-cell`}>Lançada em</th><th className={TH}>Status</th>
             </tr></thead>
-            <tbody>{lista.map((r, i) => (
-              <tr key={i} className={`border-t ${c.row}`}>
-                <td className={`${TD} w-px`}>{r.aprov_status === 'pendente' && <input type="checkbox" checked={sel.has(idOf(r))} onChange={() => toggle(idOf(r))} className="accent-violet-500" />}</td>
-                <td className={`${TD} font-semibold ${c.txt}`}>{r.colaborador?.nome ?? '—'}</td>
-                <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.colaborador?.base?.nome ?? '—'}</td>
-                <td className={`${TD} ${c.sub}`}>{new Date(r.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                <td className={`${TD} ${c.txt}`}>{r.motivo}</td>
-                <td className={TD}><Status s={r.aprov_status} /></td>
-              </tr>
-            ))}</tbody>
+            <tbody>{lista.map(r => {
+              const dt = new Date(r.data + 'T00:00:00')
+              return (
+                <tr key={idOf(r)} className={`border-t ${c.row}`}>
+                  <td className={`${TD} w-px`}>{r.aprov_status === 'pendente' && <input type="checkbox" checked={sel.has(idOf(r))} onChange={() => toggle(idOf(r))} className="accent-violet-500" />}</td>
+                  <td className={`${TD} font-semibold ${c.txt} max-w-[240px]`}>
+                    <span className="block truncate" title={r.colaborador_nome ?? ''}>{r.colaborador_nome ?? '—'}</span>
+                    <div className={`text-[10px] flex items-center gap-1.5 flex-wrap ${c.sub}`}>
+                      <span>{r.cargo}</span>
+                      {r.dia_todo && <span className="px-1 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">jornada à mão</span>}
+                      {r.motivo && <span className="px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 font-semibold">{r.motivo}</span>}
+                    </div>
+                  </td>
+                  <td className={`${TD} hidden md:table-cell ${c.sub}`}>{r.base_nome ?? '—'}</td>
+                  <td className={`${TD} ${c.txt}`}>{dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} <span className={c.sub}>{['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dt.getDay()]}</span></td>
+                  <Cel h={r.entrada1} ret={r.ret_e1} /><Cel h={r.saida1} ret={r.ret_s1} />
+                  <Cel h={r.entrada2} ret={r.ret_e2} mob /><Cel h={r.saida2} ret={r.ret_s2} />
+                  <td className={`${TD} hidden md:table-cell ${c.sub}`}>
+                    {r.incluido_em ? new Date(r.incluido_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
+                    {r.atraso_dias != null && r.atraso_dias > 0 && <span className={`ml-1 ${r.atraso_dias > 7 ? 'text-rose-500 font-semibold' : ''}`}>+{r.atraso_dias}d</span>}
+                  </td>
+                  <td className={TD}><Status s={r.aprov_status} /></td>
+                </tr>
+              )
+            })}</tbody>
           </table>
-        )}
+          <div className={`px-3 py-2 text-[10px] border-t ${c.isLight ? 'border-slate-100 text-slate-400' : 'border-white/[0.05] text-slate-500'}`}>
+            <span className="text-amber-500 font-semibold">Âmbar</span> = batida lançada à mão no Secullum (Origem 2, sem NSR de relógio). As demais vieram do relógio ou do intervalo pré-assinalado.
+            {' '}<span className="text-rose-500 font-semibold">Jornada à mão</span> = 3+ batidas do dia lançadas manualmente.
+          </div>
+        </>)}
       </Painel>
     </div>
   )
@@ -487,8 +540,8 @@ export function AprovacaoTab({ anoMes }: PontoTabProps) {
 
   const itens: FilaItem[] = useMemo(() => {
     const out: FilaItem[] = []
-    for (const r of (ret.data ?? [])) if (r.motivo && !RUIDO_MIGRACAO.test(r.motivo) && r.aprov_status === 'em_aprovacao')
-      out.push({ tipo: 'retificacao', key: { tipo: 'retificacao', nsr: r.nsr }, nome: r.colaborador?.nome ?? '—', baseId: r.colaborador?.base_id ?? '', baseNome: r.colaborador?.base?.nome ?? '(sem base)', quando: r.data_hora, desc: r.motivo ?? '' })
+    for (const r of (ret.data ?? [])) if (r.aprov_status === 'em_aprovacao' && (!r.motivo || !RUIDO_MIGRACAO.test(r.motivo)))
+      out.push({ tipo: 'retificacao', key: { tipo: 'retificacao', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: r.motivo ?? `${r.n_ret} batida(s) à mão${r.dia_todo ? ' · jornada inteira' : ''}` })
     for (const r of (he.data ?? [])) if (r.aprov_status === 'em_aprovacao')
       out.push({ tipo: 'hora_extra', key: { tipo: 'hora_extra', data: r.data, secullum_func_id: r.secullum_func_id }, nome: r.colaborador_nome ?? '—', baseId: r.base_id ?? '', baseNome: r.base_nome ?? '(sem base)', quando: r.data, desc: fmtHoras(r.extras_total) })
     for (const a of (at.data ?? [])) if (a.aprov_status === 'em_aprovacao')
