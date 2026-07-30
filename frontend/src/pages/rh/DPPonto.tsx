@@ -11,6 +11,7 @@ import { ultimosMeses, labelMes, mesAtual, hojeISO, ontemISO } from '../../lib/p
 import {
   RegistrosPontoTab, RetificacoesTab, HorasExtrasTab, AtestadosTab, AprovacaoTab, ConsolidacaoTab,
   MultiSelectJustif, RUIDO_MIGRACAO, REG_CHIPS, SITUACOES_PONTO,
+  TotalRetificacoes, TotalHorasExtras,
 } from '../../components/rh/ponto/PontoTabs'
 import type { PontoTabProps } from '../../types/ponto'
 
@@ -96,6 +97,9 @@ export default function DPPonto() {
             <input value={pessoa} onChange={e => setPessoa(e.target.value)} placeholder="Filtrar por pessoa…"
               className={`${selCls} w-[180px]`} />
           )}
+          {/* totalizador textual — encostado à direita, na mesma linha dos filtros */}
+          {key === 'retificacoes' && <TotalRetificacoes anoMes={anoMes} baseId={baseId} pessoa={pessoa} status={status} ocultosJustif={ocultosJustif} />}
+          {key === 'horas_extras' && <TotalHorasExtras anoMes={anoMes} baseId={baseId} pessoa={pessoa} status={status} />}
           {key === 'registros' && (
             <div className={`inline-flex rounded-xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-slate-700'}`}>
               <button onClick={() => setVista('mes')} className={segCls(vista === 'mes')}><CalendarRange size={13} /> Mês</button>

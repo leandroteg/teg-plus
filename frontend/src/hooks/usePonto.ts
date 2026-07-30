@@ -128,11 +128,12 @@ export function usePontoHorasExtrasPeriodo(de: string, ate: string) {
   return useQuery<HoraExtraItem[]>({
     queryKey: ['ponto-he-periodo', de, ate],
     queryFn: async () => {
-      const { data, error } = await supabase.from('vw_rh_ponto_hora_extra').select('*')
-        .gte('data', `${de}-01`).lt('data', proximoMes(`${ate}-01`))
-        .order('data', { ascending: false }).limit(3000)
-      if (error) { console.error('usePontoHorasExtrasPeriodo:', error); return [] }
-      return (data ?? []) as HoraExtraItem[]
+      try {
+        return await paginar<HoraExtraItem>((from, to) => supabase
+          .from('vw_rh_ponto_hora_extra').select('*')
+          .gte('data', `${de}-01`).lt('data', proximoMes(`${ate}-01`))
+          .order('data', { ascending: false }).order('secullum_func_id').range(from, to))
+      } catch (e) { console.error('usePontoHorasExtrasPeriodo:', e); return [] }
     },
   })
 }
@@ -154,6 +155,26 @@ export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
   })
 }
 
+// O PostgREST do Supabase capa em 1000 linhas por request mesmo com .limit()
+// maior — um .limit(3000) devolve 1000 em silêncio e o total da tela mente.
+// Pagina em lotes e concatena. A ordenação precisa ser TOTAL (com desempate),
+// senão linha repete ou some entre um lote e outro.
+const PAGE = 1000
+async function paginar<T>(
+  lote: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+  max = 30_000,
+): Promise<T[]> {
+  const all: T[] = []
+  for (let from = 0; from < max; from += PAGE) {
+    const { data, error } = await lote(from, from + PAGE - 1)
+    if (error) throw error
+    const pag = (data ?? []) as T[]
+    all.push(...pag)
+    if (pag.length < PAGE) break
+  }
+  return all
+}
+
 // Retificações = dias com batida de Origem 2 (inclusão manual no Secullum).
 // Lê a view, que desempacota o rh_ponto_dia.raw já gravado — o endpoint
 // /FonteDados (que trazia o texto do motivo) saiu do sync em 29/06, então
@@ -162,12 +183,13 @@ export function usePontoRetificacoes(anoMes: string) {
   return useQuery<PontoRetificacao[]>({
     queryKey: ['ponto-retificacoes', anoMes],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_rh_ponto_retificacao').select('*')
-        .gte('data', anoMes).lt('data', proximoMes(anoMes))
-        .order('data', { ascending: false }).limit(4000)
-      if (error) { console.error('usePontoRetificacoes:', error); return [] }
-      return (data ?? []) as PontoRetificacao[]
+      try {
+        return await paginar<PontoRetificacao>((from, to) => supabase
+          .from('vw_rh_ponto_retificacao').select('*')
+          .gte('data', anoMes).lt('data', proximoMes(anoMes))
+          .order('data', { ascending: false }).order('secullum_func_id')
+          .range(from, to))
+      } catch (e) { console.error('usePontoRetificacoes:', e); return [] }
     },
   })
 }
@@ -177,12 +199,14 @@ export function usePontoHorasExtras(anoMes: string, baseId?: string) {
   return useQuery<HoraExtraItem[]>({
     queryKey: ['ponto-horas-extras', anoMes, baseId || 'all'],
     queryFn: async () => {
-      let q = supabase.from('vw_rh_ponto_hora_extra').select('*')
-        .gte('data', anoMes).lt('data', proximoMes(anoMes))
-      if (baseId) q = q.eq('base_id', baseId)
-      const { data, error } = await q.order('data', { ascending: false }).limit(3000)
-      if (error) { console.error('usePontoHorasExtras:', error); return [] }
-      return (data ?? []) as HoraExtraItem[]
+      try {
+        return await paginar<HoraExtraItem>((from, to) => {
+          let q = supabase.from('vw_rh_ponto_hora_extra').select('*')
+            .gte('data', anoMes).lt('data', proximoMes(anoMes))
+          if (baseId) q = q.eq('base_id', baseId)
+          return q.order('data', { ascending: false }).order('secullum_func_id').range(from, to)
+        })
+      } catch (e) { console.error('usePontoHorasExtras:', e); return [] }
     },
   })
 }

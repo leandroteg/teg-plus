@@ -1,6 +1,6 @@
 // components/rh/ponto/PontoTabs.tsx — conteúdo das 6 abas do DP > Ponto
 import { useMemo, useState } from 'react'
-import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2, MapPinOff } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronDown, Check, X, FileText, Lock, Filter, Send, Users, Clock, Timer, UserX, AlarmClock, CalendarX2, CalendarCheck2, MapPinOff, ArrowUpDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -10,7 +10,7 @@ import {
   type PontoElegiveis,
 } from '../../../hooks/usePonto'
 import { fmtHoras, fmtHora, intervalToMin, minToHoras, labelMes, batidasForaHorario, pontoEmAberto } from '../../../lib/ponto'
-import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao } from '../../../types/ponto'
+import type { PontoResumoMes, PontoTabProps, PontoDiaLista, AprovStatus, AprovKey, AprovTipo, PontoRetificacao, HoraExtraItem } from '../../../types/ponto'
 
 // ── helpers visuais ──────────────────────────────────────────────────────────
 function Painel({ children }: { children: React.ReactNode }) {
@@ -98,6 +98,92 @@ export function MultiSelectJustif({ motivos, ocultos, toggle }: { motivos: strin
 // célula de checkbox no header
 function ThCheck({ all, none, onToggle }: { all: boolean; none: boolean; onToggle: () => void }) {
   return <th className={`${TH} w-px`}><input type="checkbox" checked={all} onChange={onToggle} disabled={none} className="accent-violet-500" /></th>
+}
+
+// ── ordenação por clique no cabeçalho (colaborador · base · dia) ─────────────
+type SortDir = 'asc' | 'desc'
+type SortCampo = 'nome' | 'base' | 'data'
+function useOrdem(inicial: SortCampo = 'data', dirInicial: SortDir = 'desc') {
+  const [campo, setCampo] = useState<SortCampo>(inicial)
+  const [dir, setDir] = useState<SortDir>(dirInicial)
+  // clicar na mesma coluna inverte; trocar de coluna começa em asc (data em desc)
+  const clicar = (k: SortCampo) => {
+    if (k === campo) setDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else { setCampo(k); setDir(k === 'data' ? 'desc' : 'asc') }
+  }
+  return { campo, dir, clicar }
+}
+type Ordem = ReturnType<typeof useOrdem>
+
+function ordenar<T>(lista: T[], o: Ordem, get: (r: T) => { nome: string; base: string; data: string }): T[] {
+  const m = o.dir === 'asc' ? 1 : -1
+  return [...lista].sort((a, b) => {
+    const A = get(a), B = get(b)
+    const cmp = o.campo === 'data' ? A.data.localeCompare(B.data)
+      : o.campo === 'base' ? A.base.localeCompare(B.base, 'pt-BR')
+        : A.nome.localeCompare(B.nome, 'pt-BR')
+    return (cmp !== 0 ? cmp : A.nome.localeCompare(B.nome, 'pt-BR')) * m
+  })
+}
+
+function ThSort({ label, k, o, className = '' }: { label: string; k: SortCampo; o: Ordem; className?: string }) {
+  const on = o.campo === k
+  return (
+    <th className={`${TH} ${className} cursor-pointer select-none`} onClick={() => o.clicar(k)} title={`Ordenar por ${label.toLowerCase()}`}>
+      <span className={`inline-flex items-center gap-1 ${on ? 'text-violet-500' : ''}`}>
+        {label}
+        {on ? <span className="text-[8px] leading-none">{o.dir === 'asc' ? '▲' : '▼'}</span>
+            : <ArrowUpDown size={10} className="opacity-30" />}
+      </span>
+    </th>
+  )
+}
+
+// ── filtro + resumo compartilhados com a barra de filtros (DPPonto) ──────────
+// Ficam aqui para a linha de total no topo e a tabela nunca divergirem.
+export function filtrarRetificacoes(data: PontoRetificacao[], f: { baseId: string; pessoa: string; status: string; ocultosJustif: Set<string> }) {
+  // o motivo só existe até 29/06 (quando o /FonteDados saiu do sync). Onde ele
+  // existe vale o filtro de justificativa + o ruído da migração; onde não existe
+  // a linha passa — senão julho em diante sumiria da tela.
+  return data.filter(r => (!f.baseId || r.base_id === f.baseId)
+    && matchPessoa(r.colaborador_nome, f.pessoa)
+    && (!f.status || r.aprov_status === f.status)
+    && (!r.motivo || (!RUIDO_MIGRACAO.test(r.motivo) && !f.ocultosJustif.has(r.motivo))))
+}
+export function resumoRetificacoes(lista: PontoRetificacao[]) {
+  if (!lista.length) return 'nenhuma retificação'
+  const batidas = lista.reduce((s, r) => s + r.n_ret, 0)
+  const diaTodo = lista.filter(r => r.dia_todo).length
+  const comAtraso = lista.filter(r => r.atraso_dias != null)
+  const atraso = comAtraso.length ? Math.round(comAtraso.reduce((s, r) => s + (r.atraso_dias ?? 0), 0) / comAtraso.length) : null
+  return [`${lista.length} dias`, `${batidas} batidas`,
+    diaTodo > 0 && `${diaTodo} à mão`,
+    atraso != null && `+${atraso}d em média`].filter(Boolean).join(' · ')
+}
+export function filtrarHorasExtras(data: HoraExtraItem[], f: { pessoa: string; status: string }) {
+  return data.filter(r => matchPessoa(r.colaborador_nome, f.pessoa) && (!f.status || r.aprov_status === f.status))
+}
+export function resumoHorasExtras(lista: HoraExtraItem[]) {
+  if (!lista.length) return 'nenhuma hora extra'
+  return `${lista.length} lançamentos · ${minToHoras(lista.reduce((s, r) => s + intervalToMin(r.extras_total), 0))}`
+}
+
+// Totalizador textual que vive na BARRA DE FILTROS. Componentes próprios (e não
+// um cálculo solto no DPPonto) para o hook só montar na aba correspondente —
+// caem no mesmo cache do TanStack que a tabela, sem request extra.
+function TotalTxt({ children }: { children: React.ReactNode }) {
+  const c = useThemeCls()
+  return <span className={`ml-auto text-xs font-semibold whitespace-nowrap ${c.sub}`}>{children}</span>
+}
+export function TotalRetificacoes({ anoMes, baseId, pessoa, status, ocultosJustif }:
+  { anoMes: string; baseId: string; pessoa: string; status: string; ocultosJustif: Set<string> }) {
+  const { data = [], isLoading } = usePontoRetificacoes(anoMes)
+  return <TotalTxt>{isLoading ? '…' : resumoRetificacoes(filtrarRetificacoes(data, { baseId, pessoa, status, ocultosJustif }))}</TotalTxt>
+}
+export function TotalHorasExtras({ anoMes, baseId, pessoa, status }:
+  { anoMes: string; baseId: string; pessoa: string; status: string }) {
+  const { data = [], isLoading } = usePontoHorasExtras(anoMes, baseId || undefined)
+  return <TotalTxt>{isLoading ? '…' : resumoHorasExtras(filtrarHorasExtras(data, { pessoa, status }))}</TotalTxt>
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -342,55 +428,29 @@ export function RetificacoesTab({ anoMes, baseId, pessoa, status, ocultosJustif 
   const aprovador = useAprovador()
   const enviar = useEnviarItens()
   const { sel, toggle, setAll, clear } = useSelecao()
-  // o motivo só existe até 29/06 (quando o /FonteDados saiu do sync). Onde ele
-  // existe vale o filtro de justificativa + o ruído da migração; onde não existe
-  // a linha passa — senão julho em diante sumiria da tela.
-  const lista = data.filter(r => (!baseId || r.base_id === baseId)
-    && matchPessoa(r.colaborador_nome, pessoa)
-    && (!status || r.aprov_status === status)
-    && (!r.motivo || (!RUIDO_MIGRACAO.test(r.motivo) && !ocultosJustif.has(r.motivo))))
+  const o = useOrdem('data', 'desc')
+  const lista = ordenar(filtrarRetificacoes(data, { baseId, pessoa, status, ocultosJustif }), o,
+    r => ({ nome: r.colaborador_nome ?? '', base: r.base_nome ?? '', data: r.data }))
   const idOf = (r: PontoRetificacao) => `${r.data}|${r.secullum_func_id}`
   const pend = lista.filter(r => r.aprov_status === 'pendente')
   const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
   const onEnviar = () => enviar.mutate({ keys: lista.filter(r => sel.has(idOf(r))).map(r => ({ tipo: 'retificacao', data: r.data, secullum_func_id: r.secullum_func_id } as AprovKey)), por: aprovador }, { onSuccess: clear })
 
-  const nBatidas = lista.reduce((s, r) => s + r.n_ret, 0)
-  const nDiaTodo = lista.filter(r => r.dia_todo).length
-  const comAtraso = lista.filter(r => r.atraso_dias != null)
-  const atrasoMed = comAtraso.length ? Math.round(comAtraso.reduce((s, r) => s + (r.atraso_dias ?? 0), 0) / comAtraso.length) : null
-
   // batida lançada à mão fica em âmbar; as demais seguem o cinza do cartão
   const Cel = ({ h, ret, mob }: { h: string | null; ret: boolean; mob?: boolean }) => (
     <td className={`${TD} ${mob ? 'hidden sm:table-cell' : ''} ${ret ? 'text-amber-500 font-bold' : c.sub}`}>{fmtHora(h)}</td>
   )
-  const box = `rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.08]'}`
 
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className={`rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-amber-50 border-amber-100' : 'bg-amber-500/10 border-amber-500/20'}`}>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Retificações · {labelMes(anoMes)}</span>
-            <p className={`text-lg font-extrabold ${c.txt}`}>{lista.length} <span className={`text-xs font-normal ${c.sub}`}>dias · {nBatidas} batidas</span></p>
-          </div>
-          <div className={box}>
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${c.sub}`}>Jornada montada à mão</span>
-            <p className={`text-lg font-extrabold ${nDiaTodo > 0 ? 'text-rose-500' : c.txt}`}>{nDiaTodo} <span className={`text-xs font-normal ${c.sub}`}>dias</span></p>
-          </div>
-          <div className={box}>
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${c.sub}`}>Lançada depois do fato</span>
-            <p className={`text-lg font-extrabold ${c.txt}`}>{atrasoMed == null ? '—' : `${atrasoMed}d`} <span className={`text-xs font-normal ${c.sub}`}>em média</span></p>
-          </div>
-        </div>
-        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
-      </div>
+      <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma retificação no filtro." /> : (<>
           <table className="w-full">
             <thead><tr className={c.head}>
               <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(idOf))} />
-              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Dia</th>
+              <ThSort label="Colaborador" k="nome" o={o} /><ThSort label="Base" k="base" o={o} className="hidden md:table-cell" /><ThSort label="Dia" k="data" o={o} />
               <th className={TH}>E1</th><th className={TH}>S1</th><th className={`${TH} hidden sm:table-cell`}>E2</th><th className={TH}>S2</th>
               <th className={`${TH} hidden md:table-cell`}>Lançada em</th><th className={TH}>Status</th>
             </tr></thead>
@@ -439,8 +499,9 @@ export function HorasExtrasTab({ anoMes, baseId, pessoa, status }: PontoTabProps
   const aprovador = useAprovador()
   const enviar = useEnviarItens()
   const { sel, toggle, setAll, clear } = useSelecao()
-  const lista = data.filter(r => matchPessoa(r.colaborador_nome, pessoa) && (!status || r.aprov_status === status))
-  const total = lista.reduce((s, r) => s + intervalToMin(r.extras_total), 0)
+  const o = useOrdem('data', 'desc')
+  const lista = ordenar(filtrarHorasExtras(data, { pessoa, status }), o,
+    r => ({ nome: r.colaborador_nome ?? '', base: r.base_nome ?? '', data: r.data }))
   const idOf = (r: { data: string; secullum_func_id: number }) => `${r.data}|${r.secullum_func_id}`
   const pend = lista.filter(r => r.aprov_status === 'pendente')
   const allSel = pend.length > 0 && pend.every(r => sel.has(idOf(r)))
@@ -449,19 +510,13 @@ export function HorasExtrasTab({ anoMes, baseId, pessoa, status }: PontoTabProps
   if (isLoading) return <Painel><Loading /></Painel>
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className={`rounded-2xl border px-4 py-2.5 ${c.isLight ? 'bg-orange-50 border-orange-100' : 'bg-orange-500/10 border-orange-500/20'}`}>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Horas extras · {labelMes(anoMes)}</span>
-          <p className={`text-lg font-extrabold ${c.txt}`}>{minToHoras(total)} <span className={`text-xs font-normal ${c.sub}`}>· {lista.length} lançamentos</span></p>
-        </div>
-        <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
-      </div>
+      <SelecaoBar n={sel.size} onEnviar={onEnviar} pending={enviar.isPending} />
       <Painel>
         {!lista.length ? <Vazio msg="Nenhuma hora extra no filtro." /> : (
           <table className="w-full">
             <thead><tr className={c.head}>
               <ThCheck all={allSel} none={!pend.length} onToggle={() => allSel ? clear() : setAll(pend.map(idOf))} />
-              <th className={TH}>Colaborador</th><th className={`${TH} hidden md:table-cell`}>Base</th><th className={TH}>Data</th><th className={`${TH} hidden sm:table-cell`}>50%</th><th className={`${TH} hidden sm:table-cell`}>100%</th><th className={TH}>Total</th><th className={TH}>Status</th>
+              <ThSort label="Colaborador" k="nome" o={o} /><ThSort label="Base" k="base" o={o} className="hidden md:table-cell" /><ThSort label="Data" k="data" o={o} /><th className={`${TH} hidden sm:table-cell`}>50%</th><th className={`${TH} hidden sm:table-cell`}>100%</th><th className={TH}>Total</th><th className={TH}>Status</th>
             </tr></thead>
             <tbody>{lista.map((r, i) => (
               <tr key={i} className={`border-t ${c.row}`}>
