@@ -1220,8 +1220,11 @@ describe('Validações extras de tipos Frotas', () => {
         em_manutencao: 0,
         em_uso: 0,
         bloqueados: 0,
+        parados: 0,
+        necessario_parada: 0,
         taxa_disponibilidade: 0,
         os_abertas: 0,
+        os_atrasadas: 0,
         os_criticas: 0,
         preventivas_vencidas: 0,
         preventivas_proximas_7d: 0,
@@ -1337,13 +1340,15 @@ describe('Validações extras de tipos Frotas', () => {
       disponivel:      { label: 'Disponível',  cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       em_uso:          { label: 'Em Uso',      cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
       em_manutencao:   { label: 'Manutenção',  cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+      parada_manutencao:{ label: 'Parada p/ Manutenção', cls: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
+      necessario_parada:{ label: 'Necessário Parada',    cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
       bloqueado:       { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
       baixado:         { label: 'Baixado',     cls: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
       em_entrada:      { label: 'Em Entrada',  cls: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
       aguardando_saida:{ label: 'Ag. Saída',   cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
     }
 
-    it('todos os 7 status de veículo têm cores definidas', () => {
+    it('todo status de veículo tem cor definida', () => {
       STATUS_VEICULO.forEach(status => {
         expect(STATUS_CFG[status]).toBeDefined()
         expect(STATUS_CFG[status].label).toBeTruthy()
