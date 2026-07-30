@@ -126,6 +126,9 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const hoje = new Date()
   const mesCorrente = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
 
+  const fechAtual = fechPorMes.get(anoMes)
+  const mesEncerrado = anoMes < mesCorrente
+
   const abrirConsolidado = (mes: string, quem: { id: string; nome: string }[], recorte?: string) =>
     setEspelho({ tipo: 'consolidado', spec: { ano_mes: mes, recorte, colaboradores: quem } })
 
@@ -181,6 +184,22 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
           <FileText size={13} /> Consolidado ({escolhidos.length})
         </button>
+        {/* fechamento do mês selecionado — na barra, visível nas duas visões */}
+        {fechAtual?.status === 'fechado' ? (
+          <button onClick={() => liberar.mutate({ anoMes, por: quem })} disabled={fechar.isPending || liberar.isPending}
+            title={`Fechado por ${fechAtual.fechado_por ?? '—'} em ${fechAtual.fechado_em ? new Date(fechAtual.fechado_em).toLocaleString('pt-BR') : '—'} — clique para reabrir`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 disabled:opacity-40 whitespace-nowrap">
+            <LockOpen size={13} /> Liberar ponto
+          </button>
+        ) : (
+          <button onClick={() => fechar.mutate({ anoMes, por: quem })} disabled={!mesEncerrado || fechar.isPending || liberar.isPending}
+            title={mesEncerrado
+              ? `Fechar o ponto de ${labelMes(anoMes)} e congelar os totais`
+              : `${labelMes(anoMes)} ainda está em andamento — o fechamento libera quando o mês terminar`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-30 whitespace-nowrap">
+            <Lock size={13} /> Fechar ponto
+          </button>
+        )}
         <div className="flex items-center gap-1">
           {vistaBtn('pessoa', Users, 'Por pessoa')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado por mês')}
