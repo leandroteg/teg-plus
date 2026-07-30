@@ -41,9 +41,23 @@ const formatStatus = (value?: string | null) => {
   return normalized.charAt(0) + normalized.slice(1).toLowerCase()
 }
 
+// Lista fechada de segmentos — definida a partir da própria base de fornecedores.
+// Ampla de propósito: um fornecedor cai em UM segmento predominante para nós.
 const SEGMENTOS_BASE = [
-  'Manutenção de Frota', 'Pneus', 'Peças', 'Combustível', 'EPI',
-  'Materiais de Obra', 'Serviços', 'TI', 'Outros',
+  'Frota e Manutenção',
+  'Materiais de Obra',
+  'Ferramentas e Equipamentos',
+  'Alimentação e Bebidas',
+  'TI e Telecom',
+  'Hospedagem e Imóveis',
+  'Transporte e Viagens',
+  'Escritório e Limpeza',
+  'Saúde Ocupacional',
+  'EPI e Uniformes',
+  'Engenharia e Consultoria',
+  'Jurídico e Contábil',
+  'Treinamentos',
+  'Taxas e Órgãos Públicos',
 ]
 
 export default function FornecedoresCad() {
@@ -642,16 +656,18 @@ export default function FornecedoresCad() {
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Segmento</label>
-              <input
-                list="lista-segmentos-fornecedor"
+              <select
                 value={(editItem as any).segmento ?? ''}
-                onChange={e => set('segmento' as any, e.target.value)}
-                placeholder="Ex.: Manutenção de Frota"
+                onChange={e => set('segmento' as any, e.target.value || null)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm
-                  focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
-              <datalist id="lista-segmentos-fornecedor">
-                {segmentosDisponiveis.map(sg => <option key={sg} value={sg} />)}
-              </datalist>
+                  focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400">
+                <option value="">Nao classificado</option>
+                {SEGMENTOS_BASE.map(sg => <option key={sg} value={sg}>{sg}</option>)}
+                {/* mantém visível um segmento legado que não esteja mais na lista */}
+                {(editItem as any).segmento && !SEGMENTOS_BASE.includes((editItem as any).segmento) && (
+                  <option value={(editItem as any).segmento}>{(editItem as any).segmento}</option>
+                )}
+              </select>
             </div>
 
             <div className="pt-3 border-t border-slate-100">
