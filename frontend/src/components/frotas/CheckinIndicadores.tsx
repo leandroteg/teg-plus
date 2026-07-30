@@ -41,12 +41,13 @@ export function NotaIcone({ nota, size = 17, titulo }: {
   if (nota == null || !ESCALA[nota]) {
     return <SemDado size={size} />
   }
-  // `size` é a altura do espaço; a estrela é menor porque são cinco lado a lado.
-  const estrela = Math.max(8, Math.round(size * 0.6))
+  // Estrela no mesmo tamanho do ícone que ela substitui: encolher para caber as
+  // cinco tornava a nota ilegível, que era justamente o problema a resolver.
+  const estrela = Math.max(13, size)
   return (
     <span
       title={`${titulo ? titulo + ': ' : ''}${nota} de 5 — ${ESCALA[nota].label}`}
-      className="inline-flex items-center gap-[1px]"
+      className="inline-flex items-center gap-[2px] whitespace-nowrap"
       aria-label={`${nota} de 5`}
     >
       {[1, 2, 3, 4, 5].map(i => (
