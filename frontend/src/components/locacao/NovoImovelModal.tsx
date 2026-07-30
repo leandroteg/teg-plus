@@ -3,6 +3,7 @@ import {
   X, Loader2, Paperclip, BedDouble, HardHat, Warehouse, Building2, Hotel,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -20,14 +21,21 @@ const TIPOS: { key: string; label: string; desc: string; icon: typeof BedDouble;
 interface Props {
   onClose: () => void
   onCreated?: (imovelId: string) => void
+  /**
+   * true  → "Novo Imóvel": abre a entrada em 'pendente' e o imóvel entra em
+   *         'em_entrada'; quem libera é o pipeline (vistoria → relatório).
+   * false → "Cadastrar Imóvel": o imóvel já nasce ativo, sem passar pelo fluxo.
+   */
+  viaFluxo?: boolean
 }
 
-export default function NovoImovelModal({ onClose, onCreated }: Props) {
+export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }: Props) {
   const { isDark } = useTheme()
   const { perfil } = useAuth()
   const centrosCusto = useLookupCentrosCusto()
   const empresas = useLookupEmpresas()
   const qc = useQueryClient()
+  const nav = useNavigate()
 
   const [step, setStep] = useState<'tipo' | 'form'>('tipo')
   const [tipo, setTipo] = useState<string>('')
@@ -120,16 +128,19 @@ export default function NovoImovelModal({ onClose, onCreated }: Props) {
         p_contrato_fim: isHtl ? null : contratoFim,
         p_arquivo_url: arquivoUrl,
         p_criado_por: perfil?.nome ?? null,
+        p_via_fluxo: viaFluxo,
       })
       if (error) throw error
-      const r = data as { ok: boolean; erro?: string; imovel_id?: string }
+      const r = data as { ok: boolean; erro?: string; imovel_id?: string; entrada_id?: string }
       if (!r.ok) { setErro(r.erro || 'Falha ao cadastrar imóvel.'); return }
 
       // invalida tudo que lista imóveis/leitos/contratos
-      ;['loc_imoveis', 'loc_alojamentos', 'loc_leitos', 'loc_imoveis_mapa', 'con_contratos'].forEach(k =>
+      ;['loc_imoveis', 'loc_alojamentos', 'loc_leitos', 'loc_imoveis_mapa', 'con_contratos', 'loc_entradas'].forEach(k =>
         qc.invalidateQueries({ queryKey: [k] }))
       if (r.imovel_id) onCreated?.(r.imovel_id)
       onClose()
+      // Leva direto para a fila onde a entrada acabou de cair.
+      if (viaFluxo && r.entrada_id) nav('/locacoes/entradas')
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao cadastrar imóvel.')
     } finally { setEnviando(false) }
@@ -142,9 +153,14 @@ export default function NovoImovelModal({ onClose, onCreated }: Props) {
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
           <div>
             <h3 className={`text-base font-bold ${txt}`}>
-              {step === 'tipo' ? 'Novo Imóvel' : `Novo Imóvel — ${TIPOS.find(t => t.key === tipo)?.label}`}
+              {viaFluxo ? 'Novo Imóvel' : 'Cadastrar Imóvel'}
+              {step !== 'tipo' && ` — ${TIPOS.find(t => t.key === tipo)?.label}`}
             </h3>
-            <p className={`text-xs ${txtMuted}`}>Locação de Imóveis · cadastro direto</p>
+            <p className={`text-xs ${txtMuted}`}>
+              {viaFluxo
+                ? 'Locação de Imóveis · abre o fluxo de entrada (vistoria → liberação)'
+                : 'Locação de Imóveis · cadastro direto, sem passar pelo fluxo'}
+            </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
@@ -323,7 +339,7 @@ export default function NovoImovelModal({ onClose, onCreated }: Props) {
               <button type="submit" disabled={enviando}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                 {enviando && <Loader2 size={14} className="animate-spin" />}
-                Cadastrar Imóvel
+                {viaFluxo ? 'Abrir Entrada' : 'Cadastrar Imóvel'}
               </button>
             </div>
           </form>

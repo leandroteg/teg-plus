@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Building2, FolderOpen, ArrowRightFromLine, Plus,
   Loader2, WifiOff, CloudUpload, CheckCircle2, AlertTriangle, X,
-  Home, Wrench, FileText, Handshake, RefreshCw, ShieldAlert, ClipboardCheck,
+  Home, Wrench, FileText, RefreshCw, ShieldAlert, ClipboardCheck, ClipboardList,
 } from 'lucide-react'
 import { useState } from 'react'
 import ModuleLayout from './ModuleLayout'
@@ -120,7 +120,8 @@ export default function LocacaoLayout() {
   // solicTipo aberto = modal de solicitação já no tipo escolhido; showNovoImovel = cadastro de imóvel
   const [solicTipo, setSolicTipo] = useState<TipoSolicitacao | null>(null)
   const [showSolic, setShowSolic] = useState(false)
-  const [showNovoImovel, setShowNovoImovel] = useState(false)
+  // null = fechado; 'fluxo' = passa pelo pipeline de Entradas; 'direto' = já nasce ativo
+  const [novoImovel, setNovoImovel] = useState<null | 'fluxo' | 'direto'>(null)
   // A inspeção usa o checklist do QSMA, mas roda aqui dentro — sem trocar de módulo.
   const [showInspecao, setShowInspecao] = useState(false)
   const { isDark } = useTheme()
@@ -140,8 +141,13 @@ export default function LocacaoLayout() {
         items: [
           {
             icon: Home, label: 'Novo Imóvel', tone: 'blue',
-            description: 'Cadastrar um novo imóvel (alojamento, canteiro, CD, escritório ou hotel).',
-            action: () => setShowNovoImovel(true),
+            description: 'Entra pelo fluxo: vistoria com checklist, relatório e liberação.',
+            action: () => setNovoImovel('fluxo'),
+          },
+          {
+            icon: ClipboardList, label: 'Cadastrar Imóvel', tone: 'violet',
+            description: 'Cadastro direto de imóvel que já está em uso — não passa pelo fluxo de entrada.',
+            action: () => setNovoImovel('direto'),
           },
           {
             icon: Wrench, label: 'Manutenção', tone: 'amber',
@@ -162,11 +168,6 @@ export default function LocacaoLayout() {
             icon: ClipboardCheck, label: 'Executar Inspeção', tone: 'cyan',
             description: 'Checklist de alojamento (DI020) com foto por item e PDF ao concluir.',
             action: () => setShowInspecao(true),
-          },
-          {
-            icon: Handshake, label: 'Acordo / Benfeitoria', tone: 'emerald',
-            description: 'Benfeitorias, abatimentos ou multas.',
-            action: () => abrirSolic('acordo'),
           },
           {
             icon: RefreshCw, label: 'Aditivo / Renovação', tone: 'violet',
@@ -194,7 +195,9 @@ export default function LocacaoLayout() {
         truncateBottomLabels
       />
       {showSolic && <NovaSolicitacaoModal tipoInicial={solicTipo ?? undefined} onClose={() => { setShowSolic(false); setSolicTipo(null) }} />}
-      {showNovoImovel && <NovoImovelModal onClose={() => setShowNovoImovel(false)} />}
+      {novoImovel && (
+        <NovoImovelModal viaFluxo={novoImovel === 'fluxo'} onClose={() => setNovoImovel(null)} />
+      )}
       {showInspecao && <InspecaoAlojamentoFluxo isDark={isDark} onClose={() => setShowInspecao(false)} />}
     </>
   )
