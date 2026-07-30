@@ -807,7 +807,7 @@ export function ConsolidacaoTab({ anoMes, bases }: PontoTabProps) {
             <button
               disabled={!pessoasFil.length}
               onClick={() => setEspelho({ tipo: 'consolidado', spec: { ano_mes: anoMes, recorte: nomeBase, colaboradores: pessoasFil.map(p => ({ id: p.id, nome: p.nome })) } })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40 whitespace-nowrap">
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 whitespace-nowrap">
               <FileText size={13} /> Consolidado ({pessoasFil.length})
             </button>
           </div>
@@ -830,7 +830,7 @@ export function ConsolidacaoTab({ anoMes, bases }: PontoTabProps) {
                 <td className={`${TD} hidden sm:table-cell ${c.sub}`}>{p.hh > 0 ? minToHoras(p.hh) : '—'}</td>
                 <td className={`${TD} font-semibold ${p.ex > 0 ? 'text-orange-500' : c.sub}`}>{p.ex > 0 ? minToHoras(p.ex) : '—'}</td>
                 <td className={`${TD} w-px`}>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-500 whitespace-nowrap"><FileText size={13} /> Espelho</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-500 whitespace-nowrap"><FileText size={13} /> Espelho</span>
                 </td>
               </tr>
             ))}</tbody>

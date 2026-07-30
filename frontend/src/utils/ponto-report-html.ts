@@ -119,7 +119,7 @@ function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], in
     if (tem) diasComManual++
   }
 
-  const kpi = (label: string, valor: string, cor = '#0d9488') =>
+  const kpi = (label: string, valor: string, cor = '#334155') =>
     `<div class="kpi"><div class="kpi-v" style="color:${cor}">${valor}</div><div class="kpi-l">${esc(label)}</div></div>`
 
   const cel = (h: string | null, o: string | null) => {
@@ -198,13 +198,13 @@ const CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;background:#f1f5f9;font-size:13px;line-height:1.5}
   .page{max-width:820px;margin:0 auto;background:#fff}
-  header{background:linear-gradient(135deg,#1e293b,#0f766e);color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  header{background:#0f172a;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
   header img{height:34px}
   header .r{text-align:right}
   header h1{font-size:20px;font-weight:700;letter-spacing:.3px}
   header .sub{font-size:12px;opacity:.85;margin-top:2px}
   .body{padding:22px 28px}
-  h2{font-size:13px;font-weight:800;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #0d9488;padding-bottom:5px;margin:0 0 12px}
+  h2{font-size:13px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #7c3aed;padding-bottom:5px;margin:0 0 12px}
   .colab{margin-bottom:26px}
   .colab.quebra{break-before:page;padding-top:6px}
   .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 24px}
@@ -316,13 +316,13 @@ export async function buildPontoConsolidadoHtml(spec: PontoConsolidadoSpec): Pro
     </tr>`
   }).join('')
 
-  const kpi = (label: string, valor: string, cor = '#0d9488') =>
+  const kpi = (label: string, valor: string, cor = '#334155') =>
     `<div class="kpi"><div class="kpi-v" style="color:${cor}">${valor}</div><div class="kpi-l">${esc(label)}</div></div>`
 
   const capa = `<section class="capa">
     <h2>Consolidado ${esc(labelMes(ini))}${spec.recorte ? ` · ${esc(spec.recorte)}` : ''}</h2>
     <div class="kpis">
-      ${kpi('Colaboradores', String(spec.colaboradores.length), '#0ea5e9')}
+      ${kpi('Colaboradores', String(spec.colaboradores.length), '#7c3aed')}
       ${kpi('HH trabalhada', tHH > 0 ? minToHoras(tHH) : '—', '#7c3aed')}
       ${kpi('Horas extras', tEx > 0 ? minToHoras(tEx) : '—', '#ea580c')}
       ${kpi('Faltas', tFalta > 0 ? minToHoras(tFalta) : '—', '#e11d48')}
