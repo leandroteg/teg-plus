@@ -13,7 +13,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText, XCircle, CheckCircle } from 'lucide-react'
+  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText, XCircle, CheckCircle, Pencil } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
@@ -93,6 +93,7 @@ export default function OSModal({
   // guardando a etapa de origem para retomar depois. Motivo vai em status_detalhe.
   const mudarStatus = useAtualizarStatusOS()
   const [pausando, setPausando] = useState(false)
+  const [trocandoVeiculo, setTrocandoVeiculo] = useState(false)
   const [motivoPausa, setMotivoPausa] = useState('')
   const pausar = () => {
     mudarStatus.mutate(
@@ -176,7 +177,7 @@ export default function OSModal({
             type="button"
             onClick={onVeiculoClick}
             disabled={!onVeiculoClick}
-            className="flex items-center gap-2 text-left w-full disabled:cursor-default"
+            className="flex items-center gap-2 text-left flex-1 min-w-0 disabled:cursor-default"
           >
             <Car size={15} className={txtMuted} />
             <div className="min-w-0">
@@ -191,7 +192,21 @@ export default function OSModal({
               </p>
             </div>
           </button>
+
+          {/* Vincular / trocar o ativo desta OS */}
+          <button onClick={() => setTrocandoVeiculo(v => !v)}
+            className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold ${
+              isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'
+            }`}>
+            <Pencil size={12} /> {os.veiculo_id ? 'Trocar ativo' : 'Vincular ativo'}
+          </button>
         </div>
+
+        {trocandoVeiculo && (
+          <div className={`px-5 py-3 border-b ${border}`}>
+            <TrocarVeiculo os={os} isDark={isDark} onFechar={() => setTrocandoVeiculo(false)} />
+          </div>
+        )}
 
         {/* Pausar → Aguardando (disponível em qualquer etapa ativa) */}
         {!encerrada && !emEspera && os.status !== 'concluida' && (
@@ -354,6 +369,76 @@ const FASES: { v: StatusOS; label: string }[] = [
   { v: 'aguardando', label: 'Aguardando' },
   { v: 'concluida', label: 'Liberado' },
 ]
+
+/** Troca o ativo da OS. Existe porque a OS pode nascer sem veiculo (o ativo
+ *  ainda nao tem ficha na frota, e fica so como `ativo_livre`) e porque ela
+ *  pode ter sido lancada no ativo errado. Trocar aqui nao mexe no historico:
+ *  a OS e a mesma, so passa a apontar para outra ficha. */
+function TrocarVeiculo({ os, isDark, onFechar }: {
+  os: FroOrdemServico; isDark: boolean; onFechar: () => void
+}) {
+  const { data: veiculos = [] } = useVeiculos()
+  const atualizar = useAtualizarOS()
+  const [busca, setBusca] = useState('')
+  const [erro, setErro] = useState<string>()
+
+  const lista = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const base = veiculos.filter(v => v.id !== os.veiculo_id)
+    if (!q) return base.slice(0, 40)
+    return base.filter(v =>
+      (v.codigo_interno ?? '').toLowerCase().includes(q) ||
+      (v.placa ?? '').toLowerCase().includes(q) ||
+      (v.marca ?? '').toLowerCase().includes(q) ||
+      (v.modelo ?? '').toLowerCase().includes(q)
+    ).slice(0, 40)
+  }, [veiculos, busca, os.veiculo_id])
+
+  async function trocar(veiculoId: string | null) {
+    try {
+      await atualizar.mutateAsync({ id: os.id, veiculo_id: veiculoId } as never)
+      onFechar()
+    } catch (e: any) { setErro(e?.message ?? 'Falha ao trocar o veiculo') }
+  }
+
+  const inp = `w-full px-2.5 py-1.5 rounded-lg border text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${
+    isDark ? 'bg-white/[0.04] border-white/[0.1] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+  }`
+
+  return (
+    <div className="space-y-2">
+      <input autoFocus value={busca} onChange={e => setBusca(e.target.value)}
+        placeholder="Buscar por codigo, placa, marca ou modelo..." className={inp} />
+      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+      <div className={`max-h-52 overflow-y-auto rounded-lg border ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+        {lista.length === 0 ? (
+          <p className={`text-[11px] text-center py-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Nenhum ativo encontrado.
+          </p>
+        ) : lista.map(v => (
+          <button key={v.id} onClick={() => trocar(v.id)} disabled={atualizar.isPending}
+            className={`w-full text-left px-2.5 py-2 text-[11px] border-b last:border-b-0 disabled:opacity-50 ${
+              isDark ? 'border-white/[0.06] hover:bg-white/[0.06] text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-slate-700'
+            }`}>
+            <span className="font-bold">{v.codigo_interno || v.placa || 'sem codigo'}</span>
+            {v.placa && v.codigo_interno && <span className="font-mono ml-1.5 opacity-70">{v.placa}</span>}
+            <span className="opacity-70"> — {v.marca} {v.modelo}</span>
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        {os.veiculo_id && (
+          <button onClick={() => trocar(null)} disabled={atualizar.isPending}
+            className={`text-[11px] font-semibold ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+            Desvincular ativo
+          </button>
+        )}
+        <button onClick={onFechar}
+          className={`ml-auto text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
 
 function TrocarFase({ os, isDark }: { os: FroOrdemServico; isDark: boolean }) {
   const mudar = useAtualizarStatusOS()
