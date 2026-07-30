@@ -1,21 +1,25 @@
-import { useState } from 'react'
-import { LogIn, Warehouse, ClipboardCheck, MapPin } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { LogIn, Warehouse, ClipboardCheck, MapPin, CalendarDays } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
 import EmEntrada      from './EmEntrada'
 import Patio          from './Patio'
 import ChecklistSaida from './ChecklistSaida'
 import Alocados       from './Alocados'
+import { useSearchParams } from 'react-router-dom'
+// A Agenda de alocação vive fisicamente em operacao/, mas é aba desta visão.
+import AgendaAlocacao from '../operacao/AgendaAlocacao'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'em_entrada' | 'patio' | 'checklist_saida' | 'alocados'
+type TabKey = 'em_entrada' | 'patio' | 'checklist_saida' | 'alocados' | 'agenda'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'em_entrada',      label: 'Em Entrada'      },
   { key: 'patio',           label: 'Pátio'            },
   { key: 'checklist_saida', label: 'Checklist Saída'  },
   { key: 'alocados',        label: 'Alocados'         },
+  { key: 'agenda',          label: 'Agenda'           },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
@@ -23,6 +27,7 @@ const TAB_ICONS: Record<TabKey, React.ElementType> = {
   patio:           Warehouse,
   checklist_saida: ClipboardCheck,
   alocados:        MapPin,
+  agenda:          CalendarDays,
 }
 
 const TAB_ACCENT: Record<TabKey, {
@@ -47,6 +52,11 @@ const TAB_ACCENT: Record<TabKey, {
     bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',
     text: 'text-emerald-600',   textActive: 'text-emerald-800',
     border: 'border-emerald-500',
+  },
+  agenda: {
+    bg: 'hover:bg-sky-50',       bgActive: 'bg-sky-50',
+    text: 'text-sky-600',        textActive: 'text-sky-800',
+    border: 'border-sky-500',
   },
 }
 
@@ -73,6 +83,11 @@ const TAB_ACCENT_DARK: Record<TabKey, {
     text: 'text-emerald-400',      textActive: 'text-emerald-200',
     border: 'border-emerald-500/40',
   },
+  agenda: {
+    bg: 'hover:bg-sky-500/10',     bgActive: 'bg-sky-500/15',
+    text: 'text-sky-400',          textActive: 'text-sky-200',
+    border: 'border-sky-500/40',
+  },
 }
 
 const COMPS: Record<TabKey, React.ComponentType> = {
@@ -80,12 +95,24 @@ const COMPS: Record<TabKey, React.ComponentType> = {
   patio: Patio,
   checklist_saida: ChecklistSaida,
   alocados: Alocados,
+  agenda: AgendaAlocacao,
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function FrotaHub() {
   const [active, setActive] = useState<TabKey>('patio')
+
+  // "Registro Alocação" (menu lateral) chega com ?novaAlocacao=1 — a aba Agenda
+  // precisa estar ativa, senão o modal abriria numa aba que não o renderiza.
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('novaAlocacao')) { setActive('agenda'); return }
+    const t = searchParams.get('tab')
+    if (t && ['em_entrada', 'patio', 'checklist_saida', 'alocados', 'agenda'].includes(t)) {
+      setActive(t as TabKey)
+    }
+  }, [searchParams])
   const { isDark } = useTheme()
   const { data: veiculos = [] } = useVeiculos()
   const counts: Record<TabKey, number> = {
@@ -93,6 +120,7 @@ export default function FrotaHub() {
     patio: veiculos.filter(v => v.status === 'disponivel').length,
     checklist_saida: veiculos.filter(v => v.status === 'aguardando_saida').length,
     alocados: veiculos.filter(v => v.status === 'em_uso').length,
+    agenda: 0,
   }
   const Comp = COMPS[active] ?? Patio
 
