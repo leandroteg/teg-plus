@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Building2, FolderOpen, ArrowRightFromLine, Plus,
   Loader2, WifiOff, CloudUpload, CheckCircle2, AlertTriangle, X,
-  Home, Wrench, FileText, RefreshCw, ShieldAlert, ClipboardCheck, ClipboardList,
+  Home, Wrench, RefreshCw, ShieldAlert, ClipboardCheck, ClipboardList,
 } from 'lucide-react'
 import { useState } from 'react'
 import ModuleLayout from './ModuleLayout'
@@ -153,11 +153,6 @@ export default function LocacaoLayout() {
             icon: Wrench, label: 'Manutenção', tone: 'amber',
             description: 'Reparos e manutenções no imóvel.',
             action: () => abrirSolic('manutencao'),
-          },
-          {
-            icon: FileText, label: 'Contrato de Serviço', tone: 'sky',
-            description: 'Serviços terceirizados (limpeza, dedetização, etc).',
-            action: () => abrirSolic('servico'),
           },
           {
             icon: ShieldAlert, label: 'NC de Segurança', tone: 'rose',
