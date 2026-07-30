@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Wrench, FileText, Handshake, RefreshCw, Loader2, Paperclip, ShieldAlert } from 'lucide-react'
+import { X, Wrench, FileText, RefreshCw, Loader2, Paperclip, ShieldAlert } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
@@ -9,7 +9,6 @@ const TIPOS: { key: TipoSolicitacao; label: string; desc: string; icon: typeof W
   { key: 'manutencao', label: 'Manutencao',           desc: 'Reparos e manutencoes no imovel',        icon: Wrench,     iconColor: 'text-orange-500' },
   { key: 'servico',    label: 'Contrato de Servico',  desc: 'Servicos terceirizados (limpeza, etc)',   icon: FileText,   iconColor: 'text-blue-500' },
   { key: 'nc_seguranca', label: 'NC de Seguranca',    desc: 'Nao-conformidade de seguranca no imovel', icon: ShieldAlert, iconColor: 'text-rose-500' },
-  { key: 'acordo',     label: 'Acordo / Benfeitoria', desc: 'Benfeitorias, abatimentos ou multas',     icon: Handshake,  iconColor: 'text-green-500' },
   { key: 'renovacao',  label: 'Aditivo / Renovacao',  desc: 'Renovar ou aditivar contrato de locacao', icon: RefreshCw,  iconColor: 'text-violet-500' },
 ]
 
