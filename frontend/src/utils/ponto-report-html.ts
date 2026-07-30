@@ -21,10 +21,14 @@ const ORIGEM_REP = '16'      // relógio/REP — sempre com NSR
 const ORIGEM_PRE = '3'       // intervalo pré-assinalado (vem do horário cadastrado)
 const ORIGEM_MANUAL = '2'    // inclusão/edição manual = retificação
 
+// O módulo Ponto trabalha com o mês já no 1º dia ('2026-07-01' — ver mesAtual()
+// em lib/ponto), mas o painel do DP usa 'YYYY-MM'. Aceita os dois.
+const normMes = (s: string) => (/^\d{4}-\d{2}$/.test(s) ? `${s}-01` : s)
+
 export interface PontoReportRow {
   colaborador_id: string
   colaborador_nome: string
-  ano_mes: string            // 'YYYY-MM'
+  ano_mes: string            // 'YYYY-MM' ou 'YYYY-MM-01'
 }
 export interface PontoConsolidadoSpec {
   ano_mes: string
@@ -68,7 +72,7 @@ async function paginar<T>(lote: (from: number, to: number) => PromiseLike<{ data
 }
 
 async function carregar(anoMes: string, ids?: string[]) {
-  const ini = `${anoMes}-01`
+  const ini = normMes(anoMes)
   const fim = proximoMes(ini)
   const umSo = ids?.length === 1 ? ids[0] : null
   const [resumo, dias] = await Promise.all([
@@ -347,5 +351,5 @@ export async function buildPontoConsolidadoHtml(spec: PontoConsolidadoSpec): Pro
 
 export function nomeArquivoPontoReport(r: PontoReportRow) {
   const nome = r.colaborador_nome.trim().split(/\s+/).slice(0, 2).join('_')
-  return `Ponto_${nome}_${r.ano_mes.replace('-', '')}`
+  return `Ponto_${nome}_${normMes(r.ano_mes).slice(0, 7).replace('-', '')}`
 }
