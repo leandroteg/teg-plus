@@ -42,6 +42,7 @@ import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import PedidoImpostosSection from '../components/PedidoImpostosSection'
 import { AnexoReferencia } from '../components/AnexoReferencia'
 import CancelarPedidoControl from '../components/CancelarPedidoControl'
+import { validarDocFornecedorPedido, fmtCnpj, type ValidacaoDocFornecedor } from '../utils/validarDocFornecedor'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
 
@@ -982,6 +983,59 @@ const TIPO_OPTIONS: { value: PedidoAnexo['tipo']; label: string }[] = [
 
 const IMPOSTO_TIPOS = ['IPI', 'ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outro']
 
+// Tipos de anexo em que vale conferir o fornecedor do documento contra o pedido
+const TIPOS_CONFERE_FORNECEDOR: PedidoAnexo['tipo'][] = ['nota_fiscal', 'boleto', 'doc_financeiro']
+
+function ValidacaoFornecedorBadge({ validacao, validando }: { validacao: ValidacaoDocFornecedor | null; validando: boolean }) {
+  if (validando) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+        <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+        Conferindo o fornecedor do documento...
+      </div>
+    )
+  }
+  if (!validacao) return null
+  if (validacao.status === 'confere') {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
+        <CheckCircle size={13} className="flex-shrink-0 mt-0.5" />
+        <span>
+          Documento confere com o fornecedor do pedido
+          {validacao.fornecedorCnpj ? <> — CNPJ <b>{fmtCnpj(validacao.fornecedorCnpj)}</b> encontrado no arquivo.</> : ' (razão social encontrada no arquivo).'}
+        </span>
+      </div>
+    )
+  }
+  if (validacao.status === 'divergente') {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+        <span>
+          O CNPJ do fornecedor <b>{validacao.fornecedorNome}</b> ({validacao.fornecedorCnpj ? fmtCnpj(validacao.fornecedorCnpj) : '—'}) não aparece no
+          documento. CNPJs lidos no arquivo: {validacao.cnpjsDocumento.slice(0, 4).map(fmtCnpj).join(', ')}
+          {validacao.cnpjsDocumento.length > 4 ? '…' : ''}. Confira se o arquivo é do pedido certo.
+        </span>
+      </div>
+    )
+  }
+  if (validacao.status === 'sem_cadastro') {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
+        <span>Fornecedor do pedido sem CNPJ no cadastro — não foi possível conferir o documento automaticamente.</span>
+      </div>
+    )
+  }
+  // ilegivel
+  return (
+    <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+      <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
+      <span>Não foi possível ler o CNPJ do arquivo (imagem ou PDF escaneado) — confira o fornecedor manualmente.</span>
+    </div>
+  )
+}
+
 type ItemTaxState = {
   hasImposto:       boolean
   imposto_tipo:     string
@@ -1002,6 +1056,10 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
   const [showImposto, setShowImposto] = useState(false)
+  // Conferência do fornecedor no documento anexado (CNPJ do PDF × pedido)
+  const [validacao, setValidacao]   = useState<ValidacaoDocFornecedor | null>(null)
+  const [validando, setValidando]   = useState(false)
+  const [ignorarDivergencia, setIgnorarDivergencia] = useState(false)
 
   const rcItens = pedido.requisicao?.itens ?? []
 
@@ -1040,11 +1098,27 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f) { setFile(f); setErro('') }
+    if (!f) return
+    setFile(f)
+    setErro('')
+    setIgnorarDivergencia(false)
+    setValidacao(null)
+    setValidando(true)
+    validarDocFornecedorPedido(f, pedido.id)
+      .then(res => setValidacao(res))
+      .catch(() => setValidacao(null))
+      .finally(() => setValidando(false))
   }
 
   const handleSubmit = async () => {
     if (!file && !temNF) { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
+    if (file && TIPOS_CONFERE_FORNECEDOR.includes(tipo)) {
+      if (validando) { setErro('Aguarde a conferência do fornecedor do documento.'); return }
+      if (validacao?.status === 'divergente' && !ignorarDivergencia) {
+        setErro('O documento não confere com o fornecedor do pedido. Confirme a divergência para anexar mesmo assim.')
+        return
+      }
+    }
     setLoading(true)
     setErro('')
     try {
@@ -1168,6 +1242,22 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+          {file && TIPOS_CONFERE_FORNECEDOR.includes(tipo) && (
+            <div className="space-y-2">
+              <ValidacaoFornecedorBadge validacao={validacao} validando={validando} />
+              {validacao?.status === 'divergente' && (
+                <label className="flex items-start gap-2 text-[11px] font-semibold text-red-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ignorarDivergencia}
+                    onChange={e => setIgnorarDivergencia(e.target.checked)}
+                    className="h-4 w-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
+                  />
+                  Confirmo que o documento pertence a este pedido — anexar mesmo assim.
+                </label>
+              )}
             </div>
           )}
           <div>
@@ -1413,10 +1503,11 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
   const [tipo, setTipo]       = useState<PedidoAnexo['tipo']>('nota_fiscal')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  // Divergência de fornecedor detectada no arquivo: segura o upload até o
+  // usuário confirmar (ou cancelar). Guarda o arquivo pendente junto.
+  const [pendente, setPendente] = useState<{ file: File; validacao: ValidacaoDocFornecedor } | null>(null)
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const enviar = async (file: File) => {
     setLoading(true)
     try {
       await uploadAnexo.mutateAsync({ pedidoId, file, tipo, origem: 'compras' })
@@ -1430,16 +1521,53 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
     }
   }
 
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPendente(null)
+    if (TIPOS_CONFERE_FORNECEDOR.includes(tipo)) {
+      setLoading(true)
+      const validacao = await validarDocFornecedorPedido(file, pedidoId).catch(() => null)
+      if (validacao?.status === 'divergente') {
+        setLoading(false)
+        setPendente({ file, validacao })
+        return
+      }
+    }
+    await enviar(file)
+  }
+
   return (
-    <div className="flex items-center gap-2 pt-2">
-      <select value={tipo} onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])} className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300">
-        {TIPO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <button onClick={() => fileRef.current?.click()} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors disabled:opacity-50">
-        {loading ? <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : success ? <CheckCircle size={12} className="text-emerald-500" /> : <Upload size={12} />}
-        {loading ? 'Enviando...' : success ? 'Anexado!' : 'Anexar'}
-      </button>
-      <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
+    <div className="space-y-2 pt-2">
+      <div className="flex items-center gap-2">
+        <select value={tipo} onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])} className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300">
+          {TIPO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <button onClick={() => fileRef.current?.click()} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors disabled:opacity-50">
+          {loading ? <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : success ? <CheckCircle size={12} className="text-emerald-500" /> : <Upload size={12} />}
+          {loading ? 'Conferindo...' : success ? 'Anexado!' : 'Anexar'}
+        </button>
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
+      </div>
+      {pendente && (
+        <div className="space-y-1.5">
+          <ValidacaoFornecedorBadge validacao={pendente.validacao} validando={false} />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { const f = pendente.file; setPendente(null); enviar(f) }}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              Anexar mesmo assim
+            </button>
+            <button
+              onClick={() => { setPendente(null); if (fileRef.current) fileRef.current.value = '' }}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
