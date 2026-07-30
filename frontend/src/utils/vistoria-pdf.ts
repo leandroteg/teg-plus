@@ -251,22 +251,22 @@ async function buildVistoriaDoc(
   doc.rect(0, 0, W, 34, 'F')
 
   // Logo
-  if (logo) desenharLogo(doc, logo, M, 4, 18, 26)
+  if (logo) desenharLogo(doc, logo, M, 7, 44, 12)
 
   // Company info
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
-  doc.text(empresa.fantasia, M + 22, 11)
+  doc.text(empresa.fantasia, M + 48, 11)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(180, 190, 200)
-  doc.text(`CNPJ: ${empresa.cnpj}`, M + 22, 16)
+  doc.text(`CNPJ: ${empresa.cnpj}`, M + 48, 16)
   if (empresa.endereco) {
-    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 22, 21)
+    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 48, 21)
   }
   if (empresa.telefone) {
-    doc.text(`${empresa.telefone}${empresa.email ? ` | ${empresa.email}` : ''}`, M + 22, 26)
+    doc.text(`${empresa.telefone}${empresa.email ? ` | ${empresa.email}` : ''}`, M + 48, 26)
   }
 
   // Document title
@@ -748,7 +748,8 @@ export function getVistoriaPdfFileName(data: VistoriaPdfData): string {
 
 export async function gerarVistoriaPdfBlob(data: VistoriaPdfData): Promise<Blob> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
-  const logo = await loadLogoBase64(empresa.logoUrl)
+  const logo = await loadLogoBase64('/logo-teg-transicao-branca.png')
+    ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
   const doc = await buildVistoriaDoc(data, empresa, logo)
   return doc.output('blob')
 }

@@ -151,13 +151,13 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   // ── HEADER ────────────────────────────────────────────────────────────────
   doc.setFillColor(...DARK)
   doc.rect(0, 0, W, 34, 'F')
-  if (logo) desenharLogo(doc, logo, M, 4, 18, 26)
+  if (logo) desenharLogo(doc, logo, M, 7, 44, 12)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 255, 255)
-  doc.text(empresa.fantasia, M + 22, 11)
+  doc.text(empresa.fantasia, M + 48, 11)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(180, 190, 200)
-  doc.text(`CNPJ: ${empresa.cnpj}`, M + 22, 16)
+  doc.text(`CNPJ: ${empresa.cnpj}`, M + 48, 16)
   if (empresa.endereco) {
-    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 22, 21)
+    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 48, 21)
   }
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(255, 255, 255)
   doc.text('FICHA DE VISTORIA', W - M, 13, { align: 'right' })
@@ -302,13 +302,15 @@ export function getFichaVistoriaFileName(data: FichaVistoriaData): string {
 /** Bytes do PDF — mesmo desenho do download, sem depender do browser. */
 export async function gerarFichaVistoriaBlob(data: FichaVistoriaData): Promise<Blob> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
-  const logo = await loadLogoBase64(empresa.logoUrl)
+  const logo = await loadLogoBase64('/logo-teg-transicao-branca.png')
+    ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
   return buildDoc(data, empresa, logo).output('blob')
 }
 
 export async function downloadFichaVistoriaPdf(data: FichaVistoriaData): Promise<void> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
-  const logo = await loadLogoBase64(empresa.logoUrl)
+  const logo = await loadLogoBase64('/logo-teg-transicao-branca.png')
+    ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
   const doc = buildDoc(data, empresa, logo)
   doc.save(getFichaVistoriaFileName(data))
 }
