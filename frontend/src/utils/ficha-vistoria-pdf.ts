@@ -24,16 +24,16 @@ export interface FichaVistoriaData {
 const ESTADOS_COL = ['Ótimo', 'Bom', 'Regular', 'Ruim', 'N/A'] as const
 
 function fmtDate(d?: string | null): string {
-  if (!d) return '-'
+  if (!d) return ''
   const dt = new Date(d.length <= 10 ? d + 'T12:00:00' : d)
-  return isNaN(dt.getTime()) ? '-' : dt.toLocaleDateString('pt-BR')
+  return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('pt-BR')
 }
 
 /** Prazo da vistoria = início previsto − 7 dias (mesma regra da tela). */
 function limiteVistoria(inicio?: string | null): string {
-  if (!inicio) return '-'
+  if (!inicio) return ''
   const dt = new Date(new Date(inicio + 'T12:00:00').getTime() - 7 * 86_400_000)
-  return isNaN(dt.getTime()) ? '-' : dt.toLocaleDateString('pt-BR')
+  return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('pt-BR')
 }
 
 async function loadLogoBase64(url: string): Promise<string | null> {
@@ -50,6 +50,19 @@ async function loadLogoBase64(url: string): Promise<string | null> {
   } catch { return null }
 }
 
+/**
+ * Encaixa a logo na caixa sem deformar. A caixa fixa antiga (18x28) esmagava
+ * qualquer logo que nao fosse retrato — a da TEG e quase quadrada.
+ */
+function desenharLogo(doc: jsPDF, logo: string, x: number, y: number, maxW: number, maxH: number) {
+  try {
+    const prop = doc.getImageProperties(logo)
+    const escala = Math.min(maxW / prop.width, maxH / prop.height)
+    const w = prop.width * escala
+    const h = prop.height * escala
+    doc.addImage(logo, 'PNG', x + (maxW - w) / 2, y + (maxH - h) / 2, w, h)
+  } catch { /* sem logo e melhor que logo torta */ }
+}
 function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
@@ -90,23 +103,32 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
     y += 5
   }
 
+  // Esta ficha e preenchida a mao quando a vistoria e manual: campo sem valor
+  // ganha uma linha para escrever, nunca um traco (traco parece 'nao tem').
+  const linhaParaEscrever = (x: number, largura: number) => {
+    doc.setDrawColor(...LIGHT)
+    doc.setLineWidth(0.3)
+    doc.line(x, y + 0.8, x + largura, y + 0.8)
+  }
+
   const par = (l1: string, v1: string, l2?: string, v2?: string) => {
     checkPage(12)
     const half = CW / 2
+    const larg = half - 6
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MID)
     doc.text(l1.toUpperCase(), M, y)
     if (l2) doc.text(l2.toUpperCase(), M + half, y)
     y += 4
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...DARK)
-    doc.text(v1 || '-', M, y)
-    if (l2) doc.text(v2 || '-', M + half, y)
+    if (v1) doc.text(v1, M, y); else linhaParaEscrever(M, larg)
+    if (l2) { if (v2) doc.text(v2, M + half, y); else linhaParaEscrever(M + half, larg) }
     y += 6
   }
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   doc.setFillColor(...DARK)
   doc.rect(0, 0, W, 34, 'F')
-  if (logo) { try { doc.addImage(logo, 'PNG', M, 3, 18, 28) } catch { /* ignore */ } }
+  if (logo) desenharLogo(doc, logo, M, 4, 18, 26)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 255, 255)
   doc.text(empresa.fantasia, M + 22, 11)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(180, 190, 200)
@@ -127,13 +149,13 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
   const linha1 = [addr, num].filter(Boolean).join(', ') + (compl ? ` - ${compl}` : '')
   const linha2 = [bairro, [cidade, uf].filter(Boolean).join('/')].filter(Boolean).join(' - ')
     + (cep ? ` · CEP ${cep}` : '')
-  par('Endereço', linha1 || '-', 'Cidade / Bairro', linha2 || '-')
-  par('Área total', imv?.area_m2 != null ? `${imv.area_m2} m²` : '-',
-      'Área construída', imv?.area_construida_m2 != null ? `${imv.area_construida_m2} m²` : '-')
-  par('Matrícula', imv?.matricula || '-',
+  par('Endereço', linha1, 'Cidade / Bairro', linha2)
+  par('Área total', imv?.area_m2 != null ? `${imv.area_m2} m²` : '',
+      'Área construída', imv?.area_construida_m2 != null ? `${imv.area_construida_m2} m²` : '')
+  par('Matrícula', imv?.matricula || '',
       'Aluguel', entrada.valor_aluguel != null
         ? entrada.valor_aluguel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-        : '-')
+        : '')
 
   // Vem preenchido do que ja se sabe; em branco, o vistoriador conta e anota.
   const cont = (v?: number | null) => (v != null ? String(v) : '____')
@@ -141,16 +163,16 @@ function buildDoc(data: FichaVistoriaData, empresa: EmpresaData, logo: string | 
       `${cont(imv?.qtd_banheiros)}  /  ${cont(imv?.qtd_portas)}  /  ${cont(imv?.qtd_janelas)}`,
       'IPTU', imv?.iptu_numero
         ? `${imv.iptu_numero}${imv.iptu_quitado == null ? '' : imv.iptu_quitado ? ' (quitado)' : ' (em aberto)'}`
-        : '-')
+        : '')
 
   // ── COMO ENTRAR ───────────────────────────────────────────────────────────
   sectionTitle('ACESSO E PRAZO')
-  par('Locador', entrada.locador_nome || imv?.locador_nome || '-',
-      'Contato', entrada.locador_contato || imv?.locador_contato || '-')
+  par('Locador', entrada.locador_nome || imv?.locador_nome || '',
+      'Contato', imv?.locador_telefone || entrada.locador_contato || imv?.locador_contato || '')
   par('Início previsto', fmtDate(entrada.data_prevista_inicio),
       'Vistoria até', limiteVistoria(entrada.data_prevista_inicio))
   par('Locado até', fmtDate(entrada.prazo_fim),
-      'Pretende renovar', entrada.renovacao === 'sim' ? 'Sim' : entrada.renovacao === 'nao' ? 'Não' : '-')
+      'Pretende renovar', entrada.renovacao === 'sim' ? 'Sim' : entrada.renovacao === 'nao' ? 'Não' : '(  ) Sim      (  ) Não')
 
   // ── O QUE JÁ SE SABE ──────────────────────────────────────────────────────
   // O texto de observações é onde ficam as pendências conhecidas (obra a fazer,

@@ -151,6 +151,16 @@ async function loadFotoImages(
 
 // ── Build PDF ───────────────────────────────────────────────────────────────
 
+/** Encaixa a logo sem deformar — caixa fixa esmagava logo nao-retrato. */
+function desenharLogo(doc: jsPDF, logo: string, x: number, y: number, maxW: number, maxH: number) {
+  try {
+    const prop = doc.getImageProperties(logo)
+    const escala = Math.min(maxW / prop.width, maxH / prop.height)
+    const w = prop.width * escala
+    const h = prop.height * escala
+    doc.addImage(logo, 'PNG', x + (maxW - w) / 2, y + (maxH - h) / 2, w, h)
+  } catch { /* sem logo e melhor que logo torta */ }
+}
 async function buildVistoriaDoc(
   data: VistoriaPdfData,
   empresa: EmpresaData,
@@ -241,9 +251,7 @@ async function buildVistoriaDoc(
   doc.rect(0, 0, W, 34, 'F')
 
   // Logo
-  if (logo) {
-    try { doc.addImage(logo, 'PNG', M, 3, 18, 28) } catch { /* ignore */ }
-  }
+  if (logo) desenharLogo(doc, logo, M, 4, 18, 26)
 
   // Company info
   doc.setFont('helvetica', 'bold')
