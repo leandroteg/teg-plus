@@ -15,6 +15,7 @@ import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
 import VistoriaModal from '../../components/locacao/VistoriaModal'
 import { UpperInput } from '../../components/UpperInput'
 import { downloadVistoriaPdf, compartilharVistoriaWhatsApp, type VistoriaPdfData } from '../../utils/vistoria-pdf'
+import { downloadFichaVistoriaPdf } from '../../utils/ficha-vistoria-pdf'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -220,7 +221,7 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
             {entrada.status === 'pendente' && (
               <>
                 <button onClick={() => onAction('gerar_pdf', entrada)} className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-indigo-400 hover:bg-indigo-500/10' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'}`}>
-                  <FileText size={14} /> PDF Orientações
+                  <FileText size={14} /> Ficha de Vistoria
                 </button>
                 <button onClick={() => onAction('solicitar_vistoria', entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
                   <ClipboardCheck size={15} /> Solicitar Vistoria
@@ -452,7 +453,10 @@ export default function EntradasPipeline() {
     if (action === 'confirmar_assinatura') { setAssinar(e); return }
     const map: Record<string, StatusEntrada> = { solicitar_vistoria: 'aguardando_vistoria', vistoria_concluida: 'aguardando_assinatura' }
     if (map[action]) atualizarStatus.mutate({ id: e.id, status: map[action] })
-    if (action === 'gerar_pdf') alert('PDF de orientações será gerado em breve')
+    if (action === 'gerar_pdf') {
+      downloadFichaVistoriaPdf({ entrada: e, imovel: e.imovel, tipo: 'entrada' })
+        .catch(err => alert(`Erro ao gerar a ficha: ${err?.message ?? 'desconhecido'}`))
+    }
   }, [atualizarStatus])
 
   if (isLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
