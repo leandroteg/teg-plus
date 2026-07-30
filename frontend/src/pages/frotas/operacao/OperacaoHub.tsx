@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CalendarDays, Fuel, AlertCircle, Radio, LayoutDashboard } from 'lucide-react'
+import { Fuel, AlertCircle, Radio, LayoutDashboard } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import ControleFrota from './ControleFrota'
-import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
 // Reutiliza a tela completa de Telemetria da Logistica (Mapa ao Vivo + Alertas + KM)
@@ -12,11 +11,10 @@ import TelemetriaLogistica from '../../logistica/TelemetriaLogistica'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'controle' | 'agenda' | 'telemetria' | 'abastecimentos' | 'multas'
+type TabKey = 'controle' | 'telemetria' | 'abastecimentos' | 'multas'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'controle',        label: 'Controle'          },
-  { key: 'agenda',          label: 'Agenda'            },
   { key: 'telemetria',      label: 'Telemetria'        },
   { key: 'abastecimentos',  label: 'Abastecimentos'    },
   { key: 'multas',          label: 'Multas & Pedágios' },
@@ -24,7 +22,6 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
   controle:       LayoutDashboard,
-  agenda:         CalendarDays,
   telemetria:     Radio,
   abastecimentos: Fuel,
   multas:         AlertCircle,
@@ -37,11 +34,6 @@ const TAB_ACCENT: Record<TabKey, {
     bg: 'hover:bg-rose-50',      bgActive: 'bg-rose-50',
     text: 'text-rose-600',       textActive: 'text-rose-800',
     border: 'border-rose-500',
-  },
-  agenda: {
-    bg: 'hover:bg-sky-50',       bgActive: 'bg-sky-50',
-    text: 'text-sky-600',        textActive: 'text-sky-800',
-    border: 'border-sky-500',
   },
   abastecimentos: {
     bg: 'hover:bg-amber-50',     bgActive: 'bg-amber-50',
@@ -68,11 +60,6 @@ const TAB_ACCENT_DARK: Record<TabKey, {
     text: 'text-rose-400',         textActive: 'text-rose-200',
     border: 'border-rose-500/40',
   },
-  agenda: {
-    bg: 'hover:bg-sky-500/10',     bgActive: 'bg-sky-500/15',
-    text: 'text-sky-400',          textActive: 'text-sky-200',
-    border: 'border-sky-500/40',
-  },
   abastecimentos: {
     bg: 'hover:bg-amber-500/10',   bgActive: 'bg-amber-500/15',
     text: 'text-amber-400',        textActive: 'text-amber-200',
@@ -92,7 +79,6 @@ const TAB_ACCENT_DARK: Record<TabKey, {
 
 const COMPS: Record<TabKey, React.ComponentType> = {
   controle:       ControleFrota,
-  agenda:         AgendaAlocacao,
   // Mesma tela da Logistica, sem o cabeçalho dela (a aba já nomeia).
   telemetria:     () => <TelemetriaLogistica hideHeader />,
   abastecimentos: AbastecimentosOp,
@@ -104,26 +90,23 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 export default function OperacaoHub() {
   const [active, setActive] = useState<TabKey>('controle')
 
-  // "Registro Alocação" (menu lateral) cai aqui com ?novaAlocacao=1 — precisa
-  // garantir a aba Agenda, senão o modal abriria numa aba que não o renderiza.
+  // Deep link do Portal (QR do ativo): ?tab=controle&veiculo=<id>
+  // A Agenda saiu daqui — mora na visão Alocação (/frotas/frota?tab=agenda).
   const [searchParams] = useSearchParams()
   useEffect(() => {
-    if (searchParams.get('novaAlocacao')) { setActive('agenda'); return }
-    // Deep link do Portal (QR do ativo): ?tab=controle&veiculo=<id>
     const t = searchParams.get('tab')
-    if (t && ['controle','agenda','telemetria','abastecimentos','multas'].includes(t)) setActive(t as TabKey)
+    if (t && ['controle','telemetria','abastecimentos','multas'].includes(t)) setActive(t as TabKey)
   }, [searchParams])
   const { isDark } = useTheme()
   const { data: abastecimentos = [] } = useAbastecimentos()
   const { data: ocorrencias = [] } = useOcorrenciasTel()
   const counts: Record<TabKey, number> = {
     controle: 0,
-    agenda: 0,
     telemetria: 0,
     abastecimentos: abastecimentos.length,
     multas: ocorrencias.length,
   }
-  const Comp = COMPS[active] ?? AgendaAlocacao
+  const Comp = COMPS[active] ?? ControleFrota
 
   return (
     <div className="flex flex-col h-full -mx-4 md:mx-0">
