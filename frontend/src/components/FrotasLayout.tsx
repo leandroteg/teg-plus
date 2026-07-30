@@ -36,14 +36,14 @@ export default function FrotasLayout() {
             label: 'Registro Alocação',
             description: 'Registrar diretamente a saída de um ativo para a obra.',
             tone: 'emerald' as const,
-            action: () => navigate(`/frotas/operacao?novaAlocacao=1&t=${Date.now()}`),
+            action: () => navigate(`/frotas/frota?tab=agenda&novaAlocacao=1&t=${Date.now()}`),
           },
         ],
       },
     },
-    { to: '/frotas/frota',      icon: Truck,           label: 'Frota & Máquinas' },
-    { to: '/frotas/manutencao', icon: Wrench,          label: 'Manutenção'       },
-    { to: '/frotas/operacao',   icon: Gauge,           label: 'Operação'         },
+    { to: '/frotas/operacao',   icon: Gauge,           label: 'Operação'   },
+    { to: '/frotas/manutencao', icon: Wrench,          label: 'Manutenção' },
+    { to: '/frotas/frota',      icon: Truck,           label: 'Alocação'   },
   ]
 
   return (
