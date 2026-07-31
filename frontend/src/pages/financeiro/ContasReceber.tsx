@@ -19,6 +19,7 @@ import {
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
+import LancarNFModal from '../../components/financeiro/LancarNFModal'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
@@ -966,6 +967,7 @@ export default function ContasReceber() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [conciliarModalItems, setConciliarModalItems] = useState<ConciliarItem[]>([])
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [lancarNF, setLancarNF] = useState(false)
   const [sortField, setSortField] = useState<SortField>('vencimento')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -975,6 +977,18 @@ export default function ContasReceber() {
 
   // Deep-link: ?nf=<numero_nf> (vindo do Painel) abre direto o modal de detalhe
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // Novo Registro › Lançar NF Recebimento chega por ?nova_nf=<ts>. Limpa o
+  // parâmetro ao abrir para que um segundo clique reabra o modal.
+  const pedidoNF = searchParams.get('nova_nf')
+  useEffect(() => {
+    if (!pedidoNF) return
+    setLancarNF(true)
+    const p = new URLSearchParams(searchParams)
+    p.delete('nova_nf')
+    setSearchParams(p, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoNF])
   useEffect(() => {
     const nf = searchParams.get('nf')
     if (!nf || contas.length === 0) return
@@ -1462,6 +1476,10 @@ export default function ContasReceber() {
       )}
 
       {/* Detalhe da medição (EGP) */}
+      {lancarNF && (
+        <LancarNFModal onClose={() => setLancarNF(false)}
+          onCriado={() => { setActiveTab('nf_emitida'); setToast({ type: 'success', msg: 'NF lançada em NF Emitida.' }) }} />
+      )}
       {medicaoView && (
         <MedicaoDetailModal
           numeroOs={medicaoView.numeroOs}

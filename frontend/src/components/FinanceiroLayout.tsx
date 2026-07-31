@@ -13,13 +13,20 @@ export default function FinanceiroLayout() {
     {
       to: '/financeiro',
       icon: Plus,
-      label: 'Nova Solicitação',
+      label: 'Novo Registro',
       end: false,
       accent: true,
       requisitanteAllowed: true,
       actionMenu: {
-        title: 'Nova solicitação',
+        title: 'Novo registro',
         items: [
+          {
+            icon: DollarSign,
+            label: 'Lançar NF Recebimento',
+            description: 'NF já emitida fora do sistema — entra direto em NF Emitida.',
+            tone: 'emerald',
+            action: () => navigate(`/financeiro/cr?nova_nf=${Date.now()}`),
+          },
           {
             icon: Receipt,
             label: 'Pagamento Extraordinário',

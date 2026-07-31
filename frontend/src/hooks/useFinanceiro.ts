@@ -969,3 +969,69 @@ export function useAplicarConciliacaoAuto() {
     },
   })
 }
+
+// ── Lançar NF de Recebimento: cria a CR já em "NF Emitida" ───────────────────
+// Atalho para a NF que já foi emitida fora do sistema (o caso da CEMIG hoje):
+// em vez de criar Previsto → Autorizar → Faturar, entra direto no pipeline no
+// ponto em que ela realmente está. A OSC traz obra, natureza e centro de custo.
+export function useLancarNFRecebimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: {
+      cliente_nome: string; cliente_cnpj?: string
+      numero_nf: string; serie_nf?: string; chave_nfe?: string
+      valor_original: number
+      data_emissao: string; data_vencimento: string
+      osc_id?: string | null; projeto_id?: string | null
+      natureza?: string | null; centro_custo?: string | null
+      descricao?: string; observacoes?: string
+      criado_por_nome?: string
+      danfeFile?: File
+    }) => {
+      const { danfeFile, ...campos } = v
+      const { data, error } = await supabase.from('fin_contas_receber')
+        .insert({ ...campos, status: 'nf_emitida', bloqueio_tipo: 'sem_bloqueio' })
+        .select('id').single()
+      if (error) throw error
+      const crId = (data as { id: string }).id
+
+      // DANFE é opcional: se o upload falhar, a CR não é desfeita — o anexo
+      // pode ser refeito depois pelo modal de detalhe.
+      if (danfeFile) {
+        const ext = danfeFile.name.split('.').pop() || 'pdf'
+        const path = `cr/${crId}/danfe-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('notas-fiscais').upload(path, danfeFile, { upsert: false, contentType: danfeFile.type })
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+          await supabase.from('fin_contas_receber').update({ danfe_url: publicUrl }).eq('id', crId)
+        }
+      }
+      return crId
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+/** OSCs para o seletor do lançamento de NF (traz obra, natureza e polo juntos) */
+export function useOscsParaNF() {
+  return useQuery<{ id: string; numero_os: string; tipo: string | null; obra_id: string | null; obra_nome: string | null; polo: string | null }[]>({
+    queryKey: ['oscs-para-nf'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pmo_fluxo_os')
+        .select('id, numero_os, tipo, obra_id, obra:obra_id(nome, projeto:pmo_projeto_id(nome))')
+        .order('numero_os', { ascending: false }).limit(1000)
+      if (error) { console.error('useOscsParaNF:', error); return [] }
+      type Row = { id: string; numero_os: string; tipo: string | null; obra_id: string | null
+                   obra: { nome: string | null; projeto: { nome: string | null } | null } | null }
+      return (data as unknown as Row[] ?? []).map(r => ({
+        id: r.id, numero_os: r.numero_os, tipo: r.tipo, obra_id: r.obra_id,
+        obra_nome: r.obra?.nome ?? null, polo: r.obra?.projeto?.nome ?? null,
+      }))
+    },
+  })
+}
