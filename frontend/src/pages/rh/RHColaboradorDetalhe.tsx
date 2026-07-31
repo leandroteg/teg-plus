@@ -214,6 +214,8 @@ export default function RHColaboradorDetalhe({ id, onBack, soTreinamentos, mostr
               <Field label="CNPJ (PJ)" value={data?.cnpj_pj} onChange={v => set('cnpj_pj', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             )}
             <Field label="Cargo" value={data?.cargo} onChange={v => set('cargo', v)} editable={editMode} cls={inputCls} isLight={isLight} />
+            {/* CBO vem da ficha de registro e e obrigatorio na OS de NR-01 */}
+            <Field label="CBO" value={data?.cbo} onChange={v => set('cbo', v)} editable={editMode} cls={inputCls} isLight={isLight} />
             <div>
               <label className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Base</label>
               {editMode ? (
