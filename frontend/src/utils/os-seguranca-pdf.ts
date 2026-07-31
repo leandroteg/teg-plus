@@ -16,15 +16,18 @@ import { EMPRESA_FALLBACK, getEmpresa } from '../services/empresa'
 export interface OsSegPdfData {
   codigo?: string | null
   colaboradorNome: string
+  matricula?: string | null
   cargo?: string | null
+  setor?: string | null
   cbo?: string | null
-  departamento?: string | null
   dataAdmissao?: string | null
   objetivo: string
   descricaoAtividade: string
+  /** Diretrizes de SST, uma por linha. */
   obrigacoes: string
-  riscos: { perigo: string; controles?: string | null; efeitos?: string | null }[]
+  riscos: { perigo: string; fonte?: string | null; medidas?: string | null }[]
   epis: { nome: string; ca?: string | null }[]
+  epcs?: string[]
   treinamentos: { nome: string; norma?: string | null }[]
   emitidaPorNome?: string | null
 }
@@ -94,12 +97,12 @@ function buildDoc(d: OsSegPdfData, empresa: EmpresaData, logo: string | null): j
 
   // ── identificação ──────────────────────────────────────────────────────────
   const campos: [string, string][] = [
-    ['NOME', d.colaboradorNome],
-    ['FUNÇÃO', d.cargo || '—'],
-    ['C.B.O.', d.cbo || '—'],
-    ['DEPARTAMENTO', d.departamento || '—'],
+    ['NOME DO TRABALHADOR', d.colaboradorNome],
+    ['MATRÍCULA', d.matricula || '—'],
     ['DATA DE ADMISSÃO', fmtDate(d.dataAdmissao)],
-    ['EMISSÃO', new Date().toLocaleDateString('pt-BR')],
+    ['CARGO', d.cargo || '—'],
+    ['SETOR', d.setor || '—'],
+    ['C.B.O.', d.cbo || '—'],
   ]
   const cw = CW / 3
   campos.forEach((c, i) => {
@@ -114,56 +117,82 @@ function buildDoc(d: OsSegPdfData, empresa: EmpresaData, logo: string | null): j
   })
   y += 11 * 2 + 5
 
-  secao('OBJETIVO'); paragrafo(d.objetivo, 7.5)
   secao('DESCRIÇÃO DA ATIVIDADE'); paragrafo(d.descricaoAtividade || '—')
+  secao('OBJETIVO'); paragrafo(d.objetivo, 7.5)
 
-  // ── riscos ─────────────────────────────────────────────────────────────────
-  secao(`RISCOS DA FUNÇÃO E MEDIDAS DE CONTROLE (${d.riscos.length})`)
-  doc.setFontSize(7)
+  // ── diretrizes: uma por linha, com marcador ────────────────────────────────
+  secao('DIRETRIZES DE SAÚDE E SEGURANÇA DO TRABALHO')
+  doc.setFontSize(7.2); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
+  d.obrigacoes.split('\n').map(x => x.trim()).filter(Boolean).forEach(item => {
+    const linhas = doc.splitTextToSize(item, CW - 6)
+    checkPage(linhas.length * 3.3 + 1.4)
+    doc.text('•', M + 1, y + 2.2)
+    doc.text(linhas, M + 4.5, y + 2.2)
+    y += linhas.length * 3.3 + 1.4
+  })
+  y += 3
+
+  // ── riscos: risco · fonte geradora · medidas administrativas ──────────────
+  secao(`IDENTIFICAÇÃO DOS RISCOS AMBIENTAIS (${d.riscos.length})`)
+  const cR = 45, cF = 50
+  doc.setFontSize(6); doc.setTextColor(...MID); doc.setFont('helvetica', 'bold')
+  checkPage(6)
+  doc.text('RISCO', M + 1, y + 2.2)
+  doc.text('FONTE GERADORA', M + cR + 1, y + 2.2)
+  doc.text('MEDIDAS ADMINISTRATIVAS', M + cR + cF + 1, y + 2.2)
+  y += 4
+  doc.setFontSize(6.6)
   d.riscos.forEach((r, i) => {
-    const linhasC = doc.splitTextToSize(r.controles || '—', CW - 62)
-    const alt = Math.max(4.6, linhasC.length * 3.2 + 1.6)
+    const lR = doc.splitTextToSize(r.perigo || '—', cR - 3)
+    const lF = doc.splitTextToSize(r.fonte || '—', cF - 3)
+    const lM = doc.splitTextToSize(r.medidas || '—', CW - cR - cF - 3)
+    const alt = Math.max(lR.length, lF.length, lM.length) * 2.9 + 2
     checkPage(alt + 2)
-    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.15)
-    if (i > 0) doc.line(M, y - 1.2, W - M, y - 1.2)
-    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold')
-    doc.text(doc.splitTextToSize(r.perigo, 56), M + 1, y + 2.4)
+    if (i > 0) { doc.setDrawColor(...LIGHT); doc.setLineWidth(0.12); doc.line(M, y - 1, W - M, y - 1) }
+    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.text(lR, M + 1, y + 2)
     doc.setFont('helvetica', 'normal'); doc.setTextColor(...MID)
-    doc.text(linhasC, M + 60, y + 2.4)
+    doc.text(lF, M + cR + 1, y + 2)
+    doc.text(lM, M + cR + cF + 1, y + 2)
     y += alt
   })
   y += 3
 
-  // ── EPIs ───────────────────────────────────────────────────────────────────
-  secao(`EPIs OBRIGATÓRIOS (${d.epis.length})`)
-  doc.setFontSize(7.5); doc.setTextColor(...DARK); doc.setFont('helvetica', 'normal')
-  if (!d.epis.length) { paragrafo('Nenhum EPI obrigatório definido para esta função.', 7.5) }
-  else {
-    d.epis.forEach((e, i) => {
-      const col = i % 2, lin = Math.floor(i / 2)
-      if (col === 0) checkPage(5)
-      const txt = `•  ${e.nome}${e.ca ? `  (CA ${e.ca})` : ''}`
-      doc.text(doc.splitTextToSize(txt, CW / 2 - 4)[0] ?? txt, M + 1 + col * (CW / 2), y + lin * 4.4)
-      if (col === 1 || i === d.epis.length - 1) { /* avança ao fechar a linha */ }
-    })
-    y += Math.ceil(d.epis.length / 2) * 4.4 + 3
+  // ── medidas preventivas: EPI | EPC, lado a lado como na OS original ───────
+  secao('MEDIDAS PREVENTIVAS')
+  const meia = CW / 2
+  doc.setFontSize(6); doc.setTextColor(...MID); doc.setFont('helvetica', 'bold')
+  checkPage(8)
+  doc.text('EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)', M + 1, y + 2.2)
+  doc.text('EQUIPAMENTOS DE PROTEÇÃO COLETIVA (EPC)', M + meia + 1, y + 2.2)
+  y += 4.5
+  const epcs = d.epcs ?? []
+  const linhasMed = Math.max(d.epis.length, epcs.length, 1)
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
+  for (let i = 0; i < linhasMed; i++) {
+    checkPage(5)
+    const e = d.epis[i]
+    if (e) doc.text(doc.splitTextToSize(`•  ${e.nome}${e.ca ? `  (CA ${e.ca})` : ''}`, meia - 4)[0] ?? '', M + 1, y + 2.4)
+    else if (i === 0 && !d.epis.length) { doc.setTextColor(...MID); doc.text('—', M + 1, y + 2.4); doc.setTextColor(...DARK) }
+    const c = epcs[i]
+    if (c) doc.text(doc.splitTextToSize(`•  ${c}`, meia - 4)[0] ?? '', M + meia + 1, y + 2.4)
+    else if (i === 0 && !epcs.length) { doc.setTextColor(...MID); doc.text('—', M + meia + 1, y + 2.4); doc.setTextColor(...DARK) }
+    y += 4.2
   }
+  y += 3
 
-  // ── treinamentos ───────────────────────────────────────────────────────────
+  // ── treinamentos ──────────────────────────────────────────────────────────
   secao(`TREINAMENTOS EXIGIDOS (${d.treinamentos.length})`)
-  doc.setFontSize(7.5); doc.setTextColor(...DARK)
-  if (!d.treinamentos.length) { paragrafo('Nenhum treinamento obrigatório definido para esta função.', 7.5) }
+  doc.setFontSize(7); doc.setTextColor(...DARK); doc.setFont('helvetica', 'normal')
+  if (!d.treinamentos.length) { paragrafo('Nenhum treinamento obrigatório definido para esta função.', 7) }
   else {
     d.treinamentos.forEach((t, i) => {
       const col = i % 2, lin = Math.floor(i / 2)
       if (col === 0) checkPage(5)
       const txt = `•  ${t.nome}${t.norma ? `  (${t.norma})` : ''}`
-      doc.text(doc.splitTextToSize(txt, CW / 2 - 4)[0] ?? txt, M + 1 + col * (CW / 2), y + lin * 4.4)
+      doc.text(doc.splitTextToSize(txt, meia - 4)[0] ?? txt, M + 1 + col * meia, y + lin * 4.2)
     })
-    y += Math.ceil(d.treinamentos.length / 2) * 4.4 + 3
+    y += Math.ceil(d.treinamentos.length / 2) * 4.2 + 3
   }
-
-  secao('OBRIGAÇÕES E RESPONSABILIDADES'); paragrafo(d.obrigacoes, 7.2)
 
   // ── ciência: uma assinatura, a de quem recebe ─────────────────────────────
   secao('CIÊNCIA DO COLABORADOR')
