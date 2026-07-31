@@ -1492,33 +1492,39 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
         Baixar tambem uma copia em PDF (a assinatura e colhida no Portal TEG)
       </label>
 
-      {/* Caminho alternativo: a ficha ja foi assinada no papel (frente sem sinal,
-          entrega no campo). Sobe o digitalizado e fecha direto — sem missao. */}
-      <label className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed text-[11px] font-semibold cursor-pointer transition-colors ${
-        erros.length ? 'opacity-40 pointer-events-none ' : ''
-      }${isDark ? 'border-white/15 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
-        {anexarAssinada.isPending ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
-        Anexar Ficha Manual (já assinada no papel)
-        <input type="file" className="hidden" accept="application/pdf,image/*"
-          onChange={async e => {
-            const f = e.target.files?.[0]; e.currentTarget.value = ''
-            if (!f) return
-            try {
-              const r = await criarFicha()
-              await anexarAssinada.mutateAsync({
-                fichaId: r.id, colaboradorId: colabId, codigo: r.codigo, arquivo: f,
-              })
-              onClose()
-            } catch (err: any) {
-              alert(`Erro ao anexar a ficha assinada: ${err?.message ?? 'desconhecido'}`)
-            }
-          }} />
-      </label>
-
       <ModalFooter
         isDark={isDark} erros={erros} avisos={avisos}
         salvando={criar.isPending || enviarAssinatura.isPending || anexarAssinada.isPending}
         onCancel={onClose} saveLabel="Enviar Ficha para Assinatura" onSave={salvar}
+        extra={
+          /* Caminho alternativo: a ficha ja foi assinada no papel (frente sem
+             sinal). Sobe o digitalizado e fecha direto — sem missao. */
+          <label
+            title={erros.length
+              ? `Complete a ficha primeiro: ${erros.join(' · ')}`
+              : 'A ficha ja foi assinada no papel: anexe o digitalizado e ela fecha direto'}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+              erros.length ? 'opacity-40 cursor-not-allowed pointer-events-none ' : 'cursor-pointer '
+            }${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            {anexarAssinada.isPending ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+            Anexar assinada
+            <input type="file" className="hidden" accept="application/pdf,image/*"
+              onChange={async e => {
+                const f = e.target.files?.[0]; e.currentTarget.value = ''
+                if (!f) return
+                try {
+                  const r = await criarFicha()
+                  await anexarAssinada.mutateAsync({
+                    fichaId: r.id, colaboradorId: colabId, codigo: r.codigo, arquivo: f,
+                  })
+                  onClose()
+                } catch (err: any) {
+                  alert(`Erro ao anexar a ficha assinada: ${err?.message ?? 'desconhecido'}`)
+                }
+              }} />
+          </label>
+        }
       />
     </QsmaModal>
   )
