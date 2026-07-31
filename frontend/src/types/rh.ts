@@ -8,6 +8,8 @@ export interface RHColaborador {
   cpf?: string
   matricula?: string
   cargo?: string
+  /** CBO da funcao (ex.: 7825-10) — vem da ficha de registro; usado na OS de NR-01. */
+  cbo?: string
   departamento?: string
   setor?: string
   obra_id?: string
