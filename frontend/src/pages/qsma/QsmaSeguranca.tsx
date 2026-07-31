@@ -1838,6 +1838,17 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
 
   // Envia uma ficha que ja existe. O PDF e remontado a partir dela — useFichasEpi
   // ja traz os itens com EPI, CA e tamanho, entao nao falta nada.
+  /** Clique no verde: abre o documento assinado. Cai no detalhe do colaborador
+   *  so quando nao ha arquivo — ai o detalhe e a unica coisa util a mostrar. */
+  async function abrirAssinada(f: QsmaEpiFicha, colaboradorId: string) {
+    if (f.arquivo_assinado_path) {
+      const url = await evidenciaUrl(f.arquivo_assinado_path)
+      if (url) { window.open(url, '_blank', 'noopener'); return }
+    }
+    if (f.onedrive_web_url) { window.open(f.onedrive_web_url, '_blank', 'noopener'); return }
+    onSelectEpi?.(colaboradorId)
+  }
+
   async function enviarFicha(f: QsmaEpiFicha, cand: IntegracaoCand) {
     if (!cand.colaborador_id) return
     setEnviandoId(f.id)
@@ -2129,8 +2140,8 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                                     <Clock size={16} className="text-amber-500 group-hover:text-amber-600" />
                                   </button>
                                 ) : e.s === 'ok' ? (
-                                  <button type="button" onClick={() => onSelectEpi?.(c.colaborador_id!)}
-                                    title={`Ficha ${e.ficha?.codigo ?? ''} assinada — ver no Controle de EPI`} className="group">
+                                  <button type="button" onClick={() => abrirAssinada(e.ficha!, c.colaborador_id!)}
+                                    title={`Ficha ${e.ficha?.codigo ?? ''} assinada — abrir o documento`} className="group">
                                     <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
                                   </button>
                                 ) : (
