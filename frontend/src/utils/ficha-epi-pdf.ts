@@ -201,12 +201,16 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
   // ── Assinatura ──────────────────────────────────────────────────────────────
   // Uma so: quem RECEBE o EPI. Ela e colhida eletronicamente no Portal TEG.
   // Quem entregou ja consta como dado da ficha — nao precisa de rubrica.
+  // Assinatura CENTRADA na pagina. E o pe da folha fica LIVRE: a edge
+  // sig-assinatura carimba ali autenticidade, selo e QR — se este documento
+  // escrever no mesmo lugar, os dois textos se sobrepoem no PDF assinado.
   checkPage(45)
   const larg = Math.min(CW, 110)
-  const cx = M + larg / 2
+  const lx = (W - larg) / 2
+  const cx = W / 2
   doc.setDrawColor(...DARK)
   doc.setLineWidth(0.3)
-  doc.line(M, y + 18, M + larg, y + 18)
+  doc.line(lx, y + 18, lx + larg, y + 18)
   doc.setFontSize(8)
   doc.setTextColor(...DARK)
   doc.text(data.colaboradorNome, cx, y + 23, { align: 'center' })
@@ -214,14 +218,9 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
   doc.setTextColor(...MID)
   doc.text('Assinatura do colaborador (recebimento)', cx, y + 27, { align: 'center' })
   if (data.entreguePorNome) {
-    doc.text(`Entregue por: ${data.entreguePorNome}`, M, y + 33)
+    doc.text(`Entregue por: ${data.entreguePorNome}`, cx, y + 33, { align: 'center' })
   }
   y += 38
-
-  // rodapé
-  doc.setFontSize(7)
-  doc.setTextColor(...MID)
-  doc.text(`Documento gerado pelo TEG+ QSMA em ${new Date().toLocaleString('pt-BR')}`, M, 288)
 
   return doc
 }

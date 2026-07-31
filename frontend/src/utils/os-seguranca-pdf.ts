@@ -201,18 +201,19 @@ function buildDoc(d: OsSegPdfData, empresa: EmpresaData, logo: string | null): j
     'função, as medidas de controle, os EPIs obrigatórios e os treinamentos exigidos; e que me comprometo a ' +
     'cumprir as determinações aqui descritas.', 7.2)
 
+  // Centrada, e com o pe da folha livre para o carimbo da assinatura
+  // eletronica (autenticidade, selo e QR) — senao os dois se sobrepoem.
   checkPage(30)
   const larg = Math.min(CW, 110)
+  const lx = (W - larg) / 2
+  const cx = W / 2
   doc.setDrawColor(...DARK); doc.setLineWidth(0.3)
-  doc.line(M, y + 16, M + larg, y + 16)
+  doc.line(lx, y + 16, lx + larg, y + 16)
   doc.setFontSize(8); doc.setTextColor(...DARK)
-  doc.text(d.colaboradorNome, M + larg / 2, y + 21, { align: 'center' })
+  doc.text(d.colaboradorNome, cx, y + 21, { align: 'center' })
   doc.setFontSize(7); doc.setTextColor(...MID)
-  doc.text('Assinatura do colaborador (ciência)', M + larg / 2, y + 25, { align: 'center' })
-  if (d.emitidaPorNome) doc.text(`Emitida por: ${d.emitidaPorNome}`, M, y + 31)
-
-  doc.setFontSize(7); doc.setTextColor(...MID)
-  doc.text(`Documento gerado pelo TEG+ QSMA em ${new Date().toLocaleString('pt-BR')}`, M, 291)
+  doc.text('Assinatura do colaborador (ciência)', cx, y + 25, { align: 'center' })
+  if (d.emitidaPorNome) doc.text(`Emitida por: ${d.emitidaPorNome}`, cx, y + 31, { align: 'center' })
   return doc
 }
 
