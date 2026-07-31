@@ -1928,7 +1928,10 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
     if (!c.colaborador_id || !cargosComEpi.has(cargoBase(c.cargo))) return { s: 'na' }
     const f = fichasEpi.find(x => x.colaborador_id === c.colaborador_id)
     if (!f) return { s: 'faltando' }
-    if (f.status === 'assinada') return { s: 'ok', ficha: f }
+    // 'arquivada' sao as fichas antigas, assinadas no papel e vinculadas do
+    // OneDrive (255 na base). Assim como 'assinada', ja estao resolvidas —
+    // tratar como pendente diria que 255 assinaturas faltam.
+    if (f.status === 'assinada' || f.status === 'arquivada') return { s: 'ok', ficha: f }
     return { s: f.missao_id ? 'enviada' : 'nao_enviada', ficha: f }
   }
 
