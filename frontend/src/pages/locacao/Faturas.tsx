@@ -1089,7 +1089,9 @@ export default function Faturas() {
 
   // Build per-imovel summary rows
   const rows = useMemo(() => {
-    return imoveis.map(imo => {
+    // Hotéis (HTL) são hospedagem temporária: não têm contrato de locação nem
+    // conta de concessionária. Vivem no Controle de Leitos — mesma regra da aba Ativos.
+    return imoveis.filter(i => i.tipo !== 'HTL').map(imo => {
       const imoFaturas = faturas.filter(f => f.imovel_id === imo.id && mesDaFatura(f) === competencia)
       const totalMes = imoFaturas.reduce((s, f) => s + getFaturaValor(f), 0)
       const hasOverdue = imoFaturas.some(f => isOverdue(f))
