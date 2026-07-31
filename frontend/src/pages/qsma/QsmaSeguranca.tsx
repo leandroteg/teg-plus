@@ -18,6 +18,7 @@ import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, useEnviarFichaEpiAssinatura, consultarCA,
   useOsSegurancaLista, useEnviarOsSegAssinatura, type OsSeguranca,
+  useAnexarFichaEpiAssinada,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
@@ -1235,6 +1236,7 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
 }) {
   const criar = useCriarFichaEpi()
   const enviarAssinatura = useEnviarFichaEpiAssinatura()
+  const anexarAssinada = useAnexarFichaEpiAssinada()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: bases = [] } = useBases()
   const { perfil } = useAuth()
@@ -1293,9 +1295,10 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
     if (epi?.validade_ca && epi.validade_ca < hoje) avisos.push(`CA ${epi.ca} (${epi.nome}) VENCIDO`)
   }
 
-  async function salvar() {
-    try {
-      const payload = {
+  /** Cria a ficha (e baixa o kit). Usada pelos DOIS caminhos: envio ao Portal
+   *  e anexo da ficha assinada no papel. */
+  async function criarFicha() {
+    const payload = {
         colaborador_id: colabId,
         colaborador_nome: colabNome,
         base_id: baseId || undefined,
@@ -1310,7 +1313,12 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
           data_troca_prevista: trocaPrevista(it.epi_id),
         })) as ItemFichaEpi[],
       }
-      const r = await criar.mutateAsync(payload)
+    return criar.mutateAsync(payload)
+  }
+
+  async function salvar() {
+    try {
+      const r = await criarFicha()
 
       // Dados do PDF — servem tanto para o envio quanto para a copia local.
       const dadosPdf = {
@@ -1484,8 +1492,32 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
         Baixar tambem uma copia em PDF (a assinatura e colhida no Portal TEG)
       </label>
 
+      {/* Caminho alternativo: a ficha ja foi assinada no papel (frente sem sinal,
+          entrega no campo). Sobe o digitalizado e fecha direto — sem missao. */}
+      <label className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed text-[11px] font-semibold cursor-pointer transition-colors ${
+        erros.length ? 'opacity-40 pointer-events-none ' : ''
+      }${isDark ? 'border-white/15 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+        {anexarAssinada.isPending ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+        Anexar Ficha Manual (já assinada no papel)
+        <input type="file" className="hidden" accept="application/pdf,image/*"
+          onChange={async e => {
+            const f = e.target.files?.[0]; e.currentTarget.value = ''
+            if (!f) return
+            try {
+              const r = await criarFicha()
+              await anexarAssinada.mutateAsync({
+                fichaId: r.id, colaboradorId: colabId, codigo: r.codigo, arquivo: f,
+              })
+              onClose()
+            } catch (err: any) {
+              alert(`Erro ao anexar a ficha assinada: ${err?.message ?? 'desconhecido'}`)
+            }
+          }} />
+      </label>
+
       <ModalFooter
-        isDark={isDark} erros={erros} avisos={avisos} salvando={criar.isPending || enviarAssinatura.isPending}
+        isDark={isDark} erros={erros} avisos={avisos}
+        salvando={criar.isPending || enviarAssinatura.isPending || anexarAssinada.isPending}
         onCancel={onClose} saveLabel="Enviar Ficha para Assinatura" onSave={salvar}
       />
     </QsmaModal>
