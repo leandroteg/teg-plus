@@ -39,7 +39,7 @@ export function QsmaModal({
 
 // Rodapé padrão: erros (vermelho, travam) · avisos (âmbar) · Cancelar/Salvar
 export function ModalFooter({
-  isDark, erros = [], avisos = [], salvando, onCancel, onSave, saveLabel = 'Salvar',
+  isDark, erros = [], avisos = [], salvando, onCancel, onSave, saveLabel = 'Salvar', extra,
 }: {
   isDark: boolean
   erros?: string[]
@@ -48,6 +48,8 @@ export function ModalFooter({
   onCancel: () => void
   onSave: () => void
   saveLabel?: string
+  /** Acao alternativa, alinhada a esquerda na mesma linha (ex.: anexar assinado). */
+  extra?: React.ReactNode
 }) {
   return (
     <div className="space-y-2">
@@ -57,7 +59,9 @@ export function ModalFooter({
           <span>{[...erros, ...avisos].join(' · ')}</span>
         </p>
       )}
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center gap-2">
+        {extra}
+        <div className="ml-auto" />
         <button
           onClick={onCancel}
           className={`px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
