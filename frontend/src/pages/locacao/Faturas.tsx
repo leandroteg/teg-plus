@@ -20,6 +20,9 @@ import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const TIPOS: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
+// O que quase todo imovel tem. Enquanto ninguem configurar, a tela cobra so isso —
+// listar os 11 tipos fazia 'nao tem' parecer 'esta faltando'.
+const TIPOS_PADRAO: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet']
 
 // Vencimento padrão do aluguel = mês seguinte à competência, no dia de vencimento do contrato
 function aluguelVencDefault(competenciaYYYYMM: string, diaVenc?: number) {
@@ -525,8 +528,8 @@ function ImovelFaturasModal({
   // ficaria invisível.
   const esperadas = imovel.faturas_esperadas ?? null
   const tiposVisiveis = useMemo(() => {
-    if (!esperadas || esperadas.length === 0) return TIPOS
-    return TIPOS.filter(t => esperadas.includes(t) || faturaByTipo[t])
+    const base = esperadas && esperadas.length > 0 ? esperadas : TIPOS_PADRAO
+    return TIPOS.filter(t => base.includes(t) || faturaByTipo[t])
   }, [esperadas, faturaByTipo])
 
   // Descontos do aluguel do mês (afetam o líquido enviado ao Financeiro)
@@ -662,7 +665,7 @@ function ImovelFaturasModal({
             <span className={`text-[11px] ${txtMuted}`}>
               {esperadas && esperadas.length > 0
                 ? `Mostrando as ${esperadas.length} contas deste imóvel`
-                : 'Todas as contas (imóvel sem configuração)'}
+                : 'Contas padrão (aluguel, energia, água, internet)'}
             </span>
             <button
               onClick={() => setConfigTipos(v => !v)}
@@ -1081,15 +1084,17 @@ export default function Faturas() {
   const columns = [
     { key: 'imovel', label: 'IMOVEL', align: 'text-left' },
     { key: '',       label: 'C. CUSTO', align: 'text-left' },
+    { key: '',       label: 'ALUGUEL', align: 'text-center' },
     { key: '',       label: 'ENERGIA', align: 'text-center' },
     { key: '',       label: 'AGUA', align: 'text-center' },
     { key: '',       label: 'INTERNET', align: 'text-center' },
-    { key: '',       label: 'IPTU', align: 'text-center' },
     { key: 'total',  label: 'TOTAL MES', align: 'text-right' },
     { key: 'status', label: 'STATUS', align: 'text-center' },
   ]
 
-  const mainTipos: TipoFatura[] = ['energia', 'agua', 'internet', 'iptu']
+  // As 4 contas que praticamente todo imovel tem. IPTU saiu: aparece em poucos e
+  // deixava uma coluna de traco atravessando a tabela inteira.
+  const mainTipos: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet']
 
   function renderCellValue(fat: LocFatura | undefined) {
     if (!fat) return <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>
@@ -1119,41 +1124,16 @@ export default function Faturas() {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Faturas</h1>
-          <p className={`text-xs ${txtMuted}`}>Visao consolidada de contas por imovel</p>
+      {/* Cabeçalho e filtros numa linha só — a contagem virou legenda do título */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="shrink-0">
+          <h1 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Faturas</h1>
+          <p className={`text-[11px] leading-tight ${txtMuted}`}>
+            {filtered.length} imóvel(is) — {competenciaLabel(competencia)}
+          </p>
         </div>
-        <button
-          onClick={async () => {
-            const competenciaDate = `${competencia}-01`
-            const label = competenciaLabel(competencia)
-            if (!confirm(`Gerar faturas (aluguel + IPTU + condomínio + energia + água + internet) para todos os imóveis ativos da competência ${label}?\n\nFaturas já existentes do mesmo trio (imóvel + tipo + mês) não são duplicadas.`)) return
-            try {
-              const r = await gerarMes.mutateAsync({ competencia: competenciaDate })
-              if (!r.ok) {
-                alert(`Erro: ${r.erro ?? 'desconhecido'}`)
-                return
-              }
-              alert(`✓ ${r.criadas} fatura(s) criada(s) para ${r.imoveis_ativos} imóvel(is) ativo(s).${r.puladas_existentes > 0 ? `\n${r.puladas_existentes} já existiam (pulada(s)).` : ''}`)
-            } catch (err: any) {
-              alert(`Erro ao gerar: ${err?.message ?? 'desconhecido'}`)
-            }
-          }}
-          disabled={gerarMes.isPending}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-60"
-          title="Cria as faturas mensais (aluguel + 5 tipos extras) para todos os imóveis ativos na competência selecionada"
-        >
-          {gerarMes.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-          Gerar faturas do mês
-        </button>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
         {/* Search */}
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
+        <div className="relative flex-1 min-w-[150px] max-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -1232,12 +1212,32 @@ export default function Faturas() {
             <LayoutGrid size={14} />
           </button>
         </div>
+
+        <button
+          onClick={async () => {
+            const competenciaDate = `${competencia}-01`
+            const label = competenciaLabel(competencia)
+            if (!confirm(`Gerar faturas (aluguel + IPTU + condomínio + energia + água + internet) para todos os imóveis ativos da competência ${label}?\n\nFaturas já existentes do mesmo trio (imóvel + tipo + mês) não são duplicadas.`)) return
+            try {
+              const r = await gerarMes.mutateAsync({ competencia: competenciaDate })
+              if (!r.ok) {
+                alert(`Erro: ${r.erro ?? 'desconhecido'}`)
+                return
+              }
+              alert(`✓ ${r.criadas} fatura(s) criada(s) para ${r.imoveis_ativos} imóvel(is) ativo(s).${r.puladas_existentes > 0 ? `\n${r.puladas_existentes} já existiam (pulada(s)).` : ''}`)
+            } catch (err: any) {
+              alert(`Erro ao gerar: ${err?.message ?? 'desconhecido'}`)
+            }
+          }}
+          disabled={gerarMes.isPending}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-60"
+          title="Cria as faturas mensais (aluguel + 5 tipos extras) para todos os imóveis ativos na competência selecionada"
+        >
+          {gerarMes.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Gerar faturas do mês
+        </button>
       </div>
 
-      {/* Count */}
-      <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {filtered.length} imovel(is) — {competenciaLabel(competencia)}
-      </p>
 
       {/* Content */}
       {filtered.length === 0 ? (
