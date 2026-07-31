@@ -793,6 +793,12 @@ export function useEnviarFichaEpiAssinatura() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (p: { fichaId: string; colaboradorId: string; codigo?: string | null; pdf: Blob }) => {
+      // Reenvio de ficha que ja tem missao nao pode gerar uma segunda.
+      const { data: atual } = await supabase.from('qsma_epi_fichas')
+        .select('missao_id').eq('id', p.fichaId).maybeSingle()
+      if ((atual as { missao_id?: string } | null)?.missao_id) {
+        return { ok: true, missao_id: (atual as { missao_id: string }).missao_id, jaEnviada: true }
+      }
       const base = `Ficha_EPI_${(p.codigo ?? p.fichaId).replace(/[^\w-]+/g, '_')}.pdf`
       const path = `qsma-epi/${p.colaboradorId}/${Date.now()}-${base}`
       const up = await supabase.storage.from('rh-admissao-docs')
