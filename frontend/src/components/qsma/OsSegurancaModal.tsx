@@ -229,6 +229,12 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
       </div>
 
       <div>
+        <label className={lbl}>Objetivo do documento</label>
+        <textarea rows={2} value={objetivo} onChange={e => setObjetivo(e.target.value)} disabled={somenteLeitura}
+          className={`${inp} resize-none text-[11px] leading-relaxed`} />
+      </div>
+
+      <div>
         <label className={lbl}>Descrição da atividade *</label>
         <textarea rows={3} value={atividade} onChange={e => setAtividade(e.target.value)} disabled={somenteLeitura}
           placeholder="O que a pessoa faz no posto de trabalho. Ex.: Operação de máquinas pesadas do tipo retroescavadeiras, tratores e similares, nos trabalhos de limpeza de áreas, nivelamentos e cavas…"
@@ -236,12 +242,6 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
         <p className={`text-[10px] mt-1 ${txtMuted}`}>
           Não vem de cadastro — o sistema não guarda descrição de atividade por cargo.
         </p>
-      </div>
-
-      <div>
-        <label className={lbl}>Objetivo</label>
-        <textarea rows={2} value={objetivo} onChange={e => setObjetivo(e.target.value)} disabled={somenteLeitura}
-          className={`${inp} resize-none text-[11px] leading-relaxed`} />
       </div>
 
       {isLoading ? (
