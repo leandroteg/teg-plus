@@ -207,7 +207,9 @@ export interface QsmaEpiEntrega {
 export const STATUS_FICHA_EPI_LABEL: Record<StatusFichaEpi, { label: string; light: string; dark: string }> = {
   aguardando_assinatura: { label: 'Aguard. assinatura', light: 'bg-amber-100 text-amber-700',     dark: 'bg-amber-500/15 text-amber-400' },
   assinada:              { label: 'Assinada',           light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
-  arquivada:             { label: 'Arquivada',          light: 'bg-slate-100 text-slate-600',     dark: 'bg-slate-500/15 text-slate-400' },
+  // Arquivada = ficha antiga, assinada no papel e vinculada do OneDrive.
+  // Tambem e estado concluido — nao pode parecer pendencia.
+  arquivada:             { label: 'Arquivada',          light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
   cancelada:             { label: 'Cancelada',          light: 'bg-red-100 text-red-600',         dark: 'bg-red-500/15 text-red-400' },
 }
 
