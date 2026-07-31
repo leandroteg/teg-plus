@@ -1775,7 +1775,40 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
   const { data: fichasEpi = [] } = useFichasEpi()
   const { data: matrizEpi = [] } = useMatrizEpi()
   const { data: episAtivos = [] } = useEpis()
+  const { data: basesEst = [] } = useBases()
   const [fichaPara, setFichaPara] = useState<IntegracaoCand | null>(null)
+  const enviarAssinatura = useEnviarFichaEpiAssinatura()
+  const [enviandoId, setEnviandoId] = useState<string | null>(null)
+
+  // Envia uma ficha que ja existe. O PDF e remontado a partir dela — useFichasEpi
+  // ja traz os itens com EPI, CA e tamanho, entao nao falta nada.
+  async function enviarFicha(f: QsmaEpiFicha, cand: IntegracaoCand) {
+    if (!cand.colaborador_id) return
+    setEnviandoId(f.id)
+    try {
+      const pdf = await gerarFichaEpiBlob({
+        codigo: f.codigo,
+        colaboradorNome: f.colaborador_nome ?? cand.nome,
+        baseNome: basesEst.find(b => b.id === f.base_id)?.nome ?? cand.base ?? undefined,
+        dataEntrega: f.data_entrega,
+        motivo: f.motivo as MotivoEntregaEpi,
+        observacoes: f.observacoes ?? undefined,
+        entreguePorNome: f.entregue_por_nome ?? undefined,
+        itens: (f.itens ?? []).map(it => ({
+          nome: it.epi?.nome ?? 'EPI',
+          ca: it.epi?.ca ?? undefined,
+          quantidade: it.quantidade ?? 1,
+          tamanho: it.tamanho ?? undefined,
+          trocaPrevista: it.data_troca_prevista ?? undefined,
+        })),
+      })
+      await enviarAssinatura.mutateAsync({
+        fichaId: f.id, colaboradorId: cand.colaborador_id, codigo: f.codigo, pdf,
+      })
+    } catch (e: any) {
+      alert(`Nao foi possivel enviar a ficha ${f.codigo}: ${e?.message ?? 'erro desconhecido'}`)
+    } finally { setEnviandoId(null) }
+  }
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
@@ -1830,14 +1863,17 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
 
   // Ficha de EPI do candidato — 'na' quando o cargo nao tem matriz de EPI.
   const cargosComEpi = new Set(matrizEpi.filter(m => m.exigencia === 'obrigatorio').map(m => cargoBase(m.cargo)))
-  // 'enviada' = ficha no Portal esperando o colaborador assinar. Separar de
-  // 'ok' evita o pior dos mundos: dar por resolvido o que ninguem assinou.
-  const statusEpi = (c: IntegracaoCand): { s: 'na' | 'ok' | 'enviada' | 'faltando'; ficha?: QsmaEpiFicha } => {
+  // Quatro estados, e o que separa 'nao_enviada' de 'enviada' e o missao_id —
+  // NAO o status. Uma ficha criada sem missao continua com status
+  // 'aguardando_assinatura', e usar isso afirmaria que alguem esta assinando
+  // quando nada foi enviado.
+  const statusEpi = (c: IntegracaoCand): { s: 'na' | 'ok' | 'enviada' | 'nao_enviada' | 'faltando'; ficha?: QsmaEpiFicha } => {
     // Sem colaborador criado ainda, a ficha nao tem onde se prender.
     if (!c.colaborador_id || !cargosComEpi.has(cargoBase(c.cargo))) return { s: 'na' }
     const f = fichasEpi.find(x => x.colaborador_id === c.colaborador_id)
     if (!f) return { s: 'faltando' }
-    return { s: f.status === 'aguardando_assinatura' ? 'enviada' : 'ok', ficha: f }
+    if (f.status === 'assinada') return { s: 'ok', ficha: f }
+    return { s: f.missao_id ? 'enviada' : 'nao_enviada', ficha: f }
   }
 
   // resumo por candidato (ok / pendente / total obrigatório) — a ficha de EPI
@@ -1915,6 +1951,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
         <div className="flex items-center gap-3 text-[11px]">
           <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Certificado anexado</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Pendente (clique p/ anexar)</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><Send size={12} className="text-orange-500" /> Criada — clique p/ enviar</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><Clock size={12} className="text-amber-500" /> Aguardando assinatura</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
         </div>
@@ -1978,6 +2015,15 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                               <div className="flex items-center justify-center h-8">
                                 {e.s === 'na' ? (
                                   <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                ) : e.s === 'nao_enviada' ? (
+                                  <button type="button" disabled={enviandoId === e.ficha!.id}
+                                    onClick={() => enviarFicha(e.ficha!, c)}
+                                    title={`Ficha ${e.ficha?.codigo ?? ''} criada mas NAO enviada — clique para enviar ao Portal`}
+                                    className="group disabled:opacity-50">
+                                    {enviandoId === e.ficha!.id
+                                      ? <Loader2 size={15} className="animate-spin text-orange-500" />
+                                      : <Send size={15} className="text-orange-500 group-hover:text-orange-600" />}
+                                  </button>
                                 ) : e.s === 'enviada' ? (
                                   <button type="button" onClick={() => onSelectEpi?.(c.colaborador_id!)}
                                     title={`Ficha ${e.ficha?.codigo ?? ''} — enviada, aguardando assinatura no Portal`} className="group">
