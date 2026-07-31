@@ -789,6 +789,153 @@ export function useCautelasColaborador(colaboradorId?: string) {
  *
  *  A ficha guarda o missao_id — e a trigger trg_qsma_ficha_epi_assinada vira o
  *  status para 'assinada' quando a missao e concluida. */
+// ── Ordem de Servico de Seguranca (NR-01) ────────────────────────────────────
+
+export interface OsSegDados {
+  objetivo: string
+  descricao_atividade: string
+  riscos: { perigo: string; risco: string | null; grupo: string | null; efeitos: string | null; controles: string | null; classificacao: string | null }[]
+  epis: { nome: string; ca: string | null; quantidade: number }[]
+  treinamentos: { nome: string; norma: string | null }[]
+  obrigacoes: string
+}
+
+export interface OsSeguranca {
+  id: string
+  codigo?: string | null
+  colaborador_id: string
+  colaborador_nome?: string | null
+  cargo?: string | null
+  cbo?: string | null
+  departamento?: string | null
+  data_admissao?: string | null
+  dados: OsSegDados
+  status: 'rascunho' | 'aguardando_assinatura' | 'assinada' | 'cancelada'
+  missao_id?: string | null
+  emitida_por_nome?: string | null
+  created_at?: string
+}
+
+/** Texto legal do objetivo — igual ao da OS em uso hoje (NR-01). */
+export const OS_OBJETIVO_PADRAO =
+  'Adequar à empresa conforme Norma Regulamentadora (NR) 01, elaborar Ordens de Serviço sobre segurança e ' +
+  'medicina do trabalho, descrever aos colaboradores as tarefas realizadas no posto de trabalho, os riscos ' +
+  'ambientais existentes, possíveis doenças ocupacionais, equipamentos de proteção individual (EPI) ' +
+  'obrigatórios referente à função, transmitir recomendações técnicas ou medidas de controle, informar suas ' +
+  'responsabilidades quanto ao descumprimento das Ordens de Serviço de Segurança e desta forma prevenir a ' +
+  'ocorrência de Acidentes de Trabalho.'
+
+export function useOsSegurancaLista() {
+  return useQuery({
+    queryKey: ['qsma_os_seguranca'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_os_seguranca')
+        .select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as OsSeguranca[]
+    },
+  })
+}
+
+/** Monta o conteudo da OS a partir das matrizes do cargo. Nada aqui e inventado:
+ *  riscos, EPIs e treinamentos sao os mesmos que a Matriz ja mantem. */
+export function useOsSegurancaDoCargo(cargo?: string | null) {
+  return useQuery({
+    queryKey: ['qsma_os_seg_cargo', cargo ? cargoBase(cargo) : null],
+    enabled: !!cargo,
+    queryFn: async (): Promise<Pick<OsSegDados, 'riscos' | 'epis' | 'treinamentos'>> => {
+      const base = cargoBase(cargo!)
+      const [mr, me, mt] = await Promise.all([
+        supabase.from('qsma_matriz_risco').select('cargo, classificacao, medidas_administrativas, risco:qsma_riscos(perigo, risco, grupo, efeitos, controles)'),
+        supabase.from('qsma_matriz_epi').select('cargo, quantidade, exigencia, epi:qsma_epis(nome, ca)'),
+        supabase.from('qsma_matriz_treinamento').select('cargo, exigencia, treino:qsma_treinamento_catalogo(nome, norma)'),
+      ])
+      const doCargo = <T extends { cargo: string }>(rows: T[] | null) =>
+        (rows ?? []).filter(r => cargoBase(r.cargo) === base)
+
+      const riscos = doCargo(mr.data as any[]).filter(r => r.risco).map(r => ({
+        perigo: r.risco.perigo,
+        risco: r.risco.risco ?? null,
+        grupo: r.risco.grupo ?? null,
+        efeitos: r.risco.efeitos ?? null,
+        controles: [r.risco.controles, r.medidas_administrativas].filter(Boolean).join(' · ') || null,
+        classificacao: r.classificacao ?? null,
+      }))
+      const epis = doCargo(me.data as any[])
+        .filter(r => r.exigencia === 'obrigatorio' && r.epi)
+        .map(r => ({ nome: r.epi.nome, ca: r.epi.ca ?? null, quantidade: r.quantidade ?? 1 }))
+      const treinamentos = doCargo(mt.data as any[])
+        .filter(r => r.exigencia === 'obrigatorio' && r.treino)
+        .map(r => ({ nome: r.treino.nome, norma: r.treino.norma ?? null }))
+
+      const uniq = <T,>(arr: T[], k: (x: T) => string) =>
+        [...new Map(arr.map(x => [k(x), x])).values()]
+      return {
+        riscos: uniq(riscos, r => r.perigo),
+        epis: uniq(epis, e => e.nome),
+        treinamentos: uniq(treinamentos, t => t.nome),
+      }
+    },
+  })
+}
+
+export function useSalvarOsSeguranca() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: Partial<OsSeguranca> & { id?: string }) => {
+      const { id, ...rest } = p
+      if (id) {
+        const { data, error } = await supabase.from('qsma_os_seguranca').update(rest).eq('id', id).select('*').single()
+        if (error) throw error
+        return data as OsSeguranca
+      }
+      const codigo = await proximoCodigo('OSSEG')
+      const { data, error } = await supabase.from('qsma_os_seguranca')
+        .insert({ ...rest, codigo }).select('*').single()
+      if (error) throw error
+      return data as OsSeguranca
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['qsma_os_seguranca'] }) },
+  })
+}
+
+/** Envia a OS para assinatura no Portal — mesmo caminho da ficha de EPI. */
+export function useEnviarOsSegAssinatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { osId: string; colaboradorId: string; codigo?: string | null; pdf: Blob }) => {
+      const { data: atual } = await supabase.from('qsma_os_seguranca')
+        .select('missao_id').eq('id', p.osId).maybeSingle()
+      if ((atual as { missao_id?: string } | null)?.missao_id) {
+        return { ok: true, missao_id: (atual as { missao_id: string }).missao_id, jaEnviada: true }
+      }
+      const base = `OS_Seguranca_${(p.codigo ?? p.osId).replace(/[^\w-]+/g, '_')}.pdf`
+      const path = `qsma-os/${p.colaboradorId}/${Date.now()}-${base}`
+      const up = await supabase.storage.from('rh-admissao-docs')
+        .upload(path, p.pdf, { contentType: 'application/pdf', upsert: false })
+      if (up.error) throw up.error
+
+      const { data, error } = await supabase.rpc('rh_missao_enviar', {
+        p_colaborador_id: p.colaboradorId,
+        p_titulo: `Ordem de Serviço de Segurança ${p.codigo ?? ''}`.trim(),
+        p_arquivo_path: path,
+        p_tipo: 'assinatura',
+        p_descricao: 'Leia a Ordem de Serviço da sua função: riscos, EPIs obrigatórios e medidas de controle. Ao assinar, você declara que foi informado e orientado.',
+        p_metadata: { origem: 'qsma_os_seguranca', os_id: p.osId },
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string; missao_id?: string }
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao enviar para assinatura')
+
+      const { error: e2 } = await supabase.from('qsma_os_seguranca')
+        .update({ missao_id: r.missao_id, status: 'aguardando_assinatura' }).eq('id', p.osId)
+      if (e2) throw e2
+      return r
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['qsma_os_seguranca'] }) },
+  })
+}
+
 export function useEnviarFichaEpiAssinatura() {
   const qc = useQueryClient()
   return useMutation({
