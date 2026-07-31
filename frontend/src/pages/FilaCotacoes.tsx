@@ -551,6 +551,11 @@ export default function FilaCotacoes() {
     return map
   }, [cotacoes])
 
+  // Cotações com esclarecimento pedido pelo aprovador financeiro — o comprador responde aqui
+  const emEsclarecimento = useMemo(() =>
+    cotacoes.filter(c => c.status === 'concluida' && c.requisicao?.status === 'cotacao_em_esclarecimento'),
+  [cotacoes])
+
   const activeItems = useMemo(() => {
     let items = grouped.get(activeTab) ?? []
 
@@ -614,6 +619,40 @@ export default function FilaCotacoes() {
           {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
           {toast.msg}
         </div>
+      )}
+
+      {/* Notifica\u00e7\u00e3o: cota\u00e7\u00f5es com esclarecimento pedido pelo aprovador */}
+      {emEsclarecimento.length > 0 && (
+        <button
+          onClick={() => {
+            setActiveTab('em_aprovacao')
+            const first = emEsclarecimento[0]
+            if (first) setDetail(first)
+          }}
+          className={`w-full flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all hover:shadow-md ${
+            isDark
+              ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15'
+              : 'bg-amber-50 border-amber-200 hover:bg-amber-100'
+          }`}
+        >
+          <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+            <span className="absolute inset-0 rounded-full bg-amber-400/40 animate-ping" />
+            <MessageSquare size={16} className="relative text-amber-600" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+              {emEsclarecimento.length === 1
+                ? '1 cota\u00e7\u00e3o aguarda esclarecimento'
+                : `${emEsclarecimento.length} cota\u00e7\u00f5es aguardam esclarecimento`}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
+              O aprovador pediu mais informa\u00e7\u00f5es. Toque para responder e reenviar.
+            </p>
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-amber-500 text-white text-[11px] font-bold px-2.5 py-1">
+            {emEsclarecimento.length}
+          </span>
+        </button>
       )}
 
       <div className="flex items-center justify-between">
