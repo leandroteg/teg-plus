@@ -1288,6 +1288,10 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
   const semTamanho = itensValidos
     .filter(it => epis.find(e => e.id === it.epi_id)?.tamanho_por_funcionario && !it.tamanho.trim())
     .map(it => epis.find(e => e.id === it.epi_id)?.nome ?? 'EPI')
+  // Guardado ANTES de somar o tamanho: o anexo do documento antigo so precisa
+  // destes. Exigir tamanho la seria aplicar regra da ficha nova a um papel que
+  // ja foi assinado no formato antigo.
+  const errosAnexo = [...erros]
   if (semTamanho.length) erros.push(`informe o tamanho: ${semTamanho.join(', ')}`)
   const avisos: string[] = []
   for (const it of itensValidos) {
@@ -1500,11 +1504,11 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
           /* Caminho alternativo: a ficha ja foi assinada no papel (frente sem
              sinal). Sobe o digitalizado e fecha direto — sem missao. */
           <label
-            title={erros.length
-              ? `Complete a ficha primeiro: ${erros.join(' · ')}`
-              : 'A ficha ja foi assinada no papel: anexe o digitalizado e ela fecha direto'}
+            title={errosAnexo.length
+              ? `Complete a ficha primeiro: ${errosAnexo.join(' · ')}`
+              : 'Documento no formato antigo, ja assinado: anexe o digitalizado e a ficha fecha direto'}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
-              erros.length ? 'opacity-40 cursor-not-allowed pointer-events-none ' : 'cursor-pointer '
+              errosAnexo.length ? 'opacity-40 cursor-not-allowed pointer-events-none ' : 'cursor-pointer '
             }${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
             {anexarAssinada.isPending ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
