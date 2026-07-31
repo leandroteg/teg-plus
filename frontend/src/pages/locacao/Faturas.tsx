@@ -8,7 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   useImoveis, useFaturas, useCriarFatura, useAtualizarFatura,
-  useEnviarFaturasFinanceiro, useGerarFaturasMes, useCancelarEnvioFatura,
+  useEnviarFaturasFinanceiro, useGerarAlugueis, useCancelarEnvioFatura,
   parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
   removerFaturaAnexoStorage, useExcluirFatura,
   useDescontosFatura, useCriarDescontoFatura, useRemoverDescontoFatura, uploadDescontoAnexo,
@@ -1064,7 +1064,9 @@ export default function Faturas() {
 
   const { data: imoveis = [], isLoading: loadingImoveis } = useImoveis()
   const { data: faturas = [], isLoading: loadingFaturas } = useFaturas()
-  const gerarMes = useGerarFaturasMes()
+  const gerarAlugueis = useGerarAlugueis()
+  const [confirmarGerar, setConfirmarGerar] = useState<null | 'perguntando' | 'rodando'>(null)
+  const [resultadoGerar, setResultadoGerar] = useState<string | null>(null)
 
   const [busca, setBusca] = useState('')
   const [competencia, setCompetencia] = useState(currentYYYYMM)
@@ -1163,8 +1165,8 @@ export default function Faturas() {
 
   // Column definitions for sortable headers
   const columns = [
-    { key: 'imovel', label: 'IMOVEL', align: 'text-left' },
-    { key: '',       label: 'C. CUSTO', align: 'text-left' },
+    { key: 'imovel', label: 'NOME', align: 'text-left' },
+    { key: '',       label: 'CIDADE', align: 'text-left' },
     { key: '',       label: 'ALUGUEL', align: 'text-center' },
     { key: '',       label: 'ENERGIA', align: 'text-center' },
     { key: '',       label: 'AGUA', align: 'text-center' },
@@ -1295,27 +1297,13 @@ export default function Faturas() {
         </div>
 
         <button
-          onClick={async () => {
-            const competenciaDate = `${competencia}-01`
-            const label = competenciaLabel(competencia)
-            if (!confirm(`Gerar faturas (aluguel + IPTU + condomínio + energia + água + internet) para todos os imóveis ativos da competência ${label}?\n\nFaturas já existentes do mesmo trio (imóvel + tipo + mês) não são duplicadas.`)) return
-            try {
-              const r = await gerarMes.mutateAsync({ competencia: competenciaDate })
-              if (!r.ok) {
-                alert(`Erro: ${r.erro ?? 'desconhecido'}`)
-                return
-              }
-              alert(`✓ ${r.criadas} fatura(s) criada(s) para ${r.imoveis_ativos} imóvel(is) ativo(s).${r.puladas_existentes > 0 ? `\n${r.puladas_existentes} já existiam (pulada(s)).` : ''}`)
-            } catch (err: any) {
-              alert(`Erro ao gerar: ${err?.message ?? 'desconhecido'}`)
-            }
-          }}
-          disabled={gerarMes.isPending}
+          onClick={() => { setResultadoGerar(null); setConfirmarGerar("perguntando") }}
+          disabled={gerarAlugueis.isPending}
           className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-60"
-          title="Cria as faturas mensais (aluguel + 5 tipos extras) para todos os imóveis ativos na competência selecionada"
+          title="Cria as faturas de aluguel de cada imovel ate o fim do contrato"
         >
-          {gerarMes.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-          Gerar faturas do mês
+          {gerarAlugueis.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Gerar aluguéis
         </button>
       </div>
 
@@ -1358,17 +1346,14 @@ export default function Faturas() {
                     >
                       <td className="px-3 py-2.5">
                         <p className={`font-semibold truncate max-w-[200px] ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                          {row.imovel.endereco || row.imovel.descricao}
+                          {row.imovel.titulo || row.imovel.nome || row.imovel.descricao}
                         </p>
-                        {row.imovel.cidade && (
-                          <p className={`text-[10px] truncate max-w-[200px] ${txtMuted}`}>{row.imovel.cidade}</p>
-                        )}
                       </td>
-                      <td className={`px-3 py-2.5 truncate max-w-[120px] ${txtMuted}`}>{cc?.descricao || '—'}</td>
+                      <td className={`px-3 py-2.5 truncate max-w-[140px] ${txtMuted}`}>{row.imovel.cidade || '—'}</td>
+                      <td className="px-3 py-2.5 text-center">{renderCellValue(row.byTipo.aluguel)}</td>
                       <td className="px-3 py-2.5 text-center">{renderCellValue(row.byTipo.energia)}</td>
                       <td className="px-3 py-2.5 text-center">{renderCellValue(row.byTipo.agua)}</td>
                       <td className="px-3 py-2.5 text-center">{renderCellValue(row.byTipo.internet)}</td>
-                      <td className="px-3 py-2.5 text-center">{renderCellValue(row.byTipo.iptu)}</td>
                       <td className={`px-3 py-2.5 text-right font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                         {row.totalMes > 0 ? fmtCurrency(row.totalMes) : '—'}
                       </td>
@@ -1441,6 +1426,64 @@ export default function Faturas() {
               </button>
             )
           })}
+        </div>
+      )}
+
+      {/* Confirmação de geração — modal proprio, nao confirm() do navegador,
+          que em PWA/webview do celular pode ser bloqueado */}
+      {confirmarGerar && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !gerarAlugueis.isPending && setConfirmarGerar(null)}>
+          <div onClick={e => e.stopPropagation()}
+            className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+              isDark ? "bg-[#1e293b] border-white/[0.08]" : "bg-white border-slate-200"}`}>
+            <div className={`px-5 py-4 border-b ${isDark ? "border-white/[0.06]" : "border-slate-100"}`}>
+              <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                Gerar faturas de aluguel
+              </h3>
+            </div>
+            <div className="p-5 space-y-3">
+              {resultadoGerar ? (
+                <p className={`text-sm ${isDark ? "text-slate-200" : "text-slate-700"}`}>{resultadoGerar}</p>
+              ) : (
+                <>
+                  <p className={`text-sm ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                    Cria uma fatura de aluguel por mês para cada imóvel ativo, de
+                    {" "}<b>{competenciaLabel(competencia)}</b> até o fim do contrato de cada um.
+                  </p>
+                  <p className={`text-xs ${txtMuted}`}>
+                    Só aluguel — energia, água e internet entram quando a conta chega.
+                    Mês que já tiver aluguel lançado não é duplicado.
+                  </p>
+                </>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setConfirmarGerar(null)} disabled={gerarAlugueis.isPending}
+                  className={`px-4 py-2 rounded-xl border text-xs font-semibold disabled:opacity-50 ${
+                    isDark ? "border-white/10 text-slate-300 hover:bg-white/[0.04]" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                  {resultadoGerar ? "Fechar" : "Cancelar"}
+                </button>
+                {!resultadoGerar && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const r = await gerarAlugueis.mutateAsync({ de: competencia + "-01" })
+                        setResultadoGerar(r.ok
+                          ? `${r.criadas} fatura(s) de aluguel criada(s) para ${r.imoveis} imóvel(is).`
+                          : `Não foi possível gerar: ${r.erro ?? "erro desconhecido"}`)
+                      } catch (e) {
+                        setResultadoGerar(`Não foi possível gerar: ${(e as Error)?.message ?? "erro desconhecido"}`)
+                      }
+                    }}
+                    disabled={gerarAlugueis.isPending}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                    {gerarAlugueis.isPending && <Loader2 size={13} className="animate-spin" />}
+                    Gerar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -528,6 +528,22 @@ export function useEnviarFaturasFinanceiro() {
 
 // Gera faturas mensais (aluguel + iptu + condominio + energia + agua + internet)
 // para todos os imoveis ativos. Idempotente: nao re-cria se ja existe (imovel, tipo, mes).
+// Aluguel e o unico lancamento previsivel (valor e vencimento estao no contrato).
+// Gera de uma vez ate o fim de cada contrato. NAO cria energia/agua/internet:
+// conta de concessionaria so existe quando chega, e linha zerada faz
+// 'este imovel nao tem' parecer 'esta faltando'.
+export function useGerarAlugueis() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ de }: { de: string }) => {
+      const { data, error } = await supabase.rpc('loc_gerar_alugueis', { p_de: de })
+      if (error) throw error
+      return data as { ok: boolean; criadas: number; imoveis: number; de: string; erro?: string }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_faturas'] }),
+  })
+}
+
 export function useGerarFaturasMes() {
   const qc = useQueryClient()
   return useMutation({
