@@ -6,7 +6,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX, Plus,
+  Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX,
   Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown,
 } from 'lucide-react'
 import {
@@ -231,11 +231,6 @@ export default function TiHome() {
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
           </div>
         ) : undefined}
-        action={
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <Link to="/ti/chamados/novo" className="btn-primary"><Plus className="h-4 w-4" /> Nova Solicitação</Link>
-          </div>
-        }
       />
 
       {/* Visão Relatório — mesmo conteúdo da página /ti/relatorios */}
