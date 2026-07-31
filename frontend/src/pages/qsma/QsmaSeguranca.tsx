@@ -2021,6 +2021,17 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
           isDark={isDark} alvo={osPara.alvo} existente={osPara.existente}
           autorNome={perfil?.nome}
           onClose={() => setOsPara(null)}
+          onAnexarAntiga={async (file) => {
+            // Caminho do documento antigo: sobe pelo mesmo upload das outras
+            // colunas, entao a celula fica verde pelo registro legado.
+            const cand = osPara.alvo
+            await admTrein.anexarCert.mutateAsync({
+              candidatoId: filt.find(x => x.colaborador_id === cand.colaboradorId)?.id ?? '',
+              nome: 'OS - Ordem de Serviço', treinamentoId: cols.find(c => c.codigo === 'OS')?.id, file,
+            })
+            qc.invalidateQueries({ queryKey: ['integracao-treinos'] })
+            setOsPara(null)
+          }}
           onEmitir={async (os) => {
             try {
               const pdf = await gerarOsSegurancaBlob({
@@ -2140,11 +2151,21 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                           if (col.codigo === 'OS') {
                             const o = osDe(c)
                             const podeEmitir = !!c.colaborador_id
+                            // A OS antiga continua valendo: quem ja tem o
+                            // documento anexado esta resolvido, mesmo sem
+                            // registro na tabela nova.
+                            const legado = statusCel(c.id, cargoKey, col)
                             return (
                               <td key={col.id} className={`text-center border-l border-dashed ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                                 <div className="flex items-center justify-center h-8">
                                   {!podeEmitir ? (
                                     <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                  ) : legado.s === 'ok' && o?.status !== 'assinada' ? (
+                                    <button type="button" onClick={() => verCert(legado.rec?.certificado_path)}
+                                      title={`OS anexada — ${legado.rec?.certificado_nome ?? 'documento no formato antigo'}`}
+                                      className="group">
+                                      <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
+                                    </button>
                                   ) : (
                                     <button type="button"
                                       onClick={() => setOsPara({
