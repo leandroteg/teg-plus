@@ -22,6 +22,10 @@ import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 const TIPOS: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
 // O que quase todo imovel tem. Enquanto ninguem configurar, a tela cobra so isso —
 // listar os 11 tipos fazia 'nao tem' parecer 'esta faltando'.
+// O mes que a tela usa para agrupar e o que a CONTA declara. Fatura sem
+// referencia (internet, aluguel) cai na competencia — senao sumiria de todo mes.
+const mesDaFatura = (f: { mes_referencia?: string | null; competencia?: string | null }) =>
+  (f.mes_referencia ?? f.competencia ?? '').slice(0, 7)
 const mesRefLabel = (d: string) => {
   const [ano, mes] = d.slice(0, 7).split("-")
   return `${mes}/${ano.slice(2)}`
@@ -155,7 +159,10 @@ function InlineEditForm({
         {
           imovel_id: imovel.id,
           tipo,
-          competencia: competencia + '-01',
+          // o mes navegado e o de REFERENCIA; a competencia segue o vencimento,
+          // que e como o financeiro agrupa
+          mes_referencia: competencia + '-01',
+          competencia: (vencimento ? vencimento.slice(0, 7) : competencia) + '-01',
           vencimento: vencimento || undefined,
           valor_previsto: parsedValor,
           status,
@@ -455,7 +462,7 @@ function ImovelFaturasModal({
       // snapshot local (tipo|competência → fatura) p/ decidir criar/atualizar dentro do lote
       const locais = new Map<string, { id: string; status: StatusFatura; temAnexo: boolean }>()
       allFaturas.filter(f => f.imovel_id === imovel.id).forEach(f => {
-        locais.set(`${f.tipo}|${(f.competencia ?? '').slice(0, 7)}`, {
+        locais.set(`${f.tipo}|${mesDaFatura(f)}`, {
           id: f.id, status: f.status, temAnexo: !!f.boleto_url,
         })
       })
@@ -500,7 +507,8 @@ function ImovelFaturasModal({
           await criarFatura.mutateAsync({
             imovel_id: imovel.id,
             tipo,
-            competencia: comp + '-01',
+            mes_referencia: comp + '-01',
+            competencia: (venc ? venc.slice(0, 7) : comp) + '-01',
             vencimento: venc ?? undefined,
             valor_previsto: valor ?? undefined,
             boleto_url: path,
@@ -574,7 +582,7 @@ function ImovelFaturasModal({
 
   // Faturas for the selected competencia
   const mesFaturas = useMemo(
-    () => allFaturas.filter(f => f.imovel_id === imovel.id && f.competencia?.startsWith(modalCompetencia)),
+    () => allFaturas.filter(f => f.imovel_id === imovel.id && mesDaFatura(f) === modalCompetencia),
     [allFaturas, imovel.id, modalCompetencia],
   )
 
@@ -605,7 +613,7 @@ function ImovelFaturasModal({
   // Historico: last 10 faturas for this imovel (excluding current month)
   const historico = useMemo(
     () => allFaturas
-      .filter(f => f.imovel_id === imovel.id && !f.competencia?.startsWith(modalCompetencia))
+      .filter(f => f.imovel_id === imovel.id && mesDaFatura(f) !== modalCompetencia)
       .sort((a, b) => (b.competencia ?? '').localeCompare(a.competencia ?? ''))
       .slice(0, 10),
     [allFaturas, imovel.id, modalCompetencia],
@@ -1082,7 +1090,7 @@ export default function Faturas() {
   // Build per-imovel summary rows
   const rows = useMemo(() => {
     return imoveis.map(imo => {
-      const imoFaturas = faturas.filter(f => f.imovel_id === imo.id && f.competencia?.startsWith(competencia))
+      const imoFaturas = faturas.filter(f => f.imovel_id === imo.id && mesDaFatura(f) === competencia)
       const totalMes = imoFaturas.reduce((s, f) => s + getFaturaValor(f), 0)
       const hasOverdue = imoFaturas.some(f => isOverdue(f))
       const allPaid = imoFaturas.length > 0 && imoFaturas.every(f => f.status === 'pago')
