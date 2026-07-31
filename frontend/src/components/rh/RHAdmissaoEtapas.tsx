@@ -9,7 +9,7 @@ import { supabase } from '../../services/supabase'
 import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
-  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock, Archive,
+  Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock, Archive, Send,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -19,7 +19,7 @@ import {
   useExcluirAnexoAdmissao, useLiberarGeset, useEncerrarAdmissao,
   type RHExame, type RHMobilizacao, type RHIntegracao, type RHProposta,
 } from '../../hooks/useRHAdmissaoFluxo'
-import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase } from '../../hooks/useQsma'
+import { useCatalogoTreinamentos, useMatrizTreinamentos, cargoBase, useFichasEpi, docAssinadoUrl } from '../../hooks/useQsma'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 import RHFichaRegistroModal, { type FichaDados } from './RHFichaRegistroModal'
 
@@ -445,6 +445,45 @@ function ExamesCandidato({ cand, isDark, autorNome }: { cand: RHAdmissaoCandidat
 }
 
 // Bloco de treinamentos (etapa Treinamentos e Integração) — dirigido pela Matriz QSMA do cargo
+/** Ficha de EPI na etapa Integracao. Nao vem do catalogo de treinamentos (ela
+ *  nao e um curso), mas e requisito da mesma etapa — sem EPI ninguem vai a
+ *  campo. Mesma leitura de estado da tela do QSMA. */
+function FichaEpiLinha({ colaboradorId }: { colaboradorId?: string | null }) {
+  const { data: fichas = [] } = useFichasEpi()
+  const f = colaboradorId ? fichas.find(x => x.colaborador_id === colaboradorId) : undefined
+
+  const assinada = f?.status === 'assinada' || f?.status === 'arquivada'
+  const enviada = !!f && !assinada && !!f.missao_id
+  const criada = !!f && !assinada && !enviada
+
+  const abrir = async () => {
+    if (!f) return
+    if (f.arquivo_assinado_path) {
+      const url = await docAssinadoUrl(f.arquivo_assinado_path)
+      if (url) { window.open(url, '_blank', 'noopener'); return }
+    }
+    if (f.onedrive_web_url) window.open(f.onedrive_web_url, '_blank', 'noopener')
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 py-1">
+      <span className="flex items-center gap-1.5 text-[11px] min-w-0">
+        {assinada ? <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+          : enviada ? <Clock size={13} className="text-amber-500 shrink-0" />
+          : criada ? <Send size={13} className="text-orange-500 shrink-0" />
+          : <Circle size={12} className="text-red-400 shrink-0" />}
+        <span className="truncate">Ficha de EPI</span>
+        <span className="text-[10px] text-slate-400 shrink-0">
+          {assinada ? 'assinada' : enviada ? 'aguardando assinatura' : criada ? 'criada — falta enviar' : 'sem ficha'}
+        </span>
+      </span>
+      {f && (assinada || f.onedrive_web_url) && (
+        <button onClick={abrir} className="text-[10px] font-semibold text-sky-600 hover:underline shrink-0">ver</button>
+      )}
+    </div>
+  )
+}
+
 export function TreinamentosBlock({ cand, cargo, treinamentos }: {
   cand: RHAdmissaoCandidato; cargo?: string | null
   treinamentos: { id: string; nome: string; norma: string | null; treinamento_id?: string | null; status: string; certificado_path?: string | null; certificado_nome?: string | null }[]
@@ -1063,6 +1102,9 @@ function IntCandidato({ cand, adm, cargoVaga, isDark, autorNome }: { cand: RHAdm
 
       {/* Treinamentos obrigatórios (dirigido pela Matriz QSMA do cargo) */}
       <TreinamentosBlock cand={cand} cargo={cargoVaga} treinamentos={data?.treinamentos ?? []} />
+
+      {/* Ficha de EPI — requisito da integração, mas não é item do catálogo */}
+      <FichaEpiLinha colaboradorId={(cand as { colaborador_id?: string | null }).colaborador_id} />
 
       {/* Recursos / Necessidades (editável aqui caso não tenha sido no Alinhamento) */}
       <RecursosBloco cand={cand} recursos={data?.proposta?.recursos} editable />
