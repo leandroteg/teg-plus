@@ -13,11 +13,13 @@
 // altera a Matriz. Corrigir a matriz é outra decisão, feita na tela dela.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Loader2, AlertTriangle, ShieldCheck, GraduationCap, Users } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, ShieldCheck, GraduationCap, Users, Eye } from 'lucide-react'
+import { gerarOsSegurancaBlob } from '../../utils/os-seguranca-pdf'
 import { QsmaModal, ModalFooter } from './ModalBits'
 import { pickerInputCls, pickerLabelCls } from './Pickers'
 import {
-  useOsSegurancaDoCargo, useSalvarOsSeguranca, OS_OBJETIVO_PADRAO, OS_DIRETRIZES_PADRAO,
+  useOsSegurancaDoCargo, useSalvarOsSeguranca, useColaboradorParaOs,
+  OS_OBJETIVO_PADRAO, OS_DIRETRIZES_PADRAO,
   type OsSegDados, type OsSeguranca,
 } from '../../hooks/useQsma'
 
@@ -42,7 +44,9 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
   onEmitir: (os: OsSeguranca) => void | Promise<void>
 }) {
   const { data: doCargo, isLoading } = useOsSegurancaDoCargo(alvo.cargo)
+  const { data: cad } = useColaboradorParaOs(alvo.colaboradorId)
   const salvar = useSalvarOsSeguranca()
+  const [previa, setPrevia] = useState(false)
 
   // Cabeçalho — vem do cadastro, mas editável: a OS não pode travar porque o
   // cadastro está incompleto (44 colaboradores ainda estão sem CBO).
@@ -75,6 +79,19 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
     setCarregou(true)
   }, [existente])
 
+  // O cadastro chega depois do primeiro render — preenche so o que continua
+  // vazio, para nao apagar o que a pessoa ja digitou.
+  useEffect(() => {
+    if (existente || !cad) return
+    setMatricula(v => v || cad.matricula || '')
+    setCbo(v => v || cad.cbo || '')
+    setCargo(v => v || cad.cargo || '')
+    // A OS traz SETOR; quando o cadastro nao tem subarea, o departamento e a
+    // informacao mais proxima — melhor que sair em branco no documento.
+    setSetor(v => v || cad.setor || cad.departamento || '')
+    setAdmissao(v => v || cad.data_admissao || '')
+  }, [cad, existente])
+
   useEffect(() => {
     if (existente || carregou || !doCargo) return
     setRiscos(doCargo.riscos); setEpis(doCargo.epis); setTreinos(doCargo.treinamentos)
@@ -103,6 +120,27 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
     if (semMedida) a.push(`${semMedida} risco(s) sem medida administrativa`)
     return a
   }, [cbo, setor, epis, treinos, riscos])
+
+  /** Abre o PDF do que esta na tela — sem salvar nada. */
+  async function verPrevia() {
+    setPrevia(true)
+    try {
+      const blob = await gerarOsSegurancaBlob({
+        codigo: existente?.codigo ?? '(prévia)',
+        colaboradorNome: alvo.nome, matricula, cargo, setor, cbo,
+        dataAdmissao: admissao || null,
+        objetivo, descricaoAtividade: atividade, obrigacoes: diretrizes,
+        riscos, epis, epcs: epcs.filter(x => x.trim()), treinamentos: treinos,
+        emitidaPorNome: autorNome ?? null,
+      })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener')
+      // Não revoga na hora: a aba precisa do blob para renderizar.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) {
+      alert(`Não foi possível gerar a prévia: ${e?.message ?? 'erro desconhecido'}`)
+    } finally { setPrevia(false) }
+  }
 
   async function emitir() {
     const dados: OsSegDados = {
@@ -316,7 +354,11 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
       </div>
 
       {somenteLeitura ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button onClick={verPrevia} disabled={previa}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold disabled:opacity-50 ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+            {previa ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Ver documento
+          </button>
           <button onClick={onClose} className={`px-4 py-2 rounded-xl border text-xs font-semibold ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
             Fechar
           </button>
@@ -324,7 +366,17 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
       ) : (
         <ModalFooter
           isDark={isDark} erros={erros} avisos={avisos} salvando={salvar.isPending}
-          onCancel={onClose} saveLabel="Emitir e enviar para assinatura" onSave={emitir}
+          onCancel={onClose} saveLabel="Emitir e enviar" onSave={emitir}
+          extra={
+            <button onClick={verPrevia} disabled={previa}
+              title="Abre o PDF do que está na tela, sem salvar nem enviar"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-50 ${
+                isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}>
+              {previa ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+              Ver prévia
+            </button>
+          }
         />
       )}
     </QsmaModal>
