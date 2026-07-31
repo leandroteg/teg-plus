@@ -198,6 +198,8 @@ export interface LocImovel {
   qtd_janelas?: number
   iptu_numero?: string
   iptu_quitado?: boolean | null
+  /** Contas que este imóvel tem todo mês. null = não configurado (mostra todas). */
+  faturas_esperadas?: TipoFatura[] | null
   prefeito_nome?: string
   prefeito_telefone?: string
   latitude?: number | null

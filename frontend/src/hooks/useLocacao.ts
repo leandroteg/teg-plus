@@ -94,6 +94,25 @@ export function useAtualizarImovel() {
   })
 }
 
+// ── Contas esperadas do imóvel ───────────────────────────────────────────────
+// Define quais tipos de fatura a tela deve cobrar por mês naquele imóvel.
+export function useSalvarFaturasEsperadas() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ imovelId, tipos }: { imovelId: string; tipos: string[] | null }) => {
+      const { error } = await supabase
+        .from('loc_imoveis')
+        .update({ faturas_esperadas: tipos, updated_at: new Date().toISOString() })
+        .eq('id', imovelId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      ;['loc_imoveis', 'loc_alojamentos', 'loc_faturas'].forEach(k =>
+        qc.invalidateQueries({ queryKey: [k] }))
+    },
+  })
+}
+
 // ── Entradas ──────────────────────────────────────────────────────────────────
 
 export function useEntradas(filtros?: { status?: StatusEntrada }) {
