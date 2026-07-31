@@ -324,7 +324,10 @@ export default function QsmaSeguranca() {
         )
         return (
           <div className="space-y-3">
-            {subTreino === 'integracao' && <IntegracaoTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />}
+            {subTreino === 'integracao' && (
+              <IntegracaoTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
+                onSelectEpi={id => { setAba('epis'); setSubEpi('controle'); setEpiColab(id) }} />
+            )}
 
             {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
 
@@ -1212,7 +1215,7 @@ function EpiCatalogoModal({ isDark, epi, onClose }: { isDark: boolean; epi: Qsma
 // ── Modal: Ficha de Entrega de EPI (multi-item, padrão SOC/NR-06) ────────────
 
 // Sugere o tamanho do colaborador conforme o tipo de EPI (roupa × calçado)
-function tamanhoSugerido(epi: QsmaEpi | undefined, c?: { tamanho_camisa?: string; tamanho_calca?: string; tamanho_calcado?: string }): string {
+function tamanhoSugerido(epi: QsmaEpi | undefined, c?: { tamanho_camisa?: string | null; tamanho_calca?: string | null; tamanho_calcado?: string | null } | null): string {
   if (!epi || !c) return ''
   const n = epi.nome.toLowerCase()
   if (/cal[çc]a|bermuda/.test(n)) return c.tamanho_calca ?? ''
@@ -1221,15 +1224,20 @@ function tamanhoSugerido(epi: QsmaEpi | undefined, c?: { tamanho_camisa?: string
   return ''
 }
 
-function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaEpi[]; onClose: () => void }) {
+function FichaEpiModal({ isDark, epis, onClose, preset }: {
+  isDark: boolean; epis: QsmaEpi[]; onClose: () => void
+  /** Colaborador ja definido pelo chamador (ex.: celula da Integracao) — o
+   *  picker some e o kit do cargo entra sozinho. */
+  preset?: { colaboradorId: string; nome: string; cargo?: string | null; baseNome?: string | null }
+}) {
   const criar = useCriarFichaEpi()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: bases = [] } = useBases()
   const { perfil } = useAuth()
-  const [cargoSel, setCargoSel] = useState('')
+  const [cargoSel, setCargoSel] = useState(preset?.cargo ?? '')
   const hoje = new Date().toISOString().split('T')[0]
-  const [colabId, setColabId] = useState('')
-  const [colabNome, setColabNome] = useState('')
+  const [colabId, setColabId] = useState(preset?.colaboradorId ?? '')
+  const [colabNome, setColabNome] = useState(preset?.nome ?? '')
   const [baseId, setBaseId] = useState('')
   const [dataEntrega, setDataEntrega] = useState(hoje)
   const [motivo, setMotivo] = useState<MotivoEntregaEpi>('entrega')
@@ -1238,6 +1246,23 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
     { epi_id: '', quantidade: '1', tamanho: '' },
   ])
   const [gerarPdfAoSalvar, setGerarPdfAoSalvar] = useState(true)
+
+  // Com o colaborador vindo pronto, o kit do cargo e a base precisam ser
+  // carregados aqui — o picker, que faria isso no onChange, nao aparece.
+  const colabsQ = useColaboradoresTreino()
+  useEffect(() => {
+    if (!preset || !matriz.length) return
+    const c = (colabsQ.data ?? []).find(x => x.id === preset.colaboradorId)
+    const cargo = c?.cargo ?? preset.cargo ?? ''
+    if (cargo) setCargoSel(prev => prev || cargo)
+    const bId = (c as { base_id?: string } | undefined)?.base_id
+      ?? bases.find(b => b.nome === preset.baseNome)?.id
+    if (bId) setBaseId(prev => prev || bId)
+    const kit = matriz
+      .filter(m => m.exigencia === 'obrigatorio' && cargoBase(m.cargo) === cargoBase(cargo))
+      .map(m => ({ epi_id: m.epi_id, quantidade: String(m.quantidade), tamanho: tamanhoSugerido(epis.find(e => e.id === m.epi_id), c) }))
+    if (kit.length) setItens(prev => (prev.some(i => i.epi_id) ? prev : kit))
+  }, [preset?.colaboradorId, matriz.length, colabsQ.data, bases.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const trocaPrevista = (epiId: string): string | undefined => {
     const epi = epis.find(e => e.id === epiId)
@@ -1305,6 +1330,12 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
 
   return (
     <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — gere o PDF, colha a assinatura e arquive" onClose={onClose}>
+      {preset ? (
+        <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-50'}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Colaborador</p>
+          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{preset.nome}</p>
+        </div>
+      ) : (
       <ColaboradorPicker isDark={isDark} value={colabId} onChange={(id, c) => {
         setColabId(id); setColabNome(c?.nome ?? ''); setCargoSel(c?.cargo ?? '')
         if ((c as { base_id?: string })?.base_id) setBaseId((c as { base_id?: string }).base_id!)
@@ -1314,6 +1345,7 @@ function FichaEpiModal({ isDark, epis, onClose }: { isDark: boolean; epis: QsmaE
           .map(m => ({ epi_id: m.epi_id, quantidade: String(m.quantidade), tamanho: tamanhoSugerido(epis.find(e => e.id === m.epi_id), c) }))
         setItens(kit.length ? kit : [{ epi_id: '', quantidade: '1', tamanho: '' }])
       }} required />
+      )}
       {colabId && (
         <p className={`-mt-1 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           {cargoSel || '—'} · {itens.filter(it => it.epi_id).length > 0
@@ -1676,14 +1708,22 @@ function ControleTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSele
 // ── Integração: candidatos em integração × treinamentos obrigatórios ─────────
 // Mesmo layout do Controle; o upload do certificado reusa o anexarCert da Admissão
 // (grava em rh_admissao_treinamentos + bucket rh-admissao-docs) → reflete na Admissão › Integração.
-function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
+function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSelectEpi }: {
   subTabs?: ReactNode; isDark: boolean; card: string; txtMain: string; txtMuted: string
+  /** Leva para o Controle de EPI, na ficha do colaborador. */
+  onSelectEpi?: (colaboradorId: string) => void
 }) {
   const qc = useQueryClient()
   const { data: catalogo = [] } = useCatalogoTreinamentos()
   const { data: matriz = [] } = useMatrizTreinamentos()
   const { data, isLoading } = useIntegracaoTreinos()
   const admTrein = useAdmissaoTreinamentos()
+  // Ficha de EPI: vem de qsma_epi_fichas, a MESMA fonte do Controle de EPI —
+  // por isso a ficha criada aqui aparece la sem nenhuma sincronizacao.
+  const { data: fichasEpi = [] } = useFichasEpi()
+  const { data: matrizEpi = [] } = useMatrizEpi()
+  const { data: episAtivos = [] } = useEpis()
+  const [fichaPara, setFichaPara] = useState<IntegracaoCand | null>(null)
   const [busca, setBusca] = useState('')
   const [quick, setQuick] = useState<'todos' | 'pendencia'>('todos')
   const [vista, setVista] = useState<'tabela' | 'cards'>('tabela')
@@ -1736,12 +1776,24 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
     return { s: 'faltando', rec }
   }
 
-  // resumo por candidato (ok / pendente / total obrigatório)
+  // Ficha de EPI do candidato — 'na' quando o cargo nao tem matriz de EPI.
+  const cargosComEpi = new Set(matrizEpi.filter(m => m.exigencia === 'obrigatorio').map(m => cargoBase(m.cargo)))
+  const statusEpi = (c: IntegracaoCand): { s: 'na' | 'ok' | 'faltando'; ficha?: QsmaEpiFicha } => {
+    // Sem colaborador criado ainda, a ficha nao tem onde se prender.
+    if (!c.colaborador_id || !cargosComEpi.has(cargoBase(c.cargo))) return { s: 'na' }
+    const f = fichasEpi.find(x => x.colaborador_id === c.colaborador_id)
+    return f ? { s: 'ok', ficha: f } : { s: 'faltando' }
+  }
+
+  // resumo por candidato (ok / pendente / total obrigatório) — a ficha de EPI
+  // conta junto: se e requisito da integracao, ficar de fora faz o numero mentir.
   const resumoDe = (c: IntegracaoCand) => {
     const req = reqPorCargo.get(cargoBase(c.cargo))
-    const total = req ? req.size : 0
+    let total = req ? req.size : 0
     let ok = 0
     req?.forEach(tid => { const cat = catById.get(tid); if (cat && statusCel(c.id, cargoBase(c.cargo), cat).s === 'ok') ok++ })
+    const epi = statusEpi(c)
+    if (epi.s !== 'na') { total += 1; if (epi.s === 'ok') ok += 1 }
     return { ok, pend: total - ok, total }
   }
 
@@ -1811,6 +1863,12 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
         </div>
       </div>
 
+      {fichaPara?.colaborador_id && (
+        <FichaEpiModal isDark={isDark} epis={episAtivos.filter(e => e.ativo)}
+          preset={{ colaboradorId: fichaPara.colaborador_id, nome: fichaPara.nome, cargo: fichaPara.cargo, baseNome: fichaPara.base }}
+          onClose={() => { setFichaPara(null); qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] }) }} />
+      )}
+
       {isLoading ? (
         <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
       ) : filt.length === 0 ? (
@@ -1821,6 +1879,12 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
             <thead>
               <tr>
                 <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Colaborador</th>
+                <th title="Ficha de entrega de EPI — depois de criada, ela vive no Controle de EPI"
+                  className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold border-l border-dashed ${isDark ? 'bg-[#0f172a] text-slate-400 border-white/10' : 'bg-slate-50 text-slate-500 border-slate-300'}`}>
+                  <div className="relative h-full">
+                    <span className="absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none">Ficha de EPI</span>
+                  </div>
+                </th>
                 {cols.map(c => (
                   <th key={c.id} title={`${c.nome}${c.norma ? ' · ' + c.norma : ''}`}
                     className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'} ${c.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-300') : ''}`}>
@@ -1835,7 +1899,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
               {grupos.map(([cargo, linhas]) => (
                 <Fragment key={cargo}>
                   <tr>
-                    <td colSpan={cols.length + 1}
+                    <td colSpan={cols.length + 2}
                       className={`sticky left-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${isDark ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                       {cargo} <span className="font-normal opacity-70">· {linhas.length}</span>
                     </td>
@@ -1850,6 +1914,30 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted }: {
                             {c.base && <p className={`text-[10px] truncate ${txtMuted}`}>{c.base}</p>}
                           </button>
                         </td>
+                        {(() => {
+                          const e = statusEpi(c)
+                          return (
+                            <td className={`text-center border-l border-dashed ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                              <div className="flex items-center justify-center h-8">
+                                {e.s === 'na' ? (
+                                  <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                ) : e.s === 'ok' ? (
+                                  <button type="button" onClick={() => onSelectEpi?.(c.colaborador_id!)}
+                                    title={`Ficha ${e.ficha?.codigo ?? ''} — ver no Controle de EPI`} className="group">
+                                    <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
+                                  </button>
+                                ) : (
+                                  <button type="button" onClick={() => setFichaPara(c)} title="Gerar ficha de EPI" className="inline-flex">
+                                    <span className="relative inline-flex items-center justify-center group">
+                                      <Circle size={14} className="text-red-400 group-hover:opacity-0" />
+                                      <Plus size={13} className="absolute text-sky-500 opacity-0 group-hover:opacity-100" />
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )
+                        })()}
                         {cols.map(col => {
                           const st = statusCel(c.id, cargoKey, col)
                           return (
