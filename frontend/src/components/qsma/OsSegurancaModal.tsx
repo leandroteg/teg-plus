@@ -13,7 +13,7 @@
 // altera a Matriz. Corrigir a matriz é outra decisão, feita na tela dela.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Loader2, AlertTriangle, ShieldCheck, GraduationCap, Users, Eye } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, ShieldCheck, GraduationCap, Users, Eye, Paperclip } from 'lucide-react'
 import { gerarOsSegurancaBlob } from '../../utils/os-seguranca-pdf'
 import { QsmaModal, ModalFooter } from './ModalBits'
 import { pickerInputCls, pickerLabelCls } from './Pickers'
@@ -34,7 +34,7 @@ export interface AlvoOs {
   dataAdmissao?: string | null
 }
 
-export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, onClose, onEmitir }: {
+export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, onClose, onEmitir, onAnexarAntiga }: {
   isDark: boolean
   alvo: AlvoOs
   /** OS já emitida — abre em consulta. */
@@ -42,11 +42,14 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
   autorNome?: string | null
   onClose: () => void
   onEmitir: (os: OsSeguranca) => void | Promise<void>
+  /** Caminho alternativo: anexar a OS no formato antigo, já assinada. */
+  onAnexarAntiga?: (file: File) => Promise<void>
 }) {
   const { data: doCargo, isLoading } = useOsSegurancaDoCargo(alvo.cargo)
   const { data: cad } = useColaboradorParaOs(alvo.colaboradorId)
   const salvar = useSalvarOsSeguranca()
   const [previa, setPrevia] = useState(false)
+  const [anexando, setAnexando] = useState(false)
 
   // Cabeçalho — vem do cadastro, mas editável: a OS não pode travar porque o
   // cadastro está incompleto (44 colaboradores ainda estão sem CBO).
@@ -368,6 +371,28 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
           isDark={isDark} erros={erros} avisos={avisos} salvando={salvar.isPending}
           onCancel={onClose} saveLabel="Emitir e enviar" onSave={emitir}
           extra={
+            <div className="flex items-center gap-2">
+            {onAnexarAntiga && (
+              /* A OS no formato antigo ja existe assinada — anexar resolve a
+                 pendencia sem passar pela emissao nem pelo Portal. */
+              <label
+                title="Anexar a OS no formato antigo, já assinada"
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}>
+                {anexando ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                Anexar assinada
+                <input type="file" className="hidden" accept="application/pdf,image/*"
+                  onChange={async e => {
+                    const f = e.target.files?.[0]; e.currentTarget.value = ''
+                    if (!f) return
+                    setAnexando(true)
+                    try { await onAnexarAntiga(f) }
+                    catch (err: any) { alert(`Erro ao anexar a OS: ${err?.message ?? 'desconhecido'}`) }
+                    finally { setAnexando(false) }
+                  }} />
+              </label>
+            )}
             <button onClick={verPrevia} disabled={previa}
               title="Abre o PDF do que está na tela, sem salvar nem enviar"
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-50 ${
@@ -376,6 +401,7 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
               {previa ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
               Ver prévia
             </button>
+            </div>
           }
         />
       )}
