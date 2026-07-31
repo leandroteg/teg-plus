@@ -2,7 +2,7 @@
 // ficha-epi-pdf.ts — Ficha de Controle e Entrega de EPI (NR-06)
 // Mesmo padrão visual do Termo de Cautela: header corporativo TEG, dados do
 // colaborador/obra, tabela de EPIs com CA, termo de responsabilidade NR-06 e
-// campos de assinatura (colaborador + responsável pela entrega).
+// campo de assinatura do colaborador (assinada no Portal TEG).
 // Fluxo: gerar → colher assinatura → digitalizar → arquivar na ficha.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -198,22 +198,25 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
   doc.text(termoLines, M, y)
   y += termoLines.length * 3.6 + 10
 
-  // ── Assinaturas ─────────────────────────────────────────────────────────────
+  // ── Assinatura ──────────────────────────────────────────────────────────────
+  // Uma so: quem RECEBE o EPI. Ela e colhida eletronicamente no Portal TEG.
+  // Quem entregou ja consta como dado da ficha — nao precisa de rubrica.
   checkPage(45)
-  const half = CW / 2
+  const larg = Math.min(CW, 110)
+  const cx = M + larg / 2
   doc.setDrawColor(...DARK)
   doc.setLineWidth(0.3)
-  doc.line(M + 5, y + 18, M + half - 10, y + 18)
-  doc.line(M + half + 10, y + 18, W - M - 5, y + 18)
+  doc.line(M, y + 18, M + larg, y + 18)
   doc.setFontSize(8)
   doc.setTextColor(...DARK)
-  doc.text(data.colaboradorNome, M + 5 + (half - 15) / 2, y + 23, { align: 'center' })
-  doc.text(data.entreguePorNome ?? 'Responsável pela entrega', M + half + 10 + (half - 15) / 2, y + 23, { align: 'center' })
+  doc.text(data.colaboradorNome, cx, y + 23, { align: 'center' })
   doc.setFontSize(7)
   doc.setTextColor(...MID)
-  doc.text('Assinatura do colaborador', M + 5 + (half - 15) / 2, y + 27, { align: 'center' })
-  doc.text('Assinatura do responsável (SESMT/Almoxarifado)', M + half + 10 + (half - 15) / 2, y + 27, { align: 'center' })
-  y += 34
+  doc.text('Assinatura do colaborador (recebimento)', cx, y + 27, { align: 'center' })
+  if (data.entreguePorNome) {
+    doc.text(`Entregue por: ${data.entreguePorNome}`, M, y + 33)
+  }
+  y += 38
 
   // rodapé
   doc.setFontSize(7)
@@ -221,6 +224,15 @@ function buildDoc(data: FichaEpiPdfData, empresa: EmpresaData, logo: string | nu
   doc.text(`Documento gerado pelo TEG+ QSMA em ${new Date().toLocaleString('pt-BR')}`, M, 288)
 
   return doc
+}
+
+/** Monta o PDF e devolve o arquivo, em vez de baixar — usado no envio para
+ *  assinatura, que precisa subir o documento no storage. */
+export async function gerarFichaEpiBlob(data: FichaEpiPdfData): Promise<Blob> {
+  let empresa: EmpresaData = EMPRESA_FALLBACK
+  try { empresa = await getEmpresa() } catch { /* fallback */ }
+  const logo = await loadLogoBase64('/logo-teg-transicao-branca.png') ?? (empresa.logoUrl ? await loadLogoBase64(empresa.logoUrl) : null)
+  return buildDoc(data, empresa, logo).output('blob')
 }
 
 export async function gerarFichaEpiPdf(data: FichaEpiPdfData): Promise<void> {
