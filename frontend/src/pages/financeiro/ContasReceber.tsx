@@ -6,7 +6,7 @@ import {
   FileText, ChevronDown, ChevronUp, X, ShieldCheck,
   Building2, Tag, Briefcase, Hash, Layers,
   ExternalLink, Download, ArrowUpDown, LayoutList,
-  LayoutGrid, ArrowDown, ArrowUp, Receipt, Mail,
+  LayoutGrid, ArrowDown, ArrowUp, Receipt, Mail, Ruler,
   ArrowRight, Upload, RefreshCw, XCircle, Zap, Users, Lock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -19,7 +19,6 @@ import {
 import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
-import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
@@ -54,12 +53,14 @@ const BLOQUEIOS: Record<BloqueioCR, { label: string; cls: string; Icon: typeof A
   contratual:       { label: 'Bloqueio Contratual',   cls: 'text-rose-500',    Icon: FileText },
   rh:               { label: 'Bloqueio Recursos Humanos', cls: 'text-rose-500', Icon: Users },
   financeiro:       { label: 'Bloqueio Financeiro',   cls: 'text-rose-500',    Icon: Receipt },
+  // motivo mais comum no controle da CEMIG: a medição não foi liberada no portal
+  medicao:          { label: 'Bloqueio de Medição',   cls: 'text-rose-500',    Icon: Ruler },
   em_identificacao: { label: 'Em identificação',      cls: 'text-amber-500',   Icon: Search },
   em_aprovacao:     { label: 'Em Aprovação',          cls: 'text-orange-500',  Icon: Clock },
   resolvido:        { label: 'Bloqueio resolvido',    cls: 'text-emerald-500', Icon: CheckCircle2 },
   sem_bloqueio:     { label: 'Sem bloqueio',          cls: 'text-slate-300',   Icon: null },
 }
-const BLOQUEIO_ORDER: BloqueioCR[] = ['sem_bloqueio', 'tecnico', 'contratual', 'rh', 'financeiro', 'em_identificacao', 'em_aprovacao', 'resolvido']
+const BLOQUEIO_ORDER: BloqueioCR[] = ['sem_bloqueio', 'tecnico', 'contratual', 'rh', 'financeiro', 'medicao', 'em_identificacao', 'em_aprovacao', 'resolvido']
 
 // cor do vencimento: vencido ou faltando ≤3 dias → vermelho (não conta se já recebido/conciliado)
 function vencInfo(cr: ContaReceber): { cls: string; bold: boolean } {
@@ -746,16 +747,6 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
               )}
             </div>
           )}
-
-          <CancelamentoDocControl
-            tipo="cr"
-            docId={cr.id}
-            status={cr.status}
-            cancelamentoPendente={cr.cancelamento_pendente}
-            dark={isDark}
-            onChanged={onClose}
-            className="mb-2"
-          />
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>

@@ -186,7 +186,7 @@ export interface ContaReceber {
 }
 
 export type BloqueioCR =
-  | 'tecnico' | 'contratual' | 'rh' | 'financeiro'
+  | 'tecnico' | 'contratual' | 'rh' | 'financeiro' | 'medicao'
   | 'em_identificacao' | 'em_aprovacao' | 'resolvido' | 'sem_bloqueio'
 
 export interface DocumentoFinanceiro {
