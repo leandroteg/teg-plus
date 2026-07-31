@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ShieldCheck, GraduationCap, Siren, Plus, Pencil, Link2,
   Search, Loader2, FileDown, Paperclip, Trash2, ChevronRight, ChevronDown,
-  CheckCircle2, XCircle, Circle, Upload, User, X,
+  CheckCircle2, XCircle, Circle, Upload, User, X, Clock,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -16,7 +16,7 @@ import { TreinamentosBlock } from '../../components/rh/RHAdmissaoEtapas'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
-  useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, consultarCA,
+  useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, useEnviarFichaEpiAssinatura, consultarCA,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
@@ -28,7 +28,7 @@ import {
   useEstoqueEpi, useSaldoEpi,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
-import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
+import { gerarFichaEpiPdf, gerarFichaEpiBlob } from '../../utils/ficha-epi-pdf'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
 import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText, Link as LinkIcon, Check, Grid3x3 } from 'lucide-react'
@@ -1231,6 +1231,7 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
   preset?: { colaboradorId: string; nome: string; cargo?: string | null; baseNome?: string | null }
 }) {
   const criar = useCriarFichaEpi()
+  const enviarAssinatura = useEnviarFichaEpiAssinatura()
   const { data: matriz = [] } = useMatrizEpi()
   const { data: bases = [] } = useBases()
   const { perfil } = useAuth()
@@ -1276,11 +1277,17 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
   const erros: string[] = []
   if (!colabId) erros.push('selecione o colaborador')
   if (itensValidos.length === 0) erros.push('adicione ao menos 1 EPI')
+  // Ficha sem tamanho nao serve para nada: quem assina precisa saber o que
+  // recebeu. Só vale para os EPIs marcados como tamanho por funcionário —
+  // protetor auricular, óculos e afins são tamanho único.
+  const semTamanho = itensValidos
+    .filter(it => epis.find(e => e.id === it.epi_id)?.tamanho_por_funcionario && !it.tamanho.trim())
+    .map(it => epis.find(e => e.id === it.epi_id)?.nome ?? 'EPI')
+  if (semTamanho.length) erros.push(`informe o tamanho: ${semTamanho.join(', ')}`)
   const avisos: string[] = []
   for (const it of itensValidos) {
     const epi = epis.find(e => e.id === it.epi_id)
     if (epi?.validade_ca && epi.validade_ca < hoje) avisos.push(`CA ${epi.ca} (${epi.nome}) VENCIDO`)
-    if (epi?.tamanho_por_funcionario && !it.tamanho.trim()) avisos.push(`${epi.nome}: informe o tamanho`)
   }
 
   async function salvar() {
@@ -1301,6 +1308,42 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
         })) as ItemFichaEpi[],
       }
       const r = await criar.mutateAsync(payload)
+
+      // Dados do PDF — servem tanto para o envio quanto para a copia local.
+      const dadosPdf = {
+        codigo: r.codigo,
+        colaboradorNome: colabNome,
+        baseNome: bases.find(b => b.id === baseId)?.nome,
+        dataEntrega,
+        motivo,
+        observacoes: obs || undefined,
+        entreguePorNome: perfil?.nome,
+        itens: itensValidos.map(it => {
+          const epi = epis.find(e => e.id === it.epi_id)
+          return {
+            nome: epi?.nome ?? 'EPI',
+            ca: epi?.ca,
+            quantidade: Number(it.quantidade),
+            tamanho: it.tamanho || undefined,
+            trocaPrevista: trocaPrevista(it.epi_id),
+          }
+        }),
+      }
+
+      // Vai para o Portal TEG assinar. Se falhar, a ficha JA existe — por isso
+      // o aviso diz onde retomar, em vez de fingir que nada aconteceu.
+      try {
+        const pdf = await gerarFichaEpiBlob(dadosPdf)
+        await enviarAssinatura.mutateAsync({
+          fichaId: r.id,
+          colaboradorId: colabId,
+          codigo: r.codigo,
+          pdf,
+        })
+      } catch (e: any) {
+        alert(`Ficha ${r.codigo} criada, mas o envio para assinatura falhou: ${e?.message ?? 'erro desconhecido'}\n\nVoce pode reenviar pelo Controle de EPI.`)
+      }
+
       if (gerarPdfAoSalvar) {
         await gerarFichaEpiPdf({
           codigo: r.codigo,
@@ -1329,7 +1372,7 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
   }
 
   return (
-    <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — gere o PDF, colha a assinatura e arquive" onClose={onClose}>
+    <QsmaModal isDark={isDark} wide titulo="Nova ficha de entrega de EPI" subtitulo="1 ficha carrega vários EPIs — ao enviar, o colaborador assina no Portal TEG" onClose={onClose}>
       {preset ? (
         <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-white/[0.05]' : 'bg-slate-50'}`}>
           <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Colaborador</p>
@@ -1403,11 +1446,20 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
               onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, quantidade: e.target.value } : x))}
               className={pickerInputCls(isDark)}
             />
-            <input
-              value={it.tamanho} placeholder="Tam." title="Tamanho"
-              onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
-              className={pickerInputCls(isDark)}
-            />
+            {(() => {
+              // O campo avisa que e obrigatorio ANTES de tentar salvar.
+              const exige = !!epis.find(e => e.id === it.epi_id)?.tamanho_por_funcionario
+              const falta = exige && !it.tamanho.trim()
+              return (
+                <input
+                  value={it.tamanho}
+                  placeholder={exige ? 'Tam. *' : 'Tam.'}
+                  title={exige ? 'Tamanho — obrigatório para este EPI' : 'Tamanho (opcional — tamanho único)'}
+                  onChange={e => setItens(prev => prev.map((x, j) => j === i ? { ...x, tamanho: e.target.value } : x))}
+                  className={`${pickerInputCls(isDark)} ${falta ? 'border-red-400 ring-1 ring-red-400/40' : ''}`}
+                />
+              )
+            })()}
             <button
               onClick={() => setItens(prev => prev.filter((_, j) => j !== i))}
               className="text-slate-400 hover:text-red-500 p-1"
@@ -1426,12 +1478,12 @@ function FichaEpiModal({ isDark, epis, onClose, preset }: {
 
       <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
         <input type="checkbox" checked={gerarPdfAoSalvar} onChange={e => setGerarPdfAoSalvar(e.target.checked)} className="accent-red-600" />
-        Gerar a ficha em PDF ao salvar (para colher a assinatura)
+        Baixar tambem uma copia em PDF (a assinatura e colhida no Portal TEG)
       </label>
 
       <ModalFooter
-        isDark={isDark} erros={erros} avisos={avisos} salvando={criar.isPending}
-        onCancel={onClose} saveLabel="Criar ficha" onSave={salvar}
+        isDark={isDark} erros={erros} avisos={avisos} salvando={criar.isPending || enviarAssinatura.isPending}
+        onCancel={onClose} saveLabel="Enviar Ficha para Assinatura" onSave={salvar}
       />
     </QsmaModal>
   )
@@ -1778,11 +1830,14 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
 
   // Ficha de EPI do candidato — 'na' quando o cargo nao tem matriz de EPI.
   const cargosComEpi = new Set(matrizEpi.filter(m => m.exigencia === 'obrigatorio').map(m => cargoBase(m.cargo)))
-  const statusEpi = (c: IntegracaoCand): { s: 'na' | 'ok' | 'faltando'; ficha?: QsmaEpiFicha } => {
+  // 'enviada' = ficha no Portal esperando o colaborador assinar. Separar de
+  // 'ok' evita o pior dos mundos: dar por resolvido o que ninguem assinou.
+  const statusEpi = (c: IntegracaoCand): { s: 'na' | 'ok' | 'enviada' | 'faltando'; ficha?: QsmaEpiFicha } => {
     // Sem colaborador criado ainda, a ficha nao tem onde se prender.
     if (!c.colaborador_id || !cargosComEpi.has(cargoBase(c.cargo))) return { s: 'na' }
     const f = fichasEpi.find(x => x.colaborador_id === c.colaborador_id)
-    return f ? { s: 'ok', ficha: f } : { s: 'faltando' }
+    if (!f) return { s: 'faltando' }
+    return { s: f.status === 'aguardando_assinatura' ? 'enviada' : 'ok', ficha: f }
   }
 
   // resumo por candidato (ok / pendente / total obrigatório) — a ficha de EPI
@@ -1793,6 +1848,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
     let ok = 0
     req?.forEach(tid => { const cat = catById.get(tid); if (cat && statusCel(c.id, cargoBase(c.cargo), cat).s === 'ok') ok++ })
     const epi = statusEpi(c)
+    // Enviada ainda e pendencia: so a assinatura encerra.
     if (epi.s !== 'na') { total += 1; if (epi.s === 'ok') ok += 1 }
     return { ok, pend: total - ok, total }
   }
@@ -1859,6 +1915,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
         <div className="flex items-center gap-3 text-[11px]">
           <span className={`flex items-center gap-1 ${txtMuted}`}><CheckCircle2 size={14} className="text-emerald-500" /> Certificado anexado</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><Circle size={12} className="text-red-400" /> Pendente (clique p/ anexar)</span>
+          <span className={`flex items-center gap-1 ${txtMuted}`}><Clock size={12} className="text-amber-500" /> Aguardando assinatura</span>
           <span className={`flex items-center gap-1 ${txtMuted}`}><span className="text-slate-300 font-bold">·</span> Não se aplica</span>
         </div>
       </div>
@@ -1921,9 +1978,14 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                               <div className="flex items-center justify-center h-8">
                                 {e.s === 'na' ? (
                                   <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                ) : e.s === 'enviada' ? (
+                                  <button type="button" onClick={() => onSelectEpi?.(c.colaborador_id!)}
+                                    title={`Ficha ${e.ficha?.codigo ?? ''} — enviada, aguardando assinatura no Portal`} className="group">
+                                    <Clock size={16} className="text-amber-500 group-hover:text-amber-600" />
+                                  </button>
                                 ) : e.s === 'ok' ? (
                                   <button type="button" onClick={() => onSelectEpi?.(c.colaborador_id!)}
-                                    title={`Ficha ${e.ficha?.codigo ?? ''} — ver no Controle de EPI`} className="group">
+                                    title={`Ficha ${e.ficha?.codigo ?? ''} assinada — ver no Controle de EPI`} className="group">
                                     <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
                                   </button>
                                 ) : (
