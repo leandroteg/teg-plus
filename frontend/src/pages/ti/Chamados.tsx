@@ -1,12 +1,13 @@
 import { useState } from 'react'
+import type { ComponentType } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Inbox, AlertTriangle, ChevronLeft, Headset, CheckCircle2, Package, X } from 'lucide-react'
+import { Search, Inbox, AlertTriangle, ArrowRight, ChevronLeft, Headset, CheckCircle2, Package, X } from 'lucide-react'
 import { NovoChamadoForm } from './NovoChamado'
 import { listCategories, listSectors } from './data/meta'
 import { listTickets, type TicketFilters } from './data/tickets'
 import { useTiAuth } from './data/auth'
-import type { Status, Priority } from './data/shapes'
+import type { Ticket, Status, Priority } from './data/shapes'
 import { STATUS_LIST, PRIORITY_LIST, STATUS_META, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner, EmptyState } from './components/ui'
 import { TiTabs } from './components/TiTabs'
@@ -14,6 +15,85 @@ import { StatusBadge, PriorityBadge, CategoryBadge, EscaladoBadge } from './comp
 import { SlaBadge } from './components/SlaBadge'
 import { Avatar } from './components/Avatar'
 import { timeAgo } from './lib/format'
+
+// ─── Seções movidas do Painel (Home) — ficam junto do quadro de chamados ─────
+const OPEN_STATUSES: Status[] = ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO']
+
+function SectionTitle({ icon: Icon, title, to, toLabel }: { icon: ComponentType<{ className?: string }>; title: string; to?: string; toLabel?: string }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-slate-700">
+        <Icon className="h-4 w-4 text-slate-400" /> {title}
+      </h2>
+      {to && <Link to={to} className="flex items-center gap-1 text-sm font-medium text-sky-600 hover:underline">{toLabel ?? 'Ver todos'} <ArrowRight className="h-3.5 w-3.5" /></Link>}
+    </div>
+  )
+}
+
+function RecentList({ tickets, loading }: { tickets: Ticket[]; loading: boolean }) {
+  if (loading) return <Spinner />
+  if (tickets.length === 0) {
+    return (
+      <div className="card p-6 text-center text-sm text-slate-500">
+        Nenhum chamado ainda — <Link to="/ti/chamados/novo" className="font-medium text-sky-600 hover:underline">abra o primeiro</Link>
+      </div>
+    )
+  }
+  return (
+    <div className="card divide-y divide-slate-100">
+      {tickets.map((t) => (
+        <Link key={t.id} to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-4 hover:bg-slate-50">
+          <span className="font-mono text-xs text-slate-400">{t.code}</span>
+          <span className="flex-1 truncate font-medium text-slate-700">{t.title}</span>
+          {t.assignee && <Avatar name={t.assignee.name} size="sm" />}
+          <span className="hidden sm:contents"><SlaBadge dueAt={t.dueAt} status={t.status} size="sm" /></span>
+          <PriorityBadge priority={t.priority} />
+          <StatusBadge status={t.status} />
+          <span className="hidden w-24 text-right text-xs text-slate-400 sm:block">{timeAgo(t.createdAt)}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function AttentionQueue({ tickets }: { tickets: Ticket[] }) {
+  const now = Date.now()
+  const isOpen = (t: Ticket) => OPEN_STATUSES.includes(t.status)
+  const overdue = tickets
+    .filter((t) => isOpen(t) && t.dueAt && new Date(t.dueAt).getTime() < now)
+    .sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime())
+  const unassigned = tickets.filter((t) => isOpen(t) && !t.assignee && !overdue.some((o) => o.id === t.id))
+  const rows = [...overdue, ...unassigned].slice(0, 7)
+
+  return (
+    <div className="card overflow-hidden">
+      {rows.length === 0 ? (
+        <div className="flex items-center gap-2 p-6 text-sm text-slate-500">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Tudo em dia — nada atrasado ou sem responsável. 🎉
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {rows.map((t) => {
+            const isOverdue = !!t.dueAt && new Date(t.dueAt).getTime() < now
+            return (
+              <li key={t.id}>
+                <Link to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-3 hover:bg-slate-50">
+                  <span className="font-mono text-xs text-slate-400">{t.code}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{t.title}</span>
+                  {isOverdue
+                    ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Atrasado</span>
+                    : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Sem responsável</span>}
+                  <PriorityBadge priority={t.priority} />
+                  <span className="hidden w-28 text-right text-xs text-slate-400 sm:block">{t.assignee ? t.assignee.name : '—'}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 function ChamadosStaff() {
   const { user, isStaff: staff } = useTiAuth()
@@ -41,6 +121,12 @@ function ChamadosStaff() {
   const key = JSON.stringify({ q, status, priority, categoryId, sectorId, scope, overdue })
   const { data, isLoading } = useQuery({ queryKey: ['ti', 'tickets', key], queryFn: () => listTickets(filters) })
   const tickets = data ?? []
+
+  // Seções "Precisam de atenção" / "Chamados recentes" (movidas do Painel):
+  // usam a lista completa, independente dos filtros do quadro acima.
+  const allQ = useQuery({ queryKey: ['ti', 'tickets', 'all'], queryFn: () => listTickets({}) })
+  const allTickets = allQ.data ?? []
+  const recent = allTickets.slice(0, 6)
 
   return (
     <div className="ti-scope">
@@ -146,6 +232,18 @@ function ChamadosStaff() {
           </div>
         </div>
       )}
+
+      {/* Precisam de atenção — atrasados e sem responsável (movido do Painel) */}
+      <section className="mt-8">
+        <SectionTitle icon={AlertTriangle} title="Precisam de atenção" />
+        {allQ.isLoading ? <Spinner /> : <AttentionQueue tickets={allTickets} />}
+      </section>
+
+      {/* Chamados recentes (movido do Painel) */}
+      <section className="mt-8">
+        <SectionTitle icon={Inbox} title="Chamados recentes" />
+        <RecentList tickets={recent} loading={allQ.isLoading} />
+      </section>
     </div>
   )
 }

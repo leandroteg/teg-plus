@@ -1,34 +1,29 @@
 // Painel do módulo TI — port fiel do Dashboard do helpdesk (versão admin/equipe).
-// KPIs operacionais, destaques de 30 dias, 5 gráficos, fila "Precisam de atenção"
-// e chamados recentes. (Banner de WhatsApp omitido — depende do worker, fase 11.)
+// KPIs operacionais, destaques de 30 dias e 5 gráficos. As seções "Precisam de
+// atenção" e "Chamados recentes" ficam na aba Chamados, junto do quadro.
+// (Banner de WhatsApp omitido — depende do worker, fase 11.)
 import { useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Inbox, Clock, PauseCircle, CheckCircle2, AlarmClock, UserX,
-  Gauge, Timer, BarChart3, AlertTriangle, ArrowRight, ChevronDown,
+  Gauge, Timer, BarChart3, ChevronDown,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar,
 } from 'recharts'
-import { getDashboardStats, listTickets } from './data/tickets'
+import { getDashboardStats } from './data/tickets'
 import { getReportSummary } from './data/reports'
 import { RelatoriosPanel } from './Relatorios'
 import { useTiAuth } from './data/auth'
-import type { Ticket, Status, Priority } from './data/shapes'
+import type { Status, Priority } from './data/shapes'
 import { STATUS_LIST, STATUS_META, PRIORITY_LIST, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner } from './components/ui'
 import { MeusChamados } from './Chamados'
-import { StatusBadge, PriorityBadge } from './components/Badges'
-import { SlaBadge } from './components/SlaBadge'
-import { Avatar } from './components/Avatar'
-import { timeAgo } from './lib/format'
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
 const fmtDay = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
-const OPEN_STATUSES: Status[] = ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO']
 
 const STATUS_HEX: Record<Status, string> = {
   ABERTO: '#3b82f6', EM_ANDAMENTO: '#f59e0b', AGUARDANDO: '#8b5cf6', RESOLVIDO: '#10b981', FECHADO: '#94a3b8',
@@ -83,82 +78,6 @@ function ChartCard({ title, className = '', empty, children }: { title: string; 
   )
 }
 
-function SectionTitle({ icon: Icon, title, to, toLabel }: { icon: ComponentType<{ className?: string }>; title: string; to?: string; toLabel?: string }) {
-  return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-slate-700">
-        <Icon className="h-4 w-4 text-slate-400" /> {title}
-      </h2>
-      {to && <Link to={to} className="flex items-center gap-1 text-sm font-medium text-sky-600 hover:underline">{toLabel ?? 'Ver todos'} <ArrowRight className="h-3.5 w-3.5" /></Link>}
-    </div>
-  )
-}
-
-function RecentList({ tickets, loading }: { tickets: Ticket[]; loading: boolean }) {
-  if (loading) return <Spinner />
-  if (tickets.length === 0) {
-    return (
-      <div className="card p-6 text-center text-sm text-slate-500">
-        Nenhum chamado ainda — <Link to="/ti/chamados/novo" className="font-medium text-sky-600 hover:underline">abra o primeiro</Link>
-      </div>
-    )
-  }
-  return (
-    <div className="card divide-y divide-slate-100">
-      {tickets.map((t) => (
-        <Link key={t.id} to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-4 hover:bg-slate-50">
-          <span className="font-mono text-xs text-slate-400">{t.code}</span>
-          <span className="flex-1 truncate font-medium text-slate-700">{t.title}</span>
-          {t.assignee && <Avatar name={t.assignee.name} size="sm" />}
-          <span className="hidden sm:contents"><SlaBadge dueAt={t.dueAt} status={t.status} size="sm" /></span>
-          <PriorityBadge priority={t.priority} />
-          <StatusBadge status={t.status} />
-          <span className="hidden w-24 text-right text-xs text-slate-400 sm:block">{timeAgo(t.createdAt)}</span>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-function AttentionQueue({ tickets }: { tickets: Ticket[] }) {
-  const now = Date.now()
-  const isOpen = (t: Ticket) => OPEN_STATUSES.includes(t.status)
-  const overdue = tickets
-    .filter((t) => isOpen(t) && t.dueAt && new Date(t.dueAt).getTime() < now)
-    .sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime())
-  const unassigned = tickets.filter((t) => isOpen(t) && !t.assignee && !overdue.some((o) => o.id === t.id))
-  const rows = [...overdue, ...unassigned].slice(0, 7)
-
-  return (
-    <div className="card overflow-hidden">
-      {rows.length === 0 ? (
-        <div className="flex items-center gap-2 p-6 text-sm text-slate-500">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Tudo em dia — nada atrasado ou sem responsável. 🎉
-        </div>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {rows.map((t) => {
-            const isOverdue = !!t.dueAt && new Date(t.dueAt).getTime() < now
-            return (
-              <li key={t.id}>
-                <Link to={`/ti/chamados/${t.id}`} className="flex items-center gap-3 p-3 hover:bg-slate-50">
-                  <span className="font-mono text-xs text-slate-400">{t.code}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{t.title}</span>
-                  {isOverdue
-                    ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Atrasado</span>
-                    : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Sem responsável</span>}
-                  <PriorityBadge priority={t.priority} />
-                  <span className="hidden w-28 text-right text-xs text-slate-400 sm:block">{t.assignee ? t.assignee.name : '—'}</span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 type Visao = 'resumo' | 'relatorio'
 
 export default function TiHome() {
@@ -174,7 +93,6 @@ export default function TiHome() {
     try { localStorage.setItem('ti-painel-visao', v) } catch { /* ignore */ }
   }
   const statsQ = useQuery({ queryKey: ['ti', 'stats'], queryFn: getDashboardStats })
-  const ticketsQ = useQuery({ queryKey: ['ti', 'tickets', 'all'], queryFn: () => listTickets({}) })
   const summaryQ = useQuery({
     queryKey: ['ti', 'dashboard-summary'],
     queryFn: () => getReportSummary(isoDaysAgo(30), isoDaysAgo(0)),
@@ -183,8 +101,6 @@ export default function TiHome() {
 
   const stats = statsQ.data
   const summary = summaryQ.data
-  const tickets = ticketsQ.data ?? []
-  const recent = tickets.slice(0, 6)
   const firstName = user?.name?.split(' ')[0] ?? ''
 
   const kpis = [
@@ -321,15 +237,6 @@ export default function TiHome() {
         </div>
       )}
 
-      <section className="mt-8">
-        <SectionTitle icon={AlertTriangle} title="Precisam de atenção" to="/ti/chamados" toLabel="Ver chamados" />
-        {ticketsQ.isLoading ? <Spinner /> : <AttentionQueue tickets={tickets} />}
-      </section>
-
-      <section className="mt-8">
-        <SectionTitle icon={Inbox} title="Chamados recentes" to="/ti/chamados" />
-        <RecentList tickets={recent} loading={ticketsQ.isLoading} />
-      </section>
       </>)}
     </div>
   )
