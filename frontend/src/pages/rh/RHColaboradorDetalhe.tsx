@@ -15,7 +15,7 @@ import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRHColaborador, useSalvarRHColaborador, useRHDependentes, useSalvarRHDependente, useRemoverRHDependente, useRHMovimentacoes, useDepartamentos } from '../../hooks/useRH'
 import { useCatalogoTreinamentos, useMatrizTreinamentos, useTreinamentos, treinoStatus, cargoBase, type TreinoStatus,
-  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi, evidenciaUrl } from '../../hooks/useQsma'
+  useEpis, useMatrizEpi, useEpiEntregas, useFichasEpi, evidenciaUrl, docAssinadoUrl } from '../../hooks/useQsma'
 import { gerarFichaEpiPdf } from '../../utils/ficha-epi-pdf'
 import { HardHat, Ruler } from 'lucide-react'
 import { useCadObras } from '../../hooks/useCadastros'
@@ -704,7 +704,7 @@ function EpisColaborador({ colaborador, sectionCls, isLight }: {
                         <ShieldCheck size={11} /> OneDrive
                       </a>
                     ) : f.arquivo_assinado_path ? (
-                      <button onClick={async () => { const url = await evidenciaUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank') }}
+                      <button onClick={async () => { const url = await docAssinadoUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank') }}
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ${isLight ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'}`}
                         title="Abrir ficha assinada arquivada">
                         <ShieldCheck size={11} /> Assinada
