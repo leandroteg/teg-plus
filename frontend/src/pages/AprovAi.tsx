@@ -669,6 +669,11 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                     Por <span className="font-semibold text-slate-700">{alt.responsavel_nome ?? 'Sistema'}</span>
                     {' '}({alt.responsavel_tipo === 'requisitante' ? 'requisitante' : 'aprovador/comprador'})
                   </p>
+                  {alt.observacao && (
+                    <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 leading-snug">
+                      {alt.observacao}
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-0.5">
                       <p className="text-[9px] font-bold uppercase tracking-wide text-rose-500">Antes</p>

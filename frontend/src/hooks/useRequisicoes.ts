@@ -992,6 +992,7 @@ export interface AlteracaoItensHistorico {
   responsavel_nome: string | null
   responsavel_tipo: string
   created_at: string
+  observacao: string | null
   antes: AlteracaoItemSnapshot[]
   depois: AlteracaoItemSnapshot[]
 }
@@ -1004,7 +1005,7 @@ export function useHistoricoAlteracoesItens(requisicaoId?: string) {
     queryFn: async (): Promise<AlteracaoItensHistorico[]> => {
       const { data, error } = await supabase
         .from('cmp_historico_status')
-        .select('id, responsavel_nome, responsavel_tipo, created_at, dados_extra')
+        .select('id, responsavel_nome, responsavel_tipo, created_at, observacao, dados_extra')
         .eq('requisicao_id', requisicaoId)
         .eq('dados_extra->>tipo', 'alteracao_itens')
         .order('created_at', { ascending: false })
@@ -1014,6 +1015,8 @@ export function useHistoricoAlteracoesItens(requisicaoId?: string) {
         responsavel_nome: r.responsavel_nome,
         responsavel_tipo: r.responsavel_tipo,
         created_at: r.created_at,
+        // Motivo da alteração (ex.: fornecedor sem a qtd total → saldo em RC complementar)
+        observacao: r.observacao && r.observacao !== 'Itens alterados' ? r.observacao : null,
         antes: (r.dados_extra?.antes ?? []) as AlteracaoItemSnapshot[],
         depois: (r.dados_extra?.depois ?? []) as AlteracaoItemSnapshot[],
       }))

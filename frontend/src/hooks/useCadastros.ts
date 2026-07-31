@@ -69,6 +69,32 @@ export function useSalvarFornecedor() {
   return useMutation({
     mutationFn: async (payload: Partial<Fornecedor> & { id?: string }) => {
       const { id, ...rest } = payload
+
+      // Um fornecedor por CNPJ: compara por dígitos (o banco guarda com máscara,
+      // mas legado pode ter só números — mig 198 normaliza e trava com unique).
+      const digits = String(rest.cnpj ?? '').replace(/\D/g, '')
+      if (digits.length === 14) {
+        const masked = `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+        rest.cnpj = masked
+        const { data: existentes } = await supabase
+          .from('cmp_fornecedores')
+          .select('id, nome_fantasia, razao_social')
+          .in('cnpj', [masked, digits])
+        const conflito = (existentes ?? []).find(f => f.id !== id)
+        if (conflito) {
+          throw new Error(
+            `CNPJ ${masked} já cadastrado como "${conflito.nome_fantasia || conflito.razao_social}". ` +
+            'Edite o cadastro existente em vez de criar outro.',
+          )
+        }
+      }
+
+      // Traduz a violação do índice único (corrida entre duas telas) em erro amigável
+      const traduzErro = (error: { code?: string; message: string }) =>
+        error.code === '23505' && error.message.includes('cnpj')
+          ? new Error('CNPJ já cadastrado para outro fornecedor. Edite o cadastro existente.')
+          : error
+
       if (id) {
         const { data, error } = await supabase
           .from('cmp_fornecedores')
@@ -76,7 +102,7 @@ export function useSalvarFornecedor() {
           .eq('id', id)
           .select('*')
           .single()
-        if (error) throw error
+        if (error) throw traduzErro(error)
         return data as Fornecedor
       } else {
         const { data, error } = await supabase
@@ -84,7 +110,7 @@ export function useSalvarFornecedor() {
           .insert(rest)
           .select('*')
           .single()
-        if (error) throw error
+        if (error) throw traduzErro(error)
         return data as Fornecedor
       }
     },

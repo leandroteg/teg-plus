@@ -212,8 +212,9 @@ BEGIN
   ) VALUES (
     v_parent_id, v_parent.status::text, v_parent.status::text, v_autor_nome, 'comprador',
     CASE WHEN v_child_id IS NOT NULL
-      THEN 'Quantidade ajustada na cotação — saldo destacado na RC complementar ' || v_child_numero
-      ELSE 'Quantidade ajustada na cotação — restante desconsiderado' END,
+      THEN 'Fornecedor sem a quantidade total — o saldo ficou em aberto na RC complementar '
+           || v_child_numero || ', para cotação com outro fornecedor'
+      ELSE 'Fornecedor sem a quantidade total — o restante foi desconsiderado pelo comprador' END,
     jsonb_build_object(
       'tipo', 'alteracao_itens',
       'antes', coalesce(v_antes, '[]'::jsonb),

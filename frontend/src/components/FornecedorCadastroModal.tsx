@@ -227,6 +227,10 @@ export default function FornecedorCadastroModal({
                   {cnpjLookup.dados.situacao}
                 </p>
               )}
+              <p className={`mt-1 text-[10px] leading-snug ${subtext}`}>
+                Ao sair do campo, buscamos os dados públicos da Receita e preenchemos o que estiver
+                disponível. Dados bancários/PIX e pessoa física (CPF) não têm consulta pública.
+              </p>
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>Contato</label>

@@ -1162,6 +1162,11 @@ export default function RequisicaoDetalhe() {
                 {' '}({alt.responsavel_tipo === 'requisitante' ? 'requisitante' : 'aprovador/comprador'})
                 {' · '}{fmtData(alt.created_at)}
               </p>
+              {alt.observacao && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug">
+                  {alt.observacao}
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-rose-500">Antes</p>

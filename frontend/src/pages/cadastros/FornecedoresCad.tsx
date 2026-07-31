@@ -633,6 +633,10 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
                     {cnpjStatusLabel}
                   </p>
                 )}
+                <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">
+                  Busca automática na Receita ao sair do campo — preenche o que estiver disponível.
+                  Dados bancários e pessoa física (CPF) não têm consulta pública.
+                </p>
               </div>
               <ConfidenceField label="Contato" value={editItem.contato_nome ?? ''} onChange={v => set('contato_nome', v)}
                 confidence={confidence.contato_nome} placeholder="Nome do contato" />
