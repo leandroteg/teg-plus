@@ -16,10 +16,15 @@ export interface LeitoOcupacao {
   data_fim: string | null
   checkin_em: string | null
   checkout_em: string | null
-  origem: 'admin' | 'portal_qr'
+  origem: 'admin' | 'portal_qr' | 'erp_equipe'
   observacao: string | null
   /** Foto do leito no check-in — obrigatória quando o check-in vem do Portal. */
   checkin_foto_url: string | null
+  /** Foto na saída. Com a de entrada, é o par que sustenta cobrança de avaria. */
+  checkout_foto_url: string | null
+  checkin_por_nome: string | null
+  checkout_por_nome: string | null
+  checkout_observacao: string | null
   colaborador?: { matricula: string | null } | null
 }
 
@@ -139,7 +144,7 @@ export function useOcupacoesAtivas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loc_leito_ocupacoes')
-        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao, checkin_foto_url, colaborador:rh_colaboradores(matricula)')
+        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao, checkin_foto_url, checkout_foto_url, checkin_por_nome, checkout_por_nome, checkout_observacao, colaborador:rh_colaboradores(matricula)')
         .is('data_fim', null)
       if (error) throw error
       return (data ?? []) as unknown as LeitoOcupacao[]
@@ -213,6 +218,98 @@ export function useExcluirLeito() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('loc_leitos').delete().eq('id', id)
       if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+// ── Foto do leito ───────────────────────────────────────────────────────────
+// Mesmo bucket das fotos que o Portal manda (vistoria-fotos), em pasta separada:
+// as duas pontas fotografam o mesmo leito e o histórico precisa mostrar juntas.
+// Aqui o upload é direto — o ERP é authenticated; o Portal é anon e por isso
+// passa pela edge portalteg-locacao-foto.
+const FOTO_LADO_MAX = 1400
+
+// Foto de celular chega com 8 MB; sobe reduzida para o histórico abrir rápido.
+async function comprimir(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  const escala = Math.min(1, FOTO_LADO_MAX / Math.max(bitmap.width, bitmap.height))
+  const w = Math.round(bitmap.width * escala)
+  const h = Math.round(bitmap.height * escala)
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, w, h)
+  bitmap.close()
+  const blob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.82))
+  if (!blob) throw new Error('Não consegui processar a foto')
+  return blob
+}
+
+export async function uploadFotoLeito(
+  file: File, imovelId: string, momento: 'checkin' | 'checkout',
+): Promise<string> {
+  const blob = await comprimir(file)
+  const nome = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const path = `erp/leito-${momento}/${imovelId}/${nome}`
+  const { error } = await supabase.storage
+    .from('vistoria-fotos').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+  if (error) throw error
+  return supabase.storage.from('vistoria-fotos').getPublicUrl(path).data.publicUrl
+}
+
+// ── Check-in / check-out pela equipe (TEG+) ─────────────────────────────────
+// Alocar é reserva (checkin_em fica nulo); check-in é presença. São ações
+// diferentes de propósito — quem chegou de verdade é o que interessa auditar.
+export function useCheckinLeito() {
+  const invalidar = useInvalidarLeitos()
+  return useMutation({
+    mutationFn: async ({ leitoId, colaboradorId, fotoUrl, obs, quando }: {
+      leitoId: string; colaboradorId?: string | null
+      fotoUrl?: string | null; obs?: string | null; quando?: string | null
+    }) => {
+      const { data, error } = await supabase.rpc('loc_leito_checkin', {
+        p_leito_id: leitoId,
+        p_colaborador_id: colaboradorId ?? undefined,
+        p_foto_url: fotoUrl ?? undefined,
+        p_obs: obs ?? undefined,
+        p_quando: quando ?? undefined,
+      })
+      if (error) throw error
+      return data as { ok: boolean; msg: string; colaborador: string; leito: string; trocou: string }
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useCheckoutLeito() {
+  const invalidar = useInvalidarLeitos()
+  return useMutation({
+    mutationFn: async ({ ocupacaoId, fotoUrl, obs, dataFim }: {
+      ocupacaoId: string; fotoUrl?: string | null; obs?: string | null; dataFim?: string | null
+    }) => {
+      const { data, error } = await supabase.rpc('loc_leito_checkout', {
+        p_ocupacao_id: ocupacaoId,
+        p_foto_url: fotoUrl ?? undefined,
+        p_obs: obs ?? undefined,
+        p_data_fim: dataFim ?? undefined,
+      })
+      if (error) throw error
+      return data as { ok: boolean; msg: string; colaborador: string }
+    },
+    onSuccess: invalidar,
+  })
+}
+
+// Regularização das ocupações antigas: carimba presença de vários de uma vez.
+export function useCheckinLote() {
+  const invalidar = useInvalidarLeitos()
+  return useMutation({
+    mutationFn: async (ocupacaoIds: string[]) => {
+      const { data, error } = await supabase.rpc('loc_leito_checkin_lote', {
+        p_ocupacao_ids: ocupacaoIds,
+      })
+      if (error) throw error
+      return data as { ok: boolean; confirmados: number }
     },
     onSuccess: invalidar,
   })

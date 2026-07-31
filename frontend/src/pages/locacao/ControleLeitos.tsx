@@ -1,16 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/locacao/ControleLeitos.tsx — aba "Controle Leitos" da Gestão de Locação
 // Duas sub-visões alternadas por ícone discreto: Alojamento | Histórico
-//   · Alojamento: grid de alojamentos → painel com os leitos (alocar/liberar/mover)
+//   · Alojamento: grid de alojamentos → painel com os leitos
 //   · Histórico:  linha do tempo de quem passou por cada leito
-// QR de check-in (Portal TEG) fica para a próxima fase.
+//
+// Alocar e check-in são coisas diferentes: alocar é reserva (o leito é do
+// fulano), check-in é presença (o fulano chegou, tal hora, e o leito estava
+// assim). Por isso a linha do leito mostra "sem check-in" enquanto só houve
+// reserva — e não some sozinha.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo, useEffect } from 'react'
 import QRCode from 'qrcode'
 import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
-  LogOut, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
-  LayoutList, LayoutGrid, Map as MapIcon, Users, Camera,
+  LogOut, LogIn, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
+  LayoutList, LayoutGrid, Map as MapIcon, Users, Camera, AlertTriangle, ListChecks,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
@@ -18,7 +22,8 @@ import { useColaboradoresAtivos } from '../../hooks/useObras'
 import MapaImoveis, { type MapaFiltros } from './MapaImoveis'
 import {
   useAlojamentos, useLeitos, useOcupacoesAtivas, useLeitosHistorico,
-  useGerarLeitos, useAlocarLeito, useLiberarLeito, useMoverLeito, useExcluirLeito,
+  useGerarLeitos, useAlocarLeito, useMoverLeito, useExcluirLeito,
+  useCheckinLeito, useCheckoutLeito, useCheckinLote, uploadFotoLeito,
   useAtualizarAlojamento, useImoveisMapa, useBasesMapa,
   type Leito, type LeitoOcupacao,
 } from '../../hooks/useLeitos'
@@ -28,6 +33,8 @@ const fmtDate = (d?: string | null) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
 const fmtCur = (v?: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+const fmtDataHora = (d?: string | null) =>
+  d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
 const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   ativo:      { label: 'Ativo',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
@@ -618,6 +625,9 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   const [alocarLeito, setAlocarLeito] = useState<Leito | null>(null)
   const [moverOcup, setMoverOcup] = useState<{ ocup: LeitoOcupacao; leito: Leito } | null>(null)
   const [qrLeito, setQrLeito] = useState<Leito | null>(null)
+  const [checkinAlvo, setCheckinAlvo] = useState<{ leito: Leito; ocup?: LeitoOcupacao } | null>(null)
+  const [checkoutAlvo, setCheckoutAlvo] = useState<{ leito: Leito; ocup: LeitoOcupacao } | null>(null)
+  const [loteAberto, setLoteAberto] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -633,6 +643,12 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
   const ativosLeitos = leitosOrd.filter(l => l.ativo)
   const ocupadosN = ativosLeitos.filter(l => ocupPorLeito.has(l.id)).length
   const st = { total: ativosLeitos.length, ocupados: ocupadosN, livres: ativosLeitos.length - ocupadosN, taxa: ativosLeitos.length ? Math.round(ocupadosN / ativosLeitos.length * 100) : 0 }
+
+  // Ocupações que nunca tiveram check-in — vieram da carga inicial, não de alguém
+  // registrando presença. São elas que a confirmação em lote resolve.
+  const pendentes = leitosOrd
+    .map(l => ({ leito: l, ocup: ocupPorLeito.get(l.id) }))
+    .filter((x): x is { leito: Leito; ocup: LeitoOcupacao } => !!x.ocup && !x.ocup.checkin_em)
 
   const handleGerar = async () => {
     const n = parseInt(qtd, 10)
@@ -753,6 +769,12 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                 </button>
               </div>
             </div>
+            {pendentes.length > 0 && (
+              <button onClick={() => setLoteAberto(true)}
+                className={`w-full mb-2.5 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-xl border ${isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15' : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>
+                <ListChecks size={13} /> Confirmar presença ({pendentes.length} sem check-in)
+              </button>
+            )}
             {leitosOrd.length === 0 ? (
               <p className={`text-sm text-center py-6 ${txtMuted}`}>Nenhum leito cadastrado ainda.</p>
             ) : (
@@ -772,6 +794,15 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                                 <p className="text-xs text-slate-500 truncate">
                                   Matrícula <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{oc.colaborador?.matricula || '—'}</span> · desde {fmtDate(oc.data_inicio)}
                                 </p>
+                                {oc.checkin_em ? (
+                                  <p className="text-[10px] font-semibold text-emerald-500 truncate">
+                                    Check-in {fmtDataHora(oc.checkin_em)}{oc.checkin_por_nome ? ` · ${oc.checkin_por_nome.split(' ')[0]}` : ''}
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] font-semibold text-amber-500 flex items-center gap-1">
+                                    <AlertTriangle size={10} /> sem check-in
+                                  </p>
+                                )}
                               </>
                             ) : (
                               <p className="text-sm text-emerald-500 font-semibold flex items-center gap-1"><CheckCircle2 size={13} /> Livre</p>
@@ -791,17 +822,30 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                                   titulo={`Leito ${leitoLbl(l.codigo_leito)} · check-in de ${oc.colaborador_nome}`}
                                 />
                               )}
+                              {!oc.checkin_em && (
+                                <button onClick={() => setCheckinAlvo({ leito: l, ocup: oc })} title="Registrar check-in"
+                                  className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                  <LogIn size={13} /> Check-in
+                                </button>
+                              )}
                               <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
                                 className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
                                 <ArrowRightLeft size={14} />
                               </button>
-                              <LiberarBtn ocupacaoId={oc.id} isDark={isDark} />
+                              <button onClick={() => setCheckoutAlvo({ leito: l, ocup: oc })} title="Check-out"
+                                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-amber-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}>
+                                <LogOut size={14} />
+                              </button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => setAlocarLeito(l)} title="Alocar colaborador"
-                                className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
-                                <UserPlus size={13} /> Alocar
+                              <button onClick={() => setCheckinAlvo({ leito: l })} title="Check-in (aloca e registra a chegada)"
+                                className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                <LogIn size={13} /> Check-in
+                              </button>
+                              <button onClick={() => setAlocarLeito(l)} title="Alocar sem check-in (só reserva)"
+                                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
+                                <UserPlus size={14} />
                               </button>
                               <button onClick={() => { if (confirm(`Remover o leito ${leitoLbl(l.codigo_leito)}?`)) excluir.mutate(l.id) }} title="Remover leito"
                                 className={`p-1.5 rounded-lg ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-white/[0.06]' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}>
@@ -826,6 +870,17 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
         <MoverModal ocup={moverOcup.ocup} leitoAtual={moverOcup.leito} isDark={isDark}
           leitosLivres={leitosOrd.filter(x => x.ativo && !ocupPorLeito.has(x.id))}
           onClose={() => setMoverOcup(null)} />
+      )}
+      {checkinAlvo && (
+        <CheckinModal leito={checkinAlvo.leito} ocup={checkinAlvo.ocup} imovelId={alojamento.id}
+          isDark={isDark} onClose={() => setCheckinAlvo(null)} />
+      )}
+      {checkoutAlvo && (
+        <CheckoutModal leito={checkoutAlvo.leito} ocup={checkoutAlvo.ocup} imovelId={alojamento.id}
+          isDark={isDark} onClose={() => setCheckoutAlvo(null)} />
+      )}
+      {loteAberto && (
+        <ConfirmarPresencaModal pendentes={pendentes} isDark={isDark} onClose={() => setLoteAberto(false)} />
       )}
     </div>
   )
@@ -899,14 +954,290 @@ function FotoCheckinBtn({ url, titulo, isDark }: { url: string; titulo: string; 
   )
 }
 
-function LiberarBtn({ ocupacaoId, isDark }: { ocupacaoId: string; isDark: boolean }) {
-  const liberar = useLiberarLeito()
+// ── Campo de foto (entrada ou saída) ─────────────────────────────────────────
+// capture="environment" abre a câmera traseira direto no celular; no desktop
+// vira um seletor de arquivo comum. A foto é opcional aqui: no ERP a equipe
+// muitas vezes registra depois, sem ter estado no quarto.
+function FotoCampo({ imovelId, momento, url, onUrl, isDark }: {
+  imovelId: string; momento: 'checkin' | 'checkout'
+  url: string | null; onUrl: (u: string | null) => void; isDark: boolean
+}) {
+  const [subindo, setSubindo] = useState(false)
+  const [erro, setErro] = useState('')
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  async function escolher(file?: File | null) {
+    if (!file) return
+    setSubindo(true); setErro('')
+    try {
+      onUrl(await uploadFotoLeito(file, imovelId, momento))
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não consegui enviar a foto')
+    } finally { setSubindo(false) }
+  }
+
   return (
-    <button onClick={() => { if (confirm('Liberar este leito (check-out)?')) liberar.mutate({ ocupacaoId }) }}
-      disabled={liberar.isPending} title="Liberar (check-out)"
-      className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-amber-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}>
-      {liberar.isPending ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
-    </button>
+    <div>
+      <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>
+        Foto do leito <span className="font-normal">(opcional)</span>
+      </label>
+      {url ? (
+        <div className="relative">
+          <img src={url} alt="" className="w-full max-h-44 object-cover rounded-xl" />
+          <button onClick={() => onUrl(null)} title="Remover foto"
+            className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80">
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <label className={`flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed cursor-pointer text-xs font-semibold ${isDark ? 'border-white/15 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'} ${subindo ? 'opacity-60 pointer-events-none' : ''}`}>
+          {subindo ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+          {subindo ? 'Enviando…' : 'Tirar / anexar foto'}
+          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={subindo}
+            onChange={e => { escolher(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
+      )}
+      {erro && <p className="text-xs text-rose-500 mt-1">{erro}</p>}
+    </div>
+  )
+}
+
+// ── Modal de check-in ────────────────────────────────────────────────────────
+// Dois casos no mesmo lugar: leito já reservado (só carimba a chegada) e leito
+// livre com a pessoa na porta (aloca e registra de uma vez).
+function CheckinModal({ leito, ocup, imovelId, isDark, onClose }: {
+  leito: Leito; ocup?: LeitoOcupacao; imovelId: string; isDark: boolean; onClose: () => void
+}) {
+  const { data: colaboradores = [] } = useColaboradoresAtivos()
+  const checkin = useCheckinLeito()
+  const [busca, setBusca] = useState('')
+  const [colabId, setColabId] = useState('')
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [obs, setObs] = useState('')
+  const [quando, setQuando] = useState('')
+  const [erro, setErro] = useState('')
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const inputCls = isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+
+  const lista = useMemo(() => {
+    const q = busca.toLowerCase()
+    return colaboradores.filter(c => !q || c.nome.toLowerCase().includes(q) || c.cargo?.toLowerCase().includes(q)).slice(0, 40)
+  }, [colaboradores, busca])
+
+  const precisaEscolher = !ocup
+  const handle = async () => {
+    if (precisaEscolher && !colabId) return
+    setErro('')
+    try {
+      await checkin.mutateAsync({
+        leitoId: leito.id,
+        colaboradorId: ocup ? ocup.colaborador_id : colabId,
+        fotoUrl, obs: obs.trim() || null,
+        quando: quando ? new Date(quando).toISOString() : null,
+      })
+      onClose()
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha no check-in') }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-base font-bold ${txt}`}>Check-in em <span className="font-mono">{leitoLbl(leito.codigo_leito)}</span></h3>
+          <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          {ocup ? (
+            <p className={`text-xs ${txtMuted}`}>
+              Confirmando a chegada de <span className={`font-semibold ${txt}`}>{ocup.colaborador_nome}</span>,
+              alocado desde {fmtDate(ocup.data_inicio)}.
+            </p>
+          ) : (
+            <>
+              <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+                <Search size={14} className={txtMuted} />
+                <input autoFocus type="text" placeholder="Buscar colaborador…" value={busca} onChange={e => setBusca(e.target.value)}
+                  className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+              </div>
+              <div className={`max-h-44 overflow-y-auto rounded-xl border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                {lista.map(c => (
+                  <button key={c.id} onClick={() => setColabId(c.id)}
+                    className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 border-b last:border-0
+                      ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}
+                      ${colabId === c.id ? (isDark ? 'bg-emerald-500/15' : 'bg-emerald-50') : (isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50')}`}>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium truncate ${txt}`}>{c.nome}</p>
+                      <p className={`text-xs truncate ${txtMuted}`}>{c.cargo || '—'}{c.base_nome ? ` · ${c.base_nome}` : ''}</p>
+                    </div>
+                    {colabId === c.id && <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />}
+                  </button>
+                ))}
+                {lista.length === 0 && <p className={`text-xs text-center py-6 ${txtMuted}`}>Nenhum colaborador</p>}
+              </div>
+            </>
+          )}
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data e hora <span className="font-normal">(padrão agora)</span></label>
+            <input type="datetime-local" value={quando} onChange={e => setQuando(e.target.value)}
+              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
+          </div>
+          <FotoCampo imovelId={imovelId} momento="checkin" url={fotoUrl} onUrl={setFotoUrl} isDark={isDark} />
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Observação</label>
+            <textarea rows={2} value={obs} onChange={e => setObs(e.target.value)}
+              placeholder="Estado do leito, itens entregues…"
+              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${inputCls}`} />
+          </div>
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
+            <button onClick={handle} disabled={checkin.isPending || (precisaEscolher && !colabId)}
+              className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {checkin.isPending && <Loader2 size={14} className="animate-spin" />} Registrar check-in
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal de check-out ───────────────────────────────────────────────────────
+function CheckoutModal({ leito, ocup, imovelId, isDark, onClose }: {
+  leito: Leito; ocup: LeitoOcupacao; imovelId: string; isDark: boolean; onClose: () => void
+}) {
+  const checkout = useCheckoutLeito()
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [obs, setObs] = useState('')
+  const [dataFim, setDataFim] = useState('')
+  const [erro, setErro] = useState('')
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const inputCls = isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+
+  const handle = async () => {
+    setErro('')
+    try {
+      await checkout.mutateAsync({ ocupacaoId: ocup.id, fotoUrl, obs: obs.trim() || null, dataFim: dataFim || null })
+      onClose()
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha no check-out') }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-base font-bold ${txt}`}>Check-out de <span className="font-mono">{leitoLbl(leito.codigo_leito)}</span></h3>
+          <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className={`text-xs ${txtMuted}`}>
+            <span className={`font-semibold ${txt}`}>{ocup.colaborador_nome}</span> deixa o leito. O leito fica livre para nova alocação.
+          </p>
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data de saída <span className="font-normal">(padrão hoje)</span></label>
+            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
+              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
+          </div>
+          <FotoCampo imovelId={imovelId} momento="checkout" url={fotoUrl} onUrl={setFotoUrl} isDark={isDark} />
+          <div>
+            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Observação de saída</label>
+            <textarea rows={2} value={obs} onChange={e => setObs(e.target.value)}
+              placeholder="Avaria encontrada, item faltando…"
+              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${inputCls}`} />
+          </div>
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
+            <button onClick={handle} disabled={checkout.isPending}
+              className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              {checkout.isPending && <Loader2 size={14} className="animate-spin" />} Registrar check-out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Confirmação de presença em lote ──────────────────────────────────────────
+// As ocupações que vieram da carga inicial nunca tiveram check-in. Uma a uma
+// seriam centenas de cliques; aqui o prefeito marca quem de fato está no quarto.
+function ConfirmarPresencaModal({ pendentes, isDark, onClose }: {
+  pendentes: { leito: Leito; ocup: LeitoOcupacao }[]; isDark: boolean; onClose: () => void
+}) {
+  const lote = useCheckinLote()
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(pendentes.map(p => p.ocup.id)))
+  const [erro, setErro] = useState('')
+  const [feito, setFeito] = useState<number | null>(null)
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+
+  const alternar = (id: string) => setMarcados(prev => {
+    const n = new Set(prev)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+
+  const handle = async () => {
+    setErro('')
+    try {
+      const r = await lote.mutateAsync([...marcados])
+      setFeito(r.confirmados)
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao confirmar') }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-base font-bold ${txt}`}>Confirmar presença</h3>
+          <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          {feito != null ? (
+            <p className={`text-sm ${txt}`}>{feito} check-in(s) registrado(s).</p>
+          ) : (
+            <>
+              <p className={`text-xs ${txtMuted}`}>
+                Estes leitos têm morador alocado mas nunca tiveram check-in. Desmarque quem não estiver no alojamento.
+              </p>
+              <div className={`max-h-72 overflow-y-auto rounded-xl border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                {pendentes.map(({ leito, ocup }) => (
+                  <button key={ocup.id} onClick={() => alternar(ocup.id)}
+                    className={`w-full text-left px-3 py-2 flex items-center gap-2.5 border-b last:border-0 ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${marcados.has(ocup.id) ? 'bg-emerald-600 border-emerald-600' : (isDark ? 'border-white/20' : 'border-slate-300')}`}>
+                      {marcados.has(ocup.id) && <CheckCircle2 size={12} className="text-white" />}
+                    </span>
+                    <span className={`text-xs font-mono font-bold shrink-0 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>{leitoLbl(leito.codigo_leito)}</span>
+                    <span className={`text-sm truncate ${txt}`}>{ocup.colaborador_nome}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {erro && <p className="text-xs text-rose-500">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+              {feito != null ? 'Fechar' : 'Cancelar'}
+            </button>
+            {feito == null && (
+              <button onClick={handle} disabled={lote.isPending || marcados.size === 0}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {lote.isPending && <Loader2 size={14} className="animate-spin" />} Confirmar {marcados.size}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1164,7 +1495,7 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Colaborador', 'Alojamento', 'Leito', 'Início', 'Fim', 'Origem', 'Foto'].map(h => (
+                  {['Colaborador', 'Alojamento', 'Leito', 'Início', 'Fim', 'Origem', 'Entrada', 'Saída'].map(h => (
                     <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>{h}</th>
                   ))}
                 </tr>
@@ -1182,8 +1513,11 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
                         : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Atual</span>}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${h.origem === 'portal_qr' ? 'bg-violet-100 text-violet-700' : (isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
-                        {h.origem === 'portal_qr' ? 'QR Portal' : 'Manual'}
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        h.origem === 'portal_qr' ? 'bg-violet-100 text-violet-700'
+                        : h.origem === 'erp_equipe' ? 'bg-emerald-100 text-emerald-700'
+                        : (isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
+                        {h.origem === 'portal_qr' ? 'QR Portal' : h.origem === 'erp_equipe' ? 'Equipe' : 'Manual'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -1191,6 +1525,14 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
                         ? <FotoCheckinBtn
                             url={h.checkin_foto_url} isDark={isDark}
                             titulo={`${h.leito ? `Leito ${leitoLbl(h.leito.codigo_leito)} · ` : ''}check-in de ${h.colaborador_nome}`}
+                          />
+                        : <span className={`text-xs ${txtMuted}`}>—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {h.checkout_foto_url
+                        ? <FotoCheckinBtn
+                            url={h.checkout_foto_url} isDark={isDark}
+                            titulo={`${h.leito ? `Leito ${leitoLbl(h.leito.codigo_leito)} · ` : ''}check-out de ${h.colaborador_nome}`}
                           />
                         : <span className={`text-xs ${txtMuted}`}>—</span>}
                     </td>
