@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
@@ -22,6 +22,10 @@ import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 const TIPOS: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet', 'telefone', 'iptu', 'condominio', 'limpeza', 'seguro', 'caucao', 'outro']
 // O que quase todo imovel tem. Enquanto ninguem configurar, a tela cobra so isso —
 // listar os 11 tipos fazia 'nao tem' parecer 'esta faltando'.
+const mesRefLabel = (d: string) => {
+  const [ano, mes] = d.slice(0, 7).split("-")
+  return `${mes}/${ano.slice(2)}`
+}
 const TIPOS_PADRAO: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet']
 
 // Vencimento padrão do aluguel = mês seguinte à competência, no dia de vencimento do contrato
@@ -341,6 +345,64 @@ function DescontosAluguel({ fatura, isDark }: { fatura: LocFatura; isDark: boole
   )
 }
 
+// ── Visualizador de anexo ───────────────────────────────────────────────────
+// Abrir em aba nova obrigava a baixar o arquivo para dar uma olhada. Aqui a
+// conta aparece na hora; o download vira escolha.
+function AnexoViewer({ path, titulo, isDark, onClose }: {
+  path: string; titulo: string; isDark: boolean; onClose: () => void
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [erro, setErro] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    faturaAnexoUrl(path)
+      .then(u => { if (vivo) { if (u) setUrl(u); else setErro(true) } })
+      .catch(() => { if (vivo) setErro(true) })
+    return () => { vivo = false }
+  }, [path])
+
+  const nome = path.split("/").pop() || "fatura.pdf"
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className={`w-full max-w-3xl h-[92vh] sm:h-[88vh] flex flex-col rounded-t-2xl sm:rounded-2xl border shadow-2xl overflow-hidden ${
+          isDark ? "bg-[#0f172a] border-white/[0.08]" : "bg-white border-slate-200"}`}>
+        <div className={`flex items-center justify-between gap-2 p-3 border-b ${isDark ? "border-white/[0.08]" : "border-slate-200"}`}>
+          <span className={`flex items-center gap-2 font-bold text-sm min-w-0 ${isDark ? "text-white" : "text-slate-800"}`}>
+            <Paperclip size={15} className="text-indigo-500 shrink-0" />
+            <span className="truncate">{titulo}</span>
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <a href={url ?? "#"} download={nome} target="_blank" rel="noreferrer"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white ${
+                url ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-400 pointer-events-none"}`}>
+              <Download size={14} /> Baixar
+            </a>
+            <button onClick={onClose}
+              className={`p-1.5 rounded-lg ${isDark ? "hover:bg-white/[0.06] text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 bg-slate-200 dark:bg-black/40">
+          {erro ? (
+            <div className="h-full flex items-center justify-center text-sm text-rose-500 p-4 text-center">
+              Não consegui abrir este anexo.
+            </div>
+          ) : !url ? (
+            <div className="h-full flex items-center justify-center gap-2 text-sm text-slate-400">
+              <Loader2 size={16} className="animate-spin" /> abrindo…
+            </div>
+          ) : (
+            <iframe title={titulo} src={url} className="w-full h-full border-0 bg-white" />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 // ── Imovel Faturas Modal ─────────────────────────────────────────────────────
 
 function ImovelFaturasModal({
@@ -356,6 +418,7 @@ function ImovelFaturasModal({
 }) {
   const [modalCompetencia, setModalCompetencia] = useState(currentYYYYMM)
   const [configTipos, setConfigTipos] = useState(false)
+  const [verAnexo, setVerAnexo] = useState<{ path: string; titulo: string } | null>(null)
   const salvarEsperadas = useSalvarFaturasEsperadas()
   const [editingRow, setEditingRow] = useState<{ tipo: TipoFatura; fatura: LocFatura | null } | null>(null)
   const enviarFinanceiro = useEnviarFaturasFinanceiro()
@@ -483,9 +546,8 @@ function ImovelFaturasModal({
     }
   }
 
-  async function abrirAnexo(pathOrUrl?: string) {
-    const url = await faturaAnexoUrl(pathOrUrl)
-    if (url) window.open(url, '_blank')
+  function abrirAnexo(pathOrUrl?: string, titulo?: string) {
+    if (pathOrUrl) setVerAnexo({ path: pathOrUrl, titulo: titulo ?? "Anexo da fatura" })
   }
 
   async function removerAnexo(fat: LocFatura) {
@@ -717,12 +779,18 @@ function ImovelFaturasModal({
               )}
             </div>
           )}
-          {/* Faturas Table */}
+              {verAnexo && (
+            <AnexoViewer path={verAnexo.path} titulo={verAnexo.titulo} isDark={isDark}
+              onClose={() => setVerAnexo(null)} />
+          )}
+
+      {/* Faturas Table */}
           <div className={`rounded-xl border overflow-hidden ${border}`}>
             <table className="w-full text-xs">
               <thead>
                 <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                   <th className="text-left px-4 py-2 font-semibold">TIPO</th>
+                  <th className="text-center px-2 py-2 font-semibold">MÊS REF.</th>
                   <th className="text-center px-2 py-2 font-semibold">VENC.</th>
                   <th className="text-right px-2 py-2 font-semibold">VALOR</th>
                   <th className="text-right px-4 py-2 font-semibold">STATUS</th>
@@ -738,6 +806,9 @@ function ImovelFaturasModal({
                       <td className={`px-4 py-2.5 font-semibold ${txtMain}`}>{TIPO_FATURA_LABEL[tipo]}</td>
                       {fat ? (
                         <>
+                          <td className={`text-center px-2 py-2.5 ${txtMuted}`}>
+                            {fat.mes_referencia ? mesRefLabel(fat.mes_referencia) : "—"}
+                          </td>
                           <td className={`text-center px-2 py-2.5 ${txtMuted}`}>{fmtDate(fat.vencimento)}</td>
                           <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>
                             {tipo === 'aluguel' && totalDescAluguel > 0 ? (
@@ -765,7 +836,7 @@ function ImovelFaturasModal({
                               {fat.boleto_url && (
                                 <span className="inline-flex items-center">
                                   <button
-                                    onClick={() => abrirAnexo(fat.boleto_url)}
+                                    onClick={() => abrirAnexo(fat.boleto_url, `${TIPO_FATURA_LABEL[tipo]} — ${fmtCurrency(getFaturaValor(fat))}`)}
                                     className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-indigo-400' : 'hover:bg-indigo-50 text-indigo-500'}`}
                                     title="Abrir anexo da fatura"
                                   >
@@ -823,6 +894,7 @@ function ImovelFaturasModal({
                       ) : tipo === 'aluguel' && imovel.valor_aluguel_mensal ? (
                         /* Aluguel ainda não lançado: prévia com valor + vencimento do contrato */
                         <>
+                          <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
                           <td className="text-center px-2 py-2.5">
                             <span className="text-amber-500" title="Vencimento do contrato">{fmtDate(aluguelVencDefault(modalCompetencia, imovel.dia_vencimento))}</span>
                           </td>
@@ -843,6 +915,7 @@ function ImovelFaturasModal({
                         </>
                       ) : (
                         <>
+                          <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
                           <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
                           <td className={`text-right px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
                           <td className="text-right px-4 py-2.5">
@@ -999,7 +1072,13 @@ export default function Faturas() {
   const [sortCol, setSortCol] = useState<string>('imovel')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [selectedImovel, setSelectedImovel] = useState<LocImovel | null>(null)
+  // Guarda o ID, nao o objeto: o modal precisa enxergar o imovel ATUALIZADO
+  // depois de salvar 'contas do imovel' — com um snapshot, o botao parecia morto.
+  const [selectedImovelId, setSelectedImovelId] = useState<string | null>(null)
+  const selectedImovel = useMemo(
+    () => imoveis.find(i => i.id === selectedImovelId) ?? null,
+    [imoveis, selectedImovelId],
+  )
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
@@ -1272,7 +1351,7 @@ export default function Faturas() {
                   return (
                     <tr
                       key={row.imovel.id}
-                      onClick={() => setSelectedImovel(row.imovel)}
+                      onClick={() => setSelectedImovelId(row.imovel.id)}
                       className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}
                     >
                       <td className="px-3 py-2.5">
@@ -1308,7 +1387,7 @@ export default function Faturas() {
               <button
                 key={row.imovel.id}
                 type="button"
-                onClick={() => setSelectedImovel(row.imovel)}
+                onClick={() => setSelectedImovelId(row.imovel.id)}
                 className={`w-full text-left rounded-xl border p-3 transition-all ${
                   isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'
                 }`}
@@ -1369,7 +1448,7 @@ export default function Faturas() {
           imovel={selectedImovel}
           allFaturas={faturas}
           isDark={isDark}
-          onClose={() => setSelectedImovel(null)}
+          onClose={() => setSelectedImovelId(null)}
         />
       )}
     </div>

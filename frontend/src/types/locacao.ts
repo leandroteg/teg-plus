@@ -317,6 +317,8 @@ export interface LocFatura {
   tipo: TipoFatura
   descricao?: string
   competencia?: string
+  /** Mês que a concessionária declara na conta; pode diferir da competência. */
+  mes_referencia?: string | null
   vencimento?: string
   valor_previsto?: number
   valor_confirmado?: number
