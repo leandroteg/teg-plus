@@ -2863,6 +2863,19 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
           </p>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isDark ? st.dark : st.light}`}>{st.label}</span>
+        {/* Existindo a versao assinada, ela vem primeiro: dizer "assinada" e
+            abrir o PDF em branco e pior do que nao dizer nada. */}
+        {f.arquivo_assinado_path && (
+          <button
+            onClick={async () => { const url = await evidenciaUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank', 'noopener') }}
+            title="Abrir a ficha ASSINADA"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${
+              isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            }`}
+          >
+            <ShieldCheck size={11} /> Assinada
+          </button>
+        )}
         <button
           onClick={() => gerarFichaEpiPdf({
             codigo: f.codigo,
@@ -2883,9 +2896,9 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
           className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${
             isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
-          title="Gerar a ficha em PDF para colher a assinatura"
+          title="Gerar a ficha em branco, para colher assinatura no papel"
         >
-          <FileDown size={11} /> PDF
+          <FileDown size={11} /> PDF em branco
         </button>
         {f.status === 'aguardando_assinatura' && (
           <label className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors ${
