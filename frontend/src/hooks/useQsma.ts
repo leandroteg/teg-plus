@@ -854,6 +854,26 @@ export const OS_DIRETRIZES_PADRAO = [
   'Em caso de acidente comunicar o superior imediato.',
 ].join('\n')
 
+/** Cadastro do colaborador para o cabecalho da OS. Busca por id em vez de
+ *  procurar na lista: a lista pode vir do cache com um formato antigo. */
+export function useColaboradorParaOs(id?: string) {
+  return useQuery({
+    queryKey: ['qsma_os_colab', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rh_colaboradores')
+        .select('id, nome, cargo, setor, departamento, matricula, cbo, data_admissao')
+        .eq('id', id!).maybeSingle()
+      if (error) throw error
+      return data as {
+        id: string; nome: string; cargo: string | null; setor: string | null
+        departamento: string | null; matricula: string | null; cbo: string | null
+        data_admissao: string | null
+      } | null
+    },
+  })
+}
+
 export function useOsSegurancaLista() {
   return useQuery({
     queryKey: ['qsma_os_seguranca'],
