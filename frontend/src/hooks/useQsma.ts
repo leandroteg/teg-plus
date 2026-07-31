@@ -794,9 +794,18 @@ export function useCautelasColaborador(colaboradorId?: string) {
 export interface OsSegDados {
   objetivo: string
   descricao_atividade: string
-  riscos: { perigo: string; risco: string | null; grupo: string | null; efeitos: string | null; controles: string | null; classificacao: string | null }[]
+  riscos: {
+    perigo: string
+    /** O que gera o risco. A OS chama de "fonte geradora". */
+    fonte: string | null
+    /** Medidas administrativas — o que a empresa faz/exige. */
+    medidas: string | null
+  }[]
   epis: { nome: string; ca: string | null; quantidade: number }[]
+  /** Proteção coletiva. Não existe cadastro no sistema: é digitada na OS. */
+  epcs: string[]
   treinamentos: { nome: string; norma: string | null }[]
+  /** Diretrizes de SST — a lista que o colaborador declara ter lido. */
   obrigacoes: string
 }
 
@@ -807,6 +816,8 @@ export interface OsSeguranca {
   colaborador_nome?: string | null
   cargo?: string | null
   cbo?: string | null
+  matricula?: string | null
+  setor?: string | null
   departamento?: string | null
   data_admissao?: string | null
   dados: OsSegDados
@@ -818,12 +829,30 @@ export interface OsSeguranca {
 
 /** Texto legal do objetivo — igual ao da OS em uso hoje (NR-01). */
 export const OS_OBJETIVO_PADRAO =
-  'Adequar à empresa conforme Norma Regulamentadora (NR) 01, elaborar Ordens de Serviço sobre segurança e ' +
-  'medicina do trabalho, descrever aos colaboradores as tarefas realizadas no posto de trabalho, os riscos ' +
-  'ambientais existentes, possíveis doenças ocupacionais, equipamentos de proteção individual (EPI) ' +
-  'obrigatórios referente à função, transmitir recomendações técnicas ou medidas de controle, informar suas ' +
-  'responsabilidades quanto ao descumprimento das Ordens de Serviço de Segurança e desta forma prevenir a ' +
-  'ocorrência de Acidentes de Trabalho.'
+  'Instruir os trabalhadores quanto as diretrizes de saúde e segurança para evitar acidentes do trabalho e ' +
+  'doenças ocupacionais de acordo com a NR-01 item 1.4.1 alínea c.'
+
+/** Diretrizes de SST — copiadas da OS que a TEG ja emite, na mesma ordem. */
+export const OS_DIRETRIZES_PADRAO = [
+  'Colaborar com as questões referentes à segurança e saúde no trabalho;',
+  'Não execute qualquer atividade sem a devida capacitação;',
+  'Obedeça às sinalizações de segurança do ambiente de trabalho;',
+  'Utilizar os EPIs recomendados pelo empregador;',
+  'Caso observe risco de acidente de trabalho ou danos a equipamentos e instalações comunicar o superior imediato e alertar os demais trabalhadores que possam se expor ao risco;',
+  'Sendo o risco grave e iminente, interromper o trabalho e comunicar o superior imediato e alertar demais trabalhadores que possam se expor ao risco;',
+  'Transitar com atenção pelos pavimentos, ficando atento com a movimentação de pessoas, máquinas e equipamentos em geral;',
+  'Comparecer no local indicado, quando convocado, para realização do exame periódico e outros que forem necessários;',
+  'Seguir as orientações de seu superior imediato;',
+  'Ao subir e descer as escadas segurar o corrimão;',
+  'Descartar os resíduos gerados no processo de trabalho em locais apropriados;',
+  'Manter o ambiente de trabalho organizado;',
+  'Fumar somente em local apropriado;',
+  'Não correr dentro das dependências do local de trabalho;',
+  'Não obstruir os acessos aos extintores de incêndio, hidrantes e saídas de emergência;',
+  'Não retirar os lacres, etiquetas ou selos do corpo dos extintores e hidrantes;',
+  'Não subir em cadeiras/mesas para alcançar locais mais altos;',
+  'Em caso de acidente comunicar o superior imediato.',
+].join('\n')
 
 export function useOsSegurancaLista() {
   return useQuery({
@@ -846,20 +875,19 @@ export function useOsSegurancaDoCargo(cargo?: string | null) {
     queryFn: async (): Promise<Pick<OsSegDados, 'riscos' | 'epis' | 'treinamentos'>> => {
       const base = cargoBase(cargo!)
       const [mr, me, mt] = await Promise.all([
-        supabase.from('qsma_matriz_risco').select('cargo, classificacao, medidas_administrativas, risco:qsma_riscos(perigo, risco, grupo, efeitos, controles)'),
+        supabase.from('qsma_matriz_risco').select('cargo, fontes, medidas_administrativas, risco:qsma_riscos(perigo, controles, fontes_tipicas)'),
         supabase.from('qsma_matriz_epi').select('cargo, quantidade, exigencia, epi:qsma_epis(nome, ca)'),
         supabase.from('qsma_matriz_treinamento').select('cargo, exigencia, treino:qsma_treinamento_catalogo(nome, norma)'),
       ])
       const doCargo = <T extends { cargo: string }>(rows: T[] | null) =>
         (rows ?? []).filter(r => cargoBase(r.cargo) === base)
 
+      // `controles` de qsma_riscos esta vazio em toda a base; o que a OS mostra
+      // como medida vem de medidas_administrativas, e a fonte geradora de `fontes`.
       const riscos = doCargo(mr.data as any[]).filter(r => r.risco).map(r => ({
         perigo: r.risco.perigo,
-        risco: r.risco.risco ?? null,
-        grupo: r.risco.grupo ?? null,
-        efeitos: r.risco.efeitos ?? null,
-        controles: [r.risco.controles, r.medidas_administrativas].filter(Boolean).join(' · ') || null,
-        classificacao: r.classificacao ?? null,
+        fonte: r.fontes || r.risco.fontes_tipicas || null,
+        medidas: r.medidas_administrativas || r.risco.controles || null,
       }))
       const epis = doCargo(me.data as any[])
         .filter(r => r.exigencia === 'obrigatorio' && r.epi)
@@ -1187,6 +1215,8 @@ export interface ColabTreino {
   base_id?: string | null
   // Alimentam o tamanho sugerido na ficha de EPI (fonte: Mobilizacao).
   tamanho_camisa?: string | null; tamanho_calca?: string | null; tamanho_calcado?: string | null
+  // Cabecalho da Ordem de Servico (NR-01).
+  cbo?: string | null; matricula?: string | null
 }
 // ── Desligamento — fluxo de 6 etapas sobre rh_desligamentos ───────────────────
 export type EtapaDeslig = 'requisicao' | 'aprovacao' | 'preparo' | 'nada_consta' | 'rescisao' | 'encerrados'
@@ -1319,7 +1349,7 @@ export function useColaboradoresTreino() {
     queryFn: async (): Promise<ColabTreino[]> => {
       const [{ data: colabs, error }, { data: bases }] = await Promise.all([
         supabase.from('rh_colaboradores')
-          .select('id, nome, cargo, setor, departamento, data_admissao, base_id, tamanho_camisa, tamanho_calca, tamanho_calcado')
+          .select('id, nome, cargo, setor, departamento, data_admissao, base_id, tamanho_camisa, tamanho_calca, tamanho_calcado, cbo, matricula')
           .eq('ativo', true).order('nome', { ascending: true }),
         supabase.from('est_bases').select('id, nome'),
       ])
