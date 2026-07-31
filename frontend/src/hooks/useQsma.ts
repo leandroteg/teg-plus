@@ -26,6 +26,16 @@ export async function uploadEvidencia(pasta: string, file: File): Promise<string
   return path
 }
 
+/** Documento ASSINADO (ficha de EPI, OS, docs de admissao). Fica no bucket do
+ *  RH, nao no de evidencias do QSMA — usar evidenciaUrl aqui devolve null em
+ *  silencio e a tela parece que "nao faz nada". */
+export async function docAssinadoUrl(path?: string | null): Promise<string | null> {
+  if (!path) return null
+  if (/^https?:\/\//.test(path)) return path
+  const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(path, 3600)
+  return data?.signedUrl ?? null
+}
+
 export async function evidenciaUrl(path?: string | null): Promise<string | null> {
   if (!path) return null
   if (/^https?:\/\//.test(path)) return path
@@ -1069,12 +1079,23 @@ export function useEpiEntregas() {
   return useQuery({
     queryKey: ['qsma_epi_entregas'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('qsma_epi_entregas')
-        .select('*, epi:qsma_epis(id, nome, ca, vida_util_dias)')
-        .order('data_entrega', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as QsmaEpiEntrega[]
+      // 2.891 linhas — acima do corte de 1.000 do PostgREST. Sem paginar, o
+      // Controle de EPI perderia entregas sem nenhum erro aparecer.
+      const PAGINA = 1000
+      const tudo: QsmaEpiEntrega[] = []
+      for (let de = 0; ; de += PAGINA) {
+        const { data, error } = await supabase
+          .from('qsma_epi_entregas')
+          .select('*, epi:qsma_epis(id, nome, ca, vida_util_dias)')
+          .order('data_entrega', { ascending: false, nullsFirst: false })
+          .order('id', { ascending: true })
+          .range(de, de + PAGINA - 1)
+        if (error) throw error
+        const lote = (data ?? []) as QsmaEpiEntrega[]
+        tudo.push(...lote)
+        if (lote.length < PAGINA) break
+      }
+      return tudo
     },
   })
 }
@@ -1085,9 +1106,24 @@ export function useTreinamentos() {
   return useQuery({
     queryKey: ['qsma_treinamentos'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('qsma_treinamentos').select('*').order('vencimento', { ascending: true })
-      if (error) throw error
-      return (data ?? []) as QsmaTreinamento[]
+      // Paginado de proposito: o PostgREST corta em 1.000 linhas e a tabela ja
+      // passa de 1.700. Como a ordem e por vencimento ASC (nulo por ultimo), os
+      // registros SEM vencimento — as 615 Ordens de Servico vinculadas — ficavam
+      // fora do corte e a tela mostrava "faltando" para todo mundo. Truncagem
+      // silenciosa: nao ha erro, so dado que nunca chega.
+      const PAGINA = 1000
+      const tudo: QsmaTreinamento[] = []
+      for (let de = 0; ; de += PAGINA) {
+        const { data, error } = await supabase.from('qsma_treinamentos').select('*')
+          .order('vencimento', { ascending: true, nullsFirst: false })
+          .order('id', { ascending: true })
+          .range(de, de + PAGINA - 1)
+        if (error) throw error
+        const lote = (data ?? []) as QsmaTreinamento[]
+        tudo.push(...lote)
+        if (lote.length < PAGINA) break
+      }
+      return tudo
     },
   })
 }
