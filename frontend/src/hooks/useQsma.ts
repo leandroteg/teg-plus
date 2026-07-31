@@ -780,6 +780,49 @@ export function useCautelasColaborador(colaboradorId?: string) {
 }
 
 // Arquiva a ficha assinada: grava o path do documento e marca itens assinados
+/** Envia a ficha para o colaborador assinar no Portal TEG.
+ *
+ *  Nao inventa fluxo: sobe o PDF no mesmo bucket do RH e chama a RPC
+ *  `rh_missao_enviar`, que cria o sig_documento, a missao em portalteg_missoes
+ *  (categoria 'assinaturas') e dispara o push. A assinatura acontece em
+ *  /assinar/<id>, no proprio ERP; o Portal so leva o colaborador ate la.
+ *
+ *  A ficha guarda o missao_id — e a trigger trg_qsma_ficha_epi_assinada vira o
+ *  status para 'assinada' quando a missao e concluida. */
+export function useEnviarFichaEpiAssinatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { fichaId: string; colaboradorId: string; codigo?: string | null; pdf: Blob }) => {
+      const base = `Ficha_EPI_${(p.codigo ?? p.fichaId).replace(/[^\w-]+/g, '_')}.pdf`
+      const path = `qsma-epi/${p.colaboradorId}/${Date.now()}-${base}`
+      const up = await supabase.storage.from('rh-admissao-docs')
+        .upload(path, p.pdf, { contentType: 'application/pdf', upsert: false })
+      if (up.error) throw up.error
+
+      const { data, error } = await supabase.rpc('rh_missao_enviar', {
+        p_colaborador_id: p.colaboradorId,
+        p_titulo: `Ficha de entrega de EPI ${p.codigo ?? ''}`.trim(),
+        p_arquivo_path: path,
+        p_tipo: 'assinatura',
+        p_descricao: 'Confira os EPIs recebidos e assine o recebimento. Ao assinar, voce declara que recebeu os equipamentos listados e foi orientado sobre o uso.',
+        p_metadata: { origem: 'qsma_epi_ficha', ficha_id: p.fichaId },
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string; missao_id?: string }
+      // A RPC devolve erro de negocio no CORPO (colaborador inativo, sem CPF ou
+      // sem data de nascimento), nao como excecao — sem esta checagem o envio
+      // falharia em silencio e a ficha ficaria sem missao.
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao enviar para assinatura')
+
+      const { error: e2 } = await supabase.from('qsma_epi_fichas')
+        .update({ missao_id: r.missao_id }).eq('id', p.fichaId)
+      if (e2) throw e2
+      return r
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] }) },
+  })
+}
+
 export function useArquivarFichaEpi() {
   const qc = useQueryClient()
   return useMutation({
