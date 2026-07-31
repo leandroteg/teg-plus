@@ -17,6 +17,7 @@ import ControladoriaFlow, { type FlowStep } from '../../components/Controladoria
 import {
   useRiscos, useSalvarRisco, useEpis, useSalvarEpi,
   useFichasEpi, useCriarFichaEpi, useArquivarFichaEpi, useEnviarFichaEpiAssinatura, consultarCA,
+  useOsSegurancaLista, useEnviarOsSegAssinatura, type OsSeguranca,
   uploadEvidencia, evidenciaUrl, type ItemFichaEpi,
   useTreinamentos, useSalvarTreinamento, useOcorrencias, useSalvarOcorrencia,
   useAcoesQsma, useAcoesDosRegistros, useToggleAcaoQsma, useEnviarOcorrenciaSgi, useGerarRelatorio, useRelatorioStatus,
@@ -29,6 +30,8 @@ import {
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf, gerarFichaEpiBlob } from '../../utils/ficha-epi-pdf'
+import { gerarOsSegurancaBlob } from '../../utils/os-seguranca-pdf'
+import OsSegurancaModal, { type AlvoOs } from '../../components/qsma/OsSegurancaModal'
 import { QsmaModal, ModalFooter, FotosUpload, fmtData } from '../../components/qsma/ModalBits'
 import { QsmaToolbar, ToolbarSelect, ToolbarPills, BotaoNovo, QuickChips, MultiCheck, ToolbarDateRange } from '../../components/qsma/Toolbar'
 import { Timer, FileSignature, List, LayoutGrid, LayoutList, Columns3, ExternalLink, Send, Sparkles, FileText, Link as LinkIcon, Check, Grid3x3 } from 'lucide-react'
@@ -1778,6 +1781,14 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
   const { data: basesEst = [] } = useBases()
   const [fichaPara, setFichaPara] = useState<IntegracaoCand | null>(null)
   const enviarAssinatura = useEnviarFichaEpiAssinatura()
+  const { data: ossSeg = [] } = useOsSegurancaLista()
+  const enviarOs = useEnviarOsSegAssinatura()
+  const [osPara, setOsPara] = useState<{ alvo: AlvoOs; existente: OsSeguranca | null } | null>(null)
+  const { perfil } = useAuth()
+
+  // Estado da OS do colaborador — mesma leitura de tres estagios da ficha de EPI.
+  const osDe = (c: IntegracaoCand): OsSeguranca | undefined =>
+    c.colaborador_id ? ossSeg.find(o => o.colaborador_id === c.colaborador_id) : undefined
   const [enviandoId, setEnviandoId] = useState<string | null>(null)
 
   // Envia uma ficha que ja existe. O PDF e remontado a partir dela — useFichasEpi
@@ -1957,6 +1968,35 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
         </div>
       </div>
 
+      {osPara && (
+        <OsSegurancaModal
+          isDark={isDark} alvo={osPara.alvo} existente={osPara.existente}
+          autorNome={perfil?.nome}
+          onClose={() => setOsPara(null)}
+          onEmitir={async (os) => {
+            try {
+              const pdf = await gerarOsSegurancaBlob({
+                codigo: os.codigo, colaboradorNome: os.colaborador_nome ?? osPara.alvo.nome,
+                cargo: os.cargo, cbo: os.cbo, departamento: os.departamento,
+                dataAdmissao: os.data_admissao,
+                objetivo: os.dados.objetivo, descricaoAtividade: os.dados.descricao_atividade,
+                obrigacoes: os.dados.obrigacoes, riscos: os.dados.riscos,
+                epis: os.dados.epis, treinamentos: os.dados.treinamentos,
+                emitidaPorNome: os.emitida_por_nome,
+              })
+              await enviarOs.mutateAsync({
+                osId: os.id, colaboradorId: os.colaborador_id, codigo: os.codigo, pdf,
+              })
+              setOsPara(null)
+            } catch (e: any) {
+              // A OS ja foi salva: o aviso diz onde retomar em vez de sumir com ela.
+              alert(`OS ${os.codigo ?? ''} salva, mas o envio falhou: ${e?.message ?? 'erro'}\n\nAbra a celula OS de novo para reenviar.`)
+              setOsPara(null)
+            }
+          }}
+        />
+      )}
+
       {fichaPara?.colaborador_id && (
         <FichaEpiModal isDark={isDark} epis={episAtivos.filter(e => e.ativo)}
           preset={{ colaboradorId: fichaPara.colaborador_id, nome: fichaPara.nome, cargo: fichaPara.cargo, baseNome: fichaPara.base }}
@@ -2047,6 +2087,45 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                           )
                         })()}
                         {cols.map(col => {
+                          // A OS nao e certificado que se anexa: e documento que a
+                          // empresa EMITE. A celula abre o modal de emissao.
+                          if (col.codigo === 'OS') {
+                            const o = osDe(c)
+                            const podeEmitir = !!c.colaborador_id
+                            return (
+                              <td key={col.id} className={`text-center border-l border-dashed ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                                <div className="flex items-center justify-center h-8">
+                                  {!podeEmitir ? (
+                                    <span className={isDark ? 'text-slate-700' : 'text-slate-200'}>·</span>
+                                  ) : (
+                                    <button type="button"
+                                      onClick={() => setOsPara({
+                                        alvo: {
+                                          colaboradorId: c.colaborador_id!, nome: c.nome,
+                                          cargo: c.cargo, cbo: null, departamento: null, dataAdmissao: null,
+                                        },
+                                        existente: o ?? null,
+                                      })}
+                                      title={o
+                                        ? `OS ${o.codigo ?? ''} — ${o.status === 'assinada' ? 'assinada' : o.status === 'aguardando_assinatura' ? 'aguardando assinatura' : 'rascunho'}`
+                                        : 'Emitir Ordem de Serviço da função'}
+                                      className="group">
+                                      {o?.status === 'assinada'
+                                        ? <CheckCircle2 size={16} className="text-emerald-500 group-hover:text-emerald-600" />
+                                        : o?.status === 'aguardando_assinatura'
+                                          ? <Clock size={16} className="text-amber-500 group-hover:text-amber-600" />
+                                          : (
+                                            <span className="relative inline-flex items-center justify-center">
+                                              <Circle size={14} className="text-red-400 group-hover:opacity-0" />
+                                              <FileText size={13} className="absolute text-sky-500 opacity-0 group-hover:opacity-100" />
+                                            </span>
+                                          )}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            )
+                          }
                           const st = statusCel(c.id, cargoKey, col)
                           return (
                             <td key={col.id} className={`text-center ${col.tipo !== 'legal' ? 'border-l border-dashed ' + (isDark ? 'border-white/10' : 'border-slate-200') : ''}`}>
