@@ -21,13 +21,6 @@ export default function FinanceiroLayout() {
         title: 'Novo registro',
         items: [
           {
-            icon: DollarSign,
-            label: 'Lançar NF Recebimento',
-            description: 'NF já emitida fora do sistema — entra direto em NF Emitida.',
-            tone: 'emerald',
-            action: () => navigate(`/financeiro/cr?nova_nf=${Date.now()}`),
-          },
-          {
             icon: Receipt,
             label: 'Pagamento Extraordinário',
             description: 'Solicitação manual urgente com entrada direta em Confirmados.',
@@ -40,6 +33,13 @@ export default function FinanceiroLayout() {
             description: 'Planejamento de despesas futuras com recorrência opcional.',
             tone: 'emerald',
             action: () => navigate('/financeiro/contas-a-pagar?nova=previsao'),
+          },
+          {
+            icon: DollarSign,
+            label: 'Lançar NF Recebimento',
+            description: 'NF já emitida fora do sistema — entra direto em NF Emitida.',
+            tone: 'emerald',
+            action: () => navigate(`/financeiro/cr?nova_nf=${Date.now()}`),
           },
         ],
       },
