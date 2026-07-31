@@ -1012,14 +1012,6 @@ function ImovelFaturasModal({
           {/* Action Buttons */}
           <div className="flex justify-end gap-2">
             <button
-              onClick={() => alert('Exportar PDF — em breve!')}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
-                isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Download size={13} /> Exportar PDF
-            </button>
-            <button
               onClick={async () => {
                 const elegiveis = mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status) && getFaturaValor(f) > 0)
                 if (elegiveis.length === 0) {
