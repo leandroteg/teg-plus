@@ -965,6 +965,9 @@ export function useSetMatrizEpiCelula() {
 export interface ColabTreino {
   id: string; nome: string; cargo: string | null; setor: string | null
   departamento: string | null; data_admissao: string | null; base: string | null
+  base_id?: string | null
+  // Alimentam o tamanho sugerido na ficha de EPI (fonte: Mobilizacao).
+  tamanho_camisa?: string | null; tamanho_calca?: string | null; tamanho_calcado?: string | null
 }
 // ── Desligamento — fluxo de 6 etapas sobre rh_desligamentos ───────────────────
 export type EtapaDeslig = 'requisicao' | 'aprovacao' | 'preparo' | 'nada_consta' | 'rescisao' | 'encerrados'
@@ -1097,7 +1100,7 @@ export function useColaboradoresTreino() {
     queryFn: async (): Promise<ColabTreino[]> => {
       const [{ data: colabs, error }, { data: bases }] = await Promise.all([
         supabase.from('rh_colaboradores')
-          .select('id, nome, cargo, setor, departamento, data_admissao, base_id')
+          .select('id, nome, cargo, setor, departamento, data_admissao, base_id, tamanho_camisa, tamanho_calca, tamanho_calcado')
           .eq('ativo', true).order('nome', { ascending: true }),
         supabase.from('est_bases').select('id, nome'),
       ])
