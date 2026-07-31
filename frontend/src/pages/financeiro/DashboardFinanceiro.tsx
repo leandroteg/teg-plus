@@ -9,7 +9,7 @@ import {
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 // Import estático: a toolbar do período renderiza no header (mesma linha do título)
-import Relatorios, { RelatoriosToolbar, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
+import Relatorios, { RelatoriosToolbar, PeriodoSelect, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
 type PainelKey = 'painel' | 'contas_receber' | 'pgtos_previstos' | 'rel_fluxo' | 'rel_aging'
@@ -138,7 +138,8 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
   const { isDark } = useTheme()
   const nav = useNavigate()
   const location = useLocation()
-  const [periodo, setPeriodo] = useState('30d')
+  // intervalo de meses ('YYYY-MM'), mesmo padrão dos relatórios
+  const [periodo, setPeriodo] = useState(relPeriodoDefault)
   const [painelAtivo, setPainelAtivo] = useState<PainelKey>(initialPainel ?? 'painel')
   const [relPeriodo, setRelPeriodo] = useState(relPeriodoDefault)  // De → Até dos relatórios (vive no header)
 
@@ -148,8 +149,8 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
     else if (painelAtivo in REL_TIPO) setRelPeriodo(relPeriodoDefault())
   }, [painelAtivo])
 
-  useEffect(() => { setPeriodo('30d') }, [location.key])
-  const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
+  useEffect(() => { setPeriodo(relPeriodoDefault()) }, [location.key])
+  const { data, isLoading, refetch } = useFinanceiroDashboard(periodo.de, periodo.ate)
 
   const kpis = data?.kpis ?? EMPTY_KPIS
   const porStatus = data?.por_status ?? []
@@ -159,12 +160,26 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
 
   // Contas a Receber (para os blocos de recebimento)
   const { data: crList = [] } = useContasReceber()
+  // Recorte do intervalo escolhido. A data que vale muda por natureza do valor:
+  // recebido olha o RECEBIMENTO; o que ainda não entrou olha o VENCIMENTO.
+  // Sem isso o card somava a base inteira e o filtro do topo não mexia em nada.
+  const noIntervalo = useMemo(() => {
+    const fimMes = new Date(Number(periodo.ate.slice(0, 4)), Number(periodo.ate.slice(5, 7)), 0)
+    const ini = `${periodo.de}-01`
+    const fim = `${periodo.ate}-${String(fimMes.getDate()).padStart(2, '0')}`
+    return (c: ContaReceber) => {
+      const d = ['recebido', 'conciliado'].includes(c.status)
+        ? (c.data_recebimento ?? c.data_vencimento) : c.data_vencimento
+      return !!d && d >= ini && d <= fim
+    }
+  }, [periodo])
+
   const cr = useMemo(() => {
     const isBloq = (b?: string) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     const a = { recebido: 0, aReceber: 0, bloqueado: 0, vencido: 0, emAberto: 0 }
     const ccReceita: Record<string, number> = {}
-    for (const c of crList as ContaReceber[]) {
+    for (const c of (crList as ContaReceber[]).filter(noIntervalo)) {
       const v = c.valor_original
       if (['recebido', 'conciliado'].includes(c.status)) { a.recebido += v; continue }
       a.aReceber += v
@@ -174,14 +189,14 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
       else a.emAberto += v
     }
     return { ...a, ccReceita }
-  }, [crList])
+  }, [crList, noIntervalo])
 
   // Painel de Contas a Receber: prazo médio, contagens e listas (últimos recebimentos / a receber)
   const crPanel = useMemo(() => {
     const isBloq = (b?: string) => !!b && b !== 'sem_bloqueio' && b !== 'resolvido'
     let nRecebidos = 0, nBloqueios = 0, prazoSum = 0, prazoN = 0
     const recebidos: ContaReceber[] = [], abertos: ContaReceber[] = []
-    for (const c of crList as ContaReceber[]) {
+    for (const c of (crList as ContaReceber[]).filter(noIntervalo)) {
       if (['recebido', 'conciliado'].includes(c.status)) {
         nRecebidos++; recebidos.push(c)
         if (c.data_recebimento && c.data_emissao) {
@@ -196,7 +211,7 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
     recebidos.sort((x, y) => (y.data_recebimento || '').localeCompare(x.data_recebimento || ''))
     abertos.sort((x, y) => (x.data_vencimento || '').localeCompare(y.data_vencimento || ''))
     return { prazoMedio: prazoN ? Math.round(prazoSum / prazoN) : 0, nRecebidos, nBloqueios, ultimos: recebidos.slice(0, 6), abertos: abertos.slice(0, 6) }
-  }, [crList])
+  }, [crList, noIntervalo])
 
   // KPIs consolidados
   const cpPago = kpis.valor_pago_periodo
@@ -267,19 +282,14 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
         <div className="flex items-center gap-3">
           {painelAtivo === 'painel' && (
             <>
-              {/* Periodo */}
-              <div className="flex gap-1">
-                {[['7d', '7d'], ['30d', '30d'], ['90d', '90d'], ['365d', 'Ano']].map(([val, lbl]) => (
-                  <button key={val} onClick={() => setPeriodo(val)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                      periodo === val
-                        ? 'bg-emerald-600 text-white'
-                        : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
-                    }`}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
+              {/* Periodo: mesmo seletor De -> Ate dos relatorios */}
+              <span className="inline-flex items-center gap-1.5">
+                <PeriodoSelect value={periodo.de} isDark={isDark}
+                  onChange={v => setPeriodo(p => ({ de: v, ate: v > p.ate ? v : p.ate }))} />
+                <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>→</span>
+                <PeriodoSelect value={periodo.ate} isDark={isDark}
+                  onChange={v => setPeriodo(p => ({ de: v < p.de ? v : p.de, ate: v }))} />
+              </span>
               <button onClick={() => refetch()}
                 className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-600'}`}>
                 <RefreshCw size={12} />

@@ -53,12 +53,17 @@ function appendExtraRequestDetailsToObservacoes(
 }
 
 // â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export function useFinanceiroDashboard(periodo = '30d') {
+// Recebe intervalo em 'YYYY-MM'. A RPC antiga (p_periodo text) só aplicava o
+// período em 2 dos 11 blocos — trocar 7d/30d/90d quase não mexia na tela.
+// A sobrecarga por data aplica o intervalo em todos.
+export function useFinanceiroDashboard(de: string, ate: string) {
   return useQuery<FinanceiroDashboardData>({
-    queryKey: ['financeiro-dashboard', periodo],
+    queryKey: ['financeiro-dashboard', de, ate],
     queryFn: async () => {
+      const fim = new Date(Number(ate.slice(0, 4)), Number(ate.slice(5, 7)), 0)  // último dia do mês
       const { data, error } = await supabase.rpc('get_dashboard_financeiro', {
-        p_periodo: periodo,
+        p_de: `${de}-01`,
+        p_ate: `${ate}-${String(fim.getDate()).padStart(2, '0')}`,
       })
       if (error) {
         // Fallback: tabela pode não existir ainda

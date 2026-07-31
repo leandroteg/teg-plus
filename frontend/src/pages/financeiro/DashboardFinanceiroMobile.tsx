@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { DollarSign, AlertTriangle, CalendarClock, Clock, TrendingUp, TrendingDown, RefreshCw, LayoutGrid } from 'lucide-react'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
@@ -41,7 +41,14 @@ export default function DashboardFinanceiroMobile() {
   const [periodo, setPeriodo] = useState('30d')
   const [painelAtivo, setPainelAtivo] = useState('painel') // 'painel' | 'pgtos_previstos'
   useEffect(() => { setPeriodo('30d') }, [location.key])
-  const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
+  // o mobile mantem os atalhos 7d/30d/90d/Ano; converte para intervalo de meses
+  const range = useMemo(() => {
+    const dias = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 }[periodo] ?? 30
+    const ini = new Date(); ini.setDate(ini.getDate() - dias)
+    const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return { de: ym(ini), ate: ym(new Date()) }
+  }, [periodo])
+  const { data, isLoading, refetch } = useFinanceiroDashboard(range.de, range.ate)
 
   const kpis = data?.kpis ?? EMPTY_KPIS
   const porStatus = data?.por_status ?? []
