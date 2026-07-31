@@ -27,7 +27,7 @@ import {
   type SstDocumento, type MatrizRiscoCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
-  useEstoqueEpi, useSaldoEpi,
+  useEstoqueEpi, useSaldoEpi, docAssinadoUrl,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
 import { gerarFichaEpiPdf, gerarFichaEpiBlob } from '../../utils/ficha-epi-pdf'
@@ -1842,7 +1842,7 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
    *  so quando nao ha arquivo — ai o detalhe e a unica coisa util a mostrar. */
   async function abrirAssinada(f: QsmaEpiFicha, colaboradorId: string) {
     if (f.arquivo_assinado_path) {
-      const url = await evidenciaUrl(f.arquivo_assinado_path)
+      const url = await docAssinadoUrl(f.arquivo_assinado_path)
       if (url) { window.open(url, '_blank', 'noopener'); return }
     }
     if (f.onedrive_web_url) { window.open(f.onedrive_web_url, '_blank', 'noopener'); return }
@@ -2878,7 +2878,7 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
             abrir o PDF em branco e pior do que nao dizer nada. */}
         {f.arquivo_assinado_path && (
           <button
-            onClick={async () => { const url = await evidenciaUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank', 'noopener') }}
+            onClick={async () => { const url = await docAssinadoUrl(f.arquivo_assinado_path); if (url) window.open(url, '_blank', 'noopener') }}
             title="Abrir a ficha ASSINADA"
             className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${
               isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -2940,7 +2940,7 @@ function FichaCard({ f, isDark, card, txtMain, txtMuted, baseNome }: {
         ) : f.arquivo_assinado_path && (
           <button
             onClick={async () => {
-              const url = await evidenciaUrl(f.arquivo_assinado_path)
+              const url = await docAssinadoUrl(f.arquivo_assinado_path)
               if (url) window.open(url, '_blank')
             }}
             className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
