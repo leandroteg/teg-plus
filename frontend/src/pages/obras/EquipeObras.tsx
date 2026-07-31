@@ -418,10 +418,16 @@ function ListaView({
   const active = useMemo(() => equipe.filter(e => STATUS_ATIVO.includes(e.status)), [equipe])
   const alocadosIds = useMemo(() => { const s = new Set<string>(); active.forEach(e => { if (e.colaborador_id) s.add(e.colaborador_id) }); return s }, [active])
 
+  // Departamento e texto livre no cadastro e ja apareceu como 'Obras', 'OBRAS' e
+  // 'OPERACIONAL'. Comparar sem diferenciar caixa evita que a tela esvazie de
+  // vez quando o RH normaliza o cadastro.
+  const mesmoDepto = (a?: string | null, b?: string | null) =>
+    (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase()
+
   const inEscopo = (c: ColaboradorAtivo) =>
     escopo === 'todos' ? true
-    : escopo === 'obras_ssma' ? (c.departamento === 'Obras' || c.papel_sugerido === 'apoio')
-    : c.departamento === escopo
+    : escopo === 'obras_ssma' ? (mesmoDepto(c.departamento, 'Obras') || c.papel_sugerido === 'apoio')
+    : mesmoDepto(c.departamento, escopo)
 
   // roster disponível por papel (no escopo + busca) — só lideranças e time entram na composição
   const COMPOR: PapelEquipe[] = ['supervisor', 'encarregado', 'time']
