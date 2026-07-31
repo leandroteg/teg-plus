@@ -1814,6 +1814,9 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
   const [fichaPara, setFichaPara] = useState<IntegracaoCand | null>(null)
   const enviarAssinatura = useEnviarFichaEpiAssinatura()
   const { data: ossSeg = [] } = useOsSegurancaLista()
+  // Cadastro completo do colaborador — a OS precisa de matricula, setor e CBO,
+  // que o candidato da Integracao nao carrega.
+  const { data: colabsTodos = [] } = useColaboradoresTreino()
   const enviarOs = useEnviarOsSegAssinatura()
   const [osPara, setOsPara] = useState<{ alvo: AlvoOs; existente: OsSeguranca | null } | null>(null)
   const { perfil } = useAuth()
@@ -2009,11 +2012,11 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
             try {
               const pdf = await gerarOsSegurancaBlob({
                 codigo: os.codigo, colaboradorNome: os.colaborador_nome ?? osPara.alvo.nome,
-                cargo: os.cargo, cbo: os.cbo, departamento: os.departamento,
+                matricula: os.matricula, cargo: os.cargo, setor: os.setor, cbo: os.cbo,
                 dataAdmissao: os.data_admissao,
                 objetivo: os.dados.objetivo, descricaoAtividade: os.dados.descricao_atividade,
                 obrigacoes: os.dados.obrigacoes, riscos: os.dados.riscos,
-                epis: os.dados.epis, treinamentos: os.dados.treinamentos,
+                epis: os.dados.epis, epcs: os.dados.epcs, treinamentos: os.dados.treinamentos,
                 emitidaPorNome: os.emitida_por_nome,
               })
               await enviarOs.mutateAsync({
@@ -2132,10 +2135,18 @@ function IntegracaoTreinamentos({ subTabs, isDark, card, txtMain, txtMuted, onSe
                                   ) : (
                                     <button type="button"
                                       onClick={() => setOsPara({
-                                        alvo: {
-                                          colaboradorId: c.colaborador_id!, nome: c.nome,
-                                          cargo: c.cargo, cbo: null, departamento: null, dataAdmissao: null,
-                                        },
+                                        alvo: (() => {
+                                          const col = colabsTodos.find(x => x.id === c.colaborador_id)
+                                          return {
+                                            colaboradorId: c.colaborador_id!, nome: c.nome,
+                                            cargo: col?.cargo ?? c.cargo,
+                                            cbo: (col as { cbo?: string } | undefined)?.cbo ?? null,
+                                            matricula: (col as { matricula?: string } | undefined)?.matricula ?? null,
+                                            setor: col?.setor ?? null,
+                                            departamento: col?.departamento ?? null,
+                                            dataAdmissao: col?.data_admissao ?? null,
+                                          }
+                                        })(),
                                         existente: o ?? null,
                                       })}
                                       title={o
