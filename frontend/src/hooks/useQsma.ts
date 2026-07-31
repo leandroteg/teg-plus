@@ -976,6 +976,29 @@ export function useEnviarFichaEpiAssinatura() {
   })
 }
 
+/** Ficha assinada no PAPEL: sobe o digitalizado e fecha a ficha direto.
+ *
+ *  Nao passa por missao nem pelo Portal — a assinatura ja existe, em tinta. O
+ *  arquivo fica em arquivo_assinado_path, que e a prova. */
+export function useAnexarFichaEpiAssinada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { fichaId: string; colaboradorId: string; codigo?: string | null; arquivo: File }) => {
+      const limpo = p.arquivo.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\- ]/g, '').replace(/\s+/g, '_')
+      const path = `qsma-epi-assinada/${p.colaboradorId}/${Date.now()}-${limpo}`
+      const up = await supabase.storage.from('rh-admissao-docs')
+        .upload(path, p.arquivo, { contentType: p.arquivo.type || 'application/pdf', upsert: false })
+      if (up.error) throw up.error
+
+      const { error } = await supabase.from('qsma_epi_fichas')
+        .update({ status: 'assinada', arquivo_assinado_path: path }).eq('id', p.fichaId)
+      if (error) throw error
+      return { path }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['qsma_epi_fichas'] }) },
+  })
+}
+
 export function useArquivarFichaEpi() {
   const qc = useQueryClient()
   return useMutation({
