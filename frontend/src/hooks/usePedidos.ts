@@ -392,7 +392,7 @@ export function useEmitirPedido() {
       // Match por descrição (cotação usa rcMatch — descrição canônica da RC).
       // Só carimba itens ainda sem atendimento; tolerante a múltiplas chamadas do hook (split).
       try {
-        const { data: cotFor } = await supabase
+        let { data: cotFor } = await supabase
           .from('cmp_cotacao_fornecedores')
           .select('itens_precos')
           .eq('cotacao_id', cotacaoId)
@@ -401,6 +401,22 @@ export function useEmitirPedido() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
+
+        // O pedido pode sair com a razao social do fornecedor MESTRE ("... S.A.")
+        // enquanto a cotacao guardou o nome digitado ("GERDAU ACOS LONGOS") — o
+        // match por nome falha e os precos nao eram herdados. Fallback: fornecedor
+        // selecionado da cotacao, independente do nome.
+        if (!cotFor) {
+          const { data: cotForSel } = await supabase
+            .from('cmp_cotacao_fornecedores')
+            .select('itens_precos')
+            .eq('cotacao_id', cotacaoId)
+            .eq('selecionado', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          cotFor = cotForSel
+        }
 
         const itensPrecos = (cotFor?.itens_precos ?? []) as Array<{ descricao?: string; valor_unitario?: number; selecionado?: boolean }>
         const descricoesCobertas = itensPrecos
