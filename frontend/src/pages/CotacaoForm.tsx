@@ -26,8 +26,9 @@ import NumericInput from '../components/NumericInput'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import { joinFornecedorContato, splitFornecedorContato } from '../utils/fornecedorContato'
-import { getEmpresa, EMPRESA_FALLBACK } from '../services/empresa'
+import { getEmpresaById, EMPRESA_FALLBACK } from '../services/empresa'
 import type { EmpresaData } from '../services/empresa'
+import { useLookupEmpresas } from '../hooks/useLookups'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -952,8 +953,9 @@ function buildSolicitacaoHtml(cotacao: Cotacao, EMPRESA: EmpresaData = EMPRESA_F
 </body></html>`
 }
 
-async function gerarSolicitacaoCotacao(cotacao: Cotacao) {
-  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+async function gerarSolicitacaoCotacao(cotacao: Cotacao, empresaId?: string | null) {
+  // Estampa a empresa do grupo escolhida na cotação (multi-empresa) — sem id, Matriz.
+  const empresa = await getEmpresaById(empresaId).catch(() => EMPRESA_FALLBACK)
   const html = buildSolicitacaoHtml(cotacao, empresa)
   const win = window.open('', '_blank')
   if (!win) return
@@ -1076,6 +1078,38 @@ export default function CotacaoForm() {
       setFornecedores([{ ...emptyFornecedor(), itens_precos: itensPendentesDaRC() }])
     }
   }, [cotacao, itensPendentesDaRC, comEscopoCompletoDaRC])
+  // ── Empresa do grupo (multi-empresa): quem solicita a cotação e recebe a NF ──
+  // Default Matriz (EMP-001); persiste na hora em cmp_cotacoes pra valer no PDF
+  // de solicitação e virar o default da emissão do pedido, mesmo antes de concluir.
+  const empresas = useLookupEmpresas()
+  const empresaMatrizId = useMemo(() => {
+    if (empresas.length === 0) return ''
+    return empresas.find(e => e.codigo === 'EMP-001')?.id ?? empresas[0].id
+  }, [empresas])
+  const [empresaId, setEmpresaId] = useState('')
+  const empresaHydratedRef = useRef(false)
+  useEffect(() => {
+    if (empresaHydratedRef.current || !cotacao) return
+    if (cotacao.empresa_id) {
+      setEmpresaId(cotacao.empresa_id)
+      empresaHydratedRef.current = true
+    } else if (empresaMatrizId) {
+      setEmpresaId(empresaMatrizId)
+      empresaHydratedRef.current = true
+    }
+  }, [cotacao, empresaMatrizId])
+  const handleEmpresaChange = useCallback((novaEmpresaId: string) => {
+    setEmpresaId(novaEmpresaId)
+    if (!id || !novaEmpresaId) return
+    supabase
+      .from('cmp_cotacoes')
+      .update({ empresa_id: novaEmpresaId })
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) console.warn('[CotacaoForm] Empresa não salva na cotação:', error.message)
+      })
+  }, [id])
+
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -1774,6 +1808,7 @@ export default function CotacaoForm() {
       await submitMutation.mutateAsync({
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
+        empresa_id: empresaId || empresaMatrizId || null,
         fornecedores: validos.map((f, validosIdx) => {
           const itensComSelecao = f.itens_precos.map(item => {
             const key = chaveDescricao(item.descricao)
@@ -1907,7 +1942,7 @@ export default function CotacaoForm() {
           {cotacao && (
             <button
               type="button"
-              onClick={() => gerarSolicitacaoCotacao(cotacao)}
+              onClick={() => gerarSolicitacaoCotacao(cotacao, empresaId)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
             >
               <Printer size={13} />
@@ -1958,6 +1993,27 @@ export default function CotacaoForm() {
           </p>
         </div>
       )}
+
+      {/* Empresa do grupo em nome da qual a cotação é solicitada (multi-empresa) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <label className="block text-xs font-bold text-slate-600 mb-1.5">Empresa Compradora</label>
+        <select
+          value={empresaId}
+          onChange={e => handleEmpresaChange(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400"
+        >
+          {empresas.length === 0 && <option value="">Carregando empresas...</option>}
+          {empresas.map(emp => (
+            <option key={emp.id} value={emp.id}>
+              {emp.nome_fantasia || emp.razao_social}
+              {emp.cnpjs?.[0] ? ` • ${maskCNPJ(emp.cnpjs[0])}` : ''}
+            </option>
+          ))}
+        </select>
+        <p className="text-[10px] text-slate-400 mt-1.5">
+          O fornecedor deve emitir a proposta e a NF para esta empresa. Ela sai no PDF de Solicitar Cotação e é sugerida na emissão do pedido.
+        </p>
+      </div>
 
       {/* Upload inteligente com IA — OCULTADO 2026-07-03: gerava muita divergência
           na cotação (IA lê PDF/imagem e preenche preços errados). Reativar: trocar false por true. */}

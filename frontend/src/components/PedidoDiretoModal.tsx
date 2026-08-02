@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2 } from 'lucide-react'
 import { useEmitirPedidoDireto } from '../hooks/usePedidos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
-import { useLookupObras } from '../hooks/useLookups'
+import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
 import NumericInput from './NumericInput'
 import { toUpperNorm } from './UpperInput'
@@ -43,6 +43,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const { data: fornecedores = [] } = useCadFornecedores()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const obras = useLookupObras()
+  const empresas = useLookupEmpresas()
 
   const salvarFornecedor = useSalvarFornecedor()
 
@@ -53,6 +54,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const [showNovoFornecedor, setShowNovoFornecedor] = useState(false)
   const [novoForn, setNovoForn] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', telefone: '', email: '' })
   const [obraId, setObraId] = useState('')
+  const [empresaId, setEmpresaId] = useState('')
   const [classeId, setClasseId] = useState('')
   const [classeBusca, setClasseBusca] = useState('')
   const [classeDropdown, setClasseDropdown] = useState(false)
@@ -63,14 +65,23 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const [itens, setItens] = useState<ItemDireto[]>([emptyItem()])
   const [erro, setErro] = useState<string | null>(null)
 
+  // Empresa emitente. Default = Matriz (EMP-001), editável.
+  const empresaMatrizId = useMemo(() => {
+    if (empresas.length === 0) return ''
+    return empresas.find(e => e.codigo === 'EMP-001')?.id ?? empresas[0].id
+  }, [empresas])
+
+  useEffect(() => {
+    if (open) setEmpresaId(empresaMatrizId)
+  }, [open, empresaMatrizId])
+
   if (!open) return null
 
-  const classesFiltradas = classes
-    .filter(c => {
-      const t = classeBusca.toLowerCase()
-      return !t || `${c.codigo} ${c.descricao}`.toLowerCase().includes(t)
-    })
-    .slice(0, 10)
+  const classesMatches = classes.filter(c => {
+    const t = classeBusca.toLowerCase()
+    return !t || `${c.codigo} ${c.descricao}`.toLowerCase().includes(t)
+  })
+  const classesFiltradas = classesMatches.slice(0, 50)
 
   const classeSel = classes.find(c => c.id === classeId)
   const obraSel = obras.find(o => o.id === obraId)
@@ -182,6 +193,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
         justificativaSemCotacao: toUpperNorm(justificativa),
         observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
         compradorId: perfil?.id,
+        empresaId: empresaId || undefined,
       })
       onSuccess?.(result.numero_pedido)
       onClose()
@@ -345,6 +357,24 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
             )}
           </div>
 
+          {/* Empresa emitente */}
+          <div>
+            <label className="text-xs font-bold text-slate-600">Empresa Emitente</label>
+            <select
+              className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+              value={empresaId}
+              onChange={e => setEmpresaId(e.target.value)}
+            >
+              {empresas.length === 0 && <option value="">Carregando empresas...</option>}
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nome_fantasia || emp.razao_social}{emp.cnpjs?.[0] ? ` • ${emp.cnpjs[0]}` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-400">Pessoa jurídica que emite o pedido. Padrão: Matriz.</p>
+          </div>
+
           {/* Obra */}
           <div>
             <label className="text-xs font-bold text-slate-600">Obra / Projeto</label>
@@ -385,6 +415,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
                       <span className="text-slate-500 truncate">{c.descricao}</span>
                     </button>
                   ))}
+                  {classesMatches.length > classesFiltradas.length && (
+                    <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 bg-slate-50">
+                      Mostrando {classesFiltradas.length} de {classesMatches.length} — digite para filtrar
+                    </div>
+                  )}
                 </div>
               )}
             </div>

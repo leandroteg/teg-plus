@@ -48,6 +48,7 @@ export interface Pedido {
   comprador_id?: string
   classe_financeira_id?: string
   centro_custo_id?: string
+  empresa_id?: string
   numero_pedido?: string
   fornecedor_nome: string
   valor_total?: number
@@ -347,6 +348,7 @@ export interface Cotacao {
   comprador_id: string
   comprador_nome?: string
   status: StatusCotacao
+  empresa_id?: string | null
   valor_selecionado?: number
   fornecedor_selecionado_id?: string
   fornecedor_selecionado_nome?: string

@@ -391,7 +391,7 @@ function getDisplayNumber(pedido: PedidoListItem) {
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-import { getEmpresa, EMPRESA_FALLBACK } from '../services/empresa'
+import { getEmpresaById, EMPRESA_FALLBACK } from '../services/empresa'
 import type { EmpresaData } from '../services/empresa'
 
 const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
@@ -569,7 +569,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
 }
 
 async function gerarPdfPedido(pedido: Pedido) {
-  const empresa = await getEmpresa()
+  const empresa = await getEmpresaById(pedido.empresa_id)
   const logoB64 = await loadLogoBase64(empresa.logoUrl)
   let html = buildPdfHtml(pedido, empresa)
   if (logoB64) {
@@ -600,7 +600,7 @@ async function loadLogoBase64(url: string): Promise<string | null> {
 }
 
 async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
-  const EMPRESA = await getEmpresa()
+  const EMPRESA = await getEmpresaById(pedido.empresa_id)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15
@@ -879,7 +879,8 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     // Se falhar ao buscar anexos, envia sem eles
   }
 
-  const pdfHtml = buildPdfHtml(pedido)
+  const empresaPdf = await getEmpresaById(pedido.empresa_id)
+  const pdfHtml = buildPdfHtml(pedido, empresaPdf)
 
   try {
     const res = await api.enviarEmailPedido({

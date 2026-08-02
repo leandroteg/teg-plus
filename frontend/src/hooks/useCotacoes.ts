@@ -9,7 +9,7 @@ const TABLE_COT  = 'cmp_cotacoes'
 const TABLE_FORN = 'cmp_cotacao_fornecedores'
 
 const SELECT_COTACAO = `
-  id, requisicao_id, comprador_id, status,
+  id, requisicao_id, comprador_id, status, empresa_id,
   fornecedor_selecionado_id, valor_selecionado, fornecedor_selecionado_nome,
   observacao, data_limite, data_conclusao, concluido_por_nome,
   created_at, updated_at, criado_por_nome, atualizado_por_nome,
@@ -145,6 +145,9 @@ export function useCotacaoByRequisicao(requisicaoId?: string) {
 export interface FinalizarCotacaoPayload {
   cotacao_id: string
   requisicao_id: string
+  // Empresa (PJ do grupo) em nome da qual a cotação foi feita — vira o default
+  // da emissão do pedido (mig 199).
+  empresa_id?: string | null
   fornecedores: {
     id?: string   // presente = atualiza a linha existente; ausente = insere nova
     fornecedor_nome: string
@@ -287,6 +290,7 @@ export function useFinalizarCotacao() {
         .from(TABLE_COT)
         .update({
           status: 'concluida',
+          empresa_id: payload.empresa_id ?? null,
           fornecedor_selecionado_id: vencedor?.id ?? null,
           fornecedor_selecionado_nome: vencedor?.fornecedor_nome ?? null,
           valor_selecionado: valorSelecionadoTotal,

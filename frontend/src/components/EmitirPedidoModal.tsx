@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, FileText, Loader2, AlertTriangle, Ban, CheckCircle2, Landmark } from 'lucide-react'
 import { useCadCentrosCusto, useCadObras } from '../hooks/useCadastros'
+import { useLookupEmpresas } from '../hooks/useLookups'
 import { useCartoesCredito } from '../hooks/useCartoes'
 import { useEditorLock } from '../hooks/useEditorLock'
 import SearchableSelect from './SearchableSelect'
@@ -18,6 +19,7 @@ type ModalCotacao = {
   valorTotal?: number
   compradorId?: string
   condicaoPagamento?: string
+  empresaId?: string | null
 }
 
 type ModalRequisicao = {
@@ -78,6 +80,7 @@ interface EmitirPedidoModalProps {
     compradorId?: string
     centroCustoId?: string
     centroCusto?: string
+    empresaId?: string
     condicaoPagamento?: string
     formaPagamento?: FormaPagamentoPedido
     cartaoId?: string
@@ -108,6 +111,7 @@ export default function EmitirPedidoModal({
 }: EmitirPedidoModalProps) {
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
+  const empresas = useLookupEmpresas()
   const { data: cartoes = [] } = useCartoesCredito()
   const { isLocked, blockedByName, canOverride, assumeControl } = useEditorLock({
     resourceType: 'cmp_requisicao',
@@ -143,7 +147,7 @@ export default function EmitirPedidoModal({
         if (!cotacaoId) return null
         const { data: cotacaoData, error: cotError } = await supabase
           .from('cmp_cotacoes')
-          .select('id, comprador_id, fornecedor_selecionado_id, fornecedor_selecionado_nome, valor_selecionado')
+          .select('id, comprador_id, empresa_id, fornecedor_selecionado_id, fornecedor_selecionado_nome, valor_selecionado')
           .eq('id', cotacaoId)
           .maybeSingle()
 
@@ -208,6 +212,7 @@ export default function EmitirPedidoModal({
           fornecedorNome: cotacao?.fornecedorNome ?? cotacaoData.fornecedor_selecionado_nome ?? undefined,
           valorTotal: cotacao?.valorTotal ?? cotacaoData.valor_selecionado ?? undefined,
           compradorId: cotacao?.compradorId ?? cotacaoData.comprador_id ?? undefined,
+          empresaId: cotacao?.empresaId ?? (cotacaoData as any).empresa_id ?? undefined,
           condicaoPagamento,
           fornecedorDB,
         } satisfies ModalCotacao & { fornecedorDB: typeof fornecedorDB }
@@ -248,6 +253,7 @@ export default function EmitirPedidoModal({
   const temSplit = fornecedoresEscolhidos.length > 1
 
   const [centroId, setCentroId] = useState('')
+  const [empresaId, setEmpresaId] = useState('')
   const [numParcelas, setNumParcelas] = useState<number | ''>('')
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
@@ -268,6 +274,20 @@ export default function EmitirPedidoModal({
   const [bancoCartao, setBancoCartao] = useState(false)
   const [bancoPix, setBancoPix] = useState('')
   const [bancoPixTipo, setBancoPixTipo] = useState('')
+
+  // Empresa emitente do pedido. Herda a empresa escolhida na cotação (mig 199);
+  // sem cotação (ou cotação antiga sem empresa), default Matriz (EMP-001).
+  // Continua editável pelo comprador — o pedido é o carimbo oficial.
+  const empresaMatrizId = useMemo(() => {
+    if (empresas.length === 0) return ''
+    return empresas.find((e) => e.codigo === 'EMP-001')?.id ?? empresas[0].id
+  }, [empresas])
+
+  const empresaCotacaoId = cotacaoResolvida?.empresaId ?? ''
+  useEffect(() => {
+    if (!open) return
+    setEmpresaId(empresaCotacaoId || empresaMatrizId)
+  }, [open, empresaMatrizId, empresaCotacaoId])
 
   useEffect(() => {
     if (!open || !requisicao) return
@@ -437,6 +457,7 @@ export default function EmitirPedidoModal({
       compradorId: cotacaoResolvida?.compradorId,
       centroCustoId: centroSelecionado?.id,
       centroCusto: centroSelecionado?.codigo,
+      empresaId: empresaId || undefined,
       condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
       formaPagamento: formaPagamento || undefined,
       cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
@@ -741,6 +762,26 @@ export default function EmitirPedidoModal({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Empresa Emitente</label>
+                <select
+                  value={empresaId}
+                  onChange={(event) => setEmpresaId(event.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                >
+                  {empresas.length === 0 && <option value="">Carregando empresas...</option>}
+                  {empresas.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.nome_fantasia || empresa.razao_social}
+                      {empresa.cnpjs?.[0] ? ` • ${empresa.cnpjs[0]}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Pessoa jurídica que emite o pedido e assume a conta a pagar. Padrão: Matriz.
+                </p>
               </div>
 
               <div>

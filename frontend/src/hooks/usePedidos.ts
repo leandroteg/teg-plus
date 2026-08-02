@@ -16,7 +16,7 @@ export function usePedidos(status?: string) {
           data_pedido, data_prevista_entrega, data_entrega_real, data_vencimento,
           nf_numero, observacoes, created_at, updated_at, criado_por_nome, atualizado_por_nome,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
-          centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
+          centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
@@ -161,6 +161,7 @@ export interface EmitirPedidoPayload {
   classeFinanceira?: string
   centroCustoId?: string
   centroCusto?: string
+  empresaId?: string
   parcelasPreview?: Array<{
     numero: number
     valor: number
@@ -258,6 +259,7 @@ export function useEmitirPedido() {
         classeFinanceiraId,
         centroCusto,
         centroCustoId,
+        empresaId,
         parcelasPreview,
       } = payload
 
@@ -376,6 +378,7 @@ export function useEmitirPedido() {
           classe_financeira_id: classeFinanceiraId || null,
           centro_custo: centroCusto || null,
           centro_custo_id: centroCustoId || null,
+          empresa_id: empresaId || null,
           parcelas_preview: parcelasResolvidas,
         })
         .select('id, numero_pedido')
@@ -489,6 +492,7 @@ export function useEmitirPedido() {
         status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
         centro_custo: centroCusto || null,
         classe_financeira: classeFinanceira || null,
+        empresa_id: empresaId || null,
         projeto_id: requisicao.projeto_id || null,
         descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length, {
           numeroPedido: pedido.numero_pedido,
@@ -585,6 +589,7 @@ export interface PedidoDiretoPayload {
   justificativaSemCotacao: string
   observacoes?: string
   compradorId?: string
+  empresaId?: string
 }
 
 export function useEmitirPedidoDireto() {
@@ -655,6 +660,7 @@ export function useEmitirPedidoDireto() {
           centro_custo_id: payload.centroCustoId || null,
           classe_financeira: payload.classeFinanceira || null,
           classe_financeira_id: payload.classeFinanceiraId || null,
+          empresa_id: payload.empresaId || null,
           observacoes: payload.observacoes || null,
           comprador_id: compradorIdResolvido,
           parcelas_preview: parcelasResolvidas,
