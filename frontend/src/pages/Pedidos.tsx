@@ -1128,8 +1128,15 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
     for (const en of files) {
       if (!TIPOS_CONFERE_FORNECEDOR.includes(en.tipo)) continue
       if (en.validando) { setErro('Aguarde a conferência do fornecedor dos documentos.'); return }
-      if (en.validacao?.status === 'divergente' && !en.ignorarDivergencia) {
+      const stValidacao = en.validacao?.status
+      if (stValidacao === 'divergente' && !en.ignorarDivergencia) {
         setErro(`O documento "${en.file.name}" não confere com o fornecedor do pedido. Confirme a divergência para anexar mesmo assim.`)
+        return
+      }
+      // Ilegível/sem cadastro: nao bloqueia, mas exige que o usuario assuma a
+      // conferencia manual (antes passava direto so com o aviso).
+      if ((stValidacao === 'ilegivel' || stValidacao === 'sem_cadastro') && !en.ignorarDivergencia) {
+        setErro(`Não foi possível conferir o fornecedor no documento "${en.file.name}". Marque a confirmação de conferência manual para continuar.`)
         return
       }
     }
@@ -1268,6 +1275,17 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
                         className="h-4 w-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
                       />
                       Confirmo que o documento pertence a este pedido — anexar mesmo assim.
+                    </label>
+                  )}
+                  {(en.validacao?.status === 'ilegivel' || en.validacao?.status === 'sem_cadastro') && (
+                    <label className="flex items-start gap-2 text-[11px] font-semibold text-amber-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={en.ignorarDivergencia}
+                        onChange={ev => patchFile(en.id, { ignorarDivergencia: ev.target.checked })}
+                        className="h-4 w-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      Conferi manualmente que o documento pertence a este fornecedor.
                     </label>
                   )}
                 </>

@@ -38,7 +38,7 @@ import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { useCadFornecedores } from '../../hooks/useCadastros'
 import { formatCNPJ, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
-import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
+import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
 import SearchableSelect from '../../components/SearchableSelect'
 import { AnexoReferencia } from '../../components/AnexoReferencia'
 import type { SelectOption } from '../../components/SearchableSelect'
@@ -2966,7 +2966,9 @@ function LoteTableRow({
 
   return (
     <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
-      {summary.lote.status === 'montando' && summary.lote.observacao && (
+      {((summary.lote.status === 'montando')
+        || (summary.lote.status === 'enviado_aprovacao' && (summary.lote as any).aprovacao_status === 'esclarecimento'))
+        && summary.lote.observacao && (
         <Link
           to={`/financeiro/lotes/${summary.lote.id}`}
           className={`mx-3 mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${isDark ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'}`}
@@ -3124,6 +3126,8 @@ export default function CPPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
+  // Filtro global por empresa do grupo ('all' | 'sem' | empresa_id) — vale para todas as abas
+  const [empresaFilter, setEmpresaFilter] = useState<string>('all')
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDate, setShowCustomDate] = useState(false)
@@ -3181,6 +3185,15 @@ export default function CPPipeline() {
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
   const { data: lotes = [] } = useLotesPagamento()
+  const empresas = useLookupEmpresas()
+
+  // CPs visíveis segundo o filtro de empresa — alimenta o agrupamento por aba,
+  // então os contadores do rail também refletem a filial escolhida
+  const contasVisiveis = useMemo(() => {
+    if (empresaFilter === 'all') return contas
+    if (empresaFilter === 'sem') return contas.filter(cp => !cp.empresa_id)
+    return contas.filter(cp => cp.empresa_id === empresaFilter)
+  }, [contas, empresaFilter])
 
   // Mutations
   const conciliarMut = useConciliarCPBatch()
@@ -3260,12 +3273,12 @@ export default function CPPipeline() {
   const grouped = useMemo(() => {
     const map = new Map<PipelineStageId, ContaPagar[]>()
     for (const stage of CP_PIPELINE_VIEW_STAGES) map.set(stage.status, [])
-    for (const cp of contas) {
+    for (const cp of contasVisiveis) {
       const arr = map.get(resolvePipelineStage(cp))
       if (arr) arr.push(cp)
     }
     return map
-  }, [contas, resolvePipelineStage])
+  }, [contasVisiveis, resolvePipelineStage])
 
   // Filter active tab by search, then sort
   const stageCPs = useMemo(() => {
@@ -3773,8 +3786,14 @@ export default function CPPipeline() {
     },
   ]
 
+  // Sincroniza remessas de TODAS as CPs em pagamento, independente do filtro de empresa
+  const pendentesRemessa = useMemo(
+    () => contas.filter(cp => resolvePipelineStage(cp) === 'em_pagamento'),
+    [contas, resolvePipelineStage],
+  )
+
   useEffect(() => {
-    const pendentes = grouped.get('em_pagamento') || []
+    const pendentes = pendentesRemessa
     if (pendentes.length === 0) return
 
     const runSync = () => {
@@ -3794,7 +3813,7 @@ export default function CPPipeline() {
     runSync()
     const timer = window.setInterval(runSync, 30000)
     return () => window.clearInterval(timer)
-  }, [grouped, syncRemessasMut])
+  }, [pendentesRemessa, syncRemessasMut])
 
   return (
     <div className="space-y-4">
@@ -3865,7 +3884,7 @@ export default function CPPipeline() {
             Contas a Pagar
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} títulos · {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+            {contasVisiveis.length} títulos · {fmt(contasVisiveis.reduce((s, c) => s + c.valor_original, 0))}
           </p>
         </div>
         <button
@@ -3896,6 +3915,27 @@ export default function CPPipeline() {
         <div className={`px-4 py-2.5 border-b flex items-center gap-1.5 overflow-x-auto hide-scrollbar ${
           isDark ? 'border-white/[0.06]' : 'border-slate-100'
         }`}>
+          {empresas.length > 0 && (
+            <>
+              <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 mr-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Empresa</span>
+              <select
+                value={empresaFilter}
+                onChange={e => setEmpresaFilter(e.target.value)}
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold cursor-pointer focus:outline-none transition-all ${
+                  empresaFilter !== 'all'
+                    ? isDark ? 'bg-teal-500/15 border-teal-400/30 text-teal-300' : 'bg-teal-50 border-teal-200 text-teal-700'
+                    : isDark ? 'bg-transparent border-white/[0.06] text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+                }`}
+              >
+                <option value="all">Todas</option>
+                {empresas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome_fantasia || e.razao_social}</option>
+                ))}
+                <option value="sem">Sem empresa</option>
+              </select>
+              <div className={`w-px h-5 shrink-0 mx-1 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
+            </>
+          )}
           <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 mr-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Vencimento</span>
           {(() => {
             const now = new Date()
