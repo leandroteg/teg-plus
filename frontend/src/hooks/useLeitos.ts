@@ -159,7 +159,7 @@ export function useLeitosHistorico(filtros?: { imovel_id?: string; colaborador_i
     queryFn: async () => {
       let q = supabase
         .from('loc_leito_ocupacoes')
-        .select('*, leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome))')
+        .select('*, colaborador:rh_colaboradores(matricula), leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome, titulo))')
         .order('data_inicio', { ascending: false })
         .limit(500)
       if (filtros?.colaborador_id) q = q.eq('colaborador_id', filtros.colaborador_id)

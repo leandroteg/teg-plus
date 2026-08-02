@@ -15,6 +15,7 @@ import {
   BedDouble, History, Search, Plus, X, Loader2, UserPlus,
   LogOut, LogIn, ArrowRightLeft, MapPin, Trash2, CheckCircle2, QrCode, Printer,
   LayoutList, LayoutGrid, Map as MapIcon, Users, Camera, AlertTriangle, ListChecks,
+  Smartphone, Monitor, User as UserIcon, Clock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { fmtEndereco } from '../../types/locacao'
@@ -25,7 +26,7 @@ import {
   useGerarLeitos, useAlocarLeito, useMoverLeito, useExcluirLeito,
   useCheckinLeito, useCheckoutLeito, useCheckinLote, uploadFotoLeito,
   useAtualizarAlojamento, useImoveisMapa, useBasesMapa,
-  type Leito, type LeitoOcupacao,
+  type Leito, type LeitoOcupacao, type OcupacaoHistorico,
 } from '../../hooks/useLeitos'
 import type { LocImovel } from '../../types/locacao'
 
@@ -1460,6 +1461,7 @@ function PessoasView({ ocupacoes, leitosById, isDark, onAbrir }: {
 function HistoricoView({ isDark }: { isDark: boolean }) {
   const { data: hist = [], isLoading } = useLeitosHistorico()
   const [busca, setBusca] = useState('')
+  const [detalhe, setDetalhe] = useState<OcupacaoHistorico | null>(null)
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
@@ -1502,7 +1504,8 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
               </thead>
               <tbody>
                 {filtrado.map(h => (
-                  <tr key={h.id} className={`border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                  <tr key={h.id} onClick={() => setDetalhe(h)} title="Ver detalhes do check-in e check-out"
+                    className={`border-b cursor-pointer ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
                     <td className={`px-4 py-3 text-sm font-medium ${txt}`}><span className="block truncate max-w-[180px]">{h.colaborador_nome}</span></td>
                     <td className={`px-4 py-3 text-sm ${txtMuted}`}><span className="block truncate max-w-[160px]">{nomeAloj(h.leito?.imovel)}</span></td>
                     <td className={`px-4 py-3 text-sm font-mono ${txtMuted}`}>{h.leito ? leitoLbl(h.leito.codigo_leito) : '—'}</td>
@@ -1543,6 +1546,96 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
           </div>
         </div>
       )}
+      {detalhe && <OcupacaoDetalheModal ocup={detalhe} isDark={isDark} onClose={() => setDetalhe(null)} />}
+    </div>
+  )
+}
+
+// ── Detalhe de uma ocupação ──────────────────────────────────────────────────
+// A tabela mostra o que aconteceu; este modal mostra COMO foi registrado —
+// quem carimbou, por qual sistema, a que horas, e a foto do leito nas duas
+// pontas. É o que sustenta uma cobrança de avaria meses depois.
+function OcupacaoDetalheModal({ ocup, isDark, onClose }: {
+  ocup: OcupacaoHistorico; isDark: boolean; onClose: () => void
+}) {
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const txt = isDark ? 'text-white' : 'text-slate-900'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+  const label = 'text-[9px] font-bold text-slate-400 uppercase tracking-wider'
+
+  const portal = ocup.origem === 'portal_qr'
+  // Quem carimbou: no Portal é o próprio colaborador; no TEG+ é quem estava
+  // logado. Nas ocupações da carga inicial não há autor — e dizer '—' é mais
+  // honesto que inventar um responsável.
+  const autor = (nome: string | null) =>
+    portal ? { icone: <Smartphone size={12} />, texto: `Portal TEG · ${ocup.colaborador_nome.split(' ')[0]}` }
+    : nome ? { icone: <Monitor size={12} />, texto: `TEG+ · ${nome}` }
+    : null
+
+  const bloco = (
+    titulo: string, cor: string, quando: string | null, quem: { icone: JSX.Element; texto: string } | null,
+    foto: string | null, obs: string | null,
+  ) => (
+    <div className={`rounded-xl p-4 ${cardBg}`}>
+      <p className={`${label} mb-2`} style={{ color: cor }}>{titulo}</p>
+      {quando ? (
+        <>
+          <p className={`text-sm font-bold flex items-center gap-1.5 ${txt}`}>
+            <Clock size={12} className="text-slate-400" />
+            {new Date(quando).toLocaleString('pt-BR', {
+              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            })}
+          </p>
+          <p className={`text-xs mt-1 flex items-center gap-1.5 ${txtMuted}`}>
+            {quem ? <>{quem.icone}{quem.texto}</> : <><UserIcon size={12} /> autor não registrado</>}
+          </p>
+        </>
+      ) : (
+        <p className={`text-sm ${txtMuted}`}>Não registrado</p>
+      )}
+      {obs && <p className={`text-xs mt-2 rounded-lg px-2.5 py-1.5 ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600'}`}>{obs}</p>}
+      {foto ? (
+        <a href={foto} target="_blank" rel="noreferrer" className="block mt-2.5">
+          <img src={foto} alt="" className="w-full max-h-52 object-cover rounded-xl" />
+          <span className="block text-center text-[10px] font-semibold text-slate-400 mt-1">abrir em tamanho original</span>
+        </a>
+      ) : (
+        <p className={`text-xs mt-2.5 flex items-center gap-1.5 ${txtMuted}`}><Camera size={12} /> sem foto</p>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+          <div className="min-w-0">
+            <h3 className={`text-base font-bold truncate ${txt}`}>{ocup.colaborador_nome}</h3>
+            <p className={`text-xs truncate ${txtMuted}`}>
+              {nomeAloj(ocup.leito?.imovel)}{ocup.leito ? ` · leito ${leitoLbl(ocup.leito.codigo_leito)}` : ''}
+              {ocup.leito?.quarto ? ` · ${ocup.leito.quarto}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} className="shrink-0"><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div className={`rounded-xl p-4 ${cardBg} grid grid-cols-3 gap-3`}>
+            <div><p className={label}>Matrícula</p><p className={`text-sm font-semibold ${txt}`}>{ocup.colaborador?.matricula || '—'}</p></div>
+            <div><p className={label}>Início</p><p className={`text-sm font-semibold ${txt}`}>{fmtDate(ocup.data_inicio)}</p></div>
+            <div>
+              <p className={label}>Fim</p>
+              <p className={`text-sm font-semibold ${ocup.data_fim ? txt : 'text-emerald-500'}`}>
+                {ocup.data_fim ? fmtDate(ocup.data_fim) : 'ocupação atual'}
+              </p>
+            </div>
+          </div>
+
+          {bloco('Check-in', '#10b981', ocup.checkin_em, autor(ocup.checkin_por_nome), ocup.checkin_foto_url, ocup.observacao)}
+          {bloco('Check-out', '#f59e0b', ocup.checkout_em, autor(ocup.checkout_por_nome), ocup.checkout_foto_url, ocup.checkout_observacao)}
+        </div>
+      </div>
     </div>
   )
 }
