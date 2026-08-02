@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Package, Truck, CheckCircle, Clock, AlertTriangle,
   FileText, Share2, Download, MessageCircle, Mail, Upload, X, Paperclip,
@@ -1900,6 +1901,27 @@ function DetailModal({
   const { data: anexosPedido } = useAnexosPedido(pedido.id)
   const temNFAnexada = (anexosPedido ?? []).some(a => a.tipo === 'nota_fiscal')
 
+  // Empresa emitente: do pedido (emitido) ou herdada da cotacao (pendente).
+  // Cotacao sem empresa escolhida assume a Matriz (fallback do CotacaoForm).
+  const cotacaoIdRef = pedido.cotacao_id ?? pedido.source_cotacao?.id
+  const { data: empresaEmitente } = useQuery({
+    queryKey: ['pedido-empresa', pedido.id, (pedido as any).empresa_id ?? null, cotacaoIdRef ?? null],
+    queryFn: async () => {
+      let empId = ((pedido as any).empresa_id as string | null) ?? null
+      if (!empId && cotacaoIdRef) {
+        const { data } = await supabase.from('cmp_cotacoes').select('empresa_id').eq('id', cotacaoIdRef).maybeSingle()
+        empId = (data as any)?.empresa_id ?? null
+      }
+      if (!empId) return null
+      const { data: emp } = await supabase
+        .from('sys_empresas')
+        .select('codigo, razao_social, nome_fantasia')
+        .eq('id', empId)
+        .maybeSingle()
+      return (emp ?? null) as { codigo: string; razao_social: string; nome_fantasia: string | null } | null
+    },
+  })
+
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
   const pending  = isPendingEmission(pedido)
@@ -1924,6 +1946,8 @@ function DetailModal({
   const pagoEm         = (pedido as any).pago_em as string | undefined
   const isLiberado     = statusPgto === 'liberado'
   const isPago         = statusPgto === 'pago'
+  const dataVenc       = (pedido as any).data_vencimento as string | undefined
+  const diasVenc       = dataVenc ? Math.floor((new Date(dataVenc + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86_400_000) : null
   // Liberar pagamento apos recebimento confirmado. NF/Boleto/Doc fica como pendencia (badge) se nao anexado.
   const podeLiberar    = entregue && !statusPgto
   const { data: fornecedorResolvido, isLoading: isLoadingFornecedorResolvido, refetch: refetchFornecedorResolvido } = useFornecedorCotacaoResolver(
@@ -2014,6 +2038,17 @@ function DetailModal({
             <div>
               <span className={sub}>Valor Total</span>
               <p className="font-extrabold text-teal-500 text-sm">{fmt(pedido.valor_total)}</p>
+            </div>
+            <div className="col-span-2">
+              <span className={sub}>Empresa Emitente</span>
+              <p className={`font-semibold ${txt}`}>
+                {empresaEmitente
+                  ? `${empresaEmitente.nome_fantasia || empresaEmitente.razao_social} (${empresaEmitente.codigo})`
+                  : '—'}
+                {pending && empresaEmitente && (
+                  <span className={`text-[10px] font-normal ml-1 ${sub}`}>· herdada da cotação, ajustável na emissão</span>
+                )}
+              </p>
             </div>
             {pedido.requisicao && (
               <>
