@@ -823,18 +823,18 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
                                 />
                               )}
                               {!oc.checkin_em && (
-                                <button onClick={() => setCheckinAlvo({ leito: l, ocup: oc })} title="Registrar check-in"
-                                  className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-                                  <LogIn size={13} /> Check-in
+                                <button onClick={() => setCheckinAlvo({ leito: l, ocup: oc })} title="Registrar check-in (com foto)"
+                                  className={`p-1.5 rounded-lg ${isDark ? 'text-emerald-300/80 hover:text-emerald-300 hover:bg-white/[0.06]' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
+                                  <LogIn size={14} />
                                 </button>
                               )}
                               <button onClick={() => setMoverOcup({ ocup: oc, leito: l })} title="Mover de leito"
                                 className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'}`}>
                                 <ArrowRightLeft size={14} />
                               </button>
-                              <button onClick={() => setCheckoutAlvo({ leito: l, ocup: oc })} title="Check-out"
-                                className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-amber-300 hover:bg-white/[0.06]' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}>
-                                <LogOut size={14} />
+                              <button onClick={() => setCheckoutAlvo({ leito: l, ocup: oc })} title="Registrar a saída deste leito"
+                                className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700">
+                                <LogOut size={13} /> Check-out
                               </button>
                             </>
                           ) : (
