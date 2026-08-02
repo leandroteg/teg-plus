@@ -44,6 +44,10 @@ export interface Leito {
 }
 
 export interface OcupacaoHistorico extends LeitoOcupacao {
+  /** Quando a LINHA foi criada — nas ocupações da carga inicial é a única data
+   *  de registro que existe, já que ninguém carimbou presença. */
+  created_at: string
+  criado_por_nome: string | null
   leito: {
     numero_seq: number
     codigo_leito: string

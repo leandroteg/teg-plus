@@ -1573,9 +1573,15 @@ function OcupacaoDetalheModal({ ocup, isDark, onClose }: {
     : nome ? { icone: <Monitor size={12} />, texto: `TEG+ · ${nome}` }
     : null
 
+  // Ocupação da carga inicial: nunca houve check-in, o registro nasceu de um
+  // lançamento manual no sistema. Mostrar QUANDO foi lançado e POR QUEM diz
+  // muito mais que "não registrado" — e não finge que alguém carimbou presença.
+  const legado = !ocup.checkin_em && ocup.origem === 'admin'
+  const quemLegado = { icone: <Monitor size={12} />, texto: `Check-in manual via sistema${ocup.criado_por_nome ? ` · ${ocup.criado_por_nome}` : ''}` }
+
   const bloco = (
     titulo: string, cor: string, quando: string | null, quem: { icone: JSX.Element; texto: string } | null,
-    foto: string | null, obs: string | null,
+    foto: string | null, obs: string | null, vazio = 'Não registrado',
   ) => (
     <div className={`rounded-xl p-4 ${cardBg}`}>
       <p className={`${label} mb-2`} style={{ color: cor }}>{titulo}</p>
@@ -1592,7 +1598,7 @@ function OcupacaoDetalheModal({ ocup, isDark, onClose }: {
           </p>
         </>
       ) : (
-        <p className={`text-sm ${txtMuted}`}>Não registrado</p>
+        <p className={`text-sm ${txtMuted}`}>{vazio}</p>
       )}
       {obs && <p className={`text-xs mt-2 rounded-lg px-2.5 py-1.5 ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600'}`}>{obs}</p>}
       {foto ? (
@@ -1632,8 +1638,14 @@ function OcupacaoDetalheModal({ ocup, isDark, onClose }: {
             </div>
           </div>
 
-          {bloco('Check-in', '#10b981', ocup.checkin_em, autor(ocup.checkin_por_nome), ocup.checkin_foto_url, ocup.observacao)}
-          {bloco('Check-out', '#f59e0b', ocup.checkout_em, autor(ocup.checkout_por_nome), ocup.checkout_foto_url, ocup.checkout_observacao)}
+          {bloco('Check-in', '#10b981',
+            legado ? ocup.created_at : ocup.checkin_em,
+            legado ? quemLegado : autor(ocup.checkin_por_nome),
+            ocup.checkin_foto_url, ocup.observacao)}
+          {bloco('Check-out', '#f59e0b', ocup.checkout_em, autor(ocup.checkout_por_nome),
+            ocup.checkout_foto_url, ocup.checkout_observacao,
+            // Sem data_fim a pessoa ainda está no leito: não é dado faltando.
+            ocup.data_fim ? 'Não registrado' : 'Ocupação em aberto')}
         </div>
       </div>
     </div>
