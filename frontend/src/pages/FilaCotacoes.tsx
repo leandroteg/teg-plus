@@ -373,6 +373,9 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
                         alcadaNivel: (req as any).alcada_nivel ?? 1,
                         solicitanteNome: perfil.nome,
                         resposta: respostaEsc.trim() || undefined,
+                        // Sem isto o hook assumia esclarecimento de validacao tecnica e
+                        // regredia a RC de cotacao_em_esclarecimento p/ em_aprovacao
+                        statusAtual: 'cotacao_em_esclarecimento',
                       })
                     }}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 transition-colors"

@@ -525,7 +525,19 @@ export function useReenviarEsclarecimento() {
       resposta?: string
       statusAtual?: string
     }) => {
-      const isCotacaoEsclarecimento = statusAtual === 'cotacao_em_esclarecimento'
+      // Blindagem: nao confia so no parametro — le o status real da RC no banco.
+      // (FilaCotacoes ja chamou sem statusAtual e a RC regrediu de
+      // cotacao_em_esclarecimento para em_aprovacao.)
+      let statusRC = statusAtual
+      if (!statusRC) {
+        const { data: rcAtual } = await supabase
+          .from(TABLE)
+          .select('status')
+          .eq('id', requisicaoId)
+          .maybeSingle()
+        statusRC = (rcAtual as { status?: string } | null)?.status
+      }
+      const isCotacaoEsclarecimento = statusRC === 'cotacao_em_esclarecimento'
       const statusRetorno = isCotacaoEsclarecimento ? 'cotacao_enviada' : 'em_aprovacao'
 
       // 1. Atualiza status de volta para o estágio correto
