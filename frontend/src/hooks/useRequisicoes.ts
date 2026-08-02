@@ -195,12 +195,13 @@ export function useCriarRequisicao() {
       let centroCustoCodigo: string | null = null
       let baseDestinoId: string | null = null
       let baseDestinoUf: string | null = null
+      let baseDestinoTipo: string | null = null
 
       if (payload.obra_id) {
         try {
           const { data: obra } = await supabase
             .from('sys_obras')
-            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo), base:est_bases!base_id(uf)')
+            .select('centro_custo_id, base_id, centro_custo:sys_centros_custo!centro_custo_id(codigo), base:est_bases!base_id(uf, tipo)')
             .eq('id', payload.obra_id)
             .maybeSingle()
 
@@ -208,6 +209,7 @@ export function useCriarRequisicao() {
           centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
           baseDestinoId = (obra as any)?.base_id ?? null
           baseDestinoUf = (obra as any)?.base?.uf ?? null
+          baseDestinoTipo = (obra as any)?.base?.tipo ?? null
         } catch {
           // fallback sem centro de custo automatico
         }
@@ -250,14 +252,17 @@ export function useCriarRequisicao() {
       // ser vinculado ao catalogo. Aprovador nao deve ver descricao livre.
       const temOrfaos = payload.itens.some(i => !i.est_item_id)
 
-      // Categorias com passa_por_cd: RC vai p/ triagem do CD Araxa antes
-      // de seguir para validacao tecnica. Sem rascunho, sem apr_aprovacoes
-      // ate o triador liberar.
+      // Sala Tecnica avalia a NECESSIDADE de toda RC de obra antes de qualquer
+      // outra etapa. So pula: RC sem obra ou de obra lotada no Escritorio (Sede).
+      // O destino pos-aprovacao (triagem CD ou aprovacao) e decidido pela RPC
+      // cmp_sala_tecnica_decidir com a mesma regra passa_por_cd + UF=MG.
+      const vaiSalaTecnica = Boolean(payload.obra_id) && baseDestinoTipo !== 'escritorio'
+
       const statusInicial: string = payload.rascunho
         ? 'rascunho'
         : temOrfaos
           ? 'aguardando_catalogo'
-          : passaPorCd ? 'em_analise_tecnica' : 'em_aprovacao'
+          : vaiSalaTecnica ? 'em_analise_tecnica' : 'em_aprovacao'
 
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
@@ -352,11 +357,11 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e p/
-      // categorias que passam pelo CD - o triador cria a aprovacao no liberar).
-      // Tambem skip quando RC esta aguardando vinculo de catalogo - aprovacao
-      // sera criada apos comprador vincular todos os itens.
-      if (!payload.rascunho && !passaPorCd && !temOrfaos) try {
+      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e p/ RCs
+      // que vao pra Sala Tecnica - a aprovacao e criada depois, pela RPC da
+      // Sala Tecnica ou pelo triador do CD no liberar). Tambem skip quando RC
+      // esta aguardando vinculo de catalogo.
+      if (!payload.rascunho && !vaiSalaTecnica && !temOrfaos) try {
         // Busca aprovador da alçada correspondente
         const { data: alcadaData } = await supabase
           .from('apr_alcadas')
@@ -404,7 +409,7 @@ export function useEnviarParaAprovacao() {
     mutationFn: async ({ requisicaoId }: { requisicaoId: string }) => {
       const { data: rc, error: rcErr } = await supabase
         .from('cmp_requisicoes')
-        .select('id, numero, status, categoria, alcada_nivel, solicitante_nome, base_destino_id')
+        .select('id, numero, status, categoria, alcada_nivel, solicitante_nome, base_destino_id, obra_id')
         .eq('id', requisicaoId)
         .maybeSingle()
       if (rcErr) throw rcErr
@@ -423,26 +428,17 @@ export function useEnviarParaAprovacao() {
         throw new Error(`Ainda ha ${itens.length} item(ns) sem vinculo de catalogo`)
       }
 
-      // Categoria com passa_por_cd vai pra triagem; senao direto pra em_aprovacao.
-      // Mesma regra UF=MG aplicada na criacao.
-      let passaPorCd = false
-      if (rc.categoria) {
-        const { data: cat } = await supabase
-          .from('cmp_categorias')
-          .select('passa_por_cd')
-          .eq('codigo', rc.categoria)
-          .maybeSingle()
-        passaPorCd = Boolean(cat?.passa_por_cd)
-      }
-      let baseUf: string | null = null
+      // Sala Tecnica avalia a necessidade de TODA RC de obra (exceto obra
+      // lotada no Escritorio/Sede). O destino pos-aprovacao (triagem CD ou
+      // aprovacao) e decidido pela RPC cmp_sala_tecnica_decidir.
+      let baseTipo: string | null = null
       if (rc.base_destino_id) {
         const { data: base } = await supabase
-          .from('est_bases').select('uf').eq('id', rc.base_destino_id).maybeSingle()
-        baseUf = (base as any)?.uf ?? null
+          .from('est_bases').select('tipo').eq('id', rc.base_destino_id).maybeSingle()
+        baseTipo = (base as any)?.tipo ?? null
       }
-      const irPraTriagem = passaPorCd && baseUf === 'MG'
-      // Sala Tecnica avalia a necessidade antes de a RC chegar na triagem do CD
-      const novoStatus = irPraTriagem ? 'em_analise_tecnica' : 'em_aprovacao'
+      const vaiSalaTecnica = Boolean((rc as any).obra_id) && baseTipo !== 'escritorio'
+      const novoStatus = vaiSalaTecnica ? 'em_analise_tecnica' : 'em_aprovacao'
 
       const { error: updErr } = await supabase
         .from('cmp_requisicoes')
@@ -450,8 +446,8 @@ export function useEnviarParaAprovacao() {
         .eq('id', requisicaoId)
       if (updErr) throw updErr
 
-      // Triagem: apr_aprovacoes sera criada pelo triador no liberar.
-      if (irPraTriagem) return { status: novoStatus }
+      // Sala Tecnica: a aprovacao e criada depois (RPC da Sala Tecnica ou triador do CD).
+      if (vaiSalaTecnica) return { status: novoStatus }
 
       // Cria apr_aprovacoes pendente
       const { data: alcadaData } = await supabase
