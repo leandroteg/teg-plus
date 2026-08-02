@@ -25,7 +25,7 @@ export interface OsSegPdfData {
   descricaoAtividade: string
   /** Diretrizes de SST, uma por linha. */
   obrigacoes: string
-  riscos: { perigo: string; fonte?: string | null; medidas?: string | null }[]
+  riscos: { perigo: string; grupo?: string | null; fonte?: string | null; medidas?: string | null }[]
   epis: { nome: string; ca?: string | null }[]
   epcs?: string[]
   treinamentos: { nome: string; norma?: string | null }[]
@@ -141,21 +141,41 @@ function buildDoc(d: OsSegPdfData, empresa: EmpresaData, logo: string | null): j
   doc.text('FONTE GERADORA', M + cR + 1, y + 2.2)
   doc.text('MEDIDAS ADMINISTRATIVAS', M + cR + cF + 1, y + 2.2)
   y += 4
-  doc.setFontSize(6.6)
-  d.riscos.forEach((r, i) => {
-    const lR = doc.splitTextToSize(r.perigo || '—', cR - 3)
-    const lF = doc.splitTextToSize(r.fonte || '—', cF - 3)
-    const lM = doc.splitTextToSize(r.medidas || '—', CW - cR - cF - 3)
-    const alt = Math.max(lR.length, lF.length, lM.length) * 2.9 + 2
-    checkPage(alt + 2)
-    if (i > 0) { doc.setDrawColor(...LIGHT); doc.setLineWidth(0.12); doc.line(M, y - 1, W - M, y - 1) }
-    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.text(lR, M + 1, y + 2)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(...MID)
-    doc.text(lF, M + cR + 1, y + 2)
-    doc.text(lM, M + cR + cF + 1, y + 2)
-    y += alt
+  // Agrupado por tipo de risco, como no modelo do SESMT: cada faixa abre um
+  // bloco e as linhas do bloco vem embaixo.
+  const ORDEM = ['Físico', 'Químico', 'Biológico', 'Ergonômico', 'Acidente']
+  const tipoDe = (g?: string | null) => {
+    const t = (g ?? '').trim()
+    return ORDEM.includes(t) ? t : 'Outros'
+  }
+  const grupos = [...ORDEM, 'Outros']
+    .map(t => ({ tipo: t, itens: d.riscos.filter(r => tipoDe(r.grupo) === t) }))
+    .filter(g => g.itens.length)
+
+  grupos.forEach(({ tipo, itens }) => {
+    checkPage(9)
+    doc.setFillColor(...LIGHT)
+    doc.rect(M, y - 1, CW, 4.6, 'F')
+    doc.setFontSize(6.2); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
+    doc.text(`${tipo === 'Outros' ? 'OUTROS' : 'RISCO ' + tipo.toUpperCase()}  (${itens.length})`, M + 1, y + 2.1)
+    y += 5.6
+    doc.setFontSize(6.6)
+    itens.forEach((r, i) => {
+      const lR = doc.splitTextToSize(r.perigo || '—', cR - 3)
+      const lF = doc.splitTextToSize(r.fonte || '—', cF - 3)
+      const lM = doc.splitTextToSize(r.medidas || '—', CW - cR - cF - 3)
+      const alt = Math.max(lR.length, lF.length, lM.length) * 2.9 + 2
+      checkPage(alt + 2)
+      if (i > 0) { doc.setDrawColor(...LIGHT); doc.setLineWidth(0.12); doc.line(M, y - 1, W - M, y - 1) }
+      doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.text(lR, M + 1, y + 2)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...MID)
+      doc.text(lF, M + cR + 1, y + 2)
+      doc.text(lM, M + cR + cF + 1, y + 2)
+      y += alt
+    })
+    y += 2
   })
-  y += 3
+  y += 1
 
   // ── medidas preventivas: EPI | EPC, lado a lado como na OS original ───────
   secao('MEDIDAS PREVENTIVAS')

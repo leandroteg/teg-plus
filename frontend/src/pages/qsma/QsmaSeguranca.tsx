@@ -27,6 +27,7 @@ import {
   type SstDocumento, type MatrizRiscoCelula,
   useColaboradoresTreino, treinoStatus, cargoBase,
   useEpiEntregas, useMatrizEpi, useSetMatrizEpiCelula,
+  useEpcs, useMatrizEpc, useSetMatrizEpcCelula,
   useEstoqueEpi, useSaldoEpi, docAssinadoUrl,
 } from '../../hooks/useQsma'
 import RHColaboradorDetalhe from '../rh/RHColaboradorDetalhe'
@@ -2761,6 +2762,9 @@ function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
   const { data: matrizTreino = [] } = useMatrizTreinamentos()
   const setCel = useSetMatrizEpiCelula()
   const [busca, setBusca] = useState('')
+  // A protecao coletiva e a outra metade das medidas preventivas da OS. Fica
+  // aqui, e nao numa aba nova, porque quem preenche uma preenche a outra.
+  const [visao, setVisao] = useState<'epi' | 'epc'>('epi')
 
   const cols = epis.filter(e => e.ativo)
   // linhas: cargos já presentes na matriz de EPI + todos os da matriz de treinamentos (mesma população de funções)
@@ -2793,12 +2797,27 @@ function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
     <div className="space-y-3">
       <div className={`rounded-2xl border p-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
         {subTabs}
+        <div className={`inline-flex p-1 rounded-xl shrink-0 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {([['epi', 'EPI'], ['epc', 'EPC']] as const).map(([k, lbl]) => (
+            <button key={k} onClick={() => setVisao(k)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                visao === k
+                  ? isDark ? 'bg-violet-500/20 text-violet-300' : 'bg-white text-violet-700 shadow-sm'
+                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+              }`}>{lbl}</button>
+          ))}
+        </div>
         <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs min-w-[160px] flex-1 ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white border-slate-200'}`}>
           <Search size={14} className={txtMuted} />
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cargo…"
             className={`bg-transparent outline-none w-full ${txtMain}`} />
         </div>
       </div>
+
+      {visao === 'epc' && (
+        <MatrizEpcs cargos={cargosF} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
+      )}
+      {visao === 'epi' && <>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className={`text-xs ${txtMuted}`}>
@@ -2849,7 +2868,98 @@ function MatrizEpis({ subTabs, isDark, txtMain, txtMuted, isAdmin }: {
           </tbody>
         </table>
       </div>
+      </>}
     </div>
+  )
+}
+
+// ── Matriz de EPCs: cargo × medida coletiva (célula liga/desliga) ─────────────
+// Os itens do catálogo saíram das OS assinadas que estão no OneDrive — APR,
+// POPs, DDS, sinalização, permissões de trabalho. Nada inventado aqui.
+const CAT_EPC: Record<string, { label: string; cor: string }> = {
+  engenharia: { label: 'Engenharia', cor: 'text-sky-500' },
+  administrativa: { label: 'Administrativa', cor: 'text-amber-500' },
+  sinalizacao: { label: 'Sinalização', cor: 'text-violet-500' },
+  procedimento: { label: 'Procedimento', cor: 'text-emerald-500' },
+}
+
+function MatrizEpcs({ cargos, isDark, txtMain, txtMuted, isAdmin }: {
+  cargos: string[]; isDark: boolean; txtMain: string; txtMuted: string; isAdmin: boolean
+}) {
+  const { data: epcs = [], isLoading: le } = useEpcs()
+  const { data: matriz = [], isLoading: lm } = useMatrizEpc()
+  const setCel = useSetMatrizEpcCelula()
+
+  const cols = epcs.filter(e => e.ativo)
+  const marcado = (cargo: string, eid: string) =>
+    matriz.some(x => x.cargo === cargo && x.epc_id === eid && x.exigencia === 'obrigatorio')
+  const onCel = (cargo: string, eid: string) => {
+    if (!isAdmin || setCel.isPending) return
+    setCel.mutate({ cargo, epc_id: eid, exigencia: marcado(cargo, eid) ? 'na' : 'obrigatorio' })
+  }
+  const cellStyle = (on: boolean) =>
+    on ? (isDark ? 'bg-violet-500/25 text-violet-300' : 'bg-violet-500 text-white')
+      : (isDark ? 'text-slate-700' : 'text-slate-200')
+
+  if (le || lm) return <div className="py-12 flex justify-center"><Loader2 size={20} className="animate-spin text-sky-500" /></div>
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className={`text-xs ${txtMuted}`}>
+          <span className="font-semibold">{cargos.length} cargo{cargos.length !== 1 ? 's' : ''} · {cols.length} EPCs</span>
+          {isAdmin && <span className="ml-2 opacity-80">· Clique para marcar. É esta lista que alimenta a coluna EPC da Ordem de Serviço.</span>}
+        </p>
+        <div className="flex items-center gap-2.5 text-[10px] flex-wrap">
+          {Object.entries(CAT_EPC).map(([k, v]) => (
+            <span key={k} className={`flex items-center gap-1 ${txtMuted}`}>
+              <span className={`w-1.5 h-1.5 rounded-full bg-current ${v.cor}`} /> {v.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className={`rounded-2xl border overflow-auto max-h-[70vh] ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+        <table className="w-full min-w-[900px] table-fixed border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={`sticky left-0 top-0 z-30 w-[240px] text-left px-3 pb-2 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>Cargo</th>
+              {cols.map(e => (
+                <th key={e.id} title={`${e.nome} · ${CAT_EPC[e.categoria]?.label ?? e.categoria}`}
+                  className={`sticky top-0 z-20 h-[132px] p-0 align-bottom font-bold ${isDark ? 'bg-[#0f172a] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                  <div className="relative h-full">
+                    <span className={`absolute bottom-2 left-1 origin-bottom-left rotate-[-45deg] whitespace-nowrap text-[11px] leading-none ${CAT_EPC[e.categoria]?.cor ?? ''}`}>
+                      {e.nome.length > 42 ? e.nome.slice(0, 41) + '…' : e.nome}
+                    </span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {cargos.map((cargo, i) => (
+              <tr key={cargo} className={i % 2 ? (isDark ? 'bg-white/[0.015]' : 'bg-slate-50/40') : ''}>
+                <td title={cargo} className={`sticky left-0 z-10 px-3 py-1.5 font-semibold truncate max-w-[240px] ${txtMain} ${isDark ? 'bg-[#0f172a]' : 'bg-white'}`}>{cargo}</td>
+                {cols.map(e => {
+                  const on = marcado(cargo, e.id)
+                  return (
+                    <td key={e.id} className="text-center">
+                      <button disabled={!isAdmin} onClick={() => onCel(cargo, e.id)}
+                        className={`w-7 h-7 m-0.5 rounded font-bold text-[11px] transition-all ${cellStyle(on)} ${isAdmin ? 'hover:ring-2 hover:ring-sky-400 cursor-pointer' : 'cursor-default'}`}>
+                        {on ? '✓' : '·'}
+                      </button>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+            {cargos.length === 0 && (
+              <tr><td colSpan={cols.length + 1} className={`px-3 py-8 text-center ${txtMuted}`}>Nenhum cargo encontrado.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 

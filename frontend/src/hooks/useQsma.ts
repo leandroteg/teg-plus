@@ -806,13 +806,16 @@ export interface OsSegDados {
   descricao_atividade: string
   riscos: {
     perigo: string
+    /** Tipo do risco (Físico · Químico · Biológico · Ergonômico · Acidente).
+     *  É por ele que a OS agrupa a tabela, como no modelo do SESMT. */
+    grupo?: string | null
     /** O que gera o risco. A OS chama de "fonte geradora". */
     fonte: string | null
     /** Medidas administrativas — o que a empresa faz/exige. */
     medidas: string | null
   }[]
   epis: { nome: string; ca: string | null; quantidade: number }[]
-  /** Proteção coletiva. Não existe cadastro no sistema: é digitada na OS. */
+  /** Proteção coletiva — vem da Matriz de EPC (cargo × EPC), continua editável. */
   epcs: string[]
   treinamentos: { nome: string; norma: string | null }[]
   /** Diretrizes de SST — a lista que o colaborador declara ter lido. */
@@ -866,6 +869,66 @@ export const OS_DIRETRIZES_PADRAO = [
 
 /** Cadastro do colaborador para o cabecalho da OS. Busca por id em vez de
  *  procurar na lista: a lista pode vir do cache com um formato antigo. */
+/** Ordem dos tipos de risco na OS — a mesma do PGR/modelo do SESMT. */
+export const ORDEM_TIPO_RISCO = ['Físico', 'Químico', 'Biológico', 'Ergonômico', 'Acidente']
+
+/** Agrupa mantendo a ordem canônica; tipo desconhecido vai para o fim. */
+export function ordenaPorTipo<T extends { grupo?: string | null; perigo: string }>(rs: T[]): T[] {
+  const pos = (g?: string | null) => {
+    const i = ORDEM_TIPO_RISCO.indexOf((g ?? '').trim())
+    return i < 0 ? ORDEM_TIPO_RISCO.length : i
+  }
+  return [...rs].sort((a, b) =>
+    pos(a.grupo) - pos(b.grupo) || a.perigo.localeCompare(b.perigo, 'pt-BR'))
+}
+
+export interface QsmaEpc {
+  id: string
+  nome: string
+  /** engenharia · administrativa · sinalizacao · procedimento */
+  categoria: string
+  descricao: string | null
+  ativo: boolean
+}
+
+export interface QsmaMatrizEpcCelula {
+  id: string; cargo: string; epc_id: string; exigencia: string
+}
+
+export function useEpcs() {
+  return useQuery({
+    queryKey: ['qsma_epcs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_epcs').select('*').order('categoria').order('nome')
+      if (error) throw error
+      return (data ?? []) as QsmaEpc[]
+    },
+  })
+}
+
+export function useMatrizEpc() {
+  return useQuery({
+    queryKey: ['qsma_matriz_epc'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('qsma_matriz_epc').select('*')
+      if (error) throw error
+      return (data ?? []) as QsmaMatrizEpcCelula[]
+    },
+  })
+}
+
+export function useSetMatrizEpcCelula() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: { cargo: string; epc_id: string; exigencia: 'obrigatorio' | 'na' }) => {
+      const { error } = await supabase.from('qsma_matriz_epc')
+        .upsert({ ...p, updated_at: new Date().toISOString() }, { onConflict: 'cargo,epc_id' })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['qsma_matriz_epc'] }),
+  })
+}
+
 export function useColaboradorParaOs(id?: string) {
   return useQuery({
     queryKey: ['qsma_os_colab', id],
@@ -902,12 +965,13 @@ export function useOsSegurancaDoCargo(cargo?: string | null) {
   return useQuery({
     queryKey: ['qsma_os_seg_cargo', cargo ? cargoBase(cargo) : null],
     enabled: !!cargo,
-    queryFn: async (): Promise<Pick<OsSegDados, 'riscos' | 'epis' | 'treinamentos'>> => {
+    queryFn: async (): Promise<Pick<OsSegDados, 'riscos' | 'epis' | 'epcs' | 'treinamentos'>> => {
       const base = cargoBase(cargo!)
-      const [mr, me, mt] = await Promise.all([
-        supabase.from('qsma_matriz_risco').select('cargo, fontes, medidas_administrativas, risco:qsma_riscos(perigo, controles, fontes_tipicas)'),
+      const [mr, me, mt, mc] = await Promise.all([
+        supabase.from('qsma_matriz_risco').select('cargo, fontes, medidas_administrativas, risco:qsma_riscos(perigo, grupo, controles, fontes_tipicas)'),
         supabase.from('qsma_matriz_epi').select('cargo, quantidade, exigencia, epi:qsma_epis(nome, ca)'),
         supabase.from('qsma_matriz_treinamento').select('cargo, exigencia, treino:qsma_treinamento_catalogo(nome, norma)'),
+        supabase.from('qsma_matriz_epc').select('cargo, exigencia, epc:qsma_epcs(nome)'),
       ])
       const doCargo = <T extends { cargo: string }>(rows: T[] | null) =>
         (rows ?? []).filter(r => cargoBase(r.cargo) === base)
@@ -916,6 +980,7 @@ export function useOsSegurancaDoCargo(cargo?: string | null) {
       // como medida vem de medidas_administrativas, e a fonte geradora de `fontes`.
       const riscos = doCargo(mr.data as any[]).filter(r => r.risco).map(r => ({
         perigo: r.risco.perigo,
+        grupo: r.risco.grupo ?? null,
         fonte: r.fontes || r.risco.fontes_tipicas || null,
         medidas: r.medidas_administrativas || r.risco.controles || null,
       }))
@@ -928,9 +993,13 @@ export function useOsSegurancaDoCargo(cargo?: string | null) {
 
       const uniq = <T,>(arr: T[], k: (x: T) => string) =>
         [...new Map(arr.map(x => [k(x), x])).values()]
+      const epcs = doCargo(mc.data as any[])
+        .filter(r => r.exigencia === 'obrigatorio' && r.epc)
+        .map(r => r.epc.nome as string)
       return {
-        riscos: uniq(riscos, r => r.perigo),
+        riscos: ordenaPorTipo(uniq(riscos, r => r.perigo)),
         epis: uniq(epis, e => e.nome),
+        epcs: [...new Set(epcs)],
         treinamentos: uniq(treinamentos, t => t.nome),
       }
     },

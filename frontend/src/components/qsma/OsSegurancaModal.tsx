@@ -20,7 +20,7 @@ import { pickerInputCls, pickerLabelCls } from './Pickers'
 import {
   useOsSegurancaDoCargo, useSalvarOsSeguranca, useColaboradorParaOs,
   OS_OBJETIVO_PADRAO, OS_DIRETRIZES_PADRAO,
-  type OsSegDados, type OsSeguranca,
+  type OsSegDados, type OsSeguranca, ORDEM_TIPO_RISCO,
 } from '../../hooks/useQsma'
 
 export interface AlvoOs {
@@ -98,6 +98,8 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
   useEffect(() => {
     if (existente || carregou || !doCargo) return
     setRiscos(doCargo.riscos); setEpis(doCargo.epis); setTreinos(doCargo.treinamentos)
+    // EPC agora vem da Matriz (cargo × medida coletiva) em vez de digitado.
+    if (doCargo.epcs?.length) setEpcs(doCargo.epcs)
     setCarregou(true)
   }, [doCargo, existente, carregou])
 
@@ -248,8 +250,8 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
         <div className="py-8 flex justify-center"><Loader2 size={18} className="animate-spin text-sky-500" /></div>
       ) : (
         <>
-          <Secao icone={AlertTriangle} titulo={`Riscos · fonte geradora · medidas (${riscos.length})`} cor="text-amber-500"
-            onAdd={() => setRiscos(r => [...r, { perigo: '', fonte: null, medidas: null }])}>
+          <Secao icone={AlertTriangle} titulo={`Riscos por tipo · fonte geradora · medidas (${riscos.length})`} cor="text-amber-500"
+            onAdd={() => setRiscos(r => [...r, { perigo: '', grupo: null, fonte: null, medidas: null }])}>
             {riscos.length === 0 ? (
               <p className={`text-[11px] italic ${txtMuted}`}>Nenhum risco na matriz para esta função.</p>
             ) : (
@@ -260,12 +262,32 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
                   <span className="flex-1">Medidas administrativas</span>
                   <span className="w-5" />
                 </div>
-                {riscos.map((r, i) => (
+                {/* Guarda o indice original: a linha e editavel e o estado
+                    continua sendo a lista achatada. */}
+                {[...ORDEM_TIPO_RISCO, '—'].map(tipo => {
+                  const itens = riscos
+                    .map((r, i) => ({ r, i }))
+                    .filter(({ r }) => (ORDEM_TIPO_RISCO.includes((r.grupo ?? '').trim())
+                      ? (r.grupo ?? '').trim() : '—') === tipo)
+                  if (!itens.length) return null
+                  return (
+                    <div key={tipo} className="mb-2">
+                      <p className={`text-[10px] font-bold uppercase tracking-wide mb-1 ${txtMuted}`}>
+                        {tipo === '—' ? 'Sem tipo definido' : `Risco ${tipo}`}
+                        <span className="ml-1.5 opacity-60 font-semibold">({itens.length})</span>
+                      </p>
+                {itens.map(({ r, i }) => (
                   <div key={i} className="flex gap-1.5 mb-1.5 items-start">
-                    <div className="w-[30%]">
+                    <div className="w-[30%] space-y-1">
                       <input value={r.perigo} placeholder="Risco" disabled={somenteLeitura}
                         onChange={e => setRiscos(p => p.map((x, j) => j === i ? { ...x, perigo: e.target.value } : x))}
                         className={`${inp} text-[11px]`} />
+                      <select value={(r.grupo ?? '').trim()} disabled={somenteLeitura}
+                        onChange={e => setRiscos(p => p.map((x, j) => j === i ? { ...x, grupo: e.target.value || null } : x))}
+                        className={`${inp} text-[10px]`}>
+                        <option value="">Sem tipo</option>
+                        {ORDEM_TIPO_RISCO.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                     </div>
                     <div className="w-[30%]">
                       <input value={r.fonte ?? ''} placeholder="Fonte geradora" disabled={somenteLeitura}
@@ -280,6 +302,9 @@ export default function OsSegurancaModal({ isDark, alvo, existente, autorNome, o
                     <Lixeira onClick={() => setRiscos(p => p.filter((_, j) => j !== i))} />
                   </div>
                 ))}
+                    </div>
+                  )
+                })}
               </>
             )}
           </Secao>
