@@ -1045,22 +1045,31 @@ type ItemTaxState = {
   deduzir:          boolean
 }
 
+// Arquivo aguardando anexo no modal de liberação — cada um com tipo próprio e conferência de fornecedor
+type AnexoEntry = {
+  id:                 number
+  file:               File
+  tipo:               PedidoAnexo['tipo']
+  validacao:          ValidacaoDocFornecedor | null
+  validando:          boolean
+  ignorarDivergencia: boolean
+}
+
 function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
   const uploadAnexo   = useUploadAnexo()
   const liberarPgto   = useLiberarPagamento()
   const fileRef       = useRef<HTMLInputElement>(null)
   const { data: anexosExistentes } = useAnexosPedido(pedido.id)
 
-  const [file, setFile]       = useState<File | null>(null)
-  const [tipo, setTipo]       = useState<PedidoAnexo['tipo']>('nota_fiscal')
+  const [files, setFiles]     = useState<AnexoEntry[]>([])
   const [obs, setObs]         = useState('')
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
   const [showImposto, setShowImposto] = useState(false)
-  // Conferência do fornecedor no documento anexado (CNPJ do PDF × pedido)
-  const [validacao, setValidacao]   = useState<ValidacaoDocFornecedor | null>(null)
-  const [validando, setValidando]   = useState(false)
-  const [ignorarDivergencia, setIgnorarDivergencia] = useState(false)
+  const anexoIdRef = useRef(0)
+
+  const patchFile = (id: number, patch: Partial<AnexoEntry>) =>
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
 
   const rcItens = pedido.requisicao?.itens ?? []
 
@@ -1098,33 +1107,36 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const temNF = docsExistentes.length > 0
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setFile(f)
+    const novos = Array.from(e.target.files ?? [])
+    if (!novos.length) return
     setErro('')
-    setIgnorarDivergencia(false)
-    setValidacao(null)
-    setValidando(true)
-    validarDocFornecedorPedido(f, pedido.id)
-      .then(res => setValidacao(res))
-      .catch(() => setValidacao(null))
-      .finally(() => setValidando(false))
+    const entries: AnexoEntry[] = novos.map(f => ({
+      id: ++anexoIdRef.current, file: f, tipo: 'nota_fiscal', validacao: null, validando: true, ignorarDivergencia: false,
+    }))
+    setFiles(prev => [...prev, ...entries])
+    entries.forEach(en => {
+      validarDocFornecedorPedido(en.file, pedido.id)
+        .then(res => patchFile(en.id, { validacao: res, validando: false }))
+        .catch(() => patchFile(en.id, { validando: false }))
+    })
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   const handleSubmit = async () => {
-    if (!file && !temNF) { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
-    if (file && TIPOS_CONFERE_FORNECEDOR.includes(tipo)) {
-      if (validando) { setErro('Aguarde a conferência do fornecedor do documento.'); return }
-      if (validacao?.status === 'divergente' && !ignorarDivergencia) {
-        setErro('O documento não confere com o fornecedor do pedido. Confirme a divergência para anexar mesmo assim.')
+    if (files.length === 0 && !temNF) { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
+    for (const en of files) {
+      if (!TIPOS_CONFERE_FORNECEDOR.includes(en.tipo)) continue
+      if (en.validando) { setErro('Aguarde a conferência do fornecedor dos documentos.'); return }
+      if (en.validacao?.status === 'divergente' && !en.ignorarDivergencia) {
+        setErro(`O documento "${en.file.name}" não confere com o fornecedor do pedido. Confirme a divergência para anexar mesmo assim.`)
         return
       }
     }
     setLoading(true)
     setErro('')
     try {
-      if (file) {
-        await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file, tipo, observacao: obs || undefined, origem: 'compras' })
+      for (const en of files) {
+        await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file: en.file, tipo: en.tipo, observacao: obs || undefined, origem: 'compras' })
       }
 
       // Build per-item payload
@@ -1211,56 +1223,56 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
           )}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              {temNF ? 'Adicionar outro documento' : 'Anexar Documento'}{' '}
+              {temNF ? 'Adicionar outros documentos' : 'Anexar Documentos'}{' '}
               {!temNF && <span className="text-red-500">*</span>}
               {temNF && <span className="text-slate-400 font-normal">(opcional)</span>}
             </label>
-            <div onClick={() => fileRef.current?.click()} className={`flex items-center gap-3 border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-colors ${file ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50'}`}>
-              <Upload size={18} className={file ? 'text-emerald-500' : 'text-slate-400'} />
+            <div onClick={() => fileRef.current?.click()} className="flex items-center gap-3 border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-colors border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50">
+              <Upload size={18} className="text-slate-400" />
               <div className="min-w-0">
-                {file ? (
-                  <>
-                    <p className="text-sm font-semibold text-emerald-700 truncate">{file.name}</p>
-                    <p className="text-[11px] text-emerald-500">{(file.size / 1024).toFixed(0)} KB</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-slate-500">Clique para selecionar</p>
-                    <p className="text-[11px] text-slate-400">PDF, JPG, PNG, XLS, XLSX</p>
-                  </>
-                )}
+                <p className="text-sm text-slate-500">Clique para selecionar</p>
+                <p className="text-[11px] text-slate-400">PDF, JPG, PNG, XLS, XLSX — pode escolher mais de um</p>
               </div>
             </div>
-            <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
+            <input ref={fileRef} type="file" multiple accept=".pdf,.xml,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
           </div>
-          {file && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tipo do Documento</label>
-              <div className="grid grid-cols-2 gap-2">
-                {TIPO_OPTIONS.map(opt => (
-                  <button key={opt.value} type="button" onClick={() => setTipo(opt.value)} className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-colors ${tipo === opt.value ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
-                    {opt.label}
-                  </button>
-                ))}
+          {files.map(en => (
+            <div key={en.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-teal-500 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{en.file.name}</p>
+                  <p className="text-[10px] text-slate-400">{(en.file.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <select
+                  value={en.tipo}
+                  onChange={e => patchFile(en.id, { tipo: e.target.value as PedidoAnexo['tipo'], ignorarDivergencia: false })}
+                  className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                >
+                  {TIPO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <button type="button" onClick={() => setFiles(prev => prev.filter(f => f.id !== en.id))} className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <X size={14} />
+                </button>
               </div>
-            </div>
-          )}
-          {file && TIPOS_CONFERE_FORNECEDOR.includes(tipo) && (
-            <div className="space-y-2">
-              <ValidacaoFornecedorBadge validacao={validacao} validando={validando} />
-              {validacao?.status === 'divergente' && (
-                <label className="flex items-start gap-2 text-[11px] font-semibold text-red-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ignorarDivergencia}
-                    onChange={e => setIgnorarDivergencia(e.target.checked)}
-                    className="h-4 w-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
-                  />
-                  Confirmo que o documento pertence a este pedido — anexar mesmo assim.
-                </label>
+              {TIPOS_CONFERE_FORNECEDOR.includes(en.tipo) && (
+                <>
+                  <ValidacaoFornecedorBadge validacao={en.validacao} validando={en.validando} />
+                  {en.validacao?.status === 'divergente' && (
+                    <label className="flex items-start gap-2 text-[11px] font-semibold text-red-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={en.ignorarDivergencia}
+                        onChange={ev => patchFile(en.id, { ignorarDivergencia: ev.target.checked })}
+                        className="h-4 w-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
+                      />
+                      Confirmo que o documento pertence a este pedido — anexar mesmo assim.
+                    </label>
+                  )}
+                </>
               )}
             </div>
-          )}
+          ))}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Observação <span className="text-slate-400 font-normal">(opcional)</span></label>
             <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Ex: NF entregue junto com o material..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300" />
@@ -2394,13 +2406,13 @@ function DetailModal({
             )
           })()}
 
-          {/* Documentos */}
+          {/* Documentos — a partir de "entregue" o anexo passa a ser feito no modal Liberar para Pagamento */}
           {!pending && (
             <div>
               <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
                 <Paperclip size={11} /> Documentos
               </p>
-              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} canUpload={!isLiberado && !isPago} />
+              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} canUpload={!podeLiberar && !isLiberado && !isPago} />
             </div>
           )}
 
