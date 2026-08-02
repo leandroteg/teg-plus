@@ -1079,13 +1079,10 @@ export default function CotacaoForm() {
     }
   }, [cotacao, itensPendentesDaRC, comEscopoCompletoDaRC])
   // ── Empresa do grupo (multi-empresa): quem solicita a cotação e recebe a NF ──
-  // Default Matriz (EMP-001); persiste na hora em cmp_cotacoes pra valer no PDF
-  // de solicitação e virar o default da emissão do pedido, mesmo antes de concluir.
+  // Escolha OBRIGATÓRIA do comprador (decisão no início do processo — Elton,
+  // 02/ago): sem default Matriz. Persiste na hora em cmp_cotacoes pra valer no
+  // PDF de solicitação e virar o default da emissão do pedido.
   const empresas = useLookupEmpresas()
-  const empresaMatrizId = useMemo(() => {
-    if (empresas.length === 0) return ''
-    return empresas.find(e => e.codigo === 'EMP-001')?.id ?? empresas[0].id
-  }, [empresas])
   const [empresaId, setEmpresaId] = useState('')
   const empresaHydratedRef = useRef(false)
   useEffect(() => {
@@ -1093,11 +1090,8 @@ export default function CotacaoForm() {
     if (cotacao.empresa_id) {
       setEmpresaId(cotacao.empresa_id)
       empresaHydratedRef.current = true
-    } else if (empresaMatrizId) {
-      setEmpresaId(empresaMatrizId)
-      empresaHydratedRef.current = true
     }
-  }, [cotacao, empresaMatrizId])
+  }, [cotacao])
   const handleEmpresaChange = useCallback((novaEmpresaId: string) => {
     setEmpresaId(novaEmpresaId)
     if (!id || !novaEmpresaId) return
@@ -1770,6 +1764,10 @@ export default function CotacaoForm() {
       })
       return
     }
+    if (!empresaId) {
+      setToast({ type: 'error', msg: 'Escolha a Empresa Compradora antes de concluir a cotação.' })
+      return
+    }
     if (!semCotacoesMinimas && validos.length < minCot) {
       setToast({ type: 'error', msg: `Mínimo de ${minCot} fornecedor${minCot > 1 ? 'es' : ''} obrigatório${minCot > 1 ? 's' : ''}, ou marque a opção para enviar sem o mínimo.` })
       return
@@ -1808,7 +1806,7 @@ export default function CotacaoForm() {
       await submitMutation.mutateAsync({
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
-        empresa_id: empresaId || empresaMatrizId || null,
+        empresa_id: empresaId || null,
         fornecedores: validos.map((f, validosIdx) => {
           const itensComSelecao = f.itens_precos.map(item => {
             const key = chaveDescricao(item.descricao)
@@ -1942,7 +1940,14 @@ export default function CotacaoForm() {
           {cotacao && (
             <button
               type="button"
-              onClick={() => gerarSolicitacaoCotacao(cotacao, empresaId)}
+              onClick={() => {
+                // PDF sai em nome da Empresa Compradora — exige a escolha antes
+                if (!empresaId) {
+                  setToast({ type: 'error', msg: 'Escolha a Empresa Compradora antes de gerar a Solicitação de Cotação.' })
+                  return
+                }
+                gerarSolicitacaoCotacao(cotacao, empresaId)
+              }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-bold shadow-sm shadow-violet-500/20 transition-colors"
             >
               <Printer size={13} />
@@ -1996,13 +2001,19 @@ export default function CotacaoForm() {
 
       {/* Empresa do grupo em nome da qual a cotação é solicitada (multi-empresa) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-        <label className="block text-xs font-bold text-slate-600 mb-1.5">Empresa Compradora</label>
+        <label className="block text-xs font-bold text-slate-600 mb-1.5">
+          Empresa Compradora <span className="text-red-500">*</span>
+        </label>
         <select
           value={empresaId}
           onChange={e => handleEmpresaChange(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400"
+          className={`w-full border rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 ${
+            empresaId ? 'border-slate-200' : 'border-amber-300 bg-amber-50/50'
+          }`}
         >
-          {empresas.length === 0 && <option value="">Carregando empresas...</option>}
+          <option value="">
+            {empresas.length === 0 ? 'Carregando empresas...' : 'Selecione a empresa do grupo...'}
+          </option>
           {empresas.map(emp => (
             <option key={emp.id} value={emp.id}>
               {emp.nome_fantasia || emp.razao_social}
@@ -2011,7 +2022,8 @@ export default function CotacaoForm() {
           ))}
         </select>
         <p className="text-[10px] text-slate-400 mt-1.5">
-          O fornecedor deve emitir a proposta e a NF para esta empresa. Ela sai no PDF de Solicitar Cotação e é sugerida na emissão do pedido.
+          Escolha obrigatória: o fornecedor deve emitir a proposta e a NF para esta empresa.
+          Ela sai no PDF de Solicitar Cotação, e a cotação não conclui sem essa definição.
         </p>
       </div>
 
