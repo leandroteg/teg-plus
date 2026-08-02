@@ -1406,20 +1406,21 @@ export function useDecisaoGenerica() {
 
 /**
  * Destino da RC apos a validacao tecnica aprovada (necessidade validada):
- * categoria passa_por_cd + destino MG → triagem do CD (valida saldo de estoque);
- * senao → 'aprovada' (fila de cotacao). Se o CD nao atender com estoque, a RC
- * sai da triagem ja aprovada para cotacao (sem nova aprovacao).
+ * categoria passa_por_cd → triagem do CD (valida saldo de estoque), EXCETO
+ * quando o destino e a Sede/Escritorio Central — "tudo que nao for Sede e
+ * considerado MG" (Elton, 02/ago), entao obra sem base vinculada tambem vai
+ * pro CD. Senao → 'aprovada' (fila de cotacao). Se o CD nao atender com
+ * estoque, a RC sai da triagem ja aprovada para cotacao (sem nova aprovacao).
  */
 async function destinoAposValidacaoTecnica(requisicaoId: string): Promise<'aprovada' | 'em_triagem_cd'> {
   try {
     const { data: rc } = await supabase
       .from(TABLE_REQ)
-      .select('categoria, base_destino_id')
+      .select('categoria, base_destino_id, obra_id')
       .eq('id', requisicaoId)
       .maybeSingle()
     const categoria = (rc as any)?.categoria as string | null
-    const baseDestinoId = (rc as any)?.base_destino_id as string | null
-    if (!categoria || !baseDestinoId) return 'aprovada'
+    if (!categoria) return 'aprovada'
 
     const { data: cat } = await supabase
       .from('cmp_categorias')
@@ -1428,12 +1429,17 @@ async function destinoAposValidacaoTecnica(requisicaoId: string): Promise<'aprov
       .maybeSingle()
     if (!cat?.passa_por_cd) return 'aprovada'
 
-    const { data: base } = await supabase
-      .from('est_bases')
-      .select('uf')
-      .eq('id', baseDestinoId)
-      .maybeSingle()
-    return (base as any)?.uf === 'MG' ? 'em_triagem_cd' : 'aprovada'
+    const baseDestinoId = (rc as any)?.base_destino_id as string | null
+    if (baseDestinoId) {
+      const { data: base } = await supabase
+        .from('est_bases')
+        .select('tipo')
+        .eq('id', baseDestinoId)
+        .maybeSingle()
+      return (base as any)?.tipo === 'escritorio' ? 'aprovada' : 'em_triagem_cd'
+    }
+    // Sem base de destino: RC de obra vai pro CD; RC administrativa (sem obra) = Sede, pula.
+    return (rc as any)?.obra_id ? 'em_triagem_cd' : 'aprovada'
   } catch {
     return 'aprovada'
   }
