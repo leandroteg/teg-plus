@@ -2963,6 +2963,11 @@ function LoteTableRow({
   const isMultiItemLote = summary.totalItems > 1
   const resumoTitle = isMultiItemLote ? summary.headerLabel : summary.supplierLabel
   const resumoSubtitle = isMultiItemLote ? summary.workLabel : summary.progressLabel
+  // Empresa pagadora do lote (1 lote = 1 CNPJ)
+  const empresasLookup = useLookupEmpresas()
+  const empresaLote = (summary.lote as any).empresa_id
+    ? empresasLookup.find(e => e.id === (summary.lote as any).empresa_id)
+    : null
 
   return (
     <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
@@ -3002,6 +3007,13 @@ function LoteTableRow({
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+            <span className={`rounded-full px-2 py-0.5 font-semibold ${
+              empresaLote
+                ? isDark ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                : isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}>
+              🏢 {empresaLote ? (empresaLote.nome_fantasia || empresaLote.razao_social) : 'Sem empresa'}
+            </span>
             <span className={`rounded-full px-2 py-0.5 ${isDark ? 'bg-white/[0.06] text-slate-200' : 'bg-white text-slate-600 border border-slate-200'}`}>{summary.totalItems} títulos</span>
             <span className={`rounded-full px-2 py-0.5 ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>{summary.approvedItems} aprovados</span>
             {summary.excludedItems > 0 && (
@@ -3499,8 +3511,11 @@ export default function CPPipeline() {
 
   const handleCriarLote = async (ids: string[]) => {
     try {
-      await criarLoteMut.mutateAsync({ cpIds: ids, criadoPor: 'Financeiro' })
-      showToast('success', `Lote criado com ${ids.length} itens`)
+      const lotesCriados = await criarLoteMut.mutateAsync({ cpIds: ids, criadoPor: 'Financeiro' })
+      const qtd = Array.isArray(lotesCriados) ? lotesCriados.length : 1
+      showToast('success', qtd > 1
+        ? `Seleção dividida em ${qtd} lotes — um por empresa pagadora (${ids.length} títulos)`
+        : `Lote criado com ${ids.length} itens`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao criar lote') }
   }

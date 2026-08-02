@@ -19,6 +19,7 @@ import {
   useCPsParaPagamento,
 } from '../../hooks/useLotesPagamento'
 import type { StatusLote, DecisaoLoteItem, LoteItem } from '../../types/financeiro'
+import { useLookupEmpresas } from '../../hooks/useLookups'
 
 type MsgEsclarecimento = {
   id: string
@@ -88,6 +89,7 @@ export default function LoteDetalhe() {
   // CPs confirmadas (fora de lote) disponiveis pra incluir neste lote
   const { data: cpsConfirmadas = [] } = useCPsParaPagamento(['confirmado'])
   const [showAdicionar, setShowAdicionar] = useState(false)
+  const empresas = useLookupEmpresas()
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [historico, setHistorico] = useState<MsgEsclarecimento[]>([])
@@ -177,6 +179,10 @@ export default function LoteDetalhe() {
 
   const isMontando = lote.status === 'montando'
   const isEmAprovacao = lote.status === 'enviado_aprovacao'
+  // 1 lote = 1 empresa pagadora: so oferece CPs da MESMA empresa do lote
+  const loteEmpresaId = ((lote as any).empresa_id as string | null) ?? null
+  const empresaLote = loteEmpresaId ? empresas.find(e => e.id === loteEmpresaId) : null
+  const cpsDisponiveis = cpsConfirmadas.filter(cp => (((cp as any).empresa_id as string | null) ?? null) === loteEmpresaId)
   const isResolvido = ['aprovado', 'parcialmente_aprovado', 'cancelado', 'pago'].includes(lote.status)
   // Financeiro pode responder quando lote está em montagem (legado) ou
   // em aprovação com pergunta pendente do aprovador (novo fluxo).
@@ -278,6 +284,7 @@ export default function LoteDetalhe() {
             </div>
             <div className="text-xs text-slate-400 mt-1">
               Criado por {lote.criado_por} · {fmtDataFull(lote.created_at)}
+              <span className="font-semibold"> · 🏢 {empresaLote ? (empresaLote.nome_fantasia || empresaLote.razao_social) : 'Empresa pagadora não definida'}</span>
               {lote.observacao && <span> · 💬 {lote.observacao}</span>}
             </div>
           </div>
@@ -430,19 +437,22 @@ export default function LoteDetalhe() {
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
               <Plus size={13} /> Adicionar títulos confirmados
               <span className={`normal-case font-bold px-1.5 py-0.5 rounded-full text-[10px] ${
-                cpsConfirmadas.length > 0
+                cpsDisponiveis.length > 0
                   ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
                   : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
-              }`}>{cpsConfirmadas.length} disponíveis</span>
+              }`}>{cpsDisponiveis.length} da mesma empresa</span>
             </span>
             {showAdicionar ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
           </button>
           {showAdicionar && (
-            cpsConfirmadas.length === 0 ? (
-              <p className="px-4 pb-4 text-xs text-slate-400">Nenhuma CP confirmada fora de lote no momento.</p>
+            cpsDisponiveis.length === 0 ? (
+              <p className="px-4 pb-4 text-xs text-slate-400">
+                Nenhuma CP confirmada desta empresa fora de lote no momento.
+                Títulos de outras empresas do grupo entram em lote próprio (1 lote = 1 CNPJ pagador).
+              </p>
             ) : (
               <div className="max-h-72 overflow-y-auto border-t border-slate-100 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
-                {cpsConfirmadas.map(cp => (
+                {cpsDisponiveis.map(cp => (
                   <div key={cp.id} className="flex items-center gap-3 px-4 py-2.5">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{cp.fornecedor_nome}</p>
