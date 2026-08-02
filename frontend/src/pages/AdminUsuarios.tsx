@@ -5,7 +5,7 @@ import {
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
   Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2,
-  LayoutGrid, LayoutList, SlidersHorizontal, MapPin,
+  LayoutGrid, LayoutList, SlidersHorizontal, MapPin, Copy,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../contexts/ThemeContext'
@@ -754,6 +754,48 @@ function UserDetailPanel({
   const [senhaError,   setSenhaError]   = useState('')
   const [success, setSuccess] = useState(false)
 
+  // ── Copiar acessos de outro usuário (estilo Totvs RM, mas via formulário:
+  //    preenche a edição com os acessos da origem; nada grava até o Salvar) ──
+  const [showCopiar, setShowCopiar]   = useState(false)
+  const [buscaCopiar, setBuscaCopiar] = useState('')
+  const [listaCopiar, setListaCopiar] = useState<{ id: string; nome: string; cargo: string | null }[]>([])
+  const [copiadoDe, setCopiadoDe]     = useState<string | null>(null)
+
+  const abrirCopiar = async () => {
+    if (!showCopiar && listaCopiar.length === 0) {
+      const { data } = await supabase
+        .from('sys_perfis')
+        .select('id, nome, cargo')
+        .eq('ativo', true)
+        .neq('id', user.id)
+        .order('nome')
+      setListaCopiar((data ?? []) as { id: string; nome: string; cargo: string | null }[])
+    }
+    setShowCopiar(v => !v)
+  }
+
+  const aplicarCopia = async (origem: { id: string; nome: string }) => {
+    const { data: o } = await supabase
+      .from('sys_perfis')
+      .select('role, papel_global, permissoes_especiais, modulos, alcada_nivel, pode_receber, almoxarife, comprador, sala_tecnica, aprova_cancelamento_fin, pode_cancelar_pedido')
+      .eq('id', origem.id)
+      .maybeSingle()
+    if (!o) return
+    setPapelGlobal(resolvePapelFromPerfil(o as unknown as Perfil))
+    setAlcada(((o as any).alcada_nivel as number) ?? 0)
+    setModulos(((o as any).modulos as Record<string, boolean>) ?? {})
+    setPermEspeciais(((o as any).permissoes_especiais as Record<string, any>) ?? {})
+    setModuloPapeis(extractModuloPapeis(((o as any).permissoes_especiais as Record<string, any>) ?? {}))
+    setPodeReceber((o as any).pode_receber ?? true)
+    setAlmoxarife((o as any).almoxarife ?? false)
+    setComprador((o as any).comprador ?? false)
+    setSalaTecnica((o as any).sala_tecnica ?? false)
+    setAprovaCancelamentoFin((o as any).aprova_cancelamento_fin ?? false)
+    setPodeCancelarPedidoFlag((o as any).pode_cancelar_pedido ?? false)
+    setCopiadoDe(origem.nome)
+    setShowCopiar(false)
+  }
+
   useEffect(() => {
     if (forceEdit) setEditing(true)
   }, [forceEdit])
@@ -930,6 +972,62 @@ function UserDetailPanel({
         </div>
       </>) : (
         <div className={`px-4 pb-4 space-y-4 border-t pt-4 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          {/* Copiar acessos de outro usuário */}
+          <div>
+            <button
+              type="button"
+              onClick={abrirCopiar}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                isDark ? 'bg-white/[0.05] text-slate-300 border-white/10 hover:border-white/20' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <Copy size={12} /> Copiar acessos de outro usuário
+              {showCopiar ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {copiadoDe && (
+              <p className="mt-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                Acessos copiados de <b>{copiadoDe}</b> — revise abaixo e clique em Salvar para aplicar.
+              </p>
+            )}
+            {showCopiar && (
+              <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+                <input
+                  value={buscaCopiar}
+                  onChange={e => setBuscaCopiar(e.target.value)}
+                  placeholder="Buscar usuário de origem..."
+                  className={`w-full text-xs rounded-lg px-2.5 py-1.5 border focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                    isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 placeholder:text-slate-300'
+                  }`}
+                />
+                <div className="max-h-44 overflow-y-auto space-y-1">
+                  {listaCopiar
+                    .filter(u => u.nome.toLowerCase().includes(buscaCopiar.toLowerCase()))
+                    .slice(0, 30)
+                    .map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => aplicarCopia(u)}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                          isDark ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        <span className="font-semibold">{u.nome}</span>
+                        {u.cargo && <span className={isDark ? 'text-slate-500' : 'text-slate-400'}> · {u.cargo}</span>}
+                      </button>
+                    ))}
+                  {listaCopiar.length === 0 && (
+                    <p className="text-[11px] text-slate-400 px-2 py-1">Carregando usuários...</p>
+                  )}
+                </div>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Copia: perfil de acesso, módulos, papéis por módulo, alçada e permissões especiais
+                  (Sala Técnica, Almoxarife, etc.). Não copia: base de lotação, senha e status ativo/inativo.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Role */}
           <div>
             <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
