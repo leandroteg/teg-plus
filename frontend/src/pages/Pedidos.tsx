@@ -1883,6 +1883,10 @@ function DetailModal({
   const [showFornecedorSelectorModal, setShowFornecedorSelectorModal] = useState(false)
   const [fornecedorVinculado, setFornecedorVinculado] = useState<Fornecedor | null>(null)
   const [emitError, setEmitError] = useState<string | null>(null)
+  const [showAvisoSemNF, setShowAvisoSemNF] = useState(false)
+  // Aviso (nao bloqueante) ao confirmar recebimento sem NF anexada na secao Documentos
+  const { data: anexosPedido } = useAnexosPedido(pedido.id)
+  const temNFAnexada = (anexosPedido ?? []).some(a => a.tipo === 'nota_fiscal')
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
@@ -2431,7 +2435,7 @@ function DetailModal({
               </>
             )}
             {podeReceber && (
-              <button onClick={() => onReceber(pedido)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
+              <button onClick={() => (temNFAnexada ? onReceber(pedido) : setShowAvisoSemNF(true))} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
                 <Package size={16} /> {parcial ? 'Receber Restante' : 'Confirmar Recebimento'}
               </button>
             )}
@@ -2525,6 +2529,42 @@ function DetailModal({
           onClose={() => setShowFornecedorSelectorModal(false)}
           onSelect={handleFornecedorVinculado}
         />
+
+        {showAvisoSemNF && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200 ${dark ? 'bg-[#0f172a] border border-white/10' : 'bg-white'}`}>
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle size={17} className="text-amber-600" />
+                  </div>
+                  <p className={`text-sm font-bold ${txt}`}>Nota Fiscal não anexada</p>
+                </div>
+                <p className={`text-xs leading-relaxed ${sub}`}>
+                  Nenhuma <b>Nota Fiscal</b> foi anexada na seção <b>Documentos</b> deste pedido.
+                  O arquivo da NF é importante para a conferência e a liberação do pagamento.
+                </p>
+                <p className={`text-xs leading-relaxed ${sub}`}>
+                  Você pode anexar agora ou seguir com o recebimento e anexar a NF depois.
+                </p>
+              </div>
+              <div className="px-5 pb-5 space-y-2">
+                <button
+                  onClick={() => setShowAvisoSemNF(false)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                >
+                  <Paperclip size={15} /> Anexar a NF agora
+                </button>
+                <button
+                  onClick={() => { setShowAvisoSemNF(false); onReceber(pedido) }}
+                  className={`w-full py-2.5 rounded-xl text-sm font-semibold border transition-colors ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                >
+                  Continuar sem anexar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
