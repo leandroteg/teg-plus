@@ -490,12 +490,27 @@ export function useRegistrarPagamentoBatch() {
   })
 }
 
+// ── Sincroniza qtd/valor do lote a partir dos itens reais ────────────────────
+
+async function syncLoteTotais(loteId: string) {
+  const { data: itens } = await supabase
+    .from('fin_lote_itens')
+    .select('valor')
+    .eq('lote_id', loteId)
+  const rows = itens ?? []
+  const valorTotal = rows.reduce((s, i) => s + Number((i as { valor?: number }).valor ?? 0), 0)
+  await supabase
+    .from('fin_lotes_pagamento')
+    .update({ valor_total: valorTotal, qtd_itens: rows.length, updated_at: new Date().toISOString() })
+    .eq('id', loteId)
+}
+
 // ── Mutation: Remover item do lote (quando montando) ─────────────────────────
 
 export function useRemoverItemLote() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ itemId, cpId }: { itemId: string; cpId: string }) => {
+    mutationFn: async ({ itemId, cpId, loteId }: { itemId: string; cpId: string; loteId?: string }) => {
       // 1. Delete item
       const { error } = await supabase
         .from('fin_lote_itens')
@@ -503,16 +518,76 @@ export function useRemoverItemLote() {
         .eq('id', itemId)
       if (error) throw error
 
-      // 2. Clear lote_id from CP
+      // 2. CP volta pra fila de Confirmados (antes ficava orfa com status em_lote)
       await supabase
         .from('fin_contas_pagar')
-        .update({ lote_id: null })
+        .update({ lote_id: null, status: 'confirmado' })
         .eq('id', cpId)
+
+      // 3. Recalcula totais do lote
+      if (loteId) await syncLoteTotais(loteId)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
+  })
+}
+
+// ── Mutation: Adicionar CPs confirmadas a um lote em montagem ────────────────
+
+export function useAdicionarItensLote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ loteId, cps }: { loteId: string; cps: { id: string; valor_original: number }[] }) => {
+      if (cps.length === 0) return
+      const { error } = await supabase
+        .from('fin_lote_itens')
+        .insert(cps.map(cp => ({ lote_id: loteId, cp_id: cp.id, valor: cp.valor_original ?? 0 })))
+      if (error) throw error
+
+      await supabase
+        .from('fin_contas_pagar')
+        .update({ lote_id: loteId, status: 'em_lote' })
+        .in('id', cps.map(cp => cp.id))
+
+      await syncLoteTotais(loteId)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
+  })
+}
+
+// ── Mutation: Devolver lote em aprovacao para edicao (financeiro) ────────────
+// Nunca editar sob os olhos do aprovador: o lote volta pra 'montando' e a
+// pendencia no AprovAi expira. Depois de editar, "Enviar para Aprovacao" recria.
+
+export function useDevolverLoteEdicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ loteId }: { loteId: string }) => {
+      const { error } = await supabase
+        .from('fin_lotes_pagamento')
+        .update({ status: 'montando', updated_at: new Date().toISOString() })
+        .eq('id', loteId)
+        .eq('status', 'enviado_aprovacao')
+      if (error) throw error
+
+      await supabase
+        .from('apr_aprovacoes')
+        .update({ status: 'expirada', data_decisao: new Date().toISOString() })
+        .eq('entidade_id', loteId)
+        .in('status', ['pendente', 'esclarecimento'])
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
     },
   })
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Package, Send, CheckCircle2, XCircle,
-  Clock, User, MessageCircle, Trash2,
+  Clock, User, MessageCircle, Trash2, Plus, Undo2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,6 +14,9 @@ import {
   useDecidirItemLote,
   useDecidirLoteCompleto,
   useRemoverItemLote,
+  useAdicionarItensLote,
+  useDevolverLoteEdicao,
+  useCPsParaPagamento,
 } from '../../hooks/useLotesPagamento'
 import type { StatusLote, DecisaoLoteItem, LoteItem } from '../../types/financeiro'
 
@@ -80,6 +83,11 @@ export default function LoteDetalhe() {
   const decidirItem = useDecidirItemLote()
   const decidirCompleto = useDecidirLoteCompleto()
   const removerItem = useRemoverItemLote()
+  const adicionarItens = useAdicionarItensLote()
+  const devolverEdicao = useDevolverLoteEdicao()
+  // CPs confirmadas (fora de lote) disponiveis pra incluir neste lote
+  const { data: cpsConfirmadas = [] } = useCPsParaPagamento(['confirmado'])
+  const [showAdicionar, setShowAdicionar] = useState(false)
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [historico, setHistorico] = useState<MsgEsclarecimento[]>([])
@@ -217,10 +225,28 @@ export default function LoteDetalhe() {
 
   const handleRemover = async (item: LoteItem) => {
     try {
-      await removerItem.mutateAsync({ itemId: item.id, cpId: item.cp_id })
-      showToast('success', 'Item removido do lote')
+      await removerItem.mutateAsync({ itemId: item.id, cpId: item.cp_id, loteId: lote.id })
+      showToast('success', 'Item removido do lote — a CP voltou para Confirmados')
     } catch {
       showToast('error', 'Erro ao remover item')
+    }
+  }
+
+  const handleAdicionar = async (cp: { id: string; valor_original: number }) => {
+    try {
+      await adicionarItens.mutateAsync({ loteId: lote.id, cps: [cp] })
+      showToast('success', 'Título adicionado ao lote')
+    } catch {
+      showToast('error', 'Erro ao adicionar título')
+    }
+  }
+
+  const handleDevolverEdicao = async () => {
+    try {
+      await devolverEdicao.mutateAsync({ loteId: lote.id })
+      showToast('success', 'Lote devolvido para edição — a pendência no AprovAí foi retirada')
+    } catch {
+      showToast('error', 'Erro ao devolver o lote para edição')
     }
   }
 
@@ -369,6 +395,77 @@ export default function LoteDetalhe() {
             <Send size={14} />
             {enviarAprovacao.isPending ? 'Enviando...' : 'Enviar para Aprovação'}
           </button>
+        </div>
+      )}
+
+      {/* Em aprovação: o financeiro pode puxar o lote de volta pra editar itens.
+          A pendência sai do AprovAí e é recriada no reenvio — nunca se edita um
+          lote enquanto o aprovador olha pra ele. */}
+      {isEmAprovacao && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDevolverEdicao}
+            disabled={devolverEdicao.isPending}
+            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border-2 transition-colors disabled:opacity-50 ${
+              isDark ? 'border-amber-500/40 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'
+            }`}
+          >
+            <Undo2 size={14} />
+            {devolverEdicao.isPending ? 'Devolvendo...' : 'Devolver para Edição'}
+          </button>
+          <span className="text-[11px] text-slate-400">
+            Retira a pendência do AprovAí para editar, remover ou incluir títulos; reenvie ao terminar.
+          </span>
+        </div>
+      )}
+
+      {/* Adicionar títulos confirmados ao lote (somente montagem) */}
+      {isMontando && (
+        <div className={`rounded-xl border overflow-hidden ${cardBg}`}>
+          <button
+            type="button"
+            onClick={() => setShowAdicionar(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors"
+          >
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <Plus size={13} /> Adicionar títulos confirmados
+              <span className={`normal-case font-bold px-1.5 py-0.5 rounded-full text-[10px] ${
+                cpsConfirmadas.length > 0
+                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                  : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
+              }`}>{cpsConfirmadas.length} disponíveis</span>
+            </span>
+            {showAdicionar ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+          </button>
+          {showAdicionar && (
+            cpsConfirmadas.length === 0 ? (
+              <p className="px-4 pb-4 text-xs text-slate-400">Nenhuma CP confirmada fora de lote no momento.</p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto border-t border-slate-100 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                {cpsConfirmadas.map(cp => (
+                  <div key={cp.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{cp.fornecedor_nome}</p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {cp.numero_documento && <span>{cp.numero_documento} · </span>}
+                        {cp.data_vencimento && <span>Venc. {fmtData(cp.data_vencimento)}</span>}
+                        {(cp as any).requisicao?.obra_nome && <span> · {(cp as any).requisicao.obra_nome}</span>}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold shrink-0">{fmtFull(cp.valor_original)}</span>
+                    <button
+                      onClick={() => handleAdicionar({ id: cp.id, valor_original: cp.valor_original })}
+                      disabled={adicionarItens.isPending}
+                      className="p-1.5 rounded-lg text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                      title="Adicionar ao lote"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </div>
       )}
 
