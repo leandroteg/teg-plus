@@ -222,7 +222,7 @@ function secaoColaborador(nome: string, resumos: ResumoRow[], dias: DiaRow[], in
       ${diasJustif > 0 ? `<span><b style="color:#0369a1">${diasJustif}</b> dia${diasJustif > 1 ? 's' : ''} com justificativa no lugar da batida</span>` : ''}
     </div>
     ${nManual > 0 ? `<div class="aviso"><b>${nManual} marcaç${nManual > 1 ? 'ões' : 'ão'} em ${diasComManual} dia${diasComManual > 1 ? 's' : ''} ${nManual > 1 ? 'foram lançadas' : 'foi lançada'} manualmente no sistema de ponto</b> — destacadas em âmbar com <sup>M</sup>. Não passaram pelo relógio, por isso não têm NSR. As marcadas com <sup>P</sup> são o intervalo pré-assinalado, gerado a partir do horário cadastrado.</div>` : ''}
-    <div class="assin"><div>Assinatura do colaborador</div><div>Assinatura do responsável</div></div>
+    <div class="assin"><div class="box"><b>${esc(cab.colaborador_nome ?? nome)}</b>Assinatura do colaborador</div></div>
   </section>`
 }
 
@@ -232,6 +232,7 @@ const CSS = `
   .page{max-width:820px;margin:0 auto;background:#fff}
   header{background:#0f172a;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
   header img{height:34px}
+  header .marca{font-size:19px;font-weight:800;letter-spacing:.6px;color:#fff}
   header .r{text-align:right}
   header h1{font-size:20px;font-weight:700;letter-spacing:.3px}
   header .sub{font-size:12px;opacity:.85;margin-top:2px}
@@ -270,8 +271,9 @@ const CSS = `
   .leg{margin-top:8px;font-size:10.5px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap}
   .leg b{color:#334155}
   .aviso{margin-top:8px;font-size:10.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px}
-  .assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px}
-  .assin div{border-top:1px solid #94a3b8;padding-top:5px;font-size:11px;color:#64748b;text-align:center}
+  .assin{display:flex;justify-content:flex-end;margin-top:34px}
+  .assin .box{width:48%;border-top:1px solid #94a3b8;padding-top:5px;font-size:11px;color:#64748b;text-align:center}
+  .assin .box b{display:block;font-size:11.5px;color:#334155;font-weight:700}
   .capa table{margin-top:10px}
   .capa td{text-align:left}
   .capa td.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -286,8 +288,28 @@ const CSS = `
     .assin{break-inside:avoid}
   }`
 
-function shell(empresa: EmpresaData, titulo: string, sub: string, corpo: string) {
-  const logoUrl = `${location.origin}/logo-teg-transicao-branca.png`
+// A logo vai EMBUTIDA (data URI), não como <img src="https://…/logo.png">.
+// O relatório é renderizado dentro de um iframe srcDoc e depois impresso/convertido
+// em PDF: nesses contextos o documento não tem a mesma origem da página, e um
+// caminho absoluto pode simplesmente não ser buscado. Pior: o onerror antigo
+// escondia a falha (display:none) — a logo sumia e ninguém sabia por quê.
+// Falhando o fetch, entra o nome da empresa em texto; nunca um espaço em branco.
+async function logoDataUri(): Promise<string | null> {
+  try {
+    const r = await fetch(`${location.origin}/logo-teg-transicao-branca.png`)
+    if (!r.ok) return null
+    const blob = await r.blob()
+    return await new Promise<string | null>(resolve => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(typeof fr.result === 'string' ? fr.result : null)
+      fr.onerror = () => resolve(null)
+      fr.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function shell(empresa: EmpresaData, titulo: string, sub: string, corpo: string) {
+  const logo = await logoDataUri()
   const hoje = new Date().toLocaleDateString('pt-BR')
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -296,7 +318,9 @@ function shell(empresa: EmpresaData, titulo: string, sub: string, corpo: string)
 <body>
 <div class="page">
   <header>
-    <div><img src="${logoUrl}" onerror="this.style.display='none'"/>
+    <div>${logo
+        ? `<img src="${logo}" alt="${esc(empresa.fantasia)}"/>`
+        : `<div class="marca">${esc(empresa.fantasia)}</div>`}
       <div class="sub" style="margin-top:8px">${esc(empresa.razao)} · CNPJ ${esc(empresa.cnpj)}</div></div>
     <div class="r"><h1>${esc(titulo)}</h1><div class="sub">${esc(sub)}</div></div>
   </header>
@@ -311,7 +335,7 @@ export async function buildPontoReportHtml(r: PontoReportRow): Promise<string> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
   const { ini, resumo, dias } = await carregar(r.ano_mes, [r.colaborador_id])
   const corpo = secaoColaborador(r.colaborador_nome, resumo, dias, ini, false)
-  return shell(empresa, 'Espelho de Ponto', `${r.colaborador_nome} · ${labelMes(ini)}`, corpo)
+  return await shell(empresa, 'Espelho de Ponto', `${r.colaborador_nome} · ${labelMes(ini)}`, corpo)
 }
 
 // ── consolidado: capa + 1 colaborador por página ─────────────────────────────
@@ -378,7 +402,7 @@ export async function buildPontoConsolidadoHtml(spec: PontoConsolidadoSpec): Pro
     .join('')
 
   const sub = `${labelMes(ini)}${spec.recorte ? ` · ${spec.recorte}` : ''} · ${spec.colaboradores.length} colaborador${spec.colaboradores.length > 1 ? 'es' : ''}`
-  return shell(empresa, 'Espelho de Ponto — Consolidado', sub, capa + secoes)
+  return await shell(empresa, 'Espelho de Ponto — Consolidado', sub, capa + secoes)
 }
 
 export function nomeArquivoPontoReport(r: PontoReportRow) {
