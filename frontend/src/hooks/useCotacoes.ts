@@ -444,6 +444,7 @@ export function useDevolverRequisicaoCotacao() {
           devolucao_msg: motivoTrim,
           devolucao_por: cotadorNome,
           devolucao_em: new Date().toISOString(),
+          devolucao_etapa: 'cotacao',
         })
         .eq('id', requisicaoId)
       if (reqError) throw reqError

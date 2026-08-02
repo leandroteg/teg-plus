@@ -88,6 +88,13 @@ const NIVEL_LABEL: Record<number, string> = {
   1: 'Coordenador', 2: 'Gerente', 3: 'Diretor', 4: 'CEO',
 }
 
+// Quem devolveu a RC ao solicitante — rótulo pela etapa carimbada (devolucao_etapa)
+function labelDevolucao(etapa?: string | null): string {
+  if (etapa === 'validacao_tecnica') return 'Devolvida pela Sala Técnica para Correção'
+  if (etapa === 'cotacao') return 'Devolvida pelo Comprador'
+  return 'Devolvida para Correção'
+}
+
 function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')          return 'Aguard. Valid. Técnica'
   if (status === 'aguardando_catalogo') return 'Falta vincular catálogo'
@@ -96,7 +103,7 @@ function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
   if (status === 'aprovada')          return 'RC Validada'
   if (status === 'atendida_cd')       return 'Atendida pelo CD'
-  if (status === 'devolvida_solicitante') return 'Devolvida pelo Comprador'
+  if (status === 'devolvida_solicitante') return 'Devolvida para Correção'
   return undefined
 }
 
@@ -247,7 +254,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
           <Undo2 size={13} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-rose-400' : 'text-rose-600'}`} />
           <div className="min-w-0">
             <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isDark ? 'text-rose-400' : 'text-rose-700'}`}>
-              Devolvida pelo Comprador{r.devolucao_por ? ` (${r.devolucao_por.split(' ')[0]})` : ''} — ajuste e reenvie
+              {labelDevolucao((r as any).devolucao_etapa)}{r.devolucao_por ? ` (${r.devolucao_por.split(' ')[0]})` : ''} — ajuste e reenvie
             </p>
             <p className={`text-xs line-clamp-2 ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>{r.devolucao_msg}</p>
           </div>
@@ -486,7 +493,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
               <div className="flex items-center gap-1.5">
                 <Undo2 size={13} className={isDark ? 'text-rose-400' : 'text-rose-600'} />
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-rose-400' : 'text-rose-700'}`}>
-                  Devolvida pelo Comprador{r.devolucao_por ? ` — ${r.devolucao_por}` : ''}
+                  {labelDevolucao((r as any).devolucao_etapa)}{r.devolucao_por ? ` — ${r.devolucao_por}` : ''}
                 </p>
               </div>
               <p className={`text-xs leading-relaxed ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>{r.devolucao_msg}</p>
@@ -765,6 +772,25 @@ export default function ListaRequisicoes() {
     )
   }, [requisicoes, perfil])
 
+  // RCs minhas rejeitadas recentemente (7 dias) — aviso de ciencia
+  const minhasRejeitadas = useMemo(() => {
+    if (!perfil) return []
+    const corte = Date.now() - 7 * 24 * 3600_000
+    return requisicoes.filter(r =>
+      r.status === 'rejeitada' &&
+      (r.solicitante_id ? r.solicitante_id === perfil.id : r.solicitante_nome === perfil.nome) &&
+      new Date((r as any).updated_at ?? r.created_at ?? 0).getTime() >= corte
+    )
+  }, [requisicoes, perfil])
+
+  // Origem das devolucoes p/ o texto do banner (uniforme → especifica; mista → neutra)
+  const origemDevolucao = useMemo(() => {
+    if (minhasDevolvidas.length === 0) return 'para correção'
+    if (minhasDevolvidas.every(r => (r as any).devolucao_etapa === 'validacao_tecnica')) return 'pela Sala Técnica para correção'
+    if (minhasDevolvidas.every(r => (r as any).devolucao_etapa === 'cotacao')) return 'pelo comprador'
+    return 'para correção'
+  }, [minhasDevolvidas])
+
   // ── Filtros Projeto / Obra ────────────────────────────────────────────────
   // obra_id → { chave do projeto, nome }. Obras sem projeto (CD/Sede) caem em SEM_PROJETO.
   const projetoDaObra = useMemo(() => {
@@ -961,8 +987,8 @@ export default function ListaRequisicoes() {
           <div className="min-w-0 flex-1">
             <p className={`text-sm font-bold ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>
               {minhasDevolvidas.length === 1
-                ? '1 requisição sua foi devolvida pelo comprador'
-                : `${minhasDevolvidas.length} requisições suas foram devolvidas pelo comprador`}
+                ? `1 requisição sua foi devolvida ${origemDevolucao}`
+                : `${minhasDevolvidas.length} requisições suas foram devolvidas ${origemDevolucao}`}
             </p>
             <p className={`text-[11px] mt-0.5 ${isDark ? 'text-rose-400/80' : 'text-rose-600'}`}>
               Toque para ver os ajustes solicitados e reenviar.
@@ -970,6 +996,38 @@ export default function ListaRequisicoes() {
           </div>
           <span className="flex-shrink-0 rounded-full bg-rose-500 text-white text-[11px] font-bold px-2.5 py-1">
             {minhasDevolvidas.length}
+          </span>
+        </button>
+      )}
+
+      {/* Notificação: minhas RCs rejeitadas (ciência — últimos 7 dias) */}
+      {minhasRejeitadas.length > 0 && (
+        <button
+          onClick={() => {
+            const first = minhasRejeitadas[0]
+            if (first) setDetail(first)
+          }}
+          className={`w-full flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all hover:shadow-md ${
+            isDark
+              ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15'
+              : 'bg-red-50 border-red-200 hover:bg-red-100'
+          }`}
+        >
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-500/20">
+            <XCircle size={16} className="text-red-600" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${isDark ? 'text-red-300' : 'text-red-700'}`}>
+              {minhasRejeitadas.length === 1
+                ? '1 requisição sua foi rejeitada na validação técnica'
+                : `${minhasRejeitadas.length} requisições suas foram rejeitadas na validação técnica`}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
+              Toque para ver o motivo. Se a necessidade persistir, crie uma nova requisição.
+            </p>
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-red-500 text-white text-[11px] font-bold px-2.5 py-1">
+            {minhasRejeitadas.length}
           </span>
         </button>
       )}

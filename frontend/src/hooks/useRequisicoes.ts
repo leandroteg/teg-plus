@@ -63,13 +63,14 @@ export function useRequisicoes(status?: string, search?: string) {
       let query = supabase
         .from(TABLE)
         .select(`
-          id, numero, solicitante_nome, obra_nome, obra_id,
+          id, numero, solicitante_id, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, justificativa_urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
+          devolucao_msg, devolucao_por, devolucao_em, devolucao_etapa,
           compra_recorrente,
-          created_at,
+          created_at, updated_at,
           comprador:cmp_compradores(nome, email)
         `)
         .order('created_at', { ascending: false })
@@ -816,6 +817,7 @@ export function useDevolverParaEdicao() {
           devolucao_msg: motivo.trim(),
           devolucao_por: aprovadorNome,
           devolucao_em: new Date().toISOString(),
+          devolucao_etapa: 'validacao_tecnica',
         })
         .eq('id', requisicaoId)
       if (reqError) throw reqError

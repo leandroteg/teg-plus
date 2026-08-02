@@ -147,6 +147,8 @@ export interface Requisicao {
   devolucao_msg?: string
   devolucao_por?: string
   devolucao_em?: string
+  /** Etapa em que a RC foi devolvida: 'validacao_tecnica' (Sala Técnica) | 'cotacao' (comprador). Legado = null. */
+  devolucao_etapa?: 'validacao_tecnica' | 'cotacao' | string
   esclarecimento_historico?: {
     tipo: 'pedido' | 'resposta'
     autor: string
