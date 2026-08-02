@@ -58,6 +58,8 @@ interface UserCtx {
   email?: string
   isAdmin: boolean
   isDiretor: boolean
+  /** Membro da Sala Tecnica — valida a necessidade das RCs (validacao tecnica). */
+  salaTecnica?: boolean
 }
 
 interface CatPolitica {
@@ -88,6 +90,9 @@ function podeVerAprovacao(
   // Compras (validacao tecnica de RC + aprovacao de cotacao): SOMENTE aprovadores
   // autorizados (independe de ser admin) — evita que admins fora da lista aprovem.
   if (tipo === 'requisicao_compra' || tipo === 'cotacao') {
+    // Sala Tecnica: membros validam a necessidade das RCs (validacao tecnica)
+    // direto no AprovAi, sem precisar estar na allowlist de aprovadores.
+    if (tipo === 'requisicao_compra' && ctx.user.salaTecnica) return true
     if (!podeAprovarCompras(ctx.user.email)) return false
     if (ctx.user.isAdmin) return true // admins autorizados veem todas as compras
     const categoria = (req?.categoria as string | undefined) ?? ''
@@ -168,7 +173,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       )
 
       const ctx: FiltroContext = {
-        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor },
+        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor, salaTecnica: Boolean((perfil as any)?.sala_tecnica) },
         politicas: politicasMap,
       }
 
@@ -894,7 +899,7 @@ export function useAprovacaoKPIs() {
         ]),
       )
       const ctx: FiltroContext = {
-        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor },
+        user: { id: perfil?.id, email: perfil?.email, isAdmin, isDiretor, salaTecnica: Boolean((perfil as any)?.sala_tecnica) },
         politicas: politicasMap,
       }
 
@@ -1399,6 +1404,41 @@ export function useDecisaoGenerica() {
 
 // ── Decisao centralizada (admin): atualiza RC + cria registro apr_aprovacoes ──
 
+/**
+ * Destino da RC apos a validacao tecnica aprovada (necessidade validada):
+ * categoria passa_por_cd + destino MG → triagem do CD (valida saldo de estoque);
+ * senao → 'aprovada' (fila de cotacao). Se o CD nao atender com estoque, a RC
+ * sai da triagem ja aprovada para cotacao (sem nova aprovacao).
+ */
+async function destinoAposValidacaoTecnica(requisicaoId: string): Promise<'aprovada' | 'em_triagem_cd'> {
+  try {
+    const { data: rc } = await supabase
+      .from(TABLE_REQ)
+      .select('categoria, base_destino_id')
+      .eq('id', requisicaoId)
+      .maybeSingle()
+    const categoria = (rc as any)?.categoria as string | null
+    const baseDestinoId = (rc as any)?.base_destino_id as string | null
+    if (!categoria || !baseDestinoId) return 'aprovada'
+
+    const { data: cat } = await supabase
+      .from('cmp_categorias')
+      .select('passa_por_cd')
+      .eq('codigo', categoria)
+      .maybeSingle()
+    if (!cat?.passa_por_cd) return 'aprovada'
+
+    const { data: base } = await supabase
+      .from('est_bases')
+      .select('uf')
+      .eq('id', baseDestinoId)
+      .maybeSingle()
+    return (base as any)?.uf === 'MG' ? 'em_triagem_cd' : 'aprovada'
+  } catch {
+    return 'aprovada'
+  }
+}
+
 export interface DecisaoPayload {
   requisicaoId: string
   decisao: 'aprovada' | 'rejeitada' | 'esclarecimento'
@@ -1436,7 +1476,9 @@ export function useDecisaoRequisicao() {
         if (isFinancialApproval) {
           updates.status = 'cotacao_aprovada'
         } else {
-          updates.status = 'aprovada'
+          // Necessidade validada: categoria que passa pelo CD (destino MG) vai
+          // pra triagem de estoque; se o CD nao atender, sai aprovada p/ cotacao.
+          updates.status = await destinoAposValidacaoTecnica(requisicaoId)
         }
       } else if (decisao === 'rejeitada') {
         // Rejeição financeira volta pra em_cotacao (não 'cotacao_rejeitada' — status

@@ -1037,7 +1037,7 @@ function UserDetailPanel({
               </span>
             </label>
 
-            {/* Sala Técnica — avalia a necessidade das RCs antes da triagem do CD */}
+            {/* Sala Técnica — valida a necessidade das RCs no AprovAi (validação técnica) */}
             <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
               <input
                 type="checkbox"
@@ -1046,7 +1046,7 @@ function UserDetailPanel({
                 className="accent-primary"
               />
               <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Sala Técnica — avalia a necessidade das RCs antes da triagem do CD Araxá
+                Sala Técnica — valida a necessidade das RCs no AprovAi (validação técnica, antes da triagem do CD)
               </span>
             </label>
           </div>

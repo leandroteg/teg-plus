@@ -252,17 +252,15 @@ export function useCriarRequisicao() {
       // ser vinculado ao catalogo. Aprovador nao deve ver descricao livre.
       const temOrfaos = payload.itens.some(i => !i.est_item_id)
 
-      // Sala Tecnica avalia a NECESSIDADE de toda RC de obra antes de qualquer
-      // outra etapa. So pula: RC sem obra ou de obra lotada no Escritorio (Sede).
-      // O destino pos-aprovacao (triagem CD ou aprovacao) e decidido pela RPC
-      // cmp_sala_tecnica_decidir com a mesma regra passa_por_cd + UF=MG.
-      const vaiSalaTecnica = Boolean(payload.obra_id) && baseDestinoTipo !== 'escritorio'
-
+      // Fluxo (ago/2026): validacao tecnica PRIMEIRO (Sala Tecnica valida a
+      // necessidade no AprovAi), triagem do CD depois. Toda RC nasce em
+      // em_aprovacao; ao aprovar, useDecisaoRequisicao roteia p/ em_triagem_cd
+      // (categoria passa_por_cd + destino MG) ou 'aprovada' (fila de cotacao).
       const statusInicial: string = payload.rascunho
         ? 'rascunho'
         : temOrfaos
           ? 'aguardando_catalogo'
-          : vaiSalaTecnica ? 'em_analise_tecnica' : 'em_aprovacao'
+          : 'em_aprovacao'
 
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
@@ -357,11 +355,9 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e p/ RCs
-      // que vao pra Sala Tecnica - a aprovacao e criada depois, pela RPC da
-      // Sala Tecnica ou pelo triador do CD no liberar). Tambem skip quando RC
-      // esta aguardando vinculo de catalogo.
-      if (!payload.rascunho && !vaiSalaTecnica && !temOrfaos) try {
+      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts e quando a
+      // RC esta aguardando vinculo de catalogo - aprovacao criada no catch-up).
+      if (!payload.rascunho && !temOrfaos) try {
         // Busca aprovador da alçada correspondente
         const { data: alcadaData } = await supabase
           .from('apr_alcadas')
@@ -428,26 +424,15 @@ export function useEnviarParaAprovacao() {
         throw new Error(`Ainda ha ${itens.length} item(ns) sem vinculo de catalogo`)
       }
 
-      // Sala Tecnica avalia a necessidade de TODA RC de obra (exceto obra
-      // lotada no Escritorio/Sede). O destino pos-aprovacao (triagem CD ou
-      // aprovacao) e decidido pela RPC cmp_sala_tecnica_decidir.
-      let baseTipo: string | null = null
-      if (rc.base_destino_id) {
-        const { data: base } = await supabase
-          .from('est_bases').select('tipo').eq('id', rc.base_destino_id).maybeSingle()
-        baseTipo = (base as any)?.tipo ?? null
-      }
-      const vaiSalaTecnica = Boolean((rc as any).obra_id) && baseTipo !== 'escritorio'
-      const novoStatus = vaiSalaTecnica ? 'em_analise_tecnica' : 'em_aprovacao'
+      // Fluxo (ago/2026): validacao tecnica PRIMEIRO — RC vai p/ em_aprovacao;
+      // a triagem do CD (se aplicavel) acontece depois da necessidade validada.
+      const novoStatus = 'em_aprovacao'
 
       const { error: updErr } = await supabase
         .from('cmp_requisicoes')
         .update({ status: novoStatus })
         .eq('id', requisicaoId)
       if (updErr) throw updErr
-
-      // Sala Tecnica: a aprovacao e criada depois (RPC da Sala Tecnica ou triador do CD).
-      if (vaiSalaTecnica) return { status: novoStatus }
 
       // Cria apr_aprovacoes pendente
       const { data: alcadaData } = await supabase
