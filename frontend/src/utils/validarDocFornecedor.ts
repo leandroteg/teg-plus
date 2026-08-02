@@ -94,12 +94,15 @@ export async function validarDocFornecedorPedido(
 
   const base = { fornecedorNome, fornecedorCnpj, cnpjsDocumento: [] as string[] }
 
-  const ehPdf = file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')
-  if (!ehPdf) return { status: 'ilegivel', ...base }
+  const nomeArquivo = file.name.toLowerCase()
+  const ehPdf = file.type.includes('pdf') || nomeArquivo.endsWith('.pdf')
+  const ehXml = file.type.includes('xml') || nomeArquivo.endsWith('.xml')
+  if (!ehPdf && !ehXml) return { status: 'ilegivel', ...base }
 
   let texto = ''
   try {
-    texto = await extrairTextoPdf(file)
+    // XML da NF-e: o texto cru já contém <CNPJ> do emitente e a chave de acesso
+    texto = ehXml ? await file.text() : await extrairTextoPdf(file)
   } catch {
     return { status: 'ilegivel', ...base }
   }

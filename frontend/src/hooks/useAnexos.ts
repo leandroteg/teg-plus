@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { autoPreencherImpostosNF } from '../utils/lerImpostosNF'
 
 export interface PedidoAnexo {
   id: string
@@ -107,10 +108,18 @@ export function useUploadAnexo() {
         .single()
       if (dbError) throw new Error('Falha ao salvar registro: ' + dbError.message)
 
+      // 4. NF anexada: tenta ler os impostos do arquivo (XML exato / PDF melhor
+      //    esforço) e pré-preencher a seção Impostos. Best-effort, nunca bloqueia.
+      if (tipo === 'nota_fiscal') {
+        try { await autoPreencherImpostosNF(pedidoId, file) } catch { /* noop */ }
+      }
+
       return registro as PedidoAnexo
     },
     onSuccess: (_data, { pedidoId }) => {
       qc.invalidateQueries({ queryKey: ['pedido-anexos', pedidoId] })
+      qc.invalidateQueries({ queryKey: ['cmp-pedido-impostos', pedidoId] })
+      qc.invalidateQueries({ queryKey: ['cmp-pedido-impostos-itens', pedidoId] })
     },
   })
 }

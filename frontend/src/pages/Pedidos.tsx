@@ -1231,7 +1231,7 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
                 )}
               </div>
             </div>
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
+            <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
           </div>
           {file && (
             <div>
@@ -1548,7 +1548,7 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
           {loading ? <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : success ? <CheckCircle size={12} className="text-emerald-500" /> : <Upload size={12} />}
           {loading ? 'Conferindo...' : success ? 'Anexado!' : 'Anexar'}
         </button>
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
+        <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
       </div>
       {pendente && (
         <div className="space-y-1.5">

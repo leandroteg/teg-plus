@@ -79,28 +79,27 @@ function FormProduto({ initial, itensNota, temDetalheSalvo, onSave, saving }: {
 
   const somas = rows.reduce(
     (acc, r) => ({
-      base_calculo_icms: acc.base_calculo_icms + (r.base_calculo_icms ?? 0),
-      valor_icms:        acc.valor_icms        + (r.valor_icms ?? 0),
-      valor_icms_st:     acc.valor_icms_st     + (r.valor_icms_st ?? 0),
-      valor_ipi:         acc.valor_ipi         + (r.valor_ipi ?? 0),
-      valor_pis:         acc.valor_pis         + (r.valor_pis ?? 0),
-      valor_cofins:      acc.valor_cofins      + (r.valor_cofins ?? 0),
+      valor_icms:    acc.valor_icms    + (r.valor_icms ?? 0),
+      valor_icms_st: acc.valor_icms_st + (r.valor_icms_st ?? 0),
+      valor_ipi:     acc.valor_ipi     + (r.valor_ipi ?? 0),
+      valor_pis:     acc.valor_pis     + (r.valor_pis ?? 0),
+      valor_cofins:  acc.valor_cofins  + (r.valor_cofins ?? 0),
     }),
-    { base_calculo_icms: 0, valor_icms: 0, valor_icms_st: 0, valor_ipi: 0, valor_pis: 0, valor_cofins: 0 },
+    { valor_icms: 0, valor_icms_st: 0, valor_ipi: 0, valor_pis: 0, valor_cofins: 0 },
   )
   const round2 = (v: number) => Math.round(v * 100) / 100
 
   const handleSave = () => {
     if (porItem && rows.length > 0) {
-      // Totais do cabecalho = soma dos itens (ICMS/ST/IPI/PIS/COFINS)
+      // Totais do cabecalho = soma dos itens (ICMS/ST/IPI/PIS/COFINS).
+      // BC ICMS fica manual no cabecalho (nao se lanca base por item na tela).
       onSave({
         ...d,
-        base_calculo_icms: round2(somas.base_calculo_icms),
-        valor_icms:        round2(somas.valor_icms),
-        valor_icms_st:     round2(somas.valor_icms_st),
-        valor_ipi:         round2(somas.valor_ipi),
-        valor_pis:         round2(somas.valor_pis),
-        valor_cofins:      round2(somas.valor_cofins),
+        valor_icms:    round2(somas.valor_icms),
+        valor_icms_st: round2(somas.valor_icms_st),
+        valor_ipi:     round2(somas.valor_ipi),
+        valor_pis:     round2(somas.valor_pis),
+        valor_cofins:  round2(somas.valor_cofins),
       }, rows)
     } else {
       // Detalhe desligado: limpa linhas salvas anteriormente, se houver
@@ -169,7 +168,6 @@ function FormProduto({ initial, itensNota, temDetalheSalvo, onSave, saving }: {
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">Valor do item: {fmt(r.valor_item ?? 0)}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <NumField label="BC ICMS" value={r.base_calculo_icms ?? 0} onChange={v => setRow(i, { base_calculo_icms: v })} prefix="R$" />
                     <NumField label="ICMS" value={r.valor_icms ?? 0} onChange={v => setRow(i, { valor_icms: v })} prefix="R$" />
                     <NumField label="ICMS ST" value={r.valor_icms_st ?? 0} onChange={v => setRow(i, { valor_icms_st: v })} prefix="R$" />
                     <NumField label="IPI" value={r.valor_ipi ?? 0} onChange={v => setRow(i, { valor_ipi: v })} prefix="R$" />
