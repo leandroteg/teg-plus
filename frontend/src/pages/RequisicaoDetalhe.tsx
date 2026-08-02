@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink, RefreshCw,
   FileText, Ban, Send, Undo2, Pencil, History, Boxes,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, useEnviarParaAprovacao, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao, useHistoricoAlteracoesItens, useSaldosPorItens, useSaldosNoCD, useTriagemAtenderItem, useTriagemLiberarRC, useEnviarParaAprovacao, useSalaTecnicaDecidir, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
 import { useCriarSolicitacaoContratoFromRC } from '../hooks/useSolicitacoes'
 import { useDecisaoRequisicao, podeAprovarCompras } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao, useTrocarFornecedorEsclarecimento, useRenegociarValorEsclarecimento } from '../hooks/useCotacoes'
@@ -169,6 +169,32 @@ export default function RequisicaoDetalhe() {
   // Triador do CD (admin ou lotado em base que faz_triagem)
   const isTriador = isAdmin || Boolean(((bases as any[]).find(b => b.id === perfil?.base_id) as any)?.faz_triagem)
   const podeTriagem = isTriador && req?.status === 'em_triagem_cd'
+
+  // Sala Tecnica: avalia a necessidade da RC antes de ela chegar na triagem do CD
+  const salaTecnicaMutation = useSalaTecnicaDecidir()
+  const isSalaTecnica = isAdmin || Boolean((perfil as any)?.sala_tecnica)
+  const podeAnaliseTecnica = isSalaTecnica && req?.status === 'em_analise_tecnica'
+  const [motivoSalaTecnica, setMotivoSalaTecnica] = useState('')
+  const [salaTecnicaMsg, setSalaTecnicaMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const decidirSalaTecnica = async (decisao: 'aprovar' | 'devolver' | 'rejeitar') => {
+    if (!req) return
+    if (decisao !== 'aprovar' && !motivoSalaTecnica.trim()) {
+      setSalaTecnicaMsg({ type: 'error', msg: 'Informe o motivo para devolver ou rejeitar.' })
+      return
+    }
+    try {
+      await salaTecnicaMutation.mutateAsync({ rcId: req.id, decisao, motivo: motivoSalaTecnica.trim() || undefined })
+      setSalaTecnicaMsg({
+        type: 'success',
+        msg: decisao === 'aprovar' ? 'Necessidade aprovada — RC enviada para a triagem do CD.'
+          : decisao === 'devolver' ? 'RC devolvida ao solicitante.'
+          : 'RC rejeitada.',
+      })
+      setMotivoSalaTecnica('')
+    } catch (e: any) {
+      setSalaTecnicaMsg({ type: 'error', msg: e?.message ?? 'Erro ao registrar a decisão.' })
+    }
+  }
   const [qtdAtender, setQtdAtender] = useState<Record<string, string>>({})
   const [triagemMsg, setTriagemMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [observacao, setObservacao] = useState('')
@@ -725,6 +751,66 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
+      {/* Sala Tecnica — membros (ou admin), RC em em_analise_tecnica */}
+      {podeAnaliseTecnica && (
+        <div className="bg-fuchsia-50 border-2 border-fuchsia-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <UserCog size={16} className="text-fuchsia-600 flex-shrink-0" />
+            <span className="text-sm font-bold text-fuchsia-700">Sala Técnica — Avaliar necessidade</span>
+          </div>
+          <p className="text-xs text-fuchsia-700">
+            Avalie se a necessidade procede. Aprovando, a RC segue para a <b>triagem do CD Araxá</b>
+            {' '}(que verifica atendimento com estoque). Devolver exige motivo e retorna a RC ao solicitante.
+          </p>
+          <textarea
+            value={motivoSalaTecnica}
+            onChange={e => setMotivoSalaTecnica(e.target.value)}
+            rows={2}
+            placeholder="Observação (obrigatória para devolver ou rejeitar)..."
+            className="w-full text-sm border border-fuchsia-200 rounded-xl px-3 py-2 resize-none bg-white focus:outline-none focus:ring-2 focus:ring-fuchsia-400 placeholder:text-slate-300"
+          />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => decidirSalaTecnica('aprovar')}
+              disabled={salaTecnicaMutation.isPending}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
+            >
+              <CheckCircle size={15} /> Aprovar necessidade
+            </button>
+            <button
+              onClick={() => decidirSalaTecnica('devolver')}
+              disabled={salaTecnicaMutation.isPending}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white border-2 border-amber-300 text-amber-700 hover:bg-amber-50 text-sm font-bold disabled:opacity-50"
+            >
+              <Undo2 size={15} /> Devolver ao solicitante
+            </button>
+            <button
+              onClick={() => decidirSalaTecnica('rejeitar')}
+              disabled={salaTecnicaMutation.isPending}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white border-2 border-red-300 text-red-600 hover:bg-red-50 text-sm font-bold disabled:opacity-50"
+            >
+              <XCircle size={15} /> Rejeitar
+            </button>
+          </div>
+          {salaTecnicaMsg && (
+            <p className={`text-xs rounded-lg px-3 py-2 border ${salaTecnicaMsg.type === 'success' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-red-600 bg-red-50 border-red-200'}`}>
+              {salaTecnicaMsg.msg}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Aviso p/ quem nao e da Sala Tecnica */}
+      {!podeAnaliseTecnica && req?.status === 'em_analise_tecnica' && (
+        <div className="bg-fuchsia-50/60 border border-fuchsia-200 rounded-2xl p-3 flex items-start gap-2">
+          <UserCog size={14} className="text-fuchsia-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-fuchsia-700">
+            Esta RC está na <b>Sala Técnica</b> aguardando avaliação de necessidade
+            (2 engenheiros e 1 analista). Aprovada, segue para a triagem do CD Araxá.
+          </p>
+        </div>
+      )}
+
       {/* Triagem CD — apenas triador, RC em em_triagem_cd */}
       {podeTriagem && (
         <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 space-y-3">
@@ -993,7 +1079,7 @@ export default function RequisicaoDetalhe() {
                 onClick={async () => {
                   try {
                     const r = await enviarParaAprovacao.mutateAsync({ requisicaoId: req.id })
-                    setEnviarMsg({ type: 'success', msg: `RC enviada para ${(r as any).status === 'em_triagem_cd' ? 'triagem do CD' : 'aprovação'}` })
+                    setEnviarMsg({ type: 'success', msg: `RC enviada para ${(r as any).status === 'em_analise_tecnica' ? 'análise da Sala Técnica' : (r as any).status === 'em_triagem_cd' ? 'triagem do CD' : 'aprovação'}` })
                   } catch (e) {
                     setEnviarMsg({ type: 'error', msg: (e as Error).message })
                   }

@@ -160,6 +160,8 @@ export interface Perfil {
   almoxarife: boolean
   /** Pode registrar devolução de cautela na SEDE (Escritório Central). */
   comprador: boolean
+  /** Membro da Sala Técnica — avalia a necessidade das RCs antes da triagem do CD. */
+  sala_tecnica: boolean
   /** Pode aprovar/recusar solicitações de cancelamento de documentos financeiros (CP/CR). */
   aprova_cancelamento_fin: boolean
   /** Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e cascateia os CP. */

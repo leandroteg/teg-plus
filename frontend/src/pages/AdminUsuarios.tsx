@@ -737,6 +737,7 @@ function UserDetailPanel({
   const [podeReceber, setPodeReceber] = useState<boolean>(user.pode_receber ?? true)
   const [almoxarife, setAlmoxarife] = useState<boolean>(user.almoxarife ?? false)
   const [comprador, setComprador] = useState<boolean>(user.comprador ?? false)
+  const [salaTecnica, setSalaTecnica] = useState<boolean>((user as any).sala_tecnica ?? false)
   const [aprovaCancelamentoFin, setAprovaCancelamentoFin] = useState<boolean>(user.aprova_cancelamento_fin ?? false)
   const [podeCancelarPedidoFlag, setPodeCancelarPedidoFlag] = useState<boolean>(user.pode_cancelar_pedido ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
@@ -793,6 +794,7 @@ function UserDetailPanel({
       pode_receber: podeReceber,
       almoxarife,
       comprador,
+      sala_tecnica: salaTecnica,
       aprova_cancelamento_fin: aprovaCancelamentoFin,
       pode_cancelar_pedido: podeCancelarPedidoFlag,
       modulos,
@@ -808,6 +810,7 @@ function UserDetailPanel({
     setPodeReceber(user.pode_receber ?? true)
     setAlmoxarife(user.almoxarife ?? false)
     setComprador(user.comprador ?? false)
+    setSalaTecnica((user as any).sala_tecnica ?? false)
     setAprovaCancelamentoFin(user.aprova_cancelamento_fin ?? false)
     setPodeCancelarPedidoFlag(user.pode_cancelar_pedido ?? false)
     setAlcada(user.alcada_nivel)
@@ -1031,6 +1034,19 @@ function UserDetailPanel({
               />
               <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e os CP ligados
+              </span>
+            </label>
+
+            {/* Sala Técnica — avalia a necessidade das RCs antes da triagem do CD */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={salaTecnica}
+                onChange={e => setSalaTecnica(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Sala Técnica — avalia a necessidade das RCs antes da triagem do CD Araxá
               </span>
             </label>
           </div>

@@ -257,7 +257,7 @@ export function useCriarRequisicao() {
         ? 'rascunho'
         : temOrfaos
           ? 'aguardando_catalogo'
-          : passaPorCd ? 'em_triagem_cd' : 'em_aprovacao'
+          : passaPorCd ? 'em_analise_tecnica' : 'em_aprovacao'
 
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
@@ -441,7 +441,8 @@ export function useEnviarParaAprovacao() {
         baseUf = (base as any)?.uf ?? null
       }
       const irPraTriagem = passaPorCd && baseUf === 'MG'
-      const novoStatus = irPraTriagem ? 'em_triagem_cd' : 'em_aprovacao'
+      // Sala Tecnica avalia a necessidade antes de a RC chegar na triagem do CD
+      const novoStatus = irPraTriagem ? 'em_analise_tecnica' : 'em_aprovacao'
 
       const { error: updErr } = await supabase
         .from('cmp_requisicoes')
@@ -1123,6 +1124,31 @@ export function useTriagemLiberarRC() {
       qc.invalidateQueries({ queryKey: ["requisicoes"] })
       qc.invalidateQueries({ queryKey: ["rcs-em-triagem-cd"] })
       qc.invalidateQueries({ queryKey: ["aprovacoes-pendentes"] })
+    },
+  })
+}
+
+// ── Sala Tecnica: decisao de necessidade (antes da triagem do CD) ────────────
+export function useSalaTecnicaDecidir() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ rcId, decisao, motivo }: {
+      rcId: string
+      decisao: 'aprovar' | 'devolver' | 'rejeitar'
+      motivo?: string
+    }) => {
+      const { error } = await supabase.rpc('cmp_sala_tecnica_decidir', {
+        p_rc_id: rcId,
+        p_decisao: decisao,
+        p_motivo: motivo || null,
+      })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['rcs-em-triagem-cd'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
