@@ -2377,7 +2377,21 @@ function DetailModal({
             const todos = pedido.requisicao!.itens!
             const temP = todos.some(i => (i.natureza ?? 'produto') === 'produto')
             const temS = todos.some(i => i.natureza === 'servico')
-            return <PedidoImpostosSection pedidoId={pedido.id} temProduto={temP} temServico={temS} dark={dark} />
+            return (
+              <PedidoImpostosSection
+                pedidoId={pedido.id}
+                temProduto={temP}
+                temServico={temS}
+                dark={dark}
+                itens={todos.map(i => ({
+                  requisicaoItemId: (i as any).id,
+                  descricao: i.descricao,
+                  quantidade: i.quantidade,
+                  valorUnitario: i.valor_unitario_estimado ?? 0,
+                  natureza: i.natureza,
+                }))}
+              />
+            )
           })()}
 
           {/* Documentos */}

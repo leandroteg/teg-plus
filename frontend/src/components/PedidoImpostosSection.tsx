@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Coins, Save, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useImpostosPedido, useSalvarImpostosPedido, type ImpostosPedido, type TipoNota } from '../hooks/useImpostosPedido'
+import { Coins, Save, Loader2, ChevronDown, ChevronUp, ListChecks } from 'lucide-react'
+import {
+  useImpostosPedido, useSalvarImpostosPedido, useImpostoItensNota,
+  type ImpostosPedido, type ImpostoItemNota, type TipoNota,
+} from '../hooks/useImpostosPedido'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+export interface ItemPedidoImposto {
+  requisicaoItemId?: string
+  descricao: string
+  quantidade: number
+  valorUnitario: number
+  natureza?: 'produto' | 'servico'
+}
 
 interface Props {
   pedidoId: string
   temProduto: boolean
   temServico: boolean
   dark: boolean
+  itens?: ItemPedidoImposto[]
 }
 
 function NumField({ label, value, onChange, prefix, suffix }: {
@@ -49,13 +61,52 @@ function TextField({ label, value, onChange, placeholder }: {
   )
 }
 
-function FormProduto({ initial, onSave, saving }: {
+function FormProduto({ initial, itensNota, temDetalheSalvo, onSave, saving }: {
   initial: Partial<ImpostosPedido>
-  onSave: (d: Partial<ImpostosPedido>) => void
+  itensNota: ImpostoItemNota[]
+  temDetalheSalvo: boolean
+  onSave: (d: Partial<ImpostosPedido>, itens?: ImpostoItemNota[]) => void
   saving: boolean
 }) {
   const [d, setD] = useState<Partial<ImpostosPedido>>(initial)
   useEffect(() => setD(initial), [initial.id])
+
+  // Detalhe por item (opcional): linhas de imposto por item da nota
+  const [porItem, setPorItem] = useState(temDetalheSalvo)
+  const [rows, setRows] = useState<ImpostoItemNota[]>(itensNota)
+  const setRow = (i: number, patch: Partial<ImpostoItemNota>) =>
+    setRows(prev => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+
+  const somas = rows.reduce(
+    (acc, r) => ({
+      base_calculo_icms: acc.base_calculo_icms + (r.base_calculo_icms ?? 0),
+      valor_icms:        acc.valor_icms        + (r.valor_icms ?? 0),
+      valor_icms_st:     acc.valor_icms_st     + (r.valor_icms_st ?? 0),
+      valor_ipi:         acc.valor_ipi         + (r.valor_ipi ?? 0),
+      valor_pis:         acc.valor_pis         + (r.valor_pis ?? 0),
+      valor_cofins:      acc.valor_cofins      + (r.valor_cofins ?? 0),
+    }),
+    { base_calculo_icms: 0, valor_icms: 0, valor_icms_st: 0, valor_ipi: 0, valor_pis: 0, valor_cofins: 0 },
+  )
+  const round2 = (v: number) => Math.round(v * 100) / 100
+
+  const handleSave = () => {
+    if (porItem && rows.length > 0) {
+      // Totais do cabecalho = soma dos itens (ICMS/ST/IPI/PIS/COFINS)
+      onSave({
+        ...d,
+        base_calculo_icms: round2(somas.base_calculo_icms),
+        valor_icms:        round2(somas.valor_icms),
+        valor_icms_st:     round2(somas.valor_icms_st),
+        valor_ipi:         round2(somas.valor_ipi),
+        valor_pis:         round2(somas.valor_pis),
+        valor_cofins:      round2(somas.valor_cofins),
+      }, rows)
+    } else {
+      // Detalhe desligado: limpa linhas salvas anteriormente, se houver
+      onSave(d, temDetalheSalvo ? [] : undefined)
+    }
+  }
 
   const total =
     (d.valor_total_nota ?? 0) ||
@@ -102,9 +153,43 @@ function FormProduto({ initial, onSave, saving }: {
         </div>
       </div>
 
+      {/* ── Detalhe por item (opcional) ─────────────────────── */}
+      {itensNota.length > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-700 cursor-pointer">
+            <input type="checkbox" checked={porItem} onChange={e => setPorItem(e.target.checked)} className="rounded" />
+            <ListChecks size={12} /> Detalhar impostos por item
+          </label>
+          {porItem && (
+            <div className="mt-2 space-y-2">
+              {rows.map((r, i) => (
+                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-slate-600 truncate">{r.descricao}</p>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">Valor do item: {fmt(r.valor_item ?? 0)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <NumField label="BC ICMS" value={r.base_calculo_icms ?? 0} onChange={v => setRow(i, { base_calculo_icms: v })} prefix="R$" />
+                    <NumField label="ICMS" value={r.valor_icms ?? 0} onChange={v => setRow(i, { valor_icms: v })} prefix="R$" />
+                    <NumField label="ICMS ST" value={r.valor_icms_st ?? 0} onChange={v => setRow(i, { valor_icms_st: v })} prefix="R$" />
+                    <NumField label="IPI" value={r.valor_ipi ?? 0} onChange={v => setRow(i, { valor_ipi: v })} prefix="R$" />
+                    <NumField label="PIS" value={r.valor_pis ?? 0} onChange={v => setRow(i, { valor_pis: v })} prefix="R$" />
+                    <NumField label="COFINS" value={r.valor_cofins ?? 0} onChange={v => setRow(i, { valor_cofins: v })} prefix="R$" />
+                  </div>
+                </div>
+              ))}
+              <p className="text-[10px] text-slate-400">
+                Σ ICMS {fmt(somas.valor_icms)} · ICMS ST {fmt(somas.valor_icms_st)} · IPI {fmt(somas.valor_ipi)} · PIS {fmt(somas.valor_pis)} · COFINS {fmt(somas.valor_cofins)}
+                {' — '}ao salvar, os totais do cabeçalho recebem a soma dos itens.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
         <span className="text-xs text-slate-500">Total estimado da NF: <strong className="text-sky-700">{fmt(total)}</strong></span>
-        <button onClick={() => onSave(d)} disabled={saving}
+        <button onClick={handleSave} disabled={saving}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold disabled:opacity-50">
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar
         </button>
@@ -191,13 +276,27 @@ function FormServico({ initial, onSave, saving }: {
   )
 }
 
-export default function PedidoImpostosSection({ pedidoId, temProduto, temServico, dark }: Props) {
+export default function PedidoImpostosSection({ pedidoId, temProduto, temServico, dark, itens }: Props) {
   const { data: impostos = [] } = useImpostosPedido(pedidoId)
+  const { data: itensSalvos = [] } = useImpostoItensNota(pedidoId)
   const salvar = useSalvarImpostosPedido()
   const [open, setOpen] = useState(false)
 
   const find = (tipo: TipoNota): Partial<ImpostosPedido> =>
     impostos.find(i => i.tipo_nota === tipo) ?? { pedido_id: pedidoId, tipo_nota: tipo }
+
+  // Detalhe por item: linhas salvas do registro NF de Produto; senao esqueleto com os itens de produto do pedido
+  const headerProduto = find('nf_produto')
+  const salvosProduto = headerProduto.id ? itensSalvos.filter(i => i.imposto_id === headerProduto.id) : []
+  const itensNotaProduto: ImpostoItemNota[] = salvosProduto.length > 0
+    ? salvosProduto
+    : (itens ?? [])
+        .filter(i => (i.natureza ?? 'produto') === 'produto')
+        .map(i => ({
+          requisicao_item_id: i.requisicaoItemId,
+          descricao: i.descricao,
+          valor_item: Math.round(i.quantidade * i.valorUnitario * 100) / 100,
+        }))
 
   if (!temProduto && !temServico) return null
 
@@ -232,8 +331,11 @@ export default function PedidoImpostosSection({ pedidoId, temProduto, temServico
               </div>
               <div className="p-3 bg-white">
                 <FormProduto
-                  initial={find('nf_produto')}
-                  onSave={d => salvar.mutate({ ...d, pedido_id: pedidoId, tipo_nota: 'nf_produto' } as ImpostosPedido)}
+                  key={`${headerProduto.id ?? 'novo'}-${salvosProduto.length}`}
+                  initial={headerProduto}
+                  itensNota={itensNotaProduto}
+                  temDetalheSalvo={salvosProduto.length > 0}
+                  onSave={(d, itensNota) => salvar.mutate({ ...d, pedido_id: pedidoId, tipo_nota: 'nf_produto', itens: itensNota } as ImpostosPedido & { itens?: ImpostoItemNota[] })}
                   saving={salvar.isPending}
                 />
               </div>

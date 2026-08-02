@@ -18,7 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
-          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
+          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
           cotacao:cmp_cotacoes!cotacao_id(concluido_por_nome)
         `)
@@ -402,9 +402,23 @@ export function useEmitirPedido() {
           .limit(1)
           .maybeSingle()
 
-        const descricoesCobertas = ((cotFor?.itens_precos ?? []) as Array<{ descricao?: string; selecionado?: boolean }>)
+        const itensPrecos = (cotFor?.itens_precos ?? []) as Array<{ descricao?: string; valor_unitario?: number; selecionado?: boolean }>
+        const descricoesCobertas = itensPrecos
           .filter(ip => ip.selecionado && typeof ip.descricao === 'string' && ip.descricao.trim().length > 0)
           .map(ip => (ip.descricao as string).trim())
+
+        // Preco contratado: quando o solicitante nao estimou valor (0/null), o item da RC
+        // herda o valor unitario da cotacao vencedora — e dele que a tela do pedido, o
+        // recebimento (custo de estoque) e a base de imposto leem.
+        for (const ip of itensPrecos) {
+          if (!ip.selecionado || !ip.descricao?.trim() || !(Number(ip.valor_unitario) > 0)) continue
+          await supabase
+            .from('cmp_requisicao_itens')
+            .update({ valor_unitario_estimado: ip.valor_unitario })
+            .eq('requisicao_id', requisicaoId)
+            .eq('descricao', ip.descricao.trim())
+            .or('valor_unitario_estimado.is.null,valor_unitario_estimado.eq.0')
+        }
 
         if (descricoesCobertas.length > 0) {
           await supabase
