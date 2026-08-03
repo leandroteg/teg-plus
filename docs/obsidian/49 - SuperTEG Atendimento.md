@@ -1,5 +1,5 @@
 ---
-title: SuperTEG AI Agent
+title: SuperTEG Atendimento
 type: dev-guide
 status: ativo
 tags: [superteg, ai, agente, chat, nlp, parse, claude, n8n]
@@ -8,9 +8,11 @@ atualizado: 2026-08-03
 relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[10 - n8n Workflows]]", "[[26 - Upload Inteligente Cotacao]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[50 - Fluxos Inter-Módulos]]"]
 ---
 
-# 🤖 SuperTEG — Agente AI Conversacional
+# 🤖 SuperTEG Atendimento — Assistente do usuário
 
-> Assistente inteligente integrado ao TEG+ ERP. Responde perguntas, executa ações, e faz parse de documentos via chat.
+> Assistente do usuário dentro do TEG+ (widget no canto da tela). Responde dúvidas, navega entre telas, registra feedback e faz parse de documentos.
+
+> ⚠️ **Não confundir com o outro SuperTEG.** Este é o **Atendimento**: workflow n8n com Gemini, voltado ao usuário. O outro é o **worker operacional** (Claude Code na VPS, `superteg-server.mjs`) que executa tarefas pesadas — extração de PDF, OneDrive, análises. São dois sistemas diferentes com o mesmo nome de família.
 
 ---
 
@@ -184,7 +186,7 @@ O componente `NovaRequisicao.tsx` consome o prefill automaticamente:
 |----------|-------|
 | Webhook URL | `VITE_N8N_WEBHOOK_URL` + `/superteg/chat` |
 | Storage bucket | `cotacoes-docs` |
-| Workflow n8n | `KJUlWGP1ItQkUQOB` — "TEG+ \| SuperTEG AI Agent" (ativo) |
+| Workflow n8n | `KJUlWGP1ItQkUQOB` — "TEG+ \| SuperTEG Atendimento" (ativo) |
 | Modelo principal | Google Gemini Flash (via n8n) |
 | Modelo de parse | Gemini 2.5 Flash (via n8n) |
 | Max histórico | 20 mensagens por sessão |

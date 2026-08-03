@@ -6,7 +6,7 @@ status: ativo
 tags: [sgi, governanca, iso9001, pdca, melhoria-continua, padronizacao, objetivos, metas, okr, missoes, documentos]
 criado: 2026-06-26
 atualizado: 2026-07-22
-relacionado: ["[[00 - TEG+ INDEX]]", "[[49 - SuperTEG AI Agent]]", "[[31 - Módulo PMO-EGP]]", "[[33 - Módulo SSMA]]", "[[PILAR - RH]]"]
+relacionado: ["[[00 - TEG+ INDEX]]", "[[49 - SuperTEG Atendimento]]", "[[31 - Módulo PMO-EGP]]", "[[33 - Módulo SSMA]]", "[[PILAR - RH]]"]
 ---
 
 # Módulo Governança / SGI
@@ -223,7 +223,7 @@ Quando um `sgi_documentos` é publicado com `requer_ciencia = true`:
 
 ## Links Relacionados
 
-- [[49 - SuperTEG AI Agent]] — Publicação de documentos e missões
+- [[49 - SuperTEG Atendimento]] — Publicação de documentos e missões
 - [[31 - Módulo PMO-EGP]] — Fonte do check-in de Produção
 - [[33 - Módulo SSMA]] — Ações corretivas em `sgi_acoes`
 - [[PILAR - RH]] — Procedimentos RH padronizados aqui

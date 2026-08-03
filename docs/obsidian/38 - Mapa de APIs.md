@@ -5,7 +5,7 @@ status: ativo
 tags: [api, endpoints, supabase, rpc, webhooks, n8n, edge-functions, cnpj, parse]
 criado: 2026-04-08
 atualizado: 2026-04-09
-relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]"]
+relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG Atendimento]]"]
 ---
 
 # 🔌 Mapa de APIs & Endpoints — TEG+ ERP
@@ -215,7 +215,7 @@ const { data, error } = await supabase.rpc('aprovar_requisicao', {
 | **Módulo** | Sistema |
 | **Sessão** | Via `session_id` no payload |
 
-Ver [[49 - SuperTEG AI Agent]] para documentação completa.
+Ver [[49 - SuperTEG Atendimento]] para documentação completa.
 
 ---
 
@@ -286,4 +286,4 @@ const response = await fetch(`${import.meta.env.VITE_N8N_WEBHOOK_URL}/contrato-a
 - [[10 - n8n Workflows]]
 - [[45 - Mapa de Integrações]]
 - [[41 - Segurança e RLS]]
-- [[49 - SuperTEG AI Agent]]
+- [[49 - SuperTEG Atendimento]]

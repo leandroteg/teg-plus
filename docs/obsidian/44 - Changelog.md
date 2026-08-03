@@ -43,7 +43,7 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[17 - Roadmap]]", "[[15 - Deploy e GitHub
 - **Rodapé do PDF colidia com o carimbo da assinatura** — removido; assinatura centralizada (ficha de EPI e OS).
 
 ### Docs
-- **SuperTEG Atendente (n8n `KJUlWGP1ItQkUQOB`)** — mapa de navegação auditado contra o `App.tsx` e atualizado. Corrigidas 3 rotas mortas de TI (`/ti/novo`, `/ti/meus`, `/ti/fila`), o rótulo de Frotas ("Frota & Máquinas" → **Alocação**) e acrescentados `/obras/gestao`, Monitoramento e AprovaAí. Ver [[49 - SuperTEG AI Agent]].
+- **SuperTEG Atendente (n8n `KJUlWGP1ItQkUQOB`)** — mapa de navegação auditado contra o `App.tsx` e atualizado. Corrigidas 3 rotas mortas de TI (`/ti/novo`, `/ti/meus`, `/ti/fila`), o rótulo de Frotas ("Frota & Máquinas" → **Alocação**) e acrescentados `/obras/gestao`, Monitoramento e AprovaAí. Ver [[49 - SuperTEG Atendimento]].
 
 ### Conhecido / pendente
 - **`SERVENTE` (113 ativos) sem nenhum risco na matriz** — a OS não emite para o maior cargo da empresa. Também sem risco: Encarregado de Montagem LD, Mestre Civil, Técnico em Segurança do Trabalho, Topógrafo, Supervisor de Obras, Engenheiro Eletricista.

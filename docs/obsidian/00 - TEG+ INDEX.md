@@ -197,7 +197,7 @@ atualizado: 2026-04-10
 | Roadmap | [[17 - Roadmap]] |
 | Glossario | [[18 - Glossário]] |
 | Cadastros AI (Master Data) | [[28 - Módulo Cadastros AI]] |
-| SuperTEG AI Agent | [[49 - SuperTEG AI Agent]] |
+| SuperTEG AI Agent | [[49 - SuperTEG Atendimento]] |
 | Fluxos Inter-Modulos | [[50 - Fluxos Inter-Módulos]] |
 
 ---
@@ -256,7 +256,7 @@ atualizado: 2026-04-10
 |--------|-------|----------|-----|
 | HHT (Horas Trabalho) | Projetos | Q3 2026 | — |
 | TI | IT | Futuro | — |
-| AI Agents | IT | Futuro | [[49 - SuperTEG AI Agent]] |
+| AI Agents | IT | Futuro | [[49 - SuperTEG Atendimento]] |
 | Estrategico | Expansao | Futuro | — |
 | Comercial | Expansao | Futuro | — |
 
@@ -288,7 +288,7 @@ atualizado: 2026-04-10
 | Performance | [[46 - Performance e Monitoring]] |
 | Disaster Recovery | [[47 - Disaster Recovery]] |
 | Guia de Estilo UI | [[48 - Guia de Estilo UI]] |
-| SuperTEG AI Agent | [[49 - SuperTEG AI Agent]] |
+| SuperTEG AI Agent | [[49 - SuperTEG Atendimento]] |
 | Fluxos Inter-Modulos | [[50 - Fluxos Inter-Módulos]] |
 
 ---

@@ -291,7 +291,7 @@ flowchart TD
     ST -->|perguntas| DASH[Dashboard\nKPIs]
 ```
 
-Ver [[49 - SuperTEG AI Agent]] para documentação completa.
+Ver [[49 - SuperTEG Atendimento]] para documentação completa.
 
 ---
 
@@ -324,5 +324,5 @@ Ver [[49 - SuperTEG AI Agent]] para documentação completa.
 - [[21 - Fluxo Pagamento]] — Fluxo de pagamento
 - [[23 - Módulo Logística e Transportes]] — Pipeline logístico
 - [[27 - Módulo Contratos Gestão]] — Gestão de contratos
-- [[49 - SuperTEG AI Agent]] — Agente AI
+- [[49 - SuperTEG Atendimento]] — Agente AI
 - [[45 - Mapa de Integrações]] — Integrações externas
