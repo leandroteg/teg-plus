@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Inbox, AlertTriangle, ChevronLeft, Headset, CheckCircle2, Package, X } from 'lucide-react'
-import { NovoChamadoForm } from './NovoChamado'
+import { Search, Inbox, AlertTriangle, ChevronLeft, Headset, CheckCircle2, Package } from 'lucide-react'
 import { listCategories, listSectors } from './data/meta'
 import { listTickets, type TicketFilters } from './data/tickets'
 import { useTiAuth } from './data/auth'
@@ -160,11 +159,7 @@ const ABERTOS_EN = ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO']
 export function MeusChamados({ home = false }: { home?: boolean }) {
   const navigate = useNavigate()
   const [tab, setTab] = useState<'abertos' | 'encerrados'>('abertos')
-  // Modal "Nova Solicitação" (padrão Estoque): o botão do menu navega para
-  // /ti?nova=1 e o parâmetro abre o formulário sobre a tela com fundo embaçado.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const novaOpen = searchParams.has('nova')
-  const closeNova = () => setSearchParams({}, { replace: true })
+  // O modal "Nova Solicitação" (?nova=1) é renderizado pelo TiLayout, global ao módulo.
   const { data, isLoading } = useQuery({ queryKey: ['ti', 'tickets', 'meus'], queryFn: () => listTickets({}) })
   const tickets = data ?? []
   const abertos = tickets.filter((t) => ABERTOS_EN.includes(t.status))
@@ -289,26 +284,6 @@ export function MeusChamados({ home = false }: { home?: boolean }) {
         </div>
       )}
 
-      {/* Modal Nova Solicitação — mesmo padrão do Estoque (Nova Movimentação) */}
-      {novaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-extrabold text-slate-800">Nova Solicitação</h2>
-              <button
-                onClick={closeNova}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-                aria-label="Fechar"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6">
-              <NovoChamadoForm plain onCancel={closeNova} />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
